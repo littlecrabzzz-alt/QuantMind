@@ -124,3 +124,28 @@ def test_vectorized_engine_does_not_trade_internal_suspension_gap():
     # The suspended high-score stock must not be selected on dates[1].  Its
     # post-resumption jump therefore cannot leak into that day's portfolio PnL.
     assert report.loc[dates[1], "return"] == pytest.approx(0.0)
+
+
+def test_vectorized_engine_charges_initial_buy_cost():
+    dates = pd.date_range("2024-01-02", periods=3, freq="B")
+    index = [(d, "SH600000") for d in dates]
+    signals = _make_pred(index, [1.0] * len(dates))
+    price_df = _make_price(index, [10.0] * len(dates))
+
+    cfg = VectorizedBacktestConfig(
+        initial_capital=100000.0,
+        topk=1,
+        commission=0.001,
+        slippage=0.002,
+        sell_cost=0.01,
+    )
+    res = VectorizedBacktestEngine(cfg).run_backtest(
+        signals=signals,
+        prices=price_df,
+        changes=None,
+    )
+
+    assert res.success, res.error_message
+    report = res.portfolio_dict["report"]
+    assert report.iloc[0]["return"] == pytest.approx(-0.003)
+    assert report.iloc[0]["cost"] == pytest.approx(300.0)

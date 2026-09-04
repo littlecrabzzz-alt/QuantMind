@@ -134,6 +134,11 @@ class VectorizedBacktestEngine:
             # Buying costs: commission + slippage; Selling costs: commission + slippage + stamp duty
             avg_cost = self.config.commission + self.config.slippage + self.config.sell_cost * 0.5
             turnover_cost = weight_diff * avg_cost
+            # The first target portfolio is bought from cash, so diff() alone
+            # must not make the initial transaction free.  No sell tax applies.
+            turnover_cost.iloc[0] = weights.iloc[0].abs().sum() * (
+                self.config.commission + self.config.slippage
+            )
             portfolio_daily_returns = portfolio_daily_returns - turnover_cost.fillna(0)
 
             # 5. Equity Curve
