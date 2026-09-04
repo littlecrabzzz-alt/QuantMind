@@ -90,8 +90,9 @@ def test_vectorized_engine_does_not_trade_internal_suspension_gap():
     instruments = ["SH600000", "SH600036"]
     index = [(d, ins) for d in dates for ins in instruments]
 
-    # SH600000 always has the higher score, but is suspended on dates[1].
-    signals = _make_pred(index, [2.0, 1.0] * len(dates))
+    # SH600000 is not held initially, then becomes the highest-score stock on
+    # its suspension day. It cannot be bought before the resumption jump.
+    signals = _make_pred(index, [1.0, 2.0, 2.0, 1.0, 2.0, 1.0, 2.0, 1.0])
     price_df = _make_price(
         index,
         [
@@ -124,6 +125,66 @@ def test_vectorized_engine_does_not_trade_internal_suspension_gap():
     # The suspended high-score stock must not be selected on dates[1].  Its
     # post-resumption jump therefore cannot leak into that day's portfolio PnL.
     assert report.loc[dates[1], "return"] == pytest.approx(0.0)
+
+
+def test_vectorized_engine_retains_position_when_sell_is_blocked():
+    dates = pd.date_range("2024-01-02", periods=4, freq="B")
+    instruments = ["SH600000", "SH600036"]
+    index = [(d, ins) for d in dates for ins in instruments]
+    signals = _make_pred(index, [2.0, 1.0, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0])
+    price_df = _make_price(
+        index,
+        [10.0, 10.0, float("nan"), 10.0, 20.0, 10.0, 20.0, 10.0],
+    )
+
+    cfg = VectorizedBacktestConfig(
+        initial_capital=100000.0,
+        topk=1,
+        commission=0.0,
+        slippage=0.0,
+        sell_cost=0.0,
+    )
+    res = VectorizedBacktestEngine(cfg).run_backtest(
+        signals=signals,
+        prices=price_df,
+        changes=None,
+    )
+
+    assert res.success, res.error_message
+    report = res.portfolio_dict["report"]
+    assert report.loc[dates[1], "return"] == pytest.approx(1.0)
+
+
+def test_vectorized_engine_retains_position_at_limit_down():
+    dates = pd.date_range("2024-01-02", periods=4, freq="B")
+    instruments = ["SH600000", "SH600036"]
+    index = [(d, ins) for d in dates for ins in instruments]
+    signals = _make_pred(index, [2.0, 1.0, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0])
+    price_df = _make_price(
+        index,
+        [10.0, 10.0, 9.0, 10.0, 8.0, 10.0, 8.0, 10.0],
+    )
+    change_df = _make_price(
+        index,
+        [0.0, 0.0, -0.10, 0.0, -0.11, 0.0, 0.0, 0.0],
+    ).rename(columns={"$close": "$change"})
+
+    cfg = VectorizedBacktestConfig(
+        initial_capital=100000.0,
+        topk=1,
+        commission=0.0,
+        slippage=0.0,
+        sell_cost=0.0,
+    )
+    res = VectorizedBacktestEngine(cfg).run_backtest(
+        signals=signals,
+        prices=price_df,
+        changes=change_df,
+    )
+
+    assert res.success, res.error_message
+    report = res.portfolio_dict["report"]
+    assert report.loc[dates[1], "return"] == pytest.approx(8.0 / 9.0 - 1.0)
 
 
 def test_vectorized_engine_charges_initial_buy_cost():

@@ -655,9 +655,7 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
 
                 cfg = VectorizedBacktestConfig(
                     initial_capital=request.initial_capital,
-                    # 向量化引擎换手成本公式: avg_cost = commission + slippage + sell_cost*0.5
-                    # commission 应为纯佣金(双向), sell_cost 为仅卖出侧费率(印花税+过户费)，
-                    # 与主引擎 CnExchange 口径对齐, 不再重复计税。
+                    # commission 是双向纯佣金；sell_cost 仅在卖出换手上计税费。
                     commission=comm,
                     slippage=request.impact_cost_coefficient,
                     topk=request.strategy_params.topk,

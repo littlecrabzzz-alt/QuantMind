@@ -89,34 +89,49 @@ class VectorizedBacktestEngine:
 
             thresholds = self._get_limit_threshold_vec(sig_wide.columns)
 
-            # Limit-up mask: True = stock is at limit-up (can't buy)
+            # Limit masks are directional: limit-up blocks buys, while
+            # limit-down blocks sells. Suspensions block both directions.
             limit_up = change_wide.ge(thresholds, axis=1).fillna(False)
+            limit_down = change_wide.le(-thresholds, axis=1).fillna(False)
             # Suspended mask must use the unfilled observations.  The filled
             # series above is only a valuation aid and is not proof of trading.
             suspended = raw_price_wide.isna()
 
-            # Tradable mask: False = should NOT be bought
-            tradable = ~limit_up & ~suspended
-
-            # Apply tradability: zero out scores for untradable stocks
-            sig_wide = sig_wide.where(tradable, other=-np.inf)
+            can_buy = ~limit_up & ~suspended
+            can_sell = ~limit_down & ~suspended
 
             # 3. Daily returns
             # pct_change()[t] = P[t]/P[t-1] - 1 (T-1到T的日收益)
             # 价格已有 forward-fill，用 fill_method=None 避免隐式 pad 的弃用告警
             asset_returns = price_wide.pct_change(fill_method=None)
 
-            # 4. Target Weights (TopK equal weight)
-            # Rank scores cross-sectionally (untradable stocks ranked last)
-            ranks = sig_wide.rank(axis=1, ascending=False, method="first")
-            weights = (ranks <= self.config.topk).astype(float)
+            # 4. Executable TopK weights.  Sell first, then use available cash
+            # for buys; blocked sells retain the prior position.
+            weights = pd.DataFrame(0.0, index=sig_wide.index, columns=sig_wide.columns)
+            previous = pd.Series(0.0, index=sig_wide.columns)
+            for dt in sig_wide.index:
+                eligible = can_buy.loc[dt] | previous.gt(0)
+                ranked = sig_wide.loc[dt].where(eligible).rank(
+                    ascending=False, method="first"
+                )
+                selected = ranked.le(self.config.topk)
+                desired = pd.Series(0.0, index=sig_wide.columns)
+                if selected.any():
+                    desired.loc[selected] = 1.0 / float(selected.sum())
 
-            # Zero out weights for untradable stocks (safety double-check)
-            weights = weights.where(tradable, other=0.0)
+                after_sells = previous.copy()
+                executable_sells = desired.lt(previous) & can_sell.loc[dt]
+                after_sells.loc[executable_sells] = desired.loc[executable_sells]
 
-            # Normalize weights
-            weight_sums = weights.sum(axis=1)
-            weights = weights.div(weight_sums.where(weight_sums > 0, 1), axis=0)
+                requested_buys = (desired - after_sells).clip(lower=0.0)
+                requested_buys = requested_buys.where(can_buy.loc[dt], 0.0)
+                requested_total = float(requested_buys.sum())
+                available_cash = max(0.0, 1.0 - float(after_sells.sum()))
+                if requested_total > 0:
+                    requested_buys *= min(1.0, available_cash / requested_total)
+
+                previous = after_sells + requested_buys
+                weights.loc[dt] = previous
 
             # A股 T+1 settlement: T-1信号 → T日成交 → 收益从T+1开始
             # weights[t] 基于 T-1 信号, 应配对 T+1 的收益 (asset_returns[t+1])
@@ -130,14 +145,14 @@ class VectorizedBacktestEngine:
             portfolio_daily_returns = (weights * asset_returns).sum(axis=1).fillna(0)
 
             # 6. Transaction costs (buy-side + sell-side asymmetry)
-            weight_diff = weights.diff().abs().sum(axis=1)
-            # Buying costs: commission + slippage; Selling costs: commission + slippage + stamp duty
-            avg_cost = self.config.commission + self.config.slippage + self.config.sell_cost * 0.5
-            turnover_cost = weight_diff * avg_cost
-            # The first target portfolio is bought from cash, so diff() alone
-            # must not make the initial transaction free.  No sell tax applies.
-            turnover_cost.iloc[0] = weights.iloc[0].abs().sum() * (
+            weight_change = weights.diff()
+            weight_change.iloc[0] = weights.iloc[0]
+            buy_turnover = weight_change.clip(lower=0.0).sum(axis=1)
+            sell_turnover = -weight_change.clip(upper=0.0).sum(axis=1)
+            turnover_cost = buy_turnover * (
                 self.config.commission + self.config.slippage
+            ) + sell_turnover * (
+                self.config.commission + self.config.slippage + self.config.sell_cost
             )
             portfolio_daily_returns = portfolio_daily_returns - turnover_cost.fillna(0)
 
