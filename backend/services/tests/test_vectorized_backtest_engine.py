@@ -83,3 +83,44 @@ def test_vectorized_engine_handles_nan_prices_as_suspended():
     res = engine.run_backtest(signals=signals, prices=price_df, changes=None)
     assert res.success
     assert res.portfolio_dict["report"] is not None
+
+
+def test_vectorized_engine_does_not_trade_internal_suspension_gap():
+    dates = pd.date_range("2024-01-02", periods=4, freq="B")
+    instruments = ["SH600000", "SH600036"]
+    index = [(d, ins) for d in dates for ins in instruments]
+
+    # SH600000 always has the higher score, but is suspended on dates[1].
+    signals = _make_pred(index, [2.0, 1.0] * len(dates))
+    price_df = _make_price(
+        index,
+        [
+            10.0,
+            10.0,
+            float("nan"),
+            10.0,
+            20.0,
+            10.0,
+            20.0,
+            10.0,
+        ],
+    )
+
+    cfg = VectorizedBacktestConfig(
+        initial_capital=100000.0,
+        topk=1,
+        commission=0.0,
+        slippage=0.0,
+        sell_cost=0.0,
+    )
+    res = VectorizedBacktestEngine(cfg).run_backtest(
+        signals=signals,
+        prices=price_df,
+        changes=None,
+    )
+
+    assert res.success, res.error_message
+    report = res.portfolio_dict["report"]
+    # The suspended high-score stock must not be selected on dates[1].  Its
+    # post-resumption jump therefore cannot leak into that day's portfolio PnL.
+    assert report.loc[dates[1], "return"] == pytest.approx(0.0)

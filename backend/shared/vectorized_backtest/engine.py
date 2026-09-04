@@ -70,10 +70,14 @@ class VectorizedBacktestEngine:
                 signals = signals.to_frame("score")
 
             sig_wide = signals["score"].unstack(level="instrument")
-            price_wide = prices["$close"].unstack(level="instrument").reindex_like(sig_wide).ffill()
-            valid_dates = sig_wide.index.intersection(price_wide.dropna(how="all").index)
+            raw_price_wide = prices["$close"].unstack(level="instrument").reindex_like(sig_wide)
+            valid_dates = sig_wide.index.intersection(raw_price_wide.dropna(how="all").index)
             sig_wide = sig_wide.loc[valid_dates]
-            price_wide = price_wide.loc[valid_dates]
+            raw_price_wide = raw_price_wide.loc[valid_dates]
+            # Keep a filled series for return calculation, but never use it to
+            # determine whether an instrument was tradable on the original day.
+            # Otherwise an internal suspension gap is hidden by ffill().
+            price_wide = raw_price_wide.ffill()
             if len(sig_wide) < 2:
                 raise ValueError("vectorized backtest requires at least two aligned signal/price dates after lagging")
 
@@ -87,8 +91,9 @@ class VectorizedBacktestEngine:
 
             # Limit-up mask: True = stock is at limit-up (can't buy)
             limit_up = change_wide.ge(thresholds, axis=1).fillna(False)
-            # Suspended mask: True = stock has no close price (suspended)
-            suspended = price_wide.isna()
+            # Suspended mask must use the unfilled observations.  The filled
+            # series above is only a valuation aid and is not proof of trading.
+            suspended = raw_price_wide.isna()
 
             # Tradable mask: False = should NOT be bought
             tradable = ~limit_up & ~suspended
