@@ -1,10 +1,13 @@
 """Small dependency-free regression check for the deployment boundary."""
 import json
 import pathlib
+import plistlib
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 
+import dual_node_deploy
 from dual_node_sync import desired, topology
 from dual_node_inventory import runtime_path
 
@@ -12,6 +15,32 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class DeploymentBoundary(unittest.TestCase):
+    def test_transport_retry_never_retries_failed_cutover(self):
+        authority = Mock(side_effect=[subprocess.CompletedProcess([], 255),
+                                      subprocess.CompletedProcess([], 1)])
+        phases = Mock()
+        cutover = Mock(side_effect=subprocess.CalledProcessError(1, "cutover"))
+        with patch.object(dual_node_deploy, "remote", authority), \
+             patch.object(dual_node_deploy, "stage", phases), \
+             patch.object(dual_node_deploy, "run", cutover), \
+             patch.object(dual_node_deploy.time, "sleep"), \
+             patch.object(dual_node_deploy.subprocess, "run", side_effect=[
+                 subprocess.CompletedProcess([], 30), subprocess.CompletedProcess([], 0)]):
+            with self.assertRaises(subprocess.CalledProcessError):
+                dual_node_deploy.deploy(None)
+        self.assertEqual(authority.call_count, 2)
+        cutover.assert_called_once_with("bash", "scripts/dual-node-cutover.sh")
+        self.assertNotIn("installing_local_tunnel", [call.args[0] for call in phases.call_args_list])
+
+    def test_reconnecting_tunnel_uses_only_loopback(self):
+        config = plistlib.loads((ROOT / "deploy/com.quantmind.cloud-tunnel.plist").read_bytes())
+        self.assertTrue(config["KeepAlive"])
+        args = config["ProgramArguments"]
+        forwards = [args[index + 1] for index, value in enumerate(args) if value == "-L"]
+        self.assertEqual(forwards, ["127.0.0.1:8000:127.0.0.1:" + topology()["QM_WEB_PORT"],
+                                    "127.0.0.1:18080:127.0.0.1:" + topology()["QM_WEB_PORT"]])
+        self.assertEqual(args[-1], topology()["QM_SSH_TARGET"])
+
     def test_snapshot_links_never_share_live_inodes(self):
         rsync = "/opt/homebrew/bin/rsync" if pathlib.Path("/opt/homebrew/bin/rsync").exists() else "rsync"
         with tempfile.TemporaryDirectory() as directory:
@@ -20,7 +49,7 @@ class DeploymentBoundary(unittest.TestCase):
             for path in (source, first, second):
                 path.mkdir()
             (source / "input").write_text("immutable input")
-            subprocess.run([rsync, "-a", str(source) + "/", str(first) + "/"], check=True)
+            subprocess.run([rsync, "-a", "--copy-dest=" + str(source), str(source) + "/", str(first) + "/"], check=True)
             subprocess.run([rsync, "-a", "--link-dest=" + str(first), str(source) + "/", str(second) + "/"], check=True)
             self.assertEqual((first / "input").stat().st_ino, (second / "input").stat().st_ino)
             self.assertNotEqual((source / "input").stat().st_ino, (first / "input").stat().st_ino)

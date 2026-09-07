@@ -18,6 +18,28 @@ cloud_guard() {
 }
 
 case "${1:-help}" in
+  install-tunnel)
+    # Only after cutover: never take port 8000 away from the original Mac service.
+    [ "$(uname -s)" = Darwin ]
+    ssh "$QM_SSH_TARGET" "sudo -n test -f $QM_REMOTE_ROOT/AUTHORITY"
+    ssh "$QM_SSH_TARGET" 'curl -fsS http://127.0.0.1:18000/health >/dev/null'
+    label=com.quantmind.cloud-tunnel
+    plist="$HOME/Library/LaunchAgents/$label.plist"
+    if ! launchctl print "gui/$(id -u)/$label" >/dev/null 2>&1; then
+      for port in 8000 18080; do
+        if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+          echo "Local port $port is still in use; refusing to replace that service." >&2
+          exit 1
+        fi
+      done
+    else
+      launchctl bootout "gui/$(id -u)/$label"
+    fi
+    mkdir -p "$HOME/Library/LaunchAgents"
+    [ ! -f "$plist" ] || cp -p "$plist" "$PROJECT/logs/cloud-tunnel.previous.plist"
+    install -m 0644 deploy/com.quantmind.cloud-tunnel.plist "$plist"
+    launchctl bootstrap "gui/$(id -u)" "$plist"
+    ;;
   web-publish)
     npm run build:react --workspace=electron
     release="$QM_REMOTE_ROOT/staging/web-$(date -u +%Y%m%dT%H%M%SZ)"
@@ -62,7 +84,7 @@ case "${1:-help}" in
     ssh -o BatchMode=yes "$QM_SSH_TARGET" "sudo -n bash -c 'df -h $QM_REMOTE_ROOT; test ! -f $QM_REMOTE_ROOT/AUTHORITY || cat $QM_REMOTE_ROOT/AUTHORITY; cd $QM_REMOTE_PROJECT; bash scripts/dual-node.sh cloud-compose ps'"
     ;;
   *)
-    echo 'Usage: bash scripts/dual-node.sh {preseed|images|web-publish|connect|cloud-compose <args...>|status}'
+    echo 'Usage: bash scripts/dual-node.sh {preseed|images|web-publish|install-tunnel|connect|cloud-compose <args...>|status}'
     exit 2
     ;;
 esac

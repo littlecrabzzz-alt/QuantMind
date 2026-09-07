@@ -84,6 +84,6 @@ cmp "$backup/runtime-manifest.jsonl" "$backup/cloud-runtime-manifest.jsonl"
 (cd "$backup" && shasum -a 256 postgres.dump *.tar.gz runtime-manifest.jsonl > SHA256SUMS)
 "$RSYNC" -a --rsync-path='sudo -n rsync' "$backup/SHA256SUMS" "$QM_SSH_TARGET:$remote_backup/"
 remote "sudo -n bash -c 'cd $remote_backup && sha256sum -c SHA256SUMS'"
-remote "sudo -n bash $QM_REMOTE_PROJECT/scripts/dual-node-restore.sh $remote_backup"
+remote "sudo -n systemd-run --unit=quantmind-cutover --wait --collect --property=RequiresMountsFor=/root/data/disk /bin/bash $QM_REMOTE_PROJECT/scripts/dual-node-restore.sh $remote_backup"
 completed=true
 echo "Cutover complete. Local data retained as offline baseline. Backup: $remote_backup"

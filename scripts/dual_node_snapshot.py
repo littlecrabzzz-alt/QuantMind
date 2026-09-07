@@ -66,9 +66,10 @@ def cloud_snapshot():
     with (base / ".lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         name = "snapshot-" + datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-        target = base / name
-        target.mkdir(mode=0o700)
-        (target / "project").mkdir()
+        # Resume an unpublished attempt rather than creating another full 65 GiB copy.
+        target = base / ".building"
+        target.mkdir(mode=0o700, exist_ok=True)
+        (target / "project").mkdir(exist_ok=True)
         previous = (base / "latest").resolve()
         sources = [str(p) for p in runtime_roots(PROJECT)]
         copy = ["rsync", "-a", "--exclude=.DS_Store", "--exclude=.rsync-partial",
@@ -100,14 +101,19 @@ def cloud_snapshot():
                     'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc --no-owner', stdout=stream)
             for volume in ("redis-data", "qwenpaw-data", "qwenpaw-secrets", "qwenpaw-backups", "qwenpaw-shared"):
                 run("tar", "-czf", str(target / (volume + ".tar.gz")), "-C", REMOTE + "/volumes/" + volume, ".")
-            hashes = {p.name: digest(p) for p in target.iterdir() if p.is_file()}
+            hashes = {p.name: digest(p) for p in target.iterdir()
+                      if p.is_file() and p.name not in {"SHA256.json", "COMPLETE"}}
             (target / "SHA256.json").write_text(json.dumps(hashes, indent=2))
             (target / "COMPLETE").touch()
-            publish_link(base, target)
+            published = base / name
+            target.rename(published)
+            publish_link(base, published)
         finally:
             if stopped:
-                run("docker", "start", *stopped)
-        print(target)
+                ordered = (["quantmind-redis"] if "quantmind-redis" in stopped else [])
+                ordered += [name for name in stopped if name != "quantmind-redis"]
+                run("docker", "start", *ordered)
+        print(published)
 
 
 def pull_snapshot():
@@ -124,11 +130,19 @@ def pull_snapshot():
         target = base / path.name
         target.mkdir(exist_ok=True)
         rsync = "/opt/homebrew/bin/rsync" if Path("/opt/homebrew/bin/rsync").exists() else "rsync"
-        args = [rsync, "-a", "--no-owner", "--no-group", "--compress", "--partial", "--rsync-path=sudo -n rsync"]
+        args = [rsync, "-a", "--checksum", "--no-owner", "--no-group", "--compress", "--partial", "--rsync-path=sudo -n rsync"]
         previous = (base / "latest").resolve()
+        metadata_args = list(args)
+        data_args = list(args)
         if previous.is_dir() and previous != target:
-            args += ["--link-dest=" + str(previous)]
-        run(*args, ssh + ":" + remote_path + "/", str(target) + "/")
+            metadata_args += ["--link-dest=" + str(previous)]
+            data_args += ["--link-dest=" + str(previous / "project")]
+        else:
+            # First download reuses matching local bytes WITHOUT hard-linking live data.
+            data_args += ["--copy-dest=" + str(PROJECT)]
+        run(*metadata_args, "--exclude=/project/", ssh + ":" + remote_path + "/", str(target) + "/")
+        (target / "project").mkdir(exist_ok=True)
+        run(*data_args, ssh + ":" + remote_path + "/project/", str(target / "project") + "/")
         hashes = json.loads((target / "SHA256.json").read_text())
         require(all(Path(name).name == name for name in hashes), "Invalid checksum path")
         require(all(digest(target / name) == expected for name, expected in hashes.items()), "Archive checksum mismatch")

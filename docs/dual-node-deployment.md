@@ -38,6 +38,8 @@ Syncthing 的历史版本保存在接收端，不等于应用一致性备份。�
 - `scripts/dual-node-cutover.sh` / `dual-node-restore.sh`：停写、备份、最终增量、逐文件校验、数据库恢复及唯一主节点切换。
 - `scripts/dual_node_inventory.py` / `deploy/table-counts.sql`：SHA-256 文件清单与全部 PostgreSQL 表的精确行数。
 - `scripts/dual_node_snapshot.py`：云端一致性快照及 Mac 校验下载；不覆盖本机已有研究目录，不回灌数据库。
+- `scripts/dual_node_deploy.py`：串联传输、校验、切换、连接检查和首份离线快照；运行状态写入 `logs/dual-node-deploy.json`，同一时间只允许一个编排进程。
+- `deploy/com.quantmind.cloud-tunnel.plist`：切换后才安装的 Mac 自动重连 SSH 隧道，保留本地开发入口访问云端的能力。
 - `deploy/syncthing-ssd.conf`：系统启动时等待 SSD 挂载，已安装到云端 systemd drop-in。
 - `python3 scripts/test_dual_node.py`：端口、共享规则、卷路径、训练安全开关的回归检查。
 
@@ -78,6 +80,8 @@ bash scripts/dual-node.sh web-publish
 bash scripts/dual-node-cutover.sh
 ```
 
+镜像和前端准备好后，也可让编排脚本完成后续全部步骤：`caffeinate -i python3 scripts/dual_node_deploy.py`。编排仅重试预复制中的暂时网络错误，不会在失败后盲目重启 Mac 主节点。云端恢复由一次性 systemd 服务托管，SSH 观察连接中断不会杀掉恢复进程；可用 `journalctl -u quantmind-cutover` 查看。
+
 切换脚本只停止 QuantMind 的写入服务，发现独立研究容器或活动 Celery 任务时拒绝切换。PostgreSQL 用事务一致性 dump 跨 CPU 架构迁移；Redis、Huntly、QwenPaw 停写后迁移。QwenPaw 整卷恢复包含其注册清单，后续技能更新仍只走 `quantbot_init.sh`，不能单独复制技能目录。
 
 初次预复制不删文件。最终停写增量只在明确的数据子目录内对齐删除，被替换/删除的旧文件保留在本次迁移备份的 `displaced/`，不是不可恢复清除。所有文件清单一致、数据库 dump/卷归档校验一致、114 张表的行数一致后才启动云端写入者。目标数据库非空时拒绝覆盖。
@@ -90,6 +94,8 @@ bash scripts/dual-node-cutover.sh
 
 联网时可直接访问云端 3080；也可运行 `bash scripts/dual-node.sh connect`，通过加密 SSH 隧道访问 `http://127.0.0.1:18080`。两种入口指向同一服务、同一数据库。公网当前是 HTTP，没有部署域名/TLS；涉及密码和研究数据时优先使用 SSH 隧道。
 
+编排在云端 API 验证通过后才执行 `install-tunnel`，安装 `com.quantmind.cloud-tunnel` LaunchAgent。它把 Mac `127.0.0.1:8000` 和 `18080` 接到云端 3080；原有本地 Vite 页面仍通过 8000 访问同一份云端数据，断网后隧道会自动重连。若端口被无关服务占用则拒绝安装，不会抢占端口。此隧道配置已通过语法/端口边界检查，但当前迁移尚未完成，因此尚未安装启动。
+
 Mac 断网不影响云端服务。断网时本机现有数据是截至切换时的离线基线，代码编辑和冻结数据研究可以继续，但云端新数据不可能实时出现在离线 Mac。
 
 权威源切换完成后，在无研究任务的时间主动创建/拉取新快照：
@@ -99,7 +105,7 @@ ssh lzy-vm 'sudo -n python3 /root/code/QuantMind/scripts/dual_node_snapshot.py c
 python3 scripts/dual_node_snapshot.py pull
 ```
 
-创建快照会先做不停服预复制，然后短暂停止本项目写入容器，完成最终文件校验、PostgreSQL dump 和冷卷归档，最后恢复原来运行的容器。快照仅在全部校验通过后发布。Mac 下载到 `logs/cloud-snapshots/<snapshot-id>/`，校验通过才更新 `latest`；重复下载同一快照只补缺失/变化部分，不覆盖本机原有 `data/`、`results/` 或数据库。研究时使用快照的明确 ID，不能在研究期间切换输入版本。
+创建快照会先做不停服预复制，然后短暂停止本项目写入容器，完成最终文件校验、PostgreSQL dump 和冷卷归档，最后恢复原来运行的容器。未完成尝试复用 `.building` 暂存目录，不会每次失败都另造一份全量副本；快照仅在全部校验通过后发布。Mac 下载到 `logs/cloud-snapshots/<snapshot-id>/`，校验通过才更新 `latest`。首次下载用 `--copy-dest` 校验并复制 Mac 已有的相同文件，不重复从网络下载，也不会与活跃源共享硬链接；后续不可变快照之间使用 `--link-dest`。不覆盖本机原有 `data/`、`results/` 或数据库。研究时使用快照的明确 ID，不能在研究期间切换输入版本。
 
 当前脚本已通过语法检查与去重边界回归测试，但首次云端全量快照/下载尚未验收，也未安装定时刷新。离线研究产物应单独保留，不能直接回灌数据库；自动结果登记尚未实现。不能把这一状态描述成已完成的自动双向数据库同步，或声称离线时仍与云端实时一致。
 
