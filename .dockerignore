@@ -4,6 +4,16 @@
 .vscode
 .idea
 .DS_Store
+.env
+.env.*
+**/.env
+**/.env.*
+config/runtime.env
+.stversions
+.stfolder
+results*
+electron/dist-react
+electron/dist-electron
 
 # rd-agent git subdirectory (rd-agent source is needed, but not its .git)
 rd-agent/.git

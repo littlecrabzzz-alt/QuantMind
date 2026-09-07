@@ -1,6 +1,9 @@
 # ==============================================================================
 # 1. Environment & Packages
 # ==============================================================================
+# Syncthing history can contain prior .env values; never commit it.
+.stfolder
+.stversions/
 .venv/
 env/
 venv/

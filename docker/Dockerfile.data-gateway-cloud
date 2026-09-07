@@ -1,0 +1,5 @@
+# Share the same verified amd64 environment as the main service.
+FROM quantmind-oss:latest
+RUN python -m pip install --no-cache-dir --no-deps --no-build-isolation \
+    --index-url https://pypi.org/simple/ ta==0.11.0
+CMD ["python", "-m", "uvicorn", "backend.services.engine.data_gateway.main:app", "--host", "0.0.0.0", "--port", "8004"]

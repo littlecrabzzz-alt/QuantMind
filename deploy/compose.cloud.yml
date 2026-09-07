@@ -1,0 +1,99 @@
+# Always use scripts/dual-node.sh cloud-compose; paths are SSD-only.
+services:
+  db:
+    ports: !reset []
+    mem_limit: 1g
+    cpus: 1.0
+  redis:
+    image: redis:7
+    ports: !reset []
+    mem_limit: 320m
+    command: redis-server --appendonly yes --maxmemory 192mb --maxmemory-policy allkeys-lru --databases 16 --bind 0.0.0.0
+  quantmind:
+    ports: !override
+      - "127.0.0.1:18000:8000"
+    mem_limit: 3g
+    cpus: 3.0
+    environment:
+      HOST_PROJECT_PATH: /root/data/disk/quantmind/project
+      TRAINING_PAUSE_OTHERS: "false"
+      QUANTMIND_ENABLE_WEB_UPDATE: "false"
+      ENABLE_REAL_TRADING: "false"
+      ENABLE_TDX_PUSH: "false"
+      QM_NODE_ROLE: authority
+  celery-worker:
+    mem_limit: 1536m
+    cpus: 1.5
+    environment:
+      HOST_PROJECT_PATH: /root/data/disk/quantmind/project
+      TRAINING_PAUSE_OTHERS: "false"
+      ENABLE_REAL_TRADING: "false"
+      ENABLE_TDX_PUSH: "false"
+      QM_NODE_ROLE: authority
+    command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q ${QLIB_CELERY_QUEUE:-qlib_backtest_srv} --loglevel=info --concurrency=1
+  celery-beat:
+    mem_limit: 384m
+    cpus: 0.5
+  data-gateway:
+    build:
+      dockerfile: docker/Dockerfile.data-gateway-cloud
+    volumes:
+      - ./backend:/app/backend:ro
+    ports: !reset []
+    mem_limit: 512m
+    cpus: 0.5
+  huntly:
+    ports: !reset []
+    mem_limit: 640m
+    cpus: 0.5
+    environment:
+      JAVA_TOOL_OPTIONS: -Xms64m -Xmx384m
+  rsshub:
+    ports: !reset []
+    mem_limit: 384m
+    cpus: 0.5
+    environment:
+      # DB 3 belongs to market data. RSSHub has its own unused logical DB.
+      REDIS_URL: redis://redis:6379/15
+  qwenpaw:
+    image: quantmind-qwenpaw:local
+    platform: linux/amd64
+    ports: !reset []
+    mem_limit: 1536m
+    cpus: 1.5
+    environment:
+      HOST_PROJECT_PATH: /root/data/disk/quantmind/project
+      TRAINING_PAUSE_OTHERS: "false"
+      ENABLE_REAL_TRADING: "false"
+      QWENPAW_CORS_ORIGINS: http://106.54.20.20:3080,http://localhost:3080,http://127.0.0.1:3080
+    build:
+      args:
+        DOCKER_CLI_VERSION: "29.1.2"
+  ib-gateway:
+    profiles: [disabled-trading]
+    ports: !reset []
+  web:
+    image: nginx:alpine
+    container_name: quantmind-web
+    ports:
+      - "3080:80"
+    volumes:
+      - ./electron/dist-react:/usr/share/nginx/html:ro
+      - ./docker/web/nginx.conf:/etc/nginx/nginx.conf:ro
+    mem_limit: 64m
+    cpus: 0.25
+    restart: unless-stopped
+    networks: [quantmind-net]
+volumes:
+  postgres-data:
+    driver_opts: {type: none, o: bind, device: /root/data/disk/quantmind/volumes/postgres-data}
+  redis-data:
+    driver_opts: {type: none, o: bind, device: /root/data/disk/quantmind/volumes/redis-data}
+  qwenpaw-data:
+    driver_opts: {type: none, o: bind, device: /root/data/disk/quantmind/volumes/qwenpaw-data}
+  qwenpaw-secrets:
+    driver_opts: {type: none, o: bind, device: /root/data/disk/quantmind/volumes/qwenpaw-secrets}
+  qwenpaw-backups:
+    driver_opts: {type: none, o: bind, device: /root/data/disk/quantmind/volumes/qwenpaw-backups}
+  qwenpaw-shared:
+    driver_opts: {type: none, o: bind, device: /root/data/disk/quantmind/volumes/qwenpaw-shared}
