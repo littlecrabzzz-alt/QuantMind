@@ -37,6 +37,7 @@ Syncthing 的历史版本保存在接收端，不等于应用一致性备份。�
 - `scripts/dual-node.sh`：可续传预复制、镜像传输、前端发布、云端 Compose 和 SSH 访问。
 - `scripts/dual-node-cutover.sh` / `dual-node-restore.sh`：停写、备份、最终增量、逐文件校验、数据库恢复及唯一主节点切换。
 - `scripts/dual_node_inventory.py` / `deploy/table-counts.sql`：SHA-256 文件清单与全部 PostgreSQL 表的精确行数。
+- `scripts/dual_node_snapshot.py`：云端一致性快照及 Mac 校验下载；不覆盖本机已有研究目录，不回灌数据库。
 - `deploy/syncthing-ssd.conf`：系统启动时等待 SSD 挂载，已安装到云端 systemd drop-in。
 - `python3 scripts/test_dual_node.py`：端口、共享规则、卷路径、训练安全开关的回归检查。
 
@@ -64,7 +65,7 @@ bash scripts/dual-node.sh status
 4. 云端启动并验证账户、策略、数据版本、模型及研究结果，再切换唯一调度器和两端访问入口。
 5. 验证 Mac 离线快照、联网后的增量追赶和结果登记；只有校验及业务验收通过后才宣布迁移完成。
 
-待设计的快照去重必须保留不可变输入。不得直接对仍会修改的源文件建立硬链接充当冻结快照。
+快照去重只对已发布的不可变快照使用 `rsync --link-dest`。活跃数据源始终独立复制，不与快照共享 inode；这一边界已有实际文件修改回归测试。首次快照需要额外约 65 GiB，以后未改变的文件在快照之间复用，不重复占用空间。磁盘可用少于 100 GiB 时拒绝新建快照，不会擅自删除研究历史。
 
 ## 首次迁移与恢复约束
 
@@ -89,6 +90,17 @@ bash scripts/dual-node-cutover.sh
 
 联网时可直接访问云端 3080；也可运行 `bash scripts/dual-node.sh connect`，通过加密 SSH 隧道访问 `http://127.0.0.1:18080`。两种入口指向同一服务、同一数据库。公网当前是 HTTP，没有部署域名/TLS；涉及密码和研究数据时优先使用 SSH 隧道。
 
-Mac 断网不影响云端服务。断网时本机现有数据是截至切换时的离线基线，代码编辑和冻结数据研究可以继续，但云端新数据不可能实时出现在离线 Mac。离线研究产物不能直接回灌数据库；后续快照拉取、结果登记流程尚未部署，不应把这一步描述为已完成的自动双向数据同步。
+Mac 断网不影响云端服务。断网时本机现有数据是截至切换时的离线基线，代码编辑和冻结数据研究可以继续，但云端新数据不可能实时出现在离线 Mac。
+
+权威源切换完成后，在无研究任务的时间主动创建/拉取新快照：
+
+```bash
+ssh lzy-vm 'sudo -n python3 /root/code/QuantMind/scripts/dual_node_snapshot.py create'
+python3 scripts/dual_node_snapshot.py pull
+```
+
+创建快照会先做不停服预复制，然后短暂停止本项目写入容器，完成最终文件校验、PostgreSQL dump 和冷卷归档，最后恢复原来运行的容器。快照仅在全部校验通过后发布。Mac 下载到 `logs/cloud-snapshots/<snapshot-id>/`，校验通过才更新 `latest`；重复下载同一快照只补缺失/变化部分，不覆盖本机原有 `data/`、`results/` 或数据库。研究时使用快照的明确 ID，不能在研究期间切换输入版本。
+
+当前脚本已通过语法检查与去重边界回归测试，但首次云端全量快照/下载尚未验收，也未安装定时刷新。离线研究产物应单独保留，不能直接回灌数据库；自动结果登记尚未实现。不能把这一状态描述成已完成的自动双向数据库同步，或声称离线时仍与云端实时一致。
 
 代码同步不等于运行中的进程自动更新。前端改动用 `web-publish` 构建并发布，旧静态文件保留于云端 `staging/web-*.previous`；后端改动完成核对后，通过仓库里的 `cloud-compose restart` 重启对应服务。

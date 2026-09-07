@@ -12,6 +12,21 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class DeploymentBoundary(unittest.TestCase):
+    def test_snapshot_links_never_share_live_inodes(self):
+        rsync = "/opt/homebrew/bin/rsync" if pathlib.Path("/opt/homebrew/bin/rsync").exists() else "rsync"
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            source, first, second = (root / name for name in ("live", "first", "second"))
+            for path in (source, first, second):
+                path.mkdir()
+            (source / "input").write_text("immutable input")
+            subprocess.run([rsync, "-a", str(source) + "/", str(first) + "/"], check=True)
+            subprocess.run([rsync, "-a", "--link-dest=" + str(first), str(source) + "/", str(second) + "/"], check=True)
+            self.assertEqual((first / "input").stat().st_ino, (second / "input").stat().st_ino)
+            self.assertNotEqual((source / "input").stat().st_ino, (first / "input").stat().st_ino)
+            (source / "input").write_text("changed live input")
+            self.assertEqual((second / "input").read_text(), "immutable input")
+
     def test_running_shell_ignores_later_file_updates(self):
         prefix = (ROOT / "scripts/dual-node.sh").read_text().split("PROJECT=", 1)[0]
         with tempfile.TemporaryDirectory() as directory:
