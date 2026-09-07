@@ -43,6 +43,7 @@ services:
     mem_limit: 512m
     cpus: 0.5
   huntly:
+    image: lcomplete/huntly@sha256:6b9159588855a39f4340224eaba956d6a909ed7a94ca3156783b9f4dedaab648
     ports: !reset []
     mem_limit: 640m
     cpus: 0.5
@@ -65,7 +66,7 @@ services:
       HOST_PROJECT_PATH: /root/data/disk/quantmind/project
       TRAINING_PAUSE_OTHERS: "false"
       ENABLE_REAL_TRADING: "false"
-      QWENPAW_CORS_ORIGINS: http://106.54.20.20:3080,http://localhost:3080,http://127.0.0.1:3080
+      QWENPAW_CORS_ORIGINS: http://106.54.20.20:3080,http://localhost:3080,http://127.0.0.1:3080,http://127.0.0.1:18080
     build:
       args:
         DOCKER_CLI_VERSION: "29.1.2"

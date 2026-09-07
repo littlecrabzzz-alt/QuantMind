@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Invoked on the cloud only, after matching cold-file manifests and archive hashes.
 set -euo pipefail
+if [ "${QM_SCRIPT_TEXT:-}" != "$0" ]; then
+  export QM_SCRIPT_TEXT="$0"
+  exec bash -c "$(< "$0")" "$0" "$@"
+fi
 PROJECT=$(cd "$(dirname "$0")/.." && pwd -P)
 source "$PROJECT/deploy/dual-node.env"
 cd "$PROJECT"

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Run from either checkout. No --delete: retries never remove unique research.
 set -euo pipefail
+# Read once: Syncthing/editor updates must not change a running shell's file offset.
+if [ "${QM_SCRIPT_TEXT:-}" != "$0" ]; then
+  export QM_SCRIPT_TEXT="$0"
+  exec bash -c "$(< "$0")" "$0" "$@"
+fi
 PROJECT=$(cd "$(dirname "$0")/.." && pwd -P)
 source "$PROJECT/deploy/dual-node.env"
 cd "$PROJECT"
@@ -41,7 +46,7 @@ case "${1:-help}" in
       [ ! -d "$path" ] || paths+=("$path")
     done
     "$RSYNC" -a --no-owner --no-group --partial --partial-dir=.rsync-partial \
-      --compress --info=progress2 --stats --exclude='.DS_Store' --exclude='data/upgrade_v*.sql' \
+      --compress --stats --exclude='.DS_Store' --exclude='data/upgrade_v*.sql' \
       --exclude='data/stocks/' --exclude='db/sql/' \
       --rsync-path='sudo -n rsync' -e 'ssh -o BatchMode=yes -o ServerAliveInterval=30' \
       "${paths[@]}" "$QM_SSH_TARGET:$QM_REMOTE_PROJECT/"

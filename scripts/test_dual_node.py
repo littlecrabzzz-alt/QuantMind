@@ -2,6 +2,7 @@
 import json
 import pathlib
 import subprocess
+import tempfile
 import unittest
 
 from dual_node_sync import desired, topology
@@ -11,6 +12,20 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class DeploymentBoundary(unittest.TestCase):
+    def test_running_shell_ignores_later_file_updates(self):
+        prefix = (ROOT / "scripts/dual-node.sh").read_text().split("PROJECT=", 1)[0]
+        with tempfile.TemporaryDirectory() as directory:
+            script = pathlib.Path(directory) / "run.sh"
+            original = prefix + 'echo READY\nread -r signal\necho DONE\n'
+            script.write_text(original)
+            process = subprocess.Popen(["bash", str(script)], stdin=subprocess.PIPE,
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            self.assertEqual(process.stdout.readline().strip(), "READY")
+            script.write_text(original + 'echo UNEXPECTED_FILE_UPDATE\n')
+            stdout, stderr = process.communicate("continue\n", timeout=10)
+            self.assertEqual(process.returncode, 0, stderr)
+            self.assertEqual(stdout.strip(), "DONE")
+
     def test_runtime_manifest_scope(self):
         for path in ("data/quantdb/state.sqlite", "db/qlib_data/data.bin", "results/snapshot/data.parquet"):
             self.assertTrue(runtime_path(pathlib.Path(path)))
