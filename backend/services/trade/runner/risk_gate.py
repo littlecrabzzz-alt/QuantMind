@@ -11,7 +11,8 @@
 
 import hashlib
 import logging
-from typing import Any, Dict, List, Optional
+import math
+from typing import Any
 
 import redis
 
@@ -20,11 +21,13 @@ logger = logging.getLogger(__name__)
 
 # ─── 内部辅助 ────────────────────────────────────────────────────────────────
 
+
 def _to_float(value: Any) -> float | None:
     try:
         if value is None or value == "":
             return None
-        return float(value)
+        numeric = float(value)
+        return numeric if math.isfinite(numeric) else None
     except Exception:
         return None
 
@@ -38,7 +41,14 @@ def _extract_live_price(snapshot: dict[str, Any]) -> float | None:
 
 
 def _extract_market_pct_change(snapshot: dict[str, Any]) -> float | None:
-    for key in ("pct_chg", "pct_change", "change_percent", "change_pct", "pct", "ChgRatio"):
+    for key in (
+        "pct_chg",
+        "pct_change",
+        "change_percent",
+        "change_pct",
+        "pct",
+        "ChgRatio",
+    ):
         parsed = _to_float(snapshot.get(key))
         if parsed is None:
             continue
@@ -52,6 +62,7 @@ def _extract_market_pct_change(snapshot: dict[str, Any]) -> float | None:
 
 
 # ─── 公开接口 ─────────────────────────────────────────────────────────────────
+
 
 class RiskGate:
     """
@@ -80,127 +91,150 @@ class RiskGate:
         对输入信号列表做多层过滤/缩减，返回合规后的信号列表。
         """
         live_trade_config = live_trade_config or {}
-
-        # 1. 配置加载
-        max_turnover = float(exec_config.get("max_turnover_ratio_per_cycle", 0.20))
-        stop_loss_threshold = float(
-            exec_config.get("stop_loss", exec_config.get("global_stop_loss_drawdown", -0.08))
-        )
-        max_buy_drop = float(exec_config.get("max_buy_drop", -0.03))
-        max_single_stock_ratio = float(exec_config.get("max_single_stock_ratio", 0.15))
-        max_order_value = float(exec_config.get("max_order_value_absolute", 500000))
-        max_price_dev = float(
-            live_trade_config.get("max_price_deviation", exec_config.get("max_price_deviation", 0.02))
-        )
-
-        total_value = float(account.get("total_value") or 0)
-        current_drawdown = float(account.get("drawdown") or 0)
-        existing_positions = account.get("positions") or {}
-
-        # 2. 全局止损：只保留平仓信号
-        if current_drawdown <= stop_loss_threshold and total_value > 0:
-            logger.warning(
-                "[Risk] 账户回撤 (%.2f) 触发全局止损 (%.2f)，拦截所有开仓信号",
-                current_drawdown,
-                stop_loss_threshold,
-            )
-            signals = [s for s in signals if s.get("trade_action") in {"SELL_TO_CLOSE", "BUY_TO_CLOSE"}]
-
-        # 3. 逐单合规性检查
-        passed_signals = []
-        for s in signals:
-            symbol = s["symbol"]
-            price = float(s["price"])
-            volume = float(s["volume"])
-            notional = price * volume
-
-            # A. 价格离散度校验
-            if market_snapshot and symbol in market_snapshot:
-                snapshot = market_snapshot[symbol]
-                live_price = _extract_live_price(snapshot)
-                if live_price is not None and live_price > 0:
-                    dev = abs(price - live_price) / live_price
-                    if dev > max_price_dev:
-                        logger.warning(
-                            "[Risk] %s 信号价(%.2f) 与市价(%.2f) 偏离 %.2f%%，拦截",
-                            symbol, price, live_price, dev * 100,
-                        )
-                        continue
-
+        config = {
+            "turnover": exec_config.get("max_turnover_ratio_per_cycle", 0.20),
+            "stop_loss": exec_config.get(
+                "stop_loss", exec_config.get("global_stop_loss_drawdown", -0.08)
+            ),
+            "buy_drop": exec_config.get("max_buy_drop", -0.03),
+            "stock_ratio": exec_config.get("max_single_stock_ratio", 0.15),
+            "order_value": exec_config.get("max_order_value_absolute", 500000),
+            "price_deviation": live_trade_config.get(
+                "max_price_deviation", exec_config.get("max_price_deviation", 0.02)
+            ),
+        }
+        limits = {key: _to_float(value) for key, value in config.items()}
+        if any(value is None for value in limits.values()):
+            logger.warning("[Risk] 非有限风控参数，拒绝整个批次")
+            return []
+        if any(
+            limits[key] < 0
+            for key in ("turnover", "stock_ratio", "order_value", "price_deviation")
+        ):
+            return []
+        total_value = _to_float(account.get("total_value"))
+        drawdown = _to_float(account.get("drawdown", 0))
+        positions = account.get("positions") or {}
+        close_actions = {"SELL_TO_CLOSE", "BUY_TO_CLOSE"}
+        open_actions = {"BUY_TO_OPEN", "SELL_TO_OPEN"}
+        passed = []
+        reserved = {}
+        for original in signals:
+            s = dict(original)
+            symbol = s.get("symbol")
+            price, volume = _to_float(s.get("price")), _to_float(s.get("volume"))
+            if (
+                not symbol
+                or price is None
+                or volume is None
+                or price <= 0
+                or volume <= 0
+            ):
+                logger.warning("[Risk] %s 价格或数量无效，拒绝", symbol)
+                continue
+            if not math.isfinite(price * volume):
+                continue
+            action = str(s.get("action") or "").upper()
             trade_action = str(s.get("trade_action") or "").upper()
-            if market_snapshot and symbol in market_snapshot:
-                pct_change = _extract_market_pct_change(market_snapshot[symbol])
-                if pct_change is not None:
-                    # B. 多头大跌拦截
-                    if trade_action == "BUY_TO_OPEN" and pct_change <= max_buy_drop:
-                        logger.warning(
-                            "[Risk] %s 涨跌幅 %.2f%% 触发多头大跌拦截，动作=%s",
-                            symbol, pct_change * 100, trade_action,
-                        )
-                        continue
-                    # C. 空头大涨拦截
-                    elif trade_action == "SELL_TO_OPEN" and pct_change >= abs(max_buy_drop):
-                        logger.warning(
-                            "[Risk] %s 涨跌幅 %.2f%% 触发空头大涨拦截，动作=%s",
-                            symbol, pct_change * 100, trade_action,
-                        )
-                        continue
-
-            # D. 单笔金额上限
-            if notional > max_order_value:
-                logger.warning(
-                    "[Risk] %s 订单金额 %.2f 超过限制 %.2f，自动缩减数量",
-                    symbol, notional, max_order_value,
-                )
-                volume = (max_order_value / price) // 100 * 100
-                s["volume"] = int(volume)
-                notional = price * volume
-
-            # E. 单票持仓上限
-            current_pos_value = float(existing_positions.get(symbol, {}).get("market_value") or 0)
-            if total_value > 0 and (current_pos_value + notional) / total_value > max_single_stock_ratio:
-                logger.warning(
-                    "[Risk] %s 预期持仓比 %.2f%% 超过上限 %.2f%%，缩减",
-                    symbol,
-                    (current_pos_value + notional) / total_value * 100,
-                    max_single_stock_ratio * 100,
-                )
-                allowed_notional = (total_value * max_single_stock_ratio) - current_pos_value
-                if allowed_notional <= 0:
+            if trade_action and trade_action not in close_actions | open_actions:
+                continue
+            if action not in {"BUY", "SELL"}:
+                continue
+            if trade_action and not trade_action.startswith(action + "_"):
+                continue
+            is_close = trade_action in close_actions
+            # Only an explicit close action receives the reduction exemption.
+            # Broker/position validation must still enforce closeable quantity.
+            if not is_close and (
+                total_value is None
+                or total_value <= 0
+                or drawdown is None
+                or drawdown <= limits["stop_loss"]
+            ):
+                logger.warning("[Risk] %s 账户无效或触发回撤限制，拒绝开仓", symbol)
+                continue
+            snapshot = market_snapshot.get(symbol) or {}
+            live_price = _extract_live_price(snapshot)
+            if (
+                live_price is not None
+                and abs(price - live_price) / live_price > limits["price_deviation"]
+            ):
+                continue
+            pct_change = _extract_market_pct_change(snapshot)
+            if not is_close and pct_change is not None:
+                if action == "BUY" and pct_change <= limits["buy_drop"]:
+                    logger.warning("[Risk] %s 触发多头大跌限制，拒绝开仓", symbol)
                     continue
-                s["volume"] = int((allowed_notional / price) // 100 * 100)
+                if action == "SELL" and pct_change >= abs(limits["buy_drop"]):
+                    logger.warning("[Risk] %s 触发空头大涨限制，拒绝开仓", symbol)
+                    continue
+            allowed = limits["order_value"]
+            if not is_close:
+                position = positions.get(symbol, {})
+                current_value = _to_float(position.get("market_value", 0))
+                if current_value is None:
+                    continue
+                # Reserve every accepted opening order. Do not credit pending
+                # closes or opposite-side opens before they have actually filled.
+                remaining = (
+                    total_value * limits["stock_ratio"]
+                    - abs(current_value)
+                    - reserved.get(symbol, 0.0)
+                )
+                allowed = min(allowed, max(0.0, remaining))
+            if price * volume > allowed:
+                logger.warning(
+                    "[Risk] %s 单笔或累计敞口超限，允许金额 %.2f", symbol, allowed
+                )
+                volume = int((allowed / price) // 100) * 100
+            if volume <= 0:
+                continue
+            s["price"] = price
+            s["volume"] = volume
+            s["action"] = action
+            if trade_action:
+                s["trade_action"] = trade_action
+            passed.append(s)
+            if not is_close:
+                reserved[symbol] = reserved.get(symbol, 0.0) + price * volume
 
-            if float(s["volume"]) > 0:
-                passed_signals.append(s)
-
-        # 4. 换手率拦截（等比例缩减）
-        final_signals = passed_signals
-        estimated_turnover = sum(float(s["volume"]) * float(s["price"]) for s in final_signals)
-        if total_value > 0 and (estimated_turnover / total_value) > max_turnover:
-            logger.warning(
-                "[Risk] 本轮换手率 (%.2f) 超过限制 (%.2f)，等比例缩减",
-                estimated_turnover / total_value,
-                max_turnover,
-            )
-            ratio = (total_value * max_turnover) / estimated_turnover
-            for s in final_signals:
-                s["volume"] = int(float(s["volume"]) * ratio // 100 * 100)
-
-        final_signals = [s for s in final_signals if float(s["volume"]) > 0]
-        logger.info(
-            "[Risk] 原始=%d -> 合规后=%d -> 换手率缩减后=%d | Drawdown: %.4f",
-            len(signals),
-            len(passed_signals),
-            len(final_signals),
-            current_drawdown,
+        # Reductions retain priority, including global stop-loss closes. Their
+        # turnover consumes the opening budget but cannot be scaled away by it.
+        closes = sum(
+            s["price"] * s["volume"]
+            for s in passed
+            if s.get("trade_action") in close_actions
         )
-        return final_signals
+        opens = sum(
+            s["price"] * s["volume"]
+            for s in passed
+            if s.get("trade_action") not in close_actions
+        )
+        budget = max(0.0, (total_value or 0.0) * limits["turnover"] - closes)
+        if opens > budget:
+            logger.warning(
+                "[Risk] 开仓金额 %.2f 超过剩余换手预算 %.2f，缩减开仓", opens, budget
+            )
+            ratio = budget / opens
+            for s in passed:
+                if s.get("trade_action") not in close_actions:
+                    s["volume"] = int(s["volume"] * ratio // 100) * 100
+        result = [s for s in passed if s["volume"] > 0]
+        logger.info(
+            "[Risk] 原始=%d -> 合规后=%d | Drawdown: %s",
+            len(signals),
+            len(result),
+            drawdown,
+        )
+        return result
 
     @staticmethod
     def fingerprint(signals: list[dict[str, Any]]) -> str:
         """计算信号批次指纹，用于幂等锁键。"""
         sorted_sigs = sorted(signals, key=lambda x: x["symbol"] + x["action"])
-        raw = "|".join([f"{s['symbol']}:{s['action']}:{s['volume']}" for s in sorted_sigs])
+        raw = "|".join(
+            [f"{s['symbol']}:{s['action']}:{s['volume']}" for s in sorted_sigs]
+        )
         return hashlib.sha256(raw.encode()).hexdigest()
 
     @staticmethod

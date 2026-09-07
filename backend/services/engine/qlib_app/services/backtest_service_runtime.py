@@ -242,7 +242,9 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
             # --- Pool File Resolution [END] ---
 
             task_log.info(
-                "signal_raw", "原始signal配置", signal=request.strategy_params.signal,
+                "signal_raw",
+                "原始signal配置",
+                signal=request.strategy_params.signal,
                 model_id=getattr(request, "model_id", None),
                 strategy_id=getattr(request, "strategy_id", None),
             )
@@ -274,7 +276,9 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                     )
                     if swapped:
                         # 重新构建信号数据
-                        signal_data, signal_meta = await self._build_signal_data(request)
+                        signal_data, signal_meta = await self._build_signal_data(
+                            request
+                        )
                         new_max = signal_meta.get("max_signal_date")
                         task_log.info(
                             "model_auto_swapped",
@@ -330,7 +334,9 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                     "Qlib calendar 加载失败，使用默认日期范围",
                     error=str(cal_err),
                 )
-                full_cal = pd.date_range(start=request.start_date, end=request.end_date, freq="B")
+                full_cal = pd.date_range(
+                    start=request.start_date, end=request.end_date, freq="B"
+                )
             cal_max_ts = pd.Timestamp(full_cal[-1].date())
             end_ts = pd.Timestamp(request.end_date)
 
@@ -594,7 +600,7 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                 use_vect = False
                 task_log.info(
                     "vectorized_safety_gate",
-                    "策略含向量化引擎无法表达的逻辑，已退回 step 模式保证语义正确",
+                    "极速引擎尚未复现整手、最低佣金及成交价规则，已退回 step 模式",
                     strategy_type=request.strategy_type,
                 )
             task_log.info(
@@ -631,7 +637,9 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                     set(map(str, pred_df.index.get_level_values("instrument")))
                 )
                 if pred_instruments:
-                    vectorized_universe = pred_instruments[: int(os.getenv("QLIB_SIGNAL_MAX_INSTRUMENTS", "2000"))]
+                    vectorized_universe = pred_instruments[
+                        : int(os.getenv("QLIB_SIGNAL_MAX_INSTRUMENTS", "2000"))
+                    ]
                 else:
                     vectorized_universe = D.instruments(request.universe)
 
@@ -1058,9 +1066,7 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
             # STRATEGY_CONFIG = {...}
             if isinstance(node, (ast.Assign, ast.AnnAssign)):
                 targets = (
-                    node.targets
-                    if isinstance(node, ast.Assign)
-                    else [node.target]
+                    node.targets if isinstance(node, ast.Assign) else [node.target]
                 )
                 for t in targets:
                     if isinstance(t, ast.Name) and t.id == "STRATEGY_CONFIG":
@@ -1071,97 +1077,15 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                         return config
         return config
 
-    @staticmethod
-    def _vectorized_unsafe_strategy_class(class_name: str) -> bool:
-        """策略类是否包含向量化引擎无法表达的逻辑。
+    def _is_vectorized_safe(self, request: QlibBacktestRequest, strategy: Any) -> bool:
+        """Formal runs require CnExchange execution semantics.
 
-        向量化引擎实现的是「每日 TopK 等权选股 + 涨跌停/停牌过滤 + 交易成本」。
-        以下策略类包含超出该语义的逻辑，必须走 step 模式保真：
-        - RedisWeightStrategy: 分数加权权重（非等权）
-        - RedisTopkStrategy 是安全子集；任何自定义/其他类名视为不安全
+        Even full TopK is not equivalent: the diagnostic engine uses fractional
+        shares, close prices and proportional fees; CnExchange uses lot sizes,
+        configurable execution prices, minimum fees and volume-based impact.
+        Keep API runs on step until those semantics have verified parity.
         """
-        name = str(class_name or "").strip().lower()
-        if not name:
-            return True
-        if name in {"redistopkstrategy", "topkdropout", "standard_topk"}:
-            return False
-        return True
-
-    def _is_vectorized_safe(
-        self, request: QlibBacktestRequest, strategy: Any
-    ) -> bool:
-        """判断策略是否可由向量化极速引擎保真执行。
-
-        安全条件（全部满足）：
-          1. 信号是模型预测信号（<PRED> 或 pred 文件），非行情特征回退
-          2. 策略类为纯 TopK 型（RedisTopkStrategy / TopkDropout）
-          3. 无 pool_file 股票池覆盖（向量化引擎不加载池文件）
-          4. 无显式配置的调仓周期 / 止损止盈 / 分数加权等参数
-
-        注意：只以用户代码 STRATEGY_CONFIG 中的显式配置为准，
-        schema 默认值（如 stop_loss=-0.08）不作为判据，否则会误伤默认策略。
-        """
-        try:
-            # 1. 信号必须是 pred 类信号
-            signal = self._normalize_signal_config(request.strategy_params.signal)
-            if isinstance(signal, str) and not (
-                signal.strip().upper() == "<PRED>"
-                or signal.strip().lower().endswith((".pkl", ".parquet"))
-            ):
-                return False
-
-            # 2. 从策略代码 STRATEGY_CONFIG 判断策略类与 kwargs（用户显式配置）
-            content = str(getattr(request, "strategy_content", "") or "")
-            cfg = self._extract_strategy_config_from_code(content)
-            if cfg:
-                class_name = str(cfg.get("class") or "").strip()
-                if self._vectorized_unsafe_strategy_class(class_name):
-                    return False
-                kwargs = cfg.get("kwargs") or {}
-                if kwargs.get("pool_file"):
-                    return False
-                if kwargs.get("rebalance_days") not in (None, 1):
-                    return False
-                if kwargs.get("stop_loss"):
-                    return False
-                if kwargs.get("take_profit"):
-                    return False
-                if kwargs.get("max_weight") or kwargs.get("min_score"):
-                    return False  # 分数加权 → 非等权
-                # n_drop 控制每期调仓数量：只有 n_drop>=topk（每期全换）才与向量化
-                # 「每日全 TopK」语义一致；部分调仓/零换手约束向量化无法表达
-                topk = int(kwargs.get("topk") or 50)
-                n_drop = kwargs.get("n_drop")
-                if n_drop is not None and int(n_drop) < topk:
-                    return False
-            elif isinstance(strategy, dict):
-                # 无 STRATEGY_CONFIG：检查已解析策略对象
-                class_name = str(strategy.get("class") or "").strip()
-                if self._vectorized_unsafe_strategy_class(class_name):
-                    return False
-                kwargs = strategy.get("kwargs") or {}
-                if kwargs.get("pool_file") or kwargs.get("max_weight") or kwargs.get("min_score"):
-                    return False
-                if kwargs.get("rebalance_days") not in (None, 1):
-                    return False
-                if kwargs.get("stop_loss") or kwargs.get("take_profit"):
-                    return False
-                topk = int(kwargs.get("topk") or 50)
-                n_drop = kwargs.get("n_drop")
-                if n_drop is not None and int(n_drop) < topk:
-                    return False
-            else:
-                # 既无 STRATEGY_CONFIG 也非策略 dict：保守退回 step
-                return False
-
-            return True
-        except Exception as exc:
-            task_logger.warning(
-                "vectorized_safety_check_failed",
-                "向量化安全检测异常，保守退回 step 模式",
-                error=str(exc),
-            )
-            return False
+        return False
 
     def _align_pred_instruments(
         self, pred: pd.DataFrame, request: QlibBacktestRequest
@@ -1242,9 +1166,9 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
 
             prio = inst_str.map(_fmt_priority)
             result = result.assign(_prio=prio.values).sort_index()
-            result = result[
-                ~result.index.duplicated(keep="first")
-            ].drop(columns="_prio")
+            result = result[~result.index.duplicated(keep="first")].drop(
+                columns="_prio"
+            )
         return result.sort_index()
 
     def _materialize_signal_dataframe(
@@ -1432,6 +1356,7 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
         if isinstance(meta, str):
             try:
                 import json
+
                 meta = json.loads(meta)
             except Exception:
                 meta = {}
@@ -1488,9 +1413,7 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                 tenant_id=tenant_id, user_id=user_id, include_archived=False
             )
             # 按更新时间降序，优先选最新的模型
-            models.sort(
-                key=lambda m: str(m.get("updated_at") or ""), reverse=True
-            )
+            models.sort(key=lambda m: str(m.get("updated_at") or ""), reverse=True)
 
             # 确定当前回测的目标市场
             request_market = self._infer_backtest_market(request)
@@ -1549,7 +1472,9 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                             task_logger.info(
                                 "auto_swap_model",
                                 "自动切换到覆盖回测区间的模型",
-                                old_model_id=getattr(request, "_original_model_id", None),
+                                old_model_id=getattr(
+                                    request, "_original_model_id", None
+                                ),
                                 new_model_id=model_id,
                                 pred_max_date=str(max_date.date()),
                             )
