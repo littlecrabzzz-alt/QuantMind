@@ -1,21 +1,21 @@
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class VectorizedBacktestConfig:
     initial_capital: float = 100000.0
-    # 默认费率与主引擎 CnExchange 对齐：佣金万2.5(双向)，
-    # sell_cost 为仅卖出侧费率(印花税万5+过户费万0.1)
+    # Proportional-cost research approximation; no minimum fees or lot rounding.
     commission: float = 0.00025
     slippage: float = 0.0001
     topk: int = 50
     sell_cost: float = 0.00051  # stamp duty + transfer fee (sell-only cost)
+
 
 @dataclass
 class VectorizedBacktestResult:
@@ -28,6 +28,7 @@ class VectorizedBacktestResult:
     portfolio_dict: dict | None = None
     indicator_dict: dict | None = None
     error_message: str = ""
+
 
 class VectorizedBacktestEngine:
     def __init__(self, config: VectorizedBacktestConfig):
@@ -43,7 +44,7 @@ class VectorizedBacktestEngine:
             pure = code.upper()
             for pfx in ("SH", "SZ", "BJ"):
                 if pure.startswith(pfx):
-                    pure = pure[len(pfx):]
+                    pure = pure[len(pfx) :]
                     break
             if pure.startswith("68") or pure.startswith("30"):
                 thresholds[sid] = 0.195  # ChiNext / STAR ±20%
@@ -57,154 +58,133 @@ class VectorizedBacktestEngine:
         prices: pd.DataFrame,
         changes: pd.DataFrame | None = None,
     ) -> VectorizedBacktestResult:
-        """
-        Pure pandas/numpy vectorized backtest.
-        signals: MultiIndex (datetime, instrument) [score]
-        prices: MultiIndex (datetime, instrument) [$close]
-        changes: MultiIndex (datetime, instrument) [$change] — daily return for limit detection
+        """Close execution with fractional shares and proportional fees.
+
+        Signals must already be lagged to their execution dates. Mark existing
+        shares at today's close BEFORE rebalancing; never shift future returns
+        into today's report. Missing quotes may mark holdings but cannot trade.
+        This diagnostic engine does not reproduce CnExchange execution rules.
         """
         try:
-            self.logger.info("Starting true vectorized backtest")
-            # 1. Unstack to wide format: (datetime x instrument)
+            cfg = self.config
+            if not np.isfinite(cfg.initial_capital) or cfg.initial_capital <= 0:
+                raise ValueError("initial_capital must be finite and positive")
+            if cfg.topk < 1 or int(cfg.topk) != cfg.topk:
+                raise ValueError("topk must be a positive integer")
+            rates = (cfg.commission, cfg.slippage, cfg.sell_cost)
+            if any(not np.isfinite(rate) or rate < 0 for rate in rates):
+                raise ValueError("cost rates must be finite and nonnegative")
+            buy_rate = cfg.commission + cfg.slippage
+            sell_rate = buy_rate + cfg.sell_cost
+            if sell_rate >= 1:
+                raise ValueError("combined sell cost must be below 100%")
             if isinstance(signals, pd.Series):
                 signals = signals.to_frame("score")
+            scores = signals["score"].unstack("instrument").sort_index()
+            raw = prices["$close"].unstack("instrument").sort_index()
+            if scores.empty or raw.empty:
+                raise ValueError("signals and prices must be nonempty")
+            # Preserve price dates without signals and dates with no valid quote.
+            dates = raw.index.union(scores.index).sort_values()
+            dates = dates[(dates >= scores.index.min()) & (dates <= raw.index.max())]
+            raw = raw.reindex(index=dates, columns=scores.columns)
+            raw = raw.where(np.isfinite(raw) & raw.gt(0))
+            scores = scores.reindex(index=dates).where(lambda x: np.isfinite(x))
+            marked = raw.ffill().fillna(0.0)
+            if len(dates) < 2:
+                raise ValueError("at least two execution/valuation dates are required")
+            can_buy = raw.notna()
+            can_sell = raw.notna()
+            if changes is not None:
+                change = changes["$change"].unstack("instrument").reindex_like(raw)
+                known = np.isfinite(change)
+                threshold = self._get_limit_threshold_vec(raw.columns)
+                can_buy &= known & change.lt(threshold, axis=1)
+                can_sell &= known & change.gt(-threshold, axis=1)
 
-            sig_wide = signals["score"].unstack(level="instrument")
-            raw_price_wide = prices["$close"].unstack(level="instrument").reindex_like(sig_wide)
-            valid_dates = sig_wide.index.intersection(raw_price_wide.dropna(how="all").index)
-            sig_wide = sig_wide.loc[valid_dates]
-            raw_price_wide = raw_price_wide.loc[valid_dates]
-            # Keep a filled series for return calculation, but never use it to
-            # determine whether an instrument was tradable on the original day.
-            # Otherwise an internal suspension gap is hidden by ffill().
-            price_wide = raw_price_wide.ffill()
-            if len(sig_wide) < 2:
-                raise ValueError("vectorized backtest requires at least two aligned signal/price dates after lagging")
-
-            # 2. Build tradability mask: filter limit-up (can't buy) and suspended stocks
-            if changes is not None and not changes.empty:
-                change_wide = changes["$change"].unstack(level="instrument").reindex_like(sig_wide)
-            else:
-                change_wide = pd.DataFrame(np.nan, index=sig_wide.index, columns=sig_wide.columns)
-
-            thresholds = self._get_limit_threshold_vec(sig_wide.columns)
-
-            # Limit masks are directional: limit-up blocks buys, while
-            # limit-down blocks sells. Suspensions block both directions.
-            limit_up = change_wide.ge(thresholds, axis=1).fillna(False)
-            limit_down = change_wide.le(-thresholds, axis=1).fillna(False)
-            # Suspended mask must use the unfilled observations.  The filled
-            # series above is only a valuation aid and is not proof of trading.
-            suspended = raw_price_wide.isna()
-
-            can_buy = ~limit_up & ~suspended
-            can_sell = ~limit_down & ~suspended
-
-            # 3. Daily returns
-            # pct_change()[t] = P[t]/P[t-1] - 1 (T-1到T的日收益)
-            # 价格已有 forward-fill，用 fill_method=None 避免隐式 pad 的弃用告警
-            asset_returns = price_wide.pct_change(fill_method=None)
-
-            # 4. Executable TopK weights.  Sell first, then use available cash
-            # for buys; blocked sells retain the prior position.
-            weights = pd.DataFrame(0.0, index=sig_wide.index, columns=sig_wide.columns)
-            previous = pd.Series(0.0, index=sig_wide.columns)
-            for dt in sig_wide.index:
-                eligible = can_buy.loc[dt] | previous.gt(0)
-                ranked = sig_wide.loc[dt].where(eligible).rank(
-                    ascending=False, method="first"
+            shares = pd.Series(0.0, index=raw.columns)
+            cash = previous_nav = float(cfg.initial_capital)
+            rows, holdings = [], []
+            for dt in dates:
+                px = marked.loc[dt]
+                values = shares * px
+                pre_trade_nav = cash + float(values.sum())
+                buy_value = sell_value = fees = 0.0
+                # An absent signal day means hold, not liquidate the portfolio.
+                if scores.loc[dt].notna().any():
+                    eligible = can_buy.loc[dt] | shares.gt(0)
+                    ranked = (
+                        scores.loc[dt]
+                        .where(eligible)
+                        .rank(ascending=False, method="first")
+                    )
+                    selected = ranked.le(cfg.topk)
+                    desired = pd.Series(0.0, index=raw.columns)
+                    if selected.any():
+                        desired.loc[selected] = pre_trade_nav / selected.sum()
+                    sells = (values - desired).clip(lower=0).where(can_sell.loc[dt], 0)
+                    sell_value = float(sells.sum())
+                    shares -= sells.div(px.where(px.gt(0))).fillna(0)
+                    cash += sell_value * (1 - sell_rate)
+                    buys = (
+                        (desired - shares * px).clip(lower=0).where(can_buy.loc[dt], 0)
+                    )
+                    requested = float(buys.sum())
+                    if requested > 0:
+                        buys *= min(1.0, max(0.0, cash) / (requested * (1 + buy_rate)))
+                    buy_value = float(buys.sum())
+                    shares += buys.div(px.where(px.gt(0))).fillna(0)
+                    cash -= buy_value * (1 + buy_rate)
+                    fees = sell_value * sell_rate + buy_value * buy_rate
+                nav = cash + float((shares * px).sum())
+                if not np.isfinite(nav) or nav <= 0 or cash < -1e-7:
+                    raise ValueError("invalid cash or portfolio value")
+                # Qlib: return is BEFORE costs; cost is a ratio of previous NAV.
+                rows.append(
+                    {
+                        "account": nav,
+                        "return": (pre_trade_nav - previous_nav) / previous_nav,
+                        "cost": fees / previous_nav,
+                        "cost_amount": fees,
+                        "turnover": (buy_value + sell_value) / previous_nav,
+                        "cash": cash,
+                        "value": nav - cash,
+                    }
                 )
-                selected = ranked.le(self.config.topk)
-                desired = pd.Series(0.0, index=sig_wide.columns)
-                if selected.any():
-                    desired.loc[selected] = 1.0 / float(selected.sum())
+                holdings.append(shares.copy())
+                previous_nav = nav
 
-                after_sells = previous.copy()
-                executable_sells = desired.lt(previous) & can_sell.loc[dt]
-                after_sells.loc[executable_sells] = desired.loc[executable_sells]
-
-                requested_buys = (desired - after_sells).clip(lower=0.0)
-                requested_buys = requested_buys.where(can_buy.loc[dt], 0.0)
-                requested_total = float(requested_buys.sum())
-                available_cash = max(0.0, 1.0 - float(after_sells.sum()))
-                if requested_total > 0:
-                    requested_buys *= min(1.0, available_cash / requested_total)
-
-                previous = after_sells + requested_buys
-                weights.loc[dt] = previous
-
-            # A股 T+1 settlement: T-1信号 → T日成交 → 收益从T+1开始
-            # weights[t] 基于 T-1 信号, 应配对 T+1 的收益 (asset_returns[t+1])
-            # 等价于将收益前移1天: portfolio[t] = weights[t] * returns[t+1]
-            asset_returns = asset_returns.shift(-1)
-
-            # 5. Calculate Portfolio Returns
-            # weights[t] = T-1日信号权重
-            # asset_returns[t] = T到T+1的收益 (已shift(-1))
-            # portfolio[t] = T-1信号 × (T到T+1收益) = 正确的T+1 settlement
-            portfolio_daily_returns = (weights * asset_returns).sum(axis=1).fillna(0)
-
-            # 6. Transaction costs (buy-side + sell-side asymmetry)
-            weight_change = weights.diff()
-            weight_change.iloc[0] = weights.iloc[0]
-            buy_turnover = weight_change.clip(lower=0.0).sum(axis=1)
-            sell_turnover = -weight_change.clip(upper=0.0).sum(axis=1)
-            turnover_cost = buy_turnover * (
-                self.config.commission + self.config.slippage
-            ) + sell_turnover * (
-                self.config.commission + self.config.slippage + self.config.sell_cost
+            report = pd.DataFrame(rows, index=dates)
+            net_returns = report["return"] - report["cost"]
+            equity = report["account"]
+            total_return = float(equity.iloc[-1] / cfg.initial_capital - 1)
+            annual_return = (1 + total_return) ** (252 / len(dates)) - 1
+            daily_std = net_returns.std(ddof=1)
+            sharpe = (
+                (net_returns.mean() - 0.02 / 252) / daily_std * np.sqrt(252)
+                if daily_std > 0
+                else 0.0
             )
-            portfolio_daily_returns = portfolio_daily_returns - turnover_cost.fillna(0)
-
-            # 5. Equity Curve
-            equity_curve = (1 + portfolio_daily_returns).cumprod() * self.config.initial_capital
-
-            # 6. Basic Metrics
-            total_return = (equity_curve.iloc[-1] / self.config.initial_capital) - 1 if len(equity_curve) > 0 else 0
-
-            years = (equity_curve.index[-1] - equity_curve.index[0]).days / 365.25 if len(equity_curve) > 1 else 1
-            annual_return = (1 + total_return) ** (1 / max(years, 0.01)) - 1
-
-            daily_std = portfolio_daily_returns.std(ddof=1)
-            sharpe_ratio = (annual_return - 0.02) / (daily_std * np.sqrt(252)) if daily_std > 0 else 0.0
-
-            rolling_max = equity_curve.cummax()
-            drawdowns = (equity_curve - rolling_max) / rolling_max
-            max_drawdown = drawdowns.min() if len(drawdowns) > 0 else 0.0
-
-            win_rate = (portfolio_daily_returns > 0).mean()
-
-            # Construct a portfolio_dict compatible with Qlib RiskAnalyzer
-            # Qlib expects a report DataFrame with account/cost/return columns.
-            # RiskAnalyzer 会基于该 report 重算 annual_return/sharpe/max_drawdown，
-            # 因此无需在此重复计算（保留计算值仅为兼容调用方直接读取）。
-            report_df = pd.DataFrame({
-                "account": equity_curve.values,
-                "cost": turnover_cost.values * self.config.initial_capital,
-                "return": portfolio_daily_returns.values,
-            }, index=equity_curve.index)
-
-            portfolio_dict = {
-                "report": report_df,
-                "final_value": float(equity_curve.iloc[-1]) if len(equity_curve) > 0 else float(self.config.initial_capital),
-                "account": float(equity_curve.iloc[-1]) if len(equity_curve) > 0 else float(self.config.initial_capital),
-                "position_value": float((weights.iloc[-1] * price_wide.iloc[-1]).sum()) if len(weights) > 0 else 0.0,
-            }
-
+            # Include initial cash in the high-water mark, including day-one fees.
+            peak = equity.cummax().clip(lower=cfg.initial_capital)
+            max_drawdown = float((equity / peak - 1).min())
             return VectorizedBacktestResult(
                 success=True,
                 annual_return=float(annual_return),
-                sharpe_ratio=float(sharpe_ratio),
-                max_drawdown=float(max_drawdown),
-                total_return=float(total_return),
-                win_rate=float(win_rate),
-                portfolio_dict=portfolio_dict,
-                indicator_dict={"report": report_df},
+                sharpe_ratio=float(sharpe),
+                max_drawdown=max_drawdown,
+                total_return=total_return,
+                win_rate=float(net_returns.gt(0).mean()),
+                portfolio_dict={
+                    "report": report,
+                    "final_value": float(equity.iloc[-1]),
+                    "account": float(equity.iloc[-1]),
+                    "position_value": float(report.iloc[-1]["value"]),
+                    "holdings": pd.DataFrame(holdings, index=dates),
+                    "execution_model": "fractional_close_proportional_costs",
+                },
+                indicator_dict={"report": report},
             )
-
-        except Exception as e:
-            self.logger.error(f"Vectorized backtest failed: {e}", exc_info=True)
-            return VectorizedBacktestResult(
-                success=False,
-                error_message=str(e)
-            )
+        except Exception as exc:
+            self.logger.error("Vectorized backtest failed: %s", exc, exc_info=True)
+            return VectorizedBacktestResult(success=False, error_message=str(exc))
