@@ -34,7 +34,6 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 import requests
-import torch
 import yaml
 
 logging.basicConfig(
@@ -1124,6 +1123,7 @@ def load_data(
     _horizon = max(1, int(target_horizon_days or 1))
 
     df = df.sort_values(["symbol", "trade_date"]).reset_index(drop=True)
+    df["_label_end_date"] = df.groupby("symbol")["trade_date"].shift(-(_horizon + _EXECUTION_LAG_DAYS))
     _mom_col = f"mom_ret_{_horizon}d"
     if direct_factor_source:
         # Raw factor sources carry close, so labels are always true forward returns.
@@ -1141,8 +1141,8 @@ def load_data(
         # 回退：通过滚动累乘 1d 收益构造 N 日远期收益
         df["label"] = (
             df.groupby("symbol")["mom_ret_1d"]
-            .transform(lambda s: (1 + s).rolling(_horizon).apply(np.prod, raw=True) - 1)
-            .shift(-(_horizon + _EXECUTION_LAG_DAYS))
+            .transform(lambda s: ((1 + s).rolling(_horizon).apply(np.prod, raw=True) - 1)
+                       .shift(-(_horizon + _EXECUTION_LAG_DAYS)))
         )
     logger.info(
         "Label built with target_horizon_days=%s (%s)",
@@ -1183,12 +1183,14 @@ def load_data(
     if not features:
         raise RuntimeError("No valid feature columns found")
 
-    keep_cols = ["symbol", "trade_date", "label"] + features
+    keep_cols = ["symbol", "trade_date", "label", "_label_end_date"] + features
     df = df[keep_cols].reset_index(drop=True)
 
     # 收益预测使用截面 rank 目标，强调同日选股排序；分类预测保持二元标签。
     if _target_mode != "classification":
         df["label"] = df.groupby("trade_date")["label"].rank(pct=True) - 0.5
+        # Rank labels depend on every stock in that day's cross section.
+        df["_label_end_date"] = df.groupby("trade_date")["_label_end_date"].transform("max")
 
     logger.info(
         f"Data ready: {len(df):,} rows, {len(features)} features, "
@@ -1198,6 +1200,32 @@ def load_data(
 
 
 # ── 训练 ──────────────────────────────────────────────────────────────────────
+
+def _purge_label_tail(frame: pd.DataFrame, cfg: dict) -> pd.DataFrame:
+    """Keep labels inside a segment, including stocks with missing trading dates.
+
+    Labels shift by rows within each symbol, so a market-wide calendar gap is
+    insufficient for sparse stocks. Short segments become empty and fail closed.
+    """
+    if "_label_end_date" in frame:
+        return frame.loc[frame["_label_end_date"] <= frame["trade_date"].max()].copy()
+    # Legacy/test frames without label provenance use conservative per-stock tails.
+    span = max(1, int((cfg.get("label") or {}).get("target_horizon_days") or 1)) + _EXECUTION_LAG_DAYS
+    ordered = frame.sort_values(["symbol", "trade_date"])
+    remaining = ordered.groupby("symbol").cumcount(ascending=False)
+    return ordered.loc[remaining >= span].copy()
+
+
+def _split_early_stopping(frame: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Reserve the last 20% of outer training dates for early stopping only."""
+    dates = sorted(frame["trade_date"].unique())
+    if len(dates) < 2:
+        return frame.iloc[:0].copy(), frame.iloc[:0].copy()
+    boundary = dates[min(len(dates) - 1, max(1, int(len(dates) * 0.8)))]
+    fit = _purge_label_tail(frame[frame["trade_date"] < boundary], cfg)
+    stop = frame[frame["trade_date"] >= boundary].copy()
+    return fit, stop
+
 
 def _split_data(df: pd.DataFrame, cfg: dict) -> tuple:
     """数据切分：显式 split 优先于 val_ratio。返回 (train_df, val_df, test_df)。
@@ -1284,31 +1312,9 @@ def _split_data(df: pd.DataFrame, cfg: dict) -> tuple:
             f"  test[{len(test_df)}] {pd.Timestamp(test_start).date()}~"
         )
 
-    # ── Embargo：标签是未来 horizon 日收益，train 末尾样本的标签落在 val 区间内 ──
-    # 不隔离会让 val/test 的价格信息经标签渗回 train。裁掉每段尾部 horizon 个交易日。
-    _horizon = max(1, int((cfg.get("label", {}) or {}).get("target_horizon_days") or 1))
-    _embargo_days = _horizon + _EXECUTION_LAG_DAYS
-    if _embargo_days > 0:
-        def _embargo(frame: pd.DataFrame, name: str) -> pd.DataFrame:
-            if frame.empty:
-                return frame
-            days = sorted(frame["trade_date"].unique())
-            if len(days) <= _embargo_days:
-                logger.warning(
-                    "Embargo skipped for %s: only %d trading days <= label span %d",
-                    name, len(days), _embargo_days,
-                )
-                return frame
-            cutoff = days[-_embargo_days]
-            trimmed = frame[frame["trade_date"] < cutoff].copy()
-            logger.info(
-                "Embargo %s: dropped last %d trading days (%d -> %d rows)",
-                name, _embargo_days, len(frame), len(trimmed),
-            )
-            return trimmed
-
-        train_df = _embargo(train_df, "train")
-        val_df = _embargo(val_df, "val")
+    # 标签跨越 horizon + T+1 行；按股票隔离，样本不足不能跳过隔离。
+    train_df = _purge_label_tail(train_df, cfg)
+    val_df = _purge_label_tail(val_df, cfg)
 
     train_df = train_df.reset_index(drop=True)
     val_df = val_df.reset_index(drop=True)
@@ -1374,6 +1380,7 @@ def _wfa_split_window(
     df: pd.DataFrame,
     wfa: dict,
     idx: int,
+    cfg: dict,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """构造第 idx 个 WFA 窗口的 (train_df, val_df)。
 
@@ -1425,6 +1432,8 @@ def _wfa_split_window(
         (df["trade_date"] <= val_end)
     ].copy()
 
+    train_df = _purge_label_tail(train_df, cfg)
+    val_df = _purge_label_tail(val_df, cfg)
     if train_df.empty or val_df.empty:
         return pd.DataFrame(), pd.DataFrame()
     return train_df, val_df
@@ -1447,8 +1456,12 @@ def _train_wfa_single(
         return None
 
     try:
+        fit_df, stop_df = _split_early_stopping(train_df, cfg)
+        if len(fit_df) < 100 or len(stop_df) < 10:
+            logger.warning("[WFA] window %d: insufficient purged early-stopping split", idx)
+            return None
         fill_values, X_train, y_train, X_val, y_val, _fill = _prepare_arrays(
-            train_df, val_df, features, prep_cfg=cfg.get("preprocessing") or {}
+            fit_df, stop_df, features, prep_cfg=cfg.get("preprocessing") or {}
         )
         if X_train.shape[0] < 100 or X_val.shape[0] < 10:
             logger.warning("[WFA] window %d: too few samples train=%d val=%d", idx, X_train.shape[0], X_val.shape[0])
@@ -1478,6 +1491,9 @@ def _train_wfa_single(
             "val_start": str(val_df["trade_date"].min().date()),
             "val_end": str(val_df["trade_date"].max().date()),
             "train_rows": int(len(train_df)),
+            "fit_rows": int(len(fit_df)),
+            "early_stopping_rows": int(len(stop_df)),
+            "evaluation_role": "held_out_window",
             "val_rows": int(len(val_df)),
             "ic": m["ic"],
             "rank_ic": m["rank_ic"],
@@ -1519,7 +1535,7 @@ def train_wfa(df: pd.DataFrame, features: list[str], cfg: dict) -> dict:
         if time.time() >= wfa_budget_deadline:
             logger.warning("[WFA] time budget (%.0f%% of %dmin) reached, stop at window %d", 60, budget_min, idx)
             break
-        train_df, val_df = _wfa_split_window(df, wfa, idx)
+        train_df, val_df = _wfa_split_window(df, wfa, idx, cfg)
         if train_df.empty or val_df.empty:
             logger.warning("[WFA] window %d skipped: empty split", idx)
             continue
@@ -1966,11 +1982,12 @@ _QLIB_FLAT_MODEL_MAP: dict[str, tuple[str, str]] = {
 _QLIB_MODEL_MAP = {**_QLIB_TS_MODEL_MAP, **_QLIB_FLAT_MODEL_MAP}
 
 
-class _TSLazyDataset(torch.utils.data.Dataset):
+class _TSLazyDataset:
     """Lazy TS dataset: 按需生成滚动窗口，避免一次性加载全部窗口到内存。
 
     存储原始数据 (per-instrument contiguous arrays)，__getitem__ 时动态切片。
     内存占用: O(total_rows * d_feat) 而非 O(N_windows * step_len * d_feat)。
+    DataLoader 使用 __len__/__getitem__ 协议，无需在树模型入口导入 PyTorch。
     """
 
     def __init__(self, X: np.ndarray, y: np.ndarray, instrument_offsets: list[int], step_len: int):
@@ -3819,17 +3836,18 @@ def _generate_oof_predictions(
         train_dates = set(dates[:train_end_idx])
         val_dates = set(dates[val_start_idx:val_end_idx])
 
-        fold_train = train_df[train_df["trade_date"].isin(train_dates)]
+        fold_train = _purge_label_tail(train_df[train_df["trade_date"].isin(train_dates)], cfg)
         fold_val = train_df[train_df["trade_date"].isin(val_dates)]
+        fit_df, stop_df = _split_early_stopping(fold_train, cfg)
 
-        if len(fold_train) < 100 or len(fold_val) < 10:
+        if len(fit_df) < 100 or len(stop_df) < 10 or len(fold_val) < 10:
             logger.warning("Fold %d too small (train=%d, val=%d), skipping", fold_i, len(fold_train), len(fold_val))
             continue
 
         # 训练 fold 基模型：OOF 只需要 fold 内验证集预测，跳过全量 pred_df 生成
         # （fold 传全量 df 会对 644 万行做全量预测 + 拷贝，9 次叠加是 OOM 主因）
         fold_result = _train_single_model(
-            model_type, fold_train, fold_val, fold_val,
+            model_type, fit_df, stop_df, fold_val,
             train_df, features, cfg, hardware=hardware, need_full_pred=False,
         )
         fold_model = fold_result["model"]
@@ -3841,7 +3859,7 @@ def _generate_oof_predictions(
             _predict_with_model(fold_model, X_val, model_type, features)
         ).flatten()
 
-        oof_pred.iloc[fold_val.index] = fold_pred
+        oof_pred.loc[fold_val.index] = fold_pred
         logger.info("OOF fold %d: train=%d dates, val=%d dates, pred_rows=%d",
                      fold_i, len(train_dates), len(val_dates), len(fold_val))
 
@@ -3938,19 +3956,9 @@ def train_stacking(
     meta_X_test = np.column_stack([test_base_preds[mt] for mt in model_types])
     test_ensemble_pred = meta_model.predict(meta_X_test)
 
-    # 评估集成指标
-    def _calc_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
-        from scipy.stats import spearmanr
-        rmse = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
-        ic = float(np.corrcoef(y_true, y_pred)[0, 1]) if len(y_true) > 2 else 0.0
-        rank_ic, _ = spearmanr(y_true, y_pred)
-        rank_ic = float(rank_ic) if not np.isnan(rank_ic) else 0.0
-        icir = ic / (np.std(y_pred) + 1e-9)
-        rank_icir = rank_ic / (np.std(y_pred) + 1e-9)
-        return {"rmse": rmse, "ic": ic, "rank_ic": rank_ic, "icir": icir, "rank_icir": rank_icir, "auc": 0.0}
-
-    val_ensemble_m = _calc_metrics(val_df[label_col].values, val_ensemble_pred)
-    test_ensemble_m = _calc_metrics(test_df[label_col].values, test_ensemble_pred)
+    # 与单模型共用逐日截面 RankIC / ICIR，不能除以预测值的标准差。
+    val_ensemble_m = _compute_metrics(val_df, val_df[label_col].values, val_ensemble_pred)
+    test_ensemble_m = _compute_metrics(test_df, test_df[label_col].values, test_ensemble_pred)
 
     logger.info("=== Stacking Ensemble Results ===")
     logger.info("Val:  IC=%.4f, RankIC=%.4f, ICIR=%.4f", val_ensemble_m["ic"], val_ensemble_m["rank_ic"], val_ensemble_m["rank_icir"])
@@ -4107,6 +4115,7 @@ def main() -> int:
         random.seed(_seed)
         np.random.seed(_seed)
         try:
+            import torch
             torch.manual_seed(_seed)
         except Exception:
             pass

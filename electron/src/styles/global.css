@@ -5,6 +5,7 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: light;
   /* 顶级量化平台 - 现代化视觉系统升级 */
   --font-family: 'Outfit', 'Inter', "Noto Sans SC", sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', var(--font-mono);
@@ -26,8 +27,28 @@
 
   /* 背景系统：软清晨层级 */
   --bg-main: radial-gradient(100% 100% at top left, #f1f5f9 0%, #e2e8f0 100%);
+  --bg-gradient: var(--bg-main);
   --bg-card: rgba(255, 255, 255, 0.7);
   --bg-glass: rgba(255, 255, 255, 0.4);
+  --bg-secondary: #f1f5f9;
+  --bg-tertiary: #e2e8f0;
+  --bg-card-hover: rgba(241, 245, 249, 0.9);
+  --bg-card-fund-overview: rgba(255, 255, 255, 0.74);
+  --bg-list-item-odd: rgba(241, 245, 249, 0.72);
+  --bg-trade-row: rgba(248, 250, 252, 0.78);
+  --bg-chart-box: rgba(248, 250, 252, 0.72);
+  --bg-alert-list-item: rgba(248, 250, 252, 0.78);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #94a3b8;
+  --text-positive: #ef4444;
+  --text-negative: #10b981;
+  --border-primary: #cbd5e1;
+  --border-secondary: #e2e8f0;
+  --border-chart-box: 1px solid rgba(203, 213, 225, 0.8);
+  --neutral: #64748b;
+  --neutral-light: #cbd5e1;
   
   /* 边框系统 */
   --border-glass: 1px solid rgba(255, 255, 255, 0.5);
@@ -77,7 +98,64 @@
 }
 
 
-/* 深色模式已移除 - 应用统一使用浅色主题 */
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --slate-50: #0f172a;
+  --slate-100: #172033;
+  --slate-200: #273449;
+  --slate-400: #94a3b8;
+  --slate-600: #cbd5e1;
+  --slate-800: #e2e8f0;
+  --slate-900: #f8fafc;
+  --bg-main: radial-gradient(100% 100% at top left, #172033 0%, #080d18 100%);
+  --bg-card: rgba(17, 24, 39, 0.82);
+  --bg-glass: rgba(15, 23, 42, 0.62);
+  --bg-secondary: #111827;
+  --bg-tertiary: #1e293b;
+  --bg-card-hover: rgba(30, 41, 59, 0.92);
+  --bg-card-fund-overview: rgba(17, 24, 39, 0.86);
+  --bg-list-item-odd: rgba(30, 41, 59, 0.66);
+  --bg-trade-row: rgba(30, 41, 59, 0.74);
+  --bg-chart-box: rgba(17, 24, 39, 0.76);
+  --bg-alert-list-item: rgba(30, 41, 59, 0.74);
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --border-primary: #475569;
+  --border-secondary: #334155;
+  --border-chart-box: 1px solid rgba(71, 85, 105, 0.72);
+  --border-glass: 1px solid rgba(148, 163, 184, 0.22);
+  --border-subtle: 1px solid rgba(71, 85, 105, 0.56);
+  --neutral-light: #475569;
+}
+
+html[data-theme='dark'] [class~='bg-white'],
+html[data-theme='dark'] [class~='bg-white/60'],
+html[data-theme='dark'] [class~='bg-white/70'],
+html[data-theme='dark'] [class~='bg-white/80'],
+html[data-theme='dark'] [class~='bg-white/90'],
+html[data-theme='dark'] [class~='bg-white/95'] {
+  background-color: #111827 !important;
+}
+
+html[data-theme='dark'] [class~='bg-[#f8fafc]'],
+html[data-theme='dark'] [class~='bg-gray-50'],
+html[data-theme='dark'] [class~='bg-gray-50/50'],
+html[data-theme='dark'] [class~='bg-slate-50'],
+html[data-theme='dark'] [class~='bg-slate-50/50'] {
+  background-color: #0f172a !important;
+}
+
+html[data-theme='dark'] :is(
+  .text-gray-600, .text-gray-700, .text-gray-800, .text-gray-900,
+  .text-slate-600, .text-slate-700, .text-slate-800, .text-slate-900
+) {
+  color: #e2e8f0 !important;
+}
+
+html[data-theme='dark'] :is(.border-gray-100, .border-gray-200, .border-slate-100, .border-slate-200) {
+  border-color: #334155 !important;
+}
 
 * { box-sizing: border-box; }
 html,
@@ -668,6 +746,15 @@ html.platform-win32.os-win10 .module-grid-container {
     inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
 }
 
+html[data-theme='dark'] .bottom-dock-inner {
+  background: rgba(15, 23, 42, 0.86);
+  border-color: rgba(148, 163, 184, 0.22);
+  box-shadow:
+    0 16px 40px -4px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(148, 163, 184, 0.12),
+    inset 0 1px 1px rgba(255, 255, 255, 0.08);
+}
+
 .bottom-dock-inner::-webkit-scrollbar {
   display: none;
 }
@@ -711,6 +798,13 @@ html.platform-win32.os-win10 .module-grid-container {
   border-color: rgba(255, 255, 255, 0.9);
 }
 
+html[data-theme='dark'] .dock-item:hover,
+html[data-theme='dark'] .dock-item.active {
+  background: rgba(51, 65, 85, 0.9);
+  border-color: rgba(96, 165, 250, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
 .dock-item.active {
   background: rgba(255, 255, 255, 0.96);
   border-color: rgba(59, 130, 246, 0.25);
@@ -727,6 +821,16 @@ html.platform-win32.os-win10 .module-grid-container {
 
 .dock-item:hover .dock-icon {
   color: #0f172a;
+}
+
+html[data-theme='dark'] .dock-icon,
+html[data-theme='dark'] .dock-label {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .dock-item:hover .dock-icon,
+html[data-theme='dark'] .dock-item:hover .dock-label {
+  color: #f8fafc;
 }
 
 .dock-item.active .dock-icon {

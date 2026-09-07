@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RecoilRoot } from 'recoil';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Spin, notification, Button, ConfigProvider } from 'antd';
+import { Spin, notification, Button, ConfigProvider, theme as antdTheme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
@@ -24,6 +24,7 @@ import { useTradingModeInitialization } from './hooks/useTradingModeInitializati
 import { useMarketReset } from './hooks/useMarketReset';
 import { authService } from './features/auth/services/authService';
 import { initDynamicServerUrl } from './config/services';
+import { preferencesService } from './services/preferences/PreferencesService';
 
 // 认证相关组件
 import AppRoutes from './features/auth/AppRoutes';
@@ -65,10 +66,16 @@ const ComingSoonPage = lazy(() => import('./features/admin/components/ComingSoon
 const AlphaResearchPage = lazy(() => import('./features/alpha-research/pages/AlphaResearchPage'));
 const SkillsCenterPage = lazy(() => import('./features/skills-center/pages/SkillsCenterPage'));
 
-// 主题切换hook
-// 主题管理已移除 - 应用统一使用浅色主题
+const subscribeToTheme = (listener: () => void) => preferencesService.addListener(listener);
+
 const useTheme = () => {
-  // 不再监听系统主题变化，强制使用浅色主题
+  const theme = React.useSyncExternalStore(subscribeToTheme, () => preferencesService.getEffectiveTheme());
+
+  const toggleTheme = useCallback(() => {
+    preferencesService.setTheme(theme === 'dark' ? 'light' : 'dark');
+  }, [theme]);
+
+  return { theme, toggleTheme };
 };
 
 // 模块配置接口
@@ -145,7 +152,7 @@ export default function App() {
   const [serverConfigReady, setServerConfigReady] = useState(false);
   const { ExportModal } = useMenuExport();
   const { isAuthenticated, isLoading } = useAuth();
-  useTheme();
+  const { theme, toggleTheme } = useTheme();
   useTradingModeInitialization();
   useMarketReset();
   
@@ -508,7 +515,10 @@ export default function App() {
     <RecoilRoot>
       <QueryProvider>
         <WebSocketProvider>
-          <ConfigProvider locale={zhCN}>
+          <ConfigProvider
+            locale={zhCN}
+            theme={{ algorithm: theme === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}
+          >
             <div className={`app-root${shouldShowNavigation ? ' has-dock' : ''}`}>
             <TitleBar />
             <ErrorBoundary>
@@ -741,6 +751,8 @@ export default function App() {
                 <FloatingNavBar
                   current={tab}
                   onChange={handleNavChange}
+                  theme={theme}
+                  onToggleTheme={toggleTheme}
                 />
               )}
 

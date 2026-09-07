@@ -37,6 +37,13 @@ export class PreferencesService {
   private static STORAGE_KEY = 'user_preferences';
   private preferences: UserPreferences;
   private listeners: Set<(prefs: UserPreferences) => void> = new Set();
+  private systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+  private onSystemThemeChange = () => {
+    if (this.preferences.theme === 'auto') {
+      this.applyTheme();
+      this.notifyListeners();
+    }
+  };
 
   constructor() {
     this.preferences = this.loadPreferences();
@@ -54,18 +61,15 @@ export class PreferencesService {
    * 更新偏好设置
    */
   updatePreferences(updates: Partial<UserPreferences>): void {
-    const normalizedUpdates = { ...updates };
-    if (normalizedUpdates.theme && normalizedUpdates.theme !== 'light') {
-      normalizedUpdates.theme = 'light';
-    }
-    this.preferences = { ...this.preferences, ...normalizedUpdates };
+    this.preferences = { ...this.preferences, ...updates };
     this.savePreferences();
-    this.notifyListeners();
 
     // 应用主题变化
-    if (normalizedUpdates.theme) {
+    if (updates.theme) {
       this.applyTheme();
     }
+
+    this.notifyListeners();
 
     // 应用字体大小变化
     if (updates.display?.fontSize) {
@@ -79,8 +83,8 @@ export class PreferencesService {
   resetToDefaults(): void {
     this.preferences = this.getDefaultPreferences();
     this.savePreferences();
-    this.notifyListeners();
     this.applyTheme();
+    this.notifyListeners();
   }
 
   /**
@@ -93,8 +97,8 @@ export class PreferencesService {
   /**
    * 设置主题
    */
-  setTheme(_theme: Theme): void {
-    this.updatePreferences({ theme: 'light' });
+  setTheme(theme: Theme): void {
+    this.updatePreferences({ theme });
   }
 
   /**
@@ -128,8 +132,8 @@ export class PreferencesService {
       if (this.validatePreferences(prefs)) {
         this.preferences = prefs;
         this.savePreferences();
-        this.notifyListeners();
         this.applyTheme();
+        this.notifyListeners();
         return true;
       }
       return false;
@@ -143,8 +147,17 @@ export class PreferencesService {
    * 添加监听器
    */
   addListener(listener: (prefs: UserPreferences) => void): () => void {
+    if (this.listeners.size === 0) {
+      this.systemTheme.addEventListener('change', this.onSystemThemeChange);
+      this.applyTheme();
+    }
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return () => {
+      this.listeners.delete(listener);
+      if (this.listeners.size === 0) {
+        this.systemTheme.removeEventListener('change', this.onSystemThemeChange);
+      }
+    };
   }
 
   /**
@@ -164,8 +177,11 @@ export class PreferencesService {
   /**
    * 获取实际主题（处理auto）
    */
-  private getEffectiveTheme(): 'light' | 'dark' {
-    return 'light';
+  getEffectiveTheme(): 'light' | 'dark' {
+    if (this.preferences.theme === 'auto') {
+      return this.systemTheme.matches ? 'dark' : 'light';
+    }
+    return this.preferences.theme;
   }
 
   /**
@@ -184,7 +200,12 @@ export class PreferencesService {
       if (stored) {
         const prefs = JSON.parse(stored);
         // 合并默认值以处理新增的设置项
-        return { ...this.getDefaultPreferences(), ...prefs, theme: 'light' };
+        const defaults = this.getDefaultPreferences();
+        return {
+          ...defaults,
+          ...prefs,
+          theme: ['light', 'dark', 'auto'].includes(prefs.theme) ? prefs.theme : defaults.theme,
+        };
       }
     } catch (error) {
       console.error('Failed to load preferences:', error);
@@ -224,6 +245,7 @@ export class PreferencesService {
    */
   private validatePreferences(prefs: any): boolean {
     if (!prefs || typeof prefs !== 'object') return false;
+    if (!['light', 'dark', 'auto'].includes(prefs.theme)) return false;
 
     // 基本验证
     const requiredKeys = ['theme', 'language', 'layout', 'notifications', 'chart', 'trading', 'display'];

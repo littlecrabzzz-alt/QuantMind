@@ -18,6 +18,8 @@ import {
   BarChart3,
   Cpu,
   CandlestickChart,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { selectCurrentMarket } from '../../store/slices/uiSlice';
@@ -26,6 +28,8 @@ import { getMarketConfig } from '../../config/marketConfig';
 interface FloatingNavBarProps {
   current?: string;
   onChange?: (section: string) => void;
+  theme: 'light' | 'dark';
+  onToggleTheme: () => void;
 }
 
 interface NavItemConfig {
@@ -34,7 +38,7 @@ interface NavItemConfig {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({ current, onChange }) => {
+export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({ current, onChange, theme, onToggleTheme }) => {
   const user = useSelector((state: any) => state.auth.user);
   const isAdmin = user?.is_admin || false;
   const currentMarket = useSelector(selectCurrentMarket);
@@ -110,6 +114,17 @@ export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({ current, onChang
             )}
           </React.Fragment>
         ))}
+        <span className="dock-divider" aria-hidden="true" />
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          className="dock-item"
+          aria-label={`切换为${theme === 'dark' ? '浅色' : '暗色'}模式`}
+          title={`切换为${theme === 'dark' ? '浅色' : '暗色'}模式`}
+        >
+          {theme === 'dark' ? <Sun className="dock-icon" /> : <Moon className="dock-icon" />}
+          <span className="dock-label">{theme === 'dark' ? '浅色' : '暗色'}</span>
+        </button>
       </div>
     </nav>
   );
