@@ -17,6 +17,9 @@ services:
     environment:
       HOST_PROJECT_PATH: /root/data/disk/quantmind/project
       TRAINING_PAUSE_OTHERS: "false"
+      TRAINING_MEMORY_LIMIT_GB: "4"
+      TRAIN_NTHREADS: "2"
+      TRAIN_IC_WORKERS: "1"
       QUANTMIND_ENABLE_WEB_UPDATE: "false"
       ENABLE_REAL_TRADING: "false"
       ENABLE_TDX_PUSH: "false"
@@ -81,6 +84,7 @@ services:
     volumes:
       - ./electron/dist-react:/usr/share/nginx/html:ro
       - ./docker/web/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx-registration.conf:/etc/nginx/quantmind/registration.conf:ro
     mem_limit: 64m
     cpus: 0.25
     restart: unless-stopped

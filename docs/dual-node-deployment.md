@@ -26,7 +26,7 @@
 
 同步源码与共享配置；排除 `.git`、依赖、缓存、日志、数据目录和研究产物。保留 `data/upgrade_v*.sql`、`data/stocks` 及 `db/sql` 等源码资源。`.stversions` 已被 Git 忽略，避免历史密钥进入 Git 提交。
 
-Syncthing 的历史版本保存在接收端，不等于应用一致性备份。当前 Git 历史仅完成初始化；后续提交、分支及合并仍需通过 Git 管理，不由 Syncthing 同步。运行中的服务也不会仅因文件同步而自动切换代码版本。
+Syncthing 的历史版本保存在接收端，不等于应用一致性备份。两端 Git 已在保留工作树内容的前提下对齐到 `master`；后续提交、分支及合并仍需通过 Git 管理，不由 Syncthing 同步。运行中的服务也不会仅因文件同步而自动切换代码版本。
 
 ## 仓库是同步和部署配置的来源
 
@@ -50,6 +50,8 @@ python3 scripts/dual_node_sync.py mac
 ssh lzy-vm 'sudo -n python3 /root/code/QuantMind/scripts/dual_node_sync.py cloud'
 bash scripts/dual-node.sh status
 ```
+
+云端原有服务已占用较多内存，训练编排原来的“至少 20 GiB、约宿主 80%”规则不适合共用服务器。云端 API 派生的训练容器明确限制为 4 GiB、模型线程数 2、IC worker 1；大型训练可能因自身资源超限失败，应单独规划训练节点，不能以暂停其他项目来换内存。手工 Docker 作业和其他研究工具也需要自行遵守共享机器预算，这不是覆盖所有任意 root 命令的全局资源隔离。
 
 修改规则后，先核对再执行 `--apply`。如 `.stignore` 被外部工具改动，脚本会报错而非忽略。Git 元数据仍不交给 Syncthing；分支/提交需要单独通过 Git 传递，不能把 `.git` 加回同步。
 
@@ -80,7 +82,7 @@ bash scripts/dual-node.sh web-publish
 bash scripts/dual-node-cutover.sh
 ```
 
-镜像和前端准备好后，也可让编排脚本完成后续全部步骤：`caffeinate -i python3 scripts/dual_node_deploy.py`。编排仅重试预复制中的暂时网络错误，不会在失败后盲目重启 Mac 主节点。云端恢复由一次性 systemd 服务托管，SSH 观察连接中断不会杀掉恢复进程；可用 `journalctl -u quantmind-cutover` 查看。
+镜像和前端准备好后，也可让编排脚本完成后续全部步骤：`caffeinate -i python3 scripts/dual_node_deploy.py`。已有预复制正在运行时用 `--wait-for <PID>` 接续，不重复启动传输。编排重试预复制中的暂时网络错误，并在研究任务忙时等待；停写后的其他错误会停止流程，不会盲目重启 Mac 主节点。云端恢复与快照创建由一次性 systemd 服务托管，SSH 观察连接中断不会杀掉恢复/解冻进程；可用 `journalctl -u quantmind-cutover` 或 `journalctl -u quantmind-snapshot-create` 查看。
 
 切换脚本只停止 QuantMind 的写入服务，发现独立研究容器或活动 Celery 任务时拒绝切换。PostgreSQL 用事务一致性 dump 跨 CPU 架构迁移；Redis、Huntly、QwenPaw 停写后迁移。QwenPaw 整卷恢复包含其注册清单，后续技能更新仍只走 `quantbot_init.sh`，不能单独复制技能目录。
 
@@ -94,6 +96,8 @@ bash scripts/dual-node-cutover.sh
 
 联网时可直接访问云端 3080；也可运行 `bash scripts/dual-node.sh connect`，通过加密 SSH 隧道访问 `http://127.0.0.1:18080`。两种入口指向同一服务、同一数据库。公网当前是 HTTP，没有部署域名/TLS；涉及密码和研究数据时优先使用 SSH 隧道。
 
+云端 Nginx 拒绝公开注册接口，仅使用迁移来的现有账号；数据库、Redis、QwenPaw 和内部 API 不直接对公网发布。该策略由 `deploy/nginx-registration.conf` 管理，不改变本地开发的默认注册行为。
+
 编排在云端 API 验证通过后才执行 `install-tunnel`，安装 `com.quantmind.cloud-tunnel` LaunchAgent。它把 Mac `127.0.0.1:8000` 和 `18080` 接到云端 3080；原有本地 Vite 页面仍通过 8000 访问同一份云端数据，断网后隧道会自动重连。若端口被无关服务占用则拒绝安装，不会抢占端口。此隧道配置已通过语法/端口边界检查，但当前迁移尚未完成，因此尚未安装启动。
 
 Mac 断网不影响云端服务。断网时本机现有数据是截至切换时的离线基线，代码编辑和冻结数据研究可以继续，但云端新数据不可能实时出现在离线 Mac。
@@ -101,7 +105,7 @@ Mac 断网不影响云端服务。断网时本机现有数据是截至切换时�
 权威源切换完成后，在无研究任务的时间主动创建/拉取新快照：
 
 ```bash
-ssh lzy-vm 'sudo -n python3 /root/code/QuantMind/scripts/dual_node_snapshot.py create'
+ssh lzy-vm 'sudo -n systemd-run --unit=quantmind-snapshot-create --wait --collect --property=RequiresMountsFor=/root/data/disk /usr/bin/python3 /root/code/QuantMind/scripts/dual_node_snapshot.py create'
 python3 scripts/dual_node_snapshot.py pull
 ```
 

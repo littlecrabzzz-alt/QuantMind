@@ -15,6 +15,19 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class DeploymentBoundary(unittest.TestCase):
+    def test_busy_cutover_waits_before_health_checks(self):
+        cutover = Mock(side_effect=[subprocess.CalledProcessError(75, "cutover"), None])
+        with patch.object(dual_node_deploy, "remote", return_value=subprocess.CompletedProcess([], 1)), \
+             patch.object(dual_node_deploy, "stage"), \
+             patch.object(dual_node_deploy, "run", cutover), \
+             patch.object(dual_node_deploy, "ready", side_effect=RuntimeError("health boundary")), \
+             patch.object(dual_node_deploy.time, "sleep") as sleep, \
+             patch.object(dual_node_deploy.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)):
+            with self.assertRaisesRegex(RuntimeError, "health boundary"):
+                dual_node_deploy.deploy(None)
+        self.assertEqual(cutover.call_count, 2)
+        sleep.assert_called_once_with(30)
+
     def test_transport_retry_never_retries_failed_cutover(self):
         authority = Mock(side_effect=[subprocess.CompletedProcess([], 255),
                                       subprocess.CompletedProcess([], 1)])
@@ -100,6 +113,7 @@ class DeploymentBoundary(unittest.TestCase):
             self.assertEqual(env["TRAINING_PAUSE_OTHERS"], "false")
             self.assertEqual(env["ENABLE_REAL_TRADING"], "false")
             self.assertEqual(env["HOST_PROJECT_PATH"], topology()["QM_REMOTE_PROJECT"])
+        self.assertEqual(services["quantmind"]["environment"]["TRAINING_MEMORY_LIMIT_GB"], "4")
         for volume in config["volumes"].values():
             self.assertTrue(volume["driver_opts"]["device"].startswith(
                 topology()["QM_REMOTE_ROOT"] + "/volumes/"))

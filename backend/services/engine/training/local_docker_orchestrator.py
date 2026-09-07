@@ -52,11 +52,18 @@ _TRAINING_BOOTSTRAP_PIP = (os.getenv("TRAINING_BOOTSTRAP_PIP") or "duckdb pyqlib
 def _host_mem_limit_gb() -> str | None:
     """训练容器的 mem_limit（GB 字符串），保护宿主机不被训练进程打爆。
 
+    共用宿主机优先显式配置 TRAINING_MEMORY_LIMIT_GB，避免按整机内存分配。
     编排器运行在 api 容器内，/proc/meminfo 显示宿主机总内存（cgroup v2 不虚拟化）。
     取宿主机 80%（下限 20GB、上限 64GB）；读不到内存信息时返回 None（不限）。
     限制留 20% 余量给宿主机其它服务（PG/Redis/LLM 容器等），
     训练峰值超限时只牺牲训练容器（OOM → ExitCode 137），不拖垮整机。
     """
+    configured = os.getenv("TRAINING_MEMORY_LIMIT_GB", "").strip()
+    if configured:
+        limit = int(configured)
+        if not 1 <= limit <= 64:
+            raise ValueError("TRAINING_MEMORY_LIMIT_GB must be between 1 and 64")
+        return f"{limit}g"
     try:
         with open("/proc/meminfo", encoding="utf-8") as f:
             for line in f:

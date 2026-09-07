@@ -22,6 +22,10 @@ WRITERS = ["quantmind-celery-beat", "quantmind", "quantmind-celery",
            "quantmind-huntly", "qwenpaw", "quantmind-redis"]
 
 
+class BusyError(RuntimeError):
+    pass
+
+
 def run(*args, **kwargs):
     return subprocess.run(args, check=True, **kwargs)
 
@@ -80,11 +84,14 @@ def cloud_snapshot():
             copy += ["--link-dest=" + str(previous / "project")]
         run(*copy, *sources, str(target / "project") + "/")
         active = output("docker", "ps", "--format", "{{.Names}}").splitlines()
-        require(not any(n.startswith(("qm-train-", "qm-agent-", "qm-frozen-")) for n in active), "Research job active")
+        if any(n.startswith(("qm-train-", "qm-agent-", "qm-frozen-")) for n in active):
+            raise BusyError("Research job active")
         if "quantmind-celery" in active:
             jobs = json.loads(output("docker", "exec", "quantmind-celery", "celery", "-A",
                 "backend.services.engine.qlib_app.celery_config:celery_app", "inspect", "active", "--json", "--timeout=15"))
-            require(jobs and all(not value for value in jobs.values()), "Celery work active")
+            require(bool(jobs), "No Celery worker response")
+            if any(jobs.values()):
+                raise BusyError("Celery work active")
         stopped = [name for name in WRITERS if name in active]
         try:
             applications = [name for name in stopped if name != "quantmind-redis"]
@@ -157,4 +164,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("create", "pull"))
     action = parser.parse_args().action
-    cloud_snapshot() if action == "create" else pull_snapshot()
+    try:
+        cloud_snapshot() if action == "create" else pull_snapshot()
+    except BusyError as exc:
+        print(str(exc), flush=True)
+        raise SystemExit(75)

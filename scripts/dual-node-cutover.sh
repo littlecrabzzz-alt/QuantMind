@@ -35,11 +35,11 @@ trap finish EXIT
 # Do not interrupt independent model/backtest containers or in-flight Celery work.
 if docker ps --format '{{.Names}}' | rg '^qm-(train|frozen|agent)-'; then
   echo 'A research job is active; retry after it finishes.' >&2
-  exit 1
+  exit 75
 fi
 docker exec quantmind-celery celery -A backend.services.engine.qlib_app.celery_config:celery_app \
   inspect active --json --timeout=15 > "$backup/celery-active.json"
-python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d and all(not jobs for jobs in d.values()), "Active Celery tasks: retry later"' "$backup/celery-active.json"
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(1 if not d else (75 if any(d.values()) else 0))' "$backup/celery-active.json"
 docker inspect quantmind quantmind-celery quantmind-celery-beat quantmind-huntly qwenpaw \
   --format '{{.Name}} {{.State.Running}} {{.HostConfig.RestartPolicy.Name}}' > "$backup/local-services.txt"
 echo 'Freezing QuantMind writers; unrelated services are untouched.'

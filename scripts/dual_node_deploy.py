@@ -10,6 +10,7 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import time
 import urllib.request
@@ -41,8 +42,18 @@ def remote(command):
 
 
 def ready():
+    check = '''import json, subprocess, sys
+names = ["quantmind", "quantmind-db", "quantmind-redis", "quantmind-celery",
+         "quantmind-celery-beat", "quantmind-data-gateway", "quantmind-huntly",
+         "quantmind-rsshub", "qwenpaw", "quantmind-web"]
+items = json.loads(subprocess.check_output(["docker", "inspect", *names]))
+sys.exit(0 if all(item["State"]["Running"] and
+    item["State"].get("Health", {}).get("Status", "healthy") == "healthy"
+    for item in items) else 1)
+'''
     for attempt in range(60):
-        result = remote("curl -fsS http://127.0.0.1:18000/health >/dev/null && "
+        result = remote("sudo -n python3 -c " + shlex.quote(check) + " && "
+                        "curl -fsS http://127.0.0.1:18000/health >/dev/null && "
                         "sudo -n docker exec qwenpaw python -c "
                         "'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8088/health\", timeout=10)' >/dev/null")
         if result.returncode == 0:
@@ -77,7 +88,15 @@ def deploy(wait_for):
             stage("preseed_waiting_for_network", returncode=result.returncode)
             time.sleep(30)
         stage("cutover")
-        run("bash", "scripts/dual-node-cutover.sh")
+        while True:
+            try:
+                run("bash", "scripts/dual-node-cutover.sh")
+                break
+            except subprocess.CalledProcessError as exc:
+                if exc.returncode != 75:
+                    raise
+                stage("cutover_waiting_for_idle_research")
+                time.sleep(30)
     stage("cloud_health")
     ready()
     stage("installing_local_tunnel")
@@ -93,7 +112,16 @@ def deploy(wait_for):
     else:
         raise RuntimeError("Local SSH tunnel is not serving the cloud web entry")
     stage("creating_cloud_snapshot")
-    remote("sudo -n python3 " + REMOTE_PROJECT + "/scripts/dual_node_snapshot.py create").check_returncode()
+    while True:
+        # The cloud must finish thawing writers even if the Mac disconnects.
+        result = remote("sudo -n systemd-run --unit=quantmind-snapshot-create --wait --collect "
+                        "--property=RequiresMountsFor=/root/data/disk /usr/bin/python3 " +
+                        REMOTE_PROJECT + "/scripts/dual_node_snapshot.py create")
+        if result.returncode != 75:
+            result.check_returncode()
+            break
+        stage("snapshot_waiting_for_idle_research")
+        time.sleep(30)
     stage("pulling_verified_offline_snapshot")
     run("python3", "scripts/dual_node_snapshot.py", "pull")
     ready()
