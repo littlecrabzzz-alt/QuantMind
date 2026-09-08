@@ -1474,7 +1474,37 @@ class Pipeline:
         }
 
     def publish(self):
-        files, active, gaps = {}, {}, []
+        previous_id, previous = None, None
+        pointer = self.root / "CURRENT.json"
+        if pointer.exists():
+            previous_id = json.loads(pointer.read_bytes())["release_id"]
+            if previous_id.startswith("data-"):
+                previous = manifest_at(self.root, previous_id)
+
+        def preserve_release_mapping(archive):
+            known = (
+                ((previous or {}).get("archive") or {})
+                .get("recovery", {})
+                .get("archived_releases", [])
+            )
+            if not known:
+                return archive
+            archive = archive or {
+                "gaps": [],
+                "recovery": {"status": "not_started", "historical_complete": False},
+            }
+            recovery = dict(archive["recovery"])
+            mappings = {}
+            for item in known + recovery.get("archived_releases", []):
+                key = item["release_id"]
+                if key in mappings and mappings[key] != item:
+                    raise ValueError("Conflicting archived release mapping")
+                mappings[key] = item
+            recovery["archived_releases"] = [mappings[key] for key in sorted(mappings)]
+            return {**archive, "recovery": recovery}
+
+        files = dict(previous["files"]) if previous else {}
+        active, gaps = {}, []
         for row in self.db.execute(
             "SELECT * FROM jobs WHERE state NOT IN ('done','pending') ORDER BY rowid"
         ):
@@ -1530,10 +1560,16 @@ class Pipeline:
             atomic_bytes(self.root / schema_name, raw)
         files[schema_name] = {"sha256": digest(raw), "bytes": len(raw)}
         archive = None
+        self_archive_verified = False
         if (self.root / "archive.sqlite").exists():
             from backend.shared.tushare_archive import archive_inventory
 
             archived = archive_inventory(self.root)
+            self_archive_verified = bool(
+                previous_id
+                and "archives/" + previous_id.removeprefix("data-") + ".json"
+                in archived["files"]
+            )
             files.update(archived["files"])
             for dataset in archived["datasets"]:
                 active.setdefault(dataset["path"], dataset)
@@ -1591,7 +1627,7 @@ class Pipeline:
             "implemented_contracts": sorted(set(CONTRACTS) | set(EXTENDED_CONTRACTS)),
             "schema_path": schema_name,
             "documents": documents,
-            "archive": archive,
+            "archive": preserve_release_mapping(archive),
             "historical_versions_complete": False,
             "retained_observations_included": True,
             "capabilities": [
@@ -1605,6 +1641,82 @@ class Pipeline:
             "catalogued_interfaces": len(self.catalog["entries"]),
             "unimplemented_catalog_scope": True,
         }
+        if previous:
+            # A crash after retaining CURRENT must not manufacture a new release
+            # solely because CURRENT's own archived manifest now exists.
+            def comparable(document):
+                value = dict(document)
+                own_path = "archives/" + previous_id[5:] + ".json"
+                if own_path in document["files"]:
+                    own = self.root / own_path
+                    expected = document["files"][own_path]
+                    if (
+                        expected
+                        != {"sha256": previous_id[5:], "bytes": own.stat().st_size}
+                        or digest(own.read_bytes()) != previous_id[5:]
+                    ):
+                        raise ValueError("Invalid archived CURRENT manifest")
+                value["files"] = {
+                    name: metadata
+                    for name, metadata in document["files"].items()
+                    if name != own_path
+                }
+                archive = document.get("archive")
+                if archive:
+                    archive = {**archive, "recovery": dict(archive["recovery"])}
+                    recovery = archive["recovery"]
+                    releases = recovery.get("archived_releases", [])
+                    retained = [r for r in releases if r["release_id"] != previous_id]
+                    if len(retained) != len(releases):
+                        recovery["archived_releases"] = retained
+                        if any(
+                            r
+                            != {
+                                "release_id": previous_id,
+                                "path": own_path,
+                                "sha256": previous_id[5:],
+                            }
+                            for r in releases
+                            if r["release_id"] == previous_id
+                        ):
+                            raise ValueError("Invalid archived CURRENT mapping")
+                    if self_archive_verified and own_path in document["files"]:
+                        recovery["files"] -= 1
+                    if archive == {
+                        "gaps": [],
+                        "recovery": {
+                            "status": "not_started",
+                            "remaining": 0,
+                            "tasks": 0,
+                            "files": 0,
+                            "open_gaps": 0,
+                            "scan_count": 0,
+                            "historical_complete": False,
+                            "archived_releases": [],
+                        },
+                    }:
+                        archive = None
+                    value["archive"] = archive
+                return value
+
+            if comparable(content) == comparable(previous):
+                return previous_id
+        if previous_id:
+            from backend.shared.tushare_archive import archive_inventory, retain_release
+
+            retained = retain_release(self.root, previous_id)
+            for name, metadata in retained["files"].items():
+                if name in files and files[name] != metadata:
+                    raise ValueError("Conflicting inherited file metadata")
+                files[name] = metadata
+            archived = archive_inventory(self.root)
+            files.update(archived["files"])
+            content["archive"] = preserve_release_mapping(
+                {
+                    "recovery": archived["recovery"],
+                    "gaps": archived["gaps"],
+                }
+            )
         raw = json_bytes(content)
         sha = digest(raw)
         release = "data-" + sha
