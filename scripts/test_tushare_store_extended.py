@@ -173,6 +173,12 @@ class FixedStore(unittest.TestCase):
     def test_all_contracts_and_financial_aliases(self):
         fixtures = []
         observations = {}
+        identity_params = {
+            "fina_mainbz": {"ts_code": "600036.SH", "type": "P"},
+            "stock_hsgt": {"trade_date": "20260904", "type": "HK_SZ"},
+            "hsgt_top10": {"trade_date": "20260904", "market_type": "1"},
+            "moneyflow_ind_dc": {"trade_date": "20260904", "content_type": "行业"},
+        }
         for api, keys in store.KEYS.items():
             if api not in store.CONTRACTS and api not in (
                 "trade_cal",
@@ -188,18 +194,52 @@ class FixedStore(unittest.TestCase):
             if store.CONTRACTS.get(api, {}).get("preserve_distinct_rows"):
                 values["_row_identity"] = "fixture-source-row"
             if store.CONTRACTS.get(api, {}).get("request_identity_fields"):
-                name = "a" * 32 + ".json"
-                values.update(_row_identity="b" * 64, _observation=name)
-                observations[name] = {
-                    "request": {"api_name": api, "params": {"type": "P"}}
+                observation = {
+                    "request": {"api_name": api, "params": identity_params[api]}
                 }
+                # An immutable observation belongs to one request, not to every
+                # dataset in this release. Reusing a name overwrites API evidence.
+                name = (
+                    hashlib.sha256(
+                        json.dumps(observation, sort_keys=True).encode()
+                    ).hexdigest()
+                    + ".json"
+                )
+                values.update(_row_identity="b" * 64, _observation=name)
+                observations[name] = observation
             fixtures.append((api, [row(**values)]))
         pinned = release(self.root, fixtures, observations=observations)
         for api, _ in fixtures:
             with self.subTest(api=api):
-                self.assertEqual(store.read_dataset(self.root, pinned, api).num_rows, 1)
+                table = store.read_dataset(self.root, pinned, api)
+                self.assertEqual(table.num_rows, 1)
+                if api in identity_params:
+                    identity_fields = store.CONTRACTS[api]["request_identity_fields"]
+                    self.assertEqual(
+                        json.loads(table.to_pylist()[0]["_request_identity"]),
+                        {
+                            field: identity_params[api][field]
+                            for field in identity_fields
+                        },
+                    )
+                    metadata = json.loads(table.schema.metadata[b"tushare"])
+                    self.assertEqual(
+                        metadata["request_identity_status"],
+                        "verified_from_immutable_observations",
+                    )
         self.assertEqual(store.read_dataset(self.root, pinned, "income").num_rows, 1)
-        self.assertEqual(len(fixtures), 131)
+        self.assertEqual(len(observations), len(identity_params))
+        self.assertTrue(
+            {
+                "stock_hsgt",
+                "hsgt_top10",
+                "moneyflow_cnt_ths",
+                "moneyflow_ind_ths",
+                "moneyflow_ind_dc",
+            }
+            <= {api for api, _ in fixtures}
+        )
+        self.assertEqual(len(fixtures), 136)
 
     def test_dates_codes_and_macro_periods(self):
         pinned = release(
