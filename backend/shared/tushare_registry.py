@@ -8,7 +8,10 @@ from backend.shared.tushare_structured_contracts import (
 
 from backend.shared.tushare_market_contracts import MARKET_CONTRACTS, iter_market_jobs
 
+from backend.shared.tushare_global_contracts import GLOBAL_CONTRACTS, iter_global_jobs
+
 EXTENDED_CONTRACTS = {
+    **{api: {**spec, "group": "global"} for api, spec in GLOBAL_CONTRACTS.items()},
     **{api: {**spec, "group": "market"} for api, spec in MARKET_CONTRACTS.items()},
     **{api: {**spec, "group": "text"} for api, spec in TEXT_CONTRACTS.items()},
     **{
@@ -20,6 +23,7 @@ PLANNERS = {
     "text": lambda config, today, ids: iter_text_jobs(config, today),
     "structured": iter_structured_jobs,
     "market": iter_market_jobs,
+    "global": iter_global_jobs,
 }
 
 
