@@ -16,6 +16,23 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class DeploymentBoundary(unittest.TestCase):
+    def test_copy_dest_reuses_changed_backup_blocks(self):
+        rsync = "/opt/homebrew/bin/rsync" if pathlib.Path("/opt/homebrew/bin/rsync").exists() else "rsync"
+        with tempfile.TemporaryDirectory() as directory:
+            source, basis, target = (pathlib.Path(directory) / p for p in ("source", "basis", "target"))
+            for p in (source, basis, target):
+                p.mkdir()
+            original = os.urandom(2 * 1024 * 1024)
+            (basis / "postgres.dump").write_bytes(original)
+            (source / "postgres.dump").write_bytes(b"changed header" + original[14:])
+            stats = subprocess.check_output([rsync, "-a", "--checksum", "--no-whole-file", "--stats",
+                "--copy-dest=" + str(basis), str(source) + "/", str(target) + "/"],
+                text=True, env={**os.environ, "LC_ALL": "C"})
+            literal = next(line for line in stats.splitlines() if line.startswith("Literal data:"))
+            self.assertLess(int(literal.split()[2].replace(",", "")), 65536)
+            self.assertEqual((target / "postgres.dump").read_bytes(), (source / "postgres.dump").read_bytes())
+            self.assertEqual((basis / "postgres.dump").read_bytes(), original)
+
     def test_completed_initial_snapshot_is_reused(self):
         opener = MagicMock()
         opener.open.return_value.__enter__.return_value.status = 200

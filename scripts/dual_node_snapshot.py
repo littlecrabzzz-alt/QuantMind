@@ -147,6 +147,10 @@ def pull_snapshot():
         else:
             # First download reuses matching local bytes WITHOUT hard-linking live data.
             data_args += ["--copy-dest=" + str(PROJECT)]
+            backups = sorted((PROJECT / "logs").glob("dual-node-*/postgres.dump"))
+            if backups:
+                # PostgreSQL dump headers can change; rsync still reuses matching blocks.
+                metadata_args += ["--copy-dest=" + str(backups[-1].parent.resolve())]
         run(*metadata_args, "--exclude=/project/", ssh + ":" + remote_path + "/", str(target) + "/")
         (target / "project").mkdir(exist_ok=True)
         run(*data_args, ssh + ":" + remote_path + "/project/", str(target / "project") + "/")
