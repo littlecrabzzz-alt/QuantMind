@@ -178,7 +178,8 @@ def mirror(root):
                 subprocess.run(
                     [
                         "rsync",
-                        "-a",
+                        "-az",
+                        "--compress-level=3",
                         "--checksum",
                         "--timeout=45",
                         "--partial-dir=.rsync-partial",

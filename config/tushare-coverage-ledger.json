@@ -2442,9 +2442,21 @@
       "acquisition_api_names": [
         "sge_basic"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "sge_basic",
+            "missing_fields": [],
+            "row_count": 13,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "285",
@@ -2456,9 +2468,21 @@
       "acquisition_api_names": [
         "sge_daily"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "sge_daily",
+            "missing_fields": [],
+            "row_count": 41,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "157",
@@ -2480,9 +2504,21 @@
       "acquisition_api_names": [
         "opt_basic"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "opt_basic",
+            "missing_fields": [],
+            "row_count": 12000,
+            "status": "possibly_truncated"
+          }
+        ]
+      }
     },
     {
       "doc_id": "159",
@@ -2494,9 +2530,21 @@
       "acquisition_api_names": [
         "opt_daily"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "opt_daily",
+            "missing_fields": [],
+            "row_count": 15000,
+            "status": "possibly_truncated"
+          }
+        ]
+      }
     },
     {
       "doc_id": "341",
@@ -2780,9 +2828,21 @@
       "acquisition_api_names": [
         "fx_obasic"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "fx_obasic",
+            "missing_fields": [],
+            "row_count": 69,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "179",
@@ -2794,9 +2854,21 @@
       "acquisition_api_names": [
         "fx_daily"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "fx_daily",
+            "missing_fields": [],
+            "row_count": 2,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "190",
@@ -3290,9 +3362,21 @@
       "acquisition_api_names": [
         "libor"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "libor",
+            "missing_fields": [],
+            "row_count": 0,
+            "status": "empty_unverified"
+          }
+        ]
+      }
     },
     {
       "doc_id": "153",
@@ -3304,9 +3388,21 @@
       "acquisition_api_names": [
         "hibor"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "hibor",
+            "missing_fields": [],
+            "row_count": 4,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "173",
@@ -3318,9 +3414,21 @@
       "acquisition_api_names": [
         "wz_index"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "wz_index",
+            "missing_fields": [],
+            "row_count": 2324,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "174",
@@ -3332,9 +3440,21 @@
       "acquisition_api_names": [
         "gz_index"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "gz_index",
+            "missing_fields": [],
+            "row_count": 1181,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "225",
@@ -3510,9 +3630,21 @@
       "acquisition_api_names": [
         "us_tycr"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "us_tycr",
+            "missing_fields": [],
+            "row_count": 4,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "220",
@@ -3524,9 +3656,21 @@
       "acquisition_api_names": [
         "us_trycr"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "us_trycr",
+            "missing_fields": [],
+            "row_count": 4,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "221",
@@ -3538,9 +3682,21 @@
       "acquisition_api_names": [
         "us_tbr"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "us_tbr",
+            "missing_fields": [],
+            "row_count": 4,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "222",
@@ -3552,9 +3708,21 @@
       "acquisition_api_names": [
         "us_tltr"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "us_tltr",
+            "missing_fields": [],
+            "row_count": 4,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "223",
@@ -3566,9 +3734,21 @@
       "acquisition_api_names": [
         "us_trltr"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Live probe retained and automatic history enabled; resolve saturated option discovery/daily windows, empty LIBOR sample and unknown historical bounds. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T19:20:38.955741+00:00",
+        "evidence": "validation/other-probe.json",
+        "results": [
+          {
+            "api_name": "us_trltr",
+            "missing_fields": [],
+            "row_count": 4,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "142",
