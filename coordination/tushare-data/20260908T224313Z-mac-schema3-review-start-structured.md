@@ -1,0 +1,1 @@
+Structured read-only audit: candidate 9cf3a60 over c62cb54, all four-file diff and document index consumers. No runtime ownership/edit, no production/API. Isolated exported committed snapshot: /var/folders/6m/svdmp5hd6lj09292v8mt73fw0000gn/T/quantmind-schema3-review-b74unxci . Test/review evidence only.

@@ -1,0 +1,1 @@
+Structured bounded read-only throughput review; main1fba0bf and candidate7218079. Read sanitized latest pipeline/document status and read-only LIMIT100 document attempts inside existing cloud-compose business containers. No API fetch, config/runtime edit, restart, snapshot PID422770 interference. Conclusions distinguish account gate from measured API/body pipeline/doc throughput.
