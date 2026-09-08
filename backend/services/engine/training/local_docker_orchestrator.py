@@ -30,6 +30,7 @@ except (ImportError, AttributeError):
 
 import yaml
 
+from backend.shared.docker_host_paths import host_path
 from backend.services.engine.training.training_log_stream import TrainingRunLogStream
 from backend.services.engine.training.orchestrator_base import TrainingOrchestrator, REGISTRY
 from backend.services.api.training_explain import DEFAULT_EXPLAIN_CFG
@@ -133,47 +134,18 @@ else:
     # 退化为当前工作目录（容器内通常为 /app）
     _HOST_PROJECT_PATH = Path.cwd().resolve()
 
-# 数据目录：feature_snapshots 在 /app/db/feature_snapshots（来自 ./db:/app/db 挂载）
-# Docker volume host path 需要宿主机绝对路径
-if Path("/app/db/feature_snapshots").exists():
-    _LOCAL_DATA_PATH = str(_HOST_PROJECT_PATH / "db" / "feature_snapshots")
-elif Path("/data/feature_snapshots").exists():
-    _LOCAL_DATA_PATH = str(_HOST_PROJECT_PATH / "data" / "feature_snapshots")
-else:
-    _LOCAL_DATA_PATH = str(_HOST_PROJECT_PATH / "db" / "feature_snapshots")
-
-# QuantDB 数据目录：train.py 需要读取 instrument_detail.parquet（行业编码）等全量数据
-# 注意 QM_QUANTDB_DATA_DIR 是【容器内】路径（如 /data/quantdb，来自 ./data:/data 挂载），
-# 而 Docker volume 的 source 必须是【宿主机】绝对路径，不能直接使用该值。
-# 这里把容器内路径换算回宿主机路径，语义与 _LOCAL_DATA_PATH 保持一致。
+# Code stays in the checkout; runtime binds follow the parent's isolated mounts.
+_LOCAL_DATA_PATH = host_path(
+    "/data/feature_snapshots" if not Path("/app/db/feature_snapshots").exists()
+    and Path("/data/feature_snapshots").exists() else "/app/db/feature_snapshots",
+    runtime_only=True,
+)
 _qdb_dir = os.getenv("QM_QUANTDB_DATA_DIR", "").strip() or "/data/quantdb"
-_qdb_path = Path(_qdb_dir)
-if _qdb_path.is_relative_to("/data"):
-    # /data/quantdb → <host_project>/data/quantdb
-    _QUANTDB_DATA_HOST_PATH = str(
-        _HOST_PROJECT_PATH / "data" / _qdb_path.relative_to("/data")
-    )
-elif _qdb_path.is_relative_to("/app"):
-    # /app/data/quantdb → <host_project>/data/quantdb
-    _QUANTDB_DATA_HOST_PATH = str(
-        _HOST_PROJECT_PATH / _qdb_path.relative_to("/app")
-    )
-elif _qdb_path.is_absolute():
-    _QUANTDB_DATA_HOST_PATH = str(_qdb_path)
-else:
-    _QUANTDB_DATA_HOST_PATH = str(_HOST_PROJECT_PATH / _qdb_path)
+_QUANTDB_DATA_HOST_PATH = host_path(_qdb_dir, runtime_only=True)
 
 
 def _market_host_path(container_dir: str) -> str:
-    """把容器内数据目录（/data/quanthk 等）换算为宿主机绝对路径。"""
-    p = Path(container_dir)
-    if p.is_relative_to("/data"):
-        return str(_HOST_PROJECT_PATH / "data" / p.relative_to("/data"))
-    if p.is_relative_to("/app"):
-        return str(_HOST_PROJECT_PATH / p.relative_to("/app"))
-    if p.is_absolute():
-        return str(p)
-    return str(_HOST_PROJECT_PATH / p)
+    return host_path(container_dir, runtime_only=True)
 
 
 def _market_data_mount(market: str) -> tuple[str, str]:
@@ -698,8 +670,7 @@ class LocalDockerOrchestrator(TrainingOrchestrator):
         # 宿主机路径：/opt/quantmind/data/training_jobs/{run_id}（Docker daemon 需要）
         container_work_dir = Path("/data") / "training_jobs" / run_id
 
-        _compose_dir = _HOST_PROJECT_PATH if _HOST_PROJECT_PATH.is_absolute() else Path.cwd()
-        host_output_dir = _compose_dir / "data" / "training_jobs" / run_id
+        host_output_dir = Path(host_path(str(container_work_dir), runtime_only=True))
 
         # 强制创建目录（使用容器内路径，确保 API 容器可写入）
         os.makedirs(internal_output_dir, exist_ok=True)

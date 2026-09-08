@@ -3,7 +3,7 @@
 适用于本次迁移后的 Mac 与 `lzy-vm`，2026-09-08 起。环境识别与命令分流以 [AGENTS.md](../AGENTS.md) 为主。Mac 联网开发前先运行：
 
 ```bash
-python3 scripts/dual_node_check.py
+bash scripts/dual-node.sh handoff
 ```
 
 Linux 权威宿主在项目目录执行 `sudo -n python3 scripts/dual_node_check.py --node cloud`，只检查云端；无参数双端检查从 Mac 发起。Mac 离线可使用已初始化的固定快照沙盒，完整联网预检延后到重连时执行。
@@ -23,14 +23,14 @@ Mac 断网后云端入口不可用；已初始化的本地沙盒、代码编辑�
 
 Mac 全栈沙盒首次执行 `scripts/local-dev.sh init`：它从 `logs/cloud-snapshots/latest` 建立 APFS 写时复制数据副本，恢复独立 PostgreSQL/Redis/QwenPaw 卷；不会复制 68 GB 的第二份物理数据块，后续本地修改才逐步占空间。`start core` 只启动 DB、Redis 和四合一后端；`start full` 再启用 Celery worker、数据网关、Huntly、RSSHub 和 QuantBot。启动时端口 8000 从云端 SSH 隧道切到本地后端，3000 的 Vite 无需改配置；`scripts/local-dev.sh stop` 停本地沙盒并恢复云端隧道。Celery beat、实盘、TDX 推送、Web 更新和自动数据同步始终禁用。
 
-本地沙盒固定在初始化时的快照 ID；云端数据继续变化不会自动混进正在进行的本地实验。需要更新基线时，先保留所需实验产物，停掉沙盒，再显式重建；仓库没有自动合并两套数据库的路径。代码与共享 `.env` 仍由 Syncthing 双向同步，`.local-dev` 明确排除。
+本地沙盒固定在初始化时的快照 ID；云端数据继续变化不会自动混进正在进行的本地实验。预检允许沙盒使用比 `latest` 更旧的已完成快照，不再要求中途重建实验输入。需要更新基线时，先保留所需实验产物，停掉沙盒，再显式重建；仓库没有自动合并两套数据库的路径。代码与共享 `.env` 仍由 Syncthing 双向同步，`.local-dev` 明确排除。
 
 ## 代码、配置和发布
 
 - 共享目录只容纳源码编辑；同一文件同一时刻只由一端负责。分支切换、批量 checkout、实验性后端开发在独立 worktree 中完成，不在正在服务的共享目录操作。
 - Syncthing 会同步未提交源码、`.env.local`、`config/runtime.env`，但不会同步 `.git`、依赖、构建产物、运行数据和测试日志。密钥文件与 `.stversions` 不入 Git，禁止把凭据写进文档/报告。共享密钥变更影响两端，不用它表达机器专属角色。
 - 出现 `.sync-conflict-*` 时停止发布，保留两份文件人工合并。禁止自动选最新时间覆盖，禁止对运行数据做双向 rsync/bisync。
-- 本地隔离测试先完成，再明确提交本次文件；禁止 `git add .` 混入并行任务。Git 元数据通过 Git 独立对齐。两端 HEAD 相同不代表工作树一致，必须检查内容哈希。
+- 本地隔离测试先完成，再明确提交本次文件；禁止 `git add .` 混入并行任务。Git 元数据通过 Git 独立对齐。Mac 的统一入口为 `bash scripts/dual-node.sh handoff`；`--align-git mac|cloud` 显式选择提交来源，只在同分支、内容一致且目标为祖先时传递 Git bundle 并执行保留工作文件的 mixed reset。暂存区非空、Git 操作进行中或分叉时拒绝；不自动提交或推送 GitHub。两端 HEAD 相同不代表工作树一致，必须检查内容哈希。
 - 源码同步不等于发布。Python bind mount 还可能被进程延迟导入，因此高风险变更必须先在 worktree 测试、选择无活动任务窗口同步并重启，不把共享目录当热更新实验沙盒。
 - 云端必须用 `bash scripts/dual-node.sh cloud-compose ...`，禁止裸 Compose 遗漏 SSD/端口/资源安全覆盖层。前端发布用 `bash scripts/dual-node.sh web-publish`，保留上版静态资源供恢复。
 - 本地完整旧 Compose 栈不得再启动。所有 9 个本地旧容器已停且 `restart=no`。`bash scripts/dual-node.sh install-mac-guard` 安装仓库内 `deploy/compose.mac-client.yml` 为仅 Mac 生效的本地 override，裸 `docker compose up` 不再选择任何服务；预检检查这一防护。显式指定服务/启用 profile/绕开 override 仍能启动旧库，被本规范禁止，这不是 root 权限隔离。
@@ -46,8 +46,15 @@ Mac 全栈沙盒首次执行 `scripts/local-dev.sh init`：它从 `logs/cloud-sn
 
 ## 快照、离线与恢复
 
-快照操作与命令见 `docs/dual-node-deployment.md`。创建时会暂停本项目写入者，应选择无研究任务的维护窗口；本次约 68 GB、35 万文件的完整校验与归档造成约 30 分钟停写，不能当作秒级在线备份。拉取只更新 `logs/cloud-snapshots`，不覆盖旧本地数据。固定快照 ID，不在实验中途跟随 `latest`。不可变快照之间去重；活跃数据不与快照共享硬链接。
+快照操作与命令见 `docs/dual-node-deployment.md`。创建时会暂停本项目写入者，应选择无研究任务的维护窗口；旧流程约 68 GB、35 万文件曾造成约 30 分钟停写。新流程在线预复制并预计算校验值，停写后按 inode/大小/mtime/ctime 变化补算源校验，只复制内容差异，再捕获未压缩的 PostgreSQL dump 和冷卷；恢复写入后独立全量校验副本、压缩冷卷，全部成功才发布 COMPLETE/latest。中断或验证失败不发布快照，保留暂存目录；常规异常、SIGINT/SIGTERM/SIGHUP 在 finally 中恢复此前运行的写入者（断电/SIGKILL 不保证）。输出 pause_seconds 记录停写到发出恢复启动命令的耗时，不代表服务已完成启动。新流程尚未在正式全量数据上计时，不能承诺秒级在线备份。未压缩 PostgreSQL dump 会增加快照磁盘占用，创建前仍要求至少 100 GiB 空闲空间；拉取保留 rsync 传输压缩。拉取只更新 `logs/cloud-snapshots`，不覆盖旧本地数据。固定快照 ID，不在实验中途跟随 `latest`。不可变快照之间去重；活跃数据不与快照共享硬链接。
 
-目前快照是显式刷新，不是定时同步；离线时不可能实时追平云端。需要新鲜数据时主动创建/拉取并重新预检。回滚代码不回滚数据，数据库回退须另做备份和明确恢复方案；绝不能让 Mac 旧库重新成为第二个主节点。
+统一刷新入口为 Mac 上 `bash scripts/dual-node.sh snapshot-refresh`，顺序执行预检、云端创建、Mac 校验拉取及复检；不会更新 `.local-dev/SNAPSHOT_ID` 或重建沙盒。直接 `create`/`pull` 仍可用于分步操作和失败后继续拉取。目前快照是显式刷新，不是定时同步；离线时不可能实时追平云端。需要新鲜数据时主动创建/拉取并重新预检。回滚代码不回滚数据，数据库回退须另做备份和明确恢复方案；绝不能让 Mac 旧库重新成为第二个主节点。
 
 访问优先用 `http://127.0.0.1:18080`（底层 SSH 加密）。公网 `3080` 当前没有 TLS，不能把页面“SSL”文案当作加密证据。最终审查还发现 QuantBot 通用 API 代理缺少独立鉴权，而其上游具备命令执行能力；前端登录不能保护匿名 API 请求，仅修改管理员密码也不足以修复。公网安全验收尚未通过，等待选择 SSH-only 或补齐入口鉴权与 HTTPS；不得把技术迁移完成当作可安全对外发布。
+
+
+## 本地启停保护
+
+`scripts/local-dev.sh` 在操作前核对 Mac 宿主、本地 Unix socket 和 Docker Desktop daemon，并拒绝 `DOCKER_HOST` 覆盖。初始化拒绝任何已有 `quantmind-dev_*` 业务卷（含 PostgreSQL），数据库恢复使用单事务及错误即停；失败保留副本/卷，不创建 READY。`logs/local-dev.lock` 串行化 init/start/stop，异常退出释放锁；强制杀进程留下的锁必须先核对 pid 再人工清理。
+
+健康且数据根目录配置正确的沙盒重复启动不改服务和隧道；旧版容器缺少隔离配置、部分运行或模式升级需先停后启。停止前检查沙盒网络中的训练/Agent/IDE 子任务，存在活跃任务时拒绝切换后端。首次启动失败停止本次启动的容器、保留卷，并恢复此前加载的隧道。`stop` 不依赖 latest 快照存在；离线时分别报告“本地已停止”和“云端暂不可达”。`HOST_RUNTIME_PATH` 只由本地 Compose 注入，不写共享 `.env.local`。

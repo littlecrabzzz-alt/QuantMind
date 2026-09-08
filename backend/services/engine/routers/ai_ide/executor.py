@@ -460,6 +460,8 @@ async def _run_image_smoke_check(
     with open(smoke_script_path, "w", encoding="utf-8") as f:
         f.write(_build_smoke_script(mandatory, optional, strict))
 
+    from backend.shared.docker_host_paths import host_path
+
     start_ts = time.time()
     container = None
     try:
@@ -469,7 +471,7 @@ async def _run_image_smoke_check(
             command=["python", "-u", "/tmp/smoke.py"],
             name=smoke_name,
             detach=True,
-            volumes={smoke_script_path: {"bind": "/tmp/smoke.py", "mode": "ro"}},
+            volumes={host_path(smoke_script_path, runtime_only=True): {"bind": "/tmp/smoke.py", "mode": "ro"}},
             read_only=True,
             network_mode="none",
             tmpfs={"/tmp": "rw,noexec,nosuid,size=64m"},
@@ -1114,9 +1116,9 @@ async def run_process(job_id: str, file_path: str):
 
         # 计算宿主机上的文件路径 (用于 Docker 挂载)
         # 假设 API 容器内的 /app 对应 宿主机的 {HOST_PROJECT_PATH}
-        rel_path = os.path.relpath(file_path, "/app")
-        host_script_path = os.path.join(HOST_PROJECT_PATH, rel_path)
-        host_runner_path = os.path.join(HOST_PROJECT_PATH, os.path.relpath(runner_path, "/app"))
+        from backend.shared.docker_host_paths import host_path
+        host_script_path = host_path(file_path, runtime_only=True)
+        host_runner_path = host_path(runner_path, runtime_only=True)
 
         # Docker 挂载文件时，如果宿主机文件不存在或是目录，会挂载空目录，
         # 导致容器内 Python 报 "can't find '__main__' module"
@@ -1145,7 +1147,7 @@ async def run_process(job_id: str, file_path: str):
                 "mode": "ro",
             },
             # 挂载 Qlib 数据目录以便运行回测脚本
-            os.path.join(HOST_PROJECT_PATH, "db/qlib_data"): {
+            host_path("/app/db/qlib_data", runtime_only=True): {
                 "bind": "/app/db/qlib_data",
                 "mode": "ro",
             },
@@ -1155,12 +1157,12 @@ async def run_process(job_id: str, file_path: str):
                 "mode": "ro",
             },
             # 挂载模型目录，确保通过 model_id 解析到的 pred.pkl 对 AI-IDE 子容器可见
-            os.path.join(HOST_PROJECT_PATH, "models"): {
+            host_path("/app/models", runtime_only=True): {
                 "bind": "/app/models",
                 "mode": "ro",
             },
             # 挂载数据根目录，兼容用户模型或本地存储落在 /data 下的场景
-            os.path.join(HOST_PROJECT_PATH, "data"): {
+            host_path("/app/data", runtime_only=True): {
                 "bind": "/data",
                 "mode": "ro",
             },

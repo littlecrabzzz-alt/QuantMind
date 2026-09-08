@@ -248,6 +248,10 @@ w.close();"""
         self.assertNotIn("celery-beat", config["services"])
         services = config["services"]
         self.assertEqual(services["quantmind"]["environment"]["QM_NODE_ROLE"], "sandbox")
+        for name in ("quantmind", "celery-worker", "qwenpaw"):
+            self.assertEqual(services[name]["environment"]["HOST_RUNTIME_PATH"], state)
+            self.assertEqual(services[name]["environment"]["HOST_PROJECT_PATH"], str(ROOT))
+            self.assertEqual(services[name]["environment"]["AI_IDE_DOCKER_NETWORK"], "quantmind-dev_quantmind-net")
         self.assertEqual(services["quantmind"]["environment"]["ENABLE_REAL_TRADING"], "false")
         self.assertEqual(services["quantmind"]["ports"], [{
             "mode": "ingress", "host_ip": "127.0.0.1", "target": 8000,

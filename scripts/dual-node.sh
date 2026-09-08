@@ -18,6 +18,17 @@ cloud_guard() {
 }
 
 case "${1:-help}" in
+  handoff)
+    shift
+    exec python3 scripts/dual_node_check.py "$@"
+    ;;
+  snapshot-refresh)
+    [ "$(uname -s)" = Darwin ]
+    python3 scripts/dual_node_check.py
+    ssh -o BatchMode=yes -o ConnectTimeout=10 "$QM_SSH_TARGET" "sudo -n python3 $QM_REMOTE_PROJECT/scripts/dual_node_snapshot.py create"
+    python3 scripts/dual_node_snapshot.py pull
+    python3 scripts/dual_node_check.py
+    ;;
   install-mac-guard)
     [ "$(uname -s)" = Darwin ]
     ssh "$QM_SSH_TARGET" "sudo -n test -f $QM_REMOTE_ROOT/AUTHORITY"
@@ -95,7 +106,7 @@ case "${1:-help}" in
     ssh -o BatchMode=yes "$QM_SSH_TARGET" "sudo -n bash -c 'df -h $QM_REMOTE_ROOT; test ! -f $QM_REMOTE_ROOT/AUTHORITY || cat $QM_REMOTE_ROOT/AUTHORITY; cd $QM_REMOTE_PROJECT; bash scripts/dual-node.sh cloud-compose ps'"
     ;;
   *)
-    echo 'Usage: bash scripts/dual-node.sh {preseed|images|web-publish|install-mac-guard|install-tunnel|connect|cloud-compose <args...>|status}'
+    echo 'Usage: bash scripts/dual-node.sh {handoff [--align-git mac|cloud]|snapshot-refresh|preseed|images|web-publish|install-mac-guard|install-tunnel|connect|cloud-compose <args...>|status}'
     exit 2
     ;;
 esac
