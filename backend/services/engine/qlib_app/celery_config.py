@@ -168,7 +168,7 @@ if os.getenv("QM_NODE_ROLE") == "authority":
     beat_schedule["tushare-acquire-continuation"] = {
         "task": "engine.tasks.tushare_acquire",
         "schedule": 120.0,
-        "options": {"expires": 110},
+        "options": {"expires": 110, "queue": "tushare_acquire"},
     }
 
 celery_app.conf.update(
@@ -201,6 +201,7 @@ celery_app.conf.update(
     task_default_routing_key=CELERY_ROUTING_KEY,
     # 任务路由
     task_routes={
+        "engine.tasks.tushare_acquire": {"queue": "tushare_acquire"},
         "backend.services.engine.qlib_app.tasks.*": {"queue": CELERY_QUEUE},
         "qlib_app.tasks.*": {"queue": CELERY_QUEUE},
     },

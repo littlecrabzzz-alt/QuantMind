@@ -13,10 +13,10 @@
 - 已完成历史请求以稳定键去重；超时/上游错误指数退避，五次后阻塞，权限/疑似截断保留明确缺口。`fund_adj` 使用官方 offset/limit，每页 1000，重复页停止。其他接口达到保守上限会阻塞，需审阅细分参数再补齐。空响应不作为历史完整证据。
 - `pipeline.sqlite` 只在云端写入并加进程文件锁，不复制活动数据库。数据版本包含所有已落盘原始对象及观察记录、Parquet、按 API 的覆盖统计及异常分片；待采集分片完整清单在云端任务库。`CURRENT.json` 最后原子切换，RRG 保持 `blocked_data`。
 - 存量读入口 `backend.shared.tushare_store.read_dataset(root, release_id, api_name)` 只读取固定版本。按自然键保留该版本中最新抓取记录，保存供应商原代码、未知字段和抓取时间；金额/量的原单位不偷偷转换。它是已观察数据视图，抓取时间不能证明历史当时已知，且不改变现有 QuantDB/业务查询路由。
-- 云端现有 Celery 每 120 秒发起一轮，最多 100 请求/100 秒（单次请求可能再花 30 秒），任务硬上限 180 秒；与既有研究队列共享单并发 worker，后续据负载决定专用队列。100 GiB 磁盘余量以下停止采集，不自动购盘。
+- 云端现有 Celery 每 120 秒发起一轮，最多 100 请求/100 秒（单次请求可能再花 30 秒），任务硬上限 180 秒；独立 tushare_acquire 队列和单并发 worker（1 GiB 内存、0.75 CPU），复用已有镜像及 Redis，避免与长时研究/行情作业互相阻塞。100 GiB 磁盘余量以下停止采集，不自动购盘。
 - Mac 的 `scripts/tushare_mirror.py` 通过 SSH 获取固定清单，rsync 只拉缺失/损坏对象；下载和 SHA256 校验全部通过才更新本地 CURRENT。重复执行不重新下载完整对象；断线保留原版，重试续传。默认保存在 `logs/tushare-mirror`（不参与 Syncthing），不覆盖旧 data/results 或沙盒数据。
 
-生产启用前先双端预检、确认没有活动研究/训练和排队任务。源码合并和元数据对齐后，通过 `cloud-compose` 重启 worker，并重新创建 beat 使其 authority 角色生效。云端容器内，将示例配置复制到 `/data/tushare/pipeline-config.json`，创建 `/data/tushare/ENABLED` 才允许采集。删除 ENABLED 可暂停后续轮次，已在途请求正常完成。
+生产启用前先双端预检、确认没有活动研究/训练和排队任务。源码合并和元数据对齐后，通过 `cloud-compose` 启动专用 tushare-worker，并重新创建 beat 使其 authority 角色生效。云端容器内，将示例配置复制到 `/data/tushare/pipeline-config.json`，创建 `/data/tushare/ENABLED` 才允许采集。删除 ENABLED 可暂停后续轮次，已在途请求正常完成。
 
 ```bash
 # 云端项目宿主：手动有界首轮，亦用于故障后的恢复检查
