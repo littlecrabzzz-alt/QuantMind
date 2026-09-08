@@ -139,8 +139,8 @@ class DocumentIndex(unittest.TestCase):
         )
         self.assertEqual(body["total"], 12035)
         self.assertEqual(body["next_offset"], 12003)
-        # Index + two bordering ref shards + one deduplicated state bucket.
-        self.assertEqual(reads.call_count, 4)
+        # Index + two reference shards + descriptor block + state leaf.
+        self.assertEqual(reads.call_count, 5)
         self.assertEqual(
             body["items"][0]["latest_result"]["fetched_at"], self.result["fetched_at"]
         )
@@ -190,10 +190,13 @@ class DocumentIndex(unittest.TestCase):
         latest, current = self.index()
         self.assertEqual(latest["rebuilt_shards"], 2)
         self.assertEqual(old_index["mappings"], current["mappings"])
-        self.assertEqual(old_index["states"][other[:2]], current["states"][other[:2]])
+        self.assertEqual(
+            old_index["states"][other[:1]],
+            current["states"][other[:1]],
+        )
         self.assertNotEqual(
-            old_index["states"][self.doc[:2]]["path"],
-            current["states"][self.doc[:2]]["path"],
+            old_index["states"][self.doc[:1]]["path"],
+            current["states"][self.doc[:1]]["path"],
         )
         release = self.publish(latest)
         row = self.page(release, limit=1).json()["items"][0]

@@ -100,13 +100,25 @@ def _documents(manifest):
     return json.loads(_artifact(manifest, path))
 
 
-def _document_shard(manifest, descriptor, kind):
+def _document_reference(manifest, descriptor):
+    if not isinstance(descriptor, dict) or not isinstance(descriptor.get("path"), str):
+        raise HTTPException(409, "Invalid document shard reference")
     path = descriptor["path"]
     if not re.fullmatch(r"documents/[a-f0-9]{64}\.json", path):
         raise HTTPException(409, "Invalid document shard path")
     expected = manifest["files"].get(path, {})
-    if any(descriptor.get(key) != expected.get(key) for key in ("sha256", "bytes")):
+    if (
+        any(descriptor.get(key) != expected.get(key) for key in ("sha256", "bytes"))
+        or descriptor.get("sha256") != Path(path).stem
+        or type(descriptor.get("bytes")) is not int
+        or descriptor["bytes"] < 0
+    ):
         raise HTTPException(409, "Document shard inventory mismatch")
+    return path
+
+
+def _document_shard(manifest, descriptor, kind):
+    path = _document_reference(manifest, descriptor)
     payload = json.loads(_artifact(manifest, path))
     if (
         payload.get("schema_version") != 2
@@ -125,7 +137,7 @@ def _document_page(manifest, index, view, offset, limit):
     if index.get("schema_version", 1) == 1:
         items = index.get(view, [])
         return items[offset : offset + limit], len(items)
-    if index.get("schema_version") != 2:
+    if index.get("schema_version") not in (2, 3):
         raise HTTPException(409, "Unsupported document index schema")
     shards = index[view]
     total = index["totals"][view]
@@ -159,12 +171,104 @@ def _document_page(manifest, index, view, offset, limit):
         states = {}
         # Retain only this page's documents, releasing each parsed bucket before
         # the next. Repeated observations no longer duplicate state on disk.
-        for prefix in sorted({ident[:2] for ident in identifiers}):
-            descriptor = index["states"].get(prefix)
-            if descriptor:
-                for item in _document_shard(manifest, descriptor, "states"):
-                    if item["id"] in identifiers:
-                        states[item["id"]] = item
+        prefix_chars = index.get("state_prefix_chars", 2)
+        if type(prefix_chars) is not int or prefix_chars not in (2, 3):
+            raise HTTPException(409, "Unsupported document state prefix")
+        if any(
+            not isinstance(ident, str) or not re.fullmatch(r"[a-f0-9]{64}", ident)
+            for ident in identifiers
+        ):
+            raise HTTPException(409, "Invalid document state reference")
+        descriptors = index["states"]
+        if index["schema_version"] == 3:
+            if (
+                prefix_chars != 3
+                or type(index.get("state_descriptor_prefix_chars")) is not int
+                or index["state_descriptor_prefix_chars"] != 1
+            ):
+                raise HTTPException(409, "Invalid state descriptor layout")
+            if (
+                not isinstance(descriptors, dict)
+                or any(
+                    not isinstance(key, str)
+                    or not re.fullmatch(r"[a-f0-9]", key)
+                    or not isinstance(item, dict)
+                    or item.get("bucket") != key
+                    or type(item.get("count")) is not int
+                    or not 1 <= item["count"] <= 256
+                    or type(item.get("state_count")) is not int
+                    or item["state_count"] < item["count"]
+                    for key, item in descriptors.items()
+                )
+                or type(index.get("state_count")) is not int
+                or sum(item["state_count"] for item in descriptors.values())
+                != index["state_count"]
+                or sum(item["documents"] for item in index["counts"])
+                != index["state_count"]
+            ):
+                raise HTTPException(409, "Invalid state descriptor counts")
+            for descriptor in descriptors.values():
+                _document_reference(manifest, descriptor)
+            leaves = {}
+            for first in sorted({ident[:1] for ident in identifiers}):
+                descriptor = descriptors.get(first)
+                if descriptor is None:
+                    raise HTTPException(409, "Missing document descriptor shard")
+                parts = _document_shard(manifest, descriptor, "state_descriptors")
+                if (
+                    any(
+                        not isinstance(item.get("bucket"), str)
+                        or not re.fullmatch(first + r"[a-f0-9]{2}", item["bucket"])
+                        or type(item.get("count")) is not int
+                        or item["count"] <= 0
+                        for item in parts
+                    )
+                    or len({item["bucket"] for item in parts}) != len(parts)
+                    or sum(item["count"] for item in parts) != descriptor["state_count"]
+                ):
+                    raise HTTPException(409, "Invalid state leaf descriptors")
+                for item in parts:
+                    _document_reference(manifest, item)
+                leaves.update({item["bucket"]: item for item in parts})
+            descriptors = leaves
+        for prefix in sorted({ident[:prefix_chars] for ident in identifiers}):
+            descriptor = descriptors.get(prefix)
+            if descriptor is None or descriptor.get("bucket") != prefix:
+                raise HTTPException(409, "Missing document state shard")
+            items = _document_shard(manifest, descriptor, "states")
+            seen = set()
+            for item in items:
+                ident = item.get("id")
+                if (
+                    not isinstance(ident, str)
+                    or not re.fullmatch(
+                        prefix + r"[a-f0-9]{" + str(64 - prefix_chars) + "}", ident
+                    )
+                    or ident in seen
+                ):
+                    raise HTTPException(409, "Invalid document state identity")
+                seen.add(ident)
+                if ident in identifiers:
+                    result = item.get("result")
+                    if not isinstance(result, dict):
+                        raise HTTPException(409, "Invalid document result")
+                    sources = result.get("files", [])
+                    if not isinstance(sources, list) or any(
+                        not isinstance(source, dict) for source in sources
+                    ):
+                        raise HTTPException(409, "Invalid document source references")
+                    for source in sources:
+                        expected = manifest["files"].get(source.get("path"), {})
+                        if not expected or any(
+                            source.get(key) != expected.get(key)
+                            for key in ("sha256", "bytes")
+                        ):
+                            raise HTTPException(
+                                409, "Document source reference missing from release"
+                            )
+                    states[ident] = item
+        if set(states) != identifiers:
+            raise HTTPException(409, "Referenced document state is missing")
         for row in selected:
             state = states.get(row.get("document_id"), {})
             row.update(

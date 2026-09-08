@@ -1130,8 +1130,23 @@ def _index_setup(db):
     ).fetchone()
     if exists:
         saved = db.execute("SELECT version FROM document_index_meta").fetchone()
-        if saved is None or saved[0] != 1:
+        if saved is None or saved[0] not in (1, 2, 3):
             raise DocumentError("unsupported_document_index_schema")
+        if saved[0] == 1:
+            with db:
+                db.execute("BEGIN IMMEDIATE")
+                # Only state buckets migrate; immutable old indexes/shards and
+                # append-only mapping/attempt ranges remain available unchanged.
+                for operation in ("insert", "update", "delete"):
+                    db.execute(f"DROP TRIGGER document_index_states_{operation}")
+                db.execute("DROP INDEX document_index_state_bucket")
+                db.execute("DELETE FROM document_index_cache WHERE kind='states'")
+                db.execute("DELETE FROM document_index_dirty WHERE kind='states'")
+                _state_index_triggers(db)
+                db.execute("UPDATE document_index_meta SET version=3")
+        elif saved[0] == 2:
+            with db:
+                db.execute("UPDATE document_index_meta SET version=3")
         return
     with db:
         db.execute("BEGIN IMMEDIATE")
@@ -1180,6 +1195,28 @@ def _index_setup(db):
         db.execute(
             "CREATE INDEX document_index_state_bucket ON documents(substr(id,1,2))"
         )
+    _index_setup(db)
+
+
+def _state_index_triggers(db):
+    for operation, rows in (
+        ("INSERT", ("NEW",)),
+        ("UPDATE", ("OLD", "NEW")),
+        ("DELETE", ("OLD",)),
+    ):
+        statements = ";".join(
+            "INSERT OR IGNORE INTO document_index_dirty VALUES('states',substr("
+            + row
+            + ".id,1,3))"
+            for row in rows
+        )
+        db.execute(
+            f"CREATE TRIGGER document_index_states_{operation.lower()} AFTER {operation} ON documents BEGIN {statements}; END"
+        )
+    db.execute("CREATE INDEX document_index_state_bucket ON documents(substr(id,1,3))")
+    db.execute(
+        "INSERT OR IGNORE INTO document_index_dirty SELECT 'states',substr(id,1,3) FROM documents"
+    )
 
 
 def _index_original_files(root, db):
@@ -1223,7 +1260,7 @@ def _index_original_files(root, db):
 
 
 def document_index(root):
-    """Publish compact v2 index, reusing unchanged content-addressed shards.
+    """Publish schema3 two-level state index, reusing unchanged immutable shards.
 
     Return path/hash/bytes, counts and a flat files list for the parent manifest.
     No old v1 inventory or shard is removed. A consistent SQLite transaction
@@ -1252,7 +1289,7 @@ def document_index(root):
                 records = [
                     dict(row)
                     for row in db.execute(
-                        "SELECT * FROM documents WHERE substr(id,1,2)=? ORDER BY id",
+                        "SELECT * FROM documents WHERE substr(id,1,3)=? ORDER BY id",
                         (bucket,),
                     )
                 ]
@@ -1298,8 +1335,10 @@ def document_index(root):
                 (kind, bucket),
             )
         index = {
-            "schema_version": 2,
+            "schema_version": 3,
             "shard_rows": INDEX_SHARD_ROWS,
+            "state_prefix_chars": 3,
+            "state_descriptor_prefix_chars": 1,
             "mappings": [],
             "attempts": [],
             "files": [],
@@ -1316,18 +1355,65 @@ def document_index(root):
             dict(row)
             for row in db.execute("SELECT * FROM document_index_files ORDER BY rowid")
         ]
+        state_groups, cached_groups = {}, {}
         for row in db.execute(
             "SELECT kind,bucket,descriptor FROM document_index_cache ORDER BY kind,CAST(bucket AS INTEGER),bucket"
         ):
             kind, bucket, raw = row
             descriptor = json.loads(raw)
+            if kind == "state_descriptors":
+                cached_groups[bucket] = descriptor
+                continue
             files.append(
                 {key: descriptor[key] for key in ("path", "sha256", "bytes", "mime")}
             )
             if kind == "states":
-                index["states"][bucket] = descriptor
+                state_groups.setdefault(bucket[:1], []).append(descriptor)
             else:
                 index[kind].append(descriptor)
+        changed_groups = {bucket[:1] for kind, bucket in dirty if kind == "states"}
+        rebuilt_descriptors = 0
+        for prefix, descriptors in sorted(state_groups.items()):
+            descriptor = cached_groups.get(prefix)
+            if descriptor is None or prefix in changed_groups:
+                descriptors.sort(key=lambda item: item["bucket"])
+                saved = _save(
+                    root,
+                    "documents",
+                    ".json",
+                    _json(
+                        {
+                            "schema_version": 2,
+                            "kind": "state_descriptors",
+                            "bucket": prefix,
+                            "items": descriptors,
+                        }
+                    ),
+                    "application/json",
+                )
+                descriptor = {
+                    **saved,
+                    "bucket": prefix,
+                    "count": len(descriptors),
+                    "state_count": sum(item["count"] for item in descriptors),
+                }
+                db.execute(
+                    "INSERT INTO document_index_cache VALUES('state_descriptors',?,?) ON CONFLICT(kind,bucket) DO UPDATE SET descriptor=excluded.descriptor",
+                    (prefix, _json(descriptor).decode()),
+                )
+                rebuilt_descriptors += 1
+            index["states"][prefix] = descriptor
+            files.append(
+                {key: descriptor[key] for key in ("path", "sha256", "bytes", "mime")}
+            )
+        for prefix in cached_groups.keys() - state_groups.keys():
+            db.execute(
+                "DELETE FROM document_index_cache WHERE kind='state_descriptors' AND bucket=?",
+                (prefix,),
+            )
+        index["state_count"] = sum(
+            item["state_count"] for item in index["states"].values()
+        )
         index["totals"] = {
             kind: sum(item["count"] for item in index[kind])
             for kind in ("mappings", "attempts", "files")
@@ -1337,12 +1423,13 @@ def document_index(root):
         db.commit()
         return {
             **saved,
-            "schema_version": 2,
+            "schema_version": 3,
             "files": files,
             "counts": index["counts"],
             "reference_counts": index["reference_counts"],
             "totals": index["totals"],
             "rebuilt_shards": len(dirty),
+            "rebuilt_descriptor_shards": rebuilt_descriptors,
         }
     except Exception:
         db.rollback()
