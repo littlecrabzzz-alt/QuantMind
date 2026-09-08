@@ -177,10 +177,15 @@ require_mac
 case "${1:-help}" in
   init) lock_operation; initialize ;;
   start) lock_operation; start_local "${2:-core}" ;;
+  restart-research-worker)
+    lock_operation
+    [ "$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' quantmind-dev-research-worker | grep '^QM_NODE_ROLE=')" = QM_NODE_ROLE=sandbox ] || fail 'Expected the isolated research worker.'
+    "${COMPOSE[@]}" restart research-worker
+    ;;
   stop) lock_operation; stop_local ;;
   status)
     echo "snapshot=$(cat "$STATE/SNAPSHOT_ID" 2>/dev/null || echo uninitialized)"
     "${COMPOSE[@]}" ps
     ;;
-  *) echo 'Usage: scripts/local-dev.sh {init|start [core|full|research]|stop|status}'; exit 2 ;;
+  *) echo 'Usage: scripts/local-dev.sh {init|start [core|full|research]|restart-research-worker|stop|status}'; exit 2 ;;
 esac
