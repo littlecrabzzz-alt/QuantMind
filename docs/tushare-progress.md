@@ -133,3 +133,6 @@
 - 真实运行发现stock_basic并集5909含T600018.SH，阻断事件family严格6位校验；其他family继续。候选修复保留T供应商身份，规范为SHT600018、不合并SH600018，旧Parquet只在读取投影兼容、不覆盖文件。另按父响应代码与已有发现取并集扇出，重入保留旧child/证据，不把基础名单误当完整全集；未验证全集仍false。明确has_more=true低于本地阈值也将判饱和，不用count=0推空。213项Tushare专项回归通过，正做第二轮有界生产恢复。
 - 下一批7期货（85字段）及6财务/研究额外接口纯合同/惰性规划已提交，仍未注册运行或生产探测。fina_mainbz须将请求P/D/I类型加入源身份；期货持仓不能把fut_basic.ts_code当symbol，weekly_detail周序号语义尚未验证。详细交接见本主题202417Z/202554Z记录。
 - 非阻塞继续项：旧结果中未处理has_more的回溯审计、原有扇出父节点补见过的代码、跨数据集统一标的发现仍需增量补全、API非200失败响应原文保留、完整字段单位语义、历史修订/PIT、所有263目录剩余接入、归档release-only catchup（正在恢复，open_gaps核查时0并非完成）。RRG signal结构切片通过不解除整体case/breadth/ETF限制。
+
+- 04:35恢复验收：5b4ec20经双端handoff passed（4390文件）后，maintenance复用pipeline锁修复两个真实饱和父分区：moneyflow_dc发现外补115代码，共6024子任务；share_float5909子任务，父记录的4股票完整保留。两个父分区仍split_pending/universe_complete=false。事件recent/history各规划500项、planning:equity_event已validation_passed，证据validation/observed-fanout-recovery.json。只重启quantmind与专属acquire worker，专属documents未在本轮重启；全部三个容器running/healthy/OOM=false，两专属队列已恢复且各有真实活动任务。
+- Mac最终固定data-dcb1c3839a99d210ec466603811ce46d104daf60a941aaa7616aa5f810c029ce共70482文件校验通过（本轮再补2375）；T600018.SH/SHT600018与600018.SH/SH600018禁网分别读取，保留不同源身份，证据/tmp/tushare-historical-stock-identity-verified.json。运行汇总validation/supplement-events-runtime.json；余量核查305.97GiB，无须本轮扩盘。新批次处理中的快照不能用前一批状态时间冒充新吞吐。
