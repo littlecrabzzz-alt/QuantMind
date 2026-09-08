@@ -11,8 +11,25 @@ from backend.shared.tushare_market_contracts import MARKET_CONTRACTS, iter_marke
 from backend.shared.tushare_global_contracts import GLOBAL_CONTRACTS, iter_global_jobs
 
 from backend.shared.tushare_other_contracts import OTHER_CONTRACTS, iter_other_jobs
+from backend.shared.tushare_supplement_contracts import (
+    SUPPLEMENT_CONTRACTS,
+    iter_supplement_jobs,
+)
+
+from backend.shared.tushare_equity_event_contracts import (
+    EQUITY_EVENT_CONTRACTS,
+    iter_equity_event_jobs,
+)
 
 EXTENDED_CONTRACTS = {
+    **{
+        api: {**spec, "group": "equity_event"}
+        for api, spec in EQUITY_EVENT_CONTRACTS.items()
+    },
+    **{
+        api: {**spec, "group": "supplement"}
+        for api, spec in SUPPLEMENT_CONTRACTS.items()
+    },
     **{api: {**spec, "group": "other"} for api, spec in OTHER_CONTRACTS.items()},
     **{api: {**spec, "group": "global"} for api, spec in GLOBAL_CONTRACTS.items()},
     **{api: {**spec, "group": "market"} for api, spec in MARKET_CONTRACTS.items()},
@@ -28,6 +45,8 @@ PLANNERS = {
     "market": iter_market_jobs,
     "global": iter_global_jobs,
     "other": iter_other_jobs,
+    "supplement": iter_supplement_jobs,
+    "equity_event": iter_equity_event_jobs,
 }
 
 

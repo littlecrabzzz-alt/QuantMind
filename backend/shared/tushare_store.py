@@ -17,6 +17,8 @@ import tempfile
 from backend.shared.tushare_market_contracts import MARKET_CONTRACTS
 from backend.shared.tushare_global_contracts import GLOBAL_CONTRACTS
 from backend.shared.tushare_other_contracts import OTHER_CONTRACTS
+from backend.shared.tushare_supplement_contracts import SUPPLEMENT_CONTRACTS
+from backend.shared.tushare_equity_event_contracts import EQUITY_EVENT_CONTRACTS
 from backend.shared.tushare_pipeline import manifest_at
 from backend.shared.tushare_structured_contracts import STRUCTURED_CONTRACTS
 from backend.shared.tushare_text_contracts import TEXT_CONTRACTS
@@ -36,6 +38,8 @@ CONTRACTS = {
     **MARKET_CONTRACTS,
     **GLOBAL_CONTRACTS,
     **OTHER_CONTRACTS,
+    **SUPPLEMENT_CONTRACTS,
+    **EQUITY_EVENT_CONTRACTS,
 }
 IDENTITIES = {}
 for _api, _contract in CONTRACTS.items():
@@ -160,6 +164,21 @@ def _dataset(root, release_id, api_name):
         keys = list(KEYS[api_name])
         if not set(keys + ["_fetched_at", "_observation"]).issubset(columns):
             raise ValueError("Stored dataset lacks natural-key or observation fields")
+        distinct_rows = CONTRACTS.get(api_name, {}).get("preserve_distinct_rows", False)
+        if distinct_rows:
+            if "_row_identity" not in columns:
+                raise ValueError("Stored event dataset lacks source row identity")
+            if (
+                relation.filter(
+                    '"_row_identity" IS NULL OR length(CAST("_row_identity" AS VARCHAR)) = 0'
+                )
+                .limit(1)
+                .fetchone()
+            ):
+                raise ValueError("Stored event dataset has missing source row identity")
+            # Some event APIs expose no stable event identifier. Preserve differing
+            # source rows; repeated observations of exactly the same row dedupe.
+            keys.append("_row_identity")
         if api_name in TEXT_CONTRACTS:
             # Text bodies and complete raw row identity survive latest-key views.
             # Existing files without row identity still retain differing bodies.
@@ -180,6 +199,9 @@ def _dataset(root, release_id, api_name):
         relation.create_view("stored")
         metadata = _metadata(manifest, release_id, api_name, aliases)
         metadata["source_api_names"] = sorted(source_apis)
+        if distinct_rows:
+            metadata["deduplication_mode"] = "distinct_supplier_rows"
+            metadata["row_identity_note"] = CONTRACTS[api_name]["row_identity_note"]
         yield db, columns, keys, metadata
 
 

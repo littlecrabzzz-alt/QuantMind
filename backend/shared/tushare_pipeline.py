@@ -30,6 +30,8 @@ from backend.shared.tushare_global_contracts import (
     global_prerequisites,
 )
 from backend.shared.tushare_other_contracts import OTHER_CONTRACTS, other_prerequisites
+from backend.shared.tushare_supplement_contracts import supplement_prerequisites
+from backend.shared.tushare_equity_event_contracts import equity_event_prerequisites
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
@@ -360,7 +362,10 @@ class Pipeline:
                         row[key] = StockCodeUtil.to_prefix(value)
                     elif (
                         key == "ts_code"
-                        and result["api_name"] in GLOBAL_CONTRACTS
+                        and (
+                            result["api_name"] in GLOBAL_CONTRACTS
+                            or result["api_name"] == "mkt_idx_bmk"
+                        )
                         and re.fullmatch(r"[A-Za-z0-9]+\.[A-Z]+", value)
                     ):
                         symbol, exchange = value.rsplit(".", 1)
@@ -493,6 +498,7 @@ class Pipeline:
             "hk_basic": "hk_stocks",
             "us_basic": "us_stocks",
             "index_basic": "indexes",
+            "mkt_idx_bmk": "indexes",
             "etf_basic": "funds",
             "fund_basic": "funds",
             "cb_basic": "bonds",
@@ -655,12 +661,53 @@ class Pipeline:
                 ),
             )
 
+    def record_supplement_planning_gaps(self, config, identifiers):
+        for gap in supplement_prerequisites(identifiers, config=config):
+            kind = "discovery" if gap["dependencies"] else "history"
+            self.db.execute(
+                "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
+                "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason "
+                "WHERE capability.status<>excluded.status OR capability.reason<>excluded.reason",
+                (
+                    "planning:supplement:" + gap["api_name"] + ":" + kind,
+                    "discovery_unverified"
+                    if kind == "discovery"
+                    else "history_scope_unverified",
+                    utc_now(),
+                    json.dumps(gap, sort_keys=True),
+                ),
+            )
+
+    def record_equity_event_planning_gaps(self, config, identifiers):
+        for gap in equity_event_prerequisites(identifiers, config=config):
+            if gap["dependencies"]:
+                kind, status = "discovery", "discovery_unverified"
+            elif gap["reason"] == "cap_note":
+                kind, status = "cap", "row_cap_unverified"
+            elif gap["reason"] == "refresh_gap":
+                kind, status = "revision", "revision_coverage_unverified"
+            else:
+                kind, status = "history", "history_scope_unverified"
+            self.db.execute(
+                "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
+                "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason "
+                "WHERE capability.status<>excluded.status OR capability.reason<>excluded.reason",
+                (
+                    f"planning:equity_event:{gap['api_name']}:{kind}",
+                    status,
+                    utc_now(),
+                    json.dumps(gap, sort_keys=True),
+                ),
+            )
+
     def plan_extended(self, config, today):
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
             ("other", self.record_other_planning_gaps),
             ("global", self.record_global_planning_gaps),
+            ("supplement", self.record_supplement_planning_gaps),
+            ("equity_event", self.record_equity_event_planning_gaps),
         ):
             if not config.get("enable_" + family, False):
                 continue
@@ -714,6 +761,10 @@ class Pipeline:
                             "global_history_start",
                             "other_apis",
                             "other_history_start",
+                            "supplement_apis",
+                            "supplement_history_start",
+                            "equity_event_apis",
+                            "equity_event_history_start",
                         )
                     },
                     "identifiers": identifiers,
@@ -1449,7 +1500,37 @@ class Pipeline:
         }
 
     def publish(self):
-        files, active, gaps = {}, {}, []
+        previous_id, previous = None, None
+        pointer = self.root / "CURRENT.json"
+        if pointer.exists():
+            previous_id = json.loads(pointer.read_bytes())["release_id"]
+            if previous_id.startswith("data-"):
+                previous = manifest_at(self.root, previous_id)
+
+        def preserve_release_mapping(archive):
+            known = (
+                ((previous or {}).get("archive") or {})
+                .get("recovery", {})
+                .get("archived_releases", [])
+            )
+            if not known:
+                return archive
+            archive = archive or {
+                "gaps": [],
+                "recovery": {"status": "not_started", "historical_complete": False},
+            }
+            recovery = dict(archive["recovery"])
+            mappings = {}
+            for item in known + recovery.get("archived_releases", []):
+                key = item["release_id"]
+                if key in mappings and mappings[key] != item:
+                    raise ValueError("Conflicting archived release mapping")
+                mappings[key] = item
+            recovery["archived_releases"] = [mappings[key] for key in sorted(mappings)]
+            return {**archive, "recovery": recovery}
+
+        files = dict(previous["files"]) if previous else {}
+        active, gaps = {}, []
         for row in self.db.execute(
             "SELECT * FROM jobs WHERE state NOT IN ('done','pending') ORDER BY rowid"
         ):
@@ -1505,10 +1586,16 @@ class Pipeline:
             atomic_bytes(self.root / schema_name, raw)
         files[schema_name] = {"sha256": digest(raw), "bytes": len(raw)}
         archive = None
+        self_archive_verified = False
         if (self.root / "archive.sqlite").exists():
             from backend.shared.tushare_archive import archive_inventory
 
             archived = archive_inventory(self.root)
+            self_archive_verified = bool(
+                previous_id
+                and "archives/" + previous_id.removeprefix("data-") + ".json"
+                in archived["files"]
+            )
             files.update(archived["files"])
             for dataset in archived["datasets"]:
                 active.setdefault(dataset["path"], dataset)
@@ -1566,7 +1653,7 @@ class Pipeline:
             "implemented_contracts": sorted(set(CONTRACTS) | set(EXTENDED_CONTRACTS)),
             "schema_path": schema_name,
             "documents": documents,
-            "archive": archive,
+            "archive": preserve_release_mapping(archive),
             "historical_versions_complete": False,
             "retained_observations_included": True,
             "capabilities": [
@@ -1580,6 +1667,82 @@ class Pipeline:
             "catalogued_interfaces": len(self.catalog["entries"]),
             "unimplemented_catalog_scope": True,
         }
+        if previous:
+            # A crash after retaining CURRENT must not manufacture a new release
+            # solely because CURRENT's own archived manifest now exists.
+            def comparable(document):
+                value = dict(document)
+                own_path = "archives/" + previous_id[5:] + ".json"
+                if own_path in document["files"]:
+                    own = self.root / own_path
+                    expected = document["files"][own_path]
+                    if (
+                        expected
+                        != {"sha256": previous_id[5:], "bytes": own.stat().st_size}
+                        or digest(own.read_bytes()) != previous_id[5:]
+                    ):
+                        raise ValueError("Invalid archived CURRENT manifest")
+                value["files"] = {
+                    name: metadata
+                    for name, metadata in document["files"].items()
+                    if name != own_path
+                }
+                archive = document.get("archive")
+                if archive:
+                    archive = {**archive, "recovery": dict(archive["recovery"])}
+                    recovery = archive["recovery"]
+                    releases = recovery.get("archived_releases", [])
+                    retained = [r for r in releases if r["release_id"] != previous_id]
+                    if len(retained) != len(releases):
+                        recovery["archived_releases"] = retained
+                        if any(
+                            r
+                            != {
+                                "release_id": previous_id,
+                                "path": own_path,
+                                "sha256": previous_id[5:],
+                            }
+                            for r in releases
+                            if r["release_id"] == previous_id
+                        ):
+                            raise ValueError("Invalid archived CURRENT mapping")
+                    if self_archive_verified and own_path in document["files"]:
+                        recovery["files"] -= 1
+                    if archive == {
+                        "gaps": [],
+                        "recovery": {
+                            "status": "not_started",
+                            "remaining": 0,
+                            "tasks": 0,
+                            "files": 0,
+                            "open_gaps": 0,
+                            "scan_count": 0,
+                            "historical_complete": False,
+                            "archived_releases": [],
+                        },
+                    }:
+                        archive = None
+                    value["archive"] = archive
+                return value
+
+            if comparable(content) == comparable(previous):
+                return previous_id
+        if previous_id:
+            from backend.shared.tushare_archive import archive_inventory, retain_release
+
+            retained = retain_release(self.root, previous_id)
+            for name, metadata in retained["files"].items():
+                if name in files and files[name] != metadata:
+                    raise ValueError("Conflicting inherited file metadata")
+                files[name] = metadata
+            archived = archive_inventory(self.root)
+            files.update(archived["files"])
+            content["archive"] = preserve_release_mapping(
+                {
+                    "recovery": archived["recovery"],
+                    "gaps": archived["gaps"],
+                }
+            )
         raw = json_bytes(content)
         sha = digest(raw)
         release = "data-" + sha
@@ -1664,14 +1827,25 @@ def tick(max_requests=None, max_seconds=None):
 def manifest_at(root, release_id):
     if not re.fullmatch(r"data-[a-f0-9]{64}", release_id):
         raise ValueError("Invalid release ID")
-    raw = (Path(root) / "releases" / release_id / "manifest.json").read_bytes()
+    root = Path(root).resolve()
+    path = root / "releases" / release_id / "manifest.json"
+    if path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
+        raise ValueError("Unsafe manifest path")
+    if not path.exists():
+        path = root / "archives" / (release_id.removeprefix("data-") + ".json")
+        if path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
+            raise ValueError("Unsafe archived manifest path")
+    raw = path.read_bytes()
     if digest(raw) != release_id.removeprefix("data-"):
         raise ValueError("Manifest checksum mismatch")
     manifest = json.loads(raw)
     for path in manifest["files"]:
-        if not re.fullmatch(
-            r"(?:objects|observations|parquet|schemas|attachments|extracted|documents|archives)/[a-f0-9]+\.(?:json|parquet|pdf|html)",
-            path,
+        if not (
+            re.fullmatch(
+                r"(?:objects|observations|parquet|schemas|attachments|extracted|documents|archives)/[a-f0-9]+\.(?:json|parquet|pdf|html)",
+                path,
+            )
+            or re.fullmatch(r"attachments/[a-f0-9]{64}\.bin", path)
         ):
             raise ValueError("Invalid object path")
     return manifest

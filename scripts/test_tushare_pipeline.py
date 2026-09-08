@@ -85,6 +85,110 @@ class PipelineAcceptance(unittest.TestCase):
                 self.assertFalse(manifest["history_complete"])
                 pipeline.close()
 
+    def test_new_mirror_reads_multiple_historical_releases_without_databases(self):
+        from backend.shared.tushare_store import read_dataset
+        import socket
+
+        with tempfile.TemporaryDirectory() as tmp:
+            source, target = Path(tmp).resolve() / "cloud", Path(tmp).resolve() / "mac"
+            pipeline = Pipeline(source, CATALOG)
+            releases = []
+            for value in (1, 2, 3):
+                with httpx.Client(
+                    transport=httpx.MockTransport(lambda _, v=value: self.response([v]))
+                ) as client:
+                    pipeline.enqueue(
+                        "fund_adj",
+                        {"trade_date": "20260907", "offset": 0, "limit": 2},
+                        epoch=str(value),
+                    )
+                    pipeline.db.commit()
+                    pipeline.run(client, "synthetic-token", CONFIG, pause=0)
+                releases.append(pipeline.publish())
+                self.assertEqual(releases[-1], pipeline.publish())
+            before = manifest_at(source, releases[-1])["archive"]["recovery"][
+                "archived_releases"
+            ]
+            (source / "archive.sqlite").unlink()
+            repaired = pipeline.publish()
+            after = manifest_at(source, repaired)["archive"]["recovery"][
+                "archived_releases"
+            ]
+            self.assertTrue(all(item in after for item in before))
+            self.assertEqual(repaired, pipeline.publish())
+            releases.append(repaired)
+            latest = manifest_at(source, releases[-1])
+            for name in latest["files"]:
+                dest = target / name
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source / name, dest)
+            dest = target / "releases" / releases[-1] / "manifest.json"
+            dest.parent.mkdir(parents=True)
+            shutil.copyfile(source / "releases" / releases[-1] / "manifest.json", dest)
+            self.assertFalse((target / "archive.sqlite").exists())
+            with patch.object(
+                socket.socket,
+                "connect",
+                side_effect=AssertionError("network forbidden"),
+            ):
+                for value, release in zip((1, 2, 3, 3), releases, strict=True):
+                    verify_data(target, release)
+                    rows = read_dataset(target, release, "fund_adj").to_pylist()
+                    self.assertEqual([r["adj_factor"] for r in rows], [value])
+            pipeline.close()
+
+    def test_publication_recovers_retention_interruptions_without_version_loop(self):
+        from backend.shared.tushare_archive import retain_release, recover_archive
+        from backend.shared.tushare_pipeline import atomic_bytes
+
+        for initialized in (False, True):
+            with (
+                self.subTest(initialized=initialized),
+                tempfile.TemporaryDirectory() as tmp,
+            ):
+                root = Path(tmp).resolve()
+                pipeline = Pipeline(root, CATALOG)
+                if initialized:
+                    recover_archive(root)
+                first = pipeline.publish()
+                raw = (root / "releases" / first / "manifest.json").read_bytes()
+                # A copy may survive before the archive DB transaction commits.
+                atomic_bytes(root / "archives" / (first[5:] + ".json"), raw)
+                self.assertEqual(first, pipeline.publish())
+                retain_release(root, first)
+                for _ in range(3):
+                    self.assertEqual(first, pipeline.publish())
+                pipeline.enqueue("fund_adj", {"trade_date": "20260907"})
+                pipeline.db.commit()
+                original = atomic_json
+
+                def interrupted(path, value, original=original):
+                    if path.name == "CURRENT.json":
+                        raise InterruptedError("before CURRENT swap")
+                    return original(path, value)
+
+                with patch(
+                    "backend.shared.tushare_pipeline.atomic_json",
+                    side_effect=interrupted,
+                ):
+                    with self.assertRaises(InterruptedError):
+                        pipeline.publish()
+                self.assertEqual(
+                    json.loads((root / "CURRENT.json").read_bytes())["release_id"],
+                    first,
+                )
+                second = pipeline.publish()
+                self.assertNotEqual(first, second)
+                self.assertEqual(second, pipeline.publish())
+                verify_data(root, second)
+                # Real recovery changes still produce a release, rather than
+                # disappearing into the CURRENT-self projection.
+                recover_archive(root, rescan_releases=True, max_items=10000)
+                third = pipeline.publish()
+                self.assertNotEqual(second, third)
+                self.assertEqual(third, pipeline.publish())
+                pipeline.close()
+
     def test_full_page_keeps_quality_failure(self):
         with (
             tempfile.TemporaryDirectory() as tmp,
@@ -146,8 +250,18 @@ class PipelineAcceptance(unittest.TestCase):
 
     def test_mirror_interruption_retry_noop_and_corruption(self):
         with tempfile.TemporaryDirectory() as tmp:
-            source, target = Path(tmp) / "cloud", Path(tmp) / "mac"
+            source, target = Path(tmp).resolve() / "cloud", Path(tmp).resolve() / "mac"
             pipeline = Pipeline(source, CATALOG)
+            from backend.shared import tushare_documents as documents
+
+            documents._document_db(source).close()
+            evidence = documents._save(
+                source,
+                "attachments",
+                ".bin",
+                b"<html>Unexpected response</html>",
+                "application/octet-stream",
+            )
             with httpx.Client(
                 transport=httpx.MockTransport(lambda _: self.response([1]))
             ) as client:
@@ -206,6 +320,11 @@ class PipelineAcceptance(unittest.TestCase):
                         self.assertEqual(unchanged["downloaded_files"], 0)
                         self.assertEqual(checked.call_count, unchanged["files"])
                 manifest = verify_data(target, second)
+                self.assertIn(evidence["path"], manifest["files"])
+                self.assertEqual(
+                    (target / evidence["path"]).read_bytes(),
+                    b"<html>Unexpected response</html>",
+                )
                 one = next(iter(manifest["files"]))
                 (target / one).write_bytes(b"corrupted")
                 with self.assertRaises(ValueError):
@@ -448,6 +567,49 @@ class PipelineAcceptance(unittest.TestCase):
             atomic_json(Path(tmp) / "releases" / release / "manifest.json", body)
             with self.assertRaises(ValueError):
                 manifest_at(Path(tmp), release)
+
+    def test_archived_manifest_fallback_rejects_corruption_and_symlinks(self):
+        from backend.shared.tushare_intake import digest, json_bytes
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            raw = json_bytes({"files": {}, "datasets": []})
+            sha = digest(raw)
+            archived = root / "archives" / (sha + ".json")
+            archived.parent.mkdir()
+            archived.write_bytes(raw)
+            self.assertEqual(manifest_at(root, "data-" + sha)["datasets"], [])
+            original = root / "releases" / ("data-" + sha) / "manifest.json"
+            original.parent.mkdir(parents=True)
+            original.write_bytes(b"corrupted")
+            with self.assertRaisesRegex(ValueError, "checksum"):
+                manifest_at(root, "data-" + sha)
+            original.unlink()
+            original.symlink_to(archived)
+            with self.assertRaisesRegex(ValueError, "Unsafe"):
+                manifest_at(root, "data-" + sha)
+            original.unlink()
+            archived.write_bytes(b"corrupted")
+            with self.assertRaisesRegex(ValueError, "checksum"):
+                manifest_at(root, "data-" + sha)
+
+    def test_binary_evidence_only_allowed_under_attachments(self):
+        from backend.shared.tushare_intake import digest, json_bytes
+
+        with tempfile.TemporaryDirectory() as tmp:
+            for family in ("objects", "parquet", "documents", "archives"):
+                body = {
+                    "files": {
+                        family + "/" + "a" * 64 + ".bin": {
+                            "sha256": "a" * 64,
+                            "bytes": 0,
+                        }
+                    }
+                }
+                release = "data-" + digest(json_bytes(body))
+                atomic_json(Path(tmp) / "releases" / release / "manifest.json", body)
+                with self.assertRaisesRegex(ValueError, "Invalid object path"):
+                    manifest_at(Path(tmp), release)
 
 
 if __name__ == "__main__":
