@@ -19,7 +19,7 @@ from backend.shared.tushare_pipeline import (
     manifest_at,
     verify_data,
 )
-from scripts.tushare_mirror import mirror
+from scripts.tushare_mirror import checked_file, mirror
 
 CATALOG = json.loads(
     (Path(__file__).resolve().parents[1] / "config/tushare-catalog.json").read_text()
@@ -199,7 +199,12 @@ class PipelineAcceptance(unittest.TestCase):
                     "scripts.tushare_mirror.subprocess.run", side_effect=download
                 ):
                     self.assertGreater(mirror(target)["downloaded_files"], 0)
-                    self.assertEqual(mirror(target)["downloaded_files"], 0)
+                    with patch(
+                        "scripts.tushare_mirror.checked_file", wraps=checked_file
+                    ) as checked:
+                        unchanged = mirror(target)
+                        self.assertEqual(unchanged["downloaded_files"], 0)
+                        self.assertEqual(checked.call_count, unchanged["files"])
                 manifest = verify_data(target, second)
                 one = next(iter(manifest["files"]))
                 (target / one).write_bytes(b"corrupted")
@@ -210,6 +215,19 @@ class PipelineAcceptance(unittest.TestCase):
                 ):
                     self.assertEqual(mirror(target)["downloaded_files"], 1)
             pipeline.close()
+
+    def test_mirror_rejects_parent_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            outside = root / "outside"
+            outside.mkdir()
+            payload = outside / "data.json"
+            payload.write_bytes(b"data")
+            (root / "objects").symlink_to(outside, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                checked_file(
+                    root / "objects/data.json", {"bytes": 4, "sha256": "ignored"}
+                )
 
     def test_offline_reader_selects_latest_observation(self):
         from backend.shared.tushare_store import read_dataset

@@ -43,10 +43,14 @@ CONTRACTS = {
 
 
 def atomic_json(path, value):
+    atomic_bytes(path, json_bytes(value))
+
+
+def atomic_bytes(path, raw):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + "." + uuid4().hex + ".tmp")
     with tmp.open("wb") as stream:
-        stream.write(json_bytes(value))
+        stream.write(raw)
         stream.flush()
         os.fsync(stream.fileno())
     tmp.replace(path)
@@ -897,8 +901,9 @@ class Pipeline:
 
     def publish(self):
         files, active, gaps = {}, {}, []
-        rows = self.db.execute("SELECT * FROM jobs ORDER BY rowid").fetchall()
-        for row in rows:
+        for row in self.db.execute(
+            "SELECT * FROM jobs WHERE state NOT IN ('done','pending') ORDER BY rowid"
+        ):
             result = json.loads(row["result"]) if row["result"] else {}
             if row["state"] not in ("done", "pending"):
                 gaps.append(
@@ -948,7 +953,7 @@ class Pipeline:
         raw = json_bytes(metadata)
         schema_name = "schemas/" + digest(raw) + ".json"
         if not (self.root / schema_name).exists():
-            atomic_json(self.root / schema_name, metadata)
+            atomic_bytes(self.root / schema_name, raw)
         files[schema_name] = {"sha256": digest(raw), "bytes": len(raw)}
         archive = None
         if (self.root / "archive.sqlite").exists():
@@ -969,7 +974,7 @@ class Pipeline:
             raw_documents = json_bytes(inventory)
             document_name = "documents/" + digest(raw_documents) + ".json"
             if not (self.root / document_name).exists():
-                atomic_json(self.root / document_name, inventory)
+                atomic_bytes(self.root / document_name, raw_documents)
             files[document_name] = {
                 "sha256": digest(raw_documents),
                 "bytes": len(raw_documents),
@@ -979,6 +984,7 @@ class Pipeline:
                 "counts": inventory["counts"],
                 "reference_counts": inventory["reference_counts"],
             }
+            del inventory, raw_documents
         content = {
             "schema_version": 1,
             "files": files,
@@ -993,7 +999,12 @@ class Pipeline:
             "gaps": gaps,
             "history_complete": False,
             "rrg_status": "blocked_data",
-            "scope": sorted({json.loads(r["job"])["api_name"] for r in rows}),
+            "scope": [
+                r[0]
+                for r in self.db.execute(
+                    "SELECT DISTINCT json_extract(job,'$.api_name') AS api FROM jobs ORDER BY api"
+                )
+            ],
             "implemented_contracts": sorted(set(CONTRACTS) | set(EXTENDED_CONTRACTS)),
             "schema_path": schema_name,
             "documents": documents,
@@ -1011,11 +1022,12 @@ class Pipeline:
             "catalogued_interfaces": len(self.catalog["entries"]),
             "unimplemented_catalog_scope": True,
         }
-        sha = digest(json_bytes(content))
+        raw = json_bytes(content)
+        sha = digest(raw)
         release = "data-" + sha
         destination = self.root / "releases" / release / "manifest.json"
         if not destination.exists():
-            atomic_json(destination, content)
+            atomic_bytes(destination, raw)
         atomic_json(
             self.root / "CURRENT.json", {"release_id": release, "manifest_sha256": sha}
         )
