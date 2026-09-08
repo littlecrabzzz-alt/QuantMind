@@ -34,6 +34,10 @@ from backend.shared.tushare_supplement_contracts import supplement_prerequisites
 from backend.shared.tushare_equity_event_contracts import equity_event_prerequisites
 from backend.shared.tushare_futures_extra_contracts import futures_extra_prerequisites
 from backend.shared.tushare_research_extra_contracts import research_extra_prerequisites
+from backend.shared.tushare_credit_extra_contracts import (
+    credit_identifiers,
+    credit_extra_prerequisites,
+)
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
@@ -82,7 +86,7 @@ class Pipeline:
         self.db = sqlite3.connect(self.root / "pipeline.sqlite", timeout=10)
         self.db.row_factory = sqlite3.Row
         version = self.db.execute("pragma user_version").fetchone()[0]
-        if version not in (0, 1, 2, 3, 4):
+        if version not in (0, 1, 2, 3, 4, 5):
             raise ValueError("Unsupported pipeline schema version")
         # Version 1 migration: SQLite is acquisition state, never copied live.
         if version == 0:
@@ -138,6 +142,26 @@ class Pipeline:
             self.recover_legacy_partitions()
             self.db.execute("PRAGMA user_version=4")
             self.db.commit()
+        if version < 5:
+            # Partial indexes keep priority,rowid order without sorting every
+            # equal-priority pending job; expansion visits only unexpanded rows.
+            try:
+                self.db.executescript("""
+                    BEGIN IMMEDIATE;
+                    CREATE INDEX IF NOT EXISTS jobs_ready_group
+                        ON jobs(group_name,priority) WHERE state='pending';
+                    CREATE INDEX IF NOT EXISTS jobs_ready_order
+                        ON jobs(priority) WHERE state='pending';
+                    CREATE INDEX IF NOT EXISTS jobs_unexpanded
+                        ON jobs(state,group_name,priority,retry_after)
+                        WHERE expanded=0 AND state IN ('done','quality','empty');
+                    PRAGMA user_version=5;
+                    COMMIT;
+                """)
+            except BaseException:
+                self.db.rollback()
+                self.db.close()
+                raise
         cursor = self.db.execute(
             "SELECT value FROM scheduler_state WHERE name='family_turn'"
         ).fetchone()
@@ -154,7 +178,7 @@ class Pipeline:
         rpm = config.get("requests_per_minute")
         if rpm is None:
             return self.db.execute(
-                "SELECT * FROM jobs WHERE state='pending' AND retry_after<=? ORDER BY priority,rowid LIMIT 1",
+                "SELECT * FROM jobs INDEXED BY jobs_ready_order WHERE state='pending' AND retry_after<=? ORDER BY priority,rowid LIMIT 1",
                 (time.time(),),
             ).fetchone()
         if not 1 <= int(rpm) <= 500:
@@ -178,16 +202,20 @@ class Pipeline:
                 raise ValueError("Invalid family scheduling weight")
             groups = [name for name in groups for _ in range(int(weights.get(name, 1)))]
             group = groups[self._fair_turn % len(groups)]
-            sql = """SELECT j.* FROM jobs j LEFT JOIN request_gates g
+            sql = """SELECT j.* FROM jobs j INDEXED BY {ready_index} LEFT JOIN request_gates g
                 ON g.scope='api:' || json_extract(j.job,'$.api_name')
                 WHERE j.state='pending' AND j.retry_after<=? AND COALESCE(g.next_at,0)<=?
                 {group_filter} ORDER BY j.priority,j.rowid LIMIT 1"""
             row = self.db.execute(
-                sql.format(group_filter="AND j.group_name=?"), (now, now, group)
+                sql.format(
+                    group_filter="AND j.group_name=?", ready_index="jobs_ready_group"
+                ),
+                (now, now, group),
             ).fetchone()
             if row is None:
                 row = self.db.execute(
-                    sql.format(group_filter=""), (now, now)
+                    sql.format(group_filter="", ready_index="jobs_ready_order"),
+                    (now, now),
                 ).fetchone()
             if row:
                 api = json.loads(row["job"])["api_name"]
@@ -542,6 +570,7 @@ class Pipeline:
     def identifiers(self):
         families = {
             "stock_basic": "stocks",
+            "margin_secs": "credit_securities",
             "hk_basic": "hk_stocks",
             "us_basic": "us_stocks",
             "index_basic": "indexes",
@@ -594,7 +623,14 @@ class Pipeline:
                 code = record.get("ts_code") or record.get("index_code")
                 if code:
                     result[families[saved["api_name"]]].add(code)
-        return {key: sorted(values) for key, values in result.items()}
+        result = {key: sorted(values) for key, values in result.items()}
+        try:
+            result.update(credit_identifiers(result))
+        except ValueError:
+            # Keep raw discovery for family-local validation below; malformed
+            # credit inputs must not block unrelated families in identifiers().
+            pass
+        return result
 
     def record_global_planning_gaps(self, config, identifiers):
         # Nonempty discovery and an explicit 1990 scope are not completeness proof.
@@ -751,6 +787,7 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "credit_extra": credit_extra_prerequisites,
             "futures_extra": futures_extra_prerequisites,
             "research_extra": research_extra_prerequisites,
         }[family]
@@ -776,6 +813,12 @@ class Pipeline:
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
+            (
+                "credit_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "credit_extra", cfg, ids
+                ),
+            ),
             ("other", self.record_other_planning_gaps),
             ("global", self.record_global_planning_gaps),
             ("supplement", self.record_supplement_planning_gaps),
@@ -853,6 +896,8 @@ class Pipeline:
                             "futures_extra_history_start",
                             "research_extra_apis",
                             "research_extra_history_start",
+                            "credit_extra_apis",
+                            "credit_extra_history_start",
                         )
                     },
                     "identifiers": identifiers,
@@ -1106,6 +1151,130 @@ class Pipeline:
                     ),
                 )
 
+    def split_observed_futures(self, row, job, result, existing):
+        """Only source-observed partitions; no complete-universe inference."""
+        api, params = job["api_name"], job["params"]
+        fields = (
+            ("exchange", "symbol")
+            if api == "fut_holding"
+            else ("exchange", "prd")
+            if "week" in params
+            else ("week",)
+        )
+        saved = result if result is not None else json.loads(row["result"] or "{}")
+        records = self.records(saved) if saved.get("object_sha256") else []
+        issues = {}
+        observed = {}
+
+        def gap(kind):
+            issues[kind] = issues.get(kind, 0) + 1
+
+        def usable(field, value):
+            if (
+                field == "week"
+                and isinstance(value, int)
+                and not isinstance(value, bool)
+            ):
+                return value > 0
+            return (
+                isinstance(value, str)
+                and 0 < len(value) <= 128
+                and not any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in value)
+            )
+
+        for record in records:
+            # Check only explicit equality constraints, never reinterpret range
+            # bounds or derive a supplier week from week_date.
+            constrained = tuple(
+                field
+                for field in ("trade_date", "week", "exchange", "symbol", "prd")
+                if field in params
+            )
+            required = set(fields) | set(constrained)
+            if any(field not in record or record[field] is None for field in required):
+                gap("missing_partition_fields")
+                continue
+            if any(not usable(field, record[field]) for field in required):
+                gap("invalid_partition_values")
+                continue
+            if any(record[field] != params[field] for field in constrained):
+                gap("parent_filter_mismatch")
+                continue
+            child = {**params, **{field: record[field] for field in fields}}
+            if child == params:
+                gap("saturated_terminal_partition")
+                continue
+            observed[json_bytes(child)] = child
+        if not records:
+            gap("missing_source_partition_rows")
+        previous = {
+            child[0]
+            for child in self.db.execute(
+                "SELECT child_id FROM partition_children WHERE parent_id=?",
+                (row["id"],),
+            )
+        }
+        children = previous | {
+            self.enqueue(api, child, row["priority"] + 1, row["epoch"])
+            for _, child in sorted(observed.items())
+        }
+        evidence = (
+            json.loads(existing["evidence"])
+            if existing
+            else {"origin": "observed_futures"}
+        )
+        evidence.update(universe_complete=False, partition_fields=list(fields))
+        sources = evidence.setdefault("source_observations", {})
+        observation_key = digest(
+            json_bytes([saved.get("observation"), saved.get("object_sha256")])
+        )
+        sources.setdefault(
+            observation_key,
+            {
+                "observation": saved.get("observation"),
+                "object_sha256": saved.get("object_sha256"),
+                "observed_partitions": len(observed),
+                "gaps": issues,
+            },
+        )
+        # Per-observation gaps remain independent even if reconciliation later
+        # reports the encompassing universe_unverified gap.
+        if existing:
+            for child in children - previous:
+                cycle = self.db.execute(
+                    "WITH RECURSIVE descendants(id) AS (SELECT child_id FROM partition_children WHERE parent_id=? "
+                    "UNION SELECT c.child_id FROM partition_children c JOIN descendants d ON c.parent_id=d.id) "
+                    "SELECT 1 FROM descendants WHERE id=? LIMIT 1",
+                    (child, row["id"]),
+                ).fetchone()
+                if child == row["id"] or cycle:
+                    raise ValueError("Partition relationship would create a cycle")
+            self.db.executemany(
+                "INSERT OR IGNORE INTO partition_children VALUES(?,?)",
+                [(row["id"], child) for child in sorted(children - previous)],
+            )
+            self.db.execute(
+                "UPDATE partition_splits SET method='observed_futures_fanout',expected_children=?,coverage_proven=0,evidence=?,status='gap',gap='universe_unverified' WHERE parent_id=?",
+                (len(children), json.dumps(evidence, sort_keys=True), row["id"]),
+            )
+        elif children:
+            self.record_partition(
+                row["id"], sorted(children), "observed_futures_fanout", False, evidence
+            )
+        else:
+            self.db.execute(
+                "INSERT INTO partition_splits VALUES(?,'observed_futures_fanout',0,0,?,'gap','universe_unverified')",
+                (row["id"], json.dumps(evidence, sort_keys=True)),
+            )
+        return {
+            "method": "observed_futures_fanout",
+            "children": len(children),
+            "universe_complete": False,
+            "observed_partitions": len(observed),
+            "added_children": len(children - previous),
+            "gaps": issues,
+        }
+
     def split_request(self, row, job, result=None):
         spec = contract_for(job["api_name"])
         params = job["params"]
@@ -1121,6 +1290,10 @@ class Pipeline:
             existing
             and existing["expected_children"]
             and not (existing["method"] == "identifier_fanout" and fanout)
+            and not (
+                existing["method"] == "observed_futures_fanout"
+                and job["api_name"] in ("fut_holding", "fut_weekly_detail")
+            )
         ):
             return {
                 "method": existing["method"],
@@ -1141,6 +1314,8 @@ class Pipeline:
                 {"origin": "v4", "date_coverage": "exhaustive"},
             )
             return {"method": "date_bisection", "children": len(ids)}
+        if job["api_name"] in ("fut_holding", "fut_weekly_detail"):
+            return self.split_observed_futures(row, job, result, existing)
         if fanout:
 
             def usable(code):
@@ -1430,7 +1605,7 @@ class Pipeline:
 
     def expand(self, config):
         for row in self.db.execute(
-            "SELECT * FROM jobs WHERE expanded=0 AND state IN ('done','quality','empty')"
+            "SELECT * FROM jobs INDEXED BY jobs_unexpanded WHERE expanded=0 AND state IN ('done','quality','empty')"
         ).fetchall():
             job, result = json.loads(row["job"]), json.loads(row["result"])
             if job["api_name"] == "trade_cal":

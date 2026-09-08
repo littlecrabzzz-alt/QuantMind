@@ -148,3 +148,18 @@
 - 阶段计时第一真实批263请求/90.028秒，总110.677秒：initialize2.551、planning4.336、archive5.093、acquire90.184、document_registration0.020、publish8.491秒，failed_stage=null。不能把90秒当整批墙钟；保持240/min账号门、接口独立门及160/180秒任务边界。下一性能候选针对已测重复SQL扫描与排序，尚未据模拟索引收益宣称生产提速。
 - 原36个无常规API页面已全部复核：33分类/说明、2个SDK pro_bar页面、1个CSV交付页。直接子目录均在基线，但正文另发现11个链接文档，其中rt_k/rt_etf_k为独立权限接口，6个链接当前正文缺失。新增discovered_entries保留，不改原263基线count。188/422仍作为需正文复核的种子；因子库独立权益、SDK与CSV交付、账户写/删均不能凭积分或目录存在自动纳入HTTP回填。
 - RRG固定价格/日历切片结构通过，下一可并行步骤是固定输入消费适配与因果性技术验收；历史行业定义、成员known_at、ETF映射/可交易性仍独立blocked。全量数据回填不作为这一步隐含依赖，但未运行策略发现、完整回测或更改研究case。
+
+
+## 2026-09-09 05:50 队列提速、信用7及RRG并行推进
+
+- 40bea6a 已合入并推送 master；双端 handoff passed（4450文件，源码摘要0c3c9f7ae87971e9a3119dddd634887a0497323774c0f1cc57afc25a9cbd2221）。276项Tushare专项隔离测试通过，含40万pending查询计划与期货重复分片回归。当前注册129数据集及6财务查询别名；注册数不等同全历史取全。
+- 两专属消费者自然排空后，SQLite正式一致性备份551518208字节，SHA256 d42289d8f372a27b02dfc0ab95fafb4e5eb07d54280732201864756629cbe03f；v4→v5迁移0.867秒、integrity_check=ok，458584 jobs / 30301 attempts / 250 capability / 119 request_gates数量一致，仅增加3个队列索引。证据validation/pre-v5-backup.json、v5-deployment.json。旧v4-only程序不能直接打开v5，回退须保留v5兼容，不能盲目恢复旧备份丢失新增进度。
+- 7信用接口真实请求2.075秒，6非空共9242原始行：margin3、margin_detail4441、margin_secs4468、block_trade164、pledge_detail165、pledge_stat1；slb_len指定20260904为空，保留未知状态。58字段含空schema均返回，非空原文/观察hash/Parquet逐字段及日期轴校验通过。block_trade有29条完全重复源行、pledge_detail有1条，原文与Parquet保留；查询视图去重数量不能冒充真实事件数。证据validation/credit7-probe.json、credit7-acceptance.json。
+- 信用7配置已启用但planning:credit_extra实际validation_blocked：funds发现22205标识，包含0000371.OF、1610142.OF以及1500011.SZ、5010021.SH等7位历史基金代码，6位校验拒绝。保留原始发现与family-local gap；structured已独立修复候选，不截断或丢弃代码。其他组继续，不能报告信用历史回填已恢复。
+- 两个真实期货满页父分区已追加137个exchange/symbol持仓子任务及66个保留原始week值/类型的周度子任务；旧证据不删，coverage_proven=false，全集和饱和末端仍有缺口。证据validation/futures-observed-recovery.json。
+- 仅重启quantmind和Tushare两专属worker；US原定时任务保持同一id继续，未重启普通/research worker。实际acquire60926005、documents039a38db均恢复；21:48:57Z首个v5批次331请求/90.048秒采集、109.752秒整批，failed_stage=null。升级前最后一批270请求/90.221秒、108.361秒整批；单批约多23%请求，不保证持续比例或据此推全量ETA。Mac持久镜像运行环境已刷新信用模块，固定版镜像正在执行，尚未宣称本批离线验收完成。
+- 用户再次要求减少串行等待：云端采集/附件与Mac固定数据消费并行；remaining已用已有原算法跑通RRG28行业坐标候选，父独立复验待完成。PCF471/472纯合同95c3ba1（6离线测试）已交付但尚未runtime集成；实时rt_k/rt_etf_k纯合同已入master但未启用，仍依赖独立权限与过期快照门槛。历史分类、成员known_at、ETF执行仍blocked，不跑策略发现/完整回测。
+- 05:48核查云端可用300.41GiB，本轮无需扩容；45万级任务还会随发现/分片增长。后续：信用7位源标识恢复、Mac本批禁网复验、RRG坐标父验收、PCF接入、目录剩余与长期吞吐。总目标持续active，不等全库下载才开发消费端。
+
+- 05:53完成追加：Mac固定data-e12e0274cf2c5acd3b36c99f0a7ab52abd43e86c5fab435b200c367129a7d597共88800文件校验通过，本次补2758文件。其保留的credit验收版data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a禁网逐字段核对9242原始行通过；block_trade视图135、pledge_detail164与原文重复数对应，slb_len空观察保留、查询明确不可用且无上游回退。证据/tmp/tushare-credit7-mac-verified.json。
+- RRG父独立断网复验通过：28行业×968日=27104坐标，220/60/20预热、3截点截断/未来扰动、逐行业缩放、同走势中心100、缺值拒绝通过；CSV SHA256 66d4ca27445090b528f346499aff1a8d661771c57b7676dc84b1d5d0be83b0e6与子验收一致。报告/tmp/quantmind-rrg-coordinate-parent-review-20260909/report.json；48个月末有47个下一交易日映射，末端边界仍gap，整体blocked_data不变。消费验收脚本及PCF纯合同已合入675301b，PCF尚未注册运行。信用7位修复4e414e4（22项隔离测试）已交付独立候选，下一轮部署恢复。

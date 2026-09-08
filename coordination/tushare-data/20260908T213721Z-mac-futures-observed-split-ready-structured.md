@@ -1,0 +1,11 @@
+# 期货实际观测维度分片交接
+- Mac/codex/tushare-futures-partitions；直接基于父e7eedbf；候选56ff7a08b6b4eb1c234a0e55e4de4de7d477b998。
+- 归属释放：仅pipeline.split_request+直接helper split_observed_futures、新scripts/test_tushare_futures_observed_split.py；AST证明其它方法不变。信用2a4bbb1与索引6ce645c保留各原分支，无混入。
+
+合法日期二分仍优先；fut_holding按source exchange+symbol成对派生，不从期货主表猜商品代码或做笛卡尔积。fut_weekly_detail无week父按实际opaque week派生，有week饱和时再按exchange+prd；正整数和字符串保持原类型，例如20191与"20191"不合并，不ISO/补零/offset。全部新observed fanout coverage_proven=0，不从子集合推断全集。
+
+原partition表保存关系；重入只追加子关系，source_observations按[observation,object_sha]稳定哈希setdefault保存，只增不删。零合法子任务仍有gap记录；missing_partition_fields/invalid_partition_values/parent_filter_mismatch/saturated_terminal_partition/missing_source_partition_rows按观察独立保存，reconciliation可继续报告universe_unverified但不抹掉详细证据。现有legacy evidence保留，可从零子关系继续追加。原父raw/jobs/attempts不由helper改写；新增关系保留cycle检查。
+
+验证8专项+7observed-fanout+11partition-closure+17pipeline=43通过；包括Mock run真实调用父→pair→空子仍split_pending、source字段缺失/非法pair、week异型、再饱和叶子、重入重复/新增旧观察、legacy零子恢复、循环拒绝、旧日期覆盖不变。Ruff/diff/AST通过；临时目录，无生产/凭据/网络。
+
+资源：每个饱和响应读取该已存object并以响应不同维度为上界派生任务，约4000行证据则至多4000新children；不扫描全库/主表，不引入额外每请求写库或采集并行。未承诺全集/权限/真实数据效果；父负责集成灰度，原函数调用参数不变。

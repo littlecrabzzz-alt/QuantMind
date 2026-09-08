@@ -913,9 +913,23 @@
       "acquisition_api_names": [
         "pledge_stat"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Recover credit-family planning blocked by seven-digit historical fund identifiers without truncation or dropping source identities; continue history and revision coverage. Empty slb_len sample does not prove absent history.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/credit7-acceptance.json",
+        "release_id": "data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a",
+        "checked_at": "2026-09-08T21:44:58.332421+00:00",
+        "sample_rows": 1,
+        "sample_params": {
+          "end_date": "20260904",
+          "ts_code": "600036.SH"
+        },
+        "source_object_sha256": "fcd42cd2cdd1a5625817775ef035f5969d0b74beff4f1b527d0a9137e740a7aa",
+        "scope": "Bounded sample only; planning credit_extra validation_blocked (Invalid supplier fund code). Raw and Parquet preserve duplicates; full history/PIT unverified.",
+        "offline_release_id": "data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a",
+        "offline_evidence": "/tmp/tushare-credit7-mac-verified.json"
+      }
     },
     {
       "doc_id": "111",
@@ -927,9 +941,23 @@
       "acquisition_api_names": [
         "pledge_detail"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Recover credit-family planning blocked by seven-digit historical fund identifiers without truncation or dropping source identities; continue history and revision coverage. Empty slb_len sample does not prove absent history.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/credit7-acceptance.json",
+        "release_id": "data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a",
+        "checked_at": "2026-09-08T21:44:58.332421+00:00",
+        "sample_rows": 165,
+        "sample_params": {
+          "end_date": "20260904",
+          "start_date": "20260901"
+        },
+        "source_object_sha256": "edffbc71888bfc5f9d31b4821965e8f892c5e5834a982766d7818e7cd7dfe049",
+        "scope": "Bounded sample only; planning credit_extra validation_blocked (Invalid supplier fund code). Raw and Parquet preserve duplicates; full history/PIT unverified.",
+        "offline_release_id": "data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a",
+        "offline_evidence": "/tmp/tushare-credit7-mac-verified.json"
+      }
     },
     {
       "doc_id": "124",
@@ -997,9 +1025,22 @@
       "acquisition_api_names": [
         "block_trade"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Recover credit-family planning blocked by seven-digit historical fund identifiers without truncation or dropping source identities; continue history and revision coverage. Empty slb_len sample does not prove absent history.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/credit7-acceptance.json",
+        "release_id": "data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a",
+        "checked_at": "2026-09-08T21:44:58.332421+00:00",
+        "sample_rows": 164,
+        "sample_params": {
+          "trade_date": "20260904"
+        },
+        "source_object_sha256": "0135643abb98fd1b50d60f241e29e1c8734d5107c52e1f29345ca1f98d798426",
+        "scope": "Bounded sample only; planning credit_extra validation_blocked (Invalid supplier fund code). Raw and Parquet preserve duplicates; full history/PIT unverified.",
+        "offline_release_id": "data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a",
+        "offline_evidence": "/tmp/tushare-credit7-mac-verified.json"
+      }
     },
     {
       "doc_id": "164",
@@ -1311,9 +1352,22 @@
       "acquisition_api_names": [
         "margin"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Recover credit-family planning blocked by seven-digit historical fund identifiers without truncation or dropping source identities; continue history and revision coverage. Empty slb_len sample does not prove absent history.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/credit7-acceptance.json",
+        "release_id": "data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a",
+        "checked_at": "2026-09-08T21:44:58.332421+00:00",
+        "sample_rows": 3,
+        "sample_params": {
+          "trade_date": "20260904"
+        },
+        "source_object_sha256": "85bdecafb8731a355c0cc13cd1c0b622d6d5e7700b51c4c7443be03ec55a7ea4",
+        "scope": "Bounded sample only; planning credit_extra validation_blocked (Invalid supplier fund code). Raw and Parquet preserve duplicates; full history/PIT unverified.",
+        "offline_release_id": "data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a",
+        "offline_evidence": "/tmp/tushare-credit7-mac-verified.json"
+      }
     },
     {
       "doc_id": "59",
@@ -1325,9 +1379,22 @@
       "acquisition_api_names": [
         "margin_detail"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Recover credit-family planning blocked by seven-digit historical fund identifiers without truncation or dropping source identities; continue history and revision coverage. Empty slb_len sample does not prove absent history.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/credit7-acceptance.json",
+        "release_id": "data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a",
+        "checked_at": "2026-09-08T21:44:58.332421+00:00",
+        "sample_rows": 4441,
+        "sample_params": {
+          "trade_date": "20260904"
+        },
+        "source_object_sha256": "da21d9dd22f308b0f17fbd293e2736f70f74a9b558afb5efe28a242442576104",
+        "scope": "Bounded sample only; planning credit_extra validation_blocked (Invalid supplier fund code). Raw and Parquet preserve duplicates; full history/PIT unverified.",
+        "offline_release_id": "data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a",
+        "offline_evidence": "/tmp/tushare-credit7-mac-verified.json"
+      }
     },
     {
       "doc_id": "326",
@@ -1339,9 +1406,22 @@
       "acquisition_api_names": [
         "margin_secs"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Recover credit-family planning blocked by seven-digit historical fund identifiers without truncation or dropping source identities; continue history and revision coverage. Empty slb_len sample does not prove absent history.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/credit7-acceptance.json",
+        "release_id": "data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a",
+        "checked_at": "2026-09-08T21:44:58.332421+00:00",
+        "sample_rows": 4468,
+        "sample_params": {
+          "trade_date": "20260904"
+        },
+        "source_object_sha256": "de597360c9cde1e14ffc0f2632a786fe56281da2f70aa6b546fd9905aeb6dddd",
+        "scope": "Bounded sample only; planning credit_extra validation_blocked (Invalid supplier fund code). Raw and Parquet preserve duplicates; full history/PIT unverified.",
+        "offline_release_id": "data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a",
+        "offline_evidence": "/tmp/tushare-credit7-mac-verified.json"
+      }
     },
     {
       "doc_id": "332",
@@ -1367,9 +1447,22 @@
       "acquisition_api_names": [
         "slb_len"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "sample_empty_unverified",
+      "permission_status": "no_denial_observed_empty",
+      "next_action": "Recover credit-family planning blocked by seven-digit historical fund identifiers without truncation or dropping source identities; continue history and revision coverage. Empty slb_len sample does not prove absent history.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/credit7-acceptance.json",
+        "release_id": "data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a",
+        "checked_at": "2026-09-08T21:44:58.332421+00:00",
+        "sample_rows": 0,
+        "sample_params": {
+          "trade_date": "20260904"
+        },
+        "source_object_sha256": "d53da8ea074b4c6c13bd6f33d3659a4a5b471cc5d90dd2aee9b3bf1e6f3aaccb",
+        "scope": "Bounded sample only; planning credit_extra validation_blocked (Invalid supplier fund code). Raw and Parquet preserve duplicates; full history/PIT unverified.",
+        "offline_release_id": "data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a",
+        "offline_evidence": "/tmp/tushare-credit7-mac-verified.json"
+      }
     },
     {
       "doc_id": "333",
@@ -2770,14 +2863,15 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "next_action": "Continue immutable source-observed paired holding/week partitions; universe completeness remains unproven and saturated terminal partitions retain explicit gaps.",
       "runtime_evidence": {
         "path": "/data/tushare/validation/extra13-acceptance.json",
         "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
         "checked_at": "2026-09-08T21:09:03.140115+00:00",
         "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
         "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
-        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5",
+        "partition_recovery_evidence": "/data/tushare/validation/futures-observed-recovery.json"
       }
     },
     {
@@ -2828,14 +2922,15 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "next_action": "Continue immutable source-observed paired holding/week partitions; universe completeness remains unproven and saturated terminal partitions retain explicit gaps.",
       "runtime_evidence": {
         "path": "/data/tushare/validation/extra13-acceptance.json",
         "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
         "checked_at": "2026-09-08T21:09:03.140115+00:00",
         "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
         "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
-        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5",
+        "partition_recovery_evidence": "/data/tushare/validation/futures-observed-recovery.json"
       }
     },
     {

@@ -29,7 +29,16 @@ from backend.shared.tushare_research_extra_contracts import (
     iter_research_extra_jobs,
 )
 
+from backend.shared.tushare_credit_extra_contracts import (
+    CREDIT_EXTRA_CONTRACTS,
+    iter_credit_extra_jobs,
+)
+
 EXTENDED_CONTRACTS = {
+    **{
+        api: {**spec, "group": "credit_extra"}
+        for api, spec in CREDIT_EXTRA_CONTRACTS.items()
+    },
     **{
         api: {**spec, "group": "futures_extra"}
         for api, spec in FUTURES_EXTRA_CONTRACTS.items()
@@ -56,6 +65,7 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "credit_extra": iter_credit_extra_jobs,
     "text": lambda config, today, ids: iter_text_jobs(config, today),
     "structured": iter_structured_jobs,
     "market": iter_market_jobs,
