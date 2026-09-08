@@ -44,7 +44,14 @@ services:
     command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q ${QLIB_CELERY_QUEUE:-qlib_backtest_srv} --loglevel=info --concurrency=1
   tushare-worker:
     extends:
+      file: docker-compose.yml
       service: celery-worker
+    environment:
+      QM_NODE_ROLE: authority
+      ENABLE_REAL_TRADING: "false"
+      ENABLE_TDX_PUSH: "false"
+      HOST_PROJECT_PATH: /root/data/disk/quantmind/project
+      TRAINING_PAUSE_OTHERS: "false"
     container_name: quantmind-tushare-worker
     mem_limit: 1g
     cpus: 0.75
