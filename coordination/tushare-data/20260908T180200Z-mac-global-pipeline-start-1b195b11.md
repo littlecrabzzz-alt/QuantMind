@@ -1,0 +1,1 @@
+任务text_contracts / global pipeline接入。Mac隔离codex/tushare-text，merge master b3950a7形成651da24，冲突3文件保留master。独占tushare_registry.py、tushare_pipeline.py、新test_tushare_global_pipeline.py及此前global3文件。仅临时目录离线验证；父暂停这3文件编辑，父拥有发布/配置。继续17API family、HK/US发现与前缀归一化，未知历史下界持续保留gap。
