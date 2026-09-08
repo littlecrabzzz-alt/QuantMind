@@ -1,0 +1,304 @@
+#!/usr/bin/env python3
+"""Offline capture -> normalize -> immutable release -> DuckDB reader acceptance."""
+
+from datetime import date
+import json
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import httpx
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from backend.shared import tushare_pipeline as module  # noqa: E402
+from backend.shared.tushare_other_contracts import OTHER_CONTRACTS, FIELDS  # noqa: E402
+from backend.shared.tushare_store import read_dataset, dataset_schema, KEYS  # noqa: E402
+
+CATALOG = json.loads((ROOT / "config/tushare-catalog.json").read_text())
+
+
+def sample(api):
+    row = dict.fromkeys(FIELDS[api])
+    if api.startswith("opt_"):
+        row.update(ts_code="600000.SH", symbol="600000", delist_date="20200101")
+    elif api.startswith("sge_"):
+        row.update(ts_code="Au(T+D)")
+    elif api.startswith("fx_"):
+        row.update(ts_code="USDCNH.FXCM")
+    if "trade_date" in row:
+        row["trade_date"] = "20260908"
+    if "date" in row:
+        row["date"] = "20260908"
+    if api == "libor":
+        row.update(curr_type="CHF", **{"1m": -0.75})
+    if api == "hibor":
+        row["2w"] = 1.25
+    row["future_vendor_field"] = "retained"
+    return row
+
+
+class OtherPipeline(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        for name in (
+            "socket.socket.connect",
+            "socket.getaddrinfo",
+            "backend.shared.tushare_pipeline.get_secret",
+        ):
+            guard = patch(name, side_effect=AssertionError("Offline test boundary"))
+            guard.start()
+            self.addCleanup(guard.stop)
+        self.p = module.Pipeline(self.root, CATALOG)
+        self.addCleanup(self.p.close)
+
+    def capture(self, samples):
+        seen = []
+
+        def respond(request):
+            job = json.loads(request.content)
+            api = job["api_name"]
+            self.assertTrue(set(FIELDS[api]) <= set(job["fields"].split(",")))
+            rows = samples[api]
+            fields = list(rows[0])
+            seen.append(api)
+            return httpx.Response(
+                200,
+                json={
+                    "code": 0,
+                    "data": {
+                        "fields": fields,
+                        "items": [[r.get(f) for f in fields] for r in rows],
+                    },
+                },
+            )
+
+        with httpx.Client(transport=httpx.MockTransport(respond)) as client:
+            self.p.run(
+                client,
+                "synthetic-fixture",
+                {"priority_start": "20200101"},
+                max_requests=len(samples),
+                pause=0,
+            )
+        self.assertEqual(set(seen), set(samples))
+
+    def test_all_fifteen_capture_and_offline_pinned_read(self):
+        for api in OTHER_CONTRACTS:
+            params = (
+                {}
+                if api.endswith("basic")
+                else {"start_date": "20260908", "end_date": "20260908"}
+            )
+            if api == "libor":
+                params["curr_type"] = "CHF"
+            self.p.enqueue(api, params)
+        self.p.db.commit()
+        self.capture({api: [sample(api)] for api in OTHER_CONTRACTS})
+        self.assertEqual(self.p.status(), {"done": 15})
+        self.p.record_other_planning_gaps(
+            {"other_history_start": "19900101"}, self.p.identifiers()
+        )
+        self.p.db.commit()
+        release = self.p.publish()
+        for api in OTHER_CONTRACTS:
+            table = read_dataset(self.root, release, api)
+            row = table.to_pylist()[0]
+            self.assertEqual(table.num_rows, 1)
+            self.assertEqual(row["future_vendor_field"], "retained")
+            self.assertEqual(KEYS[api], tuple(OTHER_CONTRACTS[api]["keys"]))
+            self.assertEqual(
+                {f["name"] for f in dataset_schema(self.root, release, api)["fields"]},
+                set(table.column_names),
+            )
+            if api.startswith(("opt_", "sge_", "fx_")):
+                prefix = {"opt": "OPT:", "sge": "SGE:", "fx": "FX:"}[api.split("_")[0]]
+                self.assertEqual(row["ts_code"], prefix + sample(api)["ts_code"])
+                self.assertEqual(row["source_ts_code"], sample(api)["ts_code"])
+                filtered = read_dataset(self.root, release, api, codes=[row["ts_code"]])
+                self.assertEqual(filtered.num_rows, 1)
+            self.assertFalse(
+                json.loads(table.schema.metadata[b"tushare"])[
+                    "historical_versions_complete"
+                ]
+            )
+        option = read_dataset(self.root, release, "opt_basic").to_pylist()[0]
+        self.assertEqual(option["symbol"], "OPT:600000")
+        self.assertEqual(option["source_symbol"], "600000")
+        self.assertEqual(
+            read_dataset(self.root, release, "libor").to_pylist()[0]["1m"], -0.75
+        )
+        self.assertEqual(
+            read_dataset(self.root, release, "hibor").to_pylist()[0]["2w"], 1.25
+        )
+        manifest = json.loads(
+            (self.root / "releases" / release / "manifest.json").read_text()
+        )
+        self.assertFalse(manifest["history_complete"])
+        self.assertEqual(manifest["rrg_status"], "blocked_data")
+        self.assertTrue(
+            any(c["status"] == "discovery_unverified" for c in manifest["capabilities"])
+        )
+        self.assertTrue(set(OTHER_CONTRACTS) <= set(manifest["implemented_contracts"]))
+
+    def test_retired_discovery_and_daily_only_symbols_are_union(self):
+        for api in ("opt_basic", "sge_basic", "fx_obasic"):
+            self.p.enqueue(api, {}, epoch="old")
+        self.p.db.commit()
+        self.capture(
+            {api: [sample(api)] for api in ("opt_basic", "sge_basic", "fx_obasic")}
+        )
+        for api in ("opt_daily", "sge_daily", "fx_daily"):
+            self.p.enqueue(api, {"trade_date": "20260908"}, epoch="new")
+        self.p.db.commit()
+        daily = {
+            api: [{**sample(api), "ts_code": code}]
+            for api, code in (
+                ("opt_daily", "M1707-C-2400.DCE"),
+                ("sge_daily", "Pt99.95"),
+                ("fx_daily", "BTCUSD.FXCM"),
+            )
+        }
+        self.capture(daily)
+        ids = self.p.identifiers()
+        self.assertEqual(ids["options"], ["600000.SH", "M1707-C-2400.DCE"])
+        self.assertEqual(ids["spot_metals"], ["Au(T+D)", "Pt99.95"])
+        self.assertEqual(ids["fx_instruments"], ["BTCUSD.FXCM", "USDCNH.FXCM"])
+        self.assertNotIn("600000.SH", ids["stocks"])
+        self.p.record_other_planning_gaps({"other_apis": ["opt_daily"]}, ids)
+        reason = json.loads(
+            self.p.db.execute(
+                "SELECT reason FROM capability WHERE scope='planning:other:opt_daily:discovery'"
+            ).fetchone()[0]
+        )
+        self.assertFalse(reason["universe_complete"])
+
+    def test_flag_incremental_planning_and_config_invalidation(self):
+        self.assertEqual(self.p.plan_extended({}, date(2026, 9, 9)), {})
+        config = {
+            "enable_other": True,
+            "other_apis": ["fx_daily"],
+            "other_history_start": "20260908",
+            "plan_jobs_per_tick": 1,
+        }
+        for _ in range(4):
+            self.p.plan_extended(config, date(2026, 9, 9))
+        rows = self.p.db.execute("SELECT * FROM jobs").fetchall()
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(all(r["group_name"] == "other" for r in rows))
+        config["other_history_start"] = "20260907"
+        for _ in range(5):
+            self.p.plan_extended(config, date(2026, 9, 9))
+        self.assertEqual(
+            self.p.db.execute("SELECT count(*) FROM jobs").fetchone()[0], 3
+        )
+        cap = self.p.db.execute(
+            "SELECT status FROM capability WHERE scope='planning:other:fx_daily:discovery'"
+        ).fetchone()[0]
+        self.assertEqual(cap, "awaiting_discovery")
+
+    def test_saturated_daily_keeps_unverified_universe_gap(self):
+        self.p.enqueue("opt_basic", {})
+        self.p.db.commit()
+        records = [
+            sample("opt_basic"),
+            {**sample("opt_basic"), "ts_code": "M1707-C-2400.DCE"},
+        ]
+        self.capture({"opt_basic": records})
+        rows = [
+            sample("opt_daily"),
+            {**sample("opt_daily"), "ts_code": "M1707-C-2400.DCE"},
+        ]
+        with patch.dict(module.EXTENDED_CONTRACTS["opt_daily"], {"row_cap": 2}):
+            key = self.p.enqueue("opt_daily", {"trade_date": "20260908"})
+            self.p.db.commit()
+            self.capture({"opt_daily": rows})
+        split = self.p.db.execute(
+            "SELECT * FROM partition_splits WHERE parent_id=?", (key,)
+        ).fetchone()
+        self.assertEqual(split["expected_children"], 2)
+        self.assertEqual(split["coverage_proven"], 0)
+        self.p.reconcile_partitions()
+        split = self.p.db.execute(
+            "SELECT * FROM partition_splits WHERE parent_id=?", (key,)
+        ).fetchone()
+        self.assertEqual(split["gap"], "universe_unverified")
+        children = self.p.db.execute(
+            "SELECT job FROM jobs WHERE id IN (SELECT child_id FROM partition_children WHERE parent_id=?)",
+            (key,),
+        ).fetchall()
+        self.assertEqual(
+            {json.loads(j[0])["params"]["ts_code"] for j in children},
+            {"600000.SH", "M1707-C-2400.DCE"},
+        )
+        self.assertEqual(
+            self.p.db.execute("SELECT state FROM jobs WHERE id=?", (key,)).fetchone()[
+                0
+            ],
+            "split_pending",
+        )
+
+    def test_hk_retired_reused_code_remains_distinct(self):
+        self.p.enqueue("hk_basic", {"list_status": "D"})
+        self.p.db.commit()
+        payload = {
+            "code": 0,
+            "data": {
+                "fields": ["ts_code", "name"],
+                "items": [["00013!.HK", "retired"], ["00013.HK", "current"]],
+            },
+        }
+        with httpx.Client(
+            transport=httpx.MockTransport(lambda _: httpx.Response(200, json=payload))
+        ) as client:
+            self.p.run(
+                client,
+                "synthetic-fixture",
+                {"priority_start": "20200101"},
+                max_requests=1,
+                pause=0,
+            )
+        release = self.p.publish()
+        rows = read_dataset(self.root, release, "hk_basic").to_pylist()
+        self.assertEqual({r["ts_code"] for r in rows}, {"HK00013!", "HK00013"})
+        self.assertEqual({r["source_ts_code"] for r in rows}, {"00013!.HK", "00013.HK"})
+        self.assertEqual({r["name"] for r in rows}, {"retired", "current"})
+        self.assertEqual(self.p.identifiers()["hk_stocks"], ["00013!.HK", "00013.HK"])
+
+    def test_permission_denial_survives_publish(self):
+        self.p.enqueue("opt_basic", {})
+        self.p.db.commit()
+        with httpx.Client(
+            transport=httpx.MockTransport(
+                lambda _: httpx.Response(
+                    200, json={"code": 40203, "msg": "permission denied", "data": None}
+                )
+            )
+        ) as client:
+            self.p.run(
+                client,
+                "synthetic-fixture",
+                {"priority_start": "20200101"},
+                max_requests=1,
+                pause=0,
+            )
+        self.p.enqueue("opt_basic", {"exchange": "SSE"})
+        self.p.db.commit()
+        release = self.p.publish()
+        manifest = json.loads(
+            (self.root / "releases" / release / "manifest.json").read_text()
+        )
+        self.assertTrue(
+            any(c["status"] == "permission_denied" for c in manifest["capabilities"])
+        )
+        self.assertTrue(any(g["api_name"] == "opt_basic" for g in manifest["gaps"]))
+        self.assertEqual(self.p.status().get("permission_blocked"), 1)
+        self.assertFalse(manifest["history_complete"])
+
+
+if __name__ == "__main__":
+    unittest.main()

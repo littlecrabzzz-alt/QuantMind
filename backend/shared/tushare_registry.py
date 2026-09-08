@@ -10,7 +10,10 @@ from backend.shared.tushare_market_contracts import MARKET_CONTRACTS, iter_marke
 
 from backend.shared.tushare_global_contracts import GLOBAL_CONTRACTS, iter_global_jobs
 
+from backend.shared.tushare_other_contracts import OTHER_CONTRACTS, iter_other_jobs
+
 EXTENDED_CONTRACTS = {
+    **{api: {**spec, "group": "other"} for api, spec in OTHER_CONTRACTS.items()},
     **{api: {**spec, "group": "global"} for api, spec in GLOBAL_CONTRACTS.items()},
     **{api: {**spec, "group": "market"} for api, spec in MARKET_CONTRACTS.items()},
     **{api: {**spec, "group": "text"} for api, spec in TEXT_CONTRACTS.items()},
@@ -24,6 +27,7 @@ PLANNERS = {
     "structured": iter_structured_jobs,
     "market": iter_market_jobs,
     "global": iter_global_jobs,
+    "other": iter_other_jobs,
 }
 
 
