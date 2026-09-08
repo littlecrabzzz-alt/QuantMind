@@ -1,6 +1,6 @@
 # QuantMind 双端部署记录
 
-更新：2026-09-08。本文区分已验证状态与尚未实施的迁移，避免把代码同步视为完整应用已上线。
+更新：2026-09-08。数据迁移、云端基础服务和首份离线快照已验收；本文同时列出尚未实现和未测试的边界。
 
 ## 已确认的目标
 
@@ -13,10 +13,10 @@
 
 - 云端 SSD：`/dev/vdb`，磁盘 ID `disk-joxd1ee9`，容量 500 GiB，ext4。
 - UUID：`3c46a144-f3a3-4250-95ee-e85fb5d8e88a`。
-- 挂载点：`/root/data/disk`；初始化后 `df` 显示可用约 467 GiB。
+- 挂载点：`/root/data/disk`；迁移、备份和首份快照完成后，`df` 显示可用约 327 GiB。
 - 修正 `/etc/fstab` 中相对挂载路径为绝对路径；原文件保留于 `/etc/fstab.quantmind-ssd-backup-20260907`。`findmnt --verify` 已无错误；未以重启验证。
 - 项目：`/root/data/disk/quantmind/project`，入口软链接 `/root/code/QuantMind`。
-- 独立目录：`/root/data/disk/quantmind/volumes`、`backups`、`staging`，顶层目录权限 0700。
+- 独立目录：`/root/data/disk/quantmind/volumes`、`backups`、`staging`、`snapshots`，顶层目录权限 0700。
 - 复用两端现有 Syncthing 服务，新建 `quantmind-code`，类型 `sendreceive`，启用文件监听和 10 个历史版本。原有 Guanlan 文件夹状态未改动。
 - `.stignore` 通过 `#include .sync-code-ignore` 加载共享规则；根 `.stignore` 已分别安装到两端。
 - 验证 Mac 到云端、云端到 Mac 的临时探针同步；验证 `.env.local`、`config/runtime.env`、关键训练代码和 SQL 升级脚本的两端 SHA-256 相同。密钥文件在云端保持 0600。
@@ -41,7 +41,8 @@ Syncthing 的历史版本保存在接收端，不等于应用一致性备份。�
 - `scripts/dual_node_deploy.py`：串联传输、校验、切换、连接检查和首份离线快照；运行状态写入 `logs/dual-node-deploy.json`，同一时间只允许一个编排进程。
 - `deploy/com.quantmind.cloud-tunnel.plist`：切换后才安装的 Mac 自动重连 SSH 隧道，保留本地开发入口访问云端的能力。
 - `deploy/syncthing-ssd.conf`：系统启动时等待 SSD 挂载，已安装到云端 systemd drop-in。
-- `deploy/quantmind-stack.service`：云端完整服务的开机入口，等待 SSD 和 Docker，并要求权威源标记存在；仅在迁移通过后启用。
+- `deploy/quantmind-stack.service`：云端完整服务的开机入口，等待 SSD 和 Docker，并要求权威源标记存在；已安装、启用并验证 active，未做整机重启测试。
+- `scripts/check_cloud_health.py`：检查 8000–8003 四个内部服务，避免仅 API 存活掩盖子服务失败；用 Python `-S` 跳过全局 AI 库初始化，探针不依赖外网。
 - `python3 scripts/test_dual_node.py`：端口、共享规则、卷路径、训练安全开关的回归检查。
 
 两端配置核对命令（Mac 项目根目录）：
@@ -60,15 +61,17 @@ bash scripts/dual-node.sh status
 
 ## 数据迁移与云端上线进度
 
-当前代码同步及配置核对通过，约 65 GiB 文件数据正在首次预复制。前端已发布，公网 `http://106.54.20.20:3080/health` 已从 Mac 验证可达；这不代表数据库/研究功能已上线。本机仍是当前运行数据所在位置，云端权威源尚未切换。只有 SSD 上的 `AUTHORITY` 标记存在且应用验收通过，才能宣布完成。
+2026-09-08 09:37 CST 已写入云端 `AUTHORITY`，lzy-vm 成为唯一数据主节点。Mac 原写入容器保持停止且自动重启策略为 `no`，不要直接重新启动旧的完整本地 Compose 栈。
 
-后续迁移顺序：
+- 351,338 个运行数据文件、68,057,092,833 字节，两端 SHA-256 清单一致；恢复前再次对 Mac 全量校验，避免其他研究工具在停写期间改变输入。
+- PostgreSQL 事务恢复完成，114 张表的精确行数全部一致；其中 `public.stock_daily_latest` 为 10,803,423 行。冷卷归档校验全部通过。
+- 恢复点：云端 `backups/migration-20260907T223006Z`，Mac `logs/dual-node-20260907T223006Z/`。最初 SSH 中断后复用恢复点续传，没有重新启动本地主节点。
+- 首份快照 `snapshot-20260908T013700467725Z` 在任何云端应用写入者启动前创建；已下载到 Mac `logs/cloud-snapshots/` 并通过完整校验，双方 `latest` 指向此快照。
+- 首次快照下载约 68GB 文件数据全部复用 Mac 原有内容，没有传输文件主体；数据库与归档约 3.08GB 中，约 3.00GB 使用现有备份块，新增字面数据约 15.52MB。网络仍有文件清单和协议开销。
+- 公网 3080 与 SSH 隧道 18080 首页均 HTTP 200；登录页已实际渲染，公开注册被拒绝（403）。没有使用未知密码登录，也未执行完整训练、交易或离线结果回灌验收。
+- QwenPaw 47/47 技能启用。迁移用整卷恢复保留注册状态，未手工复制技能。
 
-1. 清点所有可变状态，包括 PostgreSQL、Redis、Huntly SQLite/索引、QwenPaw volumes、QuantDB 同步状态、研究结果和模型；制作恢复点。
-2. 将数据预复制到 SSD 暂存区；冻结相关写入后执行一致性备份和最后增量校验。数据库底层热文件不参与 Syncthing。
-3. 单独配置云端端口、宿主路径和卷位置；关闭 `TRAINING_PAUSE_OTHERS`，保持实盘交易关闭。
-4. 云端启动并验证账户、策略、数据版本、模型及研究结果，再切换唯一调度器和两端访问入口。
-5. 验证 Mac 离线快照、联网后的增量追赶和结果登记；只有校验及业务验收通过后才宣布迁移完成。
+上线检查曾发现主容器 3GiB 上限引发子服务 OOM。已提高为 6GiB，禁用主容器内置 Celery，保留独立 worker，并将健康检查扩大到四个内部服务。新容器检查时 cgroup OOM 计数为 0。共享服务器内存仍紧张，不代表大型并发训练已获得足够容量。
 
 快照去重只对已发布的不可变快照使用 `rsync --link-dest`。活跃数据源始终独立复制，不与快照共享 inode；这一边界已有实际文件修改回归测试。首次快照需要额外约 65 GiB，以后未改变的文件在快照之间复用，不重复占用空间。磁盘可用少于 100 GiB 时拒绝新建快照，不会擅自删除研究历史。
 
@@ -103,7 +106,7 @@ bash scripts/dual-node-cutover.sh
 
 云端 Nginx 拒绝公开注册接口，仅使用迁移来的现有账号；数据库、Redis、QwenPaw 和内部 API 不直接对公网发布。该策略由 `deploy/nginx-registration.conf` 管理，不改变本地开发的默认注册行为。
 
-编排在云端 API 验证通过后才执行 `install-tunnel`，安装 `com.quantmind.cloud-tunnel` LaunchAgent。它把 Mac `127.0.0.1:8000` 和 `18080` 接到云端 3080；原有本地 Vite 页面仍通过 8000 访问同一份云端数据，断网后隧道会自动重连。若端口被无关服务占用则拒绝安装，不会抢占端口。此隧道配置已通过语法/端口边界检查，但当前迁移尚未完成，因此尚未安装启动。
+编排在云端 API 验证通过后执行 `install-tunnel`，已安装并启动 `com.quantmind.cloud-tunnel` LaunchAgent。它把 Mac `127.0.0.1:8000` 和 `18080` 接到云端 3080；原有本地 Vite 页面仍通过 8000 访问同一份云端数据。已定向终止本项目隧道进程，验证 launchd 自动拉起新进程，18080 恢复 HTTP 200；未对整台 Mac 做断网测试。若端口被无关服务占用则拒绝安装，不会抢占端口。
 
 Mac 断网不影响云端服务。断网时本机现有数据是截至切换时的离线基线，代码编辑和冻结数据研究可以继续，但云端新数据不可能实时出现在离线 Mac。
 
@@ -116,6 +119,6 @@ python3 scripts/dual_node_snapshot.py pull
 
 创建快照会先做不停服预复制，然后短暂停止本项目写入容器，完成最终文件校验、PostgreSQL dump 和冷卷归档，最后恢复原来运行的容器。未完成尝试复用 `.building` 暂存目录，不会每次失败都另造一份全量副本；快照仅在全部校验通过后发布。Mac 下载到 `logs/cloud-snapshots/<snapshot-id>/`，校验通过才更新 `latest`。首次下载用 `--copy-dest` 校验并复制 Mac 已有的相同文件，不重复从网络下载，也不会与活跃源共享硬链接；后续不可变快照之间使用 `--link-dest`。不覆盖本机原有 `data/`、`results/` 或数据库。研究时使用快照的明确 ID，不能在研究期间切换输入版本。
 
-当前脚本已通过语法检查与去重边界回归测试，但首次云端全量快照/下载尚未验收，也未安装定时刷新。离线研究产物应单独保留，不能直接回灌数据库；自动结果登记尚未实现。不能把这一状态描述成已完成的自动双向数据库同步，或声称离线时仍与云端实时一致。
+部署回归测试 14 项通过，首次云端全量快照、Mac 下载和逐文件校验均已完成；尚未安装定时刷新。离线研究产物应单独保留，不能直接回灌数据库；自动结果登记和一键离线完整应用启动尚未实现。离线可编辑代码、读取快照开展研究，但原在线界面依赖云端 API。不能把这一状态描述成自动双向数据库同步、完全离线可用的完整应用，或声称离线时仍与云端实时一致。
 
 代码同步不等于运行中的进程自动更新。前端改动用 `web-publish` 构建并发布，旧静态文件保留于云端 `staging/web-*.previous`；后端改动完成核对后，通过仓库里的 `cloud-compose restart` 重启对应服务。
