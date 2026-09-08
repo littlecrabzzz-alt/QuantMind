@@ -175,13 +175,15 @@ class FixedStore(unittest.TestCase):
             ):
                 continue
             values = dict.fromkeys(keys, "key")
+            if store.CONTRACTS.get(api, {}).get("preserve_distinct_rows"):
+                values["_row_identity"] = "fixture-source-row"
             fixtures.append((api, [row(**values)]))
         pinned = release(self.root, fixtures)
         for api, _ in fixtures:
             with self.subTest(api=api):
                 self.assertEqual(store.read_dataset(self.root, pinned, api).num_rows, 1)
         self.assertEqual(store.read_dataset(self.root, pinned, "income").num_rows, 1)
-        self.assertEqual(len(fixtures), 102)
+        self.assertEqual(len(fixtures), 109)
 
     def test_dates_codes_and_macro_periods(self):
         pinned = release(

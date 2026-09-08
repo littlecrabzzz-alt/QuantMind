@@ -31,6 +31,7 @@ from backend.shared.tushare_global_contracts import (
 )
 from backend.shared.tushare_other_contracts import OTHER_CONTRACTS, other_prerequisites
 from backend.shared.tushare_supplement_contracts import supplement_prerequisites
+from backend.shared.tushare_equity_event_contracts import equity_event_prerequisites
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
@@ -677,6 +678,28 @@ class Pipeline:
                 ),
             )
 
+    def record_equity_event_planning_gaps(self, config, identifiers):
+        for gap in equity_event_prerequisites(identifiers, config=config):
+            if gap["dependencies"]:
+                kind, status = "discovery", "discovery_unverified"
+            elif gap["reason"] == "cap_note":
+                kind, status = "cap", "row_cap_unverified"
+            elif gap["reason"] == "refresh_gap":
+                kind, status = "revision", "revision_coverage_unverified"
+            else:
+                kind, status = "history", "history_scope_unverified"
+            self.db.execute(
+                "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
+                "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason "
+                "WHERE capability.status<>excluded.status OR capability.reason<>excluded.reason",
+                (
+                    f"planning:equity_event:{gap['api_name']}:{kind}",
+                    status,
+                    utc_now(),
+                    json.dumps(gap, sort_keys=True),
+                ),
+            )
+
     def plan_extended(self, config, today):
         identifiers = self.identifiers()
         blocked_families = set()
@@ -684,6 +707,7 @@ class Pipeline:
             ("other", self.record_other_planning_gaps),
             ("global", self.record_global_planning_gaps),
             ("supplement", self.record_supplement_planning_gaps),
+            ("equity_event", self.record_equity_event_planning_gaps),
         ):
             if not config.get("enable_" + family, False):
                 continue
@@ -739,6 +763,8 @@ class Pipeline:
                             "other_history_start",
                             "supplement_apis",
                             "supplement_history_start",
+                            "equity_event_apis",
+                            "equity_event_history_start",
                         )
                     },
                     "identifiers": identifiers,

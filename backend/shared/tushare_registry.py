@@ -16,7 +16,16 @@ from backend.shared.tushare_supplement_contracts import (
     iter_supplement_jobs,
 )
 
+from backend.shared.tushare_equity_event_contracts import (
+    EQUITY_EVENT_CONTRACTS,
+    iter_equity_event_jobs,
+)
+
 EXTENDED_CONTRACTS = {
+    **{
+        api: {**spec, "group": "equity_event"}
+        for api, spec in EQUITY_EVENT_CONTRACTS.items()
+    },
     **{
         api: {**spec, "group": "supplement"}
         for api, spec in SUPPLEMENT_CONTRACTS.items()
@@ -37,6 +46,7 @@ PLANNERS = {
     "global": iter_global_jobs,
     "other": iter_other_jobs,
     "supplement": iter_supplement_jobs,
+    "equity_event": iter_equity_event_jobs,
 }
 
 
