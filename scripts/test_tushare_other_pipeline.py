@@ -269,6 +269,102 @@ class OtherPipeline(unittest.TestCase):
         self.assertEqual({r["name"] for r in rows}, {"retired", "current"})
         self.assertEqual(self.p.identifiers()["hk_stocks"], ["00013!.HK", "00013.HK"])
 
+    def test_legacy_hk_projection_deduplicates_before_filter_without_rewrite(self):
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        payload = {
+            "code": 0,
+            "data": {
+                "fields": ["ts_code", "name"],
+                "items": [["00013!.HK", "old retired name"], ["00013.HK", "current"]],
+            },
+        }
+        original_write = pq.write_table
+
+        def legacy_write(table, *args, **kwargs):
+            # Create a legacy-format fixture initially; never rewrite stored files.
+            codes = [
+                "00013!.HK" if c == "HK00013!" else c
+                for c in table["ts_code"].to_pylist()
+            ]
+            table = table.set_column(
+                table.schema.get_field_index("ts_code"), "ts_code", pa.array(codes)
+            )
+            return original_write(table, *args, **kwargs)
+
+        for epoch, observed in (
+            ("old", "2026-09-08T00:00:00+00:00"),
+            ("new", "2026-09-09T00:00:00+00:00"),
+        ):
+            self.p.enqueue("hk_basic", {"list_status": "D"}, epoch=epoch)
+            self.p.db.commit()
+            if epoch == "new":
+                payload["data"]["items"][0][1] = "new retired name"
+            with (
+                httpx.Client(
+                    transport=httpx.MockTransport(
+                        lambda _: httpx.Response(200, json=payload)
+                    )
+                ) as client,
+                patch("backend.shared.tushare_intake.utc_now", return_value=observed),
+                patch(
+                    "pyarrow.parquet.write_table",
+                    side_effect=legacy_write if epoch == "old" else original_write,
+                ),
+            ):
+                self.p.run(
+                    client,
+                    "synthetic-fixture",
+                    {"priority_start": "20200101"},
+                    max_requests=1,
+                    pause=0,
+                )
+            if epoch == "old":
+                old_release = self.p.publish()
+                old_manifest = json.loads(
+                    (self.root / "releases" / old_release / "manifest.json").read_text()
+                )
+                immutable_before = {
+                    name: module.digest((self.root / name).read_bytes())
+                    for name in old_manifest["files"]
+                }
+        release = self.p.publish()
+        rows = read_dataset(self.root, release, "hk_basic").to_pylist()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual({r["ts_code"] for r in rows}, {"HK00013!", "HK00013"})
+        retired = read_dataset(
+            self.root, release, "hk_basic", codes=["HK00013!"]
+        ).to_pylist()
+        self.assertEqual(len(retired), 1)
+        self.assertEqual(retired[0]["name"], "new retired name")
+        self.assertEqual(retired[0]["source_ts_code"], "00013!.HK")
+        prior = read_dataset(
+            self.root,
+            release,
+            "hk_basic",
+            codes=["HK00013!"],
+            as_of="2026-09-08T12:00:00+00:00",
+        ).to_pylist()
+        self.assertEqual(len(prior), 1)
+        self.assertEqual(prior[0]["name"], "old retired name")
+        self.assertEqual(prior[0]["_fetched_at"], "2026-09-08T00:00:00+00:00")
+        self.assertEqual(prior[0]["source_ts_code"], "00013!.HK")
+        self.assertEqual(
+            read_dataset(
+                self.root, old_release, "hk_basic", codes=["HK00013!"]
+            ).to_pylist()[0]["name"],
+            "old retired name",
+        )
+        for name, sha in immutable_before.items():
+            self.assertEqual(module.digest((self.root / name).read_bytes()), sha)
+        legacy_codes = {
+            r["ts_code"]
+            for d in old_manifest["datasets"]
+            for r in pq.read_table(self.root / d["path"]).to_pylist()
+        }
+        self.assertIn("00013!.HK", legacy_codes)
+
     def test_invalid_discovery_blocks_only_family_and_recovers(self):
         config = {
             "enable_global": True,

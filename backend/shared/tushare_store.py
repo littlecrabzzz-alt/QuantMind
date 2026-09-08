@@ -168,6 +168,15 @@ def _dataset(root, release_id, api_name):
                 for f in ("_row_identity",) + TEXT_FIELDS
                 if f in columns and f not in keys
             ]
+        if api_name.startswith("hk_") and "ts_code" in columns:
+            # Older captured HK delistings retained the supplier suffix. Project
+            # only this known legacy shape before key deduplication and filters;
+            # ! distinguishes retired listings from later reuse of the same code.
+            relation = relation.project(
+                "* REPLACE (CASE WHEN regexp_full_match(ts_code, '[0-9]{5}!?[.]HK') "
+                "THEN 'HK' || left(ts_code, length(ts_code) - 3) "
+                "ELSE ts_code END AS ts_code)"
+            )
         relation.create_view("stored")
         metadata = _metadata(manifest, release_id, api_name, aliases)
         metadata["source_api_names"] = sorted(source_apis)
