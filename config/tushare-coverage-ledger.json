@@ -211,9 +211,22 @@
       "acquisition_api_names": [
         "bse_mapping"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted historical and revision coverage, including saturation and unknown historical availability; verified samples are not complete history.",
+      "contract_evidence": "docs/tushare-listing-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/eight-acceptance.json",
+        "release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "checked_at": "2026-09-08T23:33:59.650278+00:00",
+        "sample_rows": 248,
+        "sample_request": {},
+        "requested_fields": 4,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "offline_evidence": "/tmp/tushare-eight-mac-verified.json",
+        "scope": "Eight APIs, 6928 source rows and 91 documented output columns verified through raw, Parquet, cloud API and offline Mac; history_complete=false."
+      }
     },
     {
       "doc_id": "123",
@@ -225,9 +238,25 @@
       "acquisition_api_names": [
         "new_share"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted historical and revision coverage, including saturation and unknown historical availability; verified samples are not complete history.",
+      "contract_evidence": "docs/tushare-listing-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/eight-acceptance.json",
+        "release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "checked_at": "2026-09-08T23:33:59.650278+00:00",
+        "sample_rows": 22,
+        "sample_request": {
+          "end_date": "20260904",
+          "start_date": "20260801"
+        },
+        "requested_fields": 12,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "offline_evidence": "/tmp/tushare-eight-mac-verified.json",
+        "scope": "Eight APIs, 6928 source rows and 91 documented output columns verified through raw, Parquet, cloud API and offline Mac; history_complete=false."
+      }
     },
     {
       "doc_id": "262",
@@ -239,9 +268,24 @@
       "acquisition_api_names": [
         "bak_basic"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted historical and revision coverage, including saturation and unknown historical availability; verified samples are not complete history.",
+      "contract_evidence": "docs/tushare-listing-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/eight-acceptance.json",
+        "release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "checked_at": "2026-09-08T23:33:59.650278+00:00",
+        "sample_rows": 5566,
+        "sample_request": {
+          "trade_date": "20260904"
+        },
+        "requested_fields": 24,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "offline_evidence": "/tmp/tushare-eight-mac-verified.json",
+        "scope": "Eight APIs, 6928 source rows and 91 documented output columns verified through raw, Parquet, cloud API and offline Mac; history_complete=false."
+      }
     },
     {
       "doc_id": "15",
@@ -1774,9 +1818,24 @@
       "acquisition_api_names": [
         "top_list"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted historical and revision coverage, including saturation and unknown historical availability; verified samples are not complete history.",
+      "contract_evidence": "docs/tushare-trading-event-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/eight-acceptance.json",
+        "release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "checked_at": "2026-09-08T23:33:59.650278+00:00",
+        "sample_rows": 57,
+        "sample_request": {
+          "trade_date": "20260904"
+        },
+        "requested_fields": 15,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "offline_evidence": "/tmp/tushare-eight-mac-verified.json",
+        "scope": "Eight APIs, 6928 source rows and 91 documented output columns verified through raw, Parquet, cloud API and offline Mac; history_complete=false."
+      }
     },
     {
       "doc_id": "107",
@@ -1788,9 +1847,24 @@
       "acquisition_api_names": [
         "top_inst"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted historical and revision coverage, including saturation and unknown historical availability; verified samples are not complete history.",
+      "contract_evidence": "docs/tushare-trading-event-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/eight-acceptance.json",
+        "release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "checked_at": "2026-09-08T23:33:59.650278+00:00",
+        "sample_rows": 660,
+        "sample_request": {
+          "trade_date": "20260904"
+        },
+        "requested_fields": 10,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "offline_evidence": "/tmp/tushare-eight-mac-verified.json",
+        "scope": "Eight APIs, 6928 source rows and 91 documented output columns verified through raw, Parquet, cloud API and offline Mac; history_complete=false."
+      }
     },
     {
       "doc_id": "355",
@@ -1956,9 +2030,22 @@
       "acquisition_api_names": [
         "hm_list"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted historical and revision coverage, including saturation and unknown historical availability; verified samples are not complete history.",
+      "contract_evidence": "docs/tushare-trading-event-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/eight-acceptance.json",
+        "release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "checked_at": "2026-09-08T23:33:59.650278+00:00",
+        "sample_rows": 117,
+        "sample_request": {},
+        "requested_fields": 3,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "offline_evidence": "/tmp/tushare-eight-mac-verified.json",
+        "scope": "Eight APIs, 6928 source rows and 91 documented output columns verified through raw, Parquet, cloud API and offline Mac; history_complete=false."
+      }
     },
     {
       "doc_id": "312",
@@ -1970,9 +2057,24 @@
       "acquisition_api_names": [
         "hm_detail"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted historical and revision coverage, including saturation and unknown historical availability; verified samples are not complete history.",
+      "contract_evidence": "docs/tushare-trading-event-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/eight-acceptance.json",
+        "release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "checked_at": "2026-09-08T23:33:59.650278+00:00",
+        "sample_rows": 246,
+        "sample_request": {
+          "trade_date": "20260904"
+        },
+        "requested_fields": 9,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "offline_evidence": "/tmp/tushare-eight-mac-verified.json",
+        "scope": "Eight APIs, 6928 source rows and 91 documented output columns verified through raw, Parquet, cloud API and offline Mac; history_complete=false."
+      }
     },
     {
       "doc_id": "320",
@@ -2600,9 +2702,24 @@
       "acquisition_api_names": [
         "daily_info"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted historical and revision coverage, including saturation and unknown historical availability; verified samples are not complete history.",
+      "contract_evidence": "docs/tushare-listing-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/eight-acceptance.json",
+        "release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "checked_at": "2026-09-08T23:33:59.650278+00:00",
+        "sample_rows": 12,
+        "sample_request": {
+          "trade_date": "20260904"
+        },
+        "requested_fields": 14,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668",
+        "offline_evidence": "/tmp/tushare-eight-mac-verified.json",
+        "scope": "Eight APIs, 6928 source rows and 91 documented output columns verified through raw, Parquet, cloud API and offline Mac; history_complete=false."
+      }
     },
     {
       "doc_id": "268",
@@ -4599,7 +4716,18 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required.",
+      "known_field_gaps": [
+        {
+          "field": "file_name",
+          "observation": "b0750473814b4996bca4a7572f591e43.json",
+          "object_sha256": "44652b0754efb081055d85a3d3e6ee5d13a31e14f18b13919f3fee37ae1c0ecc",
+          "status": "possibly_truncated",
+          "row_count": 1000,
+          "field_coverage": "gap",
+          "reason": "Explicitly requested output column absent from this actual response; documentation/source discrepancy under review. Raw data retained; no assertion of complete field coverage."
+        }
+      ]
     },
     {
       "doc_id": "465",

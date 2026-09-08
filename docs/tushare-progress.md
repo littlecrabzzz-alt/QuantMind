@@ -208,3 +208,13 @@
 - 07:00全量快照PID422770先完成在线预复制/扫描，07:19:53因`Celery work active`以75/TEMPFAIL退出；未发布新快照，现有服务仍running。期间父未暂停任何消费者，也未执行schema3迁移或新接口probe。备份失败独立记录，不阻止离线开发，不自动重试或停止其他活动任务。
 - 本机已准备但未执行 `/tmp/tushare-schema3-migrate.py`、`/tmp/tushare-trading-event-probe.py`、`/tmp/tushare-listing-extra-probe.py`及旧互联互通过滤探测。下一步发布前重查活动任务/双端一致性，自然排空两专属消费者；新API读取器先兼容旧/新索引，正式DB备份、meta1→3迁移、全核心表与全部便携行SHA比对，再做账号样本、固定API和Mac禁网验收，恢复并核验两队列。不能直接回退旧DB覆盖新增进度。
 - 全263基线+13额外发现义务不缩减；RRG固定坐标技术验收已通过，但历史成分可知性/ETF等仍blocked_data。无需等待所有PDF下载才继续RRG数据消费验证。
+
+## 2026-09-09 07:41 schema3与八接口生产闭环
+
+- f2cd52e已合入master/GitHub及云端，handoff passed（4535文件、88249b3e80c50872bb9ad0ecf89a5179594506a9582b61f610ca8dc810455d30）。正式144采集合同及6财务查询别名（KEYS150；扩展CONTRACTS137+基础7），不可将某个子注册表长度冒充全注册数。完整364隔离测试及Ruff通过，本次台账/目录修正另15定向测试通过。
+- 两专属队列自然排空后，先升级quantmind读取器，四子服务health200，再备份documents.sqlite并迁移document_index_meta1→3。420331520字节备份、352512文档/412528引用/3465尝试全内容摘要前后一致；全部便携行与DB比对一致。首次构建9.928秒、noop0.578秒，4096叶/16描述块。旧新API各9页通过，匿名401；完整证据见文档存储页。
+- 八次真实请求分别2.789/1.717秒，8API全部非空、6928原始行和91输出列通过raw/观察SHA、Parquet及过滤语义对账。hm_detail.tag246行皆null但列存在；IPO按ipo_date；BSE原码不合并生效区间；daily_info新增SH_FUND_REITs标签保留。8接口已启用，近期39新任务、历史初始961新任务，原12历史组签名/游标没有回退。
+- 固定data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668：19次真实API全字段6928行一致、upstream_calls=0、匿名401。Mac新增4141文件、总130814全校验；8接口禁网/禁凭据原文、Parquet、查询全部一致。另固定schema3迁移版350k文档等全部便携行在Mac与云端DB摘要一致，旧schema2可读。
+- 仅重启quantmind和两Tushare worker，恢复后采集7b68c095-ba31-48d5-80b8-88d31446b6ac、附件f85881ce-c050-44b2-9009-d6910b2d2dd1实测活动；普通US任务88fe98db-f897-42a9-932c-cc1a84860e10保持。23:36:37Z正常325请求/115.710秒、publish12.562秒，failed_stage=null；不能由单批或noop索引耗时推断持续提速。空间262.29GiB可用。
+- 自动非probe已推进trading done13/empty24、listing done14/empty21。IPO无筛选2000行实际饱和blocked，日期分区仍继续；research_report已捕获真实file_name缺列且原1000行保留，文档矛盾待复核。全部8条台账改ingested_partial/available_observed，基线263+发现13不变。
+- 并行下一候选：limit_extra纯cd1da8a+runtime91fc460，43 tests通过；附件脚本挑战分类5246705，43文档测试通过。两989B原文实际是JS挑战页，未执行或绕过，cninfo超时归因仍未知。候选未部署，下一轮审查集成。全部历史、修订、附件、PIT/RRG准入仍未完成，goal持续active。
