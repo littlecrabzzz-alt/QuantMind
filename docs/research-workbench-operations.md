@@ -44,4 +44,4 @@ npm run typecheck --workspace=electron
 DATABASE_URL=postgresql://.../research_test PYTHONPATH=.:scripts python3 scripts/test_research_persistence.py
 ```
 
-第三项包含真实数据库并发幂等/归属/租约/恢复和真实 Docker 取消，拒绝使用其他数据库名。它不调用模型或正式数据。产品页面与真实模型的双端验收结果需另外记录，以上检查不能替代端到端完成证据。
+第三项包含真实数据库并发幂等/归属/租约/恢复和真实 Docker 取消，拒绝使用其他数据库名。它不调用模型或正式数据。产品页面与真实模型的双端验收见 [2026-09-09 验收记录](research-workbench-validation-20260909.md)，以上检查不能替代端到端完成证据。
