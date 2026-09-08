@@ -34,6 +34,10 @@ from backend.shared.tushare_supplement_contracts import supplement_prerequisites
 from backend.shared.tushare_equity_event_contracts import equity_event_prerequisites
 from backend.shared.tushare_futures_extra_contracts import futures_extra_prerequisites
 from backend.shared.tushare_research_extra_contracts import research_extra_prerequisites
+from backend.shared.tushare_credit_extra_contracts import (
+    credit_identifiers,
+    credit_extra_prerequisites,
+)
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
@@ -566,6 +570,7 @@ class Pipeline:
     def identifiers(self):
         families = {
             "stock_basic": "stocks",
+            "margin_secs": "credit_securities",
             "hk_basic": "hk_stocks",
             "us_basic": "us_stocks",
             "index_basic": "indexes",
@@ -618,7 +623,14 @@ class Pipeline:
                 code = record.get("ts_code") or record.get("index_code")
                 if code:
                     result[families[saved["api_name"]]].add(code)
-        return {key: sorted(values) for key, values in result.items()}
+        result = {key: sorted(values) for key, values in result.items()}
+        try:
+            result.update(credit_identifiers(result))
+        except ValueError:
+            # Keep raw discovery for family-local validation below; malformed
+            # credit inputs must not block unrelated families in identifiers().
+            pass
+        return result
 
     def record_global_planning_gaps(self, config, identifiers):
         # Nonempty discovery and an explicit 1990 scope are not completeness proof.
@@ -775,6 +787,7 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "credit_extra": credit_extra_prerequisites,
             "futures_extra": futures_extra_prerequisites,
             "research_extra": research_extra_prerequisites,
         }[family]
@@ -800,6 +813,12 @@ class Pipeline:
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
+            (
+                "credit_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "credit_extra", cfg, ids
+                ),
+            ),
             ("other", self.record_other_planning_gaps),
             ("global", self.record_global_planning_gaps),
             ("supplement", self.record_supplement_planning_gaps),
@@ -877,6 +896,8 @@ class Pipeline:
                             "futures_extra_history_start",
                             "research_extra_apis",
                             "research_extra_history_start",
+                            "credit_extra_apis",
+                            "credit_extra_history_start",
                         )
                     },
                     "identifiers": identifiers,
