@@ -1,6 +1,6 @@
 """Integration checks against an explicitly disposable research_test PostgreSQL DB.
 
-Apply data/upgrade_research_workbench_v1.sql first and set DATABASE_URL.
+Apply scripts/research_workbench_v1.sql first and set DATABASE_URL.
 This never uses the application database or model credentials.
 """
 import asyncio
