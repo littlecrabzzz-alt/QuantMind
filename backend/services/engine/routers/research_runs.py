@@ -210,7 +210,7 @@ async def report(run_id: str, request: Request):
 @router.get("/{run_id}/artifacts/{experiment_id}/{name}")
 async def artifact(run_id: str, experiment_id: str, name: str, request: Request):
     row = await owned(request, run_id)
-    exp = next((e for e in row["checkpoint"].get("experiments", []) if e["id"] == experiment_id and e["status"] == "completed"), None)
+    exp = next((e for e in row["checkpoint"].get("experiments", []) if e["id"] == experiment_id and e["status"] in ("completed", "failed")), None)
     expected = (exp or {}).get("result", {}).get("artifacts", {}).get(name)
     if not expected or "/" in name or "\\" in name:
         raise HTTPException(404, "产物不存在或尚未核验")

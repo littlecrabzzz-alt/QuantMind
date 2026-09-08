@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 import research_expression as expression
-from backend.services.engine.research.coordinator import experiment_config, allowed_candidates, advance
+from backend.services.engine.research.coordinator import experiment_config, allowed_candidates, advance, require_method_result
 from backend.services.engine.research import runtime
 from backend.services.engine.routers.research_runs import NewResearch
 
@@ -104,6 +104,13 @@ class FactorContractTests(unittest.TestCase):
         self.assertNotIn("active", state)
         self.assertIn("纯表达式", state["corrections"]["candidate-1"][0])
         store.checkpoint.assert_awaited_once()
+
+    def test_method_needs_a_real_completed_factor_result(self):
+        state = {"experiments": [{"status": "completed", "result": {"summary": {}}},
+                                 {"status": "failed", "result": {}}]}
+        with self.assertRaisesRegex(ValueError, "没有实际完成"):
+            require_method_result({"kind": "method"}, state)
+        require_method_result({"kind": "strategy"}, state)
 
 
 if __name__ == "__main__":

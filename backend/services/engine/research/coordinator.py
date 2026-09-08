@@ -55,6 +55,12 @@ def allowed_candidates(state):
             and (e["proposal"]["kind"] == "baseline" or all(e.get("gates", {}).values()) and e.get("gates"))]
 
 
+def require_method_result(row, state):
+    if row["kind"] == "method" and not any(
+        e["status"] == "completed" and e.get("result", {}).get("factor_analysis") for e in state["experiments"]):
+        raise ValueError("没有实际完成并核验的新因子，不能将方法研究标记为完成；请检查失败实验的数据与日志")
+
+
 def usage(case_dir):
     attempts = [runtime.frozen.read(p) for p in (case_dir / "api").glob("**/attempt-*.json")]
     done = [a for a in attempts if a["status"] == "completed"]
@@ -133,6 +139,8 @@ async def advance(row, store, lease):
         proposal = {"kind": "baseline", "hypothesis": "复现冻结基线与两组固定对照", "changes": {}}
     elif state["stage"] in ("propose", "select"):
         selecting = state["stage"] == "select"
+        if selecting:
+            require_method_result(row, state)
         index = state["candidate_count"] + 1
         label = "selection" if selecting else f"candidate-{index}"
         correction = state.setdefault("corrections", {}).get(label, [])
@@ -226,6 +234,7 @@ async def advance(row, store, lease):
 
 
 def finish(case_dir, state, row):
+    require_method_result(row, state)
     for exp in state["experiments"]:
         if exp["status"] != "completed":
             continue
