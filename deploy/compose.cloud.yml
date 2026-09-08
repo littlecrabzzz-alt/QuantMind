@@ -45,6 +45,8 @@ services:
   celery-beat:
     mem_limit: 384m
     cpus: 0.5
+    environment:
+      QM_NODE_ROLE: authority
   data-gateway:
     build:
       dockerfile: docker/Dockerfile.data-gateway-cloud

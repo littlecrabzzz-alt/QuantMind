@@ -4,6 +4,35 @@
 
 进展：已完成 10 个实际请求、13110 行原始数据留存和云端/Mac 的无上游连接读取验收，详见 [首批实测报告](tushare-first-batch-20260908.md)。下文账号记录和准备步骤保留原始核查时点，实际接口结果以该报告为准。
 
+## 2026-09-09 持久化流水线
+
+已实现 `backend/shared/tushare_pipeline.py`，沿用原始对象/观察记录，在云端新增 SQLite v1 任务检查点及不可变 Parquet。既有样本报告是历史证据；下述实现覆盖批量留存、读取与同步，实际发布结果另外记录。
+
+- `config/tushare-pipeline.example.json` 定义从 1990 年起尝试历史回填，2020 年以后优先；年份只是请求起点，供应商实际历史可用性由响应和缺口表核验。行业按年度/代码、日线按交易日、持仓按基金/季度分片；基础信息与成分每天刷新，最近七天行情重新检查，最近 400 天报告期每周复查迟发/修订。
+- 当前只自动采集已审阅的七个 RRG 接口。总目录 263 条、其他市场和九个独立授权文本 API 仍须逐项接入，不能据此宣称全 Tushare 数据完成。当前行业发现依赖首批 30 个一级行业种子及返回成分，尚非历史分类全集证明。
+- 已完成历史请求以稳定键去重；超时/上游错误指数退避，五次后阻塞，权限/疑似截断保留明确缺口。`fund_adj` 使用官方 offset/limit，每页 1000，重复页停止。其他接口达到保守上限会阻塞，需审阅细分参数再补齐。空响应不作为历史完整证据。
+- `pipeline.sqlite` 只在云端写入并加进程文件锁，不复制活动数据库。数据版本包含所有已落盘原始对象及观察记录、Parquet、按 API 的覆盖统计及异常分片；待采集分片完整清单在云端任务库。`CURRENT.json` 最后原子切换，RRG 保持 `blocked_data`。
+- 存量读入口 `backend.shared.tushare_store.read_dataset(root, release_id, api_name)` 只读取固定版本。按自然键保留该版本中最新抓取记录，保存供应商原代码、未知字段和抓取时间；金额/量的原单位不偷偷转换。它是已观察数据视图，抓取时间不能证明历史当时已知，且不改变现有 QuantDB/业务查询路由。
+- 云端现有 Celery 每 120 秒发起一轮，最多 100 请求/100 秒（单次请求可能再花 30 秒），任务硬上限 180 秒；与既有研究队列共享单并发 worker，后续据负载决定专用队列。100 GiB 磁盘余量以下停止采集，不自动购盘。
+- Mac 的 `scripts/tushare_mirror.py` 通过 SSH 获取固定清单，rsync 只拉缺失/损坏对象；下载和 SHA256 校验全部通过才更新本地 CURRENT。重复执行不重新下载完整对象；断线保留原版，重试续传。默认保存在 `logs/tushare-mirror`（不参与 Syncthing），不覆盖旧 data/results 或沙盒数据。
+
+生产启用前先双端预检、确认没有活动研究/训练和排队任务。源码合并和元数据对齐后，通过 `cloud-compose` 重启 worker，并重新创建 beat 使其 authority 角色生效。云端容器内，将示例配置复制到 `/data/tushare/pipeline-config.json`，创建 `/data/tushare/ENABLED` 才允许采集。删除 ENABLED 可暂停后续轮次，已在途请求正常完成。
+
+```bash
+# 云端项目宿主：手动有界首轮，亦用于故障后的恢复检查
+sudo -n bash scripts/dual-node.sh cloud-compose exec -T quantmind \
+  python3 /app/scripts/tushare_pipeline.py run --max-requests 10 --max-seconds 45
+# Mac 主工作树：先手动下载、读取与核验，再安装每 15 分钟同步
+python3 scripts/tushare_mirror.py
+python3 scripts/tushare_pipeline.py verify --root logs/tushare-mirror
+python3 scripts/tushare_pipeline.py query --root logs/tushare-mirror --api-name fund_adj
+python3 scripts/tushare_mirror.py --install-launchagent
+```
+
+Mac 查询需已安装 DuckDB、PyArrow、httpx；采集在现有云端镜像使用项目已有依赖。LaunchAgent 只启动镜像脚本，不读 token、不触发 Tushare。Mac 休眠/断网期间不会同步，恢复后下一轮补拉；云端采集独立继续。固定研究输入显式保存 release_id，避免运行中跟随 CURRENT 变化。
+
+隔离验收：`uv run --no-project --with duckdb --with pyarrow --with httpx python scripts/test_tushare_pipeline.py`，另跑 `python3 scripts/test_tushare_intake.py`。包含检查点续跑、重复请求、分页异常、退避、镜像中断/重试/无变化/损坏修复及禁止网络和密钥访问的本地去重读取。测试与生产发布证据分开记录。
+
 ## 当前证据与阻塞
 
 - 当前官方数据目录共 263 个唯一文档条目，全部记录于 `config/tushare-catalog.json`，含原始页面哈希、文档链接、字段名、权限与覆盖状态。227 个条目提取了接口名和输出字段；36 个为分类页或特殊说明，保留 `manual_review_required`。这不是“263 个可调用 API”，也不是全站所有隐藏接口的穷尽证明。

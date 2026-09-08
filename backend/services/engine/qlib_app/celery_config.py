@@ -162,6 +162,15 @@ if os.getenv("MARKET_SNAPSHOT_ENABLED", "true").lower() == "true":
         "schedule": crontab(minute="10", hour="4", day_of_week="1-5"),
     }
 
+# Only the cloud authority schedules acquisition; /data/tushare/ENABLED is the
+# local operator switch. Sandbox never acquires even when it shares credentials.
+if os.getenv("QM_NODE_ROLE") == "authority":
+    beat_schedule["tushare-acquire-continuation"] = {
+        "task": "engine.tasks.tushare_acquire",
+        "schedule": 120.0,
+        "options": {"expires": 110},
+    }
+
 celery_app.conf.update(
     # 序列化
     task_serializer="json",
@@ -198,6 +207,7 @@ celery_app.conf.update(
     imports=(
         "backend.services.engine.qlib_app.tasks",
         "backend.services.engine.tasks.celery_tasks",
+        "backend.services.engine.tasks.tushare_tasks",
     ),
     # 监控配置
     worker_send_task_events=True,
