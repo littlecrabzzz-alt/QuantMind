@@ -246,6 +246,11 @@ def capture_sample(client, token, job, root: Path):
         raise ValueError("Missing token")
     request = {k: job[k] for k in ("api_name", "params", "fields")}
     started = utc_now()
+    field_coverage = {
+        "field_coverage": "unverified_default_or_invalid",
+        "requested_missing_fields": None,
+        "unexpected_returned_fields": None,
+    }
     try:
         # httpx.post reads the complete response before returning. Do not call
         # raise_for_status first: HTTP failures still have original evidence.
@@ -266,6 +271,7 @@ def capture_sample(client, token, job, root: Path):
                 "error_type": type(exc).__name__,
                 "http_status": response.status_code,
                 "response_complete": False,
+                **field_coverage,
             }
     except httpx.HTTPError as exc:
         # No complete response body is available. Exception messages/request
@@ -275,6 +281,7 @@ def capture_sample(client, token, job, root: Path):
             "status": "transport_error",
             "error_type": type(exc).__name__,
             "response_complete": False,
+            **field_coverage,
         }
     # Preserve the existing raw-object contract, with defensive token redaction.
     raw = content.replace(token.encode(), b"[REDACTED_SECRET]")
@@ -302,6 +309,26 @@ def capture_sample(client, token, job, root: Path):
             job.get("nullable_fields", ()),
             job.get("positive_fields", ()),
         )
+    requested = request["fields"]
+    requested = requested.split(",") if isinstance(requested, str) else []
+    requested = [field.strip() for field in requested]
+    # row_count is emitted only after successful response structure validation.
+    # Presence is independent of null values and never proves undocumented fields.
+    if (
+        "row_count" in assessment
+        and requested
+        and all(re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", f) for f in requested)
+    ):
+        returned = set(payload["data"]["fields"])
+        missing = sorted(set(requested) - returned)
+        field_coverage.update(
+            field_coverage="gap" if missing else "complete_for_explicit_request",
+            requested_missing_fields=missing,
+            unexpected_returned_fields=sorted(returned - set(requested)),
+        )
+        if missing and assessment["status"] == "sample_ok":
+            assessment["status"] = "schema_gap"
+    assessment.update(field_coverage)
     assessment.update(
         http_status=response.status_code,
         response_complete=True,
