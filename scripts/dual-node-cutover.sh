@@ -109,6 +109,9 @@ done
 python3 scripts/dual_node_inventory.py "$PROJECT" > "$backup/runtime-manifest.jsonl"
 remote "sudo -n python3 $QM_REMOTE_PROJECT/scripts/dual_node_inventory.py $QM_REMOTE_PROJECT" > "$backup/cloud-runtime-manifest.jsonl"
 cmp "$backup/runtime-manifest.jsonl" "$backup/cloud-runtime-manifest.jsonl"
+# External research tools can bypass the stopped application containers.
+python3 scripts/dual_node_inventory.py "$PROJECT" > "$backup/final-local-runtime-manifest.jsonl"
+cmp "$backup/runtime-manifest.jsonl" "$backup/final-local-runtime-manifest.jsonl"
 "$RSYNC" -a --rsync-path='sudo -n rsync' "$backup/" "$QM_SSH_TARGET:$remote_backup/"
 # Verify the database dump and every cold archive end-to-end before restore.
 (cd "$backup" && shasum -a 256 postgres.dump *.tar.gz runtime-manifest.jsonl > SHA256SUMS)
