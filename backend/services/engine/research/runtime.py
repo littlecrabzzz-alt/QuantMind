@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 import fcntl
 import os
 from pathlib import Path
@@ -79,17 +80,32 @@ def freeze_code(directory, contract):
             raise ValueError("本课题的冻结执行代码发生变化")
 
 
-def docker(*args):
-    return subprocess.check_output(["docker", *args], text=True, stderr=subprocess.STDOUT, timeout=30).strip()
+@contextmanager
+def docker_client():
+    # The backend image already ships the Docker SDK used by training launchers.
+    import docker
+    client = None
+    try:
+        client = docker.DockerClient(base_url="unix:///var/run/docker.sock", timeout=30)
+        yield client
+    except docker.errors.NotFound:
+        raise
+    except docker.errors.DockerException:
+        raise RuntimeError("Docker 服务暂时不可达，保留原容器标识等待恢复") from None
+    finally:
+        if client:
+            client.close()
 
 
 def inspect(name):
-    proc = subprocess.run(["docker", "inspect", name], text=True, capture_output=True, timeout=20)
-    if proc.returncode:
-        if "No such" in proc.stderr:
-            return None
-        raise RuntimeError("暂时无法查询研究容器，保留原任务等待恢复")
-    return json.loads(proc.stdout)[0]
+    import docker
+    try:
+        with docker_client() as client:
+            return client.api.inspect_container(name)
+    except docker.errors.NotFound:
+        return None
+    except docker.errors.DockerException:
+        raise RuntimeError("暂时无法查询研究容器，保留原任务等待恢复") from None
 
 
 def check_container(info, experiment, directory, node):
@@ -115,11 +131,15 @@ def _launch(case_dir, experiment, config, contract, deadline):
     info = inspect(experiment["container_name"])
     if info:
         check_container(info, experiment, directory, contract["node_id"])
+        if info["State"]["Status"] == "created":
+            with docker_client() as client:
+                client.api.start(info["Id"])
         return info["Id"]
     if (directory / "launch-intent.json").exists():
         raise ValueError("容器提交结果不明且未找到原容器，需查看证据后继续")
-    if docker("ps", "-q", "--filter", f"label=quantmind.research.node={contract['node_id']}"):
-        return None  # One heavy experiment per node; other cases remain visible.
+    with docker_client() as client:
+        if client.containers.list(filters={"label": f"quantmind.research.node={contract['node_id']}"}):
+            return None  # One heavy experiment per node; other cases remain visible.
     remaining = int(deadline-time.time()-30)
     if remaining < 90:
         return None
@@ -132,27 +152,34 @@ def _launch(case_dir, experiment, config, contract, deadline):
     frozen.write(directory / "config.json", config)
     frozen.write(directory / "proposal.json", experiment["proposal"])
     host_dir = Path(host_path(str(directory), runtime_only=True))
-    command = frozen.command(Path(host_path(str(source), runtime_only=True)), {"image": contract["image"]}, host_dir)
-    command[command.index("--name")+1] = experiment["container_name"]
-    command.insert(2, "--detach")
-    command[command.index("--cpus")+1] = "2"
-    command[command.index("PYTHONPATH=/frozen/code:/frozen/code/docker/training:/frozen/code/scripts")] = "PYTHONPATH=/research-code:/frozen/code:/frozen/code/docker/training:/frozen/code/scripts"
-    at = command.index("--entrypoint")
-    command[at:at] = ["--label", f"quantmind.research.node={contract['node_id']}",
-        "--label", f"quantmind.research.id={experiment['id']}",
-        "--mount", f"type=bind,src={host_dir / 'config.json'},dst=/frozen/config.json,readonly",
-        "--mount", f"type=bind,src={host_path(str(case_dir/'code'), runtime_only=True)},dst=/research-code,readonly"]
-    at = command.index("--entrypoint")
-    # Compute remaining time inside the container, so Docker startup latency
-    # cannot extend the wall-clock window. TERM + KILL both fit the deadline.
     watchdog = ("import os,sys,time; remaining=int(float(sys.argv[1])-time.time()-10); "
                 "sys.exit(124) if remaining<1 else os.execvp('timeout', "
                 "['timeout','--signal=TERM','--kill-after=10',str(remaining),"
                 "'python','/research-code/frozen_research_worker.py'])")
-    command[at:] = ["--entrypoint", "python", contract["image"]["Id"], "-c", watchdog, str(deadline)]
-    frozen.write(directory / "launch-intent.json", {"command": command, "deadline_epoch": deadline, "created_epoch": time.time()})
-    # No command output is allowed to include provider credentials.
-    return subprocess.check_output(command, text=True, stderr=subprocess.STDOUT, timeout=40).strip()
+    spec = {"image": contract["image"]["Id"], "name": experiment["container_name"],
+        "platform": contract["image"]["Os"]+"/"+contract["image"]["Architecture"],
+        "network_mode": "none", "read_only": True, "nano_cpus": 2_000_000_000,
+        "mem_limit": "8g", "tmpfs": {"/tmp": "rw,size=1g"}, "working_dir": "/output",
+        "labels": {"quantmind.research.node": contract["node_id"], "quantmind.research.id": experiment["id"]},
+        "volumes": {
+            host_path(str(source / "snapshot"), runtime_only=True): {"bind": "/frozen", "mode": "ro"},
+            str(host_dir): {"bind": "/output", "mode": "rw"},
+            str(host_dir / "config.json"): {"bind": "/frozen/config.json", "mode": "ro"},
+            host_path(str(case_dir / "code"), runtime_only=True): {"bind": "/research-code", "mode": "ro"}},
+        "environment": {"PYTHONPATH": "/research-code:/frozen/code:/frozen/code/docker/training:/frozen/code/scripts",
+            "PYTHONDONTWRITEBYTECODE": "1", "LITELLM_LOCAL_MODEL_COST_MAP": "True", "HOME": "/tmp",
+            "OMP_NUM_THREADS": "4", "PYTHONHASHSEED": "42", "QM_QUANTDB_DATA_DIR": "/frozen/quantdb",
+            "QUANTDB_DATA_DIR": "/frozen/quantdb", "QLIB_PROVIDER_URI": "/frozen/qlib"},
+        "entrypoint": "python", "command": ["-c", watchdog, str(deadline)]}
+    frozen.write(directory / "launch-intent.json", {"spec": spec, "deadline_epoch": deadline, "created_epoch": time.time()})
+    import docker
+    try:
+        with docker_client() as client:
+            container = client.containers.create(**spec)
+            container.start()
+            return container.id
+    except docker.errors.DockerException:
+        raise RuntimeError("容器提交响应不明，下次推进先核对相同容器名") from None
 
 
 def observe(case_dir, experiment, contract, stop=False):
@@ -162,7 +189,8 @@ def observe(case_dir, experiment, contract, stop=False):
         raise ValueError("已提交的容器不存在，不能证明实验已停止或完成")
     check_container(info, experiment, directory, contract["node_id"])
     if stop and info["State"]["Running"]:
-        docker("stop", "--time", "10", experiment["container_name"])
+        with docker_client() as client:
+            client.api.stop(experiment["container_name"], timeout=10)
         info = inspect(experiment["container_name"])
     if info["State"]["Running"]:
         return None
