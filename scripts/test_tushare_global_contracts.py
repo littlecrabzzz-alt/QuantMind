@@ -253,10 +253,10 @@ class GlobalContracts(unittest.TestCase):
                         for i in range((end - start).days + 1)
                     )
                     if job["epoch"] == "history" and api.startswith("index_"):
-                        self.assertEqual(start.year, end.year)
+                        self.assertLessEqual(end.year - start.year, 9)
                 self.assertEqual(set(covered), expected)
-                # Recent two-period review can overlap a completed annual partition.
-                self.assertEqual(len(selected), 3)
+                # Recent review can overlap the aggregated completed-year tail.
+                self.assertEqual(len(selected), 2)
         self.assertEqual(jobs, list(iter_global_jobs(config, today, ids)))
         # 2024 spring holiday's pre-Friday closing day stays inside a full range.
         self.assertIn("20240403", expected)
@@ -337,7 +337,11 @@ class GlobalContracts(unittest.TestCase):
         new_history = {
             json.dumps(j, sort_keys=True) for j in later if j["epoch"] == "history"
         }
-        self.assertTrue(old_history <= new_history)
+        # The completed prior-year tail is stable; only current-year tails change.
+        stable = {
+            j for j in old_history if json.loads(j)["params"]["end_date"] <= "20251231"
+        }
+        self.assertTrue(stable <= new_history)
         for job in later:
             if job["epoch"] != "history" or not job["params"]["start_date"].startswith(
                 "2026"
@@ -345,9 +349,7 @@ class GlobalContracts(unittest.TestCase):
                 continue
             start = date.fromisoformat(job["params"]["start_date"])
             end = date.fromisoformat(job["params"]["end_date"])
-            self.assertLessEqual(
-                (end - start).days, 6 if job["api_name"] == "weekly" else 30
-            )
+            self.assertLessEqual((end - start).days, 365)
         # Re-enumerating after a long outage still covers every fully ended period.
         for api, closed in (
             ("weekly", date(2026, 10, 4)),
@@ -367,6 +369,79 @@ class GlobalContracts(unittest.TestCase):
                 for n in range((closed - date(2025, 1, 1)).days + 1)
             }
             self.assertEqual(covered, expected)
+
+    def test_decade_buckets_cover_dates_and_bound_candidate_count(self):
+        from collections import Counter
+
+        config = {
+            "global_apis": ["index_weekly", "index_monthly"],
+            "global_history_start": "19900101",
+        }
+        ids = {"indexes": ["000300.CSI"]}
+        first = list(iter_global_jobs(config, date(2026, 9, 9), ids))
+        for api in config["global_apis"]:
+            rows = [j for j in first if j["api_name"] == api]
+            self.assertEqual(len(rows), 6)  # 3 decades, year tail, month tail, recent
+            old = [j["params"] for j in rows if j["params"]["end_date"] < "20200101"]
+            self.assertEqual(
+                [(p["start_date"], p["end_date"]) for p in old],
+                [
+                    ("19900101", "19991231"),
+                    ("20000101", "20091231"),
+                    ("20100101", "20191231"),
+                ],
+            )
+            for job in rows:
+                params = job["params"]
+                left = date.fromisoformat(params["start_date"])
+                right = date.fromisoformat(params["end_date"])
+                self.assertLessEqual(right.year - left.year, 9)
+                # Even a range straddling partial weekly labels stays below guard.
+                self.assertLess(
+                    (right - left).days // 7 + 2, GLOBAL_CONTRACTS[api]["row_cap"]
+                )
+        # Closed decade identities survive week, month, year and decade rollovers.
+        for today in (
+            date(2026, 9, 23),
+            date(2026, 10, 7),
+            date(2027, 1, 18),
+            date(2030, 1, 14),
+            date(2030, 3, 1),
+        ):
+            later = list(iter_global_jobs(config, today, ids))
+            for api in config["global_apis"]:
+                history = [
+                    j["params"]
+                    for j in later
+                    if j["api_name"] == api and j["epoch"] == "history"
+                ]
+                self.assertTrue(all(p in history for p in old))
+                ranges = sorted(
+                    (
+                        date.fromisoformat(j["params"]["start_date"]),
+                        date.fromisoformat(j["params"]["end_date"]),
+                    )
+                    for j in later
+                    if j["api_name"] == api
+                )
+                cursor = date(1990, 1, 1)
+                for left, right in ranges:
+                    self.assertLessEqual(left, cursor)
+                    cursor = max(cursor, right + timedelta(days=1))
+                closed = (
+                    today - timedelta(days=today.weekday() + 1)
+                    if api.endswith("weekly")
+                    else today.replace(day=1) - timedelta(days=1)
+                )
+                self.assertEqual(cursor, closed + timedelta(days=1))
+        # Real discovery-size simulation, streamed without materializing candidates.
+        large_ids = {"indexes": [f"{n:06d}.CSI" for n in range(9643)]}
+        counts = Counter(
+            (j["api_name"], j["epoch"] == "history")
+            for j in iter_global_jobs(config, date(2026, 9, 9), large_ids)
+        )
+        self.assertEqual(sum(counts.values()), 115716)
+        self.assertEqual(sum(n for (_, history), n in counts.items() if history), 96430)
 
     def test_calendar_closure_cross_year_and_leap_month(self):
         config = {
@@ -395,7 +470,7 @@ class GlobalContracts(unittest.TestCase):
                 and j["params"]
                 == {
                     "ts_code": "600000.SH",
-                    "start_date": "20250101",
+                    "start_date": "20230101",
                     "end_date": "20251231",
                 }
                 for j in after
