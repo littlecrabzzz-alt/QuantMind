@@ -1,0 +1,6 @@
+# Store fixture regression repaired
+
+- Commit 46772f7607c6b4b71aa9cadc2004443b3d755fc2, only scripts/test_tushare_store_extended.py. Ownership released. Parent should cherry-pick this delta after b626e6d (already picked as 5a23b1e); no runtime change.
+- Root cause: all identity-bearing datasets reused one observation filename and overwrote the request API; fixture only carried fina_mainbz type=P. Fixed one content-hashed immutable observation per real request: fina_mainbz ts_code/type, stock_hsgt trade_date/type, hsgt_top10 trade_date/market_type, moneyflow_ind_dc trade_date/content_type. Reader validation unchanged.
+- Now explicitly verifies recovered request identity and immutable-observation verification status for all four, 136 total API fixtures (previous131 + Connect5) and all five Connect names present. No deleted datasets.
+- 22 tests pass: uv run --no-project --with httpx --with pyarrow --with duckdb python -m unittest scripts.test_tushare_store_extended scripts.test_tushare_connect_pipeline scripts.test_tushare_connect_contracts scripts.test_tushare_request_identity. Ruff and diff-check pass. Existing DuckDB deprecated API warnings only. No upstream/production calls; fixtures isolated with network denied.
