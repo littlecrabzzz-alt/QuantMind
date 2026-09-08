@@ -1,0 +1,1 @@
+text_contracts / 父子分区闭环。Mac隔离codex/tushare-text已merge master39fff3d。独占tushare_pipeline.py和新增test_tushare_partition_closure.py；父处理真实权限/样本，其他agent处理API。计划v4持久父子边+聚合状态，日期覆盖可证明，缺universe/空未证实/质量/权限不可标complete；v3只恢复唯一可证实日期子关系，其余legacy gap。仅临时目录离线测试，无生产请求/部署。
