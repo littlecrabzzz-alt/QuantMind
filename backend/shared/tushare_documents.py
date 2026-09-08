@@ -23,6 +23,8 @@ import sys
 import tempfile
 import time
 from datetime import date, datetime, timezone
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from uuid import uuid4
 from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 
 MAX_REDIRECTS = 3
@@ -224,6 +226,7 @@ def _parse_pdf(path, timeout):
                 str(Path(__file__).resolve()),
                 "--parse-pdf",
                 str(path),
+                str(time.time() + timeout),
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -231,6 +234,8 @@ def _parse_pdf(path, timeout):
             check=False,
             env={"PATH": os.defpath, "LANG": "C.UTF-8"},
         )
+        if worker.returncode == -signal.SIGALRM:
+            return {"parse_status": "parse_timeout"}
         if worker.returncode:
             return {"parse_status": "parse_failed", "reason": "parser_process_failed"}
         return json.loads(worker.stdout)
@@ -240,7 +245,9 @@ def _parse_pdf(path, timeout):
         return {"parse_status": "parse_failed", "reason": "parser_process_error"}
 
 
-def fetch_document(url, root, max_bytes=25 * 1024 * 1024, timeout=20):
+def fetch_document(
+    url, root, max_bytes=25 * 1024 * 1024, timeout=20, download_only=False
+):
     """Download one public PDF/HTML; no redirect, size or parse failure loses state.
 
     ``status=downloaded`` means immutable bytes saved, not article verification or
@@ -248,6 +255,8 @@ def fetch_document(url, root, max_bytes=25 * 1024 * 1024, timeout=20):
     Timeout applies to each socket operation and separately to the parser process;
     DNS timing is controlled by the host resolver. Parent job has an overall limit.
     """
+    if type(download_only) is not bool:
+        raise ValueError("download_only must be boolean")
     if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 1:
         raise ValueError("max_bytes must be positive integer")
     if (
@@ -364,6 +373,9 @@ def fetch_document(url, root, max_bytes=25 * 1024 * 1024, timeout=20):
                 result["files"].append(artifact)
                 if is_pdf:
                     result["validation_status"] = "pdf_envelope_only"
+                    if download_only:
+                        result["parse_status"] = "parse_pending"
+                        return result
                     parsed = _parse_pdf(root / artifact["path"], timeout)
                     result["parse_status"] = parsed["parse_status"]
                     if parsed["parse_status"] in ("parsed", "no_text", "encrypted"):
@@ -607,8 +619,9 @@ def enqueue_documents(root, observation, api_name, records, fields):
         db.close()
 
 
-def _download_job(url, root, timeout):
+def _download_job(url, root, timeout, *, download_only=False):
     """Bound the complete download (including DNS/redirects and PDF subprocess)."""
+    deadline_at = time.time() + timeout
     worker = subprocess.Popen(
         [sys.executable, "-I", str(Path(__file__).resolve()), "--fetch-document"],
         stdin=subprocess.PIPE,
@@ -619,9 +632,23 @@ def _download_job(url, root, timeout):
     )
     try:
         output, _ = worker.communicate(
-            _json({"url": url, "root": str(root), "timeout": min(20, timeout)}),
+            _json(
+                {
+                    "url": url,
+                    "root": str(root),
+                    "timeout": min(20, timeout),
+                    "download_only": download_only,
+                    "deadline_at": deadline_at,
+                }
+            ),
             timeout=timeout,
         )
+        if worker.returncode == -signal.SIGALRM:
+            return {
+                "status": "download_timeout",
+                "parse_status": "not_attempted",
+                "files": [],
+            }
         if worker.returncode:
             return {
                 "status": "download_error",
@@ -698,12 +725,143 @@ def _parse_saved(root, result, timeout):
     return result
 
 
-def run_documents(root, max_documents=1, max_seconds=30):
-    """Advance bounded work; download and local parse retries use separate clocks.
+CLAIM_GRACE_SECONDS = 30
 
-    Five attempts per phase with exponential backoff. Exhausted, encrypted,
-    no-text, size/parse-limit and invalid URL outcomes stay visible as gaps.
-    This function has no authority check: the production parent must enforce it.
+
+def _claims_setup(db):
+    # Separate versioned metadata keeps queue-v2 and index-v2 consumers compatible.
+    if db.execute(
+        "SELECT 1 FROM sqlite_master WHERE name='document_claim_meta'"
+    ).fetchone():
+        row = db.execute("SELECT version FROM document_claim_meta").fetchone()
+        if row is None or row[0] != 1:
+            raise DocumentError("unsupported_document_claim_schema")
+        return
+    with db:
+        db.execute("BEGIN IMMEDIATE")
+        db.execute("CREATE TABLE document_claim_meta(version INTEGER NOT NULL)")
+        db.execute("INSERT INTO document_claim_meta VALUES(1)")
+        db.execute(
+            "CREATE TABLE document_claims(document_id TEXT PRIMARY KEY,owner TEXT NOT NULL,phase TEXT NOT NULL,claimed_at REAL NOT NULL,lease_until REAL NOT NULL)"
+        )
+        db.execute("CREATE INDEX document_claim_expiry ON document_claims(lease_until)")
+
+
+def _claim_documents(db, owner, phase, limit, seconds):
+    now = time.time()
+    download = "(download_status IN ('pending','retry') AND retry_after<=?)"
+    parse = "(download_status='downloaded' AND parse_status IN ('parse_pending','parse_unavailable','parse_failed','parse_timeout') AND parse_tries<5 AND parse_retry_after<=?)"
+    condition = (
+        download
+        if phase == "download"
+        else parse
+        if phase == "parse"
+        else "(" + download + " OR " + parse + ")"
+    )
+    with db:
+        db.execute("BEGIN IMMEDIATE")
+        db.execute("DELETE FROM document_claims WHERE lease_until<=?", (now,))
+        rows = db.execute(
+            "SELECT * FROM documents WHERE "
+            + condition
+            + " AND NOT EXISTS(SELECT 1 FROM document_claims c WHERE c.document_id=documents.id) ORDER BY id LIMIT ?",
+            ((now, now, limit) if phase is None else (now, limit)),
+        ).fetchall()
+        claimed_at = time.time()
+        for row in rows:
+            actual_phase = (
+                "parse" if row["download_status"] == "downloaded" else "download"
+            )
+            db.execute(
+                "INSERT INTO document_claims VALUES(?,?,?,?,?)",
+                (
+                    row["id"],
+                    owner,
+                    actual_phase,
+                    claimed_at,
+                    claimed_at + seconds + CLAIM_GRACE_SECONDS,
+                ),
+            )
+    return rows
+
+
+def _finish_document(db, owner, job, result, phase):
+    now = time.time()
+    if (
+        phase == "download"
+        and result.get("status") == "downloaded"
+        and job["expected_mime"]
+        and result.get("mime") != job["expected_mime"]
+    ):
+        result["status"] = "expected_mime_mismatch"
+    dtries = job["download_tries"] + (phase == "download")
+    ptries = job["parse_tries"] + (
+        phase == "parse"
+        or (
+            result.get("mime") == "application/pdf"
+            and result.get("parse_status") != "parse_pending"
+        )
+    )
+    good = result.get("status") == "downloaded"
+    terminal = result.get("status") in {
+        "invalid_url",
+        "invalid_scheme_or_host",
+        "credentials_in_url",
+        "nonstandard_port",
+        "non_public_address",
+        "invalid_host",
+        "size_limit",
+        "unsupported_or_invalid_document",
+    }
+    state = "downloaded" if good else "blocked" if terminal or dtries >= 5 else "retry"
+    delay = min(3600, 60 * 2 ** min(max(dtries, ptries), 6))
+    with db:
+        db.execute("BEGIN IMMEDIATE")
+        claim = db.execute(
+            "SELECT owner,claimed_at FROM document_claims WHERE document_id=?",
+            (job["id"],),
+        ).fetchone()
+        if not claim or claim[0] != owner:
+            raise DocumentError("stale_document_claim")
+        db.execute(
+            "INSERT INTO document_attempts(document_id,phase,result,created_at) VALUES(?,?,?,?)",
+            (job["id"], phase, json.dumps(result), claim[1]),
+        )
+        db.execute(
+            "UPDATE documents SET download_status=?,parse_status=?,download_tries=?,parse_tries=?,retry_after=?,parse_retry_after=?,result=? WHERE id=?",
+            (
+                state,
+                result.get("parse_status", "not_attempted"),
+                dtries,
+                ptries,
+                now + delay,
+                now if result.get("parse_status") == "parse_pending" else now + delay,
+                json.dumps(result),
+                job["id"],
+            ),
+        )
+        db.execute(
+            "DELETE FROM document_claims WHERE document_id=? AND owner=?",
+            (job["id"], owner),
+        )
+
+
+def _document_failure(job, phase, exc):
+    return {
+        **json.loads(job["result"]),
+        "status": "download_error" if phase == "download" else "downloaded",
+        "parse_status": "parse_failed" if phase == "parse" else "not_attempted",
+        "error_type": type(exc).__name__,
+    }
+
+
+def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
+    """Advance bounded phases; opt-in two transfers never overlap a PDF parser.
+
+    One durable owner per document, global consumer lock, expiry after child total
+    deadline plus grace. With two workers raw results commit before local parsing.
+    Failed/limited phases remain visible with the existing five-attempt backoff.
+    Callers enforce authority; workers=1 preserves the sequential path.
     """
     if (
         isinstance(max_documents, bool)
@@ -717,9 +875,13 @@ def run_documents(root, max_documents=1, max_seconds=30):
         or not 0 < max_seconds <= 300
     ):
         raise ValueError("max_seconds must be between 0 and 300")
+    if type(download_workers) is not int or download_workers not in (1, 2):
+        raise ValueError("download_workers must be 1 or 2")
     root = Path(root).resolve()
     db = _document_db(root)
-    processed, started = 0, time.monotonic()
+    processed, started, owner = 0, time.monotonic(), uuid4().hex
+    deadline = started + max_seconds
+    phase_counts = {"download": 0, "parse": 0}
     try:
         lock_path = root / "documents.lock"
         if lock_path.is_symlink():
@@ -729,94 +891,76 @@ def run_documents(root, max_documents=1, max_seconds=30):
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 return {"status": "already_running", "processed": 0}
-            while (
-                processed < max_documents and time.monotonic() - started < max_seconds
-            ):
-                now = time.time()
-                job = db.execute(
-                    """SELECT * FROM documents WHERE
-                    (download_status IN ('pending','retry') AND retry_after<=?) OR
-                    (download_status='downloaded' AND parse_status IN ('parse_unavailable','parse_failed','parse_timeout')
-                     AND parse_tries<5 AND parse_retry_after<=?)
-                    ORDER BY id LIMIT 1""",
-                    (now, now),
-                ).fetchone()
-                if job is None:
-                    break
-                remaining = max_seconds - (time.monotonic() - started)
-                if remaining <= 0:
-                    break
+            _claims_setup(db)
+            parse_turns = 1  # Finish old pending parses before admitting more raw PDFs.
+            while processed < max_documents and time.monotonic() < deadline:
+                remaining = deadline - time.monotonic()
                 phase = (
-                    "parse" if job["download_status"] == "downloaded" else "download"
+                    ("parse" if parse_turns else "download")
+                    if download_workers == 2
+                    else None
                 )
-                previous = json.loads(job["result"])
-                try:
-                    result = (
-                        _parse_saved(root, previous, remaining)
-                        if phase == "parse"
-                        else _download_job(job["url"], root, remaining)
+                count = min(2 if phase == "download" else 1, max_documents - processed)
+                seconds = min(20, remaining) if phase == "download" else remaining
+                jobs = _claim_documents(db, owner, phase, count, seconds)
+                if not jobs and download_workers == 2:
+                    phase = "download" if phase == "parse" else "parse"
+                    count = min(
+                        2 if phase == "download" else 1, max_documents - processed
                     )
-                except Exception as exc:
-                    result = {
-                        **previous,
-                        "status": "download_error"
-                        if phase == "download"
-                        else "downloaded",
-                        "parse_status": "parse_failed"
-                        if phase == "parse"
-                        else "not_attempted",
-                        "error_type": type(exc).__name__,
-                    }
-                if (
-                    phase == "download"
-                    and result.get("status") == "downloaded"
-                    and job["expected_mime"]
-                    and result.get("mime") != job["expected_mime"]
-                ):
-                    result["status"] = "expected_mime_mismatch"
-                dtries = job["download_tries"] + (phase == "download")
-                ptries = job["parse_tries"] + (
-                    phase == "parse" or result.get("mime") == "application/pdf"
-                )
-                good = result.get("status") == "downloaded"
-                terminal = result.get("status") in {
-                    "invalid_url",
-                    "invalid_scheme_or_host",
-                    "credentials_in_url",
-                    "nonstandard_port",
-                    "non_public_address",
-                    "invalid_host",
-                    "size_limit",
-                    "unsupported_or_invalid_document",
-                }
-                state = (
-                    "downloaded"
-                    if good
-                    else "blocked"
-                    if terminal or dtries >= 5
-                    else "retry"
-                )
-                delay = min(3600, 60 * 2 ** min(max(dtries, ptries), 6))
-                with db:
-                    db.execute(
-                        "INSERT INTO document_attempts(document_id,phase,result,created_at) VALUES(?,?,?,?)",
-                        (job["id"], phase, json.dumps(result), now),
+                    seconds = min(20, remaining) if phase == "download" else remaining
+                    jobs = _claim_documents(db, owner, phase, count, seconds)
+                if not jobs:
+                    break
+                if phase == "download":
+
+                    def transfer(job):
+                        budget = min(20, max(0.001, deadline - time.monotonic()))
+                        return _download_job(
+                            job["url"], root, budget, download_only=True
+                        )
+
+                    # Two subprocess waiters only; SQLite and parsing stay on this thread.
+                    with ThreadPoolExecutor(max_workers=2) as pool:
+                        futures = {pool.submit(transfer, job): job for job in jobs}
+                        for future in as_completed(futures):
+                            job = futures[future]
+                            try:
+                                result = future.result()
+                            except Exception as exc:
+                                result = _document_failure(job, "download", exc)
+                            _finish_document(db, owner, job, result, "download")
+                            phase_counts["download"] += 1
+                            processed += 1
+                    parse_turns = 2
+                else:
+                    job = jobs[0]
+                    actual_phase = (
+                        "parse"
+                        if job["download_status"] == "downloaded"
+                        else "download"
                     )
-                    db.execute(
-                        "UPDATE documents SET download_status=?,parse_status=?,download_tries=?,parse_tries=?,retry_after=?,parse_retry_after=?,result=? WHERE id=?",
-                        (
-                            state,
-                            result.get("parse_status", "not_attempted"),
-                            dtries,
-                            ptries,
-                            now + delay,
-                            now + delay,
-                            json.dumps(result),
-                            job["id"],
-                        ),
-                    )
-                processed += 1
-        return {"status": "ok", "processed": processed, "counts": _document_counts(db)}
+                    remaining = max(0.001, deadline - time.monotonic())
+                    try:
+                        result = (
+                            _parse_saved(root, json.loads(job["result"]), remaining)
+                            if actual_phase == "parse"
+                            else _download_job(job["url"], root, remaining)
+                        )
+                    except Exception as exc:
+                        result = _document_failure(job, actual_phase, exc)
+                    _finish_document(db, owner, job, result, actual_phase)
+                    phase_counts[actual_phase] += 1
+                    processed += 1
+                    parse_turns = max(0, parse_turns - 1)
+        return {
+            "status": "ok",
+            "processed": processed,
+            "counts": _document_counts(db),
+            "download_workers": download_workers,
+            "phase_counts": phase_counts,
+            "elapsed_seconds": round(time.monotonic() - started, 3),
+        }
     finally:
         db.close()
 
@@ -1134,10 +1278,24 @@ def document_index(root):
         db.close()
 
 
+def _arm_document_deadline(deadline_at):
+    # CLI subprocess only: SIG_DFL is enforced by the kernel even in blocked DNS/C
+    # calls. Absolute time also covers a child delayed before its Python startup.
+    remaining = float(deadline_at) - time.time()
+    if not 0 < remaining <= 300:
+        raise SystemExit("document_deadline_expired")
+    signal.signal(signal.SIGALRM, signal.SIG_DFL)
+    signal.setitimer(signal.ITIMER_REAL, remaining)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) == 3 and sys.argv[1] == "--parse-pdf":
+    if len(sys.argv) in (3, 4) and sys.argv[1] == "--parse-pdf":
+        if len(sys.argv) == 4:
+            _arm_document_deadline(sys.argv[3])
         print(_json(_parse_worker(sys.argv[2])).decode("utf-8"))
     elif len(sys.argv) == 2 and sys.argv[1] == "--fetch-document":
-        print(
-            _json(fetch_document(**json.loads(sys.stdin.buffer.read()))).decode("utf-8")
-        )
+        arguments = json.loads(sys.stdin.buffer.read())
+        deadline_at = arguments.pop("deadline_at", None)
+        if deadline_at is not None:
+            _arm_document_deadline(deadline_at)
+        print(_json(fetch_document(**arguments)).decode("utf-8"))
