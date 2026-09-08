@@ -217,11 +217,12 @@ class GlobalContracts(unittest.TestCase):
             i for i, job in enumerate(jobs) if job["epoch"] == "history"
         )
         self.assertTrue(all(j["epoch"] == "history" for j in jobs[first_history:]))
-        expected = {
-            (date(2024, 2, 27) + timedelta(days=i)).strftime("%Y%m%d")
-            for i in range((today - date(2024, 2, 27)).days + 1)
-        }
         for api in config["global_apis"]:
+            closed = date(2026, 1, 4) if api.endswith("weekly") else date(2025, 12, 31)
+            expected = {
+                (date(2024, 2, 27) + timedelta(days=i)).strftime("%Y%m%d")
+                for i in range((closed - date(2024, 2, 27)).days + 1)
+            }
             codes = (
                 ["000001.SH", "000300.CSI", "HSI.HI"]
                 if api.startswith("index_")
@@ -254,8 +255,8 @@ class GlobalContracts(unittest.TestCase):
                     if job["epoch"] == "history" and api.startswith("index_"):
                         self.assertEqual(start.year, end.year)
                 self.assertEqual(set(covered), expected)
-                self.assertEqual(len(covered), len(expected))
-                self.assertEqual(len(selected), 4 if api.startswith("index_") else 2)
+                # Recent two-period review can overlap a completed annual partition.
+                self.assertEqual(len(selected), 3)
         self.assertEqual(jobs, list(iter_global_jobs(config, today, ids)))
         # 2024 spring holiday's pre-Friday closing day stays inside a full range.
         self.assertIn("20240403", expected)
@@ -282,9 +283,135 @@ class GlobalContracts(unittest.TestCase):
         }
         jobs = list(iter_global_jobs(index_config, date(2026, 1, 10), ids))
         self.assertEqual(
-            len(jobs), 6000
-        )  # 2 APIs * 1000 codes * (recent + 2 year windows)
+            len(jobs), 4000
+        )  # 2 APIs * 1000 codes * (recent + completed 2025 year)
         self.assertFalse(any("trade_date" in j["params"] for j in jobs))
+
+    def test_period_epoch_is_stable_across_daily_planning_and_new_identifiers(self):
+        config = {
+            "global_apis": ["weekly", "monthly", "index_weekly", "index_monthly"],
+            "global_history_start": "20200101",
+            "planning_epoch": "20260909",
+        }
+        ids = {"stocks": ["600000.SH"], "indexes": ["000300.CSI"]}
+        first = list(iter_global_jobs(config, date(2026, 9, 9), ids))
+        second = list(
+            iter_global_jobs(
+                {**config, "planning_epoch": "20260910"}, date(2026, 9, 10), ids
+            )
+        )
+        self.assertEqual(first, second)
+        recent = [job for job in first if job["epoch"] != "history"]
+        self.assertEqual(len(recent), 4)
+        for job in recent:
+            self.assertEqual(
+                job["epoch"],
+                "period-20260906"
+                if job["api_name"].endswith("weekly")
+                else "period-20260831",
+            )
+        extended = list(
+            iter_global_jobs(
+                config,
+                date(2026, 9, 10),
+                {"stocks": ["600000.SH", "920061.BJ"], "indexes": ["000300.CSI"]},
+            )
+        )
+        old = [job for job in extended if job["params"]["ts_code"] != "920061.BJ"]
+        self.assertEqual(
+            {json.dumps(job, sort_keys=True) for job in first},
+            {json.dumps(job, sort_keys=True) for job in old},
+        )
+
+    def test_current_year_history_has_fixed_period_endpoints(self):
+        config = {
+            "global_apis": ["weekly", "monthly"],
+            "global_history_start": "20250101",
+        }
+        ids = {"stocks": ["600000.SH"]}
+        first = list(iter_global_jobs(config, date(2026, 9, 9), ids))
+        later = list(iter_global_jobs(config, date(2026, 10, 7), ids))
+        old_history = {
+            json.dumps(j, sort_keys=True) for j in first if j["epoch"] == "history"
+        }
+        new_history = {
+            json.dumps(j, sort_keys=True) for j in later if j["epoch"] == "history"
+        }
+        self.assertTrue(old_history <= new_history)
+        for job in later:
+            if job["epoch"] != "history" or not job["params"]["start_date"].startswith(
+                "2026"
+            ):
+                continue
+            start = date.fromisoformat(job["params"]["start_date"])
+            end = date.fromisoformat(job["params"]["end_date"])
+            self.assertLessEqual(
+                (end - start).days, 6 if job["api_name"] == "weekly" else 30
+            )
+        # Re-enumerating after a long outage still covers every fully ended period.
+        for api, closed in (
+            ("weekly", date(2026, 10, 4)),
+            ("monthly", date(2026, 9, 30)),
+        ):
+            covered = set()
+            for job in later:
+                if job["api_name"] != api:
+                    continue
+                start = date.fromisoformat(job["params"]["start_date"])
+                end = date.fromisoformat(job["params"]["end_date"])
+                covered.update(
+                    start + timedelta(days=n) for n in range((end - start).days + 1)
+                )
+            expected = {
+                date(2025, 1, 1) + timedelta(days=n)
+                for n in range((closed - date(2025, 1, 1)).days + 1)
+            }
+            self.assertEqual(covered, expected)
+
+    def test_calendar_closure_cross_year_and_leap_month(self):
+        config = {
+            "global_apis": ["weekly", "monthly"],
+            "global_history_start": "20230101",
+        }
+        ids = {"stocks": [{"ts_code": "600000.SH", "list_status": "D"}]}
+        jobs = list(iter_global_jobs(config, date(2024, 3, 1), ids))
+        month = next(
+            j for j in jobs if j["api_name"] == "monthly" and j["epoch"] != "history"
+        )
+        self.assertEqual(
+            month["params"],
+            {"ts_code": "600000.SH", "start_date": "20240101", "end_date": "20240229"},
+        )
+        before = list(iter_global_jobs(config, date(2026, 1, 1), ids))
+        week = next(
+            j for j in before if j["api_name"] == "weekly" and j["epoch"] != "history"
+        )
+        self.assertEqual(week["params"]["end_date"], "20251228")
+        after = list(iter_global_jobs(config, date(2026, 1, 5), ids))
+        self.assertTrue(
+            any(
+                j["api_name"] == "weekly"
+                and j["epoch"] == "history"
+                and j["params"]
+                == {
+                    "ts_code": "600000.SH",
+                    "start_date": "20250101",
+                    "end_date": "20251231",
+                }
+                for j in after
+            )
+        )
+        scope = {
+            "global_apis": ["weekly", "monthly"],
+            "global_history_start": "20260908",
+        }
+        self.assertEqual(list(iter_global_jobs(scope, date(2026, 9, 9), ids)), [])
+        self.assertTrue(
+            all(
+                "period_wait_note" in GLOBAL_CONTRACTS[api]
+                for api in scope["global_apis"]
+            )
+        )
 
     def test_retired_hk_bang_remains_distinct_and_does_not_abort_other_apis(self):
         from backend.shared.tushare_global_contracts import _identifiers
@@ -309,12 +436,24 @@ class GlobalContracts(unittest.TestCase):
         from backend.shared.tushare_global_contracts import _identifiers
 
         codes = [
-            "02121!AE.HK", "02228!AE.HK", "03636!AE.HK", "03668!AE.HK",
-            "03699!AE.HK", "02121.HK", "02121!.HK", "02121!ABCDEFGH.HK",
+            "02121!AE.HK",
+            "02228!AE.HK",
+            "03636!AE.HK",
+            "03668!AE.HK",
+            "03699!AE.HK",
+            "02121.HK",
+            "02121!.HK",
+            "02121!ABCDEFGH.HK",
         ]
         self.assertEqual(_identifiers({"hk_stocks": codes})["hk_stocks"], sorted(codes))
-        for code in ("02121!ABCDEFGHI.HK", "02121!ae.HK", "02121!!AE.HK",
-                     "2121!AE.HK", "02121AE.HK", "02121!AE.US"):
+        for code in (
+            "02121!ABCDEFGHI.HK",
+            "02121!ae.HK",
+            "02121!!AE.HK",
+            "2121!AE.HK",
+            "02121AE.HK",
+            "02121!AE.US",
+        ):
             with self.subTest(code=code), self.assertRaises(ValueError):
                 _identifiers({"hk_stocks": [code]})
 

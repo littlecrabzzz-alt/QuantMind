@@ -313,8 +313,9 @@ GLOBAL_CONTRACTS["monthly"].update(
 for _api, _family in SYMBOL_PERIODS.items():
     GLOBAL_CONTRACTS[_api].update(
         dependencies=[_family],
-        planning_version="symbol_period_ranges_v2",
-        planning_note="Complete discovered supplier-code ranges; indexes use annual historical windows, stocks use the full explicit historical range. Discovery and earliest history remain unverified.",
+        planning_version="stable_period_partitions_v3",
+        planning_note="Stable completed-year ranges, then completed calendar-period ranges for the unfinished year; recent two completed periods share a period-end epoch. Daily planning_epoch does not force period refresh. Discovery and earliest history remain unverified.",
+        period_wait_note="Open calendar weeks/months wait for their full boundary; daily-updated stk_* contracts remain independent. Late corrections outside the recent two periods require an explicit revision sweep.",
     )
 GLOBAL_CONTRACTS["hk_basic"]["identifier_note"] = (
     "Supplier codes may contain opaque ! or !AE suffixes; preserve each identity without inferring suffix meaning."
@@ -412,7 +413,9 @@ def _identifiers(identifiers):
                 )
             ):
                 raise ValueError(f"Invalid supplier identifier in {family}")
-            if family == "hk_stocks" and not re.fullmatch(r"[0-9]{5}(?:![A-Z]{0,8})?\.HK", code):
+            if family == "hk_stocks" and not re.fullmatch(
+                r"[0-9]{5}(?:![A-Z]{0,8})?\.HK", code
+            ):
                 raise ValueError(
                     "HK supplier identifiers require five digits, optional ! plus up to eight uppercase letters, and .HK"
                 )
@@ -505,28 +508,51 @@ def _interleave(streams):
                 yield job
 
 
+def _completed_period_bounds(api, today):
+    """Two fully ended calendar periods; no assumptions about their trading days."""
+    if api.endswith("weekly"):
+        end = today - timedelta(days=today.weekday() + 1)
+        return end - timedelta(days=13), end
+    end = today.replace(day=1) - timedelta(days=1)
+    start = (end.replace(day=1) - timedelta(days=1)).replace(day=1)
+    return start, end
+
+
 def _period_jobs(api, start, end, ids, epoch, priority):
-    # ts_code plus a range is documented for all four APIs. No weekday/month-end
-    # assumptions: holiday-shortened weeks and natural month labels stay covered.
-    window = start
-    while window <= end:
-        right = (
-            min(end, date(window.year, 12, 31))
-            if api.startswith("index_") and epoch == "history"
-            else end
+    if start > end:
+        return
+    for code in ids[SYMBOL_PERIODS[api]]:
+        yield _job(
+            api,
+            {
+                "ts_code": code,
+                "start_date": start.strftime("%Y%m%d"),
+                "end_date": end.strftime("%Y%m%d"),
+            },
+            epoch,
+            priority,
         )
-        for code in ids[SYMBOL_PERIODS[api]]:
-            yield _job(
-                api,
-                {
-                    "ts_code": code,
-                    "start_date": window.strftime("%Y%m%d"),
-                    "end_date": right.strftime("%Y%m%d"),
-                },
-                epoch,
-                priority,
-            )
-        window = right + timedelta(days=1)
+
+
+def _period_history_jobs(api, start, today, ids):
+    recent_start, closed = _completed_period_bounds(api, today)
+    annual_last = closed.year - (closed.month != 12 or closed.day != 31)
+    for year in range(start.year, annual_last + 1):
+        left = max(start, date(year, 1, 1))
+        yield from _period_jobs(api, left, date(year, 12, 31), ids, "history", 40)
+    # The unfinished year must not use a growing Jan-1 -> today request. Older
+    # closed periods have fixed endpoints; a missed run can enumerate them again.
+    left = max(start, date(annual_last + 1, 1, 1))
+    end = recent_start - timedelta(days=1)
+    while left <= end:
+        right = (
+            left + timedelta(days=6 - left.weekday())
+            if api.endswith("weekly")
+            else left.replace(day=monthrange(left.year, left.month)[1])
+        )
+        right = min(right, end)
+        yield from _period_jobs(api, left, right, ids, "history", 40)
+        left = right + timedelta(days=1)
 
 
 def _date_jobs(api, start, end, epoch, priority):
@@ -550,10 +576,11 @@ def _date_jobs(api, start, end, epoch, priority):
 def iter_global_jobs(config, today, identifiers=None):
     """Generate recent-first jobs without I/O or hidden history/universe cutoffs.
 
-    Four completed-period APIs require stored stocks/indexes. Recent work uses
-    one seven-day range per code. Historical index work uses code/year ranges;
-    historical stock work uses one full configured range per code (cap bisection
-    remains available). All other APIs keep their documented date plans.
+    Four completed-period APIs require stored stocks/indexes. Recent work covers
+    the last two closed calendar periods, with a stable period-end epoch. History
+    uses closed years then fixed periods for the remaining partial year. A closed
+    year may overlap the recent cross-year review; no observations are discarded.
+    Open periods wait for completion. Other APIs retain their daily plans.
     Missing discovery/history is explicit in global_prerequisites/metadata.
     Parent owns persistence, pagination, shared limits and old-plan deferral.
     """
@@ -583,12 +610,17 @@ def iter_global_jobs(config, today, identifiers=None):
     for api in enabled:
         if api in BASICS:
             continue
-        start = max(recent, starts[api] or recent)
-        streams.append(
-            _period_jobs(api, start, today, ids, epoch, 20)
-            if api in SYMBOL_PERIODS
-            else _date_jobs(api, start, today, epoch, 20)
-        )
+        if api in SYMBOL_PERIODS:
+            period_start, closed = _completed_period_bounds(api, today)
+            start = max(period_start, starts[api] or period_start)
+            streams.append(
+                _period_jobs(
+                    api, start, closed, ids, "period-" + closed.strftime("%Y%m%d"), 20
+                )
+            )
+        else:
+            start = max(recent, starts[api] or recent)
+            streams.append(_date_jobs(api, start, today, epoch, 20))
     yield from _interleave(streams)
     end = recent - timedelta(days=1)
     streams = []
@@ -597,7 +629,7 @@ def iter_global_jobs(config, today, identifiers=None):
         if api in BASICS or start is None or start > end:
             continue
         streams.append(
-            _period_jobs(api, start, end, ids, "history", 40)
+            _period_history_jobs(api, start, today, ids)
             if api in SYMBOL_PERIODS
             else _date_jobs(api, start, end, "history", 40)
         )
