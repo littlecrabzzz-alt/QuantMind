@@ -42,6 +42,8 @@ case "${1:-help}" in
     ;;
   web-publish)
     npm run build:react --workspace=electron
+    # The script protects secrets with umask 077, but nginx must read public assets.
+    chmod -R u=rwX,go=rX electron/dist-react
     release="$QM_REMOTE_ROOT/staging/web-$(date -u +%Y%m%dT%H%M%SZ)"
     ssh "$QM_SSH_TARGET" "sudo -n mkdir -p $release"
     "$RSYNC" -a --compress --rsync-path='sudo -n rsync' electron/dist-react/ "$QM_SSH_TARGET:$release/"
