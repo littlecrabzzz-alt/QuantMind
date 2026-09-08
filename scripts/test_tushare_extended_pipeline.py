@@ -2,7 +2,7 @@
 """Offline acceptance of an explicitly selected candidate v3 pipeline.
 
 Run with --pipeline-root PATH or QM_TUSHARE_PIPELINE_TEST_ROOT=PATH. The default
-is the sibling candidate worktree used during integration. No authority mount,
+is the repository containing this test. No authority mount,
 credentials, sockets or production paths are read; every SQLite DB is temporary.
 """
 
@@ -24,7 +24,7 @@ parser.add_argument(
     default=Path(
         os.environ.get(
             "QM_TUSHARE_PIPELINE_TEST_ROOT",
-            "/Users/lizeyu/.codex/worktrees/quantmind-tushare-data-intake",
+            str(Path(__file__).resolve().parents[1]),
         )
     ),
 )
