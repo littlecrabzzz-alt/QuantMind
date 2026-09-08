@@ -1460,25 +1460,19 @@ class Pipeline:
             archive = {"recovery": archived["recovery"], "gaps": archived["gaps"]}
         documents = None
         if (self.root / "documents.sqlite").exists():
-            from backend.shared.tushare_documents import document_inventory
+            from backend.shared.tushare_documents import document_index
 
-            inventory = document_inventory(self.root)
+            inventory = document_index(self.root)
             for item in inventory["files"]:
                 files[item["path"]] = {"sha256": item["sha256"], "bytes": item["bytes"]}
-            raw_documents = json_bytes(inventory)
-            document_name = "documents/" + digest(raw_documents) + ".json"
-            if not (self.root / document_name).exists():
-                atomic_bytes(self.root / document_name, raw_documents)
-            files[document_name] = {
-                "sha256": digest(raw_documents),
-                "bytes": len(raw_documents),
-            }
             documents = {
-                "path": document_name,
+                "path": inventory["path"],
+                "schema_version": inventory["schema_version"],
                 "counts": inventory["counts"],
                 "reference_counts": inventory["reference_counts"],
+                "totals": inventory["totals"],
             }
-            del inventory, raw_documents
+            del inventory
         content = {
             "schema_version": 1,
             "files": files,
