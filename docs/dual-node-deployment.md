@@ -90,6 +90,8 @@ bash scripts/dual-node-cutover.sh
 
 备份位置：Mac `logs/dual-node-<UTC>/`；云端 SSD `backups/migration-<UTC>/`。切换失败后写入服务保持停止，先查看日志和云端 `AUTHORITY`，不得在云端已成为主节点后直接重启 Mac 的旧主库服务。
 
+停写后网络中断的恢复入口：`bash scripts/dual-node-cutover.sh --resume logs/dual-node-<UTC>`。仅接受仓库日志目录内完整的既有备份；要求云端尚未接管、本机六个写入容器全部停止，并核对 PostgreSQL 表行数未变化。重用备份，续传最终增量后重新执行完整校验，不重新启动 Mac 主节点。SSH/rsync 启用连接超时与保活；恢复步骤的其他错误仍停止供人工检查。
+
 切换会把 Mac 写入容器的自动重启策略改为 `no`，防止重启 Docker Desktop 时复活第二个主节点。Syncthing 不受影响，断网重连后继续同步源码；`preseed` 在切换后会明确拒绝向权威数据目录回灌。
 
 ## 两端访问及离线边界

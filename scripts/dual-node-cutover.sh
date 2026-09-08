@@ -9,14 +9,30 @@ PROJECT=$(cd "$(dirname "$0")/.." && pwd -P)
 source "$PROJECT/deploy/dual-node.env"
 cd "$PROJECT"
 umask 077
-RSYNC=/opt/homebrew/bin/rsync
-test -x "$RSYNC"
-stamp=$(date -u +%Y%m%dT%H%M%SZ)
-backup="$PROJECT/logs/dual-node-$stamp"
+RSYNC=rsync
+[ ! -x /opt/homebrew/bin/rsync ] || RSYNC=/opt/homebrew/bin/rsync
+export RSYNC_RSH='ssh -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3'
+resume=false
+if [ "$#" = 2 ] && [ "$1" = --resume ]; then
+  resume=true
+  backup=$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "$2")
+  case "$backup" in "$PROJECT"/logs/dual-node-*) ;; *) echo 'Invalid backup path' >&2; exit 2 ;; esac
+  [ "$(dirname "$backup")" = "$PROJECT/logs" ] || exit 2
+  stamp=${backup##*/dual-node-}
+  for file in postgres.dump postgres-counts.txt redis-data.tar.gz qwenpaw-data.tar.gz qwenpaw-secrets.tar.gz qwenpaw-backups.tar.gz qwenpaw-shared.tar.gz; do
+    test -s "$backup/$file" || { echo "Missing backup: $file" >&2; exit 2; }
+  done
+elif [ "$#" = 0 ]; then
+  stamp=$(date -u +%Y%m%dT%H%M%SZ)
+  backup="$PROJECT/logs/dual-node-$stamp"
+else
+  echo 'Usage: dual-node-cutover.sh [--resume <existing-local-backup>]' >&2
+  exit 2
+fi
 remote_backup="$QM_REMOTE_ROOT/backups/migration-$stamp"
 mkdir -p "$backup"
 local_compose=(docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml)
-remote() { ssh -o BatchMode=yes -o ServerAliveInterval=30 "$QM_SSH_TARGET" "$@"; }
+remote() { ssh -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 "$QM_SSH_TARGET" "$@"; }
 
 remote "sudo -n bash -c 'set -eu; test \"\$(findmnt -n -o UUID -T $QM_REMOTE_ROOT)\" = $QM_DISK_UUID; test ! -e $QM_REMOTE_ROOT/AUTHORITY'"
 mkdir "$PROJECT/logs/dual-node-cutover.lock" || { echo 'Another cutover is active'; exit 1; }
@@ -37,6 +53,18 @@ if docker ps --format '{{.Names}}' | rg '^qm-(train|frozen|agent)-'; then
   echo 'A research job is active; retry after it finishes.' >&2
   exit 75
 fi
+if [ "$resume" = true ]; then
+  for service in quantmind quantmind-celery quantmind-celery-beat quantmind-huntly qwenpaw quantmind-redis; do
+    test "$(docker inspect "$service" --format '{{.State.Running}}')" = false || {
+      echo "Refusing resume: $service is still running" >&2; exit 1;
+    }
+  done
+  frozen=true
+  docker exec -i quantmind-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At' \
+    < deploy/table-counts.sql > "$backup/resume-postgres-counts.txt"
+  cmp "$backup/postgres-counts.txt" "$backup/resume-postgres-counts.txt"
+  echo "Resuming frozen migration from $backup"
+else
 docker exec quantmind-celery celery -A backend.services.engine.qlib_app.celery_config:celery_app \
   inspect active --json --timeout=15 > "$backup/celery-active.json"
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(1 if not d else (75 if any(d.values()) else 0))' "$backup/celery-active.json"
@@ -59,6 +87,7 @@ for volume in redis-data qwenpaw-data qwenpaw-secrets qwenpaw-backups qwenpaw-sh
     -v "quantmind_$volume:/source:ro" quantmind-oss:latest \
     -C /source -czf - . > "$backup/$volume.tar.gz"
 done
+fi
 remote "sudo -n mkdir -p $remote_backup"
 "$RSYNC" -a --partial --rsync-path='sudo -n rsync' "$backup/" "$QM_SSH_TARGET:$remote_backup/"
 
@@ -67,6 +96,7 @@ for path in results* user_pools_local; do
   [ ! -d "$path" ] || paths+=("$path")
 done
 for path in "${paths[@]}"; do
+  echo "Reconciling runtime directory: $path"
   # Deletions are scoped to one runtime subtree and retained in displaced/.
   excludes=(--exclude=.DS_Store --exclude=.rsync-partial --exclude=__pycache__)
   if [ "$path" = data ]; then excludes+=(--exclude='/upgrade_v*.sql' --exclude='/stocks/'); fi

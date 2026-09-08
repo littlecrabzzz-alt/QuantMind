@@ -1,5 +1,6 @@
 """Small dependency-free regression check for the deployment boundary."""
 import json
+import os
 import pathlib
 import plistlib
 import subprocess
@@ -15,6 +16,25 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class DeploymentBoundary(unittest.TestCase):
+    def test_resume_refuses_running_writer(self):
+        with tempfile.TemporaryDirectory(prefix="dual-node-test-", dir=ROOT / "logs") as directory:
+            backup = pathlib.Path(directory)
+            for name in ("postgres.dump", "postgres-counts.txt", "redis-data.tar.gz",
+                         "qwenpaw-data.tar.gz", "qwenpaw-secrets.tar.gz",
+                         "qwenpaw-backups.tar.gz", "qwenpaw-shared.tar.gz"):
+                (backup / name).write_text("fixture")
+            binaries = backup / "bin"
+            binaries.mkdir()
+            for name, code in {"ssh": "exit 0", "docker": '[ "$1" != inspect ] || echo true'}.items():
+                command = binaries / name
+                command.write_text("#!/bin/sh\n" + code + "\n")
+                command.chmod(0o700)
+            result = subprocess.run(["bash", "scripts/dual-node-cutover.sh", "--resume", str(backup)],
+                cwd=ROOT, env={**os.environ, "PATH": str(binaries) + ":" + os.environ["PATH"]},
+                text=True, capture_output=True)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Refusing resume: quantmind is still running", result.stderr)
+
     def test_busy_cutover_waits_before_health_checks(self):
         cutover = Mock(side_effect=[subprocess.CalledProcessError(75, "cutover"), None])
         with patch.object(dual_node_deploy, "remote", return_value=subprocess.CompletedProcess([], 1)), \
