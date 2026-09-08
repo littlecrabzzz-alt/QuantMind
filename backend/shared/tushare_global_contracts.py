@@ -317,7 +317,7 @@ for _api, _family in SYMBOL_PERIODS.items():
         planning_note="Complete discovered supplier-code ranges; indexes use annual historical windows, stocks use the full explicit historical range. Discovery and earliest history remain unverified.",
     )
 GLOBAL_CONTRACTS["hk_basic"]["identifier_note"] = (
-    "Retired supplier codes may contain ! (e.g. 00013!.HK); keep distinct from 00013.HK."
+    "Supplier codes may contain opaque ! or !AE suffixes; preserve each identity without inferring suffix meaning."
 )
 
 for _api in ("us_daily", "us_daily_adj"):
@@ -412,9 +412,9 @@ def _identifiers(identifiers):
                 )
             ):
                 raise ValueError(f"Invalid supplier identifier in {family}")
-            if family == "hk_stocks" and not re.fullmatch(r"[0-9]{5}!?\.HK", code):
+            if family == "hk_stocks" and not re.fullmatch(r"[0-9]{5}(?:![A-Z]{0,8})?\.HK", code):
                 raise ValueError(
-                    "HK supplier identifiers require five digits, optional retirement !, and .HK"
+                    "HK supplier identifiers require five digits, optional ! plus up to eight uppercase letters, and .HK"
                 )
             if family in ("stocks", "indexes") and not re.fullmatch(
                 r"[A-Za-z0-9]+\.[A-Z]+", code
