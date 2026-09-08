@@ -131,7 +131,7 @@ class PipelineAcceptance(unittest.TestCase):
                 "connect",
                 side_effect=AssertionError("network forbidden"),
             ):
-                for value, release in zip((1, 2, 3, 3), releases):
+                for value, release in zip((1, 2, 3, 3), releases, strict=True):
                     verify_data(target, release)
                     rows = read_dataset(target, release, "fund_adj").to_pylist()
                     self.assertEqual([r["adj_factor"] for r in rows], [value])
