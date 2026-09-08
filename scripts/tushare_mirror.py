@@ -7,6 +7,7 @@ import json
 import os
 import plistlib
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -25,17 +26,37 @@ def install_schedule(root):
     label = "com.quantmind.tushare-mirror"
     target = f"gui/{os.getuid()}/{label}"
     plist = Path.home() / "Library/LaunchAgents" / (label + ".plist")
-    logs = PROJECT / "logs"
-    logs.mkdir(exist_ok=True)
+    base = Path.home() / "Library/Application Support/QuantMind"
+    runtime = base / "tushare-client"
+    destination = base / "tushare"
+    # Deploy a credential-free client outside protected Documents/Desktop paths.
+    # Runtime copies are refreshed by reinstalling, never by the data mirror.
+    for name in (
+        "scripts/tushare_mirror.py",
+        "backend/shared/tushare_pipeline.py",
+        "backend/shared/tushare_intake.py",
+        "backend/shared/runtime_secrets.py",
+        "backend/shared/stock_utils.py",
+        "deploy/dual-node.env",
+    ):
+        target_file = runtime / name
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+        if (PROJECT / name).resolve() != target_file.resolve():
+            shutil.copy2(PROJECT / name, target_file)
+    if not destination.exists() and root.exists():
+        shutil.copytree(root, destination)
+    destination.mkdir(parents=True, exist_ok=True)
+    logs = base / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
     definition = {
         "Label": label,
         "ProgramArguments": [
             sys.executable,
-            str(Path(__file__).resolve()),
+            str(runtime / "scripts/tushare_mirror.py"),
             "--root",
-            str(root.resolve()),
+            str(destination),
         ],
-        "WorkingDirectory": str(PROJECT),
+        "WorkingDirectory": str(runtime),
         "StartInterval": 900,
         "RunAtLoad": True,
         "EnvironmentVariables": {
@@ -58,7 +79,7 @@ def install_schedule(root):
     subprocess.run(
         ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(plist)], check=True
     )
-    return {"status": "installed", "interval_seconds": 900}
+    return {"status": "installed", "interval_seconds": 900, "root": str(destination)}
 
 
 def mirror(root):
@@ -153,7 +174,11 @@ def mirror(root):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=PROJECT / "logs/tushare-mirror")
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=Path.home() / "Library/Application Support/QuantMind/tushare",
+    )
     parser.add_argument("--install-launchagent", action="store_true")
     args = parser.parse_args()
     try:
