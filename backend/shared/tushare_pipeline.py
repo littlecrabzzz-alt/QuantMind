@@ -358,6 +358,11 @@ class Pipeline:
                         and re.fullmatch(r"[0-9]{5}(?:![A-Z]{0,8})?\.HK", value)
                     ):
                         row[key] = "HK" + value.removesuffix(".HK")
+                    elif re.fullmatch(r"T[0-9]{6}\.(SH|SZ|BJ)", value):
+                        # Opaque historical supplier identity; T must not collapse
+                        # into the ordinary numeric listing of the same exchange.
+                        symbol, exchange = value.rsplit(".", 1)
+                        row[key] = exchange + symbol
                     elif re.fullmatch(r"\d{6}\.(SH|SZ|BJ)", value):
                         row[key] = StockCodeUtil.to_prefix(value)
                     elif (

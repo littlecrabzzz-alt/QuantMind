@@ -265,9 +265,12 @@ def _stocks(identifiers):
     if not isinstance(values, (list, tuple)):
         raise ValueError("stocks must contain supplier codes or discovery records")
     codes = set()
+    # stock_basic includes T600018.SH; preserve the supplier T identity.
     for row in values:
         code = row.get("ts_code") if isinstance(row, dict) else row
-        if not isinstance(code, str) or not re.fullmatch(r"[0-9]{6}\.(SH|SZ|BJ)", code):
+        if not isinstance(code, str) or not re.fullmatch(
+            r"T?[0-9]{6}\.(SH|SZ|BJ)", code
+        ):
             raise ValueError("Invalid stock supplier identifier")
         codes.add(code)
     return sorted(codes)

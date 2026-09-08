@@ -95,6 +95,58 @@ class EquityEventPipeline(unittest.TestCase):
                 0,
             )
 
+    def test_historical_supplier_stock_identity_is_planned_and_not_collapsed(self):
+        with patch.object(
+            self.p, "identifiers", return_value={"stocks": ["T600018.SH", "600018.SH"]}
+        ):
+            report = self.p.plan_extended(
+                {
+                    "enable_equity_event": True,
+                    "equity_event_apis": ["dividend"],
+                    "history_start": "20260901",
+                    "plan_jobs_per_tick": 100,
+                },
+                date(2026, 9, 9),
+            )
+        self.assertIn("history:equity_event", report)
+        planned = [
+            json.loads(row[0])["params"].get("ts_code")
+            for row in self.p.db.execute("SELECT job FROM jobs")
+        ]
+        self.assertIn("T600018.SH", planned)
+        self.assertIn("600018.SH", planned)
+        # Isolate the capture fixture from the separately validated planning jobs.
+        self.p.db.execute("DELETE FROM jobs")
+        self.p.db.commit()
+        self.capture(
+            {
+                "dividend": [
+                    sample("dividend", ts_code=code)
+                    for code in ("T600018.SH", "600018.SH")
+                ]
+            }
+        )
+        release = self.p.publish()
+        rows = read_dataset(self.root, release, "dividend").to_pylist()
+        self.assertEqual({r["ts_code"] for r in rows}, {"SHT600018", "SH600018"})
+        self.assertEqual(
+            {r["source_ts_code"] for r in rows}, {"T600018.SH", "600018.SH"}
+        )
+        historical = {
+            **rows[0],
+            "ts_code": "T600018.SH",
+            "source_ts_code": "T600018.SH",
+            "_row_identity": "old-special",
+        }
+        normalized = {**historical, "ts_code": "SHT600018", "_observation": "new"}
+        ordinary = {**rows[1], "ts_code": "SH600018", "_row_identity": "ordinary"}
+        legacy = fixture_release(
+            self.root, [("dividend", [historical, normalized, ordinary])]
+        )
+        actual = read_dataset(self.root, legacy, "dividend").to_pylist()
+        self.assertEqual({r["ts_code"] for r in actual}, {"SHT600018", "SH600018"})
+        self.assertEqual(len(actual), 2)
+
     def test_all_seven_capture_replay_fixed_release_and_future_unlock(self):
         rows = {api: [sample(api)] for api in EQUITY_EVENT_CONTRACTS}
         rows["share_float"][0]["float_date"] = "20290904"

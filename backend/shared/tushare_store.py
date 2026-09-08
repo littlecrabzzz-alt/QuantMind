@@ -187,6 +187,16 @@ def _dataset(root, release_id, api_name):
                 for f in ("_row_identity",) + TEXT_FIELDS
                 if f in columns and f not in keys
             ]
+        if "ts_code" in columns and not api_name.startswith(
+            ("opt_", "sge_", "fx_", "us_")
+        ):
+            # Canonicalize the old stored supplier spelling without rewriting
+            # immutable partitions or merging its distinct historical identity.
+            relation = relation.project(
+                "* REPLACE (CASE WHEN regexp_full_match(ts_code, 'T[0-9]{6}[.](SH|SZ|BJ)') "
+                "THEN split_part(ts_code, '.', 2) || split_part(ts_code, '.', 1) "
+                "ELSE ts_code END AS ts_code)"
+            )
         if api_name.startswith("hk_") and "ts_code" in columns:
             # Older captured HK delistings retained the supplier suffix. Project
             # only this known legacy shape before key deduplication and filters;

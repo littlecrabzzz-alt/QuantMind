@@ -604,9 +604,23 @@
       "acquisition_api_names": [
         "dividend"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Real source fields retained and fixed-release Mac reads verified; continue full-history partitions, source revision checks, and finite-cap subdivision. Empty stock/window is not absence of history. Runtime capability remains authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T20:14:27.364534+00:00",
+        "evidence": "validation/supplement-events-probe.json",
+        "release_id": "data-a3ab845ec2313d5224969ea70c9ac58b0f4677359dc1fd327a7053ac572a9913",
+        "results": [
+          {
+            "api_name": "dividend",
+            "missing_fields": [],
+            "object_sha256": "437304fae7d69849fd7a27ae7571fe760da6d2d050aebd5a55d6a687e9bbd111",
+            "row_count": 75,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "79",
@@ -738,9 +752,23 @@
       "acquisition_api_names": [
         "top10_holders"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Real source fields retained and fixed-release Mac reads verified; continue full-history partitions, source revision checks, and finite-cap subdivision. Empty stock/window is not absence of history. Runtime capability remains authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T20:14:27.364534+00:00",
+        "evidence": "validation/supplement-events-probe.json",
+        "release_id": "data-a3ab845ec2313d5224969ea70c9ac58b0f4677359dc1fd327a7053ac572a9913",
+        "results": [
+          {
+            "api_name": "top10_holders",
+            "missing_fields": [],
+            "object_sha256": "84c2956221318a8ab29c38bf4b2ac6219b2fa43a3c75cff26a441162503c50b4",
+            "row_count": 60,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "62",
@@ -752,9 +780,23 @@
       "acquisition_api_names": [
         "top10_floatholders"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Real source fields retained and fixed-release Mac reads verified; continue full-history partitions, source revision checks, and finite-cap subdivision. Empty stock/window is not absence of history. Runtime capability remains authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T20:14:27.364534+00:00",
+        "evidence": "validation/supplement-events-probe.json",
+        "release_id": "data-a3ab845ec2313d5224969ea70c9ac58b0f4677359dc1fd327a7053ac572a9913",
+        "results": [
+          {
+            "api_name": "top10_floatholders",
+            "missing_fields": [],
+            "object_sha256": "97d8712dd42febec3ef76d341d27e67d82957ee6217d420b945a811262049972",
+            "row_count": 60,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "110",
@@ -794,9 +836,23 @@
       "acquisition_api_names": [
         "repurchase"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Real source fields retained and fixed-release Mac reads verified; continue full-history partitions, source revision checks, and finite-cap subdivision. Empty stock/window is not absence of history. Runtime capability remains authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T20:14:27.364534+00:00",
+        "evidence": "validation/supplement-events-probe.json",
+        "release_id": "data-a3ab845ec2313d5224969ea70c9ac58b0f4677359dc1fd327a7053ac572a9913",
+        "results": [
+          {
+            "api_name": "repurchase",
+            "missing_fields": [],
+            "object_sha256": "b4315ae43ec9196adb720825ceb9e059d465d4578a0aa21c23eb1c6191ec21fd",
+            "row_count": 262,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "160",
@@ -808,9 +864,23 @@
       "acquisition_api_names": [
         "share_float"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Real source fields retained and fixed-release Mac reads verified; continue full-history partitions, source revision checks, and finite-cap subdivision. Empty stock/window is not absence of history. Runtime capability remains authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T20:14:27.364534+00:00",
+        "evidence": "validation/supplement-events-probe.json",
+        "release_id": "data-a3ab845ec2313d5224969ea70c9ac58b0f4677359dc1fd327a7053ac572a9913",
+        "results": [
+          {
+            "api_name": "share_float",
+            "missing_fields": [],
+            "object_sha256": "82bed316e1216ddff93fe3244b815cec556fbc133525ff74f085e526a88c385c",
+            "row_count": 6000,
+            "status": "possibly_truncated"
+          }
+        ]
+      }
     },
     {
       "doc_id": "161",
@@ -864,9 +934,23 @@
       "acquisition_api_names": [
         "stk_holdernumber"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Real source fields retained and fixed-release Mac reads verified; continue full-history partitions, source revision checks, and finite-cap subdivision. Empty stock/window is not absence of history. Runtime capability remains authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T20:14:27.364534+00:00",
+        "evidence": "validation/supplement-events-probe.json",
+        "release_id": "data-a3ab845ec2313d5224969ea70c9ac58b0f4677359dc1fd327a7053ac572a9913",
+        "results": [
+          {
+            "api_name": "stk_holdernumber",
+            "missing_fields": [],
+            "object_sha256": "1cc22cc0550d4efe42071f4e2b9db2fc718c9d2cbdf48b4992f881b3fbb373ad",
+            "row_count": 9,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "175",
@@ -878,9 +962,23 @@
       "acquisition_api_names": [
         "stk_holdertrade"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Real source fields retained and fixed-release Mac reads verified; continue full-history partitions, source revision checks, and finite-cap subdivision. Empty stock/window is not absence of history. Runtime capability remains authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T20:14:27.364534+00:00",
+        "evidence": "validation/supplement-events-probe.json",
+        "release_id": "data-a3ab845ec2313d5224969ea70c9ac58b0f4677359dc1fd327a7053ac572a9913",
+        "results": [
+          {
+            "api_name": "stk_holdertrade",
+            "missing_fields": [],
+            "object_sha256": "b7df0e5c46c31090441e5c959d060eb6253094f67a951605b04707d2167880d8",
+            "row_count": 0,
+            "status": "empty_unverified"
+          }
+        ]
+      }
     },
     {
       "doc_id": "291",
@@ -1188,9 +1286,23 @@
       "acquisition_api_names": [
         "moneyflow_ths"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Real source fields retained and fixed-release Mac reads verified; continue full-history partitions, source revision checks, and finite-cap subdivision. Empty stock/window is not absence of history. Runtime capability remains authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T20:14:27.364534+00:00",
+        "evidence": "validation/supplement-events-probe.json",
+        "release_id": "data-a3ab845ec2313d5224969ea70c9ac58b0f4677359dc1fd327a7053ac572a9913",
+        "results": [
+          {
+            "api_name": "moneyflow_ths",
+            "missing_fields": [],
+            "object_sha256": "9ad5853cc21f2002fddee182d0f95daf09db1bbcdb8e0f1470bc432438d3b774",
+            "row_count": 5211,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "349",
@@ -1202,9 +1314,23 @@
       "acquisition_api_names": [
         "moneyflow_dc"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Real source fields retained and fixed-release Mac reads verified; continue full-history partitions, source revision checks, and finite-cap subdivision. Empty stock/window is not absence of history. Runtime capability remains authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T20:14:27.364534+00:00",
+        "evidence": "validation/supplement-events-probe.json",
+        "release_id": "data-a3ab845ec2313d5224969ea70c9ac58b0f4677359dc1fd327a7053ac572a9913",
+        "results": [
+          {
+            "api_name": "moneyflow_dc",
+            "missing_fields": [],
+            "object_sha256": "7cf3fef7f56f2e6a83a65ea59ca4a110a424487d09de4499d5bc33dac4ef0ae3",
+            "row_count": 6000,
+            "status": "possibly_truncated"
+          }
+        ]
+      }
     },
     {
       "doc_id": "371",
@@ -1258,9 +1384,23 @@
       "acquisition_api_names": [
         "moneyflow_mkt_dc"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Real source fields retained and fixed-release Mac reads verified; continue full-history partitions, source revision checks, and finite-cap subdivision. Empty stock/window is not absence of history. Runtime capability remains authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T20:14:27.364534+00:00",
+        "evidence": "validation/supplement-events-probe.json",
+        "release_id": "data-a3ab845ec2313d5224969ea70c9ac58b0f4677359dc1fd327a7053ac572a9913",
+        "results": [
+          {
+            "api_name": "moneyflow_mkt_dc",
+            "missing_fields": [],
+            "object_sha256": "2fb2aab4eb8876b28ef81a4b98986b7079ec727a0bec81ade1bc8ecf5fe456ae",
+            "row_count": 1,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "346",
@@ -1684,9 +1824,23 @@
       "acquisition_api_names": [
         "etf_share_size"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Real source fields retained and fixed-release Mac reads verified; continue full-history partitions, source revision checks, and finite-cap subdivision. Empty stock/window is not absence of history. Runtime capability remains authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T20:14:27.364534+00:00",
+        "evidence": "validation/supplement-events-probe.json",
+        "release_id": "data-a3ab845ec2313d5224969ea70c9ac58b0f4677359dc1fd327a7053ac572a9913",
+        "results": [
+          {
+            "api_name": "etf_share_size",
+            "missing_fields": [],
+            "object_sha256": "80a800e53c087f1ce61ad1b01cff05b1668f98b37f667a627259c031fcb886ff",
+            "row_count": 1656,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "471",
@@ -2132,9 +2286,23 @@
       "acquisition_api_names": [
         "mkt_idx_bmk"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Real source fields retained and fixed-release Mac reads verified; continue full-history partitions, source revision checks, and finite-cap subdivision. Empty stock/window is not absence of history. Runtime capability remains authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T20:14:27.364534+00:00",
+        "evidence": "validation/supplement-events-probe.json",
+        "release_id": "data-a3ab845ec2313d5224969ea70c9ac58b0f4677359dc1fd327a7053ac572a9913",
+        "results": [
+          {
+            "api_name": "mkt_idx_bmk",
+            "missing_fields": [],
+            "object_sha256": "78d9b3df8fc736a37cdec2757f07438168f3cefbec7c3f633f3cfda44b3682d4",
+            "row_count": 141,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "207",
