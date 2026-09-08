@@ -190,10 +190,17 @@ class DocumentIndex(unittest.TestCase):
         latest, current = self.index()
         self.assertEqual(latest["rebuilt_shards"], 2)
         self.assertEqual(old_index["mappings"], current["mappings"])
-        self.assertEqual(old_index["states"][other[:2]], current["states"][other[:2]])
+        self.assertEqual(
+            old_index["states"][other[: old_index.get("state_prefix_chars", 2)]],
+            current["states"][other[: old_index.get("state_prefix_chars", 2)]],
+        )
         self.assertNotEqual(
-            old_index["states"][self.doc[:2]]["path"],
-            current["states"][self.doc[:2]]["path"],
+            old_index["states"][self.doc[: old_index.get("state_prefix_chars", 2)]][
+                "path"
+            ],
+            current["states"][self.doc[: old_index.get("state_prefix_chars", 2)]][
+                "path"
+            ],
         )
         release = self.publish(latest)
         row = self.page(release, limit=1).json()["items"][0]

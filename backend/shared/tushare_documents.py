@@ -1130,8 +1130,20 @@ def _index_setup(db):
     ).fetchone()
     if exists:
         saved = db.execute("SELECT version FROM document_index_meta").fetchone()
-        if saved is None or saved[0] != 1:
+        if saved is None or saved[0] not in (1, 2):
             raise DocumentError("unsupported_document_index_schema")
+        if saved[0] == 1:
+            with db:
+                db.execute("BEGIN IMMEDIATE")
+                # Only state buckets migrate; immutable old indexes/shards and
+                # append-only mapping/attempt ranges remain available unchanged.
+                for operation in ("insert", "update", "delete"):
+                    db.execute(f"DROP TRIGGER document_index_states_{operation}")
+                db.execute("DROP INDEX document_index_state_bucket")
+                db.execute("DELETE FROM document_index_cache WHERE kind='states'")
+                db.execute("DELETE FROM document_index_dirty WHERE kind='states'")
+                _state_index_triggers(db)
+                db.execute("UPDATE document_index_meta SET version=2")
         return
     with db:
         db.execute("BEGIN IMMEDIATE")
@@ -1180,6 +1192,28 @@ def _index_setup(db):
         db.execute(
             "CREATE INDEX document_index_state_bucket ON documents(substr(id,1,2))"
         )
+    _index_setup(db)
+
+
+def _state_index_triggers(db):
+    for operation, rows in (
+        ("INSERT", ("NEW",)),
+        ("UPDATE", ("OLD", "NEW")),
+        ("DELETE", ("OLD",)),
+    ):
+        statements = ";".join(
+            "INSERT OR IGNORE INTO document_index_dirty VALUES('states',substr("
+            + row
+            + ".id,1,3))"
+            for row in rows
+        )
+        db.execute(
+            f"CREATE TRIGGER document_index_states_{operation.lower()} AFTER {operation} ON documents BEGIN {statements}; END"
+        )
+    db.execute("CREATE INDEX document_index_state_bucket ON documents(substr(id,1,3))")
+    db.execute(
+        "INSERT OR IGNORE INTO document_index_dirty SELECT 'states',substr(id,1,3) FROM documents"
+    )
 
 
 def _index_original_files(root, db):
@@ -1252,7 +1286,7 @@ def document_index(root):
                 records = [
                     dict(row)
                     for row in db.execute(
-                        "SELECT * FROM documents WHERE substr(id,1,2)=? ORDER BY id",
+                        "SELECT * FROM documents WHERE substr(id,1,3)=? ORDER BY id",
                         (bucket,),
                     )
                 ]
@@ -1300,6 +1334,7 @@ def document_index(root):
         index = {
             "schema_version": 2,
             "shard_rows": INDEX_SHARD_ROWS,
+            "state_prefix_chars": 3,
             "mappings": [],
             "attempts": [],
             "files": [],

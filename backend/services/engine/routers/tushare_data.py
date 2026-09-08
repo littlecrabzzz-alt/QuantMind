@@ -159,7 +159,10 @@ def _document_page(manifest, index, view, offset, limit):
         states = {}
         # Retain only this page's documents, releasing each parsed bucket before
         # the next. Repeated observations no longer duplicate state on disk.
-        for prefix in sorted({ident[:2] for ident in identifiers}):
+        prefix_chars = index.get("state_prefix_chars", 2)
+        if type(prefix_chars) is not int or prefix_chars not in (2, 3):
+            raise HTTPException(409, "Unsupported document state prefix")
+        for prefix in sorted({ident[:prefix_chars] for ident in identifiers}):
             descriptor = index["states"].get(prefix)
             if descriptor:
                 for item in _document_shard(manifest, descriptor, "states"):
