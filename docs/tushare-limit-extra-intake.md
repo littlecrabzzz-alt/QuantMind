@@ -1,0 +1,33 @@
+# 涨跌停专题 4 接口纯候选
+
+对照 263 项目录基线、13 项额外发现与 144 个已注册 API，选取下列尚无运行合同的 4 项；保留全范围缺口，未改目录、台账或生产。权限均为 `unprobed`，门槛不是账户实际授权证明。
+
+| 官方接口 | 页面门槛 / 单次上限 | 本批必须保留的差异 |
+|---|---|---|
+| [limit_list_ths / 355](https://tushare.pro/document/2?doc_id=355) | 8000 分以上 / 4000 行 | 从 20231101 起，约 16 点更新。默认涨停池；必须显式覆盖全部 5 池，6 个字段默认隐藏。页面注明个人学习研究用途。 |
+| [limit_list_d / 298](https://tushare.pro/document/2?doc_id=298) | 5000 / 2500 | 从 2020 年起，明确不提供 ST 统计；分别请求 U/D/Z。输入 `limit_type` 和输出 `limit` 不同名。 |
+| [limit_step / 356](https://tushare.pro/document/2?doc_id=356) | 8000 分以上 / 2000 | 历史下界未公布；`nums` 是字符串且可多值筛选。官方样例含 ST，不能沿用另一接口的排除规则。 |
+| [limit_cpt_list / 357](https://tushare.pro/document/2?doc_id=357) | 8000 分以上 / 2000 | 历史下界未公布。`ts_code` 如 `885728.TI` 是概念板块，`rank` 是字符串，不是股票或资金流净额。 |
+
+已核对完整输入与 55 个输出字段，和固定目录一致。THS 的 `first_lu_time/last_lu_time/first_ld_time/last_ld_time/rise_rate/sum_float` 全部默认 N；合同将其列入显式 requested/extra/required 字段并允许空值。`fields=''` 不等于已经获取这些列；运行集成必须验收真实请求与返回 schema，同时保留未来发现的未知列。
+
+THS 五个参数原文为 `涨停池/连扳池/冲刺涨停/炸板池/跌停池`；保留官方“连扳池”的拼写，实测接受性与返回类别前不自动替换成“连板池”。部分字段只对特定池有值，例如最大封单；合法 null 不应触发数值错误。D 接口跌停首次封板时间、涨停板上金额同样允许空。
+
+## 接入契约
+
+新增纯模块 `tushare_limit_extra_contracts.py`、专属测试与本文。导出 `LIMIT_EXTRA_CONTRACTS`、`iter_limit_extra_jobs(config,today,identifiers=None)`、`limit_extra_prerequisites(...)`；建议未来组 `limit_extra`，配置 `limit_extra_apis`、`limit_extra_history_start`（字符串或每 API 字典），回退 `history_start`。
+
+最近 7 个自然日按接口/日/全部类别规划，然后按接口轮转惰性历史分区。每日合计 10 个请求（THS 5、D 3、step 1、cpt 1），无当前上市/开市过滤；step 的 `nums` 不筛选，也不猜连板最大高度。THS 市场参数不筛选，默认是否覆盖全部市场仍待实证；合法值仅按官方记录 HS/GEM/STAR，不虚构 BJ 筛选。step/cpt 未配置历史起点时仅规划近期，样例日期不能作为全历史下界。
+
+所有输出日期轴均 `trade_date`，合法起止范围按此拆分；THS 的 20231101 是页面日期下界，D 的 20200101 是年份范围的规划边界，均未验证实际首条/全历史完整性。保留所有源时间字符串，不拼装没有时区证据的盘中时间戳。
+
+键候选分别为：THS `(trade_date,ts_code,limit_type,market_type)`，D `(trade_date,ts_code,limit)`，step `(trade_date,ts_code,nums)`，cpt `(trade_date,ts_code)`。均保留不同原始行；THS/D 还要求 `request_identity_fields=["limit_type"]`，避免供应商返回相同行时丢失不同池请求的证据。父运行接入必须在注册与读取合同中保留这个参数身份，并补全全合同 store fixture 的两组请求身份，不能只添加 API 数量断言。
+
+## 饱和、权限与研究边界
+
+- 4 页都没有 offset/limit 参数。只可保留池/市场/交易所/nums 过滤条件后拆日期或 `ts_code`；单日单代码达到上限仍应 blocked。
+- 股票接口使用独立 `limit_securities` 发现集合，接入时并入历史/T/退市股票、历史列表和已观察榜单代码，不能只看当前股票。cpt 使用独立 `limit_concepts`；已观察排名板块或未来 THS 主表也不能单独证明完整历史概念集合。纯候选尚未实现这些运行发现/分区。
+- 页面给出 8000 分以上每分钟 500 次、每日不限；D 另给 5000 分每分钟 200 次、每日 10000 次。合同保守运行上限 50 rpm 与供应商额度分开，真实权限、字段返回和共享频控由后续业务探测验证。
+- 全部是供应商日终/事后榜单口径，不构成盘中因果信号、PIT 历史成员或 RRG 准入。涨停原因/连续标签、旧修订和相同值多条事件仍需独立证据；7 日重叠不证明修订完全。
+
+复验命令：`python3 -S -B scripts/test_tushare_limit_extra_contracts.py`。8 个测试涵盖完整字段与隐藏列、5/3 类别无遗漏、80 个跨闰日分区唯一覆盖、源 namespace、未知下界、惰性轮转和非法配置；不导入 Pipeline，不联网、不访问生产数据。
