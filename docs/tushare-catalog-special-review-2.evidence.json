@@ -1,0 +1,1180 @@
+{
+  "reviewed_at": "2026-09-08T21:11:07.316380+00:00",
+  "baseline_commit": "d83c402",
+  "ledger_sha256": "f2b4f70add642dee5a28c0af15ff926186294a15c57379547fb593a6a568346c",
+  "ledger_entry_count": 263,
+  "selection_rule": "first ten empty-api review_required entries excluding batch1 doc_ids",
+  "skipped_batch1_doc_ids": [
+    "14",
+    "24",
+    "15",
+    "146",
+    "109",
+    "16",
+    "17",
+    "291",
+    "330",
+    "342"
+  ],
+  "selected_doc_ids": [
+    "346",
+    "384",
+    "93",
+    "18",
+    "134",
+    "314",
+    "283",
+    "157",
+    "184",
+    "177"
+  ],
+  "review": [
+    {
+      "doc_id": "346",
+      "url": "https://tushare.pro/document/2?doc_id=346",
+      "html_sha256": "7b68d3e77c87aedaf96b196a98828e0763c617cc8f7d56a2d6d11a98eaa4b3c3",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "106",
+          "text": "龙虎榜每日统计单",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "top_list"
+          ]
+        },
+        {
+          "doc_id": "107",
+          "text": "龙虎榜机构交易单",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "top_inst"
+          ]
+        },
+        {
+          "doc_id": "355",
+          "text": "THS涨跌停榜单",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "limit_list_ths"
+          ]
+        },
+        {
+          "doc_id": "298",
+          "text": "涨跌停和炸板数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "limit_list_d"
+          ]
+        },
+        {
+          "doc_id": "356",
+          "text": "涨停股票连板天梯",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "limit_step"
+          ]
+        },
+        {
+          "doc_id": "357",
+          "text": "涨停最强板块统计",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "limit_cpt_list"
+          ]
+        },
+        {
+          "doc_id": "259",
+          "text": "THS概念板块分类",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "ths_index"
+          ]
+        },
+        {
+          "doc_id": "260",
+          "text": "THS概念板块行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "ths_daily"
+          ]
+        },
+        {
+          "doc_id": "261",
+          "text": "THS概念板块成分",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "ths_member"
+          ]
+        },
+        {
+          "doc_id": "362",
+          "text": "DC概念板块分类",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "dc_index"
+          ]
+        },
+        {
+          "doc_id": "363",
+          "text": "DC概念板块成分",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "dc_member"
+          ]
+        },
+        {
+          "doc_id": "382",
+          "text": "DC概念板块行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "dc_daily"
+          ]
+        },
+        {
+          "doc_id": "369",
+          "text": "开盘竞价成交（当日）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_auction"
+          ]
+        },
+        {
+          "doc_id": "311",
+          "text": "市场游资最全名录",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hm_list"
+          ]
+        },
+        {
+          "doc_id": "312",
+          "text": "游资交易每日明细",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hm_detail"
+          ]
+        },
+        {
+          "doc_id": "320",
+          "text": "THS热榜",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "ths_hot"
+          ]
+        },
+        {
+          "doc_id": "321",
+          "text": "DC热榜",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "dc_hot"
+          ]
+        },
+        {
+          "doc_id": "376",
+          "text": "TDX概念板块分类",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "tdx_index"
+          ]
+        },
+        {
+          "doc_id": "377",
+          "text": "TDX概念板块成分",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "tdx_member"
+          ]
+        },
+        {
+          "doc_id": "378",
+          "text": "TDX概念板块行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "tdx_daily"
+          ]
+        },
+        {
+          "doc_id": "347",
+          "text": "榜单数据（KP）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "kpl_list"
+          ]
+        },
+        {
+          "doc_id": "351",
+          "text": "题材成分（KP）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "kpl_concept_cons"
+          ]
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "384",
+      "url": "https://tushare.pro/document/2?doc_id=384",
+      "html_sha256": "b92a9b73227c633d37fee0ad4950aceb09d1cc3e63c9f8000f96204f80a0744c",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "385",
+          "text": "ETF基本信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "etf_basic"
+          ]
+        },
+        {
+          "doc_id": "386",
+          "text": "ETF跟踪指数",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "etf_index"
+          ]
+        },
+        {
+          "doc_id": "387",
+          "text": "ETF历史分钟",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "etf_mins"
+          ]
+        },
+        {
+          "doc_id": "127",
+          "text": "ETF日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_daily"
+          ]
+        },
+        {
+          "doc_id": "199",
+          "text": "ETF复权因子",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_adj"
+          ]
+        },
+        {
+          "doc_id": "491",
+          "text": "ETF每日涨跌停价格",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "etf_limit"
+          ]
+        },
+        {
+          "doc_id": "408",
+          "text": "ETF份额规模",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "etf_share_size"
+          ]
+        },
+        {
+          "doc_id": "471",
+          "text": "每日篮子组合(沪市PCF）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "etf_sh_cons"
+          ]
+        },
+        {
+          "doc_id": "472",
+          "text": "每日篮子组合(深市PCF）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "etf_sz_cons"
+          ]
+        },
+        {
+          "doc_id": "454",
+          "text": "ETF实时参考",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "rt_etf_sz_iopv"
+          ]
+        },
+        {
+          "doc_id": "460",
+          "text": "指数公司公告",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "idx_anns"
+          ]
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "93",
+      "url": "https://tushare.pro/document/2?doc_id=93",
+      "html_sha256": "41acade4ba7303860c2208a281f153120f4e4a5edace9212e69b5f20b1c24886",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "94",
+          "text": "指数基本信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "index_basic"
+          ]
+        },
+        {
+          "doc_id": "95",
+          "text": "指数日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "index_daily"
+          ]
+        },
+        {
+          "doc_id": "403",
+          "text": "指数实时日线",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "rt_idx_k"
+          ]
+        },
+        {
+          "doc_id": "420",
+          "text": "指数实时分钟",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "rt_idx_min"
+          ]
+        },
+        {
+          "doc_id": "171",
+          "text": "指数周线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "index_weekly"
+          ]
+        },
+        {
+          "doc_id": "419",
+          "text": "指数历史分钟",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "idx_mins"
+          ]
+        },
+        {
+          "doc_id": "172",
+          "text": "指数月线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "index_monthly"
+          ]
+        },
+        {
+          "doc_id": "96",
+          "text": "指数成分和权重",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "index_weight"
+          ]
+        },
+        {
+          "doc_id": "128",
+          "text": "大盘指数每日指标",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "index_dailybasic"
+          ]
+        },
+        {
+          "doc_id": "181",
+          "text": "申万行业分类",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "index_classify"
+          ]
+        },
+        {
+          "doc_id": "335",
+          "text": "申万行业成分（分级）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "index_member_all"
+          ]
+        },
+        {
+          "doc_id": "327",
+          "text": "申万日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "sw_daily"
+          ]
+        },
+        {
+          "doc_id": "417",
+          "text": "申万实时行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "rt_sw_k"
+          ]
+        },
+        {
+          "doc_id": "469",
+          "text": "SW历史分钟",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "sw_mins"
+          ]
+        },
+        {
+          "doc_id": "373",
+          "text": "中信行业成分",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "ci_index_member"
+          ]
+        },
+        {
+          "doc_id": "308",
+          "text": "中信行业指数日行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "ci_daily"
+          ]
+        },
+        {
+          "doc_id": "211",
+          "text": "国际主要指数",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "index_global"
+          ]
+        },
+        {
+          "doc_id": "358",
+          "text": "指数技术面因子(专业版)",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "idx_factor_pro"
+          ]
+        },
+        {
+          "doc_id": "215",
+          "text": "沪深市场每日交易统计",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "daily_info"
+          ]
+        },
+        {
+          "doc_id": "268",
+          "text": "深圳市场每日交易情况",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "sz_daily_info"
+          ]
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category_and_identifier_spec",
+      "api_candidates": [
+        "index_member"
+      ],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "18",
+      "url": "https://tushare.pro/document/2?doc_id=18",
+      "html_sha256": "e7bef5783d7d02bfee8ff94874bac8877b0f9d8ee38546b26a5dc650c3a1ca86",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "19",
+          "text": "基金列表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_basic"
+          ]
+        },
+        {
+          "doc_id": "118",
+          "text": "基金管理人",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_company"
+          ]
+        },
+        {
+          "doc_id": "208",
+          "text": "基金经理",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_manager"
+          ]
+        },
+        {
+          "doc_id": "462",
+          "text": "基金业绩基准",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "mkt_idx_bmk"
+          ]
+        },
+        {
+          "doc_id": "207",
+          "text": "基金规模",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_share"
+          ]
+        },
+        {
+          "doc_id": "119",
+          "text": "基金净值",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_nav"
+          ]
+        },
+        {
+          "doc_id": "120",
+          "text": "基金分红",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_div"
+          ]
+        },
+        {
+          "doc_id": "121",
+          "text": "基金持仓",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_portfolio"
+          ]
+        },
+        {
+          "doc_id": "359",
+          "text": "基金技术面因子(专业版)",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_factor_pro"
+          ]
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "19",
+          "text": "公募基金列表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_basic"
+          ]
+        },
+        {
+          "doc_id": "118",
+          "text": "公募基金公司",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_company"
+          ]
+        },
+        {
+          "doc_id": "119",
+          "text": "公募基金净值",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_nav"
+          ]
+        },
+        {
+          "doc_id": "127",
+          "text": "场内基金日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_daily"
+          ]
+        },
+        {
+          "doc_id": "120",
+          "text": "公募基金分红",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_div"
+          ]
+        },
+        {
+          "doc_id": "121",
+          "text": "公募基金持仓数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_portfolio"
+          ]
+        }
+      ],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "134",
+      "url": "https://tushare.pro/document/2?doc_id=134",
+      "html_sha256": "923179e1542e3a9a09d044b401bc830e044e4251effc8648f1be53513f983210",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "135",
+          "text": "合约信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_basic"
+          ]
+        },
+        {
+          "doc_id": "467",
+          "text": "期货交易日历",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_trade_cal"
+          ]
+        },
+        {
+          "doc_id": "138",
+          "text": "期货日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_daily"
+          ]
+        },
+        {
+          "doc_id": "492",
+          "text": "期货复权行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_daily_adj"
+          ]
+        },
+        {
+          "doc_id": "337",
+          "text": "期货周/月线行情(每日更新)",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_weekly_monthly"
+          ]
+        },
+        {
+          "doc_id": "340",
+          "text": "实时分钟行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "rt_fut_min"
+          ]
+        },
+        {
+          "doc_id": "140",
+          "text": "仓单日报",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_wsr"
+          ]
+        },
+        {
+          "doc_id": "141",
+          "text": "每日结算参数",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_settle"
+          ]
+        },
+        {
+          "doc_id": "313",
+          "text": "历史分钟行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "ft_mins"
+          ]
+        },
+        {
+          "doc_id": "314",
+          "text": "历史Tick行情",
+          "in_ledger": true,
+          "ledger_api_names": []
+        },
+        {
+          "doc_id": "139",
+          "text": "每日持仓排名",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_holding"
+          ]
+        },
+        {
+          "doc_id": "468",
+          "text": "南华期货指数日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_index_daily"
+          ]
+        },
+        {
+          "doc_id": "189",
+          "text": "期货主力与连续合约",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_mapping"
+          ]
+        },
+        {
+          "doc_id": "216",
+          "text": "期货主要品种交易周报",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_weekly_detail"
+          ]
+        },
+        {
+          "doc_id": "368",
+          "text": "期货合约涨跌停价格",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "ft_limit"
+          ]
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "135",
+          "text": "期货合约列表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_basic"
+          ]
+        },
+        {
+          "doc_id": "137",
+          "text": "期货交易日历",
+          "in_ledger": false,
+          "ledger_api_names": []
+        },
+        {
+          "doc_id": "138",
+          "text": "期货日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_daily"
+          ]
+        },
+        {
+          "doc_id": "139",
+          "text": "每日成交持仓排名",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_holding"
+          ]
+        },
+        {
+          "doc_id": "140",
+          "text": "仓单日报",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_wsr"
+          ]
+        },
+        {
+          "doc_id": "141",
+          "text": "结算参数",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_settle"
+          ]
+        }
+      ],
+      "missing_body_ids": [
+        "137"
+      ],
+      "classification": "category_and_identifier_spec",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "314",
+      "url": "https://tushare.pro/document/2?doc_id=314",
+      "html_sha256": "51814b9d304672fc03c1d50677855afdec3890012ac97209b9f019f0f564bb72",
+      "http_status": 200,
+      "children": [],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "external_delivery",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "283",
+      "url": "https://tushare.pro/document/2?doc_id=283",
+      "html_sha256": "f10050b2e4d99fc8234747ca5bf6327bb61954661a3dbd9cbeb4508320dac5f4",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "284",
+          "text": "上海黄金基础信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "sge_basic"
+          ]
+        },
+        {
+          "doc_id": "285",
+          "text": "上海黄金现货日行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "sge_daily"
+          ]
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "284",
+          "text": "黄金现货基础信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "sge_basic"
+          ]
+        },
+        {
+          "doc_id": "285",
+          "text": "现货黄金日行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "sge_daily"
+          ]
+        }
+      ],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "157",
+      "url": "https://tushare.pro/document/2?doc_id=157",
+      "html_sha256": "15dd124227264e7462ccdaa46e4c37d30d7bb759fb6a883733c1b55fa0245858",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "158",
+          "text": "期权合约信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "opt_basic"
+          ]
+        },
+        {
+          "doc_id": "159",
+          "text": "期权日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "opt_daily"
+          ]
+        },
+        {
+          "doc_id": "341",
+          "text": "期权分钟行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "opt_mins"
+          ]
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "158",
+          "text": "期权合约信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "opt_basic"
+          ]
+        },
+        {
+          "doc_id": "159",
+          "text": "期权日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "opt_daily"
+          ]
+        }
+      ],
+      "missing_body_ids": [],
+      "classification": "category_and_identifier_spec",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "184",
+      "url": "https://tushare.pro/document/2?doc_id=184",
+      "html_sha256": "999e089202ade8a9c8beb345253a164b9359e72e0a9546cfbef3555f3db14508",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "185",
+          "text": "可转债基础信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cb_basic"
+          ]
+        },
+        {
+          "doc_id": "186",
+          "text": "可转债发行",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cb_issue"
+          ]
+        },
+        {
+          "doc_id": "269",
+          "text": "可转债赎回信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cb_call"
+          ]
+        },
+        {
+          "doc_id": "305",
+          "text": "可转债票面利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cb_rate"
+          ]
+        },
+        {
+          "doc_id": "187",
+          "text": "可转债行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cb_daily"
+          ]
+        },
+        {
+          "doc_id": "459",
+          "text": "可转债十大持有人",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "top10_cb_holders"
+          ]
+        },
+        {
+          "doc_id": "392",
+          "text": "可转债技术面因子(专业版)",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cb_factor_pro"
+          ]
+        },
+        {
+          "doc_id": "246",
+          "text": "可转债转股价变动",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cb_price_chg"
+          ]
+        },
+        {
+          "doc_id": "247",
+          "text": "可转债转股结果",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cb_share"
+          ]
+        },
+        {
+          "doc_id": "458",
+          "text": "可转债债券评级",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cb_rating"
+          ]
+        },
+        {
+          "doc_id": "256",
+          "text": "债券回购日行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "repo_daily"
+          ]
+        },
+        {
+          "doc_id": "322",
+          "text": "柜台流通式债券报价",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "bc_otcqt"
+          ]
+        },
+        {
+          "doc_id": "323",
+          "text": "柜台流通式债券最优报价",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "bc_bestotcqt"
+          ]
+        },
+        {
+          "doc_id": "271",
+          "text": "大宗交易",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "bond_blk"
+          ]
+        },
+        {
+          "doc_id": "272",
+          "text": "大宗交易明细",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "bond_blk_detail"
+          ]
+        },
+        {
+          "doc_id": "201",
+          "text": "国债收益率曲线",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "yc_cb"
+          ]
+        },
+        {
+          "doc_id": "233",
+          "text": "全球财经事件",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "eco_cal"
+          ]
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "185",
+          "text": "可转债基础信息数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cb_basic"
+          ]
+        },
+        {
+          "doc_id": "186",
+          "text": "可转债发行数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cb_issue"
+          ]
+        },
+        {
+          "doc_id": "187",
+          "text": "可转债日线行情数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cb_daily"
+          ]
+        }
+      ],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "177",
+      "url": "https://tushare.pro/document/2?doc_id=177",
+      "html_sha256": "9fc486f9eddbbcea8bbc2c3c62ca6e7d4c21b71ae414b202139b67f369b5a202",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "178",
+          "text": "外汇基础信息（海外）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fx_obasic"
+          ]
+        },
+        {
+          "doc_id": "179",
+          "text": "外汇日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fx_daily"
+          ]
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "178",
+          "text": "外汇基础信息（海外）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fx_obasic"
+          ]
+        },
+        {
+          "doc_id": "179",
+          "text": "外汇日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fx_daily"
+          ]
+        }
+      ],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    }
+  ],
+  "linked_evidence": [
+    {
+      "doc_id": "137",
+      "url": "https://tushare.pro/document/2?doc_id=137",
+      "http_status": 200,
+      "bytes": 23,
+      "sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "content_status": "document_missing"
+    },
+    {
+      "doc_id": "467",
+      "url": "https://tushare.pro/document/2?doc_id=467",
+      "http_status": 200,
+      "bytes": 35426,
+      "sha256": "ff220bb8945ed78196042c190e35624ab686717255383c75248050dfcbfb2801",
+      "content_status": "document_present"
+    }
+  ],
+  "unlinked_mentions": [
+    {
+      "source_doc_id": "93",
+      "api_name": "index_member",
+      "status": "official_overview_name_only_no_link_or_contract_confirmed"
+    },
+    {
+      "source_doc_id": "177",
+      "name": "在岸人民币",
+      "status": "announced_without_api_name_or_link"
+    },
+    {
+      "source_doc_id": "18",
+      "name": "私募基金",
+      "status": "future_scope_without_api_name_or_link"
+    }
+  ],
+  "scope_limit": "No data API calls, runtime permissions, delivery purchases, or recursive whole-site closure verified."
+}
