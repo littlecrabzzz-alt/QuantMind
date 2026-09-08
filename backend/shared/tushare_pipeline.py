@@ -1923,6 +1923,9 @@ class Pipeline:
 
 
 def tick(max_requests=None, max_seconds=None):
+    from contextlib import contextmanager
+
+    tick_started = time.monotonic()
     authority()
     if not (ROOT / "ENABLED").exists():
         return {"status": "disabled"}
@@ -1951,44 +1954,102 @@ def tick(max_requests=None, max_seconds=None):
         token = get_secret("TUSHARE_TOKEN")
         if not token:
             return {"status": "blocked_missing_token"}
-        pipeline = Pipeline(ROOT, catalog)
+        report = {}
+        stage_seconds = {}
+        completed_stages = []
+        failed_stage = None
+
+        @contextmanager
+        def measure(name):
+            nonlocal failed_stage
+            started = time.monotonic()
+            try:
+                yield
+            except BaseException:
+                failed_stage = name
+                raise
+            else:
+                completed_stages.append(name)
+            finally:
+                stage_seconds[name] = max(0.0, time.monotonic() - started)
+
+        pipeline = None
+        failed = False
         try:
-            today = datetime.now(ZoneInfo("Asia/Shanghai")).date()
-            pipeline.initialize(config, today)
-            planning = pipeline.plan_extended(config, today)
-            from backend.shared.tushare_archive import recover_archive
+            try:
+                today = datetime.now(ZoneInfo("Asia/Shanghai")).date()
+                with measure("initialize"):
+                    pipeline = Pipeline(ROOT, catalog)
+                    pipeline.initialize(config, today)
+                with measure("planning"):
+                    report["planning"] = pipeline.plan_extended(config, today)
+                with measure("archive"):
+                    from backend.shared.tushare_archive import recover_archive
 
-            archive_report = recover_archive(
-                ROOT,
-                max_items=int(config.get("archive_items_per_tick", 200)),
-                max_seconds=5,
-            )
-            with httpx.Client(
-                trust_env=False, timeout=30, follow_redirects=False
-            ) as client:
-                report = pipeline.run(
-                    client, token, config, max_requests, max_seconds, pause=0
-                )
-            if config.get("enable_documents", False):
-                from backend.shared.tushare_documents import run_documents
-
-                report["document_registration"] = pipeline.register_documents()
-                if config.get("document_execution") != "worker":
-                    report["documents"] = run_documents(
+                    report["archive"] = recover_archive(
                         ROOT,
-                        max_documents=int(config.get("documents_per_tick", 3)),
-                        max_seconds=min(20, float(config.get("document_seconds", 20))),
+                        max_items=int(config.get("archive_items_per_tick", 200)),
+                        max_seconds=5,
                     )
-            report.update(
-                release_id=pipeline.publish(),
-                updated_at=utc_now(),
-                planning=planning,
-                archive=archive_report,
-            )
-            atomic_json(ROOT / "pipeline-status.json", report)
+                # run retains its existing budget and reconciliation calls.
+                with measure("acquire"):
+                    with httpx.Client(
+                        trust_env=False, timeout=30, follow_redirects=False
+                    ) as client:
+                        report.update(
+                            pipeline.run(
+                                client,
+                                token,
+                                config,
+                                max_requests,
+                                max_seconds,
+                                pause=0,
+                            )
+                        )
+                if config.get("enable_documents", False):
+                    with measure("document_registration"):
+                        report["document_registration"] = pipeline.register_documents()
+                    if config.get("document_execution") != "worker":
+                        with measure("documents"):
+                            from backend.shared.tushare_documents import run_documents
+
+                            report["documents"] = run_documents(
+                                ROOT,
+                                max_documents=int(config.get("documents_per_tick", 3)),
+                                max_seconds=min(
+                                    20, float(config.get("document_seconds", 20))
+                                ),
+                            )
+                with measure("publish"):
+                    report["release_id"] = pipeline.publish()
+            finally:
+                if pipeline is not None:
+                    with measure("close"):
+                        pipeline.close()
             return report
+        except BaseException as exc:
+            failed = True
+            report.update(status="error", error_type=type(exc).__name__)
+            raise
         finally:
-            pipeline.close()
+            report.update(
+                updated_at=utc_now(),
+                timing={
+                    "stage_seconds": stage_seconds,
+                    "completed_stages": completed_stages,
+                    "failed_stage": failed_stage,
+                    "included_stages": {"reconciliation": "acquire"},
+                    # Includes setup and close; excludes serializing this report.
+                    "total_elapsed_seconds": max(0.0, time.monotonic() - tick_started),
+                },
+            )
+            if failed:
+                try:
+                    atomic_json(ROOT / "pipeline-status.json", report)
+                except Exception:
+                    pass  # Reporting failure must not mask the original exception.
+            else:
+                atomic_json(ROOT / "pipeline-status.json", report)
 
 
 def manifest_at(root, release_id):
