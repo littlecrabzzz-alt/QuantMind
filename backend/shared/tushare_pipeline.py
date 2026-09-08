@@ -32,6 +32,8 @@ from backend.shared.tushare_global_contracts import (
 from backend.shared.tushare_other_contracts import OTHER_CONTRACTS, other_prerequisites
 from backend.shared.tushare_supplement_contracts import supplement_prerequisites
 from backend.shared.tushare_equity_event_contracts import equity_event_prerequisites
+from backend.shared.tushare_futures_extra_contracts import futures_extra_prerequisites
+from backend.shared.tushare_research_extra_contracts import research_extra_prerequisites
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
@@ -297,6 +299,19 @@ class Pipeline:
     def records(self, result):
         if not result or "object_sha256" not in result:
             return []
+        # Complete HTTP error bodies are immutable evidence, never market rows.
+        if (
+            result.get("status")
+            in (
+                "transport_error",
+                "rate_limited",
+                "permission_denied",
+                "api_error",
+                "invalid_response",
+            )
+            or result.get("response_format") == "non_json"
+        ):
+            return []
         payload = json.loads(
             (self.root / "objects" / (result["object_sha256"] + ".json")).read_bytes()
         )
@@ -536,6 +551,8 @@ class Pipeline:
             "cb_basic": "bonds",
             "index_classify": "sw_l3",
             "fut_basic": "futures",
+            "fut_daily_adj": "futures_continuous",
+            "fut_index_daily": "futures_indexes",
             "opt_basic": "options",
             "opt_daily": "options",
             "sge_basic": "spot_metals",
@@ -732,6 +749,29 @@ class Pipeline:
                 ),
             )
 
+    def record_extra_planning_gaps(self, family, config, identifiers):
+        prerequisites = {
+            "futures_extra": futures_extra_prerequisites,
+            "research_extra": research_extra_prerequisites,
+        }[family]
+        # Validate the complete list before recording any of this family's gaps.
+        gaps = prerequisites(identifiers, config=config)
+        for gap in gaps:
+            kind = "discovery" if gap["dependencies"] else gap["reason"]
+            self.db.execute(
+                "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
+                "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason "
+                "WHERE capability.status<>excluded.status OR capability.reason<>excluded.reason",
+                (
+                    f"planning:{family}:{gap['api_name']}:{kind}",
+                    "discovery_unverified"
+                    if gap["dependencies"]
+                    else "coverage_unverified",
+                    utc_now(),
+                    json.dumps(gap, sort_keys=True),
+                ),
+            )
+
     def plan_extended(self, config, today):
         identifiers = self.identifiers()
         blocked_families = set()
@@ -740,6 +780,18 @@ class Pipeline:
             ("global", self.record_global_planning_gaps),
             ("supplement", self.record_supplement_planning_gaps),
             ("equity_event", self.record_equity_event_planning_gaps),
+            (
+                "futures_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "futures_extra", cfg, ids
+                ),
+            ),
+            (
+                "research_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "research_extra", cfg, ids
+                ),
+            ),
         ):
             if not config.get("enable_" + family, False):
                 continue
@@ -797,6 +849,10 @@ class Pipeline:
                             "supplement_history_start",
                             "equity_event_apis",
                             "equity_event_history_start",
+                            "futures_extra_apis",
+                            "futures_extra_history_start",
+                            "research_extra_apis",
+                            "research_extra_history_start",
                         )
                     },
                     "identifiers": identifiers,

@@ -70,6 +70,8 @@ def install_schedule(root):
         "backend/shared/tushare_other_contracts.py",
         "backend/shared/tushare_supplement_contracts.py",
         "backend/shared/tushare_equity_event_contracts.py",
+        "backend/shared/tushare_futures_extra_contracts.py",
+        "backend/shared/tushare_research_extra_contracts.py",
         "backend/shared/runtime_secrets.py",
         "backend/shared/stock_utils.py",
         "deploy/dual-node.env",

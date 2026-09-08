@@ -19,6 +19,8 @@ from backend.shared.tushare_global_contracts import GLOBAL_CONTRACTS
 from backend.shared.tushare_other_contracts import OTHER_CONTRACTS
 from backend.shared.tushare_supplement_contracts import SUPPLEMENT_CONTRACTS
 from backend.shared.tushare_equity_event_contracts import EQUITY_EVENT_CONTRACTS
+from backend.shared.tushare_futures_extra_contracts import FUTURES_EXTRA_CONTRACTS
+from backend.shared.tushare_research_extra_contracts import RESEARCH_EXTRA_CONTRACTS
 from backend.shared.tushare_pipeline import manifest_at
 from backend.shared.tushare_structured_contracts import STRUCTURED_CONTRACTS
 from backend.shared.tushare_text_contracts import TEXT_CONTRACTS
@@ -40,6 +42,8 @@ CONTRACTS = {
     **OTHER_CONTRACTS,
     **SUPPLEMENT_CONTRACTS,
     **EQUITY_EVENT_CONTRACTS,
+    **FUTURES_EXTRA_CONTRACTS,
+    **RESEARCH_EXTRA_CONTRACTS,
 }
 IDENTITIES = {}
 for _api, _contract in CONTRACTS.items():
@@ -60,6 +64,9 @@ DATE_FIELDS = (
     "nav_date",
     "cal_date",
     "publish_date",
+    "report_date",
+    "surv_date",
+    "week_date",
     "end_date",
     "in_date",
     "start_date",
