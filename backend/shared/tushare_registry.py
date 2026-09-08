@@ -45,6 +45,24 @@ from backend.shared.tushare_connect_contracts import (
     iter_connect_jobs,
 )
 
+from backend.shared.tushare_trading_event_contracts import (
+    TRADING_EVENT_CONTRACTS,
+    iter_trading_event_jobs,
+)
+
+TRADING_EVENT_RUNTIME_CONTRACTS = {
+    api: {
+        **spec,
+        "group": "trading_event",
+        **(
+            {"saturation_fallback": "trading_event_securities"}
+            if api != "hm_list"
+            else {}
+        ),
+    }
+    for api, spec in TRADING_EVENT_CONTRACTS.items()
+}
+
 CONNECT_RUNTIME_CONTRACTS = {
     api: {
         **spec,
@@ -56,6 +74,7 @@ CONNECT_RUNTIME_CONTRACTS = {
 }
 
 EXTENDED_CONTRACTS = {
+    **TRADING_EVENT_RUNTIME_CONTRACTS,
     **CONNECT_RUNTIME_CONTRACTS,
     **{
         api: {**spec, "group": "etf_basket"}
@@ -91,6 +110,7 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "trading_event": iter_trading_event_jobs,
     "connect": iter_connect_jobs,
     "etf_basket": iter_etf_basket_jobs,
     "credit_extra": iter_credit_extra_jobs,

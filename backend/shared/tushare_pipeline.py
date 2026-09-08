@@ -39,7 +39,11 @@ from backend.shared.tushare_credit_extra_contracts import (
     credit_identifiers,
     credit_extra_prerequisites,
 )
-from backend.shared.tushare_connect_contracts import CONNECT_CONTRACTS, connect_prerequisites
+from backend.shared.tushare_connect_contracts import (
+    CONNECT_CONTRACTS,
+    connect_prerequisites,
+)
+from backend.shared.tushare_trading_event_contracts import trading_event_prerequisites
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
@@ -633,6 +637,10 @@ class Pipeline:
     def identifiers(self):
         families = {
             **{api: "connect_" + api for api in CONNECT_CONTRACTS},
+            "top_list": "trading_event_securities",
+            "top_inst": "trading_event_securities",
+            "hm_detail": "trading_event_securities",
+            "hm_list": "hot_money_names",
             "stock_basic": "stocks",
             "margin_secs": "credit_securities",
             "hk_basic": "hk_stocks",
@@ -687,11 +695,24 @@ class Pipeline:
                     and record.get("level") != "L3"
                 ):
                     continue
+                if saved["api_name"] == "hm_list":
+                    if isinstance(record.get("name"), str) and record["name"]:
+                        result["hot_money_names"].add(record["name"])
+                    continue
+                if (
+                    saved["api_name"] == "hm_detail"
+                    and isinstance(record.get("hm_name"), str)
+                    and record["hm_name"]
+                ):
+                    result["hot_money_names"].add(record["hm_name"])
                 code = record.get("ts_code") or record.get("index_code")
                 if code:
                     result[families[saved["api_name"]]].add(code)
                     if saved["api_name"] == "etf_basic":
                         result["etfs"].add(code)
+        # Retain historical/T stock identities and securities discovered in any
+        # saved event response, including saturated attempts and retired codes.
+        result["trading_event_securities"].update(result["stocks"])
         result = {key: sorted(values) for key, values in result.items()}
         try:
             result.update(credit_identifiers(result))
@@ -856,6 +877,7 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "trading_event": trading_event_prerequisites,
             "connect": connect_prerequisites,
             "etf_basket": etf_basket_prerequisites,
             "credit_extra": credit_extra_prerequisites,
@@ -884,6 +906,12 @@ class Pipeline:
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
+            (
+                "trading_event",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "trading_event", cfg, ids
+                ),
+            ),
             (
                 "connect",
                 lambda cfg, ids: self.record_extra_planning_gaps("connect", cfg, ids),

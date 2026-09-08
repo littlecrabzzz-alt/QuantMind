@@ -3603,10 +3603,7 @@
       "output_fields": [
         "name",
         "desc",
-        "orgs",
-        "zhouyu1933",
-        "bike770",
-        "Asking"
+        "orgs"
       ],
       "audit_status": "schema_extracted",
       "permission_status": "unprobed",
