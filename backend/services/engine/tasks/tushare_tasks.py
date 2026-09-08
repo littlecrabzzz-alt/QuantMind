@@ -69,6 +69,7 @@ def tushare_documents():
     else:
         count = config.get("document_worker_max_documents", 100)
         seconds = config.get("document_worker_max_seconds", 90)
+        workers = config.get("document_download_workers", 1)
         if (
             isinstance(count, bool)
             or not isinstance(count, int)
@@ -76,12 +77,17 @@ def tushare_documents():
             or isinstance(seconds, bool)
             or not isinstance(seconds, (int, float))
             or not 0 < seconds <= 90
+            or isinstance(workers, bool)
+            or not isinstance(workers, int)
+            or workers not in (1, 2)
         ):
             raise ValueError(
-                "Invalid document worker bounds: 1..100 documents, 0..90 seconds"
+                "Invalid document worker bounds: 1..100 stages, 0..90 seconds, 1..2 downloads"
             )
         try:
-            report = run_documents(ROOT, max_documents=count, max_seconds=seconds)
+            report = run_documents(
+                ROOT, max_documents=count, max_seconds=seconds, download_workers=workers
+            )
         except Exception as exc:
             atomic_json(
                 ROOT / "document-worker-status.json",

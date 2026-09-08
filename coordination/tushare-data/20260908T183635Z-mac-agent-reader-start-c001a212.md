@@ -1,0 +1,5 @@
+# Registered Tushare API and QuantBot read tool
+- /root/structured_contracts; Mac isolated worktree codex/tushare-structured; master39fff3d merged as47f3e76, conflicts resolved preserving current master archive/ledger/extended-test integrations.
+- Own engine/main.py, api/routers/engine_proxy.py, new engine/quantbot/tushare_tool.py, new scripts/test_tushare_agent_integration.py; parent additionally released engine/routers/quantbot_router.py after checking no other active claimant. Research workbench release: continuous-research/*180755*.
+- Existing engine QuantBot plain SSE had no tools dispatch; add one real read_stored_tushare tool only for explicit user release pin, max2reads then final answer. No skill publication, no provider fallback; existing unpinned SSE path retained. Router/store reused, direct tool calls require authenticated Request context.
+- Tests real temporary Parquet and original text, real source middleware/registration, mock auth verification/model transport, no socket/credential reads. Parent owns cloud integration/model capability/deployment verification.

@@ -1,0 +1,1 @@
+text_contracts / 紧急周月规划优化+HK退市标识修复。隔离codex/tushare-text，独占global_contracts及原global tests；不动pipeline/registry/store。已复核官方144/145/171/172，四类按标的时间范围，index年度、stocks完整显式范围；父指定monthly guard5629达到报警，标记上限未知并保留4500文档差异。HK原始五位+可选!+.HK独立保留，不与现上市代码合并。无生产调用/写入/部署；旧pending仅向父提出延期策略，不删除任务成果。

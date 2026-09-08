@@ -133,18 +133,26 @@ class DocumentWorkerTest(unittest.TestCase):
 
     def test_worker_bounds_disk_guard_and_atomic_status(self):
         result = self.tasks.tushare_documents()
-        self.run.assert_called_once_with(self.root, max_documents=100, max_seconds=90)
+        self.run.assert_called_once_with(
+            self.root, max_documents=100, max_seconds=90, download_workers=1
+        )
         self.assertEqual(
             json.loads((self.root / "document-worker-status.json").read_bytes()), result
         )
         self.assertEqual(result["processed"], 3)
         self.config.update(
-            document_worker_max_documents=7, document_worker_max_seconds=12.5
+            document_worker_max_documents=7,
+            document_worker_max_seconds=12.5,
+            document_download_workers=2,
         )
         self.save_config()
         self.tasks.tushare_documents()
-        self.run.assert_called_with(self.root, max_documents=7, max_seconds=12.5)
+        self.run.assert_called_with(
+            self.root, max_documents=7, max_seconds=12.5, download_workers=2
+        )
         for key, value in (
+            ("document_download_workers", 3),
+            ("document_download_workers", True),
             ("document_worker_max_documents", 101),
             ("document_worker_max_documents", True),
             ("document_worker_max_seconds", 91),

@@ -17,9 +17,9 @@
 | 结构化下一批 | 49 个合同已合入候选分支，覆盖主数据、A股/财务/宏观及基金/指数/可转债/期货 | 主数据发现、分区和满页细分、权限实测与本地查询 |
 | 其余目录接口 | 未完成，全部保持台账计划项 | 按依赖逐批实现；无权限/停更/未知分别登记，不能静默缩小到上述首批 |
 | PDF/附件、HTML正文与解析 | 云端已下载并解析15份；Mac真实PDF首页面核对通过，独立附件消费者接入中 | 安全下载、独立状态/重试，公告与研报各一份真实 PDF 页码核验，全部原文纳入镜像 |
-| 通用查询与 API/Agent 消费 | 82接口和6财务别名读/schema/筛选/JSONL通过隔离测试；65类已有生产合同，17类global待实测；API/Agent待挂载 | 目录/schema、日期/标的/字段/关键词/as_of 筛选、JSONL/Parquet 导出；Agent 引用真实已存原文 |
+| 通用查询与 API/Agent 消费 | 97接口和6财务别名已有合同及离线读/schema；API/Agent云端固定版真实读取通过，15类other待实测 | 目录/schema、日期/标的/字段/关键词/as_of 筛选、JSONL/Parquet 导出；Agent 引用真实已存原文 |
 | 全历史回填、修订与缺口补齐 | RRG、文本、结构化、market四组持续回填；未证实上游全历史完整 | 分接口/来源/标的/日期/字段统计，满页细分、不可证实窗口保留 partial |
-| 全范围镜像与版本增长 | 原始响应/Parquet/文本/附件/旧归档已同步验收；清单分块仍待实现 | 纳入 schema/目录/所有历史对象，清单分块避免每轮复制完整大清单；固定输入与故障恢复 |
+| 全范围镜像与版本增长 | 文档清单v2分片已部署，保留旧元数据对象；全部历史release索引闭包仍待补齐 | 纳入 schema/目录/所有历史对象，清单分块避免每轮复制完整大清单；固定输入与故障恢复 |
 | 容量与运行监测 | 每轮保留 100 GiB 云端余量，尚缺长期增长预测 | 采集/文件/清单/备份按真实规模估算，需扩容提前报告，不能用容量缩小目标 |
 | RRG/训练可用性 | blocked_data | 与可下载/可查询状态独立；历史分类、PIT、交易与持仓暴露验收前不启用 |
 
@@ -88,3 +88,31 @@
 - US基本分页四次2行交叉验证：缺省offset与0一致，offset1移动一行，offset2接续下一页；证据 validation/us-pagination-probe.json，证明本次0起点连续。其无过滤列表包含035420等数字代码，保留全部原始标的；US内部前缀仅供应商数据集命名空间，不能据此判定真实交易所/可交易资格。
 - 六VIP财务接口都有样本：income9000、balancesheet7000、cashflow6400、fina_indicator10736、forecast1913、express66。官方财务文档明确VIP可按季度批量，但未给独立最大行数；候选只将上述已实测返回量作为更合理的饱和下界，row_cap_verified保持false，触界仍保守拆分。待部署后启用六类回填，不把样本较少当全历史证明。
 - 53项pipeline/迁移/父子关系/global/structured/API/Agent隔离检查通过；新v4与Agent仍候选，未据隔离测试宣称云端业务已消费。新校验要求补实际Parquet SHA256后再部署。期权/黄金/外汇/国际宏观15类契约、文档清单分块正并行实现。
+
+
+## 2026-09-09 03:15 v4及API/Agent生产验收
+
+- ca2eca7双端handoff passed（4348文件，同HEAD/摘要）；只重启Tushare两专属worker和已确认无活动训练任务的quantmind，未重启其他Celery/研究worker。pipeline SQLite v3→v4迁移4.741秒，integrity_check=ok，迁移前一致性备份validation/pre-v4-pipeline.sqlite。
+- 分区SHA256校验闭环首批解析120个父分区，其他575个split_pending仍保留缺口；不能把父子关系恢复等同全历史完整。旧周月线9802个pending可逆改为deferred_legacy_period_plan，原请求/尝试/数据保留，新标的范围计划接替。
+- 文档v2真实首次构建：227338条引用、486个分片、7.792秒；顶层索引116237字节，随后的publish2.007秒。累计231份parsed、208532待下载（核查时点），附件吞吐仍是主要瓶颈；独立消费者继续工作，正在有界优化。
+- 固定版data-3ad1585cfb1fae53f710a25b3588bc0f156cb6862f14e9dd5afcc3e995522f65：真实engine API查询HK00001/20260904 close69.85，耗时0.683秒；文档跨分片页返回3条/总227338；匿名和伪造用户头均401。本次采用既有服务身份，未冒充已验收用户JWT登录。
+- QuantBot真实LLM工具调用2次（schema→query），7.838秒完成并输出69.85、release和历史不完整提示；数据工具upstream_calls=0。证据validation/api-agent-acceptance.json已保存。验收脚本最后打印含null delta时发生TypeError，只影响摘要打印；随后独立读取已存事件核对tool_result数据及回答通过，未重复模型调用。
+- 112项pipeline/合同/分区/文档/API/Agent隔离检查通过；后续元数据闭包8项、HK特殊代码15项通过。没有宣称全仓测试通过。
+- global恢复启用后发现hk_basic的5个额外供应商代码带!AE（02121、02228、03636、03668、03699），原!规则仍不够；family隔离生效，其他组继续。新的保持原后缀身份兼容修复待部署，记录在validation/global-planning-incident.json，不过滤这些标的。六VIP已启用；15个other接口合同/规划已集成，仍待实际探测后启用。
+- 后续：修复global特殊标识并确认真实规划恢复；稳定周/月历史分区与近期刷新节奏；附件有界并发；other15权限/字段实测；全部历史release引用闭包、剩余目录、上游历史边界/PIT、容量增长和长期吞吐仍未完成。RRG仍blocked_data，总目标保持进行中。
+
+
+## 2026-09-09 03:40 并行提速与其他市场实测
+
+- 15个other API真实探测5.166秒：14个非空，LIBOR指定2023年窗口为空（不推断停更或没有历史），期权基础12000、期权日线15000均触及保守饱和阈值。全部原文/字段保留并启用history回填，证据validation/other-probe.json；表内permission_blocked与saturation blocked不同，不能把期权满页说成无权限。coverage ledger已补15项实测；完整目录仍263项。
+- HK名单额外5个!AE代码已保持身份兼容，validation/global-other-recovered.json显示global/other规划成功、global恢复validation_passed。官方响应另证hk_daily仅1次/小时：此前导致整批60秒等待和两条任务达到重试终止。这次识别明确接口限额后只冻结该API，保留不明确限频的账号退避；学习间隔跨重启保留，配置hk_daily至少3605秒，两条quota等待任务已恢复pending，原尝试不删。证据validation/parallel-speed-deployment.json及原文对象08ecf0fd1fac65fdfea6c6ae6086cd7ef456bfd19938335cad4e16eab3bd024e。港股全历史速度受真实权益限制，未代购权限。
+- 四类周月线改为固定十年桶及小尾窗：9643指数1990→20260909历史计划由年度/小周候选1080016降为96430；含近期115716。范围逐日连续，单指数周线桶低于1000行警戒；不删除旧请求。未完成历史规划跨周保留cursor，完成后才更新anchor，避免大队列反复从头开始。计划数改善不是实际全量ETA。
+- 文档消费者启用download_workers=2：最多两路仅下载，随后一路解析；原文先落盘，持久claim/过期恢复、独立子进程总deadline、锁及版本保留。每轮100为阶段预算，一份PDF通常需要下载+解析两个阶段；20秒传输上限慢源会重试。单份解析资源预算未增加，实际提速待连续批次计时。
+- 传输压缩实际验收：15733337字节固定清单，传输4429014字节、48.845秒（与已有镜像共享网络），SHA256一致。Mac镜像已更新rsync压缩；旧手动传输安全中止后复用已存文件续传，固定版data-bad7ca3db1f1a31565355a5116195f47046109f245f918c55527f05c324786c1共52692文件校验通过，补4754文件。该版5类other各2行及v2文档跨分片页已禁用socket/DNS实读，无Tushare凭据。FX:、SGE:是供应商数据集命名空间，不证明每行属于外汇/现货或具备交易资格。
+- 159项Tushare专项隔离检查通过，涵盖全部test_tushare*.py；修正旧40203断言、模块导入路径及测试调度顺序后全通过，无新增生产依赖。c864a24双端源码/Git核对后启用配置；仅重启Tushare两消费者和无活动训练容器窗口的quantmind。主机其他服务未重启。
+- 下批5个纯合同已提交（moneyflow_mkt_dc、moneyflow_dc、moneyflow_ths、etf_share_size、mkt_idx_bmk），59字段和纯规划6项测试通过；尚未注册pipeline/store/镜像及真实探测，不能把这5个算作已采集。目前注册97个数据集及6财务查询别名。12项下一批官方核查、pro_bar SDK别名与CSV-only Tick特殊页分类见coordination/tushare-data/20260908T192000Z-mac-next-coverage-review-c107c921.md。
+- 继续项：验证限频隔离后API吞吐与双下载真实批次、接上5个补充合同、期权精确上市日补发现/未公开上限、全部历史release引用闭包、263项未实现与权限差异、全历史及修订PIT验证、容量/镜像增长监测。全目标仍进行中，RRG仍blocked_data。
+
+- 03:44追加运行证据：新采集首批b97f4f8e为177请求/105.209秒采集段、117.498秒整批，成功发布data-72a638823926ffd7a05aedae082ebefe41e9ec92f965f66cd2dd13220d83a174；pending因新的饱和细分增至344613，数量仍在增长，不按此推最终ETA。三个相关容器running/healthy、OOM=false。双下载首批90.296秒完成10阶段（8下载尝试+2解析尝试），不能说10份PDF成功；后续已实测两份cninfo原文downloaded→parse_pending→parsed（5页/8页）。仍有下载超时和HTTP200非PDF内容，保留各自失败状态。当前汇总存validation/parallel-runtime-acceptance.json。159专项检查、双端源码/Git核对和GitHub master推送通过。
+
+- 再一批实时汇总：19:44:36Z采集248次/91.262秒，done13988、pending344393；19:44:16Z附件32阶段/90.241秒（28下载尝试、4解析），累计parsed311，仍有215555待下载。云端余量309.43GiB。证据同上，不能把阶段数等同成功文件数。

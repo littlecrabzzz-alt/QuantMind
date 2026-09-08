@@ -193,11 +193,24 @@ class Pipeline:
                 )
                 if not 1 <= api_rpm <= 500:
                     raise ValueError("Invalid API request rate")
+                interval = config.get("api_min_interval_seconds", {}).get(api, 0)
+                if (
+                    isinstance(interval, bool)
+                    or not isinstance(interval, (int, float))
+                    or not 0 <= interval <= 86400
+                ):
+                    raise ValueError("Invalid API minimum request interval")
+                quota = self.db.execute(
+                    "SELECT reason FROM capability WHERE scope=? AND status='rate_limit_observed'",
+                    ("quota:" + api,),
+                ).fetchone()
+                if quota:
+                    interval = max(interval, json.loads(quota[0])["interval_seconds"])
                 self.db.executemany(
                     "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=excluded.next_at",
                     [
                         ("account", now + 60 / int(rpm)),
-                        ("api:" + api, now + 60 / api_rpm),
+                        ("api:" + api, now + max(60 / api_rpm, interval)),
                     ],
                 )
                 self._fair_turn += 1
@@ -340,7 +353,7 @@ class Pipeline:
                     elif (
                         key == "ts_code"
                         and result["api_name"] in GLOBAL_CONTRACTS
-                        and re.fullmatch(r"[0-9]{5}!?\.HK", value)
+                        and re.fullmatch(r"[0-9]{5}(?:![A-Z]{0,8})?\.HK", value)
                     ):
                         row[key] = "HK" + value.removesuffix(".HK")
                     elif re.fullmatch(r"\d{6}\.(SH|SZ|BJ)", value):
@@ -723,6 +736,28 @@ class Pipeline:
                 state = self.db.execute(
                     "SELECT * FROM planning_state WHERE name=?", (name,)
                 ).fetchone()
+                if (
+                    mode == "history"
+                    and family == "global"
+                    and set(config.get("global_apis", GLOBAL_CONTRACTS)).intersection(
+                        ("weekly", "monthly", "index_weekly", "index_monthly")
+                    )
+                ):
+                    # Finish a bounded historical enumeration before advancing its
+                    # anchor. Resetting an unfinished large universe every week can
+                    # permanently starve its tail. Stable job keys make the next
+                    # completed-period sweep reuse already planned history.
+                    week_end = today - timedelta(days=today.weekday() + 1)
+                    month_end = today.replace(day=1) - timedelta(days=1)
+                    revision = (
+                        signature + ":periods:" + str(week_end) + ":" + str(month_end)
+                    )
+                    if (
+                        state is not None
+                        and not state["done"]
+                        and state["signature"].startswith(signature + ":periods:")
+                    ):
+                        revision = state["signature"]
                 if state is None or state["signature"] != revision:
                     self.db.execute(
                         "INSERT INTO planning_state(name,anchor,signature,offset,done) VALUES(?,?,?,0,0) ON CONFLICT(name) DO UPDATE SET anchor=excluded.anchor,signature=excluded.signature,offset=0,done=0",
@@ -1224,10 +1259,30 @@ class Pipeline:
             ):
                 state = "blocked" if row["tries"] >= 4 else "pending"
             if status == "rate_limited":
+                state = "pending"  # A quota wait is not a terminal data failure.
+                scoped = result.get("rate_limit_api") == job["api_name"]
+                scope = "api:" + job["api_name"] if scoped else "account"
+                cooldown = result.get("rate_limit_window_seconds", 60) if scoped else 60
                 self.db.execute(
-                    "INSERT INTO request_gates(scope,next_at) VALUES('account',?) ON CONFLICT(scope) DO UPDATE SET next_at=excluded.next_at",
-                    (time.time() + 60,),
+                    "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=MAX(next_at,excluded.next_at)",
+                    (scope, time.time() + cooldown),
                 )
+                if scoped:
+                    self.db.execute(
+                        "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,'rate_limit_observed',?,?) ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
+                        (
+                            "quota:" + job["api_name"],
+                            utc_now(),
+                            json.dumps(
+                                {
+                                    "window_seconds": cooldown,
+                                    "requests": result["rate_limit_requests"],
+                                    "interval_seconds": cooldown
+                                    / result["rate_limit_requests"],
+                                }
+                            ),
+                        ),
+                    )
             if status in (
                 "sample_ok",
                 "schema_gap",

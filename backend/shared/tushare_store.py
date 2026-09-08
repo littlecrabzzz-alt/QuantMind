@@ -173,7 +173,7 @@ def _dataset(root, release_id, api_name):
             # only this known legacy shape before key deduplication and filters;
             # ! distinguishes retired listings from later reuse of the same code.
             relation = relation.project(
-                "* REPLACE (CASE WHEN regexp_full_match(ts_code, '[0-9]{5}!?[.]HK') "
+                "* REPLACE (CASE WHEN regexp_full_match(ts_code, '[0-9]{5}(![A-Z]{0,8})?[.]HK') "
                 "THEN 'HK' || left(ts_code, length(ts_code) - 3) "
                 "ELSE ts_code END AS ts_code)"
             )

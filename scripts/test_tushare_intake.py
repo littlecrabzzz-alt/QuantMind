@@ -105,7 +105,9 @@ class IntakeAcceptance(unittest.TestCase):
         self.assertEqual(
             assess_response({"code": 2002}, 2, [])["status"], "permission_denied"
         )
-        self.assertEqual(assess_response({"code": 40203}, 2, [])["status"], "api_error")
+        self.assertEqual(
+            assess_response({"code": 40203}, 2, [])["status"], "permission_denied"
+        )
 
     def test_observations_preserve_revisions_and_mirror_integrity(self):
         responses = [
