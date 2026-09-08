@@ -81,7 +81,7 @@ _API_REWRITE_SCRIPT = r"""<script>
   function rwAsset(u){
     if(typeof u!=='string') return u;
     if(u.charAt(0)==='/' && u.startsWith('/assets/')) return UI_P+u.slice(1);
-    if(u.charAt(0)==='/' && u.startsWith('/online.svg')) return UI_P+'online.svg';
+    if(/^\/(online\.svg|qwenpaw\.png|logo-(light|dark)\.svg)([?#].*)?$/.test(u)) return UI_P+u.slice(1);
     return u;
   }
   function rwAll(u){ return rwAsset(rwApi(rwWs(u))); }
@@ -103,10 +103,11 @@ _API_REWRITE_SCRIPT = r"""<script>
   }
   patchUrlProperty(HTMLLinkElement.prototype,'href');
   patchUrlProperty(HTMLScriptElement.prototype,'src');
+  patchUrlProperty(HTMLImageElement.prototype,'src');
   var _setAttr=Element.prototype.setAttribute;
   Element.prototype.setAttribute=function(name,value){
     if((name==='href' || name==='src') &&
-       (this instanceof HTMLLinkElement || this instanceof HTMLScriptElement)){
+       (this instanceof HTMLLinkElement || this instanceof HTMLScriptElement || this instanceof HTMLImageElement)){
       value=rwAsset(value);
     }
     return _setAttr.call(this,name,value);

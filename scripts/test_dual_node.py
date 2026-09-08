@@ -1,4 +1,4 @@
-"""Small dependency-free regression check for the deployment boundary."""
+"""Deployment regression checks; the embedded UI check uses frontend jsdom."""
 import json
 import ast
 import os
@@ -18,6 +18,23 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class DeploymentBoundary(unittest.TestCase):
+    def test_embedded_agent_images_use_the_proxy_prefix(self):
+        tree = ast.parse((ROOT / "backend/services/api/routers/qwenpaw_ui_proxy.py").read_text())
+        script = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign)
+                      and any(isinstance(t, ast.Name) and t.id == "_API_REWRITE_SCRIPT" for t in n.targets))
+        js = script.removeprefix("<script>").removesuffix("</script>")
+        code = """const {JSDOM}=require('jsdom');
+const w=new JSDOM('',{url:'http://localhost:18080',runScripts:'outside-only'}).window;
+w.fetch=async()=>{};
+w.eval(require('fs').readFileSync(0,'utf8'));
+const img=w.document.createElement('img');
+img.src='/qwenpaw.png';
+require('assert').equal(img.getAttribute('src'),'/api/v1/qwenpaw-ui/qwenpaw.png');
+img.setAttribute('src','/logo-light.svg');
+require('assert').equal(img.getAttribute('src'),'/api/v1/qwenpaw-ui/logo-light.svg');
+w.close();"""
+        subprocess.run(["node", "-e", code], input=js, text=True, cwd=ROOT, check=True)
+
     def test_mac_guard_selects_no_default_services(self):
         services = subprocess.check_output([
             "docker", "compose", "--env-file", ".env.local", "-f", "docker-compose.yml",

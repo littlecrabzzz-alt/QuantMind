@@ -52,6 +52,18 @@ def node(role):
                 require(not item["HostConfig"].get("PortBindings"), f"Private service published: {name}")
             if name == "/quantmind":
                 require(item["HostConfig"]["Memory"] == 12 * 1024**3, "Main memory limit drift")
+                require(item["HostConfig"]["PortBindings"] == {
+                    "8000/tcp": [{"HostIp": "127.0.0.1", "HostPort": "18000"}]},
+                    "Internal API port exposure drift")
+            if name == "/quantmind-web":
+                require(item["HostConfig"]["PortBindings"] == {
+                    "80/tcp": [{"HostIp": "", "HostPort": SETTINGS["QM_WEB_PORT"]}]},
+                    "Public web port drift")
+        volume_names = sorted({m["Name"] for c in containers for m in c["Mounts"] if m["Type"] == "volume"})
+        for volume in json.loads(output("docker", "volume", "inspect", *volume_names)):
+            device = (volume.get("Options") or {}).get("device", "")
+            require(Path(device).is_absolute() and Path(device).resolve().is_relative_to(root / "volumes"),
+                    f"Persistent volume is outside the SSD: {volume['Name']}")
         output("docker", "exec", "quantmind", "python", "-S", "/app/scripts/check_cloud_health.py")
         snapshot = (root / "snapshots/latest").resolve()
     else:
