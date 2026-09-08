@@ -14,6 +14,7 @@ import re
 import shutil
 import sqlite3
 import time
+from collections import deque
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
@@ -74,7 +75,7 @@ class Pipeline:
         self.db = sqlite3.connect(self.root / "pipeline.sqlite", timeout=10)
         self.db.row_factory = sqlite3.Row
         version = self.db.execute("pragma user_version").fetchone()[0]
-        if version not in (0, 1, 2, 3):
+        if version not in (0, 1, 2, 3, 4):
             raise ValueError("Unsupported pipeline schema version")
         # Version 1 migration: SQLite is acquisition state, never copied live.
         if version == 0:
@@ -112,6 +113,24 @@ class Pipeline:
                 CREATE TABLE IF NOT EXISTS scheduler_state (name TEXT PRIMARY KEY, value INTEGER NOT NULL);
                 PRAGMA user_version=3;
             """)
+        if version < 4:
+            self.db.executescript("""
+                BEGIN IMMEDIATE;
+                CREATE TABLE IF NOT EXISTS partition_splits (
+                    parent_id TEXT PRIMARY KEY, method TEXT NOT NULL,
+                    expected_children INTEGER NOT NULL, coverage_proven INTEGER NOT NULL,
+                    evidence TEXT NOT NULL, status TEXT NOT NULL, gap TEXT);
+                CREATE TABLE IF NOT EXISTS partition_children (
+                    parent_id TEXT NOT NULL, child_id TEXT NOT NULL,
+                    PRIMARY KEY(parent_id,child_id), CHECK(parent_id<>child_id));
+                CREATE INDEX IF NOT EXISTS partition_child_parent
+                    ON partition_children(child_id,parent_id);
+                CREATE INDEX IF NOT EXISTS jobs_partition_lookup
+                    ON jobs(epoch,json_extract(job,'$.api_name'));
+            """)
+            self.recover_legacy_partitions()
+            self.db.execute("PRAGMA user_version=4")
+            self.db.commit()
         cursor = self.db.execute(
             "SELECT value FROM scheduler_state WHERE name='family_turn'"
         ).fetchone()
@@ -628,60 +647,350 @@ class Pipeline:
                 }
         return stats
 
-    def split_request(self, row, job):
-        spec = contract_for(job["api_name"])
+    def date_children(self, job):
+        """The exact date partition rule used by both v3 and v4."""
         params = job["params"]
-        if spec.get("group") == "global" and spec.get("pagination"):
-            # Documented pagination takes priority over whole-universe fanout.
-            # Repeated/ignored pages remain blocked by run(), never declared complete.
-            return None
-        split = spec.get("split")
+        split = contract_for(job["api_name"]).get("split")
         if "pub_start" in params and "pub_end" in params:
             split = {
                 "start_param": "pub_start",
                 "end_param": "pub_end",
                 "precision": "second",
             }
-        if split and split["start_param"] in params and split["end_param"] in params:
-            fmt = "%Y-%m-%d %H:%M:%S" if split["precision"] == "second" else "%Y%m%d"
-            left = datetime.strptime(params[split["start_param"]], fmt)
-            right = datetime.strptime(params[split["end_param"]], fmt)
-            step = (
-                timedelta(seconds=1)
-                if split["precision"] == "second"
-                else timedelta(days=1)
+        if (
+            not split
+            or split["start_param"] not in params
+            or split["end_param"] not in params
+        ):
+            return None
+        fmt = "%Y-%m-%d %H:%M:%S" if split["precision"] == "second" else "%Y%m%d"
+        left = datetime.strptime(params[split["start_param"]], fmt)
+        right = datetime.strptime(params[split["end_param"]], fmt)
+        step = (
+            timedelta(seconds=1)
+            if split["precision"] == "second"
+            else timedelta(days=1)
+        )
+        units = int((right - left) / step)
+        if units <= 0:
+            return None
+        middle = left + (units // 2) * step
+        children = [
+            {**params, split["end_param"]: middle.strftime(fmt)},
+            {**params, split["start_param"]: (middle + step).strftime(fmt)},
+        ]
+        if split["precision"] == "second" and units > 1:
+            children[1][split["start_param"]] = middle.strftime(fmt)
+        return children
+
+    def record_partition(self, parent_id, children, method, coverage_proven, evidence):
+        """Record a complete immutable split plan in the caller's transaction."""
+        children = sorted(set(children))
+        parent = self.db.execute(
+            "SELECT epoch,job FROM jobs WHERE id=?", (parent_id,)
+        ).fetchone()
+        if not parent:
+            raise ValueError("Missing parent job")
+        if not children or parent_id in children:
+            raise ValueError("A partition requires distinct children")
+        for child in children:
+            saved_child = self.db.execute(
+                "SELECT epoch,job FROM jobs WHERE id=?", (child,)
+            ).fetchone()
+            if not saved_child:
+                raise ValueError("Missing child job")
+            if (
+                saved_child["epoch"] != parent["epoch"]
+                or json.loads(saved_child["job"])["api_name"]
+                != json.loads(parent["job"])["api_name"]
+            ):
+                raise ValueError(
+                    "Child belongs to a different API or observation epoch"
+                )
+            cycle = self.db.execute(
+                "WITH RECURSIVE descendants(id) AS (SELECT child_id FROM partition_children WHERE parent_id=? "
+                "UNION SELECT c.child_id FROM partition_children c JOIN descendants d ON c.parent_id=d.id) "
+                "SELECT 1 FROM descendants WHERE id=? LIMIT 1",
+                (child, parent_id),
+            ).fetchone()
+            if cycle:
+                raise ValueError("Partition relationship would create a cycle")
+        existing = self.db.execute(
+            "SELECT * FROM partition_splits WHERE parent_id=?", (parent_id,)
+        ).fetchone()
+        if (
+            existing
+            and json.loads(existing["evidence"]).get("origin") != "legacy_unverified"
+        ):
+            old = [
+                r[0]
+                for r in self.db.execute(
+                    "SELECT child_id FROM partition_children WHERE parent_id=? ORDER BY child_id",
+                    (parent_id,),
+                )
+            ]
+            if (
+                old != children
+                or existing["method"] != method
+                or existing["coverage_proven"] != int(coverage_proven)
+            ):
+                raise ValueError("Existing partition plan differs")
+            return
+        self.db.execute(
+            "INSERT INTO partition_splits VALUES(?,?,?,?,?,'pending',NULL) "
+            "ON CONFLICT(parent_id) DO UPDATE SET method=excluded.method,expected_children=excluded.expected_children,"
+            "coverage_proven=excluded.coverage_proven,evidence=excluded.evidence,status='pending',gap=NULL",
+            (
+                parent_id,
+                method,
+                len(children),
+                int(coverage_proven),
+                json.dumps(evidence, sort_keys=True),
+            ),
+        )
+        self.db.executemany(
+            "INSERT OR IGNORE INTO partition_children VALUES(?,?)",
+            [(parent_id, child) for child in children],
+        )
+
+    def recover_legacy_partitions(self):
+        """Recover only exact, unique v3 date children; never infer a universe."""
+        for row in self.db.execute("SELECT * FROM jobs WHERE state='split_pending'"):
+            recovered = False
+            method = "unknown"
+            try:
+                job, result = json.loads(row["job"]), json.loads(row["result"] or "{}")
+                method = result.get("split", {}).get("method", "unknown")
+                expected = (
+                    self.date_children(job) if method == "date_bisection" else None
+                )
+                if expected and result.get("split", {}).get("children") == 2:
+                    matches = []
+                    for params in expected:
+                        candidates = []
+                        filters = [
+                            (key, value)
+                            for key, value in params.items()
+                            if value is None or isinstance(value, (str, int, float))
+                        ]
+                        where = " AND json_extract(job,?) IS ?" * len(filters)
+                        values = [
+                            item
+                            for key, value in filters
+                            for item in ("$.params." + json.dumps(key), value)
+                        ]
+                        for child in self.db.execute(
+                            "SELECT id,job FROM jobs WHERE epoch=? AND json_extract(job,'$.api_name')=? AND id<>?"
+                            + where,
+                            (row["epoch"], job["api_name"], row["id"], *values),
+                        ):
+                            candidate = json.loads(child["job"])
+                            if candidate == {**job, "params": params}:
+                                candidates.append(child["id"])
+                        if len(candidates) != 1:
+                            break
+                        matches.extend(candidates)
+                    if len(matches) == 2:
+                        self.record_partition(
+                            row["id"],
+                            matches,
+                            method,
+                            True,
+                            {"origin": "v3_exact_job_match"},
+                        )
+                        recovered = True
+            except (ValueError, KeyError, TypeError):
+                pass
+            if not recovered:
+                self.db.execute(
+                    "INSERT OR IGNORE INTO partition_splits VALUES(?,?,0,0,?,'gap',?)",
+                    (
+                        row["id"],
+                        method,
+                        json.dumps({"origin": "legacy_unverified"}),
+                        "legacy_relationship_unverified",
+                    ),
+                )
+
+    def split_request(self, row, job):
+        spec = contract_for(job["api_name"])
+        params = job["params"]
+        if spec.get("group") == "global" and spec.get("pagination"):
+            return None
+        existing = self.db.execute(
+            "SELECT * FROM partition_splits WHERE parent_id=?", (row["id"],)
+        ).fetchone()
+        if existing and existing["expected_children"]:
+            return {
+                "method": existing["method"],
+                "children": existing["expected_children"],
+                "universe_complete": bool(existing["coverage_proven"]),
+            }
+        children = self.date_children(job)
+        if children:
+            ids = [
+                self.enqueue(job["api_name"], child, row["priority"], row["epoch"])
+                for child in children
+            ]
+            self.record_partition(
+                row["id"],
+                ids,
+                "date_bisection",
+                True,
+                {"origin": "v4", "date_coverage": "exhaustive"},
             )
-            units = int((right - left) / step)
-            if units > 0:
-                middle = left + (units // 2) * step
-                children = [
-                    {**params, split["end_param"]: middle.strftime(fmt)},
-                    {**params, split["start_param"]: (middle + step).strftime(fmt)},
-                ]
-                # Time inclusivity is undocumented: overlap the boundary second.
-                if split["precision"] == "second" and units > 1:
-                    children[1][split["start_param"]] = middle.strftime(fmt)
-                for child in children:
-                    self.enqueue(job["api_name"], child, row["priority"], row["epoch"])
-                return {"method": "date_bisection", "children": len(children)}
+            return {"method": "date_bisection", "children": len(ids)}
         family = spec.get("saturation_fallback")
         param = spec.get("saturation_param", "ts_code")
         if family and param not in params:
             codes = self.identifiers().get(family, [])
             if codes:
-                for code in codes:
+                ids = [
                     self.enqueue(
                         job["api_name"],
                         {**params, param: code},
                         row["priority"] + 1,
                         row["epoch"],
                     )
+                    for code in codes
+                ]
+                self.record_partition(
+                    row["id"],
+                    ids,
+                    "identifier_fanout",
+                    False,
+                    {"origin": "v4", "family": family, "universe_complete": False},
+                )
                 return {
                     "method": "identifier_fanout",
-                    "children": len(codes),
+                    "children": len(ids),
                     "universe_complete": False,
                 }
         return None
+
+    def reconcile_partitions(self, max_parents=1000, child_id=None):
+        """Bounded, restartable closure; descendants must carry positive evidence.
+
+        A done pagination page or empty-unverified terminator is not a complete
+        partition. Resolved children are acceptable only while their split evidence
+        still holds. The single writer never promotes an incomplete universe.
+        """
+        if not 1 <= max_parents <= 10000:
+            raise ValueError("Invalid partition reconciliation budget")
+        if child_id is None:
+            saved = self.db.execute(
+                "SELECT value FROM scheduler_state WHERE name='partition_cursor'"
+            ).fetchone()
+            cursor = saved[0] if saved else 0
+            selected = self.db.execute(
+                "SELECT rowid,parent_id FROM partition_splits WHERE rowid>? ORDER BY rowid LIMIT ?",
+                (cursor, max_parents),
+            ).fetchall()
+            self.db.execute(
+                "INSERT INTO scheduler_state VALUES('partition_cursor',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                (selected[-1]["rowid"] if selected else 0,),
+            )
+            pending = deque(row["parent_id"] for row in selected)
+        else:
+            pending = deque(
+                r[0]
+                for r in self.db.execute(
+                    "SELECT parent_id FROM partition_children WHERE child_id=? UNION SELECT parent_id FROM partition_splits WHERE parent_id=?",
+                    (child_id, child_id),
+                )
+            )
+        checked, resolved = 0, 0
+        while pending and checked < max_parents:
+            parent_id = pending.popleft()
+            split = self.db.execute(
+                "SELECT * FROM partition_splits WHERE parent_id=?", (parent_id,)
+            ).fetchone()
+            if not split:
+                continue
+            parent = self.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (parent_id,)
+            ).fetchone()
+            if not parent:
+                continue
+            gap = None
+            children = self.db.execute(
+                "SELECT c.child_id,j.state,j.result,s.status AS split_status FROM partition_children c "
+                "LEFT JOIN jobs j ON j.id=c.child_id LEFT JOIN partition_splits s ON s.parent_id=c.child_id WHERE c.parent_id=?",
+                (parent_id,),
+            ).fetchall()
+            if json.loads(split["evidence"]).get("origin") == "legacy_unverified":
+                gap = "legacy_relationship_unverified"
+            elif parent["state"] not in ("split_pending", "resolved"):
+                gap = "parent_not_split_pending"
+            elif not split["coverage_proven"]:
+                gap = "universe_unverified"
+            elif not children or len(children) != split["expected_children"]:
+                gap = "child_relationship_incomplete"
+            else:
+                for child in children:
+                    try:
+                        result = json.loads(child["result"] or "{}")
+                    except (ValueError, TypeError):
+                        gap = "child_evidence_invalid"
+                        break
+                    if (
+                        child["state"] == "resolved"
+                        and child["split_status"] == "resolved"
+                    ):
+                        continue
+                    parquet = result.get("parquet") or {}
+                    if (
+                        child["state"] != "done"
+                        or result.get("status") != "sample_ok"
+                        or result.get("pagination_error")
+                        or not result.get("row_count", 0)
+                    ):
+                        gap = "child_not_verified"
+                        break
+                    if (
+                        not parquet.get("path")
+                        or not (self.root / parquet["path"]).is_file()
+                    ):
+                        gap = "child_artifact_missing"
+                        break
+            status = "gap" if gap else "resolved"
+            changed = split["status"] != status or split["gap"] != gap
+            self.db.execute(
+                "UPDATE partition_splits SET status=?,gap=? WHERE parent_id=?",
+                (status, gap, parent_id),
+            )
+            if parent["state"] in ("split_pending", "resolved"):
+                self.db.execute(
+                    "UPDATE jobs SET state=? WHERE id=?",
+                    ("split_pending" if gap else "resolved", parent_id),
+                )
+            if changed:
+                pending.extend(
+                    r[0]
+                    for r in self.db.execute(
+                        "SELECT parent_id FROM partition_children WHERE child_id=?",
+                        (parent_id,),
+                    )
+                )
+            checked += 1
+            resolved += int(not gap)
+        self.db.commit()
+        return {"checked": checked, "resolved": resolved}
+
+    def partition_inventory(self):
+        entries = []
+        for row in self.db.execute("SELECT * FROM partition_splits ORDER BY parent_id"):
+            item = dict(row)
+            item["evidence"] = json.loads(item["evidence"])
+            item["children"] = [
+                r[0]
+                for r in self.db.execute(
+                    "SELECT child_id FROM partition_children WHERE parent_id=? ORDER BY child_id",
+                    (row["parent_id"],),
+                )
+            ]
+            entries.append(item)
+        return {"schema_version": 1, "splits": entries}
 
     def expand(self, config):
         for row in self.db.execute(
@@ -711,6 +1020,7 @@ class Pipeline:
 
     def run(self, client, token, config, max_requests=100, max_seconds=100, pause=0.6):
         started = time.monotonic()
+        self.reconcile_partitions()
         completed = 0
         while completed < max_requests and time.monotonic() - started < max_seconds:
             self.expand(config)
@@ -845,6 +1155,7 @@ class Pipeline:
                 ),
             )
             self.db.commit()  # response + object references checkpoint before next request
+            self.reconcile_partitions(child_id=row["id"])
             completed += 1
             if pause:
                 time.sleep(pause)
@@ -905,7 +1216,7 @@ class Pipeline:
             "SELECT * FROM jobs WHERE state NOT IN ('done','pending') ORDER BY rowid"
         ):
             result = json.loads(row["result"]) if row["result"] else {}
-            if row["state"] not in ("done", "pending"):
+            if row["state"] not in ("done", "pending", "resolved"):
                 gaps.append(
                     {
                         "id": row["id"],
@@ -998,6 +1309,7 @@ class Pipeline:
             ],
             "gaps": gaps,
             "history_complete": False,
+            "partition_closure": self.partition_inventory(),
             "rrg_status": "blocked_data",
             "scope": [
                 r[0]
