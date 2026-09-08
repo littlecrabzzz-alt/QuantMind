@@ -38,6 +38,8 @@ def install_schedule(root):
         "backend/shared/tushare_pipeline.py",
         "backend/shared/tushare_intake.py",
         "backend/shared/tushare_registry.py",
+        "backend/shared/tushare_documents.py",
+        "backend/shared/tushare_archive.py",
         "backend/shared/tushare_text_contracts.py",
         "backend/shared/tushare_structured_contracts.py",
         "backend/shared/tushare_market_contracts.py",

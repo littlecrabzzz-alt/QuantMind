@@ -63,6 +63,80 @@ class ExtendedPipeline(unittest.TestCase):
         p = module.Pipeline(self.root, CATALOG)
         return p
 
+    def test_document_checkpoint_and_release_include_saved_original(self):
+        from backend.shared import tushare_documents as documents
+
+        fields = ["ann_date", "ts_code", "name", "title", "url", "rec_time"]
+        payload = {
+            "code": 0,
+            "data": {
+                "fields": fields,
+                "items": [
+                    [
+                        "20260908",
+                        "600000.SH",
+                        "fixture",
+                        "公告",
+                        "https://example.com/report.pdf",
+                        "2026-09-08 10:00:00",
+                    ]
+                ],
+            },
+        }
+        p = self.pipeline()
+        p.enqueue("anns_d", {"start_date": "20260908", "end_date": "20260908"})
+        p.db.commit()
+        with httpx.Client(
+            transport=httpx.MockTransport(lambda _: httpx.Response(200, json=payload))
+        ) as client:
+            p.run(client, "synthetic-token", CONFIG, max_requests=1, pause=0)
+        self.assertEqual(p.register_documents()["observations"], 1)
+        p.close()
+        p = self.pipeline()
+        self.assertEqual(p.register_documents()["observations"], 0)
+        artifact = documents._save(
+            self.root.resolve(),
+            "attachments",
+            ".pdf",
+            b"%PDF-fixture-original",
+            "application/pdf",
+        )
+        saved = {
+            "status": "downloaded",
+            "mime": "application/pdf",
+            "parse_status": "parse_failed",
+            "fetched_at": "2026-09-09T00:00:00+00:00",
+            "files": [artifact],
+        }
+        with patch.object(documents, "_download_job", return_value=saved):
+            self.assertEqual(
+                documents.run_documents(self.root, max_documents=1, max_seconds=1)[
+                    "processed"
+                ],
+                1,
+            )
+        release = p.publish()
+        manifest = module.verify_data(self.root, release)
+        self.assertIn(artifact["path"], manifest["files"])
+        portable = json.loads((self.root / manifest["documents"]["path"]).read_bytes())
+        self.assertEqual(len(portable["mappings"]), 1)
+        self.assertEqual(
+            portable["mappings"][0]["latest_result"]["parse_status"], "parse_failed"
+        )
+        self.assertEqual(release, p.publish())
+        from backend.shared.tushare_archive import recover_archive
+
+        recovery = recover_archive(self.root, max_items=1000, max_seconds=5)
+        self.assertEqual(recovery["status"], "complete")
+        archived_release = p.publish()
+        archived_manifest = module.verify_data(self.root, archived_release)
+        self.assertIn(artifact["path"], archived_manifest["files"])
+        self.assertTrue(
+            any(name.startswith("archives/") for name in archived_manifest["files"])
+        )
+        self.assertEqual(archived_release, p.publish())
+        p.close()
+
     def test_bounded_planning_resumes_across_connection_and_deduplicates(self):
         def planner(config, anchor, identifiers):
             for n in range(12):

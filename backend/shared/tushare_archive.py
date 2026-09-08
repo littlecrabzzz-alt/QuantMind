@@ -15,11 +15,20 @@ import stat
 import tempfile
 import time
 
-DIRECTORIES = ("objects", "observations", "parquet", "attachments", "extracted")
+DIRECTORIES = (
+    "objects",
+    "observations",
+    "parquet",
+    "attachments",
+    "extracted",
+    "schemas",
+    "documents",
+    "archives",
+)
 FILE_PATTERN = re.compile(
     r"(?:objects/[a-f0-9]{64}\.json|observations/[a-f0-9]{32,64}\.json|"
     r"parquet/[a-f0-9]{64}\.parquet|(?:attachments|extracted)/[a-f0-9]{64}\.[a-z0-9]{1,16}|"
-    r"(?:archives|schemas)/[a-f0-9]{64}\.json)"
+    r"(?:archives|schemas|documents)/[a-f0-9]{64}\.json)"
 )
 RELEASE_PATTERN = re.compile(r"(?:data-[a-f0-9]{64}|probe-[a-f0-9]{32})")
 

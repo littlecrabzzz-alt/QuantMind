@@ -762,6 +762,44 @@ class Pipeline:
             **self.status(),
         }
 
+    def register_documents(self, max_observations=20):
+        from backend.shared.tushare_documents import enqueue_documents
+
+        apis = [
+            api
+            for api, spec in EXTENDED_CONTRACTS.items()
+            if spec.get("attachment_fields")
+        ]
+        if not apis:
+            return {"observations": 0}
+        last = self.db.execute(
+            "SELECT value FROM scheduler_state WHERE name='document_cursor'"
+        ).fetchone()
+        rows = self.db.execute(
+            "SELECT rowid,result FROM attempts WHERE rowid>? AND json_extract(result,'$.api_name') IN ("
+            + ",".join("?" for _ in apis)
+            + ") ORDER BY rowid LIMIT ?",
+            (last[0] if last else 0, *apis, max_observations),
+        ).fetchall()
+        count = 0
+        for row in rows:
+            result = json.loads(row["result"])
+            if result.get("observation") and result.get("object_sha256"):
+                enqueue_documents(
+                    self.root,
+                    result["observation"],
+                    result["api_name"],
+                    self.records(result),
+                    contract_for(result["api_name"])["attachment_fields"],
+                )
+                count += 1
+            self.db.execute(
+                "INSERT INTO scheduler_state(name,value) VALUES('document_cursor',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                (row["rowid"],),
+            )
+            self.db.commit()  # Idempotent document refs make crash replay safe.
+        return {"observations": count}
+
     def status(self):
         return {
             r[0]: r[1]
@@ -823,6 +861,35 @@ class Pipeline:
         if not (self.root / schema_name).exists():
             atomic_json(self.root / schema_name, metadata)
         files[schema_name] = {"sha256": digest(raw), "bytes": len(raw)}
+        archive = None
+        if (self.root / "archive.sqlite").exists():
+            from backend.shared.tushare_archive import archive_inventory
+
+            archived = archive_inventory(self.root)
+            files.update(archived["files"])
+            for dataset in archived["datasets"]:
+                active.setdefault(dataset["path"], dataset)
+            archive = {"recovery": archived["recovery"], "gaps": archived["gaps"]}
+        documents = None
+        if (self.root / "documents.sqlite").exists():
+            from backend.shared.tushare_documents import document_inventory
+
+            inventory = document_inventory(self.root)
+            for item in inventory["files"]:
+                files[item["path"]] = {"sha256": item["sha256"], "bytes": item["bytes"]}
+            raw_documents = json_bytes(inventory)
+            document_name = "documents/" + digest(raw_documents) + ".json"
+            if not (self.root / document_name).exists():
+                atomic_json(self.root / document_name, inventory)
+            files[document_name] = {
+                "sha256": digest(raw_documents),
+                "bytes": len(raw_documents),
+            }
+            documents = {
+                "path": document_name,
+                "counts": inventory["counts"],
+                "reference_counts": inventory["reference_counts"],
+            }
         content = {
             "schema_version": 1,
             "files": files,
@@ -840,6 +907,8 @@ class Pipeline:
             "scope": sorted({json.loads(r["job"])["api_name"] for r in rows}),
             "implemented_contracts": sorted(set(CONTRACTS) | set(EXTENDED_CONTRACTS)),
             "schema_path": schema_name,
+            "documents": documents,
+            "archive": archive,
             "historical_versions_complete": False,
             "retained_observations_included": True,
             "capabilities": [
@@ -898,14 +967,33 @@ def tick(max_requests=None, max_seconds=None):
             today = datetime.now(ZoneInfo("Asia/Shanghai")).date()
             pipeline.initialize(config, today)
             planning = pipeline.plan_extended(config, today)
+            from backend.shared.tushare_archive import recover_archive
+
+            archive_report = recover_archive(
+                ROOT,
+                max_items=int(config.get("archive_items_per_tick", 200)),
+                max_seconds=5,
+            )
             with httpx.Client(
                 trust_env=False, timeout=30, follow_redirects=False
             ) as client:
                 report = pipeline.run(
                     client, token, config, max_requests, max_seconds, pause=0
                 )
+            if config.get("enable_documents", False):
+                from backend.shared.tushare_documents import run_documents
+
+                report["document_registration"] = pipeline.register_documents()
+                report["documents"] = run_documents(
+                    ROOT,
+                    max_documents=int(config.get("documents_per_tick", 3)),
+                    max_seconds=min(20, float(config.get("document_seconds", 20))),
+                )
             report.update(
-                release_id=pipeline.publish(), updated_at=utc_now(), planning=planning
+                release_id=pipeline.publish(),
+                updated_at=utc_now(),
+                planning=planning,
+                archive=archive_report,
             )
             atomic_json(ROOT / "pipeline-status.json", report)
             return report
@@ -922,7 +1010,7 @@ def manifest_at(root, release_id):
     manifest = json.loads(raw)
     for path in manifest["files"]:
         if not re.fullmatch(
-            r"(?:objects|observations|parquet|schemas|attachments|extracted)/[a-f0-9]+\.(?:json|parquet|pdf|html)",
+            r"(?:objects|observations|parquet|schemas|attachments|extracted|documents|archives)/[a-f0-9]+\.(?:json|parquet|pdf|html)",
             path,
         ):
             raise ValueError("Invalid object path")
