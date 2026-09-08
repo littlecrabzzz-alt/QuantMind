@@ -31,6 +31,7 @@ class DeploymentBoundary(unittest.TestCase):
         run.assert_called_with("python3", "scripts/dual_node_snapshot.py", "pull")
 
     def test_resume_refuses_running_writer(self):
+        (ROOT / "logs").mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(prefix="dual-node-test-", dir=ROOT / "logs") as directory:
             backup = pathlib.Path(directory)
             for name in ("postgres.dump", "postgres-counts.txt", "redis-data.tar.gz",
