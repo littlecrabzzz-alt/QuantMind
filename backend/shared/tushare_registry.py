@@ -34,7 +34,16 @@ from backend.shared.tushare_credit_extra_contracts import (
     iter_credit_extra_jobs,
 )
 
+from backend.shared.tushare_etf_basket_contracts import (
+    ETF_BASKET_CONTRACTS,
+    iter_etf_basket_jobs,
+)
+
 EXTENDED_CONTRACTS = {
+    **{
+        api: {**spec, "group": "etf_basket"}
+        for api, spec in ETF_BASKET_CONTRACTS.items()
+    },
     **{
         api: {**spec, "group": "credit_extra"}
         for api, spec in CREDIT_EXTRA_CONTRACTS.items()
@@ -65,6 +74,7 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "etf_basket": iter_etf_basket_jobs,
     "credit_extra": iter_credit_extra_jobs,
     "text": lambda config, today, ids: iter_text_jobs(config, today),
     "structured": iter_structured_jobs,

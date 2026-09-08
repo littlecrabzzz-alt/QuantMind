@@ -34,3 +34,11 @@ SH 官方示例 `517030.SH / 20260615` 含 `00001.HK`、零数量和声明为 fl
 这两个接口没有提供完整 PCF 表头、最小申赎单位或总持仓/净资产分母。申赎篮子数量不能直接解释成持仓权重，更不能与季度 `fund_portfolio` 互相替代。ETF 全量及退市发现覆盖、实际账户权限、实际返回上限、历史范围仍待独立验收。
 
 离线验证：`python3 scripts/test_tushare_etf_basket_contracts.py`，6 项测试包含官方目录字段一致性、日期无遗漏/重复、闰日、稳定旧分区、历史未知、特殊和退市 ETF、延迟生成及非法输入；测试禁用 socket 连接与 DNS，无生产请求。
+
+## 运行集成与数值原文
+
+现已接入 `enable_etf_basket` family，但本次没有启用生产配置或探测生产权限。专属 `etfs` 只从已存 `etf_basic` 的全部观察取源代码并集，不从普通基金、股票或篮子成分推断；镜像客户端部署同时带上本合同模块。
+
+PCF 的 `qty/cpr/rdr/sca/sub_cc/red_cc` 中实际属于对应合同的字段，以 nullable 文本列存 Parquet：字符串保持原文，数字使用 JSON 数字文本，空值保持 null。每行 `_raw_numeric_json` 保存这些字段的原始 JSON 标量和类型，原始行摘要在转换前计算。`json.loads(row['_raw_numeric_json'])` 可逐字段恢复 `0`、`0.0`、`"-"` 与 null，完整原始 HTTP 对象继续保留。Arrow schema 的 `source_scalar_encodings` 明确标为 `text_with_row_raw_numeric_json_v1`；缺少标记的旧分区仅报告编码未知，不猜所有字符串均为编码值。
+
+当前 Arrow、默认 JSONL 及 API 行结果都返回这些文本列和原文 JSON provenance，**没有自动恢复数值类型**。字段投影需要同时选择 `_raw_numeric_json` 才保留精确原标量；只选 `qty` 等列得到文本。消费便捷解码留待单独实现，不能直接把这些文本作为策略浮点输入。

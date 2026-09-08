@@ -15,6 +15,7 @@ import re
 import tempfile
 
 from backend.shared.tushare_credit_extra_contracts import CREDIT_EXTRA_CONTRACTS
+from backend.shared.tushare_etf_basket_contracts import ETF_BASKET_CONTRACTS
 from backend.shared.tushare_market_contracts import MARKET_CONTRACTS
 from backend.shared.tushare_global_contracts import GLOBAL_CONTRACTS
 from backend.shared.tushare_other_contracts import OTHER_CONTRACTS
@@ -36,6 +37,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **ETF_BASKET_CONTRACTS,
     **CREDIT_EXTRA_CONTRACTS,
     **TEXT_CONTRACTS,
     **STRUCTURED_CONTRACTS,
@@ -415,6 +417,40 @@ def _dataset(root, release_id, api_name):
         relation.create_view("stored")
         metadata = _metadata(manifest, release_id, api_name, aliases)
         metadata["source_api_names"] = sorted(source_apis)
+        if api_name in ETF_BASKET_CONTRACTS:
+            if "_raw_numeric_json" in columns:
+                if (
+                    relation.filter(
+                        '"_raw_numeric_json" IS NULL OR NOT json_valid("_raw_numeric_json")'
+                    )
+                    .limit(1)
+                    .fetchone()
+                ):
+                    raise ValueError(
+                        "PCF numeric provenance missing or invalid; mixed legacy encoding gap"
+                    )
+                if (
+                    relation.filter("json_type(\"_raw_numeric_json\") <> 'OBJECT'")
+                    .limit(1)
+                    .fetchone()
+                ):
+                    raise ValueError("PCF numeric provenance must be a JSON object")
+                metadata["source_scalar_encodings"] = {
+                    field: "text_with_row_raw_numeric_json_v1"
+                    for field in spec["raw_numeric_fields"]
+                    if field in columns
+                }
+                metadata["source_scalar_note"] = (
+                    "Numeric source fields are nullable text; json.loads(row['_raw_numeric_json']) "
+                    "recovers original scalar types, including 0, 0.0, '-' and null. "
+                    "Arrow and JSONL do not automatically restore them. Select _raw_numeric_json "
+                    "when projecting fields to retain exact scalar provenance."
+                )
+            else:
+                metadata["source_scalar_encodings"] = {}
+                metadata["source_scalar_note"] = (
+                    "Legacy PCF numeric encoding unknown; never assume strings are encoded JSON."
+                )
         if identity_fields:
             metadata["request_identity_fields"] = list(identity_fields)
             metadata["request_identity_status"] = "verified_from_immutable_observations"
@@ -424,7 +460,10 @@ def _dataset(root, release_id, api_name):
             )
         if distinct_rows:
             metadata["deduplication_mode"] = "distinct_supplier_rows"
-            metadata["row_identity_note"] = CONTRACTS[api_name]["row_identity_note"]
+            metadata["row_identity_note"] = spec.get(
+                "row_identity_note",
+                spec.get("revision_gap", "Differing source rows are retained."),
+            )
         yield db, columns, keys, metadata
 
 

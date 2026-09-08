@@ -34,6 +34,7 @@ from backend.shared.tushare_supplement_contracts import supplement_prerequisites
 from backend.shared.tushare_equity_event_contracts import equity_event_prerequisites
 from backend.shared.tushare_futures_extra_contracts import futures_extra_prerequisites
 from backend.shared.tushare_research_extra_contracts import research_extra_prerequisites
+from backend.shared.tushare_etf_basket_contracts import etf_basket_prerequisites
 from backend.shared.tushare_credit_extra_contracts import (
     credit_identifiers,
     credit_extra_prerequisites,
@@ -395,6 +396,18 @@ class Pipeline:
                 params.get("src") or row.get("src") or row.get("src_site") or ""
             )
             row["_api_name"] = result["api_name"]
+            if contract_for(result["api_name"]).get("group") == "etf_basket":
+                # Arrow cannot hold numeric and '-' scalars in one column. Keep
+                # queryable text plus exact original JSON types, after raw hashing.
+                numeric = {
+                    field: row[field]
+                    for field in contract_for(result["api_name"])["raw_numeric_fields"]
+                    if field in row
+                }
+                row["_raw_numeric_json"] = json_bytes(numeric).decode("utf-8")
+                for field, value in numeric.items():
+                    if value is not None and not isinstance(value, str):
+                        row[field] = json_bytes(value).decode("utf-8")
             for key in (
                 "ts_code",
                 "symbol",
@@ -591,7 +604,10 @@ class Pipeline:
         }
         result = {name: set() for name in families.values()}
         result.update(
-            sw_indexes=set(), futures_continuous=set(), futures_products=set()
+            sw_indexes=set(),
+            futures_continuous=set(),
+            futures_products=set(),
+            etfs=set(),
         )
         placeholders = ",".join("?" for _ in families)
         for row in self.db.execute(
@@ -623,6 +639,8 @@ class Pipeline:
                 code = record.get("ts_code") or record.get("index_code")
                 if code:
                     result[families[saved["api_name"]]].add(code)
+                    if saved["api_name"] == "etf_basic":
+                        result["etfs"].add(code)
         result = {key: sorted(values) for key, values in result.items()}
         try:
             result.update(credit_identifiers(result))
@@ -787,6 +805,7 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "etf_basket": etf_basket_prerequisites,
             "credit_extra": credit_extra_prerequisites,
             "futures_extra": futures_extra_prerequisites,
             "research_extra": research_extra_prerequisites,
@@ -794,7 +813,7 @@ class Pipeline:
         # Validate the complete list before recording any of this family's gaps.
         gaps = prerequisites(identifiers, config=config)
         for gap in gaps:
-            kind = "discovery" if gap["dependencies"] else gap["reason"]
+            kind = "discovery" if gap.get("dependencies") else gap["reason"]
             self.db.execute(
                 "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
                 "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason "
@@ -802,7 +821,7 @@ class Pipeline:
                 (
                     f"planning:{family}:{gap['api_name']}:{kind}",
                     "discovery_unverified"
-                    if gap["dependencies"]
+                    if gap.get("dependencies")
                     else "coverage_unverified",
                     utc_now(),
                     json.dumps(gap, sort_keys=True),
@@ -813,6 +832,12 @@ class Pipeline:
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
+            (
+                "etf_basket",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "etf_basket", cfg, ids
+                ),
+            ),
             (
                 "credit_extra",
                 lambda cfg, ids: self.record_extra_planning_gaps(
@@ -896,6 +921,8 @@ class Pipeline:
                             "futures_extra_history_start",
                             "research_extra_apis",
                             "research_extra_history_start",
+                            "etf_basket_apis",
+                            "etf_basket_history_start",
                             "credit_extra_apis",
                             "credit_extra_history_start",
                         )
