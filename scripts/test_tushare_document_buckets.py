@@ -25,11 +25,23 @@ class StateBuckets(unittest.TestCase):
     manifest = index_tests.DocumentIndex.manifest
     page = index_tests.DocumentIndex.page
 
+    def leaves(self, index):
+        if index["schema_version"] == 2:
+            return index["states"]
+        return {
+            item["bucket"]: item
+            for group in index["states"].values()
+            for item in json.loads((self.root / group["path"]).read_bytes())["items"]
+        }
+
     def legacy(self):
         """Construct the exact old two-prefix cache/trigger shape and fixed index."""
         saved, index = self.index()
         old = json.loads(json.dumps(index))
         old.pop("state_prefix_chars")
+        old.pop("state_descriptor_prefix_chars")
+        old.pop("state_count")
+        old["schema_version"] = 2
         old["states"] = {}
         files = list(saved["files"])
         grouped = {}
@@ -160,6 +172,105 @@ class StateBuckets(unittest.TestCase):
         self.assertEqual(self.index()[0]["rebuilt_shards"], 0)
         self.assertTrue((self.root / saved["path"]).exists())
 
+    def test_schema3_missing_tampered_or_cross_bucket_references_rejected(self):
+        self.refs(0, 1)
+        saved, index = self.index()
+        release = self.publish(saved)
+        root_manifest = json.loads(
+            (self.root / f"releases/{release}/manifest.json").read_bytes()
+        )
+        first = self.doc[:1]
+        descriptor = index["states"][first]
+        descriptor_path = self.root / descriptor["path"]
+        raw = descriptor_path.read_bytes()
+        descriptor_path.write_bytes(b"x" * len(raw))
+        self.assertEqual(self.page(release).status_code, 409)
+        descriptor_path.write_bytes(raw)
+        parts = json.loads(raw)
+        leaf = next(item for item in parts["items"] if item["bucket"] == self.doc[:3])
+        leaf_path = self.root / leaf["path"]
+        leaf_raw = leaf_path.read_bytes()
+        leaf_path.write_bytes(b"x" * len(leaf_raw))
+        self.assertEqual(self.page(release).status_code, 409)
+        leaf_path.write_bytes(leaf_raw)
+
+        def republish(changed, manifest_change=None):
+            item = docs._save(
+                self.root, "documents", ".json", docs._json(changed), "application/json"
+            )
+            manifest = json.loads(json.dumps(root_manifest))
+            manifest["files"][item["path"]] = {k: item[k] for k in ("sha256", "bytes")}
+            manifest["documents"]["path"] = item["path"]
+            if manifest_change:
+                manifest_change(manifest)
+            return self.manifest(manifest)
+
+        for change in (
+            lambda x: x["states"].pop(first),
+            lambda x: x.update(state_count=x["state_count"] + 1),
+            lambda x: x.update(state_prefix_chars=2),
+            lambda x: x.update(schema_version=4),
+        ):
+            changed = json.loads(json.dumps(index))
+            change(changed)
+            self.assertEqual(self.page(republish(changed)).status_code, 409)
+        for missing in (descriptor["path"], leaf["path"], self.original["path"]):
+            broken = republish(
+                index, lambda manifest, missing=missing: manifest["files"].pop(missing)
+            )
+            self.assertEqual(self.page(broken).status_code, 409)
+        # A rehashed but wrong state identity must not silently become an empty result.
+        wrong = json.loads(leaf_raw)
+        wrong["items"][0]["id"] = sha("wrong-source-reference")
+        item = docs._save(
+            self.root, "documents", ".json", docs._json(wrong), "application/json"
+        )
+        altered = json.loads(raw)
+        altered["items"] = [
+            {**part, **item} if part["bucket"] == self.doc[:3] else part
+            for part in altered["items"]
+        ]
+        group = docs._save(
+            self.root, "documents", ".json", docs._json(altered), "application/json"
+        )
+        changed = json.loads(json.dumps(index))
+        changed["states"][first].update(group)
+
+        def include(manifest):
+            for entry in (item, group):
+                manifest["files"][entry["path"]] = {
+                    k: entry[k] for k in ("sha256", "bytes")
+                }
+
+        self.assertEqual(self.page(republish(changed, include)).status_code, 409)
+        self.assertEqual(self.page(release).status_code, 200)
+
+    def test_descriptor_save_failure_preserves_dirty_state_and_old_release(self):
+        self.refs(0, 1)
+        saved, old = self.index()
+        release = self.publish(saved)
+        self.db.execute(
+            "UPDATE documents SET download_tries=download_tries+1 WHERE id=?",
+            (self.doc,),
+        )
+        self.db.commit()
+        original = docs._save
+
+        def fail(root, directory, suffix, payload, mime):
+            if json.loads(payload).get("kind") == "state_descriptors":
+                raise OSError("descriptor publication interrupted")
+            return original(root, directory, suffix, payload, mime)
+
+        with patch.object(docs, "_save", side_effect=fail):
+            with self.assertRaises(OSError):
+                self.index()
+        self.assertEqual(self.page(release).status_code, 200)
+        new, index = self.index()
+        self.assertEqual(new["rebuilt_shards"], 1)
+        self.assertEqual(new["rebuilt_descriptor_shards"], 1)
+        self.assertEqual(index["mappings"], old["mappings"])
+        self.assertEqual(self.index()[0]["rebuilt_descriptor_shards"], 0)
+
     def test_large_append_and_single_update_bound_rewrites(self):
         def insert(start, stop):
             self.db.executemany(
@@ -175,24 +286,20 @@ class StateBuckets(unittest.TestCase):
         _, old = self.index()
         insert(20000, 21000)
         saved, new = self.index()
-        changed = {
-            b for b, item in new["states"].items() if old["states"].get(b) != item
-        }
+        old_leaves, new_leaves = self.leaves(old), self.leaves(new)
+        changed = {b for b, item in new_leaves.items() if old_leaves.get(b) != item}
         expected = {sha(str(i))[:3] for i in range(20000, 21000)}
         self.assertEqual(changed, expected)
         self.assertEqual(saved["rebuilt_shards"], len(expected))
-        changed_rows = sum(new["states"][b]["count"] for b in changed)
+        changed_rows = sum(new_leaves[b]["count"] for b in changed)
         self.assertLess(changed_rows, 7000)
         self.db.execute("UPDATE documents SET download_tries=1 WHERE id=?", (sha("1"),))
         self.db.commit()
         updated, latest = self.index()
         self.assertEqual(updated["rebuilt_shards"], 1)
+        latest_leaves = self.leaves(latest)
         self.assertEqual(
-            {
-                b
-                for b in latest["states"]
-                if latest["states"][b] != new["states"].get(b)
-            },
+            {b for b in latest_leaves if latest_leaves[b] != new_leaves.get(b)},
             {sha("1")[:3]},
         )
         self.assertEqual(self.index()[0]["rebuilt_shards"], 0)
