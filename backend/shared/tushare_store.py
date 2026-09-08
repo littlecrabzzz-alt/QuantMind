@@ -17,6 +17,7 @@ import tempfile
 from backend.shared.tushare_registry import (
     CONNECT_RUNTIME_CONTRACTS,
     TRADING_EVENT_RUNTIME_CONTRACTS,
+    LISTING_EXTRA_RUNTIME_CONTRACTS,
 )
 from backend.shared.tushare_credit_extra_contracts import CREDIT_EXTRA_CONTRACTS
 from backend.shared.tushare_etf_basket_contracts import ETF_BASKET_CONTRACTS
@@ -41,6 +42,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **LISTING_EXTRA_RUNTIME_CONTRACTS,
     **TRADING_EVENT_RUNTIME_CONTRACTS,
     **CONNECT_RUNTIME_CONTRACTS,
     **ETF_BASKET_CONTRACTS,
@@ -80,6 +82,7 @@ DATE_FIELDS = (
     "end_date",
     "in_date",
     "start_date",
+    "ipo_date",
     "list_date",
     "begin_date",
     "rate_start_date",
@@ -457,6 +460,10 @@ def _dataset(root, release_id, api_name):
                 metadata["source_scalar_note"] = (
                     "Legacy PCF numeric encoding unknown; never assume strings are encoded JSON."
                 )
+        if api_name in LISTING_EXTRA_RUNTIME_CONTRACTS:
+            for note in ("date_axis_note", "namespace_note", "history_gap"):
+                if spec.get(note):
+                    metadata[note] = spec[note]
         if identity_fields:
             metadata["request_identity_fields"] = list(identity_fields)
             metadata["request_identity_status"] = "verified_from_immutable_observations"
@@ -582,7 +589,13 @@ def _query(
             not isinstance(c, str) or not c for c in codes
         ):
             raise ValueError("codes must contain stored identifiers")
-        if any(re.fullmatch(r"[0-9]{6}\.(SH|SZ|BJ)", c) for c in codes):
+        mapping_source = code_field in ("o_code", "n_code") and {
+            "o_code",
+            "n_code",
+        }.issubset(columns)
+        if not mapping_source and any(
+            re.fullmatch(r"[0-9]{6}\.(SH|SZ|BJ)", c) for c in codes
+        ):
             raise ValueError("Use internal prefix stock codes, for example SH600036")
         column = _identifier(code_field, columns)
         filters.append(
