@@ -272,6 +272,8 @@ def fetch_document(
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "files": [],
         "redirects": [],
+        "raw_complete": False,
+        "received_bytes": 0,
     }
     root = Path(root).resolve()
     current = url
@@ -293,6 +295,27 @@ def fetch_document(
                 )
                 response = connection.getresponse()
                 result["http_status"] = response.status
+                # Deliberate allowlist: no cookies, authorization or location URLs.
+                result["response_headers"] = {
+                    name.lower(): value[:1024]
+                    for name in (
+                        "Content-Type",
+                        "Content-Encoding",
+                        "Content-Length",
+                        "Transfer-Encoding",
+                    )
+                    if (value := response.getheader(name)) is not None
+                }
+                result["response_headers_truncated"] = [
+                    name.lower()
+                    for name in (
+                        "Content-Type",
+                        "Content-Encoding",
+                        "Content-Length",
+                        "Transfer-Encoding",
+                    )
+                    if len(response.getheader(name, "")) > 1024
+                ]
                 if response.status in (301, 302, 303, 307, 308):
                     location = response.getheader("Location")
                     if not location:
@@ -302,11 +325,9 @@ def fetch_document(
                     current = urljoin(current, location)
                     result["redirects"].append(current)
                     continue
-                if response.status != 200:
-                    raise DocumentError("http_error")
-                encoding = response.getheader("Content-Encoding", "identity").lower()
-                if encoding not in ("", "identity"):
-                    raise DocumentError("unsupported_content_encoding")
+                encoding = (
+                    response.getheader("Content-Encoding", "identity").strip().lower()
+                )
                 length = response.getheader("Content-Length")
                 if length is not None and (
                     not length.isdecimal() or int(length) > max_bytes
@@ -320,12 +341,14 @@ def fetch_document(
                     if not chunk:
                         break
                     size += len(chunk)
+                    result["received_bytes"] = size
                     if size > max_bytes:
                         raise DocumentError("size_limit")
                     chunks.append(chunk)
                 if length is not None and size != int(length):
                     raise DocumentError("incomplete_download")
                 payload = b"".join(chunks)
+                result["raw_complete"] = True
                 declared = (
                     response.getheader("Content-Type", "")
                     .split(";", 1)[0]
@@ -351,10 +374,31 @@ def fetch_document(
                         re.I,
                     )
                 )
-                if pdf_expected and not is_pdf:
-                    raise DocumentError("pdf_content_mismatch")
-                if is_pdf and declared in ("text/html", "application/xhtml+xml"):
-                    raise DocumentError("mime_content_mismatch")
+                encoded = encoding not in ("", "identity") or payload.startswith(
+                    b"\x1f\x8b"
+                )
+                result["content_kind"] = (
+                    "encoded_body"
+                    if encoded
+                    else "pdf_envelope"
+                    if is_pdf
+                    else "html"
+                    if is_html
+                    else "malformed_pdf_envelope"
+                    if payload.startswith(b"%PDF-")
+                    else "unknown"
+                )
+                reason = (
+                    "http_error"
+                    if response.status != 200
+                    else "unsupported_content_encoding"
+                    if encoded
+                    else "pdf_content_mismatch"
+                    if pdf_expected and not is_pdf
+                    else "mime_content_mismatch"
+                    if is_pdf and declared in ("text/html", "application/xhtml+xml")
+                    else None
+                )
                 if is_pdf:
                     suffix, mime = ".pdf", "application/pdf"
                 elif is_html and declared in (
@@ -365,7 +409,16 @@ def fetch_document(
                 ):
                     suffix, mime = ".html", "text/html"
                 else:
-                    raise DocumentError("unsupported_or_invalid_document")
+                    reason = reason or "unsupported_or_invalid_document"
+                if reason:
+                    # Preserve original encoded bytes, never decode or parse an error
+                    # response as PDF/text. A complete transfer is not a valid document.
+                    artifact = _save(
+                        root, "attachments", ".bin", payload, "application/octet-stream"
+                    )
+                    result.update(status=reason, validation_status="unexpected_content")
+                    result["files"].append(artifact)
+                    return result
                 artifact = _save(root, "attachments", suffix, payload, mime)
                 result.update(
                     status="downloaded", mime=mime, document_sha256=artifact["sha256"]
@@ -648,6 +701,7 @@ def _download_job(url, root, timeout, *, download_only=False):
                 "status": "download_timeout",
                 "parse_status": "not_attempted",
                 "files": [],
+                "raw_complete": False,
             }
         if worker.returncode:
             return {
@@ -655,6 +709,7 @@ def _download_job(url, root, timeout, *, download_only=False):
                 "parse_status": "not_attempted",
                 "reason": "download_process_failed",
                 "files": [],
+                "raw_complete": False,
             }
         return json.loads(output)
     except subprocess.TimeoutExpired:
@@ -667,6 +722,7 @@ def _download_job(url, root, timeout, *, download_only=False):
             "status": "download_timeout",
             "parse_status": "not_attempted",
             "files": [],
+            "raw_complete": False,
         }
     except (ValueError, OSError):
         return {
@@ -674,6 +730,7 @@ def _download_job(url, root, timeout, *, download_only=False):
             "parse_status": "not_attempted",
             "reason": "download_process_error",
             "files": [],
+            "raw_complete": False,
         }
     finally:
         if worker.poll() is None:
@@ -1014,7 +1071,14 @@ def document_inventory(root):
         db.commit()
         files = []
         for directory, extensions in (
-            ("attachments", {"pdf": "application/pdf", "html": "text/html"}),
+            (
+                "attachments",
+                {
+                    "pdf": "application/pdf",
+                    "html": "text/html",
+                    "bin": "application/octet-stream",
+                },
+            ),
             ("extracted", {"json": "application/json"}),
         ):
             parent = root / directory
@@ -1026,7 +1090,9 @@ def document_inventory(root):
                         continue
                     if (
                         path.is_symlink()
-                        or not re.fullmatch(r"[a-f0-9]{64}\.(pdf|html|json)", path.name)
+                        or not re.fullmatch(
+                            r"[a-f0-9]{64}\.(pdf|html|bin|json)", path.name
+                        )
                         or path.suffix[1:] not in extensions
                     ):
                         raise DocumentError("unsafe_storage_path")
@@ -1120,7 +1186,14 @@ def _index_original_files(root, db):
     # Keep committed orphan evidence. Only compact file metadata is scanned;
     # large reference and attempt histories are never loaded here.
     for directory, extensions in (
-        ("attachments", {"pdf": "application/pdf", "html": "text/html"}),
+        (
+            "attachments",
+            {
+                "pdf": "application/pdf",
+                "html": "text/html",
+                "bin": "application/octet-stream",
+            },
+        ),
         ("extracted", {"json": "application/json"}),
     ):
         parent = root / directory
@@ -1134,7 +1207,7 @@ def _index_original_files(root, db):
             if (
                 path.is_symlink()
                 or not path.is_file()
-                or not re.fullmatch(r"[a-f0-9]{64}\.(pdf|html|json)", path.name)
+                or not re.fullmatch(r"[a-f0-9]{64}\.(pdf|html|bin|json)", path.name)
                 or path.suffix[1:] not in extensions
             ):
                 raise DocumentError("unsafe_storage_path")

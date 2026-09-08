@@ -207,8 +207,13 @@ class Documents(unittest.TestCase):
         for response, options, expected in cases:
             result, _ = self.fetch(response, **options)
             self.assertEqual(result["status"], expected)
-            self.assertEqual(result["files"], [])
-        self.assertEqual(list(self.root.iterdir()), [])
+            if expected in ("size_limit", "incomplete_download"):
+                self.assertEqual(result["files"], [])
+                self.assertFalse(result["raw_complete"])
+            else:
+                self.assertEqual(len(result["files"]), 1)
+                self.assertTrue(result["raw_complete"])
+                self.assertEqual(result["validation_status"], "unexpected_content")
 
     def test_pdf_survives_parser_failure_and_timeout(self):
         for state in (
