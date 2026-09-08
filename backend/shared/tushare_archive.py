@@ -27,7 +27,8 @@ DIRECTORIES = (
 )
 FILE_PATTERN = re.compile(
     r"(?:objects/[a-f0-9]{64}\.json|observations/[a-f0-9]{32,64}\.json|"
-    r"parquet/[a-f0-9]{64}\.parquet|(?:attachments|extracted)/[a-f0-9]{64}\.[a-z0-9]{1,16}|"
+    r"parquet/[a-f0-9]{64}\.parquet|attachments/[a-f0-9]{64}\.(?:pdf|html|bin)|"
+    r"extracted/[a-f0-9]{64}\.json|"
     r"(?:archives|schemas|documents)/[a-f0-9]{64}\.json)"
 )
 RELEASE_PATTERN = re.compile(r"(?:data-[a-f0-9]{64}|probe-[a-f0-9]{32})")
@@ -128,14 +129,7 @@ def _gap(db, row, code, detail=None):
     )
 
 
-def _snapshot(root, db, rescan):
-    if db.execute("SELECT 1 FROM meta WHERE key='snapshot'").fetchone() and not rescan:
-        return
-    if rescan:
-        db.execute("UPDATE tasks SET state='pending',cursor=0")
-        db.execute("UPDATE files SET valid=0")
-        for saved in db.execute("SELECT path FROM files").fetchall():
-            _task(db, "file", saved[0])
+def _queue_releases(root, db):
     release_root = root / "releases"
     if release_root.exists() or release_root.is_symlink():
         if release_root.is_symlink() or not release_root.is_dir():
@@ -144,6 +138,18 @@ def _snapshot(root, db, rescan):
             for entry in sorted(release_root.iterdir()):
                 if not entry.name.startswith("."):
                     _task(db, "manifest", f"releases/{entry.name}/manifest.json")
+    db.execute("INSERT OR REPLACE INTO meta VALUES('release_catchup','1')")
+
+
+def _snapshot(root, db, rescan):
+    if db.execute("SELECT 1 FROM meta WHERE key='snapshot'").fetchone() and not rescan:
+        return
+    if rescan:
+        db.execute("UPDATE tasks SET state='pending',cursor=0")
+        db.execute("UPDATE files SET valid=0")
+        for saved in db.execute("SELECT path FROM files").fetchall():
+            _task(db, "file", saved[0])
+    _queue_releases(root, db)
     for directory in DIRECTORIES:
         parent = root / directory
         if not parent.exists() and not parent.is_symlink():
@@ -200,6 +206,139 @@ def _copy_manifest(root, raw):
     return "archives/" + destination.name, sha
 
 
+def _record_release(root, db, release, raw):
+    sha = _hash(raw)
+    old = db.execute(
+        "SELECT sha256 FROM archived_releases WHERE release_id=?", (release,)
+    ).fetchone()
+    if old and old[0] != sha:
+        raise ArchiveError("immutable_release_conflict")
+    path, sha = _copy_manifest(root, raw)
+    _register(db, path, sha, len(raw))
+    db.execute(
+        "INSERT OR IGNORE INTO archived_releases VALUES(?,?,?)", (release, path, sha)
+    )
+    return path, {"sha256": sha, "bytes": len(raw)}
+
+
+def _manifest_document(root, release):
+    if not isinstance(release, str) or not RELEASE_PATTERN.fullmatch(release):
+        raise ArchiveError("invalid_release_id")
+    raw = _safe(root, f"releases/{release}/manifest.json").read_bytes()
+    if release.startswith("data-") and release[5:] != _hash(raw):
+        raise ArchiveError("manifest_checksum_mismatch")
+    document = json.loads(raw)
+    if not isinstance(document, dict):
+        raise ArchiveError("invalid_manifest")
+    return raw, document
+
+
+def _expected_files(root, release, document):
+    """Supplier manifest expectations, NOT a fresh referenced-object validation."""
+    files = document.get("files")
+    if release.startswith("data-"):
+        if not isinstance(files, dict):
+            raise ArchiveError("invalid_file_inventory")
+        entries = files.items()
+    elif isinstance(files, list):
+        entries = [
+            (item.get("path"), item) if isinstance(item, dict) else (item, {})
+            for item in files
+        ]
+    elif isinstance(document.get("results"), list):
+        entries = []
+        for result in document["results"]:
+            if not isinstance(result, dict) or "observation" not in result:
+                continue
+            entries.extend(
+                [
+                    (
+                        "observations/" + str(result["observation"]),
+                        {"sha256": result.get("observation_sha256")},
+                    ),
+                    (
+                        "objects/" + str(result.get("object_sha256")) + ".json",
+                        {"sha256": result.get("object_sha256")},
+                    ),
+                ]
+            )
+    else:
+        raise ArchiveError("invalid_probe_results")
+    output = {}
+    for name, metadata in entries:
+        if not isinstance(name, str) or not FILE_PATTERN.fullmatch(name):
+            raise ArchiveError("invalid_immutable_path")
+        if not isinstance(metadata, dict):
+            raise ArchiveError("invalid_file_metadata")
+        sha, size = metadata.get("sha256"), metadata.get("bytes")
+        if not release.startswith("data-") and (sha is None or size is None):
+            target = _safe(root, name)
+            if sha is None:
+                sha, measured = _fingerprint(target, float("inf"))
+                size = measured if size is None else size
+            elif size is None:
+                size = target.stat().st_size
+        if (
+            not isinstance(sha, str)
+            or not re.fullmatch(r"[a-f0-9]{64}", sha)
+            or type(size) is not int
+            or size < 0
+        ):
+            raise ArchiveError("invalid_file_metadata")
+        if not name.startswith("observations/") and Path(name).stem != sha:
+            raise ArchiveError("referenced_file_mismatch")
+        expected = {"sha256": sha, "bytes": size}
+        if name in output and output[name] != expected:
+            raise ArchiveError("conflicting_file_metadata")
+        output[name] = expected
+    return output
+
+
+def retain_release(root, release_id):
+    """Retain one predecessor; caller merges ``files`` before publishing CURRENT.
+
+    Copies only the exact manifest bytes. Referenced file metadata is inherited,
+    not rehashed or inserted into the verified-files table. Publisher/mirror must
+    verify actual referenced bytes before claiming closure. Legacy probe IDs are
+    mapped to observed SHA256; their IDs never prove original content authenticity.
+    Missing legacy metadata is measured locally and is only observed evidence.
+    No initial tree scan occurs here. Repeating after interruption is idempotent.
+    """
+    root = Path(root).resolve()
+    raw, document = _manifest_document(root, release_id)
+    files = _expected_files(root, release_id, document)
+    with (root / ".archive.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        db = _db(root)
+        try:
+            path, metadata = _record_release(root, db, release_id, raw)
+            files[path] = metadata
+            db.commit()
+            releases = [
+                dict(row)
+                for row in db.execute(
+                    "SELECT * FROM archived_releases ORDER BY release_id"
+                )
+            ]
+            # Include every known manifest file, even when the predecessor
+            # predates legacy catch-up. Data-object closure still comes from its
+            # expectations and the caller's bounded archive recovery inventory.
+            for saved in db.execute(
+                "SELECT f.path,f.sha256,f.bytes FROM files f JOIN archived_releases r ON r.path=f.path"
+            ):
+                metadata = {"sha256": saved["sha256"], "bytes": saved["bytes"]}
+                if saved["path"] in files and files[saved["path"]] != metadata:
+                    raise ArchiveError("conflicting_file_metadata")
+                files[saved["path"]] = metadata
+            return {
+                "files": files,
+                "archived_releases": releases,
+                "verification": "manifest_verified_references_expected",
+            }
+        finally:
+            db.close()
+
+
 def _manifest(root, db, row, deadline):
     parts = Path(row["path"]).parts
     if (
@@ -217,11 +356,7 @@ def _manifest(root, db, row, deadline):
     document = json.loads(raw)
     if not isinstance(document, dict):
         raise ArchiveError("invalid_manifest")
-    archive, sha = _copy_manifest(root, raw)
-    _register(db, archive, sha, len(raw))
-    db.execute(
-        "INSERT OR IGNORE INTO archived_releases VALUES(?,?,?)", (release, archive, sha)
-    )
+    _record_release(root, db, release, raw)
     references = []
     if release.startswith("data-"):
         files = document.get("files")
@@ -256,6 +391,14 @@ def _manifest(root, db, row, deadline):
                     },
                 )
             )
+    elif isinstance(document.get("files"), list):
+        if any(
+            not isinstance(item, dict) or "sha256" not in item or "bytes" not in item
+            for item in document["files"]
+        ):
+            _gap(db, row, "legacy_file_metadata_observed_without_manifest_anchor")
+        for name, metadata in _expected_files(root, release, document).items():
+            references.append((name, {"metadata": metadata, "release_id": release}))
     else:
         results = document.get("results")
         if not isinstance(results, list):
@@ -368,12 +511,16 @@ def _progress(db):
     }
 
 
-def recover_archive(root, max_items=200, max_seconds=5, *, rescan=False):
+def recover_archive(
+    root, max_items=200, max_seconds=5, *, rescan=False, rescan_releases=False
+):
     """Freeze initial inputs, verify a bounded batch; explicit rescan rechecks all.
 
     max_seconds is checked between artifacts and manifest-reference chunks. One
     artifact hash, JSON parse or initial directory snapshot may exceed the soft
     limit; a large file must not be restarted forever. No old data is replaced.
+    A legacy frozen scan gets one release-directory-only catch-up; explicit
+    rescan_releases repeats only that discovery, without resetting object tasks.
     Finished calls read SQLite only. Failure gaps persist, including resolved gaps
     in the DB after a later successful explicit rescan.
     """
@@ -394,6 +541,18 @@ def recover_archive(root, max_items=200, max_seconds=5, *, rescan=False):
         processed = 0
         try:
             _snapshot(root, db, rescan)
+            if (
+                rescan_releases
+                or not db.execute(
+                    "SELECT 1 FROM meta WHERE key='release_catchup'"
+                ).fetchone()
+            ):
+                if rescan_releases:
+                    db.execute(
+                        "UPDATE tasks SET state='pending',cursor=0 WHERE kind='manifest'"
+                    )
+                _queue_releases(root, db)
+                db.commit()
             deadline = time.monotonic() + max_seconds
             while processed < max_items and time.monotonic() < deadline:
                 row = db.execute(
