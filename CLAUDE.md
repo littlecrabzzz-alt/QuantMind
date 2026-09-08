@@ -4,9 +4,13 @@
 
 ## 当前迁移后的开发规则（优先）
 
-先读 `AGENTS.md` 的“双端开发约束”与 `docs/development-data-contract.md`。
+先读 [AGENTS.md](AGENTS.md) 的“双端开发约束”和“先识别环境，再执行开发命令”，再读 [数据规范](docs/development-data-contract.md)。环境规则以 AGENTS.md 为主，避免维护两份不同的启动逻辑。
 本仓库 Mac 和 `lzy-vm` 都能开发，`lzy-vm` 仍是唯一正式数据写入节点；禁止在 Mac 重启旧完整 Compose 栈或回灌旧数据。需要本地全栈时只用 `scripts/local-dev.sh init` 与 `start core|full`，其 `.local-dev` 数据库和文件是固定云端快照的隔离沙盒，不参与同步。
-下方通用 OSS 本地启动/历史 Gitee 发布命令不适用于当前迁移拓扑。开发前运行 `python3 scripts/dual_node_check.py`，发布只使用仓库内的 `scripts/dual-node.sh`。独立测试与正式数据严格分开，断网不切回旧主库。
+
+- **Mac/Darwin 宿主**：优先本机开发沙盒，`bash scripts/local-dev.sh status` 查看、`start core|full` 启动、`stop` 停止并恢复云端隧道。首次初始化和断网限制见 AGENTS.md；Vite 未运行时从根目录启动 `npm run dev:react --workspace=electron -- --host 127.0.0.1`。
+- **Linux/lzy-vm 宿主**：核对 SSH 身份、真实项目路径、SSD 与 AUTHORITY，服务操作走 `sudo -n bash scripts/dual-node.sh cloud-compose ...`。其他 Linux 或容器不得默认视为云端权威节点。
+- **预检**：Mac 联网运行 `python3 scripts/dual_node_check.py`；Linux 权威项目运行 `sudo -n python3 scripts/dual_node_check.py --node cloud`。Mac 离线使用已初始化沙盒和固定数据，恢复联网后再做双端预检。
+- **切换与写入**：8000 在本地 API 与云端隧道之间切换，操作前确认角色；本地输出不自动回灌，正式数据由云端写入。只提交本次文件；仅在任务包含发布时重启服务，文档提交不触发发布。
 
 ## ⚠️ 免责声明
 
@@ -29,10 +33,10 @@ QuantMind 是一个量化交易平台，后端为 Python（FastAPI），前端�
 
 ### 后端
 ```bash
-# 启动全部服务（Docker）
-docker compose up -d
+# Mac 沙盒启动；Linux 使用上方 cloud-compose 入口
+bash scripts/local-dev.sh start core
 
-# 本地运行单个服务
+# 仅在数据库、Redis、输出和凭据均隔离的测试环境运行单个服务
 SERVICE_MODE=api python backend/main_oss.py
 
 # 测试（在项目根目录执行）
@@ -120,20 +124,19 @@ npm run dashboard:build  # 生产环境构建
 
 ## 部署工作流
 
-代码改动后务必：
-1. **提交 git**：写描述清晰的提交信息
-2. **部署到服务器**：在目标服务器上使用受控更新脚本
+开发、提交和部署按任务范围分别执行。先做当前改动相关验证，再提交明确文件；任务包含发布时，按 AGENTS.md 的对应环境流程部署。
 
 ```bash
 # 本地：提交改动
 git add <changed-files>
 git commit -m "descriptive message"
-git push gitee master
+git push origin HEAD
 
-# 注意：目标服务器的 SSH 别名/主机与项目目录因人而异，部署前先向用户询问确认。
-# 用 ${SSH_TARGET} 和 ${PROJECT_DIR} 表示用户提供的具体值。
-ssh ${SSH_TARGET} "cd ${PROJECT_DIR} && sudo bash deploy/update.sh"
+# Mac 联网交接/发布预检；Linux 的 --node cloud 命令见上方
+python3 scripts/dual_node_check.py
 ```
+
+源码由 Syncthing 同步，Git 元数据另行对齐；不在有未提交工作的共享目录盲目 pull/reset。不要因收到“更新开发规范”的任务而启动、迁移或重启服务。
 
 Electron 前端在本地开发时使用 Vite HMR；修改 `electron/src` 后运行 `npm run typecheck` 即可，不需要复制构建产物到服务器的 `web` 容器。
 

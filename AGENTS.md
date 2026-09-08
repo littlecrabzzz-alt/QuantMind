@@ -7,9 +7,50 @@
 - 权威数据节点为 `lzy-vm:/root/code/QuantMind`，真实目录在 SSD `/root/data/disk/quantmind/project`。先读 `docs/dual-node-deployment.md` 与 `docs/development-data-contract.md`。
 - Mac 的旧 `data/`、`results/`、数据库卷仅保留作迁移基线，禁止重启原完整 Compose 栈、调度器或回灌这些数据。默认联网前端连接 SSH 隧道 `127.0.0.1:8000/18080`；需要 Mac 本地算力时只用 `scripts/local-dev.sh` 启动 `.local-dev` 隔离沙盒，断网不得把它切成主库。
 - 源码工作树和共享密钥由 Syncthing 双向同步；`.git` 独立。不要两端同时编辑同一文件、在共享运行目录切分支或批量 checkout。并行后端开发使用独立 worktree；测试不挂载权威数据可写，不携带生产凭据，不接生产网络。
-- 开发前/发布前运行 `python3 scripts/dual_node_check.py`，离线只做独立测试或固定快照研究。任何 `.sync-conflict-*`、代码哈希/Git HEAD 不一致都必须先处理，不能自动覆盖。
+- 开发前/发布前按下方宿主环境选择预检。Mac 离线可使用已初始化的固定快照沙盒或独立测试；联网后再做双端预检。任何 `.sync-conflict-*`、代码哈希/Git HEAD 不一致都必须先处理，不能自动覆盖。
 - 后端发布只走 `scripts/dual-node.sh cloud-compose`；禁止裸 Compose 遗漏云端覆盖层。先确认没有训练/研究任务，核对同步与改动，明确提交路径（不要 `git add .`），再重启相关服务并验收。
 - 正式数据写入只在云端由现有业务服务/作业完成；本地沙盒写入不参与 Syncthing，也不自动回灌。修改 schema 走版本化 SQL/迁移；重复请求必须幂等。离线研究结果不直接同步到权威 `results/`，应在云端以固定输入、代码版本、参数重跑验收。
+
+## 先识别环境，再执行开发命令
+
+在当前终端先检查 `uname -s`、`uname -m`、`hostname`、`pwd -P`、`git status --short` 和 `docker context show`。操作系统、执行位置和数据角色要一起判断：Mac 上 Docker 容器也报告 Linux，不能仅凭 Linux 就使用云端命令；Docker context 可能指向别的机器，也不能仅凭本地终端就认定使用本地算力。
+
+| 环境 | 判断依据 | 开发与数据规则 |
+|---|---|---|
+| Mac 宿主 | `Darwin`；当前主工作树 `/Users/lizeyu/Documents/ChatGPT/投资/QuantMind` | 默认优先本机全栈开发，用 `.local-dev/project` 和 `quantmind-dev_*` 独立卷；正式数据仍在云端 |
+| Linux 云端宿主 | SSH `lzy-vm`；项目真实路径与 `deploy/dual-node.env` 一致，SSD UUID 和 `AUTHORITY` 标记核对通过 | 可以编辑与研究；共享路径被正式服务挂载，实验性代码先在独立 worktree 验证，正式写入走云端服务 |
+| Docker 容器或其他 Linux/worktree | 容器内 `/app`、`/quantmind`，或不匹配上述宿主身份 | 先确认容器名、`QM_NODE_ROLE`、挂载源和 Docker context；不得推断为正式节点，也不得执行宿主迁移/启停脚本 |
+
+### Mac：优先使用本地资源
+
+以下命令在项目根目录的 Mac 宿主执行：
+
+```bash
+bash scripts/local-dev.sh status
+# 仅首次且不存在 .local-dev 时初始化；已初始化不重复执行
+bash scripts/local-dev.sh init
+# 按需选一个：core 为 DB/Redis/后端，full 再含 worker/资讯/QuantBot
+bash scripts/local-dev.sh start core
+# bash scripts/local-dev.sh start full
+# Vite 未运行时启动；不要重复占用 3000
+npm run dev:react --workspace=electron -- --host 127.0.0.1
+```
+
+`start` 会卸载原先承载 8000/18080 的云端隧道，8000 改为本地 API；`stop` 停本地容器、保留沙盒数据并恢复云端隧道。因此同一个 Vite 3000 页面在切换后可能写入不同数据库：切换前停止交互和任务，切换后刷新页面、重新确认后端角色再写入。`start` 当前不是热重启命令；已有沙盒运行时先检查状态，不能盲目重复启动。停止命令为 `bash scripts/local-dev.sh stop`，断网时其恢复隧道检查可能失败，要分别确认本地容器确已停止和云端连接状态。
+
+沙盒数据固定在 `.local-dev/SNAPSHOT_ID`；离线可使用本地已有数据与依赖，外部 LLM/行情源需要网络。`.env.local`、`config/runtime.env` 仍是共享配置，不要写入机器专属路径/角色；本地角色配置放 `deploy/compose.local-dev.yml`。涉及 Docker 子容器的训练/Agent 作业，要核对其实际挂载也指向沙盒后才启动：父容器标记为 sandbox 不等于任意子进程自动隔离。Mac 当前复用的后端镜像是 `linux/amd64`，Apple Silicon 上使用本机算力但存在架构转换开销；依赖、虚拟环境和构建产物按平台分别安装，不双向复制。
+
+### Linux：云端开发与发布
+
+在 `lzy-vm` 宿主项目目录操作服务统一用 `sudo -n bash scripts/dual-node.sh cloud-compose <参数>`；例如 `ps` 查看状态。该入口检查 SSD，不能用裸 Compose 替代。Linux 不运行 Mac 的 `local-dev.sh`、`launchctl` 或 APFS `cp -c` 命令。
+
+Linux 预检：`sudo -n python3 scripts/dual_node_check.py --node cloud`，它只检查云端。Mac 联网时执行 `python3 scripts/dual_node_check.py` 才同时核对两端 Git、工作树内容、快照与服务；不要在 Linux 直接运行无参数版本，它默认从 Mac 发起。Linux 独立 worktree 的测试使用明确隔离的数据与输出目录；正式部署始终回到已验证的权威项目入口。
+
+### 交接与提交
+
+换端开发时先结束当前任务，等待 Syncthing 完成，核对冲突、工作树和 Git 分支/HEAD。源码和共享配置双向同步，`.git` 独立传递；活跃数据库、`.local-dev`、模型输出与运行数据不双向合并。即使平时只有一端开发，也保留这些检查。
+
+仅暂存本次明确文件，保留已有未提交工作。修改文档或提交代码不等于授权重启服务；只有任务包含发布时才构建/重启，并选择没有活动研究任务的窗口。源码同步可能影响云端延迟导入的 Python 文件，高风险改动先在共享树之外测试。`AGENTS.md` 是环境规则主入口，`CLAUDE.md` 引用本节，详细数据规则统一维护在 `docs/development-data-contract.md`。
 
 ## 项目概述
 
@@ -28,10 +69,10 @@ QuantMind 是一个量化交易平台，后端为 Python（FastAPI），前端�
 
 ### 后端
 ```bash
-# 启动全部服务（Docker）
-docker-compose up -d
+# Mac 沙盒启动（Linux 宿主用上方 cloud-compose 入口）
+bash scripts/local-dev.sh start core
 
-# 本地运行单个服务
+# 仅在数据库、Redis、输出和凭据均隔离的测试环境运行单个服务
 SERVICE_MODE=api python backend/main_oss.py
 
 # 测试（在项目根目录执行）
@@ -97,7 +138,7 @@ npm run dashboard:build  # 生产环境构建
 - **前端修改规则**：**修改前端（electron/src）代码后，不需要每次重新构建或重启服务器上的 `web` 容器**，本地可实时热重载预览调试。提交前运行 `npm run typecheck` 保证类型安全即可。
 
 ### 2. 后端同步与部署
-- **后端修改规则**：**修改后端（backend/）代码后，必须推送到仓库并同步重启远程服务器上的后端容器**。
+- **后端修改规则**：先在当前开发环境验证；任务包含发布时才同步部署和重启云端对应服务。文档变更无需重启。
 
 ```bash
 # 1. 明确列出本次变更路径，勿混入他人工作/密钥/产物
@@ -106,8 +147,7 @@ git commit -m "descriptive message"
 git push origin HEAD
 
 # 2. 同步并重启后端服务（服务名见 docker compose config --services）
-# 注意：目标服务器的 SSH 别名/主机与项目目录因人而异，部署前先向用户询问确认。
-# 用 ${SSH_TARGET} 和 ${PROJECT_DIR} 表示用户提供的具体值。
+# 以下仅用于任务已包含云端发布时；当前目标记录在 deploy/dual-node.env。
 # 当前 lzy-vm 拓扑：Syncthing 同步工作树后核对 HEAD/内容，不在共享目录盲目 git pull。
 python3 scripts/dual_node_check.py
 ssh lzy-vm 'sudo -n bash -c "cd /root/code/QuantMind && bash scripts/dual-node.sh cloud-compose restart quantmind celery-worker celery-beat"'
@@ -115,10 +155,10 @@ ssh lzy-vm 'sudo -n bash -c "cd /root/code/QuantMind && bash scripts/dual-node.s
 
 ### 3. 镜像构建规则（是否需重新打包）
 - **后端代码走 bind mount**（`./backend:/app/backend` 等挂载进容器），镜像只含 Python 依赖环境。
-- **纯代码改动（未新增 pip 依赖、未改 Dockerfile/构建参数）**：只需 `git pull && docker compose restart`，**无需重新打包镜像**。
+- **纯代码改动（未新增 pip 依赖、未改 Dockerfile/构建参数）**：发布时先核对源码与 Git，再通过对应环境入口重启；无需重新打包镜像，不在同步工作树盲目 `git pull`。
 - **需要重build 的场景**：①新增了 `requirements.txt` 未收录的 Python 依赖；②升级 torch/qlib/duckdb 等底层库；③全新服务器首次部署无现成镜像。
-- **重build 方式**（利用 Docker build cache，通常仅增量安装新增包）：服务器上执行 `docker compose build quantmind`，再 `docker compose up -d`。
-- 本地 Windows 无法直接构建 linux/amd64 镜像，重build 一律在服务器或 CI 上进行。
+- **云端重build 方式**：在已授权的发布任务中执行 `sudo -n bash scripts/dual-node.sh cloud-compose build quantmind`，然后用同一入口 `up -d --no-deps quantmind`。
+- 跨 Mac/Linux 构建时核对镜像架构与依赖；不能把 Mac 的虚拟环境、node_modules 或数据库物理卷当作 Linux 可移植产物。
 
 ### 4. QwenPaw（QuantBot）技能更新
 - **统一入口**：`bash scripts/quantbot_init.sh`（在服务器上、项目根目录执行）。一次完成：本地 `skills/` 全部技能经 API 导入技能池 → 广播到 `default` 工作区并启用 → 写入量化人格（SOUL/PROFILE/AGENTS）。

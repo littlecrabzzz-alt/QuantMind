@@ -1,23 +1,25 @@
 # 双端开发与数据写入规范
 
-适用于本次迁移后的 Mac 与 `lzy-vm`，2026-09-08 起。开发前先运行：
+适用于本次迁移后的 Mac 与 `lzy-vm`，2026-09-08 起。环境识别与命令分流以 [AGENTS.md](../AGENTS.md) 为主。Mac 联网开发前先运行：
 
 ```bash
 python3 scripts/dual_node_check.py
 ```
 
+Linux 权威宿主在项目目录执行 `sudo -n python3 scripts/dual_node_check.py --node cloud`，只检查云端；无参数双端检查从 Mac 发起。Mac 离线可使用已初始化的固定快照沙盒，完整联网预检延后到重连时执行。
+
 此只读检查要求两端源码/共享配置内容哈希、Git HEAD/分支、快照 ID 一致，Syncthing 在线且无待同步项，Mac 旧服务停止且禁止自动重启，云端 SSD/服务/隧道正常。失败不自动修复或覆盖数据。编辑结束后给文件监听与传输留出时间，再检查。检查只是当时证据，不是对任意 root 命令的权限隔离。
 
-## 三种工作方式
+## 工作方式
 
 | 工作方式 | 代码 | 输入数据 | 输出与写入 |
 |---|---|---|---|
 | Mac 在线前端开发 | 当前共享工作树，`npm run dev:react --workspace=electron -- --host 127.0.0.1` | Vite 通过 8000 SSH 隧道连接云端 | API 操作写云端；这是正式数据，不是沙盒 |
-| Mac 全栈开发 | 当前共享工作树，`scripts/local-dev.sh start full` | 已校验云端快照的 APFS 写时复制副本和独立 Docker 卷 | 只写 `.local-dev` 沙盒；不上传、不回灌、不运行定时调度 |
+| Mac 全栈开发（本地开发默认选择） | 当前共享工作树，`scripts/local-dev.sh start full` | 已校验云端快照的 APFS 写时复制副本和独立 Docker 卷 | 业务写入使用沙盒；Celery beat 默认不启动；子作业另核对挂载 |
 | 本地测试/离线研究 | 独立 worktree 或只读源码 | 测试夹具，或固定 ID 的已校验快照 | 独立临时目录；不加载生产 `.env`，不连云端 DB/Redis，不运行调度器 |
 | 正式运行/数据作业 | 已核对并发布的云端版本 | 云端权威 DB、QuantDB、模型 | 仅云端业务服务写入；保留任务/实验 ID 与日志 |
 
-Mac 断网后在线界面不可用，但代码编辑和离线夹具/快照研究可继续。不能启动旧主库作为“兜底”。恢复联网后先做预检，不将旧本地数据库或 `data/results` 覆盖到云端。
+Mac 断网后云端入口不可用；已初始化的本地沙盒、代码编辑和离线夹具/快照研究可继续，外部 LLM/行情调用仍需要网络。不能启动旧主库作为“兜底”。恢复联网后先做预检，不将旧本地数据库或 `data/results` 覆盖到云端。
 
 Mac 全栈沙盒首次执行 `scripts/local-dev.sh init`：它从 `logs/cloud-snapshots/latest` 建立 APFS 写时复制数据副本，恢复独立 PostgreSQL/Redis/QwenPaw 卷；不会复制 68 GB 的第二份物理数据块，后续本地修改才逐步占空间。`start core` 只启动 DB、Redis 和四合一后端；`start full` 再启用 Celery worker、数据网关、Huntly、RSSHub 和 QuantBot。启动时端口 8000 从云端 SSH 隧道切到本地后端，3000 的 Vite 无需改配置；`scripts/local-dev.sh stop` 停本地沙盒并恢复云端隧道。Celery beat、实盘、TDX 推送、Web 更新和自动数据同步始终禁用。
 
