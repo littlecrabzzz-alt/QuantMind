@@ -15,8 +15,9 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from backend.shared.tushare_archive import link_manifest_alias
 from backend.shared.tushare_intake import digest
-from backend.shared.tushare_pipeline import atomic_json, manifest_at
+from backend.shared.tushare_pipeline import atomic_bytes, atomic_json, manifest_at
 
 PROJECT = Path(__file__).resolve().parents[1]
 
@@ -268,13 +269,34 @@ def mirror(root):
             raise ValueError("Remote manifest mismatch")
         # Storing the pinned manifest is safe before CURRENT is updated.
         manifest_path = root / "releases" / release / "manifest.json"
-        atomic_json(manifest_path, json.loads(raw))
+        if manifest_path.is_symlink() or any(
+            parent.is_symlink() for parent in manifest_path.parents
+        ):
+            raise ValueError("Refusing mirrored manifest symlink")
+        manifest_expected = {"sha256": digest(raw), "bytes": len(raw)}
+        if manifest_path.exists():
+            manifest_at(root, release)  # Verify existing bytes; preserve its inode.
+
+        elif not link_manifest_alias(
+            root,
+            "archives/" + release[5:] + ".json",
+            "releases/" + release + "/manifest.json",
+            manifest_expected,
+        ):
+            atomic_bytes(manifest_path, raw)
         manifest = manifest_at(root, release)
         missing, verified = [], {}
         for name, expected in manifest["files"].items():
             path = root / name
             if path.is_symlink() or path.parent.is_symlink():
                 raise ValueError("Refusing mirrored symlink")
+            if not path.exists() and re.fullmatch(r"archives/[a-f0-9]{64}\.json", name):
+                link_manifest_alias(
+                    root,
+                    "releases/data-" + path.stem + "/manifest.json",
+                    name,
+                    expected,
+                )
             stamp = checked_file(path, expected) if path.exists() else None
             if stamp is None:
                 missing.append(name)

@@ -4,6 +4,8 @@ No provider calls, credentials or Pipeline dependency. Publication is the caller
 responsibility. Recovery completeness is never upstream historical completeness.
 """
 
+from contextlib import contextmanager
+import errno
 import fcntl
 import hashlib
 import json
@@ -183,7 +185,188 @@ def _register(db, path, sha, size, dataset=None):
     )
 
 
-def _copy_manifest(root, raw):
+@contextmanager
+def _alias_parent(root, relative, *, create=False):
+    """Pin each directory without following symlinks during alias publication."""
+    if any(path.is_symlink() for path in (root, *root.parents)):
+        raise ArchiveError("symlink")
+    descriptor = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for part in Path(relative).parent.parts:
+            if create:
+                try:
+                    os.mkdir(part, dir_fd=descriptor)
+                except FileExistsError:
+                    pass
+            child = os.open(
+                part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor
+            )
+            os.close(descriptor)
+            descriptor = child
+        yield descriptor
+    finally:
+        os.close(descriptor)
+
+
+def link_manifest_alias(root, source, destination, expected):
+    """Create only a verified release/archive alias; preserve every existing file.
+
+    Directory descriptors and O_NOFOLLOW pin source identity against path swaps.
+    Same-filesystem files share an inode; EXDEV copies exact verified bytes.
+    Missing source returns False, allowing the mirror's normal transfer path.
+    """
+    pattern = r"(?:archives/([a-f0-9]{64})\.json|releases/(data-[a-f0-9]{64}|probe-[a-f0-9]{32})/manifest\.json)"
+    matches = [
+        re.fullmatch(pattern, name) if isinstance(name, str) else None
+        for name in (source, destination)
+    ]
+    if not all(matches) or source.startswith("archives/") == destination.startswith(
+        "archives/"
+    ):
+        raise ArchiveError("invalid_manifest_alias")
+    sha, size = expected.get("sha256"), expected.get("bytes")
+    if (
+        not isinstance(sha, str)
+        or not re.fullmatch(r"[a-f0-9]{64}", sha)
+        or type(size) is not int
+        or size < 0
+    ):
+        raise ArchiveError("invalid_manifest_metadata")
+    for match in matches:
+        named_sha = match[1] or (match[2][5:] if match[2].startswith("data-") else sha)
+        if named_sha != sha:
+            raise ArchiveError("manifest_alias_hash_identity_mismatch")
+    root = Path(root).absolute()
+    source_name, target_name = Path(source).name, Path(destination).name
+    try:
+        with _alias_parent(root, source) as source_dir:
+            source_fd = os.open(
+                source_name,
+                os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                dir_fd=source_dir,
+            )
+            try:
+                before = os.fstat(source_fd)
+                if not stat.S_ISREG(before.st_mode) or before.st_size != size:
+                    raise ArchiveError("manifest_alias_source_mismatch")
+
+                def verify(fd):
+                    initial = os.fstat(fd)
+                    if not stat.S_ISREG(initial.st_mode) or initial.st_size != size:
+                        raise ArchiveError("manifest_alias_not_regular_file")
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    digest = hashlib.sha256()
+                    while block := os.read(fd, 1024 * 1024):
+                        digest.update(block)
+                    final = os.fstat(fd)
+                    if (initial.st_size, initial.st_mtime_ns, initial.st_ctime_ns) != (
+                        final.st_size,
+                        final.st_mtime_ns,
+                        final.st_ctime_ns,
+                    ):
+                        raise ArchiveError("manifest_alias_file_changed")
+                    if digest.hexdigest() != sha:
+                        raise ArchiveError("manifest_alias_checksum_mismatch")
+
+                verify(source_fd)
+                after = os.fstat(source_fd)
+                if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+                    after.st_size,
+                    after.st_mtime_ns,
+                    after.st_ctime_ns,
+                ):
+                    raise ArchiveError("manifest_alias_source_changed")
+                with _alias_parent(root, destination, create=True) as target_dir:
+                    temporary = ".archive-alias-" + os.urandom(12).hex()
+                    try:
+                        try:
+                            os.link(
+                                source_name,
+                                temporary,
+                                src_dir_fd=source_dir,
+                                dst_dir_fd=target_dir,
+                                follow_symlinks=False,
+                            )
+                        except OSError as error:
+                            if error.errno != errno.EXDEV:
+                                raise
+                            fd = os.open(
+                                temporary,
+                                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                                0o600,
+                                dir_fd=target_dir,
+                            )
+                            with os.fdopen(fd, "wb") as stream:
+                                os.lseek(source_fd, 0, os.SEEK_SET)
+                                while block := os.read(source_fd, 1024 * 1024):
+                                    stream.write(block)
+                                stream.flush()
+                                os.fsync(stream.fileno())
+                        else:
+                            linked = os.stat(
+                                temporary, dir_fd=target_dir, follow_symlinks=False
+                            )
+                            if (linked.st_dev, linked.st_ino) != (
+                                before.st_dev,
+                                before.st_ino,
+                            ):
+                                raise ArchiveError("manifest_alias_source_replaced")
+                        fd = os.open(
+                            temporary,
+                            os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                            dir_fd=target_dir,
+                        )
+                        try:
+                            if os.fstat(fd).st_size != size:
+                                raise ArchiveError("manifest_alias_source_changed")
+                            verify(fd)
+                        finally:
+                            os.close(fd)
+                        try:
+                            os.link(
+                                temporary,
+                                target_name,
+                                src_dir_fd=target_dir,
+                                dst_dir_fd=target_dir,
+                                follow_symlinks=False,
+                            )
+                        except FileExistsError:
+                            fd = os.open(
+                                target_name,
+                                os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                                dir_fd=target_dir,
+                            )
+                            try:
+                                if os.fstat(fd).st_size != size:
+                                    raise ArchiveError(
+                                        "manifest_alias_destination_mismatch"
+                                    )
+                                verify(fd)
+                            finally:
+                                os.close(fd)
+                        published = _safe(root, destination).stat()
+                        pinned = os.stat(
+                            target_name, dir_fd=target_dir, follow_symlinks=False
+                        )
+                        if (published.st_dev, published.st_ino) != (
+                            pinned.st_dev,
+                            pinned.st_ino,
+                        ):
+                            raise ArchiveError("manifest_alias_directory_changed")
+                        os.fsync(target_dir)
+                    finally:
+                        try:
+                            os.unlink(temporary, dir_fd=target_dir)
+                        except FileNotFoundError:
+                            pass
+            finally:
+                os.close(source_fd)
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def _copy_manifest(root, raw, release=None):
     sha = _hash(raw)
     directory = root / "archives"
     if directory.is_symlink():
@@ -193,6 +376,13 @@ def _copy_manifest(root, raw):
     if destination.exists() or destination.is_symlink():
         if destination.is_symlink() or destination.read_bytes() != raw:
             raise ArchiveError("archive_copy_conflict")
+    elif release is not None and link_manifest_alias(
+        root,
+        f"releases/{release}/manifest.json",
+        f"archives/{sha}.json",
+        {"sha256": sha, "bytes": len(raw)},
+    ):
+        pass
     else:
         fd, temporary = tempfile.mkstemp(prefix=".archive-", dir=directory)
         try:
@@ -213,7 +403,7 @@ def _record_release(root, db, release, raw):
     ).fetchone()
     if old and old[0] != sha:
         raise ArchiveError("immutable_release_conflict")
-    path, sha = _copy_manifest(root, raw)
+    path, sha = _copy_manifest(root, raw, release)
     _register(db, path, sha, len(raw))
     db.execute(
         "INSERT OR IGNORE INTO archived_releases VALUES(?,?,?)", (release, path, sha)
