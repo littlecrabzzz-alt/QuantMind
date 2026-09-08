@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Simulated acquisition + a locally generated two-page PDF; never contacts APIs."""
 
+from datetime import datetime, timezone
 import hashlib
 import io
 import json
@@ -52,7 +53,7 @@ class Documents(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.root = Path(self.tmp.name)
+        self.root = Path(self.tmp.name).resolve()
 
     def fetch(self, response, url="https://example.com/report.pdf", **options):
         conn = connection(response)
@@ -248,6 +249,202 @@ class Documents(unittest.TestCase):
             Response(body, Content_Type="text/html"), url="https://example.com/policy"
         )
         self.assertEqual(retry["status"], "unsafe_storage_path")
+
+
+class DocumentQueue(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name).resolve()
+        self.network = patch.object(
+            socket.socket, "connect", side_effect=AssertionError("network forbidden")
+        )
+        self.dns = patch.object(
+            socket, "getaddrinfo", side_effect=AssertionError("DNS forbidden")
+        )
+        self.network.start()
+        self.dns.start()
+        self.addCleanup(self.network.stop)
+        self.addCleanup(self.dns.stop)
+
+    def saved(self, body=None, *, mime="application/pdf", parse="parsed"):
+        body = pdf() if body is None else body
+        suffix = ".pdf" if mime == "application/pdf" else ".html"
+        item = docs._save(self.root, "attachments", suffix, body, mime)
+        return {
+            "status": "downloaded",
+            "parse_status": parse,
+            "source_url": "https://example.com/original",
+            "mime": mime,
+            "document_sha256": item["sha256"],
+            "files": [item],
+        }
+
+    def due(self):
+        db = docs._document_db(self.root)
+        with db:
+            db.execute("UPDATE documents SET retry_after=0,parse_retry_after=0")
+        db.close()
+
+    def test_references_idempotence_empty_and_missing(self):
+        rows = [
+            {
+                "title": "a",
+                "url": "https://example.com/original",
+                "_row_identity": "a" * 64,
+            },
+            {
+                "title": "b",
+                "url": None,
+                "pub_time": datetime(2026, 9, 9, tzinfo=timezone.utc),
+            },
+        ]
+        first = docs.enqueue_documents(self.root, "obs-1", "anns_d", rows, ["url"])
+        again = docs.enqueue_documents(self.root, "obs-1", "anns_d", rows, ["url"])
+        docs.enqueue_documents(self.root, "obs-empty", "anns_d", [], ["url"])
+        self.assertEqual(first["enqueued"], 1)
+        self.assertEqual(again["enqueued"], 0)
+        self.assertEqual(again["existing"], 1)
+        inventory = docs.document_inventory(self.root)
+        self.assertEqual(len(inventory["mappings"]), 3)
+        self.assertEqual(
+            {r["status"] for r in inventory["mappings"]},
+            {"queued", "missing_url", "no_records"},
+        )
+        self.assertEqual(inventory["files"], [])
+        self.assertIn("a" * 64, [r["record_sha256"] for r in inventory["mappings"]])
+
+    def test_bounded_resume_and_url_revision_bytes_preserved(self):
+        for observation in ("old", "new"):
+            docs.enqueue_documents(
+                self.root,
+                observation,
+                "npr",
+                [{"url": "https://example.com/original"}],
+                ["url"],
+            )
+        with patch.object(
+            docs,
+            "_download_job",
+            side_effect=[
+                self.saved(
+                    b"<html>v1</html>", mime="text/html", parse="not_applicable"
+                ),
+                self.saved(
+                    b"<html>v2</html>", mime="text/html", parse="not_applicable"
+                ),
+            ],
+        ) as fetch:
+            self.assertEqual(docs.run_documents(self.root)["processed"], 1)
+            self.assertEqual(docs.run_documents(self.root)["processed"], 1)
+            self.assertEqual(docs.run_documents(self.root)["processed"], 0)
+            self.assertEqual(fetch.call_count, 2)
+        inventory = docs.document_inventory(self.root)
+        self.assertEqual(len(inventory["files"]), 2)
+        self.assertEqual(len(inventory["attempts"]), 2)
+        self.assertEqual(
+            {r["observation"] for r in inventory["mappings"]}, {"old", "new"}
+        )
+        self.assertTrue(
+            all(r["download_status"] == "downloaded" for r in inventory["mappings"])
+        )
+
+    def test_parse_retry_uses_saved_pdf_without_download(self):
+        docs.enqueue_documents(
+            self.root,
+            "obs",
+            "anns_d",
+            [{"url": "https://example.com/report.pdf"}],
+            ["url"],
+        )
+        with patch.object(
+            docs, "_download_job", return_value=self.saved(parse="parse_unavailable")
+        ) as fetch:
+            docs.run_documents(self.root)
+            self.assertEqual(docs.run_documents(self.root)["processed"], 0)
+            self.due()
+            with patch.object(
+                docs,
+                "_parse_pdf",
+                return_value={
+                    "parse_status": "parsed",
+                    "page_count": 1,
+                    "pages": [{"page_number": 1, "text": "retained evidence"}],
+                },
+            ):
+                self.assertEqual(docs.run_documents(self.root)["processed"], 1)
+            self.assertEqual(fetch.call_count, 1)
+        inventory = docs.document_inventory(self.root)
+        mapping = inventory["mappings"][0]
+        self.assertEqual(
+            (mapping["download_status"], mapping["parse_status"]),
+            ("downloaded", "parsed"),
+        )
+        self.assertEqual(mapping["download_tries"], 1)
+        self.assertEqual(len(inventory["files"]), 2)
+        self.assertEqual(
+            [a["phase"] for a in inventory["attempts"]], ["download", "parse"]
+        )
+
+    def test_download_failure_backoff_exhaustion_and_mime_check(self):
+        docs.enqueue_documents(
+            self.root,
+            "obs",
+            "anns_d",
+            [{"url": "https://example.com/download"}],
+            ["url"],
+        )
+        html = self.saved(
+            b"<html>login</html>", mime="text/html", parse="not_applicable"
+        )
+        with patch.object(docs, "_download_job", return_value=html):
+            docs.run_documents(self.root)
+        result = docs.document_inventory(self.root)["mappings"][0]
+        self.assertEqual(result["download_status"], "retry")
+        self.assertEqual(result["latest_result"]["status"], "expected_mime_mismatch")
+        with patch.object(
+            docs,
+            "_download_job",
+            return_value={
+                "status": "download_error",
+                "parse_status": "not_attempted",
+                "files": [],
+            },
+        ) as fetch:
+            self.assertEqual(docs.run_documents(self.root)["processed"], 0)
+            for _ in range(4):
+                self.due()
+                docs.run_documents(self.root)
+            self.due()
+            self.assertEqual(docs.run_documents(self.root)["processed"], 0)
+            self.assertEqual(fetch.call_count, 4)
+        inventory = docs.document_inventory(self.root)
+        self.assertEqual(inventory["mappings"][0]["download_status"], "blocked")
+        self.assertEqual(
+            len(inventory["files"]), 1
+        )  # Failed MIME bytes remain evidence.
+
+    def test_worker_deadline_schema_and_unreferenced_files(self):
+        worker = Mock(pid=123)
+        worker.communicate.side_effect = [
+            subprocess.TimeoutExpired("document", 1),
+            (b"", b""),
+        ]
+        with (
+            patch.object(docs.subprocess, "Popen", return_value=worker) as start,
+            patch.object(docs.os, "killpg") as kill,
+        ):
+            result = docs._download_job("https://example.com/a", self.root, 1)
+        self.assertEqual(result["status"], "download_timeout")
+        self.assertTrue(start.call_args.kwargs["start_new_session"])
+        kill.assert_called_once_with(123, docs.signal.SIGKILL)
+        self.saved(parse="parse_unavailable")  # Simulate bytes saved before a crash.
+        self.assertEqual(len(docs.document_inventory(self.root)["files"]), 1)
+        db = docs._document_db(self.root)
+        db.execute("PRAGMA user_version=99")
+        db.close()
+        with self.assertRaises(ValueError):
+            docs.run_documents(self.root)
 
 
 if __name__ == "__main__":

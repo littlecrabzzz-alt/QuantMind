@@ -1,12 +1,13 @@
 """Public document acquisition with pinned DNS, immutable files, bounded PDF parsing.
 
-No credentials, queue, database, browser, cookies or proxy configuration is read.
-The caller owns retries, authority checks and release publication.
+No credentials, browser, cookies or proxy configuration is read.
+A separate SQLite queue owns document retries; callers enforce authority and publication.
 """
 
 from __future__ import annotations
 
 import hashlib
+import fcntl
 import http.client
 import ipaddress
 import json
@@ -14,11 +15,14 @@ import os
 from pathlib import Path
 import re
 import socket
+import signal
+import sqlite3
 import ssl
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, timezone
+import time
+from datetime import date, datetime, timezone
 from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 
 MAX_REDIRECTS = 3
@@ -392,5 +396,473 @@ def fetch_document(url, root, max_bytes=25 * 1024 * 1024, timeout=20):
     return result
 
 
-if __name__ == "__main__" and len(sys.argv) == 3 and sys.argv[1] == "--parse-pdf":
-    print(_json(_parse_worker(sys.argv[2])).decode("utf-8"))
+def _document_db(root):
+    root = Path(root).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / "documents.sqlite"
+    if path.is_symlink():
+        raise DocumentError("unsafe_storage_path")
+    db = sqlite3.connect(path, timeout=10)
+    db.row_factory = sqlite3.Row
+    version = db.execute("PRAGMA user_version").fetchone()[0]
+    if version not in (0, 1):
+        db.close()
+        raise ValueError("Unsupported document queue schema version")
+    if version == 0:
+        db.executescript("""
+            BEGIN IMMEDIATE;
+            CREATE TABLE IF NOT EXISTS documents (
+                id TEXT PRIMARY KEY, observation TEXT NOT NULL, url TEXT NOT NULL,
+                expected_mime TEXT, download_status TEXT NOT NULL DEFAULT 'pending',
+                parse_status TEXT NOT NULL DEFAULT 'not_attempted',
+                download_tries INTEGER NOT NULL DEFAULT 0, parse_tries INTEGER NOT NULL DEFAULT 0,
+                retry_after REAL NOT NULL DEFAULT 0, parse_retry_after REAL NOT NULL DEFAULT 0,
+                result TEXT NOT NULL DEFAULT '{}');
+            CREATE TABLE IF NOT EXISTS document_refs (
+                id TEXT PRIMARY KEY, observation TEXT NOT NULL, api_name TEXT NOT NULL,
+                record_sha256 TEXT, field TEXT, source_url TEXT, document_id TEXT, status TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS document_attempts (
+                id INTEGER PRIMARY KEY, document_id TEXT NOT NULL,
+                phase TEXT NOT NULL, result TEXT NOT NULL, created_at REAL NOT NULL);
+            CREATE INDEX IF NOT EXISTS document_download_due ON documents(download_status,retry_after);
+            PRAGMA user_version=1;
+            COMMIT;
+        """)
+    return db
+
+
+def _reference_hash(value):
+    # Parquet readers may expose datetime/Decimal/bytes scalars. Their tagged
+    # identity remains stable without changing the stored supplier payload.
+    def scalar(item):
+        from decimal import Decimal
+
+        if isinstance(item, (date, datetime)):
+            return {"$type": type(item).__name__, "value": item.isoformat()}
+        if isinstance(item, Decimal):
+            return {"$decimal": str(item)}
+        if isinstance(item, bytes):
+            return {"$bytes_hex": item.hex()}
+        raise TypeError("Unsupported document record scalar")
+
+    return hashlib.sha256(
+        json.dumps(
+            value,
+            default=scalar,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def enqueue_documents(root, observation, api_name, records, fields):
+    """Register references from saved JSON/Parquet rows; never guess missing URLs.
+
+    Queue identity is observation + URL + expected MIME. Each record/field has a
+    separate reference; another observation of the same URL can capture revisions.
+    Empty observations and missing/invalid URL cells remain explicit references.
+    """
+    if not all(isinstance(v, str) and v for v in (observation, api_name)):
+        raise ValueError("observation and api_name are required")
+    if not isinstance(fields, (list, tuple)) or any(
+        not isinstance(f, str) or not f for f in fields
+    ):
+        raise ValueError("fields must be attachment field names")
+    if len(set(fields)) != len(fields):
+        raise ValueError("Duplicate attachment fields")
+    count = {"enqueued": 0, "missing": 0, "existing": 0, "references": 0}
+    db = _document_db(root)
+    try:
+        with db:
+            saw_record = False
+            for record in records:
+                if not isinstance(record, dict):
+                    raise ValueError("records must contain saved record objects")
+                saw_record = True
+                known_identity = record.get("_row_identity")
+                record_sha = (
+                    known_identity
+                    if isinstance(known_identity, str)
+                    and re.fullmatch(r"[a-f0-9]{64}", known_identity)
+                    else _reference_hash(record)
+                )
+                for field in fields or ("",):
+                    value = record.get(field)
+                    valid = isinstance(value, str) and bool(value.strip())
+                    status = (
+                        "queued"
+                        if valid
+                        else "not_applicable"
+                        if not field
+                        else "missing_url"
+                        if value is None or value == ""
+                        else "invalid_url_value"
+                    )
+                    expected = (
+                        "application/pdf"
+                        if field == "pdf_url"
+                        or (
+                            field == "url" and api_name in ("anns_d", "research_report")
+                        )
+                        else None
+                    )
+                    job_id = (
+                        hashlib.sha256(
+                            _json([observation, value, expected])
+                        ).hexdigest()
+                        if valid
+                        else None
+                    )
+                    if valid:
+                        inserted = db.execute(
+                            "INSERT OR IGNORE INTO documents(id,observation,url,expected_mime) VALUES(?,?,?,?)",
+                            (job_id, observation, value, expected),
+                        ).rowcount
+                        count["enqueued" if inserted else "existing"] += 1
+                    else:
+                        count["missing"] += 1
+                    ref_id = _reference_hash(
+                        [observation, api_name, record_sha, field, value]
+                    )
+                    count["references"] += db.execute(
+                        "INSERT OR IGNORE INTO document_refs VALUES(?,?,?,?,?,?,?,?)",
+                        (
+                            ref_id,
+                            observation,
+                            api_name,
+                            record_sha,
+                            field,
+                            value if isinstance(value, str) else None,
+                            job_id,
+                            status,
+                        ),
+                    ).rowcount
+            if not saw_record:
+                ref_id = hashlib.sha256(
+                    _json([observation, api_name, "no_records", fields])
+                ).hexdigest()
+                count["references"] += db.execute(
+                    "INSERT OR IGNORE INTO document_refs VALUES(?,?,?,?,?,?,?,?)",
+                    (
+                        ref_id,
+                        observation,
+                        api_name,
+                        None,
+                        None,
+                        None,
+                        None,
+                        "no_records",
+                    ),
+                ).rowcount
+        return count
+    finally:
+        db.close()
+
+
+def _download_job(url, root, timeout):
+    """Bound the complete download (including DNS/redirects and PDF subprocess)."""
+    worker = subprocess.Popen(
+        [sys.executable, "-I", str(Path(__file__).resolve()), "--fetch-document"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        env={"PATH": os.defpath, "LANG": "C.UTF-8"},
+        start_new_session=True,
+    )
+    try:
+        output, _ = worker.communicate(
+            _json({"url": url, "root": str(root), "timeout": min(20, timeout)}),
+            timeout=timeout,
+        )
+        if worker.returncode:
+            return {
+                "status": "download_error",
+                "parse_status": "not_attempted",
+                "reason": "download_process_failed",
+                "files": [],
+            }
+        return json.loads(output)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(worker.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        worker.communicate()
+        return {
+            "status": "download_timeout",
+            "parse_status": "not_attempted",
+            "files": [],
+        }
+    except (ValueError, OSError):
+        return {
+            "status": "download_error",
+            "parse_status": "not_attempted",
+            "reason": "download_process_error",
+            "files": [],
+        }
+    finally:
+        if worker.poll() is None:
+            try:
+                os.killpg(worker.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            worker.communicate()
+
+
+def _parse_saved(root, result, timeout):
+    result = dict(result)
+    files = list(result.get("files", []))
+    pdf = next((f for f in files if f.get("mime") == "application/pdf"), None)
+    if not pdf or not re.fullmatch(r"attachments/[a-f0-9]{64}\.pdf", pdf["path"]):
+        return {
+            **result,
+            "parse_status": "parse_failed",
+            "parse_detail": {"reason": "saved_pdf_missing"},
+        }
+    path = Path(root) / pdf["path"]
+    if (
+        path.is_symlink()
+        or path.parent.is_symlink()
+        or hashlib.sha256(path.read_bytes()).hexdigest() != pdf["sha256"]
+    ):
+        return {
+            **result,
+            "parse_status": "parse_failed",
+            "parse_detail": {"reason": "saved_pdf_checksum"},
+        }
+    parsed = _parse_pdf(path, timeout)
+    result["parse_status"] = parsed["parse_status"]
+    result["parse_detail"] = {k: v for k, v in parsed.items() if k != "pages"}
+    if parsed["parse_status"] in ("parsed", "no_text", "encrypted"):
+        result["validation_status"] = "pdf_structure_valid"
+    if "pages" in parsed:
+        parsed["document_sha256"] = pdf["sha256"]
+        artifact = _save(
+            Path(root).resolve(),
+            "extracted",
+            ".json",
+            _json(parsed),
+            "application/json",
+        )
+        if artifact not in files:
+            files.append(artifact)
+    result["files"] = files
+    return result
+
+
+def run_documents(root, max_documents=1, max_seconds=30):
+    """Advance bounded work; download and local parse retries use separate clocks.
+
+    Five attempts per phase with exponential backoff. Exhausted, encrypted,
+    no-text, size/parse-limit and invalid URL outcomes stay visible as gaps.
+    This function has no authority check: the production parent must enforce it.
+    """
+    if (
+        isinstance(max_documents, bool)
+        or not isinstance(max_documents, int)
+        or max_documents < 0
+    ):
+        raise ValueError("max_documents must be nonnegative")
+    if (
+        isinstance(max_seconds, bool)
+        or not isinstance(max_seconds, (int, float))
+        or not 0 < max_seconds <= 300
+    ):
+        raise ValueError("max_seconds must be between 0 and 300")
+    root = Path(root).resolve()
+    db = _document_db(root)
+    processed, started = 0, time.monotonic()
+    try:
+        lock_path = root / "documents.lock"
+        if lock_path.is_symlink():
+            raise DocumentError("unsafe_storage_path")
+        with lock_path.open("a") as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return {"status": "already_running", "processed": 0}
+            while (
+                processed < max_documents and time.monotonic() - started < max_seconds
+            ):
+                now = time.time()
+                job = db.execute(
+                    """SELECT * FROM documents WHERE
+                    (download_status IN ('pending','retry') AND retry_after<=?) OR
+                    (download_status='downloaded' AND parse_status IN ('parse_unavailable','parse_failed','parse_timeout')
+                     AND parse_tries<5 AND parse_retry_after<=?)
+                    ORDER BY id LIMIT 1""",
+                    (now, now),
+                ).fetchone()
+                if job is None:
+                    break
+                remaining = max_seconds - (time.monotonic() - started)
+                if remaining <= 0:
+                    break
+                phase = (
+                    "parse" if job["download_status"] == "downloaded" else "download"
+                )
+                previous = json.loads(job["result"])
+                try:
+                    result = (
+                        _parse_saved(root, previous, remaining)
+                        if phase == "parse"
+                        else _download_job(job["url"], root, remaining)
+                    )
+                except Exception as exc:
+                    result = {
+                        **previous,
+                        "status": "download_error"
+                        if phase == "download"
+                        else "downloaded",
+                        "parse_status": "parse_failed"
+                        if phase == "parse"
+                        else "not_attempted",
+                        "error_type": type(exc).__name__,
+                    }
+                if (
+                    phase == "download"
+                    and result.get("status") == "downloaded"
+                    and job["expected_mime"]
+                    and result.get("mime") != job["expected_mime"]
+                ):
+                    result["status"] = "expected_mime_mismatch"
+                dtries = job["download_tries"] + (phase == "download")
+                ptries = job["parse_tries"] + (
+                    phase == "parse" or result.get("mime") == "application/pdf"
+                )
+                good = result.get("status") == "downloaded"
+                terminal = result.get("status") in {
+                    "invalid_url",
+                    "invalid_scheme_or_host",
+                    "credentials_in_url",
+                    "nonstandard_port",
+                    "non_public_address",
+                    "invalid_host",
+                    "size_limit",
+                    "unsupported_or_invalid_document",
+                }
+                state = (
+                    "downloaded"
+                    if good
+                    else "blocked"
+                    if terminal or dtries >= 5
+                    else "retry"
+                )
+                delay = min(3600, 60 * 2 ** min(max(dtries, ptries), 6))
+                with db:
+                    db.execute(
+                        "INSERT INTO document_attempts(document_id,phase,result,created_at) VALUES(?,?,?,?)",
+                        (job["id"], phase, json.dumps(result), now),
+                    )
+                    db.execute(
+                        "UPDATE documents SET download_status=?,parse_status=?,download_tries=?,parse_tries=?,retry_after=?,parse_retry_after=?,result=? WHERE id=?",
+                        (
+                            state,
+                            result.get("parse_status", "not_attempted"),
+                            dtries,
+                            ptries,
+                            now + delay,
+                            now + delay,
+                            json.dumps(result),
+                            job["id"],
+                        ),
+                    )
+                processed += 1
+        return {"status": "ok", "processed": processed, "counts": _document_counts(db)}
+    finally:
+        db.close()
+
+
+def _document_counts(db):
+    return [
+        dict(row)
+        for row in db.execute(
+            "SELECT download_status,parse_status,count(*) AS documents FROM documents GROUP BY download_status,parse_status"
+        )
+    ]
+
+
+def document_inventory(root):
+    """Return portable immutable files, all observation mappings and phase status.
+
+    SQLite/locks never belong in a release. Include unreferenced committed files
+    left by a killed worker; the parent's release verifier checks their hashes.
+    """
+    root = Path(root).resolve()
+    db = _document_db(root)
+    try:
+        db.execute("BEGIN")
+        mappings = [
+            dict(row)
+            for row in db.execute("""SELECT r.*,d.expected_mime,d.download_status,d.parse_status,
+            d.download_tries,d.parse_tries,d.result AS latest_result FROM document_refs r
+            LEFT JOIN documents d ON r.document_id=d.id ORDER BY r.id""")
+        ]
+        for mapping in mappings:
+            mapping["latest_result"] = (
+                json.loads(mapping["latest_result"])
+                if mapping["latest_result"]
+                else None
+            )
+        attempts = [
+            dict(row)
+            for row in db.execute(
+                "SELECT document_id,phase,result,created_at FROM document_attempts ORDER BY id"
+            )
+        ]
+        for attempt in attempts:
+            attempt["result"] = json.loads(attempt["result"])
+        counts = _document_counts(db)
+        reference_counts = [
+            dict(row)
+            for row in db.execute(
+                "SELECT status,count(*) AS references_count FROM document_refs GROUP BY status"
+            )
+        ]
+        db.commit()
+        files = []
+        for directory, extensions in (
+            ("attachments", {"pdf": "application/pdf", "html": "text/html"}),
+            ("extracted", {"json": "application/json"}),
+        ):
+            parent = root / directory
+            if parent.is_symlink():
+                raise DocumentError("unsafe_storage_path")
+            if parent.exists():
+                for path in sorted(parent.iterdir()):
+                    if path.name.startswith(".document-"):
+                        continue
+                    if (
+                        path.is_symlink()
+                        or not re.fullmatch(r"[a-f0-9]{64}\.(pdf|html|json)", path.name)
+                        or path.suffix[1:] not in extensions
+                    ):
+                        raise DocumentError("unsafe_storage_path")
+                    files.append(
+                        {
+                            "path": str(path.relative_to(root)),
+                            "sha256": path.stem,
+                            "bytes": path.stat().st_size,
+                            "mime": extensions[path.suffix[1:]],
+                        }
+                    )
+        return {
+            "schema_version": 1,
+            "files": files,
+            "mappings": mappings,
+            "attempts": attempts,
+            "counts": counts,
+            "reference_counts": reference_counts,
+        }
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "--parse-pdf":
+        print(_json(_parse_worker(sys.argv[2])).decode("utf-8"))
+    elif len(sys.argv) == 2 and sys.argv[1] == "--fetch-document":
+        print(
+            _json(fetch_document(**json.loads(sys.stdin.buffer.read()))).decode("utf-8")
+        )
