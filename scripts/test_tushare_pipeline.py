@@ -346,6 +346,64 @@ class PipelineAcceptance(unittest.TestCase):
             self.assertEqual(json.loads(row["job"])["api_name"], "fund_daily")
             p.close()
 
+    def test_named_hourly_quota_preserves_other_work_and_survives_restart(self):
+        import time
+
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Pipeline(Path(tmp), CATALOG)
+            key = p.enqueue("hk_daily", {"trade_date": "20260907"}, priority=1)
+            p.db.execute("UPDATE jobs SET tries=5 WHERE id=?", (key,))
+            p.db.commit()
+            with httpx.Client(
+                transport=httpx.MockTransport(
+                    lambda _: httpx.Response(
+                        200,
+                        json={
+                            "code": 40203,
+                            "msg": "抱歉，您访问接口(hk_daily)频率超限(1次/小时)，具体频次详情。",
+                        },
+                    )
+                )
+            ) as client:
+                p.run(
+                    client,
+                    "fixture-token",
+                    {"requests_per_minute": 240},
+                    max_requests=1,
+                    pause=0,
+                )
+            self.assertEqual(
+                p.db.execute("SELECT state FROM jobs WHERE id=?", (key,)).fetchone()[0],
+                "pending",
+            )
+            self.assertGreater(
+                p.db.execute(
+                    "SELECT next_at FROM request_gates WHERE scope='api:hk_daily'"
+                ).fetchone()[0],
+                time.time() + 3500,
+            )
+            p.enqueue("fund_daily", {"trade_date": "20260907"}, priority=2)
+            p.db.commit()
+            p.close()
+            p = Pipeline(Path(tmp), CATALOG)
+            next_row = p.next_job({"requests_per_minute": 240}, time.monotonic() + 1)
+            self.assertEqual(json.loads(next_row["job"])["api_name"], "fund_daily")
+            # Simulate the hourly wait elapsing without sleeping. Learned quota
+            # must space the next successful request, not merely its retry.
+            p.db.execute("UPDATE jobs SET state='done' WHERE id=?", (next_row["id"],))
+            p.db.execute("UPDATE jobs SET retry_after=0 WHERE id=?", (key,))
+            p.db.execute("UPDATE request_gates SET next_at=0")
+            p.db.commit()
+            next_row = p.next_job({"requests_per_minute": 240}, time.monotonic() + 1)
+            self.assertEqual(json.loads(next_row["job"])["api_name"], "hk_daily")
+            self.assertGreater(
+                p.db.execute(
+                    "SELECT next_at FROM request_gates WHERE scope='api:hk_daily'"
+                ).fetchone()[0],
+                time.time() + 3500,
+            )
+            p.close()
+
     def test_frequency_error_is_not_permission_denial(self):
         from backend.shared.tushare_intake import assess_response, capture_sample
 

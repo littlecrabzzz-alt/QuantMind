@@ -193,11 +193,24 @@ class Pipeline:
                 )
                 if not 1 <= api_rpm <= 500:
                     raise ValueError("Invalid API request rate")
+                interval = config.get("api_min_interval_seconds", {}).get(api, 0)
+                if (
+                    isinstance(interval, bool)
+                    or not isinstance(interval, (int, float))
+                    or not 0 <= interval <= 86400
+                ):
+                    raise ValueError("Invalid API minimum request interval")
+                quota = self.db.execute(
+                    "SELECT reason FROM capability WHERE scope=? AND status='rate_limit_observed'",
+                    ("quota:" + api,),
+                ).fetchone()
+                if quota:
+                    interval = max(interval, json.loads(quota[0])["interval_seconds"])
                 self.db.executemany(
                     "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=excluded.next_at",
                     [
                         ("account", now + 60 / int(rpm)),
-                        ("api:" + api, now + 60 / api_rpm),
+                        ("api:" + api, now + max(60 / api_rpm, interval)),
                     ],
                 )
                 self._fair_turn += 1
@@ -1246,10 +1259,30 @@ class Pipeline:
             ):
                 state = "blocked" if row["tries"] >= 4 else "pending"
             if status == "rate_limited":
+                state = "pending"  # A quota wait is not a terminal data failure.
+                scoped = result.get("rate_limit_api") == job["api_name"]
+                scope = "api:" + job["api_name"] if scoped else "account"
+                cooldown = result.get("rate_limit_window_seconds", 60) if scoped else 60
                 self.db.execute(
-                    "INSERT INTO request_gates(scope,next_at) VALUES('account',?) ON CONFLICT(scope) DO UPDATE SET next_at=excluded.next_at",
-                    (time.time() + 60,),
+                    "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=MAX(next_at,excluded.next_at)",
+                    (scope, time.time() + cooldown),
                 )
+                if scoped:
+                    self.db.execute(
+                        "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,'rate_limit_observed',?,?) ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
+                        (
+                            "quota:" + job["api_name"],
+                            utc_now(),
+                            json.dumps(
+                                {
+                                    "window_seconds": cooldown,
+                                    "requests": result["rate_limit_requests"],
+                                    "interval_seconds": cooldown
+                                    / result["rate_limit_requests"],
+                                }
+                            ),
+                        ),
+                    )
             if status in (
                 "sample_ok",
                 "schema_gap",

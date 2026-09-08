@@ -303,7 +303,7 @@ class ParallelDocuments(unittest.TestCase):
 
     def test_download_only_does_not_start_pdf_parser(self):
         # Use only existing deterministic response fixtures; DNS/HTTP are mocked.
-        from test_tushare_documents import Response, resolution
+        from scripts.test_tushare_documents import Response, resolution
 
         response = Response(b"%PDF-fixture\n%%EOF", Content_Type="application/pdf")
         connection = Mock()

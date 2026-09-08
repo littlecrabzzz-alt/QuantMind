@@ -145,7 +145,7 @@ def assess_response(
         return {"status": "invalid_response"}
     code = payload.get("code")
     if code != 0:
-        return {
+        assessment = {
             "status": "rate_limited"
             if re.search(
                 r"每分钟|每小时|频率|频次|too many|rate.limit",
@@ -162,6 +162,24 @@ def assess_response(
             else "api_error",
             "code": code,
         }
+        # Only an explicit named interface quota can isolate its cooldown.
+        # Ambiguous/provider-wide errors retain the shared account backoff.
+        quota = re.search(
+            r"接口\(([A-Za-z0-9_]+)\)频率超限\(([1-9][0-9]*)次/(秒|分钟|小时|天)\)",
+            str(payload.get("msg", "")),
+        )
+        if assessment["status"] == "rate_limited" and quota:
+            assessment.update(
+                rate_limit_api=quota[1],
+                rate_limit_requests=int(quota[2]),
+                rate_limit_window_seconds={
+                    "秒": 1,
+                    "分钟": 60,
+                    "小时": 3600,
+                    "天": 86400,
+                }[quota[3]],
+            )
+        return assessment
     data = payload.get("data")
     if not isinstance(data, dict):
         return {"status": "invalid_response"}
