@@ -233,7 +233,7 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
             { title: '净收益', render: (_, e) => fmt(e.result?.summary.comparison.model.total_return, true) },
             { title: '最大回撤', render: (_, e) => fmt(e.result?.summary.comparison.model.max_drawdown, true) },
             { title: '费用（元）', render: (_, e) => fmt(e.result?.summary.comparison.model.transaction_cost) },
-            { title: '结论', render: (_, e) => e.status !== 'completed' ? '失败，证据保留' : e.gates ? Object.values(e.gates).every(Boolean) ? '通过开发门槛' : '未通过开发门槛' : '已核验' },
+            { title: '结论', render: (_, e) => e.status !== 'completed' ? <Space>失败，证据保留{e.result?.artifacts['execution.log'] && <Button size="small" onClick={() => void download(e, 'execution.log')}>日志</Button>}</Space> : e.gates ? Object.values(e.gates).every(Boolean) ? '通过开发门槛' : '未通过开发门槛' : '已核验' },
           ]} />
           {experiments.filter(e => e.result?.factor_analysis).map(e => {
             const m = e.result!.factor_analysis!.splits.valid;
