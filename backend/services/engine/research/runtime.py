@@ -159,6 +159,7 @@ def _launch(case_dir, experiment, config, contract, deadline):
     spec = {"image": contract["image"]["Id"], "name": experiment["container_name"],
         "platform": contract["image"]["Os"]+"/"+contract["image"]["Architecture"],
         "network_mode": "none", "read_only": True, "nano_cpus": 2_000_000_000,
+        "healthcheck": {"test": ["NONE"]},
         "mem_limit": "8g", "tmpfs": {"/tmp": "rw,size=1g"}, "working_dir": "/output",
         "labels": {"quantmind.research.node": contract["node_id"], "quantmind.research.id": experiment["id"]},
         "volumes": {
@@ -243,9 +244,13 @@ def model_decision(folder, contract, name, properties, prompt, deadline):
         attempts = sorted(folder.glob("attempt-*.json"))
         if attempts:
             previous = frozen.read(attempts[-1])
-            if previous["status"] != "retryable":
-                raise ValueError("上次模型调用结果不明，保留调用证据等待检查")
-            if time.time() < previous["retry_at"]:
+            if previous["status"] not in ("retryable", "uncertain", "intent"):
+                raise ValueError("上次模型调用被服务拒绝，保留调用证据等待检查")
+            # Model calls only propose text: replay cannot submit an experiment.
+            # Keep unknown usage and wait out a crashed request before another call.
+            retry_at = previous.get("retry_at", attempts[-1].stat().st_mtime +
+                                    (210 if previous["status"] == "intent" else retry_delay(len(attempts), None)))
+            if time.time() < retry_at:
                 return None
         if deadline-time.time() < 60:
             return None
@@ -259,13 +264,13 @@ def model_decision(folder, contract, name, properties, prompt, deadline):
             data=json.dumps(payload).encode(), headers={"Content-Type": "application/json",
             "Authorization": "Bearer "+credentials_config["api_key"]})
         try:
-            with urllib.request.urlopen(request, timeout=min(120, deadline-time.time()-30)) as stream:
+            with urllib.request.urlopen(request, timeout=min(180, deadline-time.time()-30)) as stream:
                 response = json.load(stream)
             frozen.write(response_file, response)
             frozen.write(attempt_file, {"status": "completed", "usage": response.get("usage"),
                                        "seconds": time.time()-started})
         except urllib.error.HTTPError as exc:
-            if exc.code in (429, 503):
+            if exc.code == 429 or 500 <= exc.code <= 599:
                 delay = retry_delay(len(attempts)+1, exc.headers.get("Retry-After"))
                 frozen.write(attempt_file, {"status": "retryable", "http_status": exc.code,
                     "retry_at": time.time()+delay, "usage": None})
@@ -273,8 +278,9 @@ def model_decision(folder, contract, name, properties, prompt, deadline):
             frozen.write(attempt_file, {"status": "failed", "http_status": exc.code, "usage": None})
             raise ValueError(f"模型服务 HTTP {exc.code}") from None
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
-            frozen.write(attempt_file, {"status": "uncertain", "usage": None})
-            raise ValueError("模型调用响应不明，停止自动重发并保留请求记录") from None
+            frozen.write(attempt_file, {"status": "uncertain", "usage": None,
+                "retry_at": time.time()+retry_delay(len(attempts)+1, None)})
+            return None
     try:
         calls = response["choices"][0]["message"].get("tool_calls") or []
         if len(calls) != 1 or calls[0]["function"]["name"] != name:
