@@ -340,7 +340,7 @@ class Pipeline:
                     elif (
                         key == "ts_code"
                         and result["api_name"] in GLOBAL_CONTRACTS
-                        and re.fullmatch(r"[0-9]{5}!?\.HK", value)
+                        and re.fullmatch(r"[0-9]{5}(?:![A-Z]{0,8})?\.HK", value)
                     ):
                         row[key] = "HK" + value.removesuffix(".HK")
                     elif re.fullmatch(r"\d{6}\.(SH|SZ|BJ)", value):

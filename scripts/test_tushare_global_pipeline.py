@@ -125,6 +125,7 @@ class GlobalPipeline(unittest.TestCase):
     def test_prefix_conversion_preserves_raw_and_revision_identity(self):
         cases = [
             ("hk_daily", "00700.HK", "HK00700"),
+            ("hk_daily", "02121!AE.HK", "HK02121!AE"),
             ("us_daily", "BRK.B", "USBRK.B"),
             ("us_daily", "USG", "USUSG"),
             ("weekly", "600000.SH", "SH600000"),
