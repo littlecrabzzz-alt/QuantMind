@@ -337,6 +337,12 @@ class PipelineAcceptance(unittest.TestCase):
             )["status"],
             "rate_limited",
         )
+        self.assertEqual(
+            assess_response({"code": 40203, "msg": "没有访问该接口的权限"}, 1000, [])[
+                "status"
+            ],
+            "permission_denied",
+        )
         with (
             tempfile.TemporaryDirectory() as tmp,
             httpx.Client(

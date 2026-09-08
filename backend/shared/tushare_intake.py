@@ -153,7 +153,12 @@ def assess_response(
                 re.I,
             )
             else "permission_denied"
-            if code == 2002
+            if code in (2002, 40203)
+            or re.search(
+                r"没有.{0,12}权限|无权访问|permission.denied|not.authorized",
+                str(payload.get("msg", "")),
+                re.I,
+            )
             else "api_error",
             "code": code,
         }
