@@ -446,7 +446,8 @@ class QuantDBFactorReader:
         start_s, end_s = str(start)[:10], str(end)[:10]
 
         duckdb = self._duckdb()
-        con = duckdb.connect(config={"memory_limit": "8GB", "threads": "4"})
+        # Leave room for the API's other processes and the returned pandas frame.
+        con = duckdb.connect(config={"memory_limit": "4GB", "threads": "2"})
         try:
             date_expr = factor_date
             from_clause = f"{factor_relation} AS f"
@@ -454,7 +455,8 @@ class QuantDBFactorReader:
                 # factors.date 为实际交易日，补给表 dt 为 hive 分区整数。
                 # 用日期格式化连接可同时兼容 int/string 两种 dt 物理类型。
                 from_clause += (
-                    f" LEFT JOIN {ohlcv_join} AS k"
+                    f" LEFT JOIN (SELECT * FROM {ohlcv_join} "
+                    "WHERE CAST(dt AS VARCHAR) BETWEEN ? AND ?) AS k"
                     " ON k.symbol = f.symbol"
                     f" AND CAST(k.dt AS VARCHAR) = strftime({date_expr}, '%Y%m%d')"
                 )
@@ -462,7 +464,9 @@ class QuantDBFactorReader:
                 f"SELECT {', '.join(selected)} FROM {from_clause} "
                 f"WHERE {date_expr} BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)"
             )
-            frame = con.execute(sql, [start_s, end_s]).fetchdf()
+            params = ([start_s.replace("-", ""), end_s.replace("-", "")]
+                      if ohlcv_join else []) + [start_s, end_s]
+            frame = con.execute(sql, params).fetchdf()
         finally:
             con.close()
         frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="coerce")

@@ -2,6 +2,15 @@
 
 本文件为 AI 编码助手（Claude Code / Codex / QwenPaw 等）在此仓库中工作时提供指导。
 
+## 当前双端开发约束（优先于下方通用 OSS 命令）
+
+- 权威数据节点为 `lzy-vm:/root/code/QuantMind`，真实目录在 SSD `/root/data/disk/quantmind/project`。先读 `docs/dual-node-deployment.md` 与 `docs/development-data-contract.md`。
+- Mac 的旧 `data/`、`results/`、数据库卷仅保留作迁移基线，禁止重启原完整 Compose 栈、调度器或回灌这些数据。联网前端连接 SSH 隧道 `127.0.0.1:8000/18080`；断网不得切回另一主库。
+- 源码工作树和共享密钥由 Syncthing 双向同步；`.git` 独立。不要两端同时编辑同一文件、在共享运行目录切分支或批量 checkout。并行后端开发使用独立 worktree；测试不挂载权威数据可写，不携带生产凭据，不接生产网络。
+- 开发前/发布前运行 `python3 scripts/dual_node_check.py`，离线只做独立测试或固定快照研究。任何 `.sync-conflict-*`、代码哈希/Git HEAD 不一致都必须先处理，不能自动覆盖。
+- 后端发布只走 `scripts/dual-node.sh cloud-compose`；禁止裸 Compose 遗漏云端覆盖层。先确认没有训练/研究任务，核对同步与改动，明确提交路径（不要 `git add .`），再重启相关服务并验收。
+- 数据写入只在云端由现有业务服务/作业完成；修改 schema 走版本化 SQL/迁移；重复请求必须幂等。离线研究结果不直接同步到权威 `results/`，应在云端以固定输入、代码版本、参数重跑验收。
+
 ## 项目概述
 
 QuantMind 是一个量化交易平台，后端为 Python（FastAPI），前端为 Electron/React/TypeScript。开源版（OSS）采用单容器部署，所有后端服务运行在同一个容器中。
@@ -91,15 +100,17 @@ npm run dashboard:build  # 生产环境构建
 - **后端修改规则**：**修改后端（backend/）代码后，必须推送到仓库并同步重启远程服务器上的后端容器**。
 
 ```bash
-# 1. 本地提交并推送
-git add .
+# 1. 明确列出本次变更路径，勿混入他人工作/密钥/产物
+git add <本次修改的文件>
 git commit -m "descriptive message"
-git push gitee NEXT
+git push origin HEAD
 
 # 2. 同步并重启后端服务（服务名见 docker compose config --services）
 # 注意：目标服务器的 SSH 别名/主机与项目目录因人而异，部署前先向用户询问确认。
 # 用 ${SSH_TARGET} 和 ${PROJECT_DIR} 表示用户提供的具体值。
-ssh ${SSH_TARGET} "cd ${PROJECT_DIR} && git pull && docker compose restart quantmind celery-worker celery-beat"
+# 当前 lzy-vm 拓扑：Syncthing 同步工作树后核对 HEAD/内容，不在共享目录盲目 git pull。
+python3 scripts/dual_node_check.py
+ssh lzy-vm 'sudo -n bash -c "cd /root/code/QuantMind && bash scripts/dual-node.sh cloud-compose restart quantmind celery-worker celery-beat"'
 ```
 
 ### 3. 镜像构建规则（是否需重新打包）

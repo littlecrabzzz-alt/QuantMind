@@ -11,13 +11,33 @@ from unittest.mock import MagicMock, Mock, patch
 
 import dual_node_deploy
 import check_cloud_health
-from dual_node_sync import desired, topology
+from dual_node_sync import content_digest, desired, topology
 from dual_node_inventory import runtime_path
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class DeploymentBoundary(unittest.TestCase):
+    def test_mac_guard_selects_no_default_services(self):
+        services = subprocess.check_output([
+            "docker", "compose", "--env-file", ".env.local", "-f", "docker-compose.yml",
+            "-f", "deploy/compose.mac-client.yml", "config", "--services"], cwd=ROOT, text=True)
+        self.assertEqual(services.strip(), "")
+
+    def test_source_digest_includes_secrets_and_rejects_conflicts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / ".env.local").write_text("SECRET=fixture-one")
+            nodes = [{"name": ".env.local", "type": "FILE_INFO_TYPE_FILE"}]
+            original = content_digest(root, nodes)
+            self.assertEqual(original["contentFiles"], 1)
+            (root / ".env.local").write_text("SECRET=fixture-two")
+            self.assertNotEqual(original, content_digest(root, nodes))
+            conflict = "source.sync-conflict-test.py"
+            (root / conflict).touch()
+            with self.assertRaisesRegex(RuntimeError, "conflict"):
+                content_digest(root, [{"name": conflict, "type": "FILE_INFO_TYPE_FILE"}])
+
     def test_health_requires_all_four_child_services(self):
         opener = MagicMock()
         opener.open.return_value.__enter__.return_value.status = 200
@@ -179,6 +199,7 @@ class DeploymentBoundary(unittest.TestCase):
             "config", "--format", "json"], cwd=ROOT)
         config = json.loads(raw)
         services = config["services"]
+        self.assertEqual(int(services["quantmind"]["mem_limit"]), 12 * 1024**3)
         for name in ("db", "redis", "huntly", "rsshub", "qwenpaw", "data-gateway"):
             self.assertFalse(services[name].get("ports"), name)
         self.assertEqual(services["web"]["ports"][0]["published"], topology()["QM_WEB_PORT"])

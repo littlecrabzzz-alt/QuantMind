@@ -1,0 +1,13 @@
+# Installed as docker-compose.override.yml on the migrated Mac only.
+# A bare `docker compose up` must not revive the former data authority.
+services:
+  db: {profiles: [manual-old-authority], restart: "no"}
+  redis: {profiles: [manual-old-authority], restart: "no"}
+  quantmind: {profiles: [manual-old-authority], restart: "no"}
+  celery-worker: {profiles: [manual-old-authority], restart: "no"}
+  celery-beat: {profiles: [manual-old-authority], restart: "no"}
+  data-gateway: {profiles: [manual-old-authority], restart: "no"}
+  huntly: {profiles: [manual-old-authority], restart: "no"}
+  rsshub: {profiles: [manual-old-authority], restart: "no"}
+  qwenpaw: {profiles: [manual-old-authority], restart: "no"}
+  ib-gateway: {profiles: [manual-old-authority], restart: "no"}

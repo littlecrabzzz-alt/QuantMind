@@ -69,40 +69,27 @@ function persistServerUrl(url: string | null): void {
  * 检测是否为 Electron 桌面环境
  */
 export function isElectronEnv(): boolean {
-  return typeof window !== 'undefined' && typeof (window as any).electronAPI === 'object';
+  // The browser compatibility shim also defines electronAPI, but has no IPC.
+  return typeof window !== 'undefined' && typeof (window as any).electronAPI?.getServerUrl === 'function';
 }
 
 /**
  * 校验服务器地址是否可达（通过 /health 端点）
  */
 export async function isServerReachable(url: string, timeoutMs = 8000): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
     const res = await fetch(`${url.replace(/\/+$/, '')}/health`, {
       signal: controller.signal,
       // 不携带凭据，仅做连通性探测
       cache: 'no-store',
     });
-    clearTimeout(timer);
     return res.ok;
   } catch {
     return false;
-  }
-}
-
-/**
- * 清理失效的服务器配置（本地缓存 + 桌面端配置文件）
- */
-async function clearStaleServerUrl(reason: string): Promise<void> {
-  console.warn(`[services] 服务器地址失效，清除缓存配置: ${reason}`);
-  persistServerUrl(null);
-  if (typeof window !== 'undefined' && (window as any).electronAPI?.setServerUrl) {
-    try {
-      await (window as any).electronAPI.setServerUrl('');
-    } catch (e) {
-      console.warn('[services] 清除桌面配置文件失败（忽略）:', e);
-    }
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -115,32 +102,19 @@ async function clearStaleServerUrl(reason: string): Promise<void> {
  * 避免“隔段时间保存的 IP 丢失、需重新配置”的问题。
  */
 export async function initDynamicServerUrl(): Promise<void> {
-  // 1. 持久化配置：若探测可达则采用；若确认不可达，清除缓存并回退本机默认，
-  //    避免换 IP/克隆部署到新机器后始终连旧地址导致“验证身份”卡死。
+  // Disconnection must never switch the data authority to another backend.
   const persisted = readPersistedServerUrl();
   if (persisted) {
-    const ok = await isServerReachable(persisted);
-    if (ok) {
-      dynamicServerUrl = persisted;
-      return;
-    }
-    console.warn(`[services] 服务器 ${persisted} 探测未通过，清除配置并回退本地默认后端`);
-    await clearStaleServerUrl(`换 IP 后旧地址 ${persisted} 不可达`);
+    dynamicServerUrl = persisted;
+    return;
   }
 
-  // 2. 旧 key（quantmind_server_url）遗留缓存迁移：可达才采用，失效仅清旧 key（不动新 key）
+  // 2. Migrate the saved address without requiring a working network.
   const legacy = readLegacyPersistedServerUrl();
   if (legacy) {
-    const ok = await isServerReachable(legacy);
-    if (ok) {
-      dynamicServerUrl = legacy;
-      persistServerUrl(legacy);
-      return;
-    }
-    try {
-      localStorage.removeItem(LEGACY_SERVER_URL_STORAGE_KEY);
-    } catch { /* ignore */ }
-    console.warn(`[services] 旧版服务器地址失效，清除缓存: ${legacy}`);
+    dynamicServerUrl = legacy;
+    persistServerUrl(legacy);
+    return;
   }
 
   // 3. Electron 配置文件：同样采用 + 后台探测日志，不清除

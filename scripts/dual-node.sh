@@ -18,6 +18,15 @@ cloud_guard() {
 }
 
 case "${1:-help}" in
+  install-mac-guard)
+    [ "$(uname -s)" = Darwin ]
+    ssh "$QM_SSH_TARGET" "sudo -n test -f $QM_REMOTE_ROOT/AUTHORITY"
+    if [ -e docker-compose.override.yml ] && ! cmp -s deploy/compose.mac-client.yml docker-compose.override.yml; then
+      echo 'Existing local Compose override differs; refusing to overwrite it.' >&2
+      exit 1
+    fi
+    install -m 0644 deploy/compose.mac-client.yml docker-compose.override.yml
+    ;;
   install-tunnel)
     # Only after cutover: never take port 8000 away from the original Mac service.
     [ "$(uname -s)" = Darwin ]
@@ -86,7 +95,7 @@ case "${1:-help}" in
     ssh -o BatchMode=yes "$QM_SSH_TARGET" "sudo -n bash -c 'df -h $QM_REMOTE_ROOT; test ! -f $QM_REMOTE_ROOT/AUTHORITY || cat $QM_REMOTE_ROOT/AUTHORITY; cd $QM_REMOTE_PROJECT; bash scripts/dual-node.sh cloud-compose ps'"
     ;;
   *)
-    echo 'Usage: bash scripts/dual-node.sh {preseed|images|web-publish|install-tunnel|connect|cloud-compose <args...>|status}'
+    echo 'Usage: bash scripts/dual-node.sh {preseed|images|web-publish|install-mac-guard|install-tunnel|connect|cloud-compose <args...>|status}'
     exit 2
     ;;
 esac

@@ -96,6 +96,11 @@ def test_read_range_backfills_null_factor_ohlcv_from_daily_backward(tmp_path):
         _frame("2024-01-02", 12).drop(columns=["date", "l1_alpha"]),
         "20240102",
     )
+    # An unrelated partition must not join into the requested day.
+    _write_daily_backward_partition(
+        tmp_path, _frame("2024-01-03", 999).drop(columns=["date", "l1_alpha"]),
+        "20240103",
+    )
 
     frame = QuantDBFactorReader(tmp_path).read_day(
         "l1_factors", features=["l1_alpha"], trade_date="2024-01-02"

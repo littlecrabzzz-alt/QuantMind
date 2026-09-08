@@ -12,7 +12,7 @@ services:
   quantmind:
     ports: !override
       - "127.0.0.1:18000:8000"
-    mem_limit: 6g
+    mem_limit: 12g
     cpus: 3.0
     healthcheck:
       # Stdlib-only probe: skip the global LiteLLM sitecustomize/network import.

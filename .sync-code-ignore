@@ -20,6 +20,9 @@ __pycache__
 /electron/dist-electron
 .rsync-partial
 /logs
+/.playwright-cli
+/output
+/docker-compose.override.yml
 /results*
 /models
 /mlruns
