@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 import fcntl
 import os
 from pathlib import Path
@@ -79,10 +80,21 @@ def freeze_code(directory, contract):
             raise ValueError("本课题的冻结执行代码发生变化")
 
 
+@contextmanager
 def docker_client():
     # The backend image already ships the Docker SDK used by training launchers.
     import docker
-    return docker.DockerClient(base_url="unix:///var/run/docker.sock", timeout=30)
+    client = None
+    try:
+        client = docker.DockerClient(base_url="unix:///var/run/docker.sock", timeout=30)
+        yield client
+    except docker.errors.NotFound:
+        raise
+    except docker.errors.DockerException:
+        raise RuntimeError("Docker 服务暂时不可达，保留原容器标识等待恢复") from None
+    finally:
+        if client:
+            client.close()
 
 
 def inspect(name):
