@@ -22,6 +22,10 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from backend.shared.tushare_registry import EXTENDED_CONTRACTS, PLANNERS, contract_for
+from backend.shared.tushare_global_contracts import (
+    GLOBAL_CONTRACTS,
+    global_prerequisites,
+)
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
@@ -192,6 +196,10 @@ class Pipeline:
 
     def enqueue(self, api, params, priority=10, epoch="history"):
         spec = contract_for(api)
+        if spec.get("group") == "global" and spec.get("pagination"):
+            params = dict(params)
+            pagination = spec["pagination"]
+            params.setdefault(pagination["limit_param"], pagination["page_size"])
         cap, required = (
             CONTRACTS[api]
             if api in CONTRACTS
@@ -286,8 +294,28 @@ class Pipeline:
                 value = row.get(key)
                 if isinstance(value, str):
                     row["source_" + key] = value
-                    if re.fullmatch(r"\d{6}\.(SH|SZ|BJ)", value):
+                    if (
+                        key == "ts_code"
+                        and result["api_name"] in GLOBAL_CONTRACTS
+                        and result["api_name"].startswith("us_")
+                    ):
+                        # US symbols are opaque supplier tickers, not suffix codes.
+                        row[key] = "US" + value
+                    elif (
+                        key == "ts_code"
+                        and result["api_name"] in GLOBAL_CONTRACTS
+                        and re.fullmatch(r"[0-9]{5}\.HK", value)
+                    ):
+                        row[key] = "HK" + value.removesuffix(".HK")
+                    elif re.fullmatch(r"\d{6}\.(SH|SZ|BJ)", value):
                         row[key] = StockCodeUtil.to_prefix(value)
+                    elif (
+                        key == "ts_code"
+                        and result["api_name"] in GLOBAL_CONTRACTS
+                        and re.fullmatch(r"[A-Za-z0-9]+\.[A-Z]+", value)
+                    ):
+                        symbol, exchange = value.rsplit(".", 1)
+                        row[key] = exchange + symbol
                     elif re.fullmatch(r"CI\d+\.CI", value):
                         row[key] = value.removesuffix(".CI")
                     elif (
@@ -413,6 +441,8 @@ class Pipeline:
     def identifiers(self):
         families = {
             "stock_basic": "stocks",
+            "hk_basic": "hk_stocks",
+            "us_basic": "us_stocks",
             "index_basic": "indexes",
             "etf_basic": "funds",
             "fund_basic": "funds",
@@ -428,8 +458,10 @@ class Pipeline:
         for row in self.db.execute(
             "SELECT result FROM jobs WHERE result IS NOT NULL AND json_extract(job,'$.api_name') IN ("
             + placeholders
+            + ") UNION SELECT result FROM attempts WHERE json_extract(result,'$.api_name') IN ("
+            + placeholders
             + ")",
-            tuple(families),
+            tuple(families) + tuple(families),
         ):
             saved = json.loads(row[0])
             for record in self.records(saved):
@@ -454,8 +486,59 @@ class Pipeline:
                     result[families[saved["api_name"]]].add(code)
         return {key: sorted(values) for key, values in result.items()}
 
+    def record_global_planning_gaps(self, config, identifiers):
+        # Nonempty discovery and an explicit 1990 scope are not completeness proof.
+        # Keep planning evidence in the existing portable capability inventory.
+        global_prerequisites(identifiers, config=config)  # validate before mutation
+        selected = config.get("global_apis", tuple(GLOBAL_CONTRACTS))
+        setting = config.get("global_history_start")
+        for api in selected:
+            spec = GLOBAL_CONTRACTS[api]
+            evidence = []
+            if spec.get("history_gap"):
+                explicit = setting.get(api) if isinstance(setting, dict) else setting
+                evidence.append(
+                    (
+                        "history",
+                        "unknown_history_bound",
+                        {
+                            "reason": spec["history_gap"],
+                            "requested_start": explicit or config.get("history_start"),
+                            "scope_is_full_history_proof": False,
+                        },
+                    )
+                )
+            family = spec.get("saturation_fallback")
+            if family:
+                count = len(identifiers.get(family, []))
+                evidence.append(
+                    (
+                        "discovery",
+                        "discovery_unverified" if count else "awaiting_discovery",
+                        {
+                            "family": family,
+                            "observed_codes": count,
+                            "universe_complete": False,
+                        },
+                    )
+                )
+            for kind, status, reason in evidence:
+                self.db.execute(
+                    "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
+                    "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason "
+                    "WHERE capability.status<>excluded.status OR capability.reason<>excluded.reason",
+                    (
+                        f"planning:global:{api}:{kind}",
+                        status,
+                        utc_now(),
+                        json.dumps(reason, sort_keys=True),
+                    ),
+                )
+
     def plan_extended(self, config, today):
         identifiers = self.identifiers()
+        if config.get("enable_global", False):
+            self.record_global_planning_gaps(config, identifiers)
         budget = int(config.get("plan_jobs_per_tick", 2000))
         if not 1 <= budget <= 10000:
             raise ValueError("Invalid planner batch size")
@@ -474,6 +557,8 @@ class Pipeline:
                             "text_apis",
                             "structured_apis",
                             "market_apis",
+                            "global_apis",
+                            "global_history_start",
                         )
                     },
                     "identifiers": identifiers,
@@ -542,6 +627,10 @@ class Pipeline:
     def split_request(self, row, job):
         spec = contract_for(job["api_name"])
         params = job["params"]
+        if spec.get("group") == "global" and spec.get("pagination"):
+            # Documented pagination takes priority over whole-universe fanout.
+            # Repeated/ignored pages remain blocked by run(), never declared complete.
+            return None
         split = spec.get("split")
         if "pub_start" in params and "pub_end" in params:
             split = {
@@ -984,11 +1073,12 @@ def tick(max_requests=None, max_seconds=None):
                 from backend.shared.tushare_documents import run_documents
 
                 report["document_registration"] = pipeline.register_documents()
-                report["documents"] = run_documents(
-                    ROOT,
-                    max_documents=int(config.get("documents_per_tick", 3)),
-                    max_seconds=min(20, float(config.get("document_seconds", 20))),
-                )
+                if config.get("document_execution") != "worker":
+                    report["documents"] = run_documents(
+                        ROOT,
+                        max_documents=int(config.get("documents_per_tick", 3)),
+                        max_seconds=min(20, float(config.get("document_seconds", 20))),
+                    )
             report.update(
                 release_id=pipeline.publish(),
                 updated_at=utc_now(),
