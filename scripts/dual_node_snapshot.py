@@ -183,7 +183,9 @@ def pull_snapshot(base=None, only_new=False):
             print("Already verified:", target, flush=True)
             return
         target.mkdir(exist_ok=True)
-        (target / "COMPLETE").unlink(missing_ok=True)
+        # A previously published local snapshot stays usable during revalidation.
+        if (base / "latest").resolve() != target.resolve():
+            (target / "COMPLETE").unlink(missing_ok=True)
         (target / "VERIFIED").unlink(missing_ok=True)
         rsync = "/opt/homebrew/bin/rsync" if Path("/opt/homebrew/bin/rsync").exists() else "rsync"
         args = [rsync, "-a", "--checksum", "--no-owner", "--no-group", "--compress", "--partial", "--stats", "--timeout=120", "-e", "ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=30", "--rsync-path=sudo -n rsync"]

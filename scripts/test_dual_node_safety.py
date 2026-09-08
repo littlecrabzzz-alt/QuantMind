@@ -330,6 +330,21 @@ class ScheduledPull(unittest.TestCase):
             self.assertFalse((root / "snapshot-new/COMPLETE").exists())
             self.assertFalse((root / "snapshot-new/VERIFIED").exists())
 
+    def test_existing_latest_stays_available_during_revalidation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "snapshot-old"
+            target.mkdir()
+            (target / "COMPLETE").touch()
+            (root / "latest").symlink_to(target.name)
+            def run(*args, **kwargs):
+                if "--exclude=/COMPLETE" in args:
+                    raise OSError("disconnected")
+            with patch.object(snapshot, "output", return_value=snapshot.REMOTE + "/snapshots/snapshot-old"), patch.object(snapshot, "run", side_effect=run):
+                with self.assertRaises(OSError):
+                    snapshot.pull_snapshot(root, True)
+            self.assertTrue((target / "COMPLETE").is_file())
+
     def test_noop_requires_local_verified_marker(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
