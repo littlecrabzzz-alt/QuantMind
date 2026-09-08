@@ -43,6 +43,102 @@ def checked_file(path, expected):
     return after if sha.hexdigest() == expected["sha256"] else None
 
 
+# Tested client-only dependencies; do not install the production requirements.
+CLIENT_PACKAGES = ("httpx==0.28.1", "pyarrow==25.0.1", "duckdb==1.5.5")
+CLIENT_HEALTH = """
+import json, sys
+from pathlib import Path
+import httpx, pyarrow, duckdb
+assert pyarrow.table({'value': [1]}).num_rows == 1
+with duckdb.connect(':memory:') as db:
+    assert db.execute('SELECT 1').fetchone() == (1,)
+print(json.dumps({'prefix': sys.prefix, 'base': str(Path(sys._base_executable).resolve())}))
+"""
+
+
+def client_python_ready(python):
+    """Offline import/query smoke; reject a venv based on a temporary uv build."""
+    if not python.is_file() or python.parent.parent.is_symlink():
+        return False
+    try:
+        result = subprocess.run(
+            [str(python), "-I", "-c", CLIENT_HEALTH],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        info = json.loads(result.stdout)
+        base = Path(info["base"])
+        return Path(
+            info["prefix"]
+        ).resolve() == python.parent.parent.resolve() and not any(
+            part in (".cache", "Caches", "builds-v0", "archive-v0")
+            or part.startswith(".tmp")
+            for part in base.parts
+        )
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+        return False
+
+
+def install_client_python(runtime):
+    """Reuse a healthy persistent environment without uv or any network access."""
+    environment = runtime / ".venv"
+    python = environment / "bin/python"
+    if client_python_ready(python):
+        return python
+    uv = shutil.which("uv")
+    if not uv:
+        raise RuntimeError(
+            "A healthy client .venv or uv is required; schedule unchanged"
+        )
+    runtime.mkdir(parents=True, exist_ok=True)
+    # Stage under the persistent runtime; relocatable entrypoints survive rename.
+    # uv-managed Python lives in its standard persistent installation directory.
+    with tempfile.TemporaryDirectory(prefix=".venv-install-", dir=runtime) as folder:
+        staging = Path(folder) / ".venv"
+        subprocess.run(
+            [
+                uv,
+                "venv",
+                "--no-project",
+                "--managed-python",
+                "--python",
+                "3.12",
+                "--relocatable",
+                str(staging),
+            ],
+            check=True,
+        )
+        subprocess.run(
+            [
+                uv,
+                "pip",
+                "install",
+                "--python",
+                str(staging / "bin/python"),
+                "--link-mode",
+                "copy",
+                *CLIENT_PACKAGES,
+            ],
+            check=True,
+        )
+        if not client_python_ready(staging / "bin/python"):
+            raise RuntimeError(
+                "Client environment validation failed; schedule unchanged"
+            )
+        backup = Path(folder) / "previous"
+        if environment.exists() or environment.is_symlink():
+            environment.rename(backup)
+        try:
+            staging.rename(environment)
+        except OSError:
+            if backup.exists() or backup.is_symlink():
+                backup.rename(environment)
+            raise
+    return python
+
+
 def install_schedule(root):
     if sys.platform != "darwin":
         raise ValueError("The mirror schedule belongs on the Mac client")
@@ -52,6 +148,7 @@ def install_schedule(root):
     base = Path.home() / "Library/Application Support/QuantMind"
     runtime = base / "tushare-client"
     destination = base / "tushare"
+    python = install_client_python(runtime)
     # Deploy a credential-free client outside protected Documents/Desktop paths.
     # Runtime copies are refreshed by reinstalling, never by the data mirror.
     for name in (
@@ -88,7 +185,8 @@ def install_schedule(root):
     definition = {
         "Label": label,
         "ProgramArguments": [
-            sys.executable,
+            str(python),
+            "-I",
             str(runtime / "scripts/tushare_mirror.py"),
             "--root",
             str(destination),
@@ -102,6 +200,13 @@ def install_schedule(root):
         "StandardOutPath": str(logs / "tushare-mirror.out.log"),
         "StandardErrorPath": str(logs / "tushare-mirror.err.log"),
     }
+    # Resolve every deployed import before touching the existing LaunchAgent.
+    subprocess.run(
+        [str(python), "-I", str(runtime / "scripts/tushare_mirror.py"), "--help"],
+        check=True,
+        capture_output=True,
+        timeout=30,
+    )
     raw = plistlib.dumps(definition)
     installed = (
         subprocess.run(["launchctl", "print", target], capture_output=True).returncode
