@@ -203,8 +203,9 @@ def run_all_services():
         ("engine", run_engine_service, (ports["engine"], workers_config["engine"])),
         ("trade", run_trade_service, (ports["trade"], workers_config["trade"])),
         ("stream", run_stream_service, (ports["stream"], workers_config["stream"])),
-        ("celery", run_celery_worker, ()),
     ]
+    if os.getenv("OSS_EMBEDDED_CELERY", "true").lower() in {"1", "true", "yes"}:
+        services.append(("celery", run_celery_worker, ()))
 
     # name -> (runner, args, process, restart_count, last_restart_ts, health_failures)
     state: dict = {}

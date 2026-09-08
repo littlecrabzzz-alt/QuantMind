@@ -1,5 +1,6 @@
 """Small dependency-free regression check for the deployment boundary."""
 import json
+import ast
 import os
 import pathlib
 import plistlib
@@ -9,6 +10,7 @@ import unittest
 from unittest.mock import MagicMock, Mock, patch
 
 import dual_node_deploy
+import check_cloud_health
 from dual_node_sync import desired, topology
 from dual_node_inventory import runtime_path
 
@@ -16,6 +18,25 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class DeploymentBoundary(unittest.TestCase):
+    def test_health_requires_all_four_child_services(self):
+        opener = MagicMock()
+        opener.open.return_value.__enter__.return_value.status = 200
+        with patch.object(check_cloud_health.urllib.request, "build_opener", return_value=opener):
+            self.assertTrue(check_cloud_health.healthy())
+            self.assertEqual(opener.open.call_count, 4)
+            opener.open.side_effect = [opener.open.return_value, OSError("engine down")]
+            self.assertFalse(check_cloud_health.healthy())
+
+    def test_embedded_worker_can_be_disabled_without_importing_app(self):
+        tree = ast.parse((ROOT / "backend/main_oss.py").read_text())
+        function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "run_all_services")
+        branch = next(n for n in function.body if isinstance(n, ast.If) and "OSS_EMBEDDED_CELERY" in ast.unparse(n))
+        for value, expected in (("true", 1), ("false", 0)):
+            namespace = {"os": os, "services": [], "run_celery_worker": None}
+            with patch.dict(os.environ, {"OSS_EMBEDDED_CELERY": value}):
+                exec(compile(ast.Module(body=[branch], type_ignores=[]), "worker-switch", "exec"), namespace)
+            self.assertEqual(len(namespace["services"]), expected)
+
     def test_copy_dest_reuses_changed_backup_blocks(self):
         rsync = "/opt/homebrew/bin/rsync" if pathlib.Path("/opt/homebrew/bin/rsync").exists() else "rsync"
         with tempfile.TemporaryDirectory() as directory:
@@ -167,6 +188,8 @@ class DeploymentBoundary(unittest.TestCase):
             self.assertEqual(env["ENABLE_REAL_TRADING"], "false")
             self.assertEqual(env["HOST_PROJECT_PATH"], topology()["QM_REMOTE_PROJECT"])
         self.assertEqual(services["quantmind"]["environment"]["TRAINING_MEMORY_LIMIT_GB"], "4")
+        self.assertEqual(services["quantmind"]["environment"]["OSS_EMBEDDED_CELERY"], "false")
+        self.assertIn("/app/scripts/check_cloud_health.py", services["quantmind"]["healthcheck"]["test"])
         for volume in config["volumes"].values():
             self.assertTrue(volume["driver_opts"]["device"].startswith(
                 topology()["QM_REMOTE_ROOT"] + "/volumes/"))

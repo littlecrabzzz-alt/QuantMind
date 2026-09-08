@@ -12,14 +12,21 @@ services:
   quantmind:
     ports: !override
       - "127.0.0.1:18000:8000"
-    mem_limit: 3g
+    mem_limit: 6g
     cpus: 3.0
+    healthcheck:
+      test: ["CMD", "python", "/app/scripts/check_cloud_health.py"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 180s
     environment:
       HOST_PROJECT_PATH: /root/data/disk/quantmind/project
       TRAINING_PAUSE_OTHERS: "false"
       TRAINING_MEMORY_LIMIT_GB: "4"
       TRAIN_NTHREADS: "2"
       TRAIN_IC_WORKERS: "1"
+      OSS_EMBEDDED_CELERY: "false"
       QUANTMIND_ENABLE_WEB_UPDATE: "false"
       ENABLE_REAL_TRADING: "false"
       ENABLE_TDX_PUSH: "false"
