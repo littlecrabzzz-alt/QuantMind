@@ -39,7 +39,24 @@ from backend.shared.tushare_etf_basket_contracts import (
     iter_etf_basket_jobs,
 )
 
+from backend.shared.tushare_connect_contracts import (
+    CONNECT_CONTRACTS,
+    VARIANTS as CONNECT_VARIANTS,
+    iter_connect_jobs,
+)
+
+CONNECT_RUNTIME_CONTRACTS = {
+    api: {
+        **spec,
+        "group": "connect",
+        "request_identity_fields": list(CONNECT_VARIANTS.get(api, [{}])[0]),
+        "row_identity_note": "Keep distinct source rows and immutable request type/market_type/content_type; an identical response under different requested channels is not interchangeable coverage evidence.",
+    }
+    for api, spec in CONNECT_CONTRACTS.items()
+}
+
 EXTENDED_CONTRACTS = {
+    **CONNECT_RUNTIME_CONTRACTS,
     **{
         api: {**spec, "group": "etf_basket"}
         for api, spec in ETF_BASKET_CONTRACTS.items()
@@ -74,6 +91,7 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "connect": iter_connect_jobs,
     "etf_basket": iter_etf_basket_jobs,
     "credit_extra": iter_credit_extra_jobs,
     "text": lambda config, today, ids: iter_text_jobs(config, today),

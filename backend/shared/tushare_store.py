@@ -14,6 +14,7 @@ from pathlib import Path
 import re
 import tempfile
 
+from backend.shared.tushare_registry import CONNECT_RUNTIME_CONTRACTS
 from backend.shared.tushare_credit_extra_contracts import CREDIT_EXTRA_CONTRACTS
 from backend.shared.tushare_etf_basket_contracts import ETF_BASKET_CONTRACTS
 from backend.shared.tushare_market_contracts import MARKET_CONTRACTS
@@ -37,6 +38,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **CONNECT_RUNTIME_CONTRACTS,
     **ETF_BASKET_CONTRACTS,
     **CREDIT_EXTRA_CONTRACTS,
     **TEXT_CONTRACTS,

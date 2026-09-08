@@ -39,6 +39,7 @@ from backend.shared.tushare_credit_extra_contracts import (
     credit_identifiers,
     credit_extra_prerequisites,
 )
+from backend.shared.tushare_connect_contracts import CONNECT_CONTRACTS, connect_prerequisites
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
@@ -631,6 +632,7 @@ class Pipeline:
 
     def identifiers(self):
         families = {
+            **{api: "connect_" + api for api in CONNECT_CONTRACTS},
             "stock_basic": "stocks",
             "margin_secs": "credit_securities",
             "hk_basic": "hk_stocks",
@@ -854,6 +856,7 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "connect": connect_prerequisites,
             "etf_basket": etf_basket_prerequisites,
             "credit_extra": credit_extra_prerequisites,
             "futures_extra": futures_extra_prerequisites,
@@ -881,6 +884,10 @@ class Pipeline:
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
+            (
+                "connect",
+                lambda cfg, ids: self.record_extra_planning_gaps("connect", cfg, ids),
+            ),
             (
                 "etf_basket",
                 lambda cfg, ids: self.record_extra_planning_gaps(
