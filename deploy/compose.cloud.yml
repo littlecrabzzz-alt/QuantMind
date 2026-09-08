@@ -58,6 +58,20 @@ services:
     mem_limit: 1g
     cpus: 0.75
     command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q tushare_acquire --loglevel=info --concurrency=1 --prefetch-multiplier=1
+  tushare-document-worker:
+    extends:
+      file: docker-compose.yml
+      service: celery-worker
+    environment:
+      QM_NODE_ROLE: authority
+      ENABLE_REAL_TRADING: "false"
+      ENABLE_TDX_PUSH: "false"
+      HOST_PROJECT_PATH: /root/data/disk/quantmind/project
+      TRAINING_PAUSE_OTHERS: "false"
+    container_name: quantmind-tushare-document-worker
+    mem_limit: 1536m
+    cpus: 0.5
+    command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q tushare_documents --loglevel=info --concurrency=1 --prefetch-multiplier=1
   celery-beat:
     mem_limit: 384m
     cpus: 0.5

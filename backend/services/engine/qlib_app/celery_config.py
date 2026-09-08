@@ -202,6 +202,7 @@ celery_app.conf.update(
     # 任务路由
     task_routes={
         "engine.tasks.tushare_acquire": {"queue": "tushare_acquire"},
+        "engine.tasks.tushare_documents": {"queue": "tushare_documents"},
         "backend.services.engine.qlib_app.tasks.*": {"queue": CELERY_QUEUE},
         "qlib_app.tasks.*": {"queue": CELERY_QUEUE},
     },

@@ -24,7 +24,7 @@ from dual_node_sync import PROJECT, topology
 SETTINGS = topology()
 REMOTE = SETTINGS["QM_REMOTE_ROOT"]
 WRITERS = ["quantmind-celery-beat", "quantmind", "quantmind-celery",
-           "quantmind-huntly", "qwenpaw", "quantmind-tushare-worker", "quantmind-redis"]
+           "quantmind-huntly", "qwenpaw", "quantmind-tushare-worker", "quantmind-tushare-document-worker", "quantmind-redis"]
 
 
 class BusyError(RuntimeError):
@@ -126,7 +126,7 @@ def cloud_snapshot():
             jobs = json.loads(output("docker", "exec", "quantmind-celery", "celery", "-A",
                 "backend.services.engine.qlib_app.celery_config:celery_app", "inspect", "active", "--json", "--timeout=15"))
             require(bool(jobs), "No Celery worker response")
-            if any(task["name"] != "engine.tasks.tushare_acquire"
+            if any(task["name"] not in {"engine.tasks.tushare_acquire", "engine.tasks.tushare_documents"}
                    for tasks in jobs.values() for task in tasks):
                 raise BusyError("Celery work active")
         stopped = [name for name in WRITERS if name in active]
