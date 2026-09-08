@@ -85,6 +85,8 @@ def public(row, details=False):
         result["experiments"] = [{k: e.get(k) for k in ("id", "status", "proposal", "gates", "result")} for e in s.get("experiments", [])]
         curves = []
         directory = runtime.case_directory(row["case_id"])
+        from backend.services.engine.research.coordinator import usage
+        result["usage"] = usage(directory)
         for exp in s.get("experiments", []):
             if exp["status"] != "completed":
                 continue

@@ -246,9 +246,9 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
                 <Text>Rank ICIR {fmt(m.rank_icir)}</Text><Text>正 Rank IC 比例 {fmt(m.positive_rank_ic_fraction, true)}</Text></Space>
             </Card>;
           })}
-          {selected.selection && <div><h4>模型选择说明</h4><Paragraph>{selected.selection.reason}</Paragraph><Text type="secondary">下一问题：{selected.selection.next_question}</Text></div>}
+          {selected.selection && <div><h4>模型选择说明（解释）</h4><Paragraph>{selected.selection.reason}</Paragraph><Text type="secondary">下一问题：{selected.selection.next_question}</Text></div>}
           <div><h4>研究进展</h4>{selected.events?.slice(-12).map((e, i) => <div key={`${e.at}-${i}`} className="py-1"><Text type="secondary">{new Date(e.at * 1000).toLocaleTimeString()} </Text>{e.message}</div>)}</div>
-          <Text type="secondary">已记录调用 {selected.usage?.calls ?? 0} 次 · Token {fmt(selected.usage ? selected.usage.input_tokens + selected.usage.output_tokens : null)} · 限流重试 {selected.usage?.retryable ?? 0} 次 · 金额未返回</Text>
+          <Text type="secondary">已完成调用 {selected.usage?.calls ?? 0} 次 · 已确认 Token {fmt(selected.usage ? selected.usage.input_tokens + selected.usage.output_tokens : null)} · 用量未知 {selected.usage?.unknown_usage ?? 0} 次 · 服务退避 {selected.usage?.retryable ?? 0} 次 · 金额未返回</Text>
         </div>
       </Card>}
     </div>

@@ -196,10 +196,12 @@ async def advance(row, store, lease):
                     raise ValueError("配置已经实验过，不重复同一候选")
                 state["candidate_count"] += 1
             runtime.frozen.write(call_dir / "tool-output.json", {"accepted": True, "arguments": decision})
-        except (ValueError, KeyError, TypeError) as exc:
-            correction.append(str(exc))
+        except (ValueError, KeyError, TypeError, SyntaxError) as exc:
+            message = ("公式必须是纯表达式，不得包含 research_signal = 赋值、代码块或语句。被拒绝公式："+
+                       str(decision.get("expression", ""))) if isinstance(exc, SyntaxError) else str(exc)
+            correction.append(message)
             state["corrections"][label] = correction
-            runtime.frozen.write(call_dir / "tool-output.json", {"accepted": False, "error": str(exc)})
+            runtime.frozen.write(call_dir / "tool-output.json", {"accepted": False, "error": message})
             if len(correction) >= 3 or supplied and not selecting and index == 1:
                 raise ValueError("候选连续校验失败："+str(exc)) from None
             event(state, "候选未通过合同检查，要求模型修正")
