@@ -248,6 +248,94 @@ class CreditPipelineTest(unittest.TestCase):
             self.p.identifiers()["credit_securities"], ["159999.SZ", "510300.SH"]
         )
 
+    def test_seven_digit_fund_planning_fanout_and_stored_identity(self):
+        self.capture(
+            "fund_basic",
+            {},
+            [
+                {"ts_code": code, "name": "原始基金"}
+                for code in ("150001.SZ", "1500011.SZ", "5010021.SH", "0000371.OF")
+            ],
+        )
+        self.capture(
+            "margin_secs",
+            {"trade_date": "20260904"},
+            [
+                {**source("margin_secs"), "ts_code": code}
+                for code in ("150001.SZ", "1500011.SZ")
+            ],
+        )
+        self.p.db.execute(
+            "INSERT INTO capability VALUES('planning:credit_extra','validation_blocked','old','old error')"
+        )
+        self.p.db.commit()
+        planned = self.p.plan_extended(
+            {
+                "enable_credit_extra": True,
+                "credit_extra_apis": ["margin_detail"],
+                "credit_extra_history_start": "20260901",
+                "plan_jobs_per_tick": 100,
+            },
+            date(2026, 9, 9),
+        )
+        self.assertIn("recent:credit_extra", planned)
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT status FROM capability WHERE scope='planning:credit_extra'"
+            ).fetchone()[0],
+            "validation_passed",
+        )
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT status FROM capability WHERE scope='planning:credit_extra:margin_detail:opaque_fund_identity_unverified'"
+            ).fetchone()[0],
+            "coverage_unverified",
+        )
+        for code, expected in (("1500011.SZ", 3), ("5020561.SH", 4)):
+            row, job, result = self.capture(
+                "margin_detail",
+                {"trade_date": "20260904"},
+                [{**source("margin_detail"), "ts_code": code}],
+                has_more=True,
+            )
+            split = self.p.split_request(row, job, result)
+            self.assertEqual(split["children"], expected)
+            self.assertFalse(split["universe_complete"])
+            self.assertEqual(
+                self.p.split_request(row, job, result)["children"], expected
+            )
+        children = {
+            json.loads(r[0])["params"]["ts_code"]
+            for r in self.p.db.execute(
+                "SELECT j.job FROM partition_children c JOIN jobs j ON j.id=c.child_id WHERE c.parent_id=?",
+                (row["id"],),
+            )
+        }
+        self.assertEqual(
+            children, {"150001.SZ", "1500011.SZ", "5010021.SH", "5020561.SH"}
+        )
+        release = self.p.publish()
+        rows = read_dataset(self.root, release, "margin_secs").to_pylist()
+        self.assertEqual({r["ts_code"] for r in rows}, {"SZ150001", "1500011.SZ"})
+        self.assertEqual(
+            {r["source_ts_code"] for r in rows}, {"150001.SZ", "1500011.SZ"}
+        )
+        self.assertEqual(
+            read_dataset(
+                self.root, release, "margin_secs", codes=["1500011.SZ"]
+            ).num_rows,
+            1,
+        )
+        self.assertEqual(
+            read_dataset(
+                self.root, release, "margin_secs", codes=["SZ150001"]
+            ).num_rows,
+            1,
+        )
+        master = read_dataset(self.root, release, "fund_basic").to_pylist()
+        self.assertIn("0000371.OF", {r["source_ts_code"] for r in master})
+        self.assertIn("0000371.OF", {r["ts_code"] for r in master})
+
     def test_legal_pledge_range_split_and_unsplittable_stock_history(self):
         row, job, result = self.capture(
             "pledge_detail",
