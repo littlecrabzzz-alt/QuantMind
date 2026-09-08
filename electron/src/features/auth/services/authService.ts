@@ -204,7 +204,7 @@ class AuthService {
     // 请求拦截器
     this.axiosInstance.interceptors.request.use(
       (config) => {
-        console.log(`[Auth Request] ${config.method?.toUpperCase()} ${config.url}`, config.data);
+        console.log(`[Auth Request] ${config.method?.toUpperCase()} ${config.url}`);
         return config;
       },
       (error) => {
@@ -216,7 +216,7 @@ class AuthService {
     // 响应拦截器
     this.axiosInstance.interceptors.response.use(
       (response: AxiosResponse) => {
-        console.log(`[Auth Response] ${response.config.url}`, response.data);
+        console.log(`[Auth Response] ${response.config.url} status=${response.status}`);
         return response;
       },
       async (error) => {

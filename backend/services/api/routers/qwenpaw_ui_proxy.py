@@ -258,6 +258,9 @@ async def _proxy_static(path: str, accept: str) -> Response:
         html = html.replace('href="/assets/', 'href="/api/v1/qwenpaw-ui/assets/')
         html = html.replace('href="/online.svg"', 'href="/api/v1/qwenpaw-ui/online.svg"')
         html = html.replace('src="/online.svg"', 'src="/api/v1/qwenpaw-ui/online.svg"')
+        html = html.replace('src="/qwenpaw.png"', 'src="/api/v1/qwenpaw-ui/qwenpaw.png"')
+        html = html.replace('src="/logo-light.svg"', 'src="/api/v1/qwenpaw-ui/logo-light.svg"')
+        html = html.replace('src="/logo-dark.svg"', 'src="/api/v1/qwenpaw-ui/logo-dark.svg"')
         # 在 <head> 后注入 API 路径拦截脚本
         html = html.replace("<head>", "<head>" + _API_REWRITE_SCRIPT, 1)
         return HTMLResponse(content=html, status_code=resp.status_code)

@@ -19,7 +19,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 class DeploymentBoundary(unittest.TestCase):
     def test_embedded_agent_images_use_the_proxy_prefix(self):
-        tree = ast.parse((ROOT / "backend/services/api/routers/qwenpaw_ui_proxy.py").read_text())
+        source = (ROOT / "backend/services/api/routers/qwenpaw_ui_proxy.py").read_text()
+        tree = ast.parse(source)
+        self.assertIn("html.replace('src=\"/qwenpaw.png\"'", source)
         script = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign)
                       and any(isinstance(t, ast.Name) and t.id == "_API_REWRITE_SCRIPT" for t in n.targets))
         js = script.removeprefix("<script>").removesuffix("</script>")
@@ -217,6 +219,7 @@ w.close();"""
         config = json.loads(raw)
         services = config["services"]
         self.assertEqual(int(services["quantmind"]["mem_limit"]), 12 * 1024**3)
+        self.assertEqual(float(services["db"]["cpus"]), 2.0)
         for name in ("db", "redis", "huntly", "rsshub", "qwenpaw", "data-gateway"):
             self.assertFalse(services[name].get("ports"), name)
         self.assertEqual(services["web"]["ports"][0]["published"], topology()["QM_WEB_PORT"])
@@ -232,6 +235,31 @@ w.close();"""
         for volume in config["volumes"].values():
             self.assertTrue(volume["driver_opts"]["device"].startswith(
                 topology()["QM_REMOTE_ROOT"] + "/volumes/"))
+
+    def test_local_dev_is_an_isolated_sandbox(self):
+        state = str(ROOT / ".local-dev/project")
+        environment = os.environ | {"QM_LOCAL_PROJECT": str(ROOT), "QM_LOCAL_STATE": state}
+        raw = subprocess.check_output([
+            "docker", "compose", "--env-file", ".env.local", "-f", "docker-compose.yml",
+            "-f", "deploy/compose.local-dev.yml", "--project-directory", str(ROOT),
+            "config", "--format", "json"], cwd=ROOT, env=environment)
+        config = json.loads(raw)
+        self.assertEqual(config["name"], "quantmind-dev")
+        self.assertNotIn("celery-beat", config["services"])
+        services = config["services"]
+        self.assertEqual(services["quantmind"]["environment"]["QM_NODE_ROLE"], "sandbox")
+        self.assertEqual(services["quantmind"]["environment"]["ENABLE_REAL_TRADING"], "false")
+        self.assertEqual(services["quantmind"]["ports"], [{
+            "mode": "ingress", "host_ip": "127.0.0.1", "target": 8000,
+            "published": "8000", "protocol": "tcp"}])
+        for service in services.values():
+            self.assertEqual(service.get("restart", "no"), "no")
+            for mount in service.get("volumes", []):
+                if mount["type"] == "bind" and mount["target"] in {
+                    "/data", "/app/db", "/app/models", "/app/logs", "/app/user_pools_local"
+                }:
+                    self.assertTrue(mount["source"].startswith(state), mount)
+        self.assertIn("/.local-dev", (ROOT / ".sync-code-ignore").read_text())
 
     def test_code_excludes_runtime_but_not_secrets(self):
         rules = (ROOT / ".sync-code-ignore").read_text().splitlines()

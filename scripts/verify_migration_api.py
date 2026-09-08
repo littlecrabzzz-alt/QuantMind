@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded API acceptance via the SSH tunnel; optional reversible write/inference."""
+"""Bounded API acceptance; optional reversible write/inference."""
 import argparse
 import getpass
 import json
@@ -13,11 +13,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write-probe", action="store_true")
     parser.add_argument("--predict", action="store_true", help="Execute one registered model for one stock/day; retain run evidence")
+    parser.add_argument("--port", type=int, default=18080, help="Primary API/web entry (default: SSH tunnel 18080)")
+    parser.add_argument("--cross-port", type=int, default=8000, help="Second entry used by the write probe")
     args = parser.parse_args()
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     token = None
 
-    def call(path, body=None, method=None, port=18080):
+    def call(path, body=None, method=None, port=None):
+        port = args.port if port is None else port
         headers = {"Content-Type": "application/json"}
         if token:
             headers["Authorization"] = "Bearer " + token
@@ -56,7 +59,7 @@ def main():
         try:
             for _ in range(2):
                 call(route + "/" + symbol, {"stock_name": marker})
-            after = call(route + "?limit=10000", port=8000)
+            after = call(route + "?limit=10000", port=args.cross_port)
             added = [i for i in after["items"] if i["symbol"] == symbol]
             if len(added) != 1 or added[0]["stockName"] != marker or after["total"] != before["total"] + 1:
                 raise RuntimeError("Cross-entry visibility/idempotence failed")

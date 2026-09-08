@@ -76,10 +76,25 @@ def node(role):
             require(not item["State"]["Running"] and item["HostConfig"]["RestartPolicy"]["Name"] == "no",
                     f"Old local service is running or can auto-restart: {item['Name']}")
         snapshot = (PROJECT / "logs/cloud-snapshots/latest").resolve()
+        mode = "cloud-tunnel"
+        probe = subprocess.run(("docker", "inspect", "quantmind-dev"), text=True, capture_output=True)
+        development = json.loads(probe.stdout)[0] if probe.returncode == 0 else None
+        if development and development["State"]["Running"]:
+            env = dict(v.split("=", 1) for v in development["Config"]["Env"] if "=" in v)
+            require(env.get("QM_NODE_ROLE") == "sandbox", "Local backend is not marked as a sandbox")
+            require(development["HostConfig"]["RestartPolicy"]["Name"] == "no",
+                    "Local sandbox can restart automatically")
+            sources = {m["Destination"]: m["Source"] for m in development["Mounts"] if m["Type"] == "bind"}
+            for destination in ("/data", "/app/db", "/app/models", "/app/logs", "/app/user_pools_local"):
+                require(Path(sources[destination]).resolve().is_relative_to(PROJECT / ".local-dev/project"),
+                        f"Local sandbox mount escaped isolation: {destination}")
+            require((PROJECT / ".local-dev/SNAPSHOT_ID").read_text().strip() == snapshot.name,
+                    "Local sandbox uses an older snapshot; stop or rebuild it")
+            mode = "local-sandbox"
     require((snapshot / "COMPLETE").is_file(), "No completed offline snapshot")
     return {"role": role, "head": output("git", "-C", str(PROJECT), "rev-parse", "HEAD"),
             "branch": output("git", "-C", str(PROJECT), "branch", "--show-current"),
-            "snapshot": snapshot.name, "sync": sync}
+            "snapshot": snapshot.name, "sync": sync, "mode": mode if role == "mac" else "authority"}
 
 
 def main():
@@ -98,14 +113,17 @@ def main():
     for key in ("contentFiles", "contentDigest"):
         require(local["sync"][key] == remote["sync"][key], "Working trees differ; wait for sync or resolve conflicts")
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    for url in ("http://127.0.0.1:18080/health", "http://127.0.0.1:8000/health"):
+    urls = (("http://127.0.0.1:8000/health",) if local["mode"] == "local-sandbox" else
+            ("http://127.0.0.1:18080/health", "http://127.0.0.1:8000/health"))
+    for url in urls:
         with opener.open(url, timeout=15) as response:
             require(response.status == 200, "Cloud tunnel is not healthy")
     print(json.dumps({"status": "passed", "head": local["head"],
                       "source_files": local["sync"]["contentFiles"],
                       "source_digest": local["sync"]["contentDigest"],
                       "snapshot": local["snapshot"], "data_authority": "lzy-vm",
-                      "local_writers": "stopped; restart=no"}, indent=2))
+                      "mac_mode": local["mode"],
+                      "local_writers": "old authority stopped; restart=no"}, indent=2))
 
 
 if __name__ == "__main__":

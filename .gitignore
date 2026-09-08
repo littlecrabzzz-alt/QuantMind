@@ -269,4 +269,5 @@ scripts/publish_electron_to_cos.py
 REFACTOR_PLAN.md
 /.playwright-cli/
 /output/playwright/
+/.local-dev/
 /docker-compose.override.yml

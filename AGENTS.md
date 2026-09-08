@@ -5,11 +5,11 @@
 ## 当前双端开发约束（优先于下方通用 OSS 命令）
 
 - 权威数据节点为 `lzy-vm:/root/code/QuantMind`，真实目录在 SSD `/root/data/disk/quantmind/project`。先读 `docs/dual-node-deployment.md` 与 `docs/development-data-contract.md`。
-- Mac 的旧 `data/`、`results/`、数据库卷仅保留作迁移基线，禁止重启原完整 Compose 栈、调度器或回灌这些数据。联网前端连接 SSH 隧道 `127.0.0.1:8000/18080`；断网不得切回另一主库。
+- Mac 的旧 `data/`、`results/`、数据库卷仅保留作迁移基线，禁止重启原完整 Compose 栈、调度器或回灌这些数据。默认联网前端连接 SSH 隧道 `127.0.0.1:8000/18080`；需要 Mac 本地算力时只用 `scripts/local-dev.sh` 启动 `.local-dev` 隔离沙盒，断网不得把它切成主库。
 - 源码工作树和共享密钥由 Syncthing 双向同步；`.git` 独立。不要两端同时编辑同一文件、在共享运行目录切分支或批量 checkout。并行后端开发使用独立 worktree；测试不挂载权威数据可写，不携带生产凭据，不接生产网络。
 - 开发前/发布前运行 `python3 scripts/dual_node_check.py`，离线只做独立测试或固定快照研究。任何 `.sync-conflict-*`、代码哈希/Git HEAD 不一致都必须先处理，不能自动覆盖。
 - 后端发布只走 `scripts/dual-node.sh cloud-compose`；禁止裸 Compose 遗漏云端覆盖层。先确认没有训练/研究任务，核对同步与改动，明确提交路径（不要 `git add .`），再重启相关服务并验收。
-- 数据写入只在云端由现有业务服务/作业完成；修改 schema 走版本化 SQL/迁移；重复请求必须幂等。离线研究结果不直接同步到权威 `results/`，应在云端以固定输入、代码版本、参数重跑验收。
+- 正式数据写入只在云端由现有业务服务/作业完成；本地沙盒写入不参与 Syncthing，也不自动回灌。修改 schema 走版本化 SQL/迁移；重复请求必须幂等。离线研究结果不直接同步到权威 `results/`，应在云端以固定输入、代码版本、参数重跑验收。
 
 ## 项目概述
 

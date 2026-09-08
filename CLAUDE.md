@@ -5,7 +5,7 @@
 ## 当前迁移后的开发规则（优先）
 
 先读 `AGENTS.md` 的“双端开发约束”与 `docs/development-data-contract.md`。
-本仓库 Mac 是开发客户端，`lzy-vm` 是唯一数据写入节点；禁止在 Mac 重启旧完整 Compose 栈或回灌旧数据。
+本仓库 Mac 和 `lzy-vm` 都能开发，`lzy-vm` 仍是唯一正式数据写入节点；禁止在 Mac 重启旧完整 Compose 栈或回灌旧数据。需要本地全栈时只用 `scripts/local-dev.sh init` 与 `start core|full`，其 `.local-dev` 数据库和文件是固定云端快照的隔离沙盒，不参与同步。
 下方通用 OSS 本地启动/历史 Gitee 发布命令不适用于当前迁移拓扑。开发前运行 `python3 scripts/dual_node_check.py`，发布只使用仓库内的 `scripts/dual-node.sh`。独立测试与正式数据严格分开，断网不切回旧主库。
 
 ## ⚠️ 免责声明

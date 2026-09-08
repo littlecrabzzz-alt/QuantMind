@@ -1,0 +1,129 @@
+# Mac-only full-stack sandbox. Always invoke through scripts/local-dev.sh.
+name: quantmind-dev
+
+services:
+  db:
+    container_name: quantmind-dev-db
+    ports: !reset []
+    restart: "no"
+  redis:
+    container_name: quantmind-dev-redis
+    ports: !reset []
+    restart: "no"
+  quantmind:
+    container_name: quantmind-dev
+    ports: !override
+      - "127.0.0.1:8000:8000"
+    environment:
+      APP_ENV: development
+      QM_NODE_ROLE: sandbox
+      HOST_PROJECT_PATH: ${QM_LOCAL_PROJECT:?run through scripts/local-dev.sh}
+      TRAINING_DOCKER_NETWORK: quantmind-dev_quantmind-net
+      TRAINING_PAUSE_OTHERS: "false"
+      OSS_EMBEDDED_CELERY: "false"
+      DAILY_SYNC_ENABLED: "false"
+      QUANTMIND_ENABLE_WEB_UPDATE: "false"
+      ENABLE_REAL_TRADING: "false"
+      ENABLE_TDX_PUSH: "false"
+    volumes: !override
+      - ${QM_LOCAL_STATE:?run through scripts/local-dev.sh}/data:/data
+      - ${QM_LOCAL_STATE}/models:/app/models
+      - ${QM_LOCAL_STATE}/db:/app/db
+      - ${QM_LOCAL_STATE}/logs:/app/logs
+      - ./backend:/app/backend
+      - ./docs:/app/docs:ro
+      - ./config:/app/config
+      - ./scripts:/app/scripts
+      - ./alphaagent:/app/alphaagent
+      - ./TradingAgents-astock:/app/TradingAgents-astock
+      - ./docker/training:/app/docker/training
+      - ./strategy_templates:/app/strategy_templates
+      - ${QM_LOCAL_STATE}/user_pools_local:/app/user_pools_local
+      - ./docker/conda-shim:/usr/local/bin/conda:ro
+      - ./docker/litellm_sitecustomize.py:/usr/local/lib/python3.10/site-packages/sitecustomize.py:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - qwenpaw-shared:/qwenpaw-shared
+    restart: "no"
+  celery-worker:
+    container_name: quantmind-dev-celery
+    environment:
+      QM_NODE_ROLE: sandbox
+      HOST_PROJECT_PATH: ${QM_LOCAL_PROJECT}
+      TRAINING_DOCKER_NETWORK: quantmind-dev_quantmind-net
+      TRAINING_PAUSE_OTHERS: "false"
+      DAILY_SYNC_ENABLED: "false"
+      ENABLE_REAL_TRADING: "false"
+      ENABLE_TDX_PUSH: "false"
+    volumes: !override
+      - ${QM_LOCAL_STATE}/data:/data
+      - ${QM_LOCAL_STATE}/models:/app/models
+      - ${QM_LOCAL_STATE}/db:/app/db
+      - ${QM_LOCAL_STATE}/logs:/app/logs
+      - ./backend:/app/backend
+      - ./config:/app/config
+      - ./scripts:/app/scripts
+      - ./strategy_templates:/app/strategy_templates
+      - ${QM_LOCAL_STATE}/user_pools_local:/app/user_pools_local
+    command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q ${QLIB_CELERY_QUEUE:-qlib_backtest_srv} --loglevel=info --concurrency=4
+    restart: "no"
+  celery-beat:
+    container_name: quantmind-dev-celery-beat
+    profiles: [local-dev-scheduler]
+    environment:
+      QM_NODE_ROLE: sandbox
+      DAILY_SYNC_ENABLED: "false"
+      NEWS_ENRICH_ENABLED: "false"
+    volumes: !override
+      - ./backend:/app/backend
+      - ./config:/app/config
+      - ./scripts:/app/scripts
+      - ${QM_LOCAL_STATE}/logs:/app/logs
+      - ${QM_LOCAL_STATE}/data:/data
+      - ${QM_LOCAL_STATE}/db:/app/db
+    restart: "no"
+  data-gateway:
+    container_name: quantmind-dev-data-gateway
+    ports: !reset []
+    restart: "no"
+  huntly:
+    container_name: quantmind-dev-huntly
+    ports: !reset []
+    volumes: !override
+      - ${QM_LOCAL_STATE}/data/huntly:/data
+    restart: "no"
+  rsshub:
+    container_name: quantmind-dev-rsshub
+    ports: !reset []
+    restart: "no"
+  qwenpaw:
+    image: quantmind-qwenpaw:local
+    container_name: quantmind-dev-qwenpaw
+    ports: !reset []
+    environment:
+      QM_NODE_ROLE: sandbox
+      HOST_PROJECT_PATH: ${QM_LOCAL_PROJECT}
+      TRAINING_DOCKER_NETWORK: quantmind-dev_quantmind-net
+      TRAINING_PAUSE_OTHERS: "false"
+      ENABLE_REAL_TRADING: "false"
+    volumes: !override
+      - qwenpaw-data:/app/working
+      - qwenpaw-secrets:/app/working.secret
+      - qwenpaw-backups:/app/working.backups
+      - ./backend:/app/backend:ro
+      - ./config:/app/config:ro
+      - ./scripts:/app/scripts:ro
+      - ./strategy_templates:/app/strategy_templates:ro
+      - ./CLAUDE.md:/app/CLAUDE.md:ro
+      - ./:/quantmind:ro
+      - ./docker/training/fonts:/app/docker/training/fonts:ro
+      - ${QM_LOCAL_STATE}/data:/data
+      - ${QM_LOCAL_STATE}/db:/app/db
+      - ${QM_LOCAL_STATE}/models:/app/models
+      - ${QM_LOCAL_STATE}/logs:/app/logs
+      - ${QM_LOCAL_STATE}/user_pools_local:/app/user_pools_local
+      - qwenpaw-shared:/qwenpaw-shared
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: "no"
+  ib-gateway:
+    profiles: [disabled-trading]
+    restart: "no"
