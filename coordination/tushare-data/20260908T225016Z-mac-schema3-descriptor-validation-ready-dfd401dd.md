@@ -1,0 +1,13 @@
+# Cached schema3 descriptor validation fix
+
+Owner text_contracts; isolated delta commit0ea2e88, applies after cumulative schema3 candidate9cf3a60 (same relevant file content as original0fa2e5b). Only tushare_documents.py and test_tushare_document_buckets.py. No production operations/deploy; all files released.
+
+Confirmed defect from structured review: equal-size corruption of a cached state_descriptors JSON while updating another firsthex prefix allowed publish to advance CURRENT; API subsequently rejected checksum. Structured separately reproduced the analogous old schema2 cached-state-leaf defect against c62cb54.
+
+Fix scope: for each unchanged current schema3 descriptor group (at most16 small files, ~1MB combined at assessed scale), rebuild canonical expected JSON from current SQLite leaf descriptors, verify cache path/SHA256/bytes/count/state_count/reference list, open O_NOFOLLOW/O_NONBLOCK, compare exact actual bytes, regular-file type and device/inode/size/mtime_ns/ctime_ns stability. No new global cache or full-tree bytes scan. Changed descriptors still use immutable _save verification. Reference comparison verifies this descriptor matches current leaf cache; it does not newly certify every referenced leaf body.
+
+New isolated real Pipeline.publish regression: valid CURRENT → same-byte-size descriptor corruption + other-prefix state update → DocumentError and exact CURRENT bytes unchanged. Restore deliberately damaged temporary fixture → retry publishes valid new release, old/new API remain readable. No-op release ID unchanged and no new document files. Cached descriptor state_count inconsistency also blocks publication and preserves CURRENT. Existing dirty/append/interruption tests remain passing.
+
+Validation: buckets6 + document_index6 + pipeline17 =29 passed; Ruff and diff check passed. No benchmark re-run necessary for write-volume claim: immutable serialized descriptor/root layout is unchanged, only bounded verification reads were added. No new latency guarantee.
+
+Explicit remaining risk: existing schema2/schema3 cached state leaf body corruption (and cached mapping/attempt bodies or superseded historical metadata corruption) is NOT covered by this limited publishing check; current mirror whole-inventory hash verification and API on-demand artifact hashing still reject those corrupt bytes. This is not a full publisher integrity audit or a claim every historical release remains locally readable under arbitrary disk corruption. A separate bounded integrity mechanism would be needed if parent chooses that broader scope. No files were auto-repaired, removed or rewritten in production.

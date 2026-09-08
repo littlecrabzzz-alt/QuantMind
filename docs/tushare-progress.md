@@ -188,3 +188,14 @@
 - 并行继续Connect5 runtime、schema3两层文档状态索引、龙虎榜/游资4接口合同。schema3合成写入减少约74%-87%仍非生产收益且初建inode更多；四个旧互联互通正文缺失保留缺口，不阻塞已知接口。完整历史、原文附件与RRG PIT准入义务仍未完成。
 - 正常运行追加证据：22:36:45Z 326请求/122.069秒，22:38:45Z 334请求/119.488秒，均failed_stage=null、无规划reset。发布仍占约18秒，不能据此声称吞吐全面提升；新作业0说明有限迁移扫描仍经过既有前缀，并非没有后续历史义务。
 - Mac两轮均verified：第一版40ef395f共106578文件、补5335；第二版data-e45c6159e515a82a9ae020d12c05bb619f7789e8c2c22206a0c8495922267f96共107697文件、补1118。第二轮将本机已有40ef395f清单复用为archives，54300820字节、同inode/SHA验证通过；全清单逐文件校验后才切CURRENT。证据/tmp/tushare-planning-alias-mac-verified.json。
+
+
+## 2026-09-09 06:56 Connect5生产接入与旧接口证据
+
+- 93b6343已合入master/GitHub/云端；完整319 tests、Ruff及双端handoff passed（4499文件）。实际11方向/类型请求8.412秒、6292原始行、58输出字段，原文/观察SHA/Parquet/固定读库及请求日期/type全部一致。5接口已enable_connect，近期77新作业，历史初始423新作业；动态签名确认原11家族历史未重置。现136采集API及6财务查询别名，不代表全量历史完成。
+- fixed data-2e5f447c9fc136fc016c864d19c21a953ae872c1969a255a116b71e6ebe77012：云端API15次分批全列6292行与存储一致、upstream_calls=0、匿名401。Mac补4066文件、共111764全部校验；禁网禁凭据逐字段原文和查询验收通过。报告validation/connect-acceptance.json、connect-api-acceptance.json、/tmp/tushare-connect-mac-verified.json。
+- 22:51:17Z正常批331请求/125.204秒、failed_stage=null，发布19.344秒；Connect自动非probe done19/empty12（当次快照），history已推进1500，完整任务仍扩展。云端可用295.69GiB，本轮无需扩盘。仅重启quantmind+tushare-worker，文档队列恢复且新任务3cef7903、采集523080b8实测；通用US/研究未中断。
+- 4个旧接口有界raw探测：moneyflow_hsgt 1行；ggt_daily 1000行、has_more=true；ggt_top10空参数校验失败50101；ggt_monthly名称拒绝40101。后两者不视为无权限，月度历史义务不删。仅保留归档清单不足以镜像新raw；已定向验证并归档8引用文件、发布b93d6be5，证据validation/connect-legacy-closure.json，Mac闭包复核另记。
+- 覆盖台账5条改ingested_partial/available_observed；47补当前能力证据，196/197作为额外发现条目补入，原263基线保持、discovered由11至13。目录测试改为允许有非空原始探测证据支持的权限更新，不能把初次unverified固定成永远未知。
+- 并行候选：schema3 9cf3a60 + descriptor校验0ea2e88，独立Python3.10审查证明损坏descriptor不再推进CURRENT；旧缓存leaf等完整性风险仍记录。龙虎榜/游资纯4d2f953+runtime b5b6a80，含hm_list错误字段定点修正、hm_detail.tag显式请求，未部署；hm_name二级拆分仍gap。
+- 旧接口引用闭包Mac复核完成：固定data-b93d6be5405e42c5ae4c2cee7b27876f65e2eea09af25920b398761c2c55a65c共114928文件、补2029，四个原始response及四个observation全部在发布清单内并通过SHA。/tmp/tushare-connect-legacy-mac-verified.json；不增加未审API归一化注册数。修复闭包时只自然排空采集消费者，随后已恢复，无再次重启服务。
