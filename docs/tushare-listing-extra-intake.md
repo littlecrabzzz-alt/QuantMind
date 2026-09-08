@@ -34,3 +34,7 @@
 固定 `daily_info` 目录把 31 个板块代码误记入 `input_fields`。纯合同将参数限定为 `trade_date/ts_code/exchange/start_date/end_date/fields`；板块代码和其起日归入 `DAILY_INFO_STARTS` 元数据。`fields` 是顶层字段选择参数。保留目录原文哈希 `15df88d3827e3e6b28fa904833651a052ccb0495690aa9186cfd7a2bd7ed8010` 和全部分母，留给父任务明确修正；本批没有编辑目录。其余 3 页字段与固定目录一致。
 
 离线复验：`python3 -S -B scripts/test_tushare_listing_extra_contracts.py`。8 个测试覆盖所有字段/输入、完整类别起日、日期轴、闰日连续性、未知下界、快照与历史区分、惰性轮转及非法配置；不导入 Pipeline，不访问账户或数据目录。
+
+## 运行候选集成（尚未上线）
+
+纯合同后已接入现有 registry、Pipeline、store 与 Mac 镜像安装清单，组名 `listing_extra`，默认禁用。历史证券发现合并存量历史/T股票、IPO及BSE旧/新代码；市场统计类别独立保存。IPO默认按发行日查询，上市日可显式选择；BSE查询仅在原映射列上接受源后缀代码，普通证券查询仍使用内部前缀。专属测试覆盖发现、规划、离线查询及饱和末端不冒充完整。真实权限、返回字段与云端/Mac端到端验收仍待执行。
