@@ -320,7 +320,7 @@ class DocumentQueue(unittest.TestCase):
                 self.root,
                 observation,
                 "npr",
-                [{"url": "https://example.com/original"}],
+                [{"url": "https://example.com/original", "title": observation}],
                 ["url"],
             )
         with patch.object(
@@ -402,6 +402,14 @@ class DocumentQueue(unittest.TestCase):
         result = docs.document_inventory(self.root)["mappings"][0]
         self.assertEqual(result["download_status"], "retry")
         self.assertEqual(result["latest_result"]["status"], "expected_mime_mismatch")
+        reused = docs.enqueue_documents(
+            self.root,
+            "obs-retry",
+            "anns_d",
+            [{"url": "https://example.com/download"}],
+            ["url"],
+        )
+        self.assertEqual((reused["enqueued"], reused["reused"]), (0, 1))
         with patch.object(
             docs,
             "_download_job",
@@ -423,6 +431,145 @@ class DocumentQueue(unittest.TestCase):
         self.assertEqual(
             len(inventory["files"]), 1
         )  # Failed MIME bytes remain evidence.
+
+    def test_cross_observation_reuse_preserves_fetch_time_and_parse_retry(self):
+        original = {
+            "title": "unchanged",
+            "url": "https://example.com/original",
+            "_row_identity": "b" * 64,
+            "_fetched_at": "observation-one",
+        }
+        first = docs.enqueue_documents(
+            self.root, "obs-one", "anns_d", [original], ["url"]
+        )
+        pending = docs.enqueue_documents(
+            self.root,
+            "obs-two",
+            "anns_d",
+            [{**original, "_fetched_at": "observation-two"}],
+            ["url"],
+        )
+        self.assertEqual(first["enqueued"], 1)
+        self.assertEqual((pending["enqueued"], pending["reused"]), (0, 1))
+        result = {
+            **self.saved(parse="parse_unavailable"),
+            "fetched_at": "2026-09-09T01:00:00Z",
+        }
+        with patch.object(docs, "_download_job", return_value=result) as fetch:
+            docs.run_documents(self.root)
+            reused = docs.enqueue_documents(
+                self.root, "obs-three", "anns_d", [original], ["url"]
+            )
+            repeated = docs.enqueue_documents(
+                self.root, "obs-three", "anns_d", [original], ["url"]
+            )
+            self.assertEqual((reused["enqueued"], reused["reused"]), (0, 1))
+            self.assertEqual(
+                (repeated["enqueued"], repeated["reused"], repeated["existing"]),
+                (0, 0, 1),
+            )
+            self.due()
+            with patch.object(
+                docs,
+                "_parse_pdf",
+                return_value={
+                    "parse_status": "parsed",
+                    "pages": [{"page_number": 1, "text": "text"}],
+                },
+            ):
+                docs.run_documents(self.root)
+            self.assertEqual(fetch.call_count, 1)
+        mappings = docs.document_inventory(self.root)["mappings"]
+        self.assertEqual(len(mappings), 3)
+        self.assertEqual(len({m["document_id"] for m in mappings}), 1)
+        self.assertEqual(
+            {m["status"] for m in mappings}, {"queued", "reused_pending", "reused"}
+        )
+        self.assertEqual({m["validation_observation"] for m in mappings}, {"obs-one"})
+        self.assertEqual(
+            {m["latest_result"]["fetched_at"] for m in mappings}, {result["fetched_at"]}
+        )
+        self.assertTrue(all(m["parse_status"] == "parsed" for m in mappings))
+
+    def test_changed_row_url_or_expected_mime_creates_work(self):
+        original = {
+            "title": "old",
+            "url": "https://example.com/original",
+            "_row_identity": "b" * 64,
+        }
+        changed_row = {**original, "title": "new", "_row_identity": "c" * 64}
+        changed_url = {**original, "url": "https://example.com/new-url"}
+        for observation, record in (
+            ("old", original),
+            ("changed-row", changed_row),
+            ("changed-url", changed_url),
+        ):
+            stats = docs.enqueue_documents(
+                self.root, observation, "anns_d", [record], ["url"]
+            )
+            self.assertEqual(stats["enqueued"], 1)
+            self.assertEqual(stats["reused"], 0)
+        with patch.object(docs, "_download_job", return_value=self.saved()) as fetch:
+            self.assertEqual(
+                docs.run_documents(self.root, max_documents=3)["processed"], 3
+            )
+            self.assertEqual(fetch.call_count, 3)
+        # Simulate an older contract which accepted unspecified MIME for the
+        # exact same API/row/field/URL. The new PDF requirement cannot reuse it.
+        db = docs._document_db(self.root)
+        with db:
+            db.execute(
+                "UPDATE documents SET expected_mime=NULL WHERE observation='old'"
+            )
+        db.close()
+        stronger = docs.enqueue_documents(
+            self.root, "stronger-mime", "anns_d", [original], ["url"]
+        )
+        self.assertEqual((stronger["enqueued"], stronger["reused"]), (1, 0))
+        self.assertEqual(len(docs.document_inventory(self.root)["mappings"]), 4)
+
+    def test_legacy_rows_ignore_acquisition_metadata_for_reuse(self):
+        for observation in ("one", "two"):
+            stats = docs.enqueue_documents(
+                self.root,
+                observation,
+                "anns_d",
+                [
+                    {
+                        "title": "unchanged",
+                        "url": "https://example.com/original",
+                        "_observation": observation,
+                        "_fetched_at": observation,
+                    }
+                ],
+                ["url"],
+            )
+        self.assertEqual((stats["enqueued"], stats["reused"]), (0, 1))
+        mappings = docs.document_inventory(self.root)["mappings"]
+        self.assertEqual(len({m["document_id"] for m in mappings}), 1)
+        self.assertEqual(len(mappings), 2)
+
+    def test_v1_index_migration_retains_existing_jobs(self):
+        docs.enqueue_documents(
+            self.root,
+            "existing",
+            "anns_d",
+            [{"url": "https://example.com/original"}],
+            ["url"],
+        )
+        db = docs._document_db(self.root)
+        db.execute("DROP INDEX document_reference_reuse")
+        db.execute("PRAGMA user_version=1")
+        db.close()
+        db = docs._document_db(self.root)
+        self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 2)
+        self.assertEqual(db.execute("SELECT count(*) FROM documents").fetchone()[0], 1)
+        self.assertTrue(
+            db.execute(
+                "SELECT name FROM sqlite_master WHERE name='document_reference_reuse'"
+            ).fetchone()
+        )
+        db.close()
 
     def test_worker_deadline_schema_and_unreferenced_files(self):
         worker = Mock(pid=123)

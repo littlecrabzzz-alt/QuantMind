@@ -405,7 +405,7 @@ def _document_db(root):
     db = sqlite3.connect(path, timeout=10)
     db.row_factory = sqlite3.Row
     version = db.execute("PRAGMA user_version").fetchone()[0]
-    if version not in (0, 1):
+    if version not in (0, 1, 2):
         db.close()
         raise ValueError("Unsupported document queue schema version")
     if version == 0:
@@ -426,6 +426,15 @@ def _document_db(root):
                 phase TEXT NOT NULL, result TEXT NOT NULL, created_at REAL NOT NULL);
             CREATE INDEX IF NOT EXISTS document_download_due ON documents(download_status,retry_after);
             PRAGMA user_version=1;
+            COMMIT;
+        """)
+    if db.execute("PRAGMA user_version").fetchone()[0] == 1:
+        # Version 2 only adds a reuse lookup index; old jobs/references stay intact.
+        db.executescript("""
+            BEGIN IMMEDIATE;
+            CREATE INDEX IF NOT EXISTS document_reference_reuse
+                ON document_refs(api_name,record_sha256,field,source_url,document_id);
+            PRAGMA user_version=2;
             COMMIT;
         """)
     return db
@@ -459,8 +468,10 @@ def _reference_hash(value):
 def enqueue_documents(root, observation, api_name, records, fields):
     """Register references from saved JSON/Parquet rows; never guess missing URLs.
 
-    Queue identity is observation + URL + expected MIME. Each record/field has a
-    separate reference; another observation of the same URL can capture revisions.
+    Unchanged API/row identity/field/URL/MIME reuses downloaded or pending work.
+    Every observation retains its own reference and original download timestamp.
+    Metadata or URL changes create work; silent same-URL document revisions need
+    a separate periodic validation policy and are not detected by this reuse.
     Empty observations and missing/invalid URL cells remain explicit references.
     """
     if not all(isinstance(v, str) and v for v in (observation, api_name)):
@@ -471,10 +482,11 @@ def enqueue_documents(root, observation, api_name, records, fields):
         raise ValueError("fields must be attachment field names")
     if len(set(fields)) != len(fields):
         raise ValueError("Duplicate attachment fields")
-    count = {"enqueued": 0, "missing": 0, "existing": 0, "references": 0}
+    count = {"enqueued": 0, "missing": 0, "existing": 0, "references": 0, "reused": 0}
     db = _document_db(root)
     try:
         with db:
+            db.execute("BEGIN IMMEDIATE")
             saw_record = False
             for record in records:
                 if not isinstance(record, dict):
@@ -485,7 +497,13 @@ def enqueue_documents(root, observation, api_name, records, fields):
                     known_identity
                     if isinstance(known_identity, str)
                     and re.fullmatch(r"[a-f0-9]{64}", known_identity)
-                    else _reference_hash(record)
+                    else _reference_hash(
+                        {
+                            k: v
+                            for k, v in record.items()
+                            if k not in ("_fetched_at", "_observation")
+                        }
+                    )
                 )
                 for field in fields or ("",):
                     value = record.get(field)
@@ -507,24 +525,53 @@ def enqueue_documents(root, observation, api_name, records, fields):
                         )
                         else None
                     )
-                    job_id = (
-                        hashlib.sha256(
-                            _json([observation, value, expected])
-                        ).hexdigest()
-                        if valid
-                        else None
-                    )
-                    if valid:
-                        inserted = db.execute(
-                            "INSERT OR IGNORE INTO documents(id,observation,url,expected_mime) VALUES(?,?,?,?)",
-                            (job_id, observation, value, expected),
-                        ).rowcount
-                        count["enqueued" if inserted else "existing"] += 1
-                    else:
-                        count["missing"] += 1
                     ref_id = _reference_hash(
                         [observation, api_name, record_sha, field, value]
                     )
+                    job_id = None
+                    if valid:
+                        existing = db.execute(
+                            "SELECT document_id FROM document_refs WHERE id=?",
+                            (ref_id,),
+                        ).fetchone()
+                        if existing is not None:
+                            count["existing"] += 1
+                            continue
+                        reusable = db.execute(
+                            """SELECT d.id,d.download_status FROM document_refs r
+                            JOIN documents d ON r.document_id=d.id
+                            WHERE r.api_name=? AND r.record_sha256=? AND r.field=? AND r.source_url=?
+                              AND d.expected_mime IS ? AND d.download_status IN ('downloaded','pending','retry')
+                            ORDER BY CASE WHEN d.download_status='downloaded' THEN 0 ELSE 1 END,d.rowid DESC
+                            LIMIT 1""",
+                            (api_name, record_sha, field, value, expected),
+                        ).fetchone()
+                        if reusable is not None:
+                            job_id = reusable["id"]
+                            status = (
+                                "reused"
+                                if reusable["download_status"] == "downloaded"
+                                else "reused_pending"
+                            )
+                            count["reused"] += 1
+                        else:
+                            job_id = _reference_hash(
+                                [
+                                    observation,
+                                    api_name,
+                                    record_sha,
+                                    field,
+                                    value,
+                                    expected,
+                                ]
+                            )
+                            inserted = db.execute(
+                                "INSERT OR IGNORE INTO documents(id,observation,url,expected_mime) VALUES(?,?,?,?)",
+                                (job_id, observation, value, expected),
+                            ).rowcount
+                            count["enqueued" if inserted else "existing"] += 1
+                    else:
+                        count["missing"] += 1
                     count["references"] += db.execute(
                         "INSERT OR IGNORE INTO document_refs VALUES(?,?,?,?,?,?,?,?)",
                         (
@@ -795,7 +842,7 @@ def document_inventory(root):
         db.execute("BEGIN")
         mappings = [
             dict(row)
-            for row in db.execute("""SELECT r.*,d.expected_mime,d.download_status,d.parse_status,
+            for row in db.execute("""SELECT r.*,d.observation AS validation_observation,d.expected_mime,d.download_status,d.parse_status,
             d.download_tries,d.parse_tries,d.result AS latest_result FROM document_refs r
             LEFT JOIN documents d ON r.document_id=d.id ORDER BY r.id""")
         ]
