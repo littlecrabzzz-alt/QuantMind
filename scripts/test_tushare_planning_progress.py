@@ -279,6 +279,136 @@ class PlanningProgress(unittest.TestCase):
                 )
                 self.assertEqual(set(ids), dependencies)
 
+    def test_all_registered_planners_preserve_jobs_with_projected_identifiers(self):
+        """Compare every real API and whole family, including implicit dependencies."""
+        ids = {
+            "stocks": ["600000.SH", "000001.SZ"],
+            "indexes": ["000001.SH", "CI005001.CI", "801010.SI"],
+            "funds": ["510300.SH", "159915.SZ", "160000.OF"],
+            "etfs": ["510300.SH", "159915.SZ"],
+            "bonds": ["110001.SH"],
+            "sw_l3": ["801011.SI"],
+            "sw_indexes": ["801010.SI"],
+            "futures": ["IF2609.CFX"],
+            "futures_continuous": ["IFL.CFX"],
+            "futures_indexes": ["NHA.NH"],
+            "futures_products": ["IF"],
+            "options": ["10000001.SH"],
+            "spot_metals": ["Au99.99"],
+            "fx_instruments": ["USDCNY.FXCM"],
+            "credit_securities": ["T000001.SH", "159915.SZ"],
+            "hk_stocks": ["00013!.HK", "00013.HK"],
+            "us_stocks": ["AAPL", "OLD^A"],
+        }
+        for family, planner in module.PLANNERS.items():
+            apis = [
+                api
+                for api, spec in module.EXTENDED_CONTRACTS.items()
+                if spec["group"] == family
+            ]
+            for selected in ([api] for api in apis + [None]):
+                config = {"history_start": "20251201", "planning_epoch": "frozen-epoch"}
+                if selected != [None]:
+                    config[family + "_apis"] = selected
+                with self.subTest(family=family, selected=selected):
+                    _, projected = module._planning_inputs(family, config, ids)
+                    self.assertEqual(
+                        list(planner(config, date(2026, 9, 9), ids)),
+                        list(planner(config, date(2026, 9, 9), projected)),
+                    )
+
+    def test_text_history_keys_all_affect_policy(self):
+        config = {"history_start": "20250101", "text_apis": ["news"]}
+        before, _ = module._planning_inputs("text", config, {})
+        for key, value in (
+            ("text_history_start", "20240101"),
+            ("text_history_starts", {"news": "20240101"}),
+            ("text_history_window", "month"),
+        ):
+            with self.subTest(key=key):
+                after, _ = module._planning_inputs("text", {**config, key: value}, {})
+                self.assertNotEqual(before, after)
+
+    def test_structured_and_market_use_frozen_anchor_despite_epoch_override(self):
+        for family, apis, ids in (
+            ("structured", ["daily"], {}),
+            ("market", ["fund_nav"], {"funds": ["510300.SH", "159915.SZ"]}),
+        ):
+            with self.subTest(family=family):
+                self.p.db.execute("DELETE FROM planning_state")
+                self.p.db.execute("DELETE FROM jobs")
+                config = {
+                    "history_start": "20260801",
+                    "enable_" + family: True,
+                    family + "_apis": apis,
+                    "plan_jobs_per_tick": 1,
+                }
+                with patch.object(self.p, "identifiers", return_value=ids):
+                    self.p.plan_extended(config, date(2026, 9, 1))
+                    before = self.state("recent:" + family)
+                    self.p.plan_extended(config, date(2026, 9, 20))
+                    self.assertEqual(
+                        self.state("recent:" + family)["signature"], before["signature"]
+                    )
+                    epochs = {
+                        epoch for _, epoch, _ in self.jobs() if epoch != "history"
+                    }
+                    self.assertEqual(epochs, {"20260901"})
+                    for _ in range(60):
+                        self.p.plan_extended(config, date(2026, 9, 20))
+                    self.assertEqual(
+                        self.state("recent:" + family)["anchor"], "20260920"
+                    )
+                    self.assertTrue(self.state("recent:" + family)["done"])
+                    count = len(self.jobs())
+                    self.p.plan_extended(config, date(2026, 9, 20))
+                    self.assertEqual(len(self.jobs()), count)
+
+    def test_six_day_catchup_preserves_completed_week_month_and_quarter_axes(self):
+        global_planner = module.PLANNERS["global"]
+        ids = {"stocks": ["600000.SH"], "indexes": ["000001.SH"]}
+        config = {
+            "history_start": "20260101",
+            "global_apis": ["weekly", "monthly", "index_weekly", "index_monthly"],
+        }
+        days = [date(2026, 6, 25) + timedelta(days=n) for n in range(0, 31, 6)]
+        ranges = {}
+        for today in days:
+            for job in global_planner(config, today, ids):
+                if job["epoch"] == "history":
+                    continue
+                params = job["params"]
+                left = date.fromisoformat(params["start_date"])
+                right = date.fromisoformat(params["end_date"])
+                ranges.setdefault(job["api_name"], set()).update(
+                    left + timedelta(days=n) for n in range((right - left).days + 1)
+                )
+        for api in ("weekly", "index_weekly"):
+            self.assertLessEqual(
+                {date(2026, 6, 8) + timedelta(days=n) for n in range(42)}, ranges[api]
+            )
+        for api in ("monthly", "index_monthly"):
+            self.assertLessEqual(
+                {date(2026, 4, 1) + timedelta(days=n) for n in range(91)}, ranges[api]
+            )
+        config = {
+            "enable_structured": True,
+            "structured_apis": ["income_vip"],
+            "history_start": "20260101",
+            "plan_jobs_per_tick": 1,
+        }
+        with patch.object(self.p, "identifiers", return_value={}):
+            self.p.plan_extended(config, days[0])
+            for _ in range(200):
+                self.p.plan_extended(config, days[-1])
+            self.assertEqual(self.state("recent:structured")["anchor"], "20260725")
+            self.assertTrue(self.state("recent:structured")["done"])
+            periods = {p["period"] for p, epoch, _ in self.jobs() if epoch != "history"}
+            self.assertEqual(periods, {"20260331", "20260630"})
+            count = len(self.jobs())
+            self.assertEqual(self.p.plan_extended(config, days[-1]), {})
+            self.assertEqual(len(self.jobs()), count)
+
 
 if __name__ == "__main__":
     unittest.main()
