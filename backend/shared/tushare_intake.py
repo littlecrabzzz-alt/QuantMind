@@ -247,12 +247,54 @@ def capture_sample(client, token, job, root: Path):
     request = {k: job[k] for k in ("api_name", "params", "fields")}
     started = utc_now()
     try:
+        # httpx.post reads the complete response before returning. Do not call
+        # raise_for_status first: HTTP failures still have original evidence.
         response = client.post(API_ROOT, json={**request, "token": token})
-        response.raise_for_status()
-        # Defensive redaction if upstream accidentally echoes the request secret.
-        raw = response.content.replace(token.encode(), b"[REDACTED_SECRET]")
-        redacted = raw != response.content
+        content = response.content
+    except httpx.HTTPStatusError as exc:
+        # A caller's response hook may raise early; archive only an already-read
+        # body and keep the HTTP classification when no complete body exists.
+        response = exc.response
+        try:
+            content = response.content
+        except httpx.ResponseNotRead:
+            return {
+                "api_name": job["api_name"],
+                "status": "rate_limited"
+                if response.status_code == 429
+                else "transport_error",
+                "error_type": type(exc).__name__,
+                "http_status": response.status_code,
+                "response_complete": False,
+            }
+    except httpx.HTTPError as exc:
+        # No complete response body is available. Exception messages/request
+        # bodies may contain the token and must never be serialized.
+        return {
+            "api_name": job["api_name"],
+            "status": "transport_error",
+            "error_type": type(exc).__name__,
+            "response_complete": False,
+        }
+    # Preserve the existing raw-object contract, with defensive token redaction.
+    raw = content.replace(token.encode(), b"[REDACTED_SECRET]")
+    redacted = raw != content
+    try:
         payload = json.loads(raw)
+        response_format = "json"
+    except (ValueError, UnicodeError):
+        payload = None
+        response_format = "non_json"
+    if not response.is_success:
+        assessment = {
+            "status": "rate_limited"
+            if response.status_code == 429
+            else "transport_error",
+            "error_type": "HTTPStatusError",
+        }
+    elif response_format == "non_json":
+        assessment = {"status": "invalid_response"}
+    else:
         assessment = assess_response(
             payload,
             job["row_cap"],
@@ -260,24 +302,11 @@ def capture_sample(client, token, job, root: Path):
             job.get("nullable_fields", ()),
             job.get("positive_fields", ()),
         )
-    except httpx.HTTPStatusError as exc:
-        return {
-            "api_name": job["api_name"],
-            "status": "rate_limited"
-            if exc.response.status_code == 429
-            else "transport_error",
-            "error_type": type(exc).__name__,
-            "http_status": exc.response.status_code,
-        }
-    except httpx.HTTPError as exc:
-        # Do not serialize exception messages/request bodies (could contain token).
-        return {
-            "api_name": job["api_name"],
-            "status": "transport_error",
-            "error_type": type(exc).__name__,
-        }
-    except (ValueError, UnicodeError):
-        assessment = {"status": "invalid_response"}
+    assessment.update(
+        http_status=response.status_code,
+        response_complete=True,
+        response_format=response_format,
+    )
     sha = digest(raw)
     objects = root / "objects"
     observations = root / "observations"
