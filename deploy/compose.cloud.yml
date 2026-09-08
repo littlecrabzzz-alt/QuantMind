@@ -42,9 +42,25 @@ services:
       ENABLE_TDX_PUSH: "false"
       QM_NODE_ROLE: authority
     command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q ${QLIB_CELERY_QUEUE:-qlib_backtest_srv} --loglevel=info --concurrency=1
+  tushare-worker:
+    extends:
+      file: docker-compose.yml
+      service: celery-worker
+    environment:
+      QM_NODE_ROLE: authority
+      ENABLE_REAL_TRADING: "false"
+      ENABLE_TDX_PUSH: "false"
+      HOST_PROJECT_PATH: /root/data/disk/quantmind/project
+      TRAINING_PAUSE_OTHERS: "false"
+    container_name: quantmind-tushare-worker
+    mem_limit: 1g
+    cpus: 0.75
+    command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q tushare_acquire --loglevel=info --concurrency=1 --prefetch-multiplier=1
   celery-beat:
     mem_limit: 384m
     cpus: 0.5
+    environment:
+      QM_NODE_ROLE: authority
   data-gateway:
     build:
       dockerfile: docker/Dockerfile.data-gateway-cloud

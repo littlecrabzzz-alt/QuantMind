@@ -7,6 +7,7 @@ from pathlib import Path
 import shlex
 import subprocess
 import sys
+import tempfile
 import urllib.request
 
 from dual_node_sync import PROJECT, topology
@@ -27,6 +28,14 @@ def require(condition, reason):
 
 
 def node(role):
+    if role == "mac":
+        require(sys.platform == "darwin", "Run the two-node check on the Mac host")
+        require(not os.getenv("DOCKER_HOST"), "Unset DOCKER_HOST for local verification")
+        endpoint = output("docker", "context", "inspect", "--format", "{{.Endpoints.docker.Host}}")
+        require(endpoint.startswith("unix://" + str(Path.home() / ".docker") + "/")
+                or endpoint == "unix:///var/run/docker.sock", "Non-local Docker endpoint")
+        require(output("docker", "info", "--format", "{{.OperatingSystem}}") == "Docker Desktop",
+                "Expected local Docker Desktop daemon")
     sync = json.loads(output(sys.executable, str(PROJECT / "scripts/dual_node_sync.py"),
                              role, "--content-hash"))
     names = CONTAINERS + (["quantmind-web"] if role == "cloud" else [])
@@ -88,19 +97,60 @@ def node(role):
             for destination in ("/data", "/app/db", "/app/models", "/app/logs", "/app/user_pools_local"):
                 require(Path(sources[destination]).resolve().is_relative_to(PROJECT / ".local-dev/project"),
                         f"Local sandbox mount escaped isolation: {destination}")
-            require((PROJECT / ".local-dev/SNAPSHOT_ID").read_text().strip() == snapshot.name,
-                    "Local sandbox uses an older snapshot; stop or rebuild it")
+            require(env.get("HOST_RUNTIME_PATH") == str(PROJECT / ".local-dev/project"),
+                    "Local child jobs lack the sandbox runtime root; recreate the sandbox containers")
+            validate_sandbox_snapshot(PROJECT)
             mode = "local-sandbox"
     require((snapshot / "COMPLETE").is_file(), "No completed offline snapshot")
     return {"role": role, "head": output("git", "-C", str(PROJECT), "rev-parse", "HEAD"),
             "branch": output("git", "-C", str(PROJECT), "branch", "--show-current"),
-            "snapshot": snapshot.name, "sync": sync, "mode": mode if role == "mac" else "authority"}
+            "snapshot": snapshot.name, "sync": sync, "mode": mode if role == "mac" else "authority",
+            "sandbox_snapshot": (PROJECT / ".local-dev/SNAPSHOT_ID").read_text().strip()
+                if role == "mac" and (PROJECT / ".local-dev/SNAPSHOT_ID").is_file() else None}
+
+
+def validate_sandbox_snapshot(project):
+    ident = (project / ".local-dev/SNAPSHOT_ID").read_text().strip()
+    require(ident.startswith("snapshot-") and Path(ident).name == ident,
+            "Invalid fixed sandbox snapshot ID")
+    require((project / "logs/cloud-snapshots" / ident / "COMPLETE").is_file(),
+            "The fixed sandbox snapshot is missing or incomplete")
+    return ident
+
+
+def align_git(local, remote, source_role):
+    import dual_node_git
+    source, destination = (local, remote) if source_role == "mac" else (remote, local)
+    require(local["branch"] == remote["branch"], "Branches differ; resolve explicitly before handoff")
+    for key in ("contentFiles", "contentDigest"):
+        require(local["sync"][key] == remote["sync"][key], "Working trees differ; refusing Git alignment")
+    if source["head"] == destination["head"]:
+        return
+    require(sys.platform == "darwin", "Git handoff is coordinated from the Mac host")
+    helper = SETTINGS["QM_REMOTE_PROJECT"] + "/scripts/dual_node_git.py"
+    ssh = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", SETTINGS["QM_SSH_TARGET"]]
+    with tempfile.TemporaryFile() as bundle:
+        if source_role == "mac":
+            dual_node_git.write_bundle(source["head"], destination["head"], bundle)
+        else:
+            command = shlex.join(["sudo", "-n", "python3", helper, "bundle", source["head"], destination["head"]])
+            subprocess.run([*ssh, command], check=True, stdout=bundle)
+        bundle.seek(0)
+        args = [destination["head"], destination["branch"], source["head"], local["sync"]["contentDigest"]]
+        if source_role == "mac":
+            command = shlex.join(["sudo", "-n", "python3", helper, "receive", *args, "cloud"])
+            subprocess.run([*ssh, command], check=True, stdin=bundle)
+        else:
+            dual_node_git.receive_bundle(*args, "mac", bundle)
+    print("Git metadata fast-forwarded; synchronized working files retained.", file=sys.stderr)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--node", choices=("mac", "cloud"))
+    parser.add_argument("--align-git", choices=("mac", "cloud"), help="Explicit source of a metadata-only fast-forward; never rewrites working files")
     args = parser.parse_args()
+    require(not (args.node and args.align_git), "Use --align-git from the Mac two-node entry")
     if args.node:
         print(json.dumps(node(args.node), indent=2))
         return
@@ -108,6 +158,11 @@ def main():
     command = "sudo -n python3 " + shlex.quote(SETTINGS["QM_REMOTE_PROJECT"] + "/scripts/dual_node_check.py") + " --node cloud"
     remote = json.loads(output("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
                                SETTINGS["QM_SSH_TARGET"], command))
+    if args.align_git:
+        align_git(local, remote, args.align_git)
+        local = node("mac")
+        remote = json.loads(output("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+                                   SETTINGS["QM_SSH_TARGET"], command))
     for key in ("head", "branch", "snapshot"):
         require(local[key] == remote[key], f"Two-node {key} differs; resolve before development")
     for key in ("contentFiles", "contentDigest"):
@@ -123,6 +178,7 @@ def main():
                       "source_digest": local["sync"]["contentDigest"],
                       "snapshot": local["snapshot"], "data_authority": "lzy-vm",
                       "mac_mode": local["mode"],
+                      "sandbox_snapshot": local["sandbox_snapshot"],
                       "local_writers": "old authority stopped; restart=no"}, indent=2))
 
 

@@ -1,0 +1,283 @@
+"""Offline failure, resume and mirror acceptance; temporary files only."""
+
+import json
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+import httpx
+import pyarrow.parquet as pq
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from backend.shared.tushare_pipeline import (
+    Pipeline,
+    atomic_json,
+    manifest_at,
+    verify_data,
+)
+from scripts.tushare_mirror import mirror
+
+CATALOG = json.loads(
+    (Path(__file__).resolve().parents[1] / "config/tushare-catalog.json").read_text()
+)
+CONFIG = {"priority_start": "20200101"}
+
+
+class PipelineAcceptance(unittest.TestCase):
+    def response(self, values):
+        return httpx.Response(
+            200,
+            json={
+                "code": 0,
+                "data": {
+                    "fields": ["ts_code", "trade_date", "adj_factor"],
+                    "items": [["510300" + ".SH", "20260907", x] for x in values],
+                },
+            },
+        )
+
+    def test_checkpoint_resume_normalization_and_no_repeat(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            calls = []
+
+            def handler(request):
+                params = json.loads(request.content)["params"]
+                calls.append(params)
+                return self.response([1, 2] if params["offset"] == 0 else [3])
+
+            pipeline = Pipeline(root, CATALOG)
+            pipeline.enqueue(
+                "fund_adj", {"trade_date": "20260907", "offset": 0, "limit": 2}
+            )
+            pipeline.db.commit()
+            with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+                pipeline.run(client, "synthetic-token", CONFIG, max_requests=1, pause=0)
+                self.assertEqual(pipeline.status(), {"done": 1, "pending": 1})
+                first = pipeline.publish()
+                pipeline.close()
+                pipeline = Pipeline(root, CATALOG)
+                pipeline.run(
+                    client, "synthetic-token", CONFIG, max_requests=10, pause=0
+                )
+                self.assertEqual(len(calls), 2)
+                self.assertEqual(
+                    pipeline.run(client, "synthetic-token", CONFIG, pause=0)[
+                        "requests"
+                    ],
+                    0,
+                )
+                second = pipeline.publish()
+                self.assertNotEqual(first, second)
+                self.assertEqual(second, pipeline.publish())
+                manifest = verify_data(root, second)
+                frames = [
+                    pq.read_table(root / d["path"]).to_pylist()
+                    for d in manifest["datasets"]
+                ]
+                self.assertEqual(sum(map(len, frames)), 3)
+                self.assertEqual(frames[0][0]["ts_code"], "SH510300")
+                self.assertIn("source_ts_code", frames[0][0])
+                self.assertFalse(manifest["history_complete"])
+                pipeline.close()
+
+    def test_full_page_keeps_quality_failure(self):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            httpx.Client(
+                transport=httpx.MockTransport(lambda _: self.response([0, 2]))
+            ) as client,
+        ):
+            pipeline = Pipeline(tmp, CATALOG)
+            pipeline.enqueue(
+                "fund_adj", {"trade_date": "20260907", "offset": 0, "limit": 2}
+            )
+            pipeline.db.commit()
+            result = pipeline.run(
+                client, "synthetic-token", CONFIG, max_requests=1, pause=0
+            )
+            self.assertEqual(result["quality"], 1)
+            self.assertEqual(result["pending"], 1)
+            pipeline.close()
+
+    def test_ignored_offset_is_blocked_not_infinite_pagination(self):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            httpx.Client(
+                transport=httpx.MockTransport(lambda _: self.response([1, 2]))
+            ) as client,
+        ):
+            pipeline = Pipeline(tmp, CATALOG)
+            pipeline.enqueue(
+                "fund_adj", {"trade_date": "20260907", "offset": 0, "limit": 2}
+            )
+            pipeline.db.commit()
+            result = pipeline.run(client, "synthetic-token", CONFIG, pause=0)
+            self.assertEqual(result["requests"], 2)
+            self.assertEqual(result["blocked"], 1)
+            pipeline.close()
+
+    def test_transport_backoff_and_blocked_row_cap(self):
+        def failure(request):
+            raise httpx.ConnectError("synthetic-token", request=request)
+
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            httpx.Client(transport=httpx.MockTransport(failure)) as client,
+        ):
+            pipeline = Pipeline(tmp, CATALOG)
+            pipeline.enqueue("ci_daily", {"trade_date": "20260907"})
+            pipeline.db.commit()
+            self.assertEqual(
+                pipeline.run(client, "synthetic-token", CONFIG, pause=0)["requests"], 1
+            )
+            self.assertEqual(
+                pipeline.run(client, "synthetic-token", CONFIG, pause=0)["requests"], 0
+            )
+            self.assertNotIn(
+                "synthetic-token",
+                pipeline.db.execute("select result from jobs").fetchone()[0],
+            )
+            pipeline.close()
+
+    def test_mirror_interruption_retry_noop_and_corruption(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source, target = Path(tmp) / "cloud", Path(tmp) / "mac"
+            pipeline = Pipeline(source, CATALOG)
+            with httpx.Client(
+                transport=httpx.MockTransport(lambda _: self.response([1]))
+            ) as client:
+                pipeline.enqueue(
+                    "fund_adj", {"trade_date": "20260907", "offset": 0, "limit": 2}
+                )
+                pipeline.db.commit()
+                pipeline.run(client, "synthetic-token", CONFIG, pause=0)
+            first = pipeline.publish()
+            shutil.copytree(source, target)
+            before = (target / "CURRENT.json").read_bytes()
+            with httpx.Client(
+                transport=httpx.MockTransport(lambda _: self.response([2]))
+            ) as client:
+                pipeline.enqueue(
+                    "fund_adj",
+                    {"trade_date": "20260907", "offset": 0, "limit": 2},
+                    epoch="revision",
+                )
+                pipeline.db.commit()
+                pipeline.run(client, "synthetic-token", CONFIG, pause=0)
+            second = pipeline.publish()
+
+            def download(cmd, **kwargs):
+                listing = next(
+                    v.split("=", 1)[1] for v in cmd if v.startswith("--files-from=")
+                )
+                for name in Path(listing).read_text().splitlines():
+                    (target / name).parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source / name, target / name)
+
+            def ssh(cmd, **kwargs):
+                if cmd[-1].endswith("CURRENT.json"):
+                    return (source / "CURRENT.json").read_bytes()
+                return (source / "releases" / second / "manifest.json").read_bytes()
+
+            with patch(
+                "scripts.tushare_mirror.subprocess.check_output", side_effect=ssh
+            ):
+                with patch(
+                    "scripts.tushare_mirror.subprocess.run",
+                    side_effect=subprocess.CalledProcessError(1, "rsync"),
+                ):
+                    with self.assertRaises(subprocess.CalledProcessError):
+                        mirror(target)
+                self.assertEqual((target / "CURRENT.json").read_bytes(), before)
+                verify_data(target, first)
+                with patch(
+                    "scripts.tushare_mirror.subprocess.run", side_effect=download
+                ):
+                    self.assertGreater(mirror(target)["downloaded_files"], 0)
+                    self.assertEqual(mirror(target)["downloaded_files"], 0)
+                manifest = verify_data(target, second)
+                one = next(iter(manifest["files"]))
+                (target / one).write_bytes(b"corrupted")
+                with self.assertRaises(ValueError):
+                    verify_data(target, second)
+                with patch(
+                    "scripts.tushare_mirror.subprocess.run", side_effect=download
+                ):
+                    self.assertEqual(mirror(target)["downloaded_files"], 1)
+            pipeline.close()
+
+    def test_offline_reader_selects_latest_observation(self):
+        from backend.shared.tushare_store import read_dataset
+        import socket
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pipeline = Pipeline(root, CATALOG)
+            for value, epoch in ((1, "old"), (2, "new")):
+                with httpx.Client(
+                    transport=httpx.MockTransport(lambda _, v=value: self.response([v]))
+                ) as client:
+                    pipeline.enqueue(
+                        "fund_adj",
+                        {"trade_date": "20260907", "offset": 0, "limit": 2},
+                        epoch=epoch,
+                    )
+                    pipeline.db.commit()
+                    pipeline.run(client, "synthetic-token", CONFIG, pause=0)
+            release = pipeline.publish()
+            with (
+                patch.object(
+                    socket.socket,
+                    "connect",
+                    side_effect=AssertionError("network forbidden"),
+                ),
+                patch(
+                    "backend.shared.tushare_pipeline.get_secret",
+                    side_effect=AssertionError("secret forbidden"),
+                ),
+            ):
+                rows = read_dataset(root, release, "fund_adj").to_pylist()
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(rows[0]["adj_factor"], 2)
+                with self.assertRaises(ValueError):
+                    read_dataset(root, release, "ci_daily")
+            pipeline.close()
+
+    def test_initialization_is_idempotent_with_daily_generations(self):
+        from datetime import date
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pipeline = Pipeline(root, CATALOG)
+            config = {
+                **CONFIG,
+                "history_start": "20260101",
+                "seed_release": "probe-fixture",
+            }
+            atomic_json(root / "releases/probe-fixture/manifest.json", {"results": []})
+            pipeline.initialize(config, date(2026, 9, 9))
+            count = pipeline.status()["pending"]
+            pipeline.initialize(config, date(2026, 9, 9))
+            self.assertEqual(pipeline.status()["pending"], count)
+            pipeline.initialize(config, date(2026, 9, 10))
+            self.assertGreater(pipeline.status()["pending"], count)
+            pipeline.close()
+
+    def test_manifest_rejects_path_escape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            from backend.shared.tushare_intake import digest, json_bytes
+
+            body = {"files": {"../outside": {"sha256": "0" * 64, "bytes": 0}}}
+            release = "data-" + digest(json_bytes(body))
+            atomic_json(Path(tmp) / "releases" / release / "manifest.json", body)
+            with self.assertRaises(ValueError):
+                manifest_at(Path(tmp), release)
+
+
+if __name__ == "__main__":
+    unittest.main()

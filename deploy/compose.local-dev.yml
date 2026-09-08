@@ -18,7 +18,10 @@ services:
       APP_ENV: development
       QM_NODE_ROLE: sandbox
       HOST_PROJECT_PATH: ${QM_LOCAL_PROJECT:?run through scripts/local-dev.sh}
+      HOST_RUNTIME_PATH: ${QM_LOCAL_STATE}
       TRAINING_DOCKER_NETWORK: quantmind-dev_quantmind-net
+      AI_IDE_DOCKER_NETWORK: quantmind-dev_quantmind-net
+      RD_AGENT_DOCKER_NETWORK: quantmind-dev_quantmind-net
       TRAINING_PAUSE_OTHERS: "false"
       OSS_EMBEDDED_CELERY: "false"
       DAILY_SYNC_ENABLED: "false"
@@ -49,7 +52,10 @@ services:
     environment:
       QM_NODE_ROLE: sandbox
       HOST_PROJECT_PATH: ${QM_LOCAL_PROJECT}
+      HOST_RUNTIME_PATH: ${QM_LOCAL_STATE}
       TRAINING_DOCKER_NETWORK: quantmind-dev_quantmind-net
+      AI_IDE_DOCKER_NETWORK: quantmind-dev_quantmind-net
+      RD_AGENT_DOCKER_NETWORK: quantmind-dev_quantmind-net
       TRAINING_PAUSE_OTHERS: "false"
       DAILY_SYNC_ENABLED: "false"
       ENABLE_REAL_TRADING: "false"
@@ -102,7 +108,10 @@ services:
     environment:
       QM_NODE_ROLE: sandbox
       HOST_PROJECT_PATH: ${QM_LOCAL_PROJECT}
+      HOST_RUNTIME_PATH: ${QM_LOCAL_STATE}
       TRAINING_DOCKER_NETWORK: quantmind-dev_quantmind-net
+      AI_IDE_DOCKER_NETWORK: quantmind-dev_quantmind-net
+      RD_AGENT_DOCKER_NETWORK: quantmind-dev_quantmind-net
       TRAINING_PAUSE_OTHERS: "false"
       ENABLE_REAL_TRADING: "false"
     volumes: !override
@@ -115,6 +124,12 @@ services:
       - ./strategy_templates:/app/strategy_templates:ro
       - ./CLAUDE.md:/app/CLAUDE.md:ro
       - ./:/quantmind:ro
+      - ${QM_LOCAL_STATE}/data:/quantmind/data
+      - ${QM_LOCAL_STATE}/db:/quantmind/db
+      - ${QM_LOCAL_STATE}/models:/quantmind/models
+      - ${QM_LOCAL_STATE}/results:/quantmind/results
+      - ${QM_LOCAL_STATE}/logs:/quantmind/logs
+      - ${QM_LOCAL_STATE}/user_pools_local:/quantmind/user_pools_local
       - ./docker/training/fonts:/app/docker/training/fonts:ro
       - ${QM_LOCAL_STATE}/data:/data
       - ${QM_LOCAL_STATE}/db:/app/db

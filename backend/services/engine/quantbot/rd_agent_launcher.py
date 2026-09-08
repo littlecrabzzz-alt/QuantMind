@@ -244,7 +244,9 @@ class RDAgentLauncher:
         windows = _WINDOW_MAP.get(factor_type, _WINDOW_MAP["综合"])
         seed_code = template.format(**windows)
 
-        tmp_dir = Path(tempfile.mkdtemp(prefix="quantbot_seed_"))
+        seed_root = Path("/data/rdagent_seeds")
+        seed_root.mkdir(parents=True, exist_ok=True)
+        tmp_dir = Path(tempfile.mkdtemp(prefix="quantbot_seed_", dir=seed_root))
         seed_path = tmp_dir / "seed_factor.py"
         seed_path.write_text(seed_code, encoding="utf-8")
         return seed_path
@@ -278,8 +280,9 @@ class RDAgentLauncher:
                 f"docker compose --profile rdagent build rdagent"
             )
 
-        # 把宿主路径映射给子容器；seed 走宿主 /tmp（Linux 共享）
-        seed_host = str(seed_path)
+        from backend.shared.docker_host_paths import host_path
+
+        seed_host = host_path(str(seed_path), runtime_only=True)
         seed_mount = "/tmp/seed_factor.py"
 
         chat_model = os.getenv("CHAT_MODEL") or os.getenv("AI_IDE_LLM_MODEL") or "deepseek-chat"
@@ -309,13 +312,14 @@ class RDAgentLauncher:
 
         host = self.HOST_PROJECT_PATH.rstrip("/")
         # 共享日志目录：rdagent 容器写入，quantmind 容器读取
-        log_dir_host = f"{host}/data/rdagent_logs"
+        log_dir_host = host_path("/data/rdagent_logs", runtime_only=True)
         log_dir_container = "/tmp/rdagent_logs"
         volumes = {
             f"{host}/backend": {"bind": "/app/backend", "mode": "ro"},
             f"{host}/scripts": {"bind": "/app/scripts", "mode": "ro"},
             f"{host}/config":  {"bind": "/app/config",  "mode": "ro"},
-            f"{host}/db":      {"bind": "/app/db",      "mode": "ro"},
+            host_path("/app/db", runtime_only=True): {"bind": "/app/db", "mode": "ro"},
+            host_path("/data", runtime_only=True): {"bind": "/data", "mode": "ro"},
             log_dir_host:      {"bind": log_dir_container, "mode": "rw"},
             seed_host: {"bind": seed_mount, "mode": "ro"},
         }
