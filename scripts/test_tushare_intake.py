@@ -109,6 +109,39 @@ class IntakeAcceptance(unittest.TestCase):
             assess_response({"code": 40203}, 2, [])["status"], "permission_denied"
         )
 
+    def test_supplier_continuation_flag_prevents_false_complete_short_page(self):
+        for items in ([[1]], []):
+            result = assess_response(
+                {
+                    "code": 0,
+                    "data": {
+                        "fields": ["open"],
+                        "items": items,
+                        "has_more": True,
+                        "count": 0,
+                    },
+                },
+                6000,
+                ["open"],
+            )
+            self.assertEqual(result["status"], "possibly_truncated")
+            self.assertTrue(result["supplier_has_more"])
+            self.assertEqual(result["row_count"], len(items))
+        result = assess_response(
+            {
+                "code": 0,
+                "data": {
+                    "fields": ["open"],
+                    "items": [[1]],
+                    "has_more": False,
+                },
+            },
+            6000,
+            ["open"],
+        )
+        self.assertEqual(result["status"], "sample_ok")
+        self.assertFalse(result["supplier_has_more"])
+
     def test_observations_preserve_revisions_and_mirror_integrity(self):
         responses = [
             {

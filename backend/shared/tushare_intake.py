@@ -218,12 +218,16 @@ def assess_response(
         status = "schema_gap"
     elif any(invalid.values()):
         status = "invalid_values"
-    # Reaching the documented cap (or conservative threshold) stays unresolved.
-    if len(items) >= row_cap:
+    # An explicit upstream continuation flag is authoritative even below our
+    # conservative row threshold. count=0 does not override retained rows.
+    if len(items) >= row_cap or data.get("has_more") is True:
         status = "possibly_truncated"
     return {
         "status": status,
         "row_count": len(items),
+        "supplier_has_more": data.get("has_more")
+        if isinstance(data.get("has_more"), bool)
+        else None,
         "missing_fields": missing,
         "null_counts": nulls,
         "invalid_positive_counts": invalid,
