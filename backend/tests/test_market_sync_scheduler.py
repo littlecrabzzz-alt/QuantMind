@@ -66,7 +66,7 @@ def test_markets_in_default_table_are_enabled_with_expected_times(stub_redis):
 
 
 def test_ashare_has_no_market_default_and_stays_disabled_without_config(stub_redis):
-    # Act：A 股不在默认表内（走独立的 daily-data-sync beat 任务）
+    # Act：A 股不在默认表内，部署时显式保存开启配置
     cfg = get_schedule("A")
 
     # Assert：保持关闭与全局默认时间
@@ -115,3 +115,35 @@ def test_normalize_of_missing_config_for_unknown_market_uses_global_defaults():
 
     # Act / Assert：未知 market 传入时仅应用全局默认，不抛错
     assert _normalize(None, "XX") == dict(DEFAULT_SCHEDULE)
+
+
+@pytest.mark.parametrize("with_qlib,errors", [(True, []), (False, ["upstream failed"])])
+def test_ashare_updates_pg_and_reports_upstream_failures(monkeypatch, with_qlib, errors):
+    import sys
+    from types import ModuleType
+    from unittest.mock import Mock
+    from backend.services.engine.tasks.market_sync_scheduler import run_market_sync
+    source = ModuleType("backend.scripts.quantdb_daily_sync")
+    source.run_daily_sync = Mock(return_value={"parquet": {"errors": errors}})
+    jobs = ModuleType("backend.shared.quantdb_sync_jobs")
+    for name in ("release_lock", "celery_progress_cb", "upsert_job", "_now_iso"):
+        setattr(jobs, name, Mock())
+    jobs.acquire_lock = Mock(return_value=True)
+    jobs.new_celery_job = Mock(return_value={"job_id": "fixture"})
+    monkeypatch.setitem(sys.modules, source.__name__, source)
+    monkeypatch.setitem(sys.modules, jobs.__name__, jobs)
+    result = run_market_sync("A", {"with_qlib": with_qlib, "datasets": ["kline"]})
+    assert source.run_daily_sync.call_args.kwargs["skip_pg"] is False
+    assert source.run_daily_sync.call_args.kwargs["skip_qlib"] is not with_qlib
+    assert source.run_daily_sync.call_args.kwargs["datasets"] == ["kline"]
+    assert result["status"] == ("partial" if errors else "completed")
+    jobs.release_lock.assert_called_once()
+    source.run_daily_sync.side_effect = RuntimeError("offline")
+    with pytest.raises(RuntimeError, match="offline"):
+        run_market_sync("A", {})
+    assert jobs.upsert_job.call_args.kwargs["status"] == "failed"
+    assert jobs.release_lock.call_count == 2
+    source.run_daily_sync.reset_mock()
+    jobs.acquire_lock.return_value = False
+    assert run_market_sync("A", {})["status"] == "skipped"
+    source.run_daily_sync.assert_not_called()

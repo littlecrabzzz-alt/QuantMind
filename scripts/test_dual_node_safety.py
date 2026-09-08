@@ -312,6 +312,73 @@ class SnapshotSafety(unittest.TestCase):
                 self.assertLess(events.index('start'),events.index('finish'))
 
 
+class ScheduledPull(unittest.TestCase):
+    def test_interrupted_pull_never_publishes_complete(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            old = root / "snapshot-old"
+            old.mkdir()
+            (old / "COMPLETE").touch()
+            (root / "latest").symlink_to(old.name)
+            def run(*args, **kwargs):
+                if "--exclude=/COMPLETE" in args:
+                    raise OSError("disconnected")
+            with patch.object(snapshot, "output", return_value=snapshot.REMOTE + "/snapshots/snapshot-new"), patch.object(snapshot, "run", side_effect=run):
+                with self.assertRaises(OSError):
+                    snapshot.pull_snapshot(root, True)
+            self.assertEqual((root / "latest").resolve(), old.resolve())
+            self.assertFalse((root / "snapshot-new/COMPLETE").exists())
+            self.assertFalse((root / "snapshot-new/VERIFIED").exists())
+
+    def test_existing_latest_stays_available_during_revalidation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "snapshot-old"
+            target.mkdir()
+            (target / "COMPLETE").touch()
+            (root / "latest").symlink_to(target.name)
+            def run(*args, **kwargs):
+                if "--exclude=/COMPLETE" in args:
+                    raise OSError("disconnected")
+            with patch.object(snapshot, "output", return_value=snapshot.REMOTE + "/snapshots/snapshot-old"), patch.object(snapshot, "run", side_effect=run):
+                with self.assertRaises(OSError):
+                    snapshot.pull_snapshot(root, True)
+            self.assertTrue((target / "COMPLETE").is_file())
+
+    def test_noop_requires_local_verified_marker(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "snapshot-new"
+            target.mkdir()
+            (root / "latest").symlink_to(target.name)
+            (target / "VERIFIED").touch()
+            (target / "COMPLETE").touch()
+            with patch.object(snapshot, "output", return_value=snapshot.REMOTE + "/snapshots/snapshot-new"), patch.object(snapshot, "run") as run:
+                snapshot.pull_snapshot(root, True)
+            self.assertEqual(run.call_count, 1)  # remote COMPLETE check; no rsync
+
+    def test_background_install_reuses_data_and_preserves_fixed_sandbox(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "repo"
+            original = project / "logs/cloud-snapshots"
+            original.mkdir(parents=True)
+            (original / "sentinel").write_text("original data")
+            (project / ".local-dev").mkdir()
+            fixed = project / ".local-dev/SNAPSHOT_ID"
+            fixed.write_text("snapshot-fixed")
+            for name in ("scripts/dual_node_snapshot.py", "scripts/dual_node_inventory.py", "scripts/dual_node_sync.py", "deploy/dual-node.env"):
+                path = project / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("fixture")
+            with patch.object(snapshot, "PROJECT", project), patch.object(snapshot.sys, "platform", "darwin"), patch.object(Path, "home", return_value=root), patch.object(snapshot, "run"), patch.object(snapshot.subprocess, "run", return_value=subprocess.CompletedProcess([], 1)):
+                snapshot.install_mac_pull()
+                snapshot.install_mac_pull()
+            self.assertTrue(original.is_symlink())
+            self.assertEqual((original / "sentinel").read_text(), "original data")
+            self.assertEqual(fixed.read_text(), "snapshot-fixed")
+
+
 @unittest.skipUnless(os.getenv("QM_TEST_LOCAL_DOCKER") == "1", "explicit local Docker smoke test")
 class DockerMounts(unittest.TestCase):
     def test_parent_and_child_share_only_sandbox_runtime(self):

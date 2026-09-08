@@ -150,3 +150,25 @@ python3 scripts/dual_node_snapshot.py pull
 部署回归测试 18 项通过，云端快照、Mac 下载和逐文件校验均已完成；尚未安装定时刷新。Mac 已能从固定快照启动隔离全栈，但外部 LLM/行情源仍依赖网络，本地写入也不会自动登记到云端。离线研究产物应单独保留，不能直接回灌数据库；自动结果登记尚未实现。不能把这一状态描述成自动双向数据库同步，或声称离线时仍与云端实时一致。
 
 代码同步不等于运行中的进程自动更新。前端改动用 `web-publish` 构建并发布，旧静态文件保留于云端 `staging/web-*.previous`；后端改动完成核对后，通过仓库里的 `cloud-compose restart` 重启对应服务。
+
+
+## 2026-09-09：QuantDB 定时更新与快照自动拉取
+
+配置与边界统一见 [数据契约](development-data-contract.md#quantdb-定期更新与本地下载)。沿用现有 Celery、快照脚本和原生系统调度，不另建同步平台；公网配置不变。
+
+```bash
+# 云端：在权威项目根目录安装每天 07:00 的快照发布
+sudo -n install -m 0644 deploy/quantmind-snapshot.service deploy/quantmind-snapshot.timer /etc/systemd/system/
+sudo -n systemctl daemon-reload
+sudo -n systemctl enable --now quantmind-snapshot.timer
+sudo -n systemctl list-timers quantmind-snapshot.timer
+sudo -n journalctl -u quantmind-snapshot.service -n 30 --no-pager
+
+# Mac：部署现有客户端并安装每小时拉取（保留已下载数据和固定沙盒）
+python3 scripts/dual_node_snapshot.py install-mac-pull
+launchctl print gui/$(id -u)/com.quantmind.snapshot-pull
+# 需要重新完整校验时，不传 --only-new
+python3 scripts/dual_node_snapshot.py pull
+```
+
+手动创建仍可 `systemctl start --no-block quantmind-snapshot.service`，通过 systemd 托管，SSH 断开不终止恢复流程。新快照会在写入者恢复后完成副本校验/压缩才发布；检查成功服务恢复与产物，不能仅凭 timer 已安装判断数据新鲜。详细验收见本主题 coordination 记录。

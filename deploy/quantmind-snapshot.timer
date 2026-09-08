@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily QuantMind snapshot after market data acquisition
+
+[Timer]
+OnCalendar=*-*-* 07:00:00 Asia/Shanghai
+Persistent=false
+Unit=quantmind-snapshot.service
+
+[Install]
+WantedBy=timers.target

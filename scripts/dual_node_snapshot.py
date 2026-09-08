@@ -11,6 +11,8 @@ import time
 import hashlib
 import json
 import os
+import plistlib
+import sys
 from pathlib import Path
 import shutil
 import signal
@@ -22,7 +24,7 @@ from dual_node_sync import PROJECT, topology
 SETTINGS = topology()
 REMOTE = SETTINGS["QM_REMOTE_ROOT"]
 WRITERS = ["quantmind-celery-beat", "quantmind", "quantmind-celery",
-           "quantmind-huntly", "qwenpaw", "quantmind-redis"]
+           "quantmind-huntly", "qwenpaw", "quantmind-tushare-worker", "quantmind-redis"]
 
 
 class BusyError(RuntimeError):
@@ -124,14 +126,15 @@ def cloud_snapshot():
             jobs = json.loads(output("docker", "exec", "quantmind-celery", "celery", "-A",
                 "backend.services.engine.qlib_app.celery_config:celery_app", "inspect", "active", "--json", "--timeout=15"))
             require(bool(jobs), "No Celery worker response")
-            if any(jobs.values()):
+            if any(task["name"] != "engine.tasks.tushare_acquire"
+                   for tasks in jobs.values() for task in tasks):
                 raise BusyError("Celery work active")
         stopped = [name for name in WRITERS if name in active]
         started_at = time.monotonic()
         try:
             applications = [name for name in stopped if name != "quantmind-redis"]
             if applications:
-                run("docker", "stop", "--time", "120", *applications)
+                run("docker", "stop", "--time", "240", *applications)
             if "quantmind-redis" in stopped:
                 run("docker", "stop", "--time", "60", "quantmind-redis")
             # Close the admission race: a child may have appeared during shutdown.
@@ -164,21 +167,28 @@ def cloud_snapshot():
         print(published)
 
 
-def pull_snapshot():
+def pull_snapshot(base=None, only_new=False):
     ssh = SETTINGS["QM_SSH_TARGET"]
-    remote_path = output("ssh", "-o", "BatchMode=yes", ssh,
+    remote_path = output("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", ssh,
                          "sudo -n realpath -e " + REMOTE + "/snapshots/latest")
     path = Path(remote_path)
     require(str(path.parent) == REMOTE + "/snapshots" and path.name.startswith("snapshot-"), "Invalid snapshot path")
-    run("ssh", ssh, "sudo -n test -f " + remote_path + "/COMPLETE")
-    base = PROJECT / "logs/cloud-snapshots"
+    run("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", ssh, "sudo -n test -f " + remote_path + "/COMPLETE")
+    base = base or PROJECT / "logs/cloud-snapshots"
     base.mkdir(parents=True, exist_ok=True, mode=0o700)
     with (base / ".lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         target = base / path.name
+        if only_new and (base / "latest").resolve() == target.resolve() and (target / "VERIFIED").is_file() and (target / "COMPLETE").is_file():
+            print("Already verified:", target, flush=True)
+            return
         target.mkdir(exist_ok=True)
+        # A previously published local snapshot stays usable during revalidation.
+        if (base / "latest").resolve() != target.resolve():
+            (target / "COMPLETE").unlink(missing_ok=True)
+        (target / "VERIFIED").unlink(missing_ok=True)
         rsync = "/opt/homebrew/bin/rsync" if Path("/opt/homebrew/bin/rsync").exists() else "rsync"
-        args = [rsync, "-a", "--checksum", "--no-owner", "--no-group", "--compress", "--partial", "--stats", "--rsync-path=sudo -n rsync"]
+        args = [rsync, "-a", "--checksum", "--no-owner", "--no-group", "--compress", "--partial", "--stats", "--timeout=120", "-e", "ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=30", "--rsync-path=sudo -n rsync"]
         previous = (base / "latest").resolve()
         metadata_args = list(args)
         data_args = list(args)
@@ -192,16 +202,66 @@ def pull_snapshot():
             if backups:
                 # PostgreSQL dump headers can change; rsync still reuses matching blocks.
                 metadata_args += ["--copy-dest=" + str(backups[-1].parent.resolve())]
-        run(*metadata_args, "--exclude=/project/", ssh + ":" + remote_path + "/", str(target) + "/")
+        run(*metadata_args, "--exclude=/project/", "--exclude=/COMPLETE", ssh + ":" + remote_path + "/", str(target) + "/")
         (target / "project").mkdir(exist_ok=True)
         run(*data_args, ssh + ":" + remote_path + "/project/", str(target / "project") + "/")
         hashes = json.loads((target / "SHA256.json").read_text())
         require(all(Path(name).name == name for name in hashes), "Invalid checksum path")
         require(all(digest(target / name) == expected for name, expected in hashes.items()), "Archive checksum mismatch")
         require(manifest(target / "project") == (target / "runtime-manifest.jsonl").read_text(), "Runtime file checksum mismatch")
+        (target / "VERIFIED").touch()
+        (target / "COMPLETE").touch()
         if previous != target:
             publish_link(base, target)
         print("Verified offline snapshot (existing local research was not overwritten):", target)
+
+
+def install_mac_pull():
+    require(sys.platform == "darwin", "Install on the Mac host")
+    home = Path.home()
+    support = home / "Library/Application Support/QuantMind"
+    runtime = support / "snapshot-client"
+    destination = support / "cloud-snapshots"
+    original = PROJECT / "logs/cloud-snapshots"
+    require(not destination.exists() or original.resolve() == destination.resolve(),
+            "Snapshot destination already exists separately; reconcile manually")
+    # Atomic same-filesystem move; no second 68GB copy and no live sandbox change.
+    support.mkdir(parents=True, exist_ok=True)
+    with (original / ".lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if not original.is_symlink():
+            original.rename(destination)
+            original.symlink_to(destination)
+    for name in ("scripts/dual_node_snapshot.py", "scripts/dual_node_inventory.py",
+                 "scripts/dual_node_sync.py", "deploy/dual-node.env"):
+        target = runtime / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(PROJECT / name, target)
+    label = "com.quantmind.snapshot-pull"
+    plist = home / "Library/LaunchAgents" / (label + ".plist")
+    logs = support / "logs"
+    logs.mkdir(exist_ok=True)
+    definition = {
+        "Label": label,
+        "ProgramArguments": [sys.executable, str(runtime / "scripts/dual_node_snapshot.py"),
+                             "pull", "--root", str(destination), "--only-new"],
+        "WorkingDirectory": str(runtime), "RunAtLoad": True, "StartInterval": 3600,
+        "EnvironmentVariables": {"PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"},
+        "StandardOutPath": str(logs / "snapshot-pull.out.log"),
+        "StandardErrorPath": str(logs / "snapshot-pull.err.log"),
+    }
+    raw = plistlib.dumps(definition)
+    target = f"gui/{os.getuid()}/{label}"
+    installed = subprocess.run(["launchctl", "print", target], capture_output=True).returncode == 0
+    if installed and plist.exists() and plist.read_bytes() == raw:
+        print("Already installed:", label)
+        return
+    if installed:
+        run("launchctl", "bootout", target)
+    plist.parent.mkdir(parents=True, exist_ok=True)
+    plist.write_bytes(raw)
+    run("launchctl", "bootstrap", f"gui/{os.getuid()}", str(plist))
+    print("Installed hourly snapshot pull:", destination)
 
 
 if __name__ == "__main__":
@@ -216,10 +276,17 @@ if __name__ == "__main__":
         signal.signal(sig, interrupted)
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("create", "pull"))
-    action = parser.parse_args().action
+    parser.add_argument("action", choices=("create", "pull", "install-mac-pull"))
+    parser.add_argument("--root", type=Path)
+    parser.add_argument("--only-new", action="store_true")
+    args = parser.parse_args()
     try:
-        cloud_snapshot() if action == "create" else pull_snapshot()
+        if args.action == "create":
+            cloud_snapshot()
+        elif args.action == "install-mac-pull":
+            install_mac_pull()
+        else:
+            pull_snapshot(args.root, args.only_new)
     except BusyError as exc:
         print(str(exc), flush=True)
         raise SystemExit(75)

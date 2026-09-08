@@ -163,7 +163,7 @@ def main():
         local = node("mac")
         remote = json.loads(output("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
                                    SETTINGS["QM_SSH_TARGET"], command))
-    for key in ("head", "branch", "snapshot"):
+    for key in ("head", "branch"):
         require(local[key] == remote[key], f"Two-node {key} differs; resolve before development")
     for key in ("contentFiles", "contentDigest"):
         require(local["sync"][key] == remote["sync"][key], "Working trees differ; wait for sync or resolve conflicts")
@@ -176,7 +176,9 @@ def main():
     print(json.dumps({"status": "passed", "head": local["head"],
                       "source_files": local["sync"]["contentFiles"],
                       "source_digest": local["sync"]["contentDigest"],
-                      "snapshot": local["snapshot"], "data_authority": "lzy-vm",
+                      "snapshot": local["snapshot"], "cloud_snapshot": remote["snapshot"],
+                      "snapshot_pending_pull": local["snapshot"] != remote["snapshot"],
+                      "data_authority": "lzy-vm",
                       "mac_mode": local["mode"],
                       "sandbox_snapshot": local["sandbox_snapshot"],
                       "local_writers": "old authority stopped; restart=no"}, indent=2))

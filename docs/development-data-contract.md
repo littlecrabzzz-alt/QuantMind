@@ -8,7 +8,7 @@ bash scripts/dual-node.sh handoff
 
 Linux 权威宿主在项目目录执行 `sudo -n python3 scripts/dual_node_check.py --node cloud`，只检查云端；无参数双端检查从 Mac 发起。Mac 离线可使用已初始化的固定快照沙盒，完整联网预检延后到重连时执行。
 
-此只读检查要求两端源码/共享配置内容哈希、Git HEAD/分支、快照 ID 一致，Syncthing 在线且无待同步项，Mac 旧服务停止且禁止自动重启，云端 SSD/服务/隧道正常。失败不自动修复或覆盖数据。编辑结束后给文件监听与传输留出时间，再检查。检查只是当时证据，不是对任意 root 命令的权限隔离。
+此只读检查要求两端源码/共享配置内容哈希、Git HEAD/分支一致，两端各有已完成快照，Syncthing 在线且无待同步项，Mac 旧服务停止且禁止自动重启，云端 SSD/服务/隧道正常。失败不自动修复或覆盖数据。编辑结束后给文件监听与传输留出时间，再检查。检查只是当时证据，不是对任意 root 命令的权限隔离。
 
 ## 工作方式
 
@@ -48,7 +48,7 @@ Mac 全栈沙盒首次执行 `scripts/local-dev.sh init`：它从 `logs/cloud-sn
 
 快照操作与命令见 `docs/dual-node-deployment.md`。创建时会暂停本项目写入者，应选择无研究任务的维护窗口；旧流程约 68 GB、35 万文件曾造成约 30 分钟停写。新流程在线预复制并预计算校验值，停写后按 inode/大小/mtime/ctime 变化补算源校验，只复制内容差异，再捕获未压缩的 PostgreSQL dump 和冷卷；恢复写入后独立全量校验副本、压缩冷卷，全部成功才发布 COMPLETE/latest。中断或验证失败不发布快照，保留暂存目录；常规异常、SIGINT/SIGTERM/SIGHUP 在 finally 中恢复此前运行的写入者（断电/SIGKILL 不保证）。输出 pause_seconds 记录停写到发出恢复启动命令的耗时，不代表服务已完成启动。新流程尚未在正式全量数据上计时，不能承诺秒级在线备份。未压缩 PostgreSQL dump 会增加快照磁盘占用，创建前仍要求至少 100 GiB 空闲空间；拉取保留 rsync 传输压缩。拉取只更新 `logs/cloud-snapshots`，不覆盖旧本地数据。固定快照 ID，不在实验中途跟随 `latest`。不可变快照之间去重；活跃数据不与快照共享硬链接。
 
-统一刷新入口为 Mac 上 `bash scripts/dual-node.sh snapshot-refresh`，顺序执行预检、云端创建、Mac 校验拉取及复检；不会更新 `.local-dev/SNAPSHOT_ID` 或重建沙盒。直接 `create`/`pull` 仍可用于分步操作和失败后继续拉取。目前快照是显式刷新，不是定时同步；离线时不可能实时追平云端。需要新鲜数据时主动创建/拉取并重新预检。回滚代码不回滚数据，数据库回退须另做备份和明确恢复方案；绝不能让 Mac 旧库重新成为第二个主节点。
+统一刷新入口为 Mac 上 `bash scripts/dual-node.sh snapshot-refresh`，顺序执行预检、云端创建、Mac 校验拉取及复检；不会更新 `.local-dev/SNAPSHOT_ID` 或重建沙盒。直接 `create`/`pull` 仍可用于分步操作和失败后继续拉取。云端定时发布与 Mac 定时拉取见下节；离线时不可能实时追平云端。两端 latest 暂时不同只报告 snapshot_pending_pull，不阻止使用已校验固定版本开发。回滚代码不回滚数据，数据库回退须另做备份和明确恢复方案；绝不能让 Mac 旧库重新成为第二个主节点。
 
 访问优先用 `http://127.0.0.1:18080`（底层 SSH 加密）。公网 `3080` 当前没有 TLS，不能把页面“SSL”文案当作加密证据。最终审查还发现 QuantBot 通用 API 代理缺少独立鉴权，而其上游具备命令执行能力；前端登录不能保护匿名 API 请求，仅修改管理员密码也不足以修复。公网安全验收尚未通过，等待选择 SSH-only 或补齐入口鉴权与 HTTPS；不得把技术迁移完成当作可安全对外发布。
 
@@ -58,3 +58,14 @@ Mac 全栈沙盒首次执行 `scripts/local-dev.sh init`：它从 `logs/cloud-sn
 `scripts/local-dev.sh` 在操作前核对 Mac 宿主、本地 Unix socket 和 Docker Desktop daemon，并拒绝 `DOCKER_HOST` 覆盖。初始化拒绝任何已有 `quantmind-dev_*` 业务卷（含 PostgreSQL），数据库恢复使用单事务及错误即停；失败保留副本/卷，不创建 READY。`logs/local-dev.lock` 串行化 init/start/stop，异常退出释放锁；强制杀进程留下的锁必须先核对 pid 再人工清理。
 
 健康且数据根目录配置正确的沙盒重复启动不改服务和隧道；旧版容器缺少隔离配置、部分运行或模式升级需先停后启。停止前检查沙盒网络中的训练/Agent/IDE 子任务，存在活跃任务时拒绝切换后端。首次启动失败停止本次启动的容器、保留卷，并恢复此前加载的隧道。`stop` 不依赖 latest 快照存在；离线时分别报告“本地已停止”和“云端暂不可达”。`HOST_RUNTIME_PATH` 只由本地 Compose 注入，不写共享 `.env.local`。
+
+
+## QuantDB 定期更新与本地下载
+
+复用现有链路：云端 Celery 市场 A 配置每天北京时间 03:00 同步 QuantDB Parquet，再增量 upsert PostgreSQL，并更新 Qlib；显式保存 enabled=true、with_qlib=true。A 股旧独立 beat 调度已移除，不能靠 DAILY_SYNC_ENABLED 判断已开启。任务进度复用管理台 Redis 作业记录；上游错误记为 partial/failed，不宣称全量成功。
+
+云端 `quantmind-snapshot.timer` 每天北京时间 07:00 调用现有完整快照脚本，包含 `data/quantdb`、数据库 dump、Qlib 和其他运行数据。无研究任务时才暂停写入者；新增的 Tushare worker 也纳入停写/恢复，以免它的后台开发采集破坏完整快照一致性。这不把 Tushare 当成 QuantDB 替代源。活动任务导致退出 75、磁盘少于 100 GiB 导致失败时，保留旧快照与 systemd 日志，次日再试；不在重启后补跑错过的维护窗口。
+
+Mac `com.quantmind.snapshot-pull` 每 3600 秒检查云端完整版本。新版本通过 SSH/rsync 续传并逐文件 SHA256 校验，成功才写本地 COMPLETE/VERIFIED 和更新 latest；已验证同版直接跳过传输，失败保留旧 latest。下载区移至 `~/Library/Application Support/QuantMind/cloud-snapshots`，原 `logs/cloud-snapshots` 是指向该目录的软链接，避免 macOS 后台 Documents 权限问题，不增加第二份数据副本。安装客户端只复制现有三份脚本和不含凭据的拓扑配置；代码更新后重新安装，数据拉取不承担代码发布。
+
+快照之间复用未变文件，不自动删除历史；数据库 dump 和变化文件仍会占新增空间，保留至少 100 GiB 云端恢复余量。定时下载不修改 `.local-dev/SNAPSHOT_ID`、沙盒文件或数据库卷，也不从 Mac 回灌。查看/安装命令见部署记录。
