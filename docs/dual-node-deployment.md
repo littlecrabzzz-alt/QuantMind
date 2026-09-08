@@ -41,6 +41,7 @@ Syncthing 的历史版本保存在接收端，不等于应用一致性备份。�
 - `scripts/dual_node_deploy.py`：串联传输、校验、切换、连接检查和首份离线快照；运行状态写入 `logs/dual-node-deploy.json`，同一时间只允许一个编排进程。
 - `deploy/com.quantmind.cloud-tunnel.plist`：切换后才安装的 Mac 自动重连 SSH 隧道，保留本地开发入口访问云端的能力。
 - `deploy/syncthing-ssd.conf`：系统启动时等待 SSD 挂载，已安装到云端 systemd drop-in。
+- `deploy/quantmind-stack.service`：云端完整服务的开机入口，等待 SSD 和 Docker，并要求权威源标记存在；仅在迁移通过后启用。
 - `python3 scripts/test_dual_node.py`：端口、共享规则、卷路径、训练安全开关的回归检查。
 
 两端配置核对命令（Mac 项目根目录）：

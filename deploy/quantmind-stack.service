@@ -1,0 +1,19 @@
+[Unit]
+Description=QuantMind cloud authority on the dedicated SSD
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+RequiresMountsFor=/root/data/disk
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/root/data/disk/quantmind/project
+ExecStartPre=/usr/bin/test -f /root/data/disk/quantmind/AUTHORITY
+ExecStart=/bin/bash scripts/dual-node.sh cloud-compose up -d --no-build
+ExecStop=/bin/bash scripts/dual-node.sh cloud-compose stop -t 120
+TimeoutStartSec=300
+TimeoutStopSec=180
+
+[Install]
+WantedBy=multi-user.target
