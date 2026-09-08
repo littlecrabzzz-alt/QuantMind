@@ -107,6 +107,69 @@ class GlobalPipeline(unittest.TestCase):
             self.p.db.execute("SELECT count(*) FROM jobs").fetchone()[0], 10
         )
 
+    def test_period_history_advances_after_completion_without_requeueing_old_jobs(self):
+        self.seed("stock_basic", [{"ts_code": "600000.SH"}])
+        config = {
+            "enable_global": True,
+            "global_apis": ["weekly", "monthly"],
+            "global_history_start": "20250101",
+            "plan_jobs_per_tick": 1000,
+        }
+        self.p.plan_extended(config, date(2026, 9, 9))
+        before = {
+            r[0] for r in self.p.db.execute("SELECT id FROM jobs WHERE epoch='history'")
+        }
+        self.assertTrue(before)
+        self.p.db.execute("UPDATE jobs SET state='done' WHERE epoch='history'")
+        self.p.db.commit()
+        self.p.plan_extended(config, date(2026, 9, 10))
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT anchor FROM planning_state WHERE name='history:global'"
+            ).fetchone()[0],
+            "20260909",
+        )
+        self.p.plan_extended(config, date(2026, 10, 5))
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT anchor FROM planning_state WHERE name='history:global'"
+            ).fetchone()[0],
+            "20261005",
+        )
+        after = {
+            r[0]: r[1]
+            for r in self.p.db.execute(
+                "SELECT id,state FROM jobs WHERE epoch='history'"
+            )
+        }
+        self.assertLess(before, set(after))
+        self.assertTrue(all(after[key] == "done" for key in before))
+
+    def test_unfinished_period_history_keeps_cursor_across_week_boundary(self):
+        self.seed("stock_basic", [{"ts_code": "600000.SH"}, {"ts_code": "600001.SH"}])
+        config = {
+            "enable_global": True,
+            "global_apis": ["weekly", "monthly"],
+            "global_history_start": "19900101",
+            "plan_jobs_per_tick": 1,
+        }
+        self.p.plan_extended(config, date(2026, 9, 9))
+        before = dict(
+            self.p.db.execute(
+                "SELECT * FROM planning_state WHERE name='history:global'"
+            ).fetchone()
+        )
+        self.assertFalse(before["done"])
+        self.p.plan_extended(config, date(2026, 9, 14))
+        after = dict(
+            self.p.db.execute(
+                "SELECT * FROM planning_state WHERE name='history:global'"
+            ).fetchone()
+        )
+        self.assertEqual(after["anchor"], before["anchor"])
+        self.assertEqual(after["signature"], before["signature"])
+        self.assertGreater(after["offset"], before["offset"])
+
     def test_discovery_keeps_old_attempts_and_retired_supplier_codes(self):
         self.seed(
             "us_basic", [{"ts_code": "OLD", "delist_date": "20190101"}], attempt=1

@@ -723,6 +723,28 @@ class Pipeline:
                 state = self.db.execute(
                     "SELECT * FROM planning_state WHERE name=?", (name,)
                 ).fetchone()
+                if (
+                    mode == "history"
+                    and family == "global"
+                    and set(config.get("global_apis", GLOBAL_CONTRACTS)).intersection(
+                        ("weekly", "monthly", "index_weekly", "index_monthly")
+                    )
+                ):
+                    # Finish a bounded historical enumeration before advancing its
+                    # anchor. Resetting an unfinished large universe every week can
+                    # permanently starve its tail. Stable job keys make the next
+                    # completed-period sweep reuse already planned history.
+                    week_end = today - timedelta(days=today.weekday() + 1)
+                    month_end = today.replace(day=1) - timedelta(days=1)
+                    revision = (
+                        signature + ":periods:" + str(week_end) + ":" + str(month_end)
+                    )
+                    if (
+                        state is not None
+                        and not state["done"]
+                        and state["signature"].startswith(signature + ":periods:")
+                    ):
+                        revision = state["signature"]
                 if state is None or state["signature"] != revision:
                     self.db.execute(
                         "INSERT INTO planning_state(name,anchor,signature,offset,done) VALUES(?,?,?,0,0) ON CONFLICT(name) DO UPDATE SET anchor=excluded.anchor,signature=excluded.signature,offset=0,done=0",
