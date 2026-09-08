@@ -269,6 +269,75 @@ class OtherPipeline(unittest.TestCase):
         self.assertEqual({r["name"] for r in rows}, {"retired", "current"})
         self.assertEqual(self.p.identifiers()["hk_stocks"], ["00013!.HK", "00013.HK"])
 
+    def test_invalid_discovery_blocks_only_family_and_recovers(self):
+        config = {
+            "enable_global": True,
+            "enable_other": True,
+            "enable_structured": True,
+            "enable_text": True,
+            "global_apis": ["hk_daily"],
+            "other_apis": ["fx_daily"],
+            "structured_apis": ["daily"],
+            "text_apis": ["news"],
+            "history_start": "20260908",
+            "plan_jobs_per_tick": 1,
+        }
+        original = json.dumps(config, sort_keys=True)
+        ids = self.p.identifiers()
+        with patch.object(self.p, "identifiers", return_value=ids):
+            self.p.plan_extended(config, date(2026, 9, 9))
+        before = [
+            tuple(r)
+            for r in self.p.db.execute(
+                "SELECT * FROM planning_state WHERE name LIKE '%:global' ORDER BY name"
+            )
+        ]
+        bad = {**ids, "hk_stocks": ["bad HK identifier"]}
+        with patch.object(self.p, "identifiers", return_value=bad):
+            continued = self.p.plan_extended(config, date(2026, 9, 9))
+        self.assertTrue(
+            {"recent:text", "recent:structured", "recent:other"} <= set(continued)
+        )
+        self.assertNotIn("recent:global", continued)
+        after = [
+            tuple(r)
+            for r in self.p.db.execute(
+                "SELECT * FROM planning_state WHERE name LIKE '%:global' ORDER BY name"
+            )
+        ]
+        self.assertEqual(before, after)
+        cap = self.p.db.execute(
+            "SELECT status,reason FROM capability WHERE scope='planning:global'"
+        ).fetchone()
+        self.assertEqual(cap["status"], "validation_blocked")
+        self.assertEqual(json.loads(cap["reason"])["error_type"], "ValueError")
+        groups = {
+            r[0] for r in self.p.db.execute("SELECT DISTINCT group_name FROM jobs")
+        }
+        self.assertTrue({"text", "structured", "other"} <= groups)
+        with patch.object(self.p, "identifiers", return_value=ids):
+            self.p.plan_extended(config, date(2026, 9, 9))
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT status FROM capability WHERE scope='planning:global'"
+            ).fetchone()[0],
+            "validation_passed",
+        )
+        self.assertEqual(original, json.dumps(config, sort_keys=True))
+        # All families blocked must still persist their diagnostic across reopen.
+        bad_other = {**ids, "options": ["invalid option identifier"]}
+        with patch.object(self.p, "identifiers", return_value=bad_other):
+            self.p.plan_extended(
+                {"enable_other": True, "other_apis": ["fx_daily"]}, date(2026, 9, 9)
+            )
+        with module.sqlite3.connect(self.root / "pipeline.sqlite") as db:
+            self.assertEqual(
+                db.execute(
+                    "SELECT status FROM capability WHERE scope='planning:other'"
+                ).fetchone()[0],
+                "validation_blocked",
+            )
+
     def test_permission_denial_survives_publish(self):
         self.p.enqueue("opt_basic", {})
         self.p.db.commit()

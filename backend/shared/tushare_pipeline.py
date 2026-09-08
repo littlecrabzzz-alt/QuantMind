@@ -644,10 +644,41 @@ class Pipeline:
 
     def plan_extended(self, config, today):
         identifiers = self.identifiers()
-        if config.get("enable_other", False):
-            self.record_other_planning_gaps(config, identifiers)
-        if config.get("enable_global", False):
-            self.record_global_planning_gaps(config, identifiers)
+        blocked_families = set()
+        for family, validate in (
+            ("other", self.record_other_planning_gaps),
+            ("global", self.record_global_planning_gaps),
+        ):
+            if not config.get("enable_" + family, False):
+                continue
+            scope = "planning:" + family
+            try:
+                validate(config, identifiers)
+            except ValueError as error:
+                # A malformed discovery blocks only its family, not independent
+                # acquisition. Do not advance its cursor or rewrite persistent config.
+                blocked_families.add(family)
+                self.db.execute(
+                    "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,'validation_blocked',?,?) "
+                    "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
+                    (
+                        scope,
+                        utc_now(),
+                        json.dumps(
+                            {"error_type": type(error).__name__, "reason": str(error)},
+                            sort_keys=True,
+                        ),
+                    ),
+                )
+            else:
+                self.db.execute(
+                    "UPDATE capability SET status='validation_passed',checked_at=?,reason=? WHERE scope=? AND status='validation_blocked'",
+                    (
+                        utc_now(),
+                        json.dumps({"reason": "family_validation_recovered"}),
+                        scope,
+                    ),
+                )
         budget = int(config.get("plan_jobs_per_tick", 2000))
         if not 1 <= budget <= 10000:
             raise ValueError("Invalid planner batch size")
@@ -679,7 +710,7 @@ class Pipeline:
         )
         stats = {}
         for family, planner in PLANNERS.items():
-            if not config.get("enable_" + family, False):
+            if family in blocked_families or not config.get("enable_" + family, False):
                 continue
             for mode in ("recent", "history"):
                 name = mode + ":" + family
@@ -733,6 +764,7 @@ class Pipeline:
                     "done": done,
                     "anchor": state["anchor"],
                 }
+        self.db.commit()  # Persist validation gaps even when every family is blocked.
         return stats
 
     def date_children(self, job):
