@@ -271,6 +271,68 @@ class StateBuckets(unittest.TestCase):
         self.assertEqual(index["mappings"], old["mappings"])
         self.assertEqual(self.index()[0]["rebuilt_descriptor_shards"], 0)
 
+    def test_cached_descriptor_corruption_prevents_current_advance(self):
+        from backend.shared.tushare_pipeline import Pipeline
+
+        catalog = json.loads(
+            (
+                Path(__file__).resolve().parents[1] / "config/tushare-catalog.json"
+            ).read_bytes()
+        )
+        other = sha("unrelated-document")
+        self.assertNotEqual(other[:1], self.doc[:1])
+        self.db.execute(
+            "INSERT INTO documents(id,observation,url) VALUES(?,?,?)",
+            (other, "other-observation", "https://example.com/2"),
+        )
+        self.db.commit()
+        self.refs(0, 1)
+        pipeline = Pipeline(self.root, catalog)
+        self.addCleanup(pipeline.close)
+        old_release = pipeline.publish()
+        pointer = (self.root / "CURRENT.json").read_bytes()
+        _, old = self.index()
+        path = self.root / old["states"][self.doc[:1]]["path"]
+        raw = path.read_bytes()
+        path.write_bytes(b"x" * len(raw))
+        self.db.execute("UPDATE documents SET download_tries=1 WHERE id=?", (other,))
+        self.db.commit()
+        with self.assertRaisesRegex(
+            docs.DocumentError, "cached_state_descriptor_checksum_mismatch"
+        ):
+            pipeline.publish()
+        self.assertEqual((self.root / "CURRENT.json").read_bytes(), pointer)
+        # Restore only this deliberately damaged temporary fixture, then retry.
+        path.write_bytes(raw)
+        repaired = pipeline.publish()
+        self.assertNotEqual(repaired, old_release)
+        self.assertEqual(self.page(old_release).status_code, 200)
+        self.assertEqual(self.page(repaired).status_code, 200)
+        before = {item.name for item in (self.root / "documents").iterdir()}
+        self.assertEqual(pipeline.publish(), repaired)
+        self.assertEqual(
+            before, {item.name for item in (self.root / "documents").iterdir()}
+        )
+        # A valid stored block with stale cache metadata is also not safe to reuse.
+        descriptor = json.loads(
+            self.db.execute(
+                "SELECT descriptor FROM document_index_cache WHERE kind='state_descriptors' AND bucket=?",
+                (self.doc[:1],),
+            ).fetchone()[0]
+        )
+        descriptor["state_count"] += 1
+        self.db.execute(
+            "UPDATE document_index_cache SET descriptor=? WHERE kind='state_descriptors' AND bucket=?",
+            (json.dumps(descriptor), self.doc[:1]),
+        )
+        self.db.commit()
+        pointer = (self.root / "CURRENT.json").read_bytes()
+        with self.assertRaisesRegex(
+            docs.DocumentError, "cached_state_descriptor_references_mismatch"
+        ):
+            pipeline.publish()
+        self.assertEqual((self.root / "CURRENT.json").read_bytes(), pointer)
+
     def test_large_append_and_single_update_bound_rewrites(self):
         def insert(start, stop):
             self.db.executemany(
