@@ -313,8 +313,8 @@ GLOBAL_CONTRACTS["monthly"].update(
 for _api, _family in SYMBOL_PERIODS.items():
     GLOBAL_CONTRACTS[_api].update(
         dependencies=[_family],
-        planning_version="stable_period_partitions_v3",
-        planning_note="Stable completed-year ranges, then completed calendar-period ranges for the unfinished year; recent two completed periods share a period-end epoch. Daily planning_epoch does not force period refresh. Discovery and earliest history remain unverified.",
+        planning_version="stable_decade_partitions_v4",
+        planning_note="Fixed closed ten-year buckets, then one prior-year tail, one prior-month tail and at most one older completed-week tail; only tails change at their calendar boundary. Recent two completed periods share a period-end epoch. Daily planning_epoch does not force period refresh. Discovery and earliest history remain unverified.",
         period_wait_note="Open calendar weeks/months wait for their full boundary; daily-updated stk_* contracts remain independent. Late corrections outside the recent two periods require an explicit revision sweep.",
     )
 GLOBAL_CONTRACTS["hk_basic"]["identifier_note"] = (
@@ -536,23 +536,27 @@ def _period_jobs(api, start, end, ids, epoch, priority):
 
 def _period_history_jobs(api, start, today, ids):
     recent_start, closed = _completed_period_bounds(api, today)
-    annual_last = closed.year - (closed.month != 12 or closed.day != 31)
-    for year in range(start.year, annual_last + 1):
-        left = max(start, date(year, 1, 1))
-        yield from _period_jobs(api, left, date(year, 12, 31), ids, "history", 40)
-    # The unfinished year must not use a growing Jan-1 -> today request. Older
-    # closed periods have fixed endpoints; a missed run can enumerate them again.
-    left = max(start, date(annual_last + 1, 1, 1))
-    end = recent_start - timedelta(days=1)
-    while left <= end:
-        right = (
-            left + timedelta(days=6 - left.weekday())
-            if api.endswith("weekly")
-            else left.replace(day=monthrange(left.year, left.month)[1])
-        )
-        right = min(right, end)
-        yield from _period_jobs(api, left, right, ids, "history", 40)
-        left = right + timedelta(days=1)
+    left = start
+    # At most ten calendar years per code: <= 523 weekly / 120 monthly
+    # period rows, below the conservative index guard of 1000. Unexpected
+    # supplier saturation still goes through the parent's normal split path.
+    decade_end = date((left.year // 10 + 1) * 10 - 1, 12, 31)
+    while decade_end <= closed:
+        yield from _period_jobs(api, left, decade_end, ids, "history", 40)
+        left = decade_end + timedelta(days=1)
+        decade_end = date(decade_end.year + 10, 12, 31)
+    # Only the unclosed decade's tail changes yearly; complete decades keep
+    # identical request keys. The remaining current-year tail changes monthly.
+    year_end = date(closed.year - (closed.month != 12 or closed.day != 31), 12, 31)
+    month_end = (
+        closed
+        if closed.day == monthrange(closed.year, closed.month)[1]
+        else closed.replace(day=1) - timedelta(days=1)
+    )
+    for right in (year_end, month_end, recent_start - timedelta(days=1)):
+        if left <= right:
+            yield from _period_jobs(api, left, right, ids, "history", 40)
+            left = right + timedelta(days=1)
 
 
 def _date_jobs(api, start, end, epoch, priority):
@@ -578,8 +582,9 @@ def iter_global_jobs(config, today, identifiers=None):
 
     Four completed-period APIs require stored stocks/indexes. Recent work covers
     the last two closed calendar periods, with a stable period-end epoch. History
-    uses closed years then fixed periods for the remaining partial year. A closed
-    year may overlap the recent cross-year review; no observations are discarded.
+    uses fixed closed decades followed by bounded year/month/week tails. Tails
+    change only at their matching calendar boundary and may overlap recent work;
+    no observations are discarded.
     Open periods wait for completion. Other APIs retain their daily plans.
     Missing discovery/history is explicit in global_prerequisites/metadata.
     Parent owns persistence, pagination, shared limits and old-plan deferral.
