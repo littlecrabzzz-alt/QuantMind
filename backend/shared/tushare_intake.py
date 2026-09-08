@@ -317,7 +317,7 @@ def capture_sample(client, token, job, root: Path):
     if (
         "row_count" in assessment
         and requested
-        and all(re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", f) for f in requested)
+        and all(re.fullmatch(r"[A-Za-z0-9_]+", f) for f in requested)
     ):
         returned = set(payload["data"]["fields"])
         missing = sorted(set(requested) - returned)

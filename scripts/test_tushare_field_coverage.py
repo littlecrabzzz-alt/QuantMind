@@ -25,17 +25,19 @@ class FieldCoverageAcceptance(unittest.TestCase):
         code=0,
         http_status=200,
         extra_data=None,
+        api="synthetic",
+        required=("ts_code",),
     ):
         payload = {
             "code": code,
             "data": {"fields": fields, "items": items, **(extra_data or {})},
         }
         job = {
-            "api_name": "synthetic",
+            "api_name": api,
             "params": {},
             "fields": requested,
             "row_cap": cap,
-            "required_fields": ["ts_code"],
+            "required_fields": list(required),
         }
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -117,6 +119,32 @@ class FieldCoverageAcceptance(unittest.TestCase):
             self.assertEqual(result["status"], "sample_ok")
             self.assertEqual(result["field_coverage"], "unverified_default_or_invalid")
             self.assertIsNone(result["requested_missing_fields"])
+
+    def test_official_numeric_leading_shibor_and_lpr_fields(self):
+        for api, requested in (
+            ("shibor", "date,on,1w,2w,1m,3m,6m,9m,1y"),
+            ("shibor_lpr", "date,1y,5y"),
+        ):
+            fields = requested.split(",")
+            values = ["20260908"] + [1.5] * (len(fields) - 1)
+            with self.subTest(api=api):
+                complete, _ = self.capture(
+                    fields, [values], requested=requested, api=api, required=("date",)
+                )
+                self.assertEqual(complete["status"], "sample_ok")
+                self.assertEqual(
+                    complete["field_coverage"], "complete_for_explicit_request"
+                )
+                missing, _ = self.capture(
+                    fields[:-1],
+                    [values[:-1]],
+                    requested=requested,
+                    api=api,
+                    required=("date",),
+                )
+                self.assertEqual(missing["status"], "schema_gap")
+                self.assertEqual(missing["field_coverage"], "gap")
+                self.assertEqual(missing["requested_missing_fields"], [fields[-1]])
 
     def test_invalid_response_does_not_claim_schema_coverage(self):
         result, _ = self.capture(["ts_code", "hidden"], [["000001.SZ"]])
