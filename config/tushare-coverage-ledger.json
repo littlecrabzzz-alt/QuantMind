@@ -1,0 +1,3548 @@
+{
+  "schema_version": 1,
+  "catalog_fetched_at": "2026-09-08T15:22:12.131618+00:00",
+  "catalog_index_sha256": "182240e4826c7e65a6b63ef83efdc4e14b7b3589a6249ed54cd36ac66c937dce",
+  "reviewed_at": "2026-09-09",
+  "entry_count": 263,
+  "scope": "Every entry in pinned official catalogue. VIP aliases stay within their source document. Static implementation ledger: runtime observations are authoritative for permissions and coverage.",
+  "entries": [
+    {
+      "doc_id": "14",
+      "title": "股票数据",
+      "url": "https://tushare.pro/document/2?doc_id=14",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "24",
+      "title": "基础数据",
+      "url": "https://tushare.pro/document/2?doc_id=24",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "25",
+      "title": "股票列表",
+      "url": "https://tushare.pro/document/2?doc_id=25",
+      "api_names": [
+        "stock_basic"
+      ],
+      "acquisition_api_names": [
+        "stock_basic"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "329",
+      "title": "每日股本（盘前）",
+      "url": "https://tushare.pro/document/2?doc_id=329",
+      "api_names": [
+        "stk_premarket"
+      ],
+      "acquisition_api_names": [
+        "stk_premarket"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "26",
+      "title": "交易日历",
+      "url": "https://tushare.pro/document/2?doc_id=26",
+      "api_names": [
+        "trade_cal"
+      ],
+      "acquisition_api_names": [
+        "trade_cal"
+      ],
+      "status": "ingested_partial",
+      "permission_status": "unverified",
+      "next_action": "Continue persisted historical backfill, revisions and coverage validation; no completeness claim."
+    },
+    {
+      "doc_id": "397",
+      "title": "ST股票列表",
+      "url": "https://tushare.pro/document/2?doc_id=397",
+      "api_names": [
+        "stock_st"
+      ],
+      "acquisition_api_names": [
+        "stock_st"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "423",
+      "title": "ST风险警示板股票",
+      "url": "https://tushare.pro/document/2?doc_id=423",
+      "api_names": [
+        "st"
+      ],
+      "acquisition_api_names": [
+        "st"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "398",
+      "title": "沪深港通股票列表",
+      "url": "https://tushare.pro/document/2?doc_id=398",
+      "api_names": [
+        "stock_hsgt"
+      ],
+      "acquisition_api_names": [
+        "stock_hsgt"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "100",
+      "title": "股票曾用名",
+      "url": "https://tushare.pro/document/2?doc_id=100",
+      "api_names": [
+        "namechange"
+      ],
+      "acquisition_api_names": [
+        "namechange"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "112",
+      "title": "上市公司基本信息",
+      "url": "https://tushare.pro/document/2?doc_id=112",
+      "api_names": [
+        "stock_company"
+      ],
+      "acquisition_api_names": [
+        "stock_company"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "193",
+      "title": "上市公司管理层",
+      "url": "https://tushare.pro/document/2?doc_id=193",
+      "api_names": [
+        "stk_managers"
+      ],
+      "acquisition_api_names": [
+        "stk_managers"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "194",
+      "title": "管理层薪酬和持股",
+      "url": "https://tushare.pro/document/2?doc_id=194",
+      "api_names": [
+        "stk_rewards"
+      ],
+      "acquisition_api_names": [
+        "stk_rewards"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "375",
+      "title": "北交所新旧代码对照",
+      "url": "https://tushare.pro/document/2?doc_id=375",
+      "api_names": [
+        "bse_mapping"
+      ],
+      "acquisition_api_names": [
+        "bse_mapping"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "123",
+      "title": "IPO新股上市",
+      "url": "https://tushare.pro/document/2?doc_id=123",
+      "api_names": [
+        "new_share"
+      ],
+      "acquisition_api_names": [
+        "new_share"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "262",
+      "title": "股票历史列表",
+      "url": "https://tushare.pro/document/2?doc_id=262",
+      "api_names": [
+        "bak_basic"
+      ],
+      "acquisition_api_names": [
+        "bak_basic"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "15",
+      "title": "行情数据",
+      "url": "https://tushare.pro/document/2?doc_id=15",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "27",
+      "title": "历史日线",
+      "url": "https://tushare.pro/document/2?doc_id=27",
+      "api_names": [
+        "daily"
+      ],
+      "acquisition_api_names": [
+        "daily"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "370",
+      "title": "历史分钟",
+      "url": "https://tushare.pro/document/2?doc_id=370",
+      "api_names": [
+        "stk_mins"
+      ],
+      "acquisition_api_names": [
+        "stk_mins"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "144",
+      "title": "周线行情",
+      "url": "https://tushare.pro/document/2?doc_id=144",
+      "api_names": [
+        "weekly"
+      ],
+      "acquisition_api_names": [
+        "weekly"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "145",
+      "title": "月线行情",
+      "url": "https://tushare.pro/document/2?doc_id=145",
+      "api_names": [
+        "monthly"
+      ],
+      "acquisition_api_names": [
+        "monthly"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "146",
+      "title": "复权行情",
+      "url": "https://tushare.pro/document/2?doc_id=146",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "336",
+      "title": "周/月线行情(每日更新)",
+      "url": "https://tushare.pro/document/2?doc_id=336",
+      "api_names": [
+        "stk_weekly_monthly"
+      ],
+      "acquisition_api_names": [
+        "stk_weekly_monthly"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "365",
+      "title": "周/月线复权行情(每日更新)",
+      "url": "https://tushare.pro/document/2?doc_id=365",
+      "api_names": [
+        "stk_week_month_adj"
+      ],
+      "acquisition_api_names": [
+        "stk_week_month_adj"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "28",
+      "title": "复权因子",
+      "url": "https://tushare.pro/document/2?doc_id=28",
+      "api_names": [
+        "adj_factor"
+      ],
+      "acquisition_api_names": [
+        "adj_factor"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "32",
+      "title": "每日指标",
+      "url": "https://tushare.pro/document/2?doc_id=32",
+      "api_names": [
+        "daily_basic"
+      ],
+      "acquisition_api_names": [
+        "daily_basic"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "109",
+      "title": "通用行情接口",
+      "url": "https://tushare.pro/document/2?doc_id=109",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "183",
+      "title": "每日涨跌停价格",
+      "url": "https://tushare.pro/document/2?doc_id=183",
+      "api_names": [
+        "stk_limit"
+      ],
+      "acquisition_api_names": [
+        "stk_limit"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "214",
+      "title": "每日停复牌信息",
+      "url": "https://tushare.pro/document/2?doc_id=214",
+      "api_names": [
+        "suspend_d"
+      ],
+      "acquisition_api_names": [
+        "suspend_d"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "48",
+      "title": "沪深股通十大成交股",
+      "url": "https://tushare.pro/document/2?doc_id=48",
+      "api_names": [
+        "hsgt_top10"
+      ],
+      "acquisition_api_names": [
+        "hsgt_top10"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "255",
+      "title": "备用行情",
+      "url": "https://tushare.pro/document/2?doc_id=255",
+      "api_names": [
+        "bak_daily"
+      ],
+      "acquisition_api_names": [
+        "bak_daily"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "16",
+      "title": "财务数据",
+      "url": "https://tushare.pro/document/2?doc_id=16",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "33",
+      "title": "利润表",
+      "url": "https://tushare.pro/document/2?doc_id=33",
+      "api_names": [
+        "income"
+      ],
+      "acquisition_api_names": [
+        "income_vip"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "36",
+      "title": "资产负债表",
+      "url": "https://tushare.pro/document/2?doc_id=36",
+      "api_names": [
+        "balancesheet"
+      ],
+      "acquisition_api_names": [
+        "balancesheet_vip"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "44",
+      "title": "现金流量表",
+      "url": "https://tushare.pro/document/2?doc_id=44",
+      "api_names": [
+        "cashflow"
+      ],
+      "acquisition_api_names": [
+        "cashflow_vip"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "45",
+      "title": "业绩预告",
+      "url": "https://tushare.pro/document/2?doc_id=45",
+      "api_names": [
+        "forecast"
+      ],
+      "acquisition_api_names": [
+        "forecast_vip"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "46",
+      "title": "业绩快报",
+      "url": "https://tushare.pro/document/2?doc_id=46",
+      "api_names": [
+        "express"
+      ],
+      "acquisition_api_names": [
+        "express_vip"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "103",
+      "title": "分红送股数据",
+      "url": "https://tushare.pro/document/2?doc_id=103",
+      "api_names": [
+        "dividend"
+      ],
+      "acquisition_api_names": [
+        "dividend"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "79",
+      "title": "财务指标数据",
+      "url": "https://tushare.pro/document/2?doc_id=79",
+      "api_names": [
+        "fina_indicator"
+      ],
+      "acquisition_api_names": [
+        "fina_indicator_vip"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "80",
+      "title": "财务审计意见",
+      "url": "https://tushare.pro/document/2?doc_id=80",
+      "api_names": [
+        "fina_audit"
+      ],
+      "acquisition_api_names": [
+        "fina_audit"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "81",
+      "title": "主营业务构成",
+      "url": "https://tushare.pro/document/2?doc_id=81",
+      "api_names": [
+        "fina_mainbz"
+      ],
+      "acquisition_api_names": [
+        "fina_mainbz"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "162",
+      "title": "财报披露日期表",
+      "url": "https://tushare.pro/document/2?doc_id=162",
+      "api_names": [
+        "disclosure_date"
+      ],
+      "acquisition_api_names": [
+        "disclosure_date"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "17",
+      "title": "参考数据",
+      "url": "https://tushare.pro/document/2?doc_id=17",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "451",
+      "title": "个股异常波动",
+      "url": "https://tushare.pro/document/2?doc_id=451",
+      "api_names": [
+        "stk_shock"
+      ],
+      "acquisition_api_names": [
+        "stk_shock"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "452",
+      "title": "个股严重异常波动",
+      "url": "https://tushare.pro/document/2?doc_id=452",
+      "api_names": [
+        "stk_high_shock"
+      ],
+      "acquisition_api_names": [
+        "stk_high_shock"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "453",
+      "title": "交易所重点提示证券",
+      "url": "https://tushare.pro/document/2?doc_id=453",
+      "api_names": [
+        "stk_alert"
+      ],
+      "acquisition_api_names": [
+        "stk_alert"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "61",
+      "title": "前十大股东",
+      "url": "https://tushare.pro/document/2?doc_id=61",
+      "api_names": [
+        "top10_holders"
+      ],
+      "acquisition_api_names": [
+        "top10_holders"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "62",
+      "title": "前十大流通股东",
+      "url": "https://tushare.pro/document/2?doc_id=62",
+      "api_names": [
+        "top10_floatholders"
+      ],
+      "acquisition_api_names": [
+        "top10_floatholders"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "110",
+      "title": "股权质押统计数据",
+      "url": "https://tushare.pro/document/2?doc_id=110",
+      "api_names": [
+        "pledge_stat"
+      ],
+      "acquisition_api_names": [
+        "pledge_stat"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "111",
+      "title": "股权质押明细数据",
+      "url": "https://tushare.pro/document/2?doc_id=111",
+      "api_names": [
+        "pledge_detail"
+      ],
+      "acquisition_api_names": [
+        "pledge_detail"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "124",
+      "title": "股票回购",
+      "url": "https://tushare.pro/document/2?doc_id=124",
+      "api_names": [
+        "repurchase"
+      ],
+      "acquisition_api_names": [
+        "repurchase"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "160",
+      "title": "限售股解禁",
+      "url": "https://tushare.pro/document/2?doc_id=160",
+      "api_names": [
+        "share_float"
+      ],
+      "acquisition_api_names": [
+        "share_float"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "161",
+      "title": "大宗交易",
+      "url": "https://tushare.pro/document/2?doc_id=161",
+      "api_names": [
+        "block_trade"
+      ],
+      "acquisition_api_names": [
+        "block_trade"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "164",
+      "title": "股票开户数据（停）",
+      "url": "https://tushare.pro/document/2?doc_id=164",
+      "api_names": [
+        "stk_account"
+      ],
+      "acquisition_api_names": [
+        "stk_account"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "165",
+      "title": "股票开户数据（旧）",
+      "url": "https://tushare.pro/document/2?doc_id=165",
+      "api_names": [
+        "stk_account_old"
+      ],
+      "acquisition_api_names": [
+        "stk_account_old"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "166",
+      "title": "股东人数",
+      "url": "https://tushare.pro/document/2?doc_id=166",
+      "api_names": [
+        "stk_holdernumber"
+      ],
+      "acquisition_api_names": [
+        "stk_holdernumber"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "175",
+      "title": "股东增减持",
+      "url": "https://tushare.pro/document/2?doc_id=175",
+      "api_names": [
+        "stk_holdertrade"
+      ],
+      "acquisition_api_names": [
+        "stk_holdertrade"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "291",
+      "title": "特色数据",
+      "url": "https://tushare.pro/document/2?doc_id=291",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "292",
+      "title": "券商盈利预测数据",
+      "url": "https://tushare.pro/document/2?doc_id=292",
+      "api_names": [
+        "report_rc"
+      ],
+      "acquisition_api_names": [
+        "report_rc"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "293",
+      "title": "每日筹码及胜率",
+      "url": "https://tushare.pro/document/2?doc_id=293",
+      "api_names": [
+        "cyq_perf"
+      ],
+      "acquisition_api_names": [
+        "cyq_perf"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "294",
+      "title": "每日筹码分布",
+      "url": "https://tushare.pro/document/2?doc_id=294",
+      "api_names": [
+        "cyq_chips"
+      ],
+      "acquisition_api_names": [
+        "cyq_chips"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "296",
+      "title": "股票技术面因子",
+      "url": "https://tushare.pro/document/2?doc_id=296",
+      "api_names": [
+        "stk_factor"
+      ],
+      "acquisition_api_names": [
+        "stk_factor"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "328",
+      "title": "股票技术面因子(专业版）",
+      "url": "https://tushare.pro/document/2?doc_id=328",
+      "api_names": [
+        "stk_factor_pro"
+      ],
+      "acquisition_api_names": [
+        "stk_factor_pro"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "353",
+      "title": "股票开盘集合竞价数据",
+      "url": "https://tushare.pro/document/2?doc_id=353",
+      "api_names": [
+        "stk_auction_o"
+      ],
+      "acquisition_api_names": [
+        "stk_auction_o"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "354",
+      "title": "股票收盘集合竞价数据",
+      "url": "https://tushare.pro/document/2?doc_id=354",
+      "api_names": [
+        "stk_auction_c"
+      ],
+      "acquisition_api_names": [
+        "stk_auction_c"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "364",
+      "title": "神奇九转指标",
+      "url": "https://tushare.pro/document/2?doc_id=364",
+      "api_names": [
+        "stk_nineturn"
+      ],
+      "acquisition_api_names": [
+        "stk_nineturn"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "399",
+      "title": "AH股比价",
+      "url": "https://tushare.pro/document/2?doc_id=399",
+      "api_names": [
+        "stk_ah_comparison"
+      ],
+      "acquisition_api_names": [
+        "stk_ah_comparison"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "275",
+      "title": "机构调研数据",
+      "url": "https://tushare.pro/document/2?doc_id=275",
+      "api_names": [
+        "stk_surv"
+      ],
+      "acquisition_api_names": [
+        "stk_surv"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "267",
+      "title": "券商月度金股",
+      "url": "https://tushare.pro/document/2?doc_id=267",
+      "api_names": [
+        "broker_recommend"
+      ],
+      "acquisition_api_names": [
+        "broker_recommend"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "330",
+      "title": "两融及转融通",
+      "url": "https://tushare.pro/document/2?doc_id=330",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "58",
+      "title": "融资融券交易汇总",
+      "url": "https://tushare.pro/document/2?doc_id=58",
+      "api_names": [
+        "margin"
+      ],
+      "acquisition_api_names": [
+        "margin"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "59",
+      "title": "融资融券交易明细",
+      "url": "https://tushare.pro/document/2?doc_id=59",
+      "api_names": [
+        "margin_detail"
+      ],
+      "acquisition_api_names": [
+        "margin_detail"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "326",
+      "title": "融资融券标的（盘前）",
+      "url": "https://tushare.pro/document/2?doc_id=326",
+      "api_names": [
+        "margin_secs"
+      ],
+      "acquisition_api_names": [
+        "margin_secs"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "332",
+      "title": "转融券交易汇总(停）",
+      "url": "https://tushare.pro/document/2?doc_id=332",
+      "api_names": [
+        "slb_sec"
+      ],
+      "acquisition_api_names": [
+        "slb_sec"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "331",
+      "title": "转融资交易汇总",
+      "url": "https://tushare.pro/document/2?doc_id=331",
+      "api_names": [
+        "slb_len"
+      ],
+      "acquisition_api_names": [
+        "slb_len"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "333",
+      "title": "转融券交易明细(停）",
+      "url": "https://tushare.pro/document/2?doc_id=333",
+      "api_names": [
+        "slb_sec_detail"
+      ],
+      "acquisition_api_names": [
+        "slb_sec_detail"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "334",
+      "title": "做市借券交易汇总(停）",
+      "url": "https://tushare.pro/document/2?doc_id=334",
+      "api_names": [
+        "slb_len_mm"
+      ],
+      "acquisition_api_names": [
+        "slb_len_mm"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "342",
+      "title": "资金流向数据",
+      "url": "https://tushare.pro/document/2?doc_id=342",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "170",
+      "title": "个股资金流向",
+      "url": "https://tushare.pro/document/2?doc_id=170",
+      "api_names": [
+        "moneyflow"
+      ],
+      "acquisition_api_names": [
+        "moneyflow"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "348",
+      "title": "个股资金流向（THS）",
+      "url": "https://tushare.pro/document/2?doc_id=348",
+      "api_names": [
+        "moneyflow_ths"
+      ],
+      "acquisition_api_names": [
+        "moneyflow_ths"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "349",
+      "title": "个股资金流向（DC）",
+      "url": "https://tushare.pro/document/2?doc_id=349",
+      "api_names": [
+        "moneyflow_dc"
+      ],
+      "acquisition_api_names": [
+        "moneyflow_dc"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "371",
+      "title": "板块资金流向（THS)",
+      "url": "https://tushare.pro/document/2?doc_id=371",
+      "api_names": [
+        "moneyflow_cnt_ths"
+      ],
+      "acquisition_api_names": [
+        "moneyflow_cnt_ths"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "343",
+      "title": "行业资金流向（THS）",
+      "url": "https://tushare.pro/document/2?doc_id=343",
+      "api_names": [
+        "moneyflow_ind_ths"
+      ],
+      "acquisition_api_names": [
+        "moneyflow_ind_ths"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "344",
+      "title": "板块资金流向（DC）",
+      "url": "https://tushare.pro/document/2?doc_id=344",
+      "api_names": [
+        "moneyflow_ind_dc"
+      ],
+      "acquisition_api_names": [
+        "moneyflow_ind_dc"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "345",
+      "title": "大盘资金流向（DC）",
+      "url": "https://tushare.pro/document/2?doc_id=345",
+      "api_names": [
+        "moneyflow_mkt_dc"
+      ],
+      "acquisition_api_names": [
+        "moneyflow_mkt_dc"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "346",
+      "title": "打板专题数据",
+      "url": "https://tushare.pro/document/2?doc_id=346",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "106",
+      "title": "龙虎榜每日统计单",
+      "url": "https://tushare.pro/document/2?doc_id=106",
+      "api_names": [
+        "top_list"
+      ],
+      "acquisition_api_names": [
+        "top_list"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "107",
+      "title": "龙虎榜机构交易单",
+      "url": "https://tushare.pro/document/2?doc_id=107",
+      "api_names": [
+        "top_inst"
+      ],
+      "acquisition_api_names": [
+        "top_inst"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "355",
+      "title": "THS涨跌停榜单",
+      "url": "https://tushare.pro/document/2?doc_id=355",
+      "api_names": [
+        "limit_list_ths"
+      ],
+      "acquisition_api_names": [
+        "limit_list_ths"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "298",
+      "title": "涨跌停和炸板数据",
+      "url": "https://tushare.pro/document/2?doc_id=298",
+      "api_names": [
+        "limit_list_d"
+      ],
+      "acquisition_api_names": [
+        "limit_list_d"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "356",
+      "title": "涨停股票连板天梯",
+      "url": "https://tushare.pro/document/2?doc_id=356",
+      "api_names": [
+        "limit_step"
+      ],
+      "acquisition_api_names": [
+        "limit_step"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "357",
+      "title": "涨停最强板块统计",
+      "url": "https://tushare.pro/document/2?doc_id=357",
+      "api_names": [
+        "limit_cpt_list"
+      ],
+      "acquisition_api_names": [
+        "limit_cpt_list"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "259",
+      "title": "THS概念板块分类",
+      "url": "https://tushare.pro/document/2?doc_id=259",
+      "api_names": [
+        "ths_index"
+      ],
+      "acquisition_api_names": [
+        "ths_index"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "260",
+      "title": "THS概念板块行情",
+      "url": "https://tushare.pro/document/2?doc_id=260",
+      "api_names": [
+        "ths_daily"
+      ],
+      "acquisition_api_names": [
+        "ths_daily"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "261",
+      "title": "THS概念板块成分",
+      "url": "https://tushare.pro/document/2?doc_id=261",
+      "api_names": [
+        "ths_member"
+      ],
+      "acquisition_api_names": [
+        "ths_member"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "362",
+      "title": "DC概念板块分类",
+      "url": "https://tushare.pro/document/2?doc_id=362",
+      "api_names": [
+        "dc_index"
+      ],
+      "acquisition_api_names": [
+        "dc_index"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "363",
+      "title": "DC概念板块成分",
+      "url": "https://tushare.pro/document/2?doc_id=363",
+      "api_names": [
+        "dc_member"
+      ],
+      "acquisition_api_names": [
+        "dc_member"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "382",
+      "title": "DC概念板块行情",
+      "url": "https://tushare.pro/document/2?doc_id=382",
+      "api_names": [
+        "dc_daily"
+      ],
+      "acquisition_api_names": [
+        "dc_daily"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "369",
+      "title": "开盘竞价成交（当日）",
+      "url": "https://tushare.pro/document/2?doc_id=369",
+      "api_names": [
+        "stk_auction"
+      ],
+      "acquisition_api_names": [
+        "stk_auction"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "311",
+      "title": "市场游资最全名录",
+      "url": "https://tushare.pro/document/2?doc_id=311",
+      "api_names": [
+        "hm_list"
+      ],
+      "acquisition_api_names": [
+        "hm_list"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "312",
+      "title": "游资交易每日明细",
+      "url": "https://tushare.pro/document/2?doc_id=312",
+      "api_names": [
+        "hm_detail"
+      ],
+      "acquisition_api_names": [
+        "hm_detail"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "320",
+      "title": "THS热榜",
+      "url": "https://tushare.pro/document/2?doc_id=320",
+      "api_names": [
+        "ths_hot"
+      ],
+      "acquisition_api_names": [
+        "ths_hot"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "321",
+      "title": "DC热榜",
+      "url": "https://tushare.pro/document/2?doc_id=321",
+      "api_names": [
+        "dc_hot"
+      ],
+      "acquisition_api_names": [
+        "dc_hot"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "376",
+      "title": "TDX概念板块分类",
+      "url": "https://tushare.pro/document/2?doc_id=376",
+      "api_names": [
+        "tdx_index"
+      ],
+      "acquisition_api_names": [
+        "tdx_index"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "377",
+      "title": "TDX概念板块成分",
+      "url": "https://tushare.pro/document/2?doc_id=377",
+      "api_names": [
+        "tdx_member"
+      ],
+      "acquisition_api_names": [
+        "tdx_member"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "378",
+      "title": "TDX概念板块行情",
+      "url": "https://tushare.pro/document/2?doc_id=378",
+      "api_names": [
+        "tdx_daily"
+      ],
+      "acquisition_api_names": [
+        "tdx_daily"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "347",
+      "title": "榜单数据（KP）",
+      "url": "https://tushare.pro/document/2?doc_id=347",
+      "api_names": [
+        "kpl_list"
+      ],
+      "acquisition_api_names": [
+        "kpl_list"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "351",
+      "title": "题材成分（KP）",
+      "url": "https://tushare.pro/document/2?doc_id=351",
+      "api_names": [
+        "kpl_concept_cons"
+      ],
+      "acquisition_api_names": [
+        "kpl_concept_cons"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "384",
+      "title": "ETF专题",
+      "url": "https://tushare.pro/document/2?doc_id=384",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "385",
+      "title": "ETF基本信息",
+      "url": "https://tushare.pro/document/2?doc_id=385",
+      "api_names": [
+        "etf_basic"
+      ],
+      "acquisition_api_names": [
+        "etf_basic"
+      ],
+      "status": "ingested_partial",
+      "permission_status": "unverified",
+      "next_action": "Continue persisted historical backfill, revisions and coverage validation; no completeness claim."
+    },
+    {
+      "doc_id": "386",
+      "title": "ETF跟踪指数",
+      "url": "https://tushare.pro/document/2?doc_id=386",
+      "api_names": [
+        "etf_index"
+      ],
+      "acquisition_api_names": [
+        "etf_index"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "387",
+      "title": "ETF历史分钟",
+      "url": "https://tushare.pro/document/2?doc_id=387",
+      "api_names": [
+        "etf_mins"
+      ],
+      "acquisition_api_names": [
+        "etf_mins"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "127",
+      "title": "ETF日线行情",
+      "url": "https://tushare.pro/document/2?doc_id=127",
+      "api_names": [
+        "fund_daily"
+      ],
+      "acquisition_api_names": [
+        "fund_daily"
+      ],
+      "status": "ingested_partial",
+      "permission_status": "unverified",
+      "next_action": "Continue persisted historical backfill, revisions and coverage validation; no completeness claim."
+    },
+    {
+      "doc_id": "199",
+      "title": "ETF复权因子",
+      "url": "https://tushare.pro/document/2?doc_id=199",
+      "api_names": [
+        "fund_adj"
+      ],
+      "acquisition_api_names": [
+        "fund_adj"
+      ],
+      "status": "ingested_partial",
+      "permission_status": "unverified",
+      "next_action": "Continue persisted historical backfill, revisions and coverage validation; no completeness claim."
+    },
+    {
+      "doc_id": "491",
+      "title": "ETF每日涨跌停价格",
+      "url": "https://tushare.pro/document/2?doc_id=491",
+      "api_names": [
+        "etf_limit"
+      ],
+      "acquisition_api_names": [
+        "etf_limit"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "408",
+      "title": "ETF份额规模",
+      "url": "https://tushare.pro/document/2?doc_id=408",
+      "api_names": [
+        "etf_share_size"
+      ],
+      "acquisition_api_names": [
+        "etf_share_size"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "471",
+      "title": "每日篮子组合(沪市PCF）",
+      "url": "https://tushare.pro/document/2?doc_id=471",
+      "api_names": [
+        "etf_sh_cons"
+      ],
+      "acquisition_api_names": [
+        "etf_sh_cons"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "472",
+      "title": "每日篮子组合(深市PCF）",
+      "url": "https://tushare.pro/document/2?doc_id=472",
+      "api_names": [
+        "etf_sz_cons"
+      ],
+      "acquisition_api_names": [
+        "etf_sz_cons"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "454",
+      "title": "ETF实时参考",
+      "url": "https://tushare.pro/document/2?doc_id=454",
+      "api_names": [
+        "rt_etf_sz_iopv"
+      ],
+      "acquisition_api_names": [
+        "rt_etf_sz_iopv"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "460",
+      "title": "指数公司公告",
+      "url": "https://tushare.pro/document/2?doc_id=460",
+      "api_names": [
+        "idx_anns"
+      ],
+      "acquisition_api_names": [
+        "idx_anns"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "93",
+      "title": "指数专题",
+      "url": "https://tushare.pro/document/2?doc_id=93",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "94",
+      "title": "指数基本信息",
+      "url": "https://tushare.pro/document/2?doc_id=94",
+      "api_names": [
+        "index_basic"
+      ],
+      "acquisition_api_names": [
+        "index_basic"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "95",
+      "title": "指数日线行情",
+      "url": "https://tushare.pro/document/2?doc_id=95",
+      "api_names": [
+        "index_daily"
+      ],
+      "acquisition_api_names": [
+        "index_daily"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "403",
+      "title": "指数实时日线",
+      "url": "https://tushare.pro/document/2?doc_id=403",
+      "api_names": [
+        "rt_idx_k"
+      ],
+      "acquisition_api_names": [
+        "rt_idx_k"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "420",
+      "title": "指数实时分钟",
+      "url": "https://tushare.pro/document/2?doc_id=420",
+      "api_names": [
+        "rt_idx_min"
+      ],
+      "acquisition_api_names": [
+        "rt_idx_min"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "171",
+      "title": "指数周线行情",
+      "url": "https://tushare.pro/document/2?doc_id=171",
+      "api_names": [
+        "index_weekly"
+      ],
+      "acquisition_api_names": [
+        "index_weekly"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "419",
+      "title": "指数历史分钟",
+      "url": "https://tushare.pro/document/2?doc_id=419",
+      "api_names": [
+        "idx_mins"
+      ],
+      "acquisition_api_names": [
+        "idx_mins"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "172",
+      "title": "指数月线行情",
+      "url": "https://tushare.pro/document/2?doc_id=172",
+      "api_names": [
+        "index_monthly"
+      ],
+      "acquisition_api_names": [
+        "index_monthly"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "96",
+      "title": "指数成分和权重",
+      "url": "https://tushare.pro/document/2?doc_id=96",
+      "api_names": [
+        "index_weight"
+      ],
+      "acquisition_api_names": [
+        "index_weight"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "128",
+      "title": "大盘指数每日指标",
+      "url": "https://tushare.pro/document/2?doc_id=128",
+      "api_names": [
+        "index_dailybasic"
+      ],
+      "acquisition_api_names": [
+        "index_dailybasic"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "181",
+      "title": "申万行业分类",
+      "url": "https://tushare.pro/document/2?doc_id=181",
+      "api_names": [
+        "index_classify"
+      ],
+      "acquisition_api_names": [
+        "index_classify"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "335",
+      "title": "申万行业成分（分级）",
+      "url": "https://tushare.pro/document/2?doc_id=335",
+      "api_names": [
+        "index_member_all"
+      ],
+      "acquisition_api_names": [
+        "index_member_all"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "327",
+      "title": "申万日线行情",
+      "url": "https://tushare.pro/document/2?doc_id=327",
+      "api_names": [
+        "sw_daily"
+      ],
+      "acquisition_api_names": [
+        "sw_daily"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "417",
+      "title": "申万实时行情",
+      "url": "https://tushare.pro/document/2?doc_id=417",
+      "api_names": [
+        "rt_sw_k"
+      ],
+      "acquisition_api_names": [
+        "rt_sw_k"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "469",
+      "title": "SW历史分钟",
+      "url": "https://tushare.pro/document/2?doc_id=469",
+      "api_names": [
+        "sw_mins"
+      ],
+      "acquisition_api_names": [
+        "sw_mins"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "373",
+      "title": "中信行业成分",
+      "url": "https://tushare.pro/document/2?doc_id=373",
+      "api_names": [
+        "ci_index_member"
+      ],
+      "acquisition_api_names": [
+        "ci_index_member"
+      ],
+      "status": "ingested_partial",
+      "permission_status": "unverified",
+      "next_action": "Continue persisted historical backfill, revisions and coverage validation; no completeness claim."
+    },
+    {
+      "doc_id": "308",
+      "title": "中信行业指数日行情",
+      "url": "https://tushare.pro/document/2?doc_id=308",
+      "api_names": [
+        "ci_daily"
+      ],
+      "acquisition_api_names": [
+        "ci_daily"
+      ],
+      "status": "ingested_partial",
+      "permission_status": "unverified",
+      "next_action": "Continue persisted historical backfill, revisions and coverage validation; no completeness claim."
+    },
+    {
+      "doc_id": "211",
+      "title": "国际主要指数",
+      "url": "https://tushare.pro/document/2?doc_id=211",
+      "api_names": [
+        "index_global"
+      ],
+      "acquisition_api_names": [
+        "index_global"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "358",
+      "title": "指数技术面因子(专业版)",
+      "url": "https://tushare.pro/document/2?doc_id=358",
+      "api_names": [
+        "idx_factor_pro"
+      ],
+      "acquisition_api_names": [
+        "idx_factor_pro"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "215",
+      "title": "沪深市场每日交易统计",
+      "url": "https://tushare.pro/document/2?doc_id=215",
+      "api_names": [
+        "daily_info"
+      ],
+      "acquisition_api_names": [
+        "daily_info"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "268",
+      "title": "深圳市场每日交易情况",
+      "url": "https://tushare.pro/document/2?doc_id=268",
+      "api_names": [
+        "sz_daily_info"
+      ],
+      "acquisition_api_names": [
+        "sz_daily_info"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "18",
+      "title": "公募基金",
+      "url": "https://tushare.pro/document/2?doc_id=18",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "19",
+      "title": "基金列表",
+      "url": "https://tushare.pro/document/2?doc_id=19",
+      "api_names": [
+        "fund_basic"
+      ],
+      "acquisition_api_names": [
+        "fund_basic"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "118",
+      "title": "基金管理人",
+      "url": "https://tushare.pro/document/2?doc_id=118",
+      "api_names": [
+        "fund_company"
+      ],
+      "acquisition_api_names": [
+        "fund_company"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "208",
+      "title": "基金经理",
+      "url": "https://tushare.pro/document/2?doc_id=208",
+      "api_names": [
+        "fund_manager"
+      ],
+      "acquisition_api_names": [
+        "fund_manager"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "462",
+      "title": "基金业绩基准",
+      "url": "https://tushare.pro/document/2?doc_id=462",
+      "api_names": [
+        "mkt_idx_bmk"
+      ],
+      "acquisition_api_names": [
+        "mkt_idx_bmk"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "207",
+      "title": "基金规模",
+      "url": "https://tushare.pro/document/2?doc_id=207",
+      "api_names": [
+        "fund_share"
+      ],
+      "acquisition_api_names": [
+        "fund_share"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "119",
+      "title": "基金净值",
+      "url": "https://tushare.pro/document/2?doc_id=119",
+      "api_names": [
+        "fund_nav"
+      ],
+      "acquisition_api_names": [
+        "fund_nav"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "120",
+      "title": "基金分红",
+      "url": "https://tushare.pro/document/2?doc_id=120",
+      "api_names": [
+        "fund_div"
+      ],
+      "acquisition_api_names": [
+        "fund_div"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "121",
+      "title": "基金持仓",
+      "url": "https://tushare.pro/document/2?doc_id=121",
+      "api_names": [
+        "fund_portfolio"
+      ],
+      "acquisition_api_names": [
+        "fund_portfolio"
+      ],
+      "status": "ingested_partial",
+      "permission_status": "unverified",
+      "next_action": "Continue persisted historical backfill, revisions and coverage validation; no completeness claim."
+    },
+    {
+      "doc_id": "359",
+      "title": "基金技术面因子(专业版)",
+      "url": "https://tushare.pro/document/2?doc_id=359",
+      "api_names": [
+        "fund_factor_pro"
+      ],
+      "acquisition_api_names": [
+        "fund_factor_pro"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "134",
+      "title": "期货数据",
+      "url": "https://tushare.pro/document/2?doc_id=134",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "135",
+      "title": "合约信息",
+      "url": "https://tushare.pro/document/2?doc_id=135",
+      "api_names": [
+        "fut_basic"
+      ],
+      "acquisition_api_names": [
+        "fut_basic"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "467",
+      "title": "期货交易日历",
+      "url": "https://tushare.pro/document/2?doc_id=467",
+      "api_names": [
+        "fut_trade_cal"
+      ],
+      "acquisition_api_names": [
+        "fut_trade_cal"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "138",
+      "title": "期货日线行情",
+      "url": "https://tushare.pro/document/2?doc_id=138",
+      "api_names": [
+        "fut_daily"
+      ],
+      "acquisition_api_names": [
+        "fut_daily"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "492",
+      "title": "期货复权行情",
+      "url": "https://tushare.pro/document/2?doc_id=492",
+      "api_names": [
+        "fut_daily_adj"
+      ],
+      "acquisition_api_names": [
+        "fut_daily_adj"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "337",
+      "title": "期货周/月线行情(每日更新)",
+      "url": "https://tushare.pro/document/2?doc_id=337",
+      "api_names": [
+        "fut_weekly_monthly"
+      ],
+      "acquisition_api_names": [
+        "fut_weekly_monthly"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "340",
+      "title": "实时分钟行情",
+      "url": "https://tushare.pro/document/2?doc_id=340",
+      "api_names": [
+        "rt_fut_min"
+      ],
+      "acquisition_api_names": [
+        "rt_fut_min"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "140",
+      "title": "仓单日报",
+      "url": "https://tushare.pro/document/2?doc_id=140",
+      "api_names": [
+        "fut_wsr"
+      ],
+      "acquisition_api_names": [
+        "fut_wsr"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "141",
+      "title": "每日结算参数",
+      "url": "https://tushare.pro/document/2?doc_id=141",
+      "api_names": [
+        "fut_settle"
+      ],
+      "acquisition_api_names": [
+        "fut_settle"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "313",
+      "title": "历史分钟行情",
+      "url": "https://tushare.pro/document/2?doc_id=313",
+      "api_names": [
+        "ft_mins"
+      ],
+      "acquisition_api_names": [
+        "ft_mins"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "314",
+      "title": "历史Tick行情",
+      "url": "https://tushare.pro/document/2?doc_id=314",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "139",
+      "title": "每日持仓排名",
+      "url": "https://tushare.pro/document/2?doc_id=139",
+      "api_names": [
+        "fut_holding"
+      ],
+      "acquisition_api_names": [
+        "fut_holding"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "468",
+      "title": "南华期货指数日线行情",
+      "url": "https://tushare.pro/document/2?doc_id=468",
+      "api_names": [
+        "fut_index_daily"
+      ],
+      "acquisition_api_names": [
+        "fut_index_daily"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "189",
+      "title": "期货主力与连续合约",
+      "url": "https://tushare.pro/document/2?doc_id=189",
+      "api_names": [
+        "fut_mapping"
+      ],
+      "acquisition_api_names": [
+        "fut_mapping"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "216",
+      "title": "期货主要品种交易周报",
+      "url": "https://tushare.pro/document/2?doc_id=216",
+      "api_names": [
+        "fut_weekly_detail"
+      ],
+      "acquisition_api_names": [
+        "fut_weekly_detail"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "368",
+      "title": "期货合约涨跌停价格",
+      "url": "https://tushare.pro/document/2?doc_id=368",
+      "api_names": [
+        "ft_limit"
+      ],
+      "acquisition_api_names": [
+        "ft_limit"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "283",
+      "title": "现货数据",
+      "url": "https://tushare.pro/document/2?doc_id=283",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "284",
+      "title": "上海黄金基础信息",
+      "url": "https://tushare.pro/document/2?doc_id=284",
+      "api_names": [
+        "sge_basic"
+      ],
+      "acquisition_api_names": [
+        "sge_basic"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "285",
+      "title": "上海黄金现货日行情",
+      "url": "https://tushare.pro/document/2?doc_id=285",
+      "api_names": [
+        "sge_daily"
+      ],
+      "acquisition_api_names": [
+        "sge_daily"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "157",
+      "title": "期权数据",
+      "url": "https://tushare.pro/document/2?doc_id=157",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "158",
+      "title": "期权合约信息",
+      "url": "https://tushare.pro/document/2?doc_id=158",
+      "api_names": [
+        "opt_basic"
+      ],
+      "acquisition_api_names": [
+        "opt_basic"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "159",
+      "title": "期权日线行情",
+      "url": "https://tushare.pro/document/2?doc_id=159",
+      "api_names": [
+        "opt_daily"
+      ],
+      "acquisition_api_names": [
+        "opt_daily"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "341",
+      "title": "期权分钟行情",
+      "url": "https://tushare.pro/document/2?doc_id=341",
+      "api_names": [
+        "opt_mins"
+      ],
+      "acquisition_api_names": [
+        "opt_mins"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "184",
+      "title": "债券专题",
+      "url": "https://tushare.pro/document/2?doc_id=184",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "185",
+      "title": "可转债基础信息",
+      "url": "https://tushare.pro/document/2?doc_id=185",
+      "api_names": [
+        "cb_basic"
+      ],
+      "acquisition_api_names": [
+        "cb_basic"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "186",
+      "title": "可转债发行",
+      "url": "https://tushare.pro/document/2?doc_id=186",
+      "api_names": [
+        "cb_issue"
+      ],
+      "acquisition_api_names": [
+        "cb_issue"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "269",
+      "title": "可转债赎回信息",
+      "url": "https://tushare.pro/document/2?doc_id=269",
+      "api_names": [
+        "cb_call"
+      ],
+      "acquisition_api_names": [
+        "cb_call"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "305",
+      "title": "可转债票面利率",
+      "url": "https://tushare.pro/document/2?doc_id=305",
+      "api_names": [
+        "cb_rate"
+      ],
+      "acquisition_api_names": [
+        "cb_rate"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "187",
+      "title": "可转债行情",
+      "url": "https://tushare.pro/document/2?doc_id=187",
+      "api_names": [
+        "cb_daily"
+      ],
+      "acquisition_api_names": [
+        "cb_daily"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "459",
+      "title": "可转债十大持有人",
+      "url": "https://tushare.pro/document/2?doc_id=459",
+      "api_names": [
+        "top10_cb_holders"
+      ],
+      "acquisition_api_names": [
+        "top10_cb_holders"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "392",
+      "title": "可转债技术面因子(专业版)",
+      "url": "https://tushare.pro/document/2?doc_id=392",
+      "api_names": [
+        "cb_factor_pro"
+      ],
+      "acquisition_api_names": [
+        "cb_factor_pro"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "246",
+      "title": "可转债转股价变动",
+      "url": "https://tushare.pro/document/2?doc_id=246",
+      "api_names": [
+        "cb_price_chg"
+      ],
+      "acquisition_api_names": [
+        "cb_price_chg"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "247",
+      "title": "可转债转股结果",
+      "url": "https://tushare.pro/document/2?doc_id=247",
+      "api_names": [
+        "cb_share"
+      ],
+      "acquisition_api_names": [
+        "cb_share"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "458",
+      "title": "可转债债券评级",
+      "url": "https://tushare.pro/document/2?doc_id=458",
+      "api_names": [
+        "cb_rating"
+      ],
+      "acquisition_api_names": [
+        "cb_rating"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "256",
+      "title": "债券回购日行情",
+      "url": "https://tushare.pro/document/2?doc_id=256",
+      "api_names": [
+        "repo_daily"
+      ],
+      "acquisition_api_names": [
+        "repo_daily"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "322",
+      "title": "柜台流通式债券报价",
+      "url": "https://tushare.pro/document/2?doc_id=322",
+      "api_names": [
+        "bc_otcqt"
+      ],
+      "acquisition_api_names": [
+        "bc_otcqt"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "323",
+      "title": "柜台流通式债券最优报价",
+      "url": "https://tushare.pro/document/2?doc_id=323",
+      "api_names": [
+        "bc_bestotcqt"
+      ],
+      "acquisition_api_names": [
+        "bc_bestotcqt"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "271",
+      "title": "大宗交易",
+      "url": "https://tushare.pro/document/2?doc_id=271",
+      "api_names": [
+        "bond_blk"
+      ],
+      "acquisition_api_names": [
+        "bond_blk"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "272",
+      "title": "大宗交易明细",
+      "url": "https://tushare.pro/document/2?doc_id=272",
+      "api_names": [
+        "bond_blk_detail"
+      ],
+      "acquisition_api_names": [
+        "bond_blk_detail"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "201",
+      "title": "国债收益率曲线",
+      "url": "https://tushare.pro/document/2?doc_id=201",
+      "api_names": [
+        "yc_cb"
+      ],
+      "acquisition_api_names": [
+        "yc_cb"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "233",
+      "title": "全球财经事件",
+      "url": "https://tushare.pro/document/2?doc_id=233",
+      "api_names": [
+        "eco_cal"
+      ],
+      "acquisition_api_names": [
+        "eco_cal"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "177",
+      "title": "外汇数据",
+      "url": "https://tushare.pro/document/2?doc_id=177",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "178",
+      "title": "外汇基础信息（海外）",
+      "url": "https://tushare.pro/document/2?doc_id=178",
+      "api_names": [
+        "fx_obasic"
+      ],
+      "acquisition_api_names": [
+        "fx_obasic"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "179",
+      "title": "外汇日线行情",
+      "url": "https://tushare.pro/document/2?doc_id=179",
+      "api_names": [
+        "fx_daily"
+      ],
+      "acquisition_api_names": [
+        "fx_daily"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "190",
+      "title": "港股数据",
+      "url": "https://tushare.pro/document/2?doc_id=190",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "191",
+      "title": "港股基础信息",
+      "url": "https://tushare.pro/document/2?doc_id=191",
+      "api_names": [
+        "hk_basic"
+      ],
+      "acquisition_api_names": [
+        "hk_basic"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "250",
+      "title": "港股交易日历",
+      "url": "https://tushare.pro/document/2?doc_id=250",
+      "api_names": [
+        "hk_tradecal"
+      ],
+      "acquisition_api_names": [
+        "hk_tradecal"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "192",
+      "title": "港股日线行情",
+      "url": "https://tushare.pro/document/2?doc_id=192",
+      "api_names": [
+        "hk_daily"
+      ],
+      "acquisition_api_names": [
+        "hk_daily"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "339",
+      "title": "港股复权行情",
+      "url": "https://tushare.pro/document/2?doc_id=339",
+      "api_names": [
+        "hk_daily_adj"
+      ],
+      "acquisition_api_names": [
+        "hk_daily_adj"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "401",
+      "title": "港股复权因子",
+      "url": "https://tushare.pro/document/2?doc_id=401",
+      "api_names": [
+        "hk_adjfactor"
+      ],
+      "acquisition_api_names": [
+        "hk_adjfactor"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "304",
+      "title": "港股分钟行情",
+      "url": "https://tushare.pro/document/2?doc_id=304",
+      "api_names": [
+        "hk_mins"
+      ],
+      "acquisition_api_names": [
+        "hk_mins"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "389",
+      "title": "港股利润表",
+      "url": "https://tushare.pro/document/2?doc_id=389",
+      "api_names": [
+        "hk_income"
+      ],
+      "acquisition_api_names": [
+        "hk_income"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "390",
+      "title": "港股资产负债表",
+      "url": "https://tushare.pro/document/2?doc_id=390",
+      "api_names": [
+        "hk_balancesheet"
+      ],
+      "acquisition_api_names": [
+        "hk_balancesheet"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "391",
+      "title": "港股现金流量表",
+      "url": "https://tushare.pro/document/2?doc_id=391",
+      "api_names": [
+        "hk_cashflow"
+      ],
+      "acquisition_api_names": [
+        "hk_cashflow"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "388",
+      "title": "港股财务指标数据",
+      "url": "https://tushare.pro/document/2?doc_id=388",
+      "api_names": [
+        "hk_fina_indicator"
+      ],
+      "acquisition_api_names": [
+        "hk_fina_indicator"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "251",
+      "title": "美股数据",
+      "url": "https://tushare.pro/document/2?doc_id=251",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "252",
+      "title": "美股基础信息",
+      "url": "https://tushare.pro/document/2?doc_id=252",
+      "api_names": [
+        "us_basic"
+      ],
+      "acquisition_api_names": [
+        "us_basic"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "253",
+      "title": "美股交易日历",
+      "url": "https://tushare.pro/document/2?doc_id=253",
+      "api_names": [
+        "us_tradecal"
+      ],
+      "acquisition_api_names": [
+        "us_tradecal"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "254",
+      "title": "美股日线行情",
+      "url": "https://tushare.pro/document/2?doc_id=254",
+      "api_names": [
+        "us_daily"
+      ],
+      "acquisition_api_names": [
+        "us_daily"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "338",
+      "title": "美股复权行情",
+      "url": "https://tushare.pro/document/2?doc_id=338",
+      "api_names": [
+        "us_daily_adj"
+      ],
+      "acquisition_api_names": [
+        "us_daily_adj"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "402",
+      "title": "美股复权因子",
+      "url": "https://tushare.pro/document/2?doc_id=402",
+      "api_names": [
+        "us_adjfactor"
+      ],
+      "acquisition_api_names": [
+        "us_adjfactor"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "394",
+      "title": "美股利润表",
+      "url": "https://tushare.pro/document/2?doc_id=394",
+      "api_names": [
+        "us_income"
+      ],
+      "acquisition_api_names": [
+        "us_income"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "395",
+      "title": "美股资产负债表",
+      "url": "https://tushare.pro/document/2?doc_id=395",
+      "api_names": [
+        "us_balancesheet"
+      ],
+      "acquisition_api_names": [
+        "us_balancesheet"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "396",
+      "title": "美股现金流量表",
+      "url": "https://tushare.pro/document/2?doc_id=396",
+      "api_names": [
+        "us_cashflow"
+      ],
+      "acquisition_api_names": [
+        "us_cashflow"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "393",
+      "title": "美股财务指标数据",
+      "url": "https://tushare.pro/document/2?doc_id=393",
+      "api_names": [
+        "us_fina_indicator"
+      ],
+      "acquisition_api_names": [
+        "us_fina_indicator"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "147",
+      "title": "宏观经济",
+      "url": "https://tushare.pro/document/2?doc_id=147",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "224",
+      "title": "国内宏观",
+      "url": "https://tushare.pro/document/2?doc_id=224",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "461",
+      "title": "中国经济数据发布日程",
+      "url": "https://tushare.pro/document/2?doc_id=461",
+      "api_names": [
+        "cn_schedule"
+      ],
+      "acquisition_api_names": [
+        "cn_schedule"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "148",
+      "title": "利率数据",
+      "url": "https://tushare.pro/document/2?doc_id=148",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "149",
+      "title": "Shibor利率",
+      "url": "https://tushare.pro/document/2?doc_id=149",
+      "api_names": [
+        "shibor"
+      ],
+      "acquisition_api_names": [
+        "shibor"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "150",
+      "title": "Shibor报价数据",
+      "url": "https://tushare.pro/document/2?doc_id=150",
+      "api_names": [
+        "shibor_quote"
+      ],
+      "acquisition_api_names": [
+        "shibor_quote"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "151",
+      "title": "LPR贷款基础利率",
+      "url": "https://tushare.pro/document/2?doc_id=151",
+      "api_names": [
+        "shibor_lpr"
+      ],
+      "acquisition_api_names": [
+        "shibor_lpr"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "152",
+      "title": "Libor利率",
+      "url": "https://tushare.pro/document/2?doc_id=152",
+      "api_names": [
+        "libor"
+      ],
+      "acquisition_api_names": [
+        "libor"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "153",
+      "title": "Hibor利率",
+      "url": "https://tushare.pro/document/2?doc_id=153",
+      "api_names": [
+        "hibor"
+      ],
+      "acquisition_api_names": [
+        "hibor"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "173",
+      "title": "温州民间借贷利率",
+      "url": "https://tushare.pro/document/2?doc_id=173",
+      "api_names": [
+        "wz_index"
+      ],
+      "acquisition_api_names": [
+        "wz_index"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "174",
+      "title": "广州民间借贷利率",
+      "url": "https://tushare.pro/document/2?doc_id=174",
+      "api_names": [
+        "gz_index"
+      ],
+      "acquisition_api_names": [
+        "gz_index"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "225",
+      "title": "国民经济",
+      "url": "https://tushare.pro/document/2?doc_id=225",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "227",
+      "title": "国内生产总值（GDP）",
+      "url": "https://tushare.pro/document/2?doc_id=227",
+      "api_names": [
+        "cn_gdp"
+      ],
+      "acquisition_api_names": [
+        "cn_gdp"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "226",
+      "title": "价格指数",
+      "url": "https://tushare.pro/document/2?doc_id=226",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "228",
+      "title": "居民消费价格指数（CPI）",
+      "url": "https://tushare.pro/document/2?doc_id=228",
+      "api_names": [
+        "cn_cpi"
+      ],
+      "acquisition_api_names": [
+        "cn_cpi"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "245",
+      "title": "工业生产者出厂价格指数（PPI）",
+      "url": "https://tushare.pro/document/2?doc_id=245",
+      "api_names": [
+        "cn_ppi"
+      ],
+      "acquisition_api_names": [
+        "cn_ppi"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "240",
+      "title": "金融",
+      "url": "https://tushare.pro/document/2?doc_id=240",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "241",
+      "title": "货币供应量",
+      "url": "https://tushare.pro/document/2?doc_id=241",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "242",
+      "title": "货币供应量（月）",
+      "url": "https://tushare.pro/document/2?doc_id=242",
+      "api_names": [
+        "cn_m"
+      ],
+      "acquisition_api_names": [
+        "cn_m"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "309",
+      "title": "社会融资",
+      "url": "https://tushare.pro/document/2?doc_id=309",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "310",
+      "title": "社融增量（月度）",
+      "url": "https://tushare.pro/document/2?doc_id=310",
+      "api_names": [
+        "sf_month"
+      ],
+      "acquisition_api_names": [
+        "sf_month"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "324",
+      "title": "景气度",
+      "url": "https://tushare.pro/document/2?doc_id=324",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "325",
+      "title": "采购经理指数（PMI）",
+      "url": "https://tushare.pro/document/2?doc_id=325",
+      "api_names": [
+        "cn_pmi"
+      ],
+      "acquisition_api_names": [
+        "cn_pmi"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+    },
+    {
+      "doc_id": "217",
+      "title": "国际宏观",
+      "url": "https://tushare.pro/document/2?doc_id=217",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "218",
+      "title": "美国利率",
+      "url": "https://tushare.pro/document/2?doc_id=218",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "219",
+      "title": "国债收益率曲线利率",
+      "url": "https://tushare.pro/document/2?doc_id=219",
+      "api_names": [
+        "us_tycr"
+      ],
+      "acquisition_api_names": [
+        "us_tycr"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "220",
+      "title": "国债实际收益率曲线利率",
+      "url": "https://tushare.pro/document/2?doc_id=220",
+      "api_names": [
+        "us_trycr"
+      ],
+      "acquisition_api_names": [
+        "us_trycr"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "221",
+      "title": "短期国债利率",
+      "url": "https://tushare.pro/document/2?doc_id=221",
+      "api_names": [
+        "us_tbr"
+      ],
+      "acquisition_api_names": [
+        "us_tbr"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "222",
+      "title": "国债长期利率",
+      "url": "https://tushare.pro/document/2?doc_id=222",
+      "api_names": [
+        "us_tltr"
+      ],
+      "acquisition_api_names": [
+        "us_tltr"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "223",
+      "title": "国债长期利率平均值",
+      "url": "https://tushare.pro/document/2?doc_id=223",
+      "api_names": [
+        "us_trltr"
+      ],
+      "acquisition_api_names": [
+        "us_trltr"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "142",
+      "title": "大模型语料",
+      "url": "https://tushare.pro/document/2?doc_id=142",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "406",
+      "title": "国家政策库",
+      "url": "https://tushare.pro/document/2?doc_id=406",
+      "api_names": [
+        "npr"
+      ],
+      "acquisition_api_names": [
+        "npr"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+    },
+    {
+      "doc_id": "415",
+      "title": "券商研究报告",
+      "url": "https://tushare.pro/document/2?doc_id=415",
+      "api_names": [
+        "research_report"
+      ],
+      "acquisition_api_names": [
+        "research_report"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+    },
+    {
+      "doc_id": "465",
+      "title": "央行货币政策执行报告",
+      "url": "https://tushare.pro/document/2?doc_id=465",
+      "api_names": [
+        "monetary_policy"
+      ],
+      "acquisition_api_names": [
+        "monetary_policy"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+    },
+    {
+      "doc_id": "143",
+      "title": "新闻快讯（短讯）",
+      "url": "https://tushare.pro/document/2?doc_id=143",
+      "api_names": [
+        "news"
+      ],
+      "acquisition_api_names": [
+        "news"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+    },
+    {
+      "doc_id": "195",
+      "title": "新闻通讯（长篇）",
+      "url": "https://tushare.pro/document/2?doc_id=195",
+      "api_names": [
+        "major_news"
+      ],
+      "acquisition_api_names": [
+        "major_news"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+    },
+    {
+      "doc_id": "154",
+      "title": "新闻联播文字稿",
+      "url": "https://tushare.pro/document/2?doc_id=154",
+      "api_names": [
+        "cctv_news"
+      ],
+      "acquisition_api_names": [
+        "cctv_news"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+    },
+    {
+      "doc_id": "176",
+      "title": "上市公司公告",
+      "url": "https://tushare.pro/document/2?doc_id=176",
+      "api_names": [
+        "anns_d"
+      ],
+      "acquisition_api_names": [
+        "anns_d"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+    },
+    {
+      "doc_id": "366",
+      "title": "上证e互动问答",
+      "url": "https://tushare.pro/document/2?doc_id=366",
+      "api_names": [
+        "irm_qa_sh"
+      ],
+      "acquisition_api_names": [
+        "irm_qa_sh"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+    },
+    {
+      "doc_id": "367",
+      "title": "深证易互动问答",
+      "url": "https://tushare.pro/document/2?doc_id=367",
+      "api_names": [
+        "irm_qa_sz"
+      ],
+      "acquisition_api_names": [
+        "irm_qa_sz"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+    },
+    {
+      "doc_id": "485",
+      "title": "量化因子库",
+      "url": "https://tushare.pro/document/2?doc_id=485",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "486",
+      "title": "因子列表",
+      "url": "https://tushare.pro/document/2?doc_id=486",
+      "api_names": [
+        "factor_list"
+      ],
+      "acquisition_api_names": [
+        "factor_list"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "490",
+      "title": "因子数据",
+      "url": "https://tushare.pro/document/2?doc_id=490",
+      "api_names": [
+        "factor_value"
+      ],
+      "acquisition_api_names": [
+        "factor_value"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "474",
+      "title": "自选组合",
+      "url": "https://tushare.pro/document/2?doc_id=474",
+      "api_names": [],
+      "acquisition_api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+    },
+    {
+      "doc_id": "446",
+      "title": "组合列表",
+      "url": "https://tushare.pro/document/2?doc_id=446",
+      "api_names": [
+        "p_list"
+      ],
+      "acquisition_api_names": [
+        "p_list"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "449",
+      "title": "成分查询",
+      "url": "https://tushare.pro/document/2?doc_id=449",
+      "api_names": [
+        "p_get"
+      ],
+      "acquisition_api_names": [
+        "p_get"
+      ],
+      "status": "planned",
+      "permission_status": "unverified",
+      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+    },
+    {
+      "doc_id": "445",
+      "title": "组合保存",
+      "url": "https://tushare.pro/document/2?doc_id=445",
+      "api_names": [
+        "p_save"
+      ],
+      "acquisition_api_names": [
+        "p_save"
+      ],
+      "status": "excluded_mutation",
+      "permission_status": "unverified",
+      "next_action": "Do not probe: account write/delete operation, not data acquisition."
+    },
+    {
+      "doc_id": "447",
+      "title": "组合删除",
+      "url": "https://tushare.pro/document/2?doc_id=447",
+      "api_names": [
+        "p_delete"
+      ],
+      "acquisition_api_names": [
+        "p_delete"
+      ],
+      "status": "excluded_mutation",
+      "permission_status": "unverified",
+      "next_action": "Do not probe: account write/delete operation, not data acquisition."
+    }
+  ]
+}
