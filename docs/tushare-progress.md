@@ -124,3 +124,15 @@
 - 失败附件完整的有界响应保存为不可变.bin证据，保留HTTP/类型/解析失败状态；不会当有效PDF。历史CURRENT继承前任清单与映射，新Mac仅复制最新files也能禁网读取多代；覆盖中断、归档数据库丢失、无变化不造新版本、真实恢复变化仍发布。188项Tushare专项测试及ruff通过。
 - RRG首个signal数据切片已经可独立结构验收：固定data-6e00837911a40223d75d7e4e7b770b4b60b4b7c9f2d208091c6e343f7283bee6；SSE交易日历推导2021-05-17预热起点，到2026-08-31共1286日，30行业38580行，按冻结协议排除综合/综合金融后28行业36008行，缺日/异常开收盘0。父独立禁网复验通过；证据/tmp/quantmind-rrg-slice-parent-20260909/report.json，可用scripts/verify_tushare_rrg_slice.py指定共享config重跑。分类历史版本/指数口径、成员PIT、ETF执行仍未验，不修改其他研究任务状态。
 - 接续：云端只读接口样本、启用新family、历史归档catchup、失败原文真实保存及Mac新版本验证；全部263目录与完整历史仍未完成，目标保持active。
+
+
+## 2026-09-09 04:30 新12接口生产与离线验收
+
+- e8ee822经双端handoff passed（4378文件）后有界探测12接口，采集段3.567秒，11非空、stk_holdertrade指定股票/窗口空。全部126源字段完整返回，原文与Parquet逐行字段、数值、空值、请求日期/代码和源行身份审计通过；没有自动缩放单位。moneyflow_dc6000、share_float6000均明确has_more=true；前者6000不同股票，后者4股票且603448.SH占5959行，未来解禁2027至2029合法保留。完整单位语义表仍待补。
+- 已启用supplement和equity_event自动回填，Mac无凭据镜像data-a3ab845ec2313d5224969ea70c9ac58b0f4677359dc1fd327a7053ac572a9913共65467文件校验通过，11非空API逐一禁网读取且全部源字段保留，/tmp/tushare-supplement-events-mac-verified.json。云端证据validation/supplement-events-probe.json。第二次Mac固定data-87e70f6d838889c27b955e7d55e4070e7970a7666317c39bafa613b454464a11共68107文件，29份失败.bin原文逐一hash通过，缺少原release路径的历史ci_daily仅用archives回退读取成功；/tmp/tushare-archive-bin-mac-verified.json。
+- 真实运行发现stock_basic并集5909含T600018.SH，阻断事件family严格6位校验；其他family继续。候选修复保留T供应商身份，规范为SHT600018、不合并SH600018，旧Parquet只在读取投影兼容、不覆盖文件。另按父响应代码与已有发现取并集扇出，重入保留旧child/证据，不把基础名单误当完整全集；未验证全集仍false。明确has_more=true低于本地阈值也将判饱和，不用count=0推空。213项Tushare专项回归通过，正做第二轮有界生产恢复。
+- 下一批7期货（85字段）及6财务/研究额外接口纯合同/惰性规划已提交，仍未注册运行或生产探测。fina_mainbz须将请求P/D/I类型加入源身份；期货持仓不能把fut_basic.ts_code当symbol，weekly_detail周序号语义尚未验证。详细交接见本主题202417Z/202554Z记录。
+- 非阻塞继续项：旧结果中未处理has_more的回溯审计、原有扇出父节点补见过的代码、跨数据集统一标的发现仍需增量补全、API非200失败响应原文保留、完整字段单位语义、历史修订/PIT、所有263目录剩余接入、归档release-only catchup（正在恢复，open_gaps核查时0并非完成）。RRG signal结构切片通过不解除整体case/breadth/ETF限制。
+
+- 04:35恢复验收：5b4ec20经双端handoff passed（4390文件）后，maintenance复用pipeline锁修复两个真实饱和父分区：moneyflow_dc发现外补115代码，共6024子任务；share_float5909子任务，父记录的4股票完整保留。两个父分区仍split_pending/universe_complete=false。事件recent/history各规划500项、planning:equity_event已validation_passed，证据validation/observed-fanout-recovery.json。只重启quantmind与专属acquire worker，专属documents未在本轮重启；全部三个容器running/healthy/OOM=false，两专属队列已恢复且各有真实活动任务。
+- Mac最终固定data-dcb1c3839a99d210ec466603811ce46d104daf60a941aaa7616aa5f810c029ce共70482文件校验通过（本轮再补2375）；T600018.SH/SHT600018与600018.SH/SH600018禁网分别读取，保留不同源身份，证据/tmp/tushare-historical-stock-identity-verified.json。运行汇总validation/supplement-events-runtime.json；余量核查305.97GiB，无须本轮扩盘。新批次处理中的快照不能用前一批状态时间冒充新吞吐。

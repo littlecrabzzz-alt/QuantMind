@@ -1,0 +1,7 @@
+# 7事件运行集成 ready
+- 分支 codex/tushare-other-markets，独立增量 4d9e81b7711588dfb1c2285ab721d9c6d892e0fc；父31d2cd0基线已pick为2864d98，勿重复pick基线。
+- 注册group equity_event；enable_equity_event显式启用；equity_event_apis/equity_event_history_start纳入规划签名；stocks依赖保持未验证，四类gap分别记录discovery/history/cap/revision；family ValueError隔离可恢复。
+- 六类preserve_distinct_rows以原始_row_identity加入自然键，同粗键不同内容保留，完全同源行重复观测去重；stk_holdernumber仍普通latest。缺失/空源身份拒绝读，读metadata明确distinct_supplier_rows。
+- mirror installer携带事件合同模块，store全合同fixture计数109。新增5集成测试覆盖7接口67字段、future解禁、null与0、原始source、as_of、固定release、权限拒绝/饱和不补造参数。
+- 38测试通过（event pipeline5、event contracts6、store6、supplement pipeline2、other pipeline8、partition closure11），ruff与diff检查通过；publish/manifest_at AST与基线完全相同。只临时目录与MockTransport，无生产访问。
+- 已知既有边界：structured planner会统一校验股票代码，坏stocks也可能阻止仅cn_cpi的structured规划；本增量没有改structured模块。事件坏API配置已验证独立structured/supplement继续；坏stock验证无stocks依赖的moneyflow_mkt_dc继续。

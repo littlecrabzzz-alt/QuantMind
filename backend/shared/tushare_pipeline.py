@@ -358,6 +358,11 @@ class Pipeline:
                         and re.fullmatch(r"[0-9]{5}(?:![A-Z]{0,8})?\.HK", value)
                     ):
                         row[key] = "HK" + value.removesuffix(".HK")
+                    elif re.fullmatch(r"T[0-9]{6}\.(SH|SZ|BJ)", value):
+                        # Opaque historical supplier identity; T must not collapse
+                        # into the ordinary numeric listing of the same exchange.
+                        symbol, exchange = value.rsplit(".", 1)
+                        row[key] = exchange + symbol
                     elif re.fullmatch(r"\d{6}\.(SH|SZ|BJ)", value):
                         row[key] = StockCodeUtil.to_prefix(value)
                     elif (
@@ -1018,7 +1023,7 @@ class Pipeline:
                     ),
                 )
 
-    def split_request(self, row, job):
+    def split_request(self, row, job, result=None):
         spec = contract_for(job["api_name"])
         params = job["params"]
         if spec.get("group") == "global" and spec.get("pagination"):
@@ -1026,7 +1031,14 @@ class Pipeline:
         existing = self.db.execute(
             "SELECT * FROM partition_splits WHERE parent_id=?", (row["id"],)
         ).fetchone()
-        if existing and existing["expected_children"]:
+        family = spec.get("saturation_fallback")
+        param = spec.get("saturation_param", "ts_code")
+        fanout = family and param not in params
+        if (
+            existing
+            and existing["expected_children"]
+            and not (existing["method"] == "identifier_fanout" and fanout)
+        ):
             return {
                 "method": existing["method"],
                 "children": existing["expected_children"],
@@ -1046,31 +1058,103 @@ class Pipeline:
                 {"origin": "v4", "date_coverage": "exhaustive"},
             )
             return {"method": "date_bisection", "children": len(ids)}
-        family = spec.get("saturation_fallback")
-        param = spec.get("saturation_param", "ts_code")
-        if family and param not in params:
-            codes = self.identifiers().get(family, [])
-            if codes:
-                ids = [
-                    self.enqueue(
-                        job["api_name"],
-                        {**params, param: code},
-                        row["priority"] + 1,
-                        row["epoch"],
+        if fanout:
+
+            def usable(code):
+                return (
+                    isinstance(code, str)
+                    and bool(code)
+                    and not any(
+                        char.isspace() or ord(char) < 32 or ord(char) == 127
+                        for char in code
                     )
-                    for code in codes
-                ]
-                self.record_partition(
-                    row["id"],
-                    ids,
-                    "identifier_fanout",
-                    False,
-                    {"origin": "v4", "family": family, "universe_complete": False},
                 )
+
+            discovered = {
+                code for code in self.identifiers().get(family, []) if usable(code)
+            }
+            saved = result if result is not None else json.loads(row["result"] or "{}")
+            observed = (
+                {
+                    record.get(param)
+                    for record in self.records(saved)
+                    if usable(record.get(param))
+                }
+                if saved.get("object_sha256")
+                else set()
+            )
+            codes = discovered | observed
+            previous_ids = {
+                child[0]
+                for child in self.db.execute(
+                    "SELECT child_id FROM partition_children WHERE parent_id=?",
+                    (row["id"],),
+                )
+            }
+            ids = previous_ids | {
+                self.enqueue(
+                    job["api_name"],
+                    {**params, param: code},
+                    row["priority"] + 1,
+                    row["epoch"],
+                )
+                for code in sorted(codes)
+            }
+            if ids:
+                evidence = (
+                    json.loads(existing["evidence"]) if existing else {"origin": "v4"}
+                )
+                evidence.update(family=family, universe_complete=False)
+                if saved.get("object_sha256"):
+                    evidence.update(
+                        parent_observed_code_count=len(observed),
+                        parent_observed_added_count=len(observed - discovered),
+                        parent_observation=saved.get("observation"),
+                    )
+                if existing:
+                    # Identifier discovery can grow. Append relationships instead of
+                    # replacing the immutable date partition contract in record_partition.
+                    for child in ids - previous_ids:
+                        cycle = self.db.execute(
+                            "WITH RECURSIVE descendants(id) AS (SELECT child_id FROM partition_children WHERE parent_id=? "
+                            "UNION SELECT c.child_id FROM partition_children c JOIN descendants d ON c.parent_id=d.id) "
+                            "SELECT 1 FROM descendants WHERE id=? LIMIT 1",
+                            (child, row["id"]),
+                        ).fetchone()
+                        if child == row["id"] or cycle:
+                            raise ValueError(
+                                "Partition relationship would create a cycle"
+                            )
+                    self.db.execute(
+                        "UPDATE partition_splits SET method='identifier_fanout',expected_children=?,coverage_proven=0,evidence=?,status='pending',gap=NULL WHERE parent_id=?",
+                        (len(ids), json.dumps(evidence, sort_keys=True), row["id"]),
+                    )
+                    self.db.executemany(
+                        "INSERT OR IGNORE INTO partition_children VALUES(?,?)",
+                        [(row["id"], child) for child in sorted(ids - previous_ids)],
+                    )
+                else:
+                    self.record_partition(
+                        row["id"], sorted(ids), "identifier_fanout", False, evidence
+                    )
+                # An unchanged re-entry must not erase a prior unresolved gap/status.
+                if (
+                    existing
+                    and ids == previous_ids
+                    and not existing["coverage_proven"]
+                    and existing["status"] != "resolved"
+                ):
+                    self.db.execute(
+                        "UPDATE partition_splits SET status=?,gap=? WHERE parent_id=?",
+                        (existing["status"], existing["gap"], row["id"]),
+                    )
                 return {
                     "method": "identifier_fanout",
                     "children": len(ids),
                     "universe_complete": False,
+                    "parent_observed_added_count": evidence.get(
+                        "parent_observed_added_count", 0
+                    ),
                 }
         return None
 
@@ -1368,7 +1452,7 @@ class Pipeline:
                 )
             if status == "possibly_truncated":
                 state = "blocked"
-                split = self.split_request(row, job)
+                split = self.split_request(row, job, result)
                 if split:
                     result["split"] = split
                     state = "split_pending"
