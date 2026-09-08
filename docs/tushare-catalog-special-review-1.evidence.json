@@ -1,0 +1,1514 @@
+{
+  "reviewed_at": "2026-09-08T21:03:57.833828+00:00",
+  "baseline_commit": "228db0d",
+  "ledger_sha256": "f2b4f70add642dee5a28c0af15ff926186294a15c57379547fb593a6a568346c",
+  "ledger_entry_count": 263,
+  "selection_rule": "first 10 entries in ledger order with api_names empty and status review_required",
+  "selected_doc_ids": [
+    "14",
+    "24",
+    "15",
+    "146",
+    "109",
+    "16",
+    "17",
+    "291",
+    "330",
+    "342"
+  ],
+  "review": [
+    {
+      "doc_id": "14",
+      "html_sha256": "182240e4826c7e65a6b63ef83efdc4e14b7b3589a6249ed54cd36ac66c937dce",
+      "children": [
+        {
+          "doc_id": "24",
+          "text": "基础数据",
+          "in_ledger": true,
+          "ledger_api_names": [],
+          "ledger_status": "review_required"
+        },
+        {
+          "doc_id": "15",
+          "text": "行情数据",
+          "in_ledger": true,
+          "ledger_api_names": [],
+          "ledger_status": "review_required"
+        },
+        {
+          "doc_id": "16",
+          "text": "财务数据",
+          "in_ledger": true,
+          "ledger_api_names": [],
+          "ledger_status": "review_required"
+        },
+        {
+          "doc_id": "17",
+          "text": "参考数据",
+          "in_ledger": true,
+          "ledger_api_names": [],
+          "ledger_status": "review_required"
+        },
+        {
+          "doc_id": "291",
+          "text": "特色数据",
+          "in_ledger": true,
+          "ledger_api_names": [],
+          "ledger_status": "review_required"
+        },
+        {
+          "doc_id": "330",
+          "text": "两融及转融通",
+          "in_ledger": true,
+          "ledger_api_names": [],
+          "ledger_status": "review_required"
+        },
+        {
+          "doc_id": "342",
+          "text": "资金流向数据",
+          "in_ledger": true,
+          "ledger_api_names": [],
+          "ledger_status": "review_required"
+        },
+        {
+          "doc_id": "346",
+          "text": "打板专题数据",
+          "in_ledger": true,
+          "ledger_api_names": [],
+          "ledger_status": "review_required"
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "25",
+          "text": "股票基础列表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stock_basic"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "112",
+          "text": "上市公司信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stock_company"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "26",
+          "text": "各交易所交易日历",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "trade_cal"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "104",
+          "text": "沪深股通成份股",
+          "in_ledger": false,
+          "ledger_api_names": [],
+          "ledger_status": null
+        },
+        {
+          "doc_id": "100",
+          "text": "股票曾用名",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "namechange"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "123",
+          "text": "IPO新股列表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "new_share"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "27",
+          "text": "日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "daily"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "109",
+          "text": "中高频的分钟行情",
+          "in_ledger": true,
+          "ledger_api_names": [],
+          "ledger_status": "review_required"
+        },
+        {
+          "doc_id": "170",
+          "text": "大单成交数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "moneyflow"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "28",
+          "text": "复权因子",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "adj_factor"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "31",
+          "text": "停复牌信息",
+          "in_ledger": false,
+          "ledger_api_names": [],
+          "ledger_status": null
+        },
+        {
+          "doc_id": "32",
+          "text": "每日行情指标",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "daily_basic"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "33",
+          "text": "利润表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "income"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "36",
+          "text": "资产负债表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "balancesheet"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "44",
+          "text": "现金流量表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cashflow"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "45",
+          "text": "业绩预告",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "forecast"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "46",
+          "text": "业绩快报",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "express"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "103",
+          "text": "分红送股",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "dividend"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "79",
+          "text": "财务指标数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fina_indicator"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "80",
+          "text": "财务审计意见",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fina_audit"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "81",
+          "text": "主营业务构成",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fina_mainbz"
+          ],
+          "ledger_status": "planned"
+        }
+      ],
+      "missing_body_ids": [
+        "104",
+        "31"
+      ],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "24",
+      "html_sha256": "e45d1c1e07013fc851113eced99b8af8df2688d01d99c5a2fc32504958663057",
+      "children": [
+        {
+          "doc_id": "25",
+          "text": "股票列表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stock_basic"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "329",
+          "text": "每日股本（盘前）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_premarket"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "26",
+          "text": "交易日历",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "trade_cal"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "397",
+          "text": "ST股票列表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stock_st"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "423",
+          "text": "ST风险警示板股票",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "st"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "398",
+          "text": "沪深港通股票列表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stock_hsgt"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "100",
+          "text": "股票曾用名",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "namechange"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "112",
+          "text": "上市公司基本信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stock_company"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "193",
+          "text": "上市公司管理层",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_managers"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "194",
+          "text": "管理层薪酬和持股",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_rewards"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "375",
+          "text": "北交所新旧代码对照",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "bse_mapping"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "123",
+          "text": "IPO新股上市",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "new_share"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "262",
+          "text": "股票历史列表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "bak_basic"
+          ],
+          "ledger_status": "planned"
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "25",
+          "text": "股票列表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stock_basic"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "26",
+          "text": "各交易所交易日历",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "trade_cal"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "104",
+          "text": "沪深股通成份股",
+          "in_ledger": false,
+          "ledger_api_names": [],
+          "ledger_status": null
+        },
+        {
+          "doc_id": "100",
+          "text": "股票曾用名",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "namechange"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "112",
+          "text": "上市公司基本信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stock_company"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "123",
+          "text": "IPO新股列表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "new_share"
+          ],
+          "ledger_status": "planned"
+        }
+      ],
+      "missing_body_ids": [
+        "104"
+      ],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "15",
+      "html_sha256": "53c69722c6acd6cc5c574b89e72a3254157cad250ecb731faf81c3688850bb8a",
+      "children": [
+        {
+          "doc_id": "27",
+          "text": "历史日线",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "daily"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "370",
+          "text": "历史分钟",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_mins"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "144",
+          "text": "周线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "weekly"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "145",
+          "text": "月线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "monthly"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "146",
+          "text": "复权行情",
+          "in_ledger": true,
+          "ledger_api_names": [],
+          "ledger_status": "review_required"
+        },
+        {
+          "doc_id": "336",
+          "text": "周/月线行情(每日更新)",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_weekly_monthly"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "365",
+          "text": "周/月线复权行情(每日更新)",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_week_month_adj"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "28",
+          "text": "复权因子",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "adj_factor"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "32",
+          "text": "每日指标",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "daily_basic"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "109",
+          "text": "通用行情接口",
+          "in_ledger": true,
+          "ledger_api_names": [],
+          "ledger_status": "review_required"
+        },
+        {
+          "doc_id": "183",
+          "text": "每日涨跌停价格",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_limit"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "214",
+          "text": "每日停复牌信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "suspend_d"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "48",
+          "text": "沪深股通十大成交股",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hsgt_top10"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "255",
+          "text": "备用行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "bak_daily"
+          ],
+          "ledger_status": "planned"
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "109",
+          "text": "通用行情接口",
+          "in_ledger": true,
+          "ledger_api_names": [],
+          "ledger_status": "review_required"
+        },
+        {
+          "doc_id": "27",
+          "text": "日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "daily"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "144",
+          "text": "周线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "weekly"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "145",
+          "text": "月线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "monthly"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "146",
+          "text": "复权行情",
+          "in_ledger": true,
+          "ledger_api_names": [],
+          "ledger_status": "review_required"
+        },
+        {
+          "doc_id": "28",
+          "text": "复权因子",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "adj_factor"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "31",
+          "text": "停复牌信息",
+          "in_ledger": false,
+          "ledger_api_names": [],
+          "ledger_status": null
+        },
+        {
+          "doc_id": "32",
+          "text": "每日行情指标",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "daily_basic"
+          ],
+          "ledger_status": "implementing"
+        }
+      ],
+      "missing_body_ids": [
+        "31"
+      ],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "146",
+      "html_sha256": "dc139e26a4460225cdaedc134495627bdd0bdeb112f91a8e4e64b7703ab927cf",
+      "children": [],
+      "body_links": [
+        {
+          "doc_id": "109",
+          "text": "通用行情接口",
+          "in_ledger": true,
+          "ledger_api_names": [],
+          "ledger_status": "review_required"
+        },
+        {
+          "doc_id": "28",
+          "text": "复权因子",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "adj_factor"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "328",
+          "text": "股票技术因子接口",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_factor_pro"
+          ],
+          "ledger_status": "planned"
+        }
+      ],
+      "missing_body_ids": [],
+      "classification": "sdk_derived",
+      "api_candidates": [
+        "pro_bar"
+      ],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "109",
+      "html_sha256": "f5dc778655ba71657b4d06f11b2d2dedd8ef03db79829a5e1df12c7c19ce3598",
+      "children": [],
+      "body_links": [
+        {
+          "doc_id": "122",
+          "text": "常见问题列表",
+          "in_ledger": false,
+          "ledger_api_names": [],
+          "ledger_status": null
+        },
+        {
+          "doc_id": "290",
+          "text": "权限列表说明",
+          "in_ledger": false,
+          "ledger_api_names": [],
+          "ledger_status": null
+        },
+        {
+          "doc_id": "234",
+          "text": "股票分钟使用方法",
+          "in_ledger": false,
+          "ledger_api_names": [],
+          "ledger_status": null
+        },
+        {
+          "doc_id": "27",
+          "text": "https://tushare.pro/document/2?doc_id=27",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "daily"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "127",
+          "text": "https://tushare.pro/document/2?doc_id=127",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fund_daily"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "138",
+          "text": "https://tushare.pro/document/2?doc_id=138",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fut_daily"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "159",
+          "text": "https://tushare.pro/document/2?doc_id=159",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "opt_daily"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "95",
+          "text": "https://tushare.pro/document/2?doc_id=95",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "index_daily"
+          ],
+          "ledger_status": "implementing"
+        }
+      ],
+      "missing_body_ids": [
+        "122",
+        "290",
+        "234"
+      ],
+      "classification": "sdk_derived",
+      "api_candidates": [
+        "pro_bar"
+      ],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "16",
+      "html_sha256": "9b2262dc1faae5dc98865fd0b53bd504d06e9cfc099931ee6a1580553997210d",
+      "children": [
+        {
+          "doc_id": "33",
+          "text": "利润表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "income"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "36",
+          "text": "资产负债表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "balancesheet"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "44",
+          "text": "现金流量表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cashflow"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "45",
+          "text": "业绩预告",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "forecast"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "46",
+          "text": "业绩快报",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "express"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "103",
+          "text": "分红送股数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "dividend"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "79",
+          "text": "财务指标数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fina_indicator"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "80",
+          "text": "财务审计意见",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fina_audit"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "81",
+          "text": "主营业务构成",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "fina_mainbz"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "162",
+          "text": "财报披露日期表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "disclosure_date"
+          ],
+          "ledger_status": "planned"
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "33",
+          "text": "利润表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "income"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "36",
+          "text": "资产负债表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "balancesheet"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "44",
+          "text": "现金流量表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cashflow"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "45",
+          "text": "业绩预告",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "forecast"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "46",
+          "text": "业绩快报",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "express"
+          ],
+          "ledger_status": "ingested_partial"
+        }
+      ],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "17",
+      "html_sha256": "5ab828c050db1aa7b121511ee35703878ea3d294e18760a7c56b7cdeac4594e5",
+      "children": [
+        {
+          "doc_id": "451",
+          "text": "个股异常波动",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_shock"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "452",
+          "text": "个股严重异常波动",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_high_shock"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "453",
+          "text": "交易所重点提示证券",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_alert"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "61",
+          "text": "前十大股东",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "top10_holders"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "62",
+          "text": "前十大流通股东",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "top10_floatholders"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "110",
+          "text": "股权质押统计数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "pledge_stat"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "111",
+          "text": "股权质押明细数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "pledge_detail"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "124",
+          "text": "股票回购",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "repurchase"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "160",
+          "text": "限售股解禁",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "share_float"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "161",
+          "text": "大宗交易",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "block_trade"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "164",
+          "text": "股票开户数据（停）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_account"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "165",
+          "text": "股票开户数据（旧）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_account_old"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "166",
+          "text": "股东人数",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_holdernumber"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "175",
+          "text": "股东增减持",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_holdertrade"
+          ],
+          "ledger_status": "ingested_partial"
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "47",
+          "text": "沪深港通资金流向",
+          "in_ledger": false,
+          "ledger_api_names": [],
+          "ledger_status": null
+        },
+        {
+          "doc_id": "48",
+          "text": "沪深股通十大成交股",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hsgt_top10"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "49",
+          "text": "港股通十大成交股",
+          "in_ledger": false,
+          "ledger_api_names": [],
+          "ledger_status": null
+        },
+        {
+          "doc_id": "58",
+          "text": "融资融券交易汇总",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "margin"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "59",
+          "text": "融资融券交易明细",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "margin_detail"
+          ],
+          "ledger_status": "planned"
+        }
+      ],
+      "missing_body_ids": [
+        "47",
+        "49"
+      ],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "291",
+      "html_sha256": "a60df90321155e183443b3f700b04dced6c10c211d56ddd9d06160aaf024a1d1",
+      "children": [
+        {
+          "doc_id": "292",
+          "text": "券商盈利预测数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "report_rc"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "293",
+          "text": "每日筹码及胜率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cyq_perf"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "294",
+          "text": "每日筹码分布",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cyq_chips"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "296",
+          "text": "股票技术面因子",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_factor"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "328",
+          "text": "股票技术面因子(专业版）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_factor_pro"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "353",
+          "text": "股票开盘集合竞价数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_auction_o"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "354",
+          "text": "股票收盘集合竞价数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_auction_c"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "364",
+          "text": "神奇九转指标",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_nineturn"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "399",
+          "text": "AH股比价",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_ah_comparison"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "275",
+          "text": "机构调研数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "stk_surv"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "267",
+          "text": "券商月度金股",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "broker_recommend"
+          ],
+          "ledger_status": "planned"
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "292",
+          "text": "券商（卖方）盈利预测数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "report_rc"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "293",
+          "text": "股票每日筹码成本和胜率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cyq_perf"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "294",
+          "text": "股票每日筹码分布",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cyq_chips"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "267",
+          "text": "券商金股数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "broker_recommend"
+          ],
+          "ledger_status": "planned"
+        }
+      ],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "330",
+      "html_sha256": "8379f56cdcc02c05d998633c1ca71d47ad97262546f70299e79ac0923dda584a",
+      "children": [
+        {
+          "doc_id": "58",
+          "text": "融资融券交易汇总",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "margin"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "59",
+          "text": "融资融券交易明细",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "margin_detail"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "326",
+          "text": "融资融券标的（盘前）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "margin_secs"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "332",
+          "text": "转融券交易汇总(停）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "slb_sec"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "331",
+          "text": "转融资交易汇总",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "slb_len"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "333",
+          "text": "转融券交易明细(停）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "slb_sec_detail"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "334",
+          "text": "做市借券交易汇总(停）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "slb_len_mm"
+          ],
+          "ledger_status": "planned"
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "342",
+      "html_sha256": "6671bb46ab74b7ae2084dc3a146edddffdd5407f0d61c9a1e043ff5a749fbf84",
+      "children": [
+        {
+          "doc_id": "170",
+          "text": "个股资金流向",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "moneyflow"
+          ],
+          "ledger_status": "implementing"
+        },
+        {
+          "doc_id": "348",
+          "text": "个股资金流向（THS）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "moneyflow_ths"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "349",
+          "text": "个股资金流向（DC）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "moneyflow_dc"
+          ],
+          "ledger_status": "ingested_partial"
+        },
+        {
+          "doc_id": "371",
+          "text": "板块资金流向（THS)",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "moneyflow_cnt_ths"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "343",
+          "text": "行业资金流向（THS）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "moneyflow_ind_ths"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "344",
+          "text": "板块资金流向（DC）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "moneyflow_ind_dc"
+          ],
+          "ledger_status": "planned"
+        },
+        {
+          "doc_id": "345",
+          "text": "大盘资金流向（DC）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "moneyflow_mkt_dc"
+          ],
+          "ledger_status": "ingested_partial"
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    }
+  ],
+  "linked_evidence": [
+    {
+      "doc_id": "104",
+      "url": "https://tushare.pro/document/2?doc_id=104",
+      "bytes": 23,
+      "sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "in_ledger": false,
+      "content_status": "document_missing_http_200",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "31",
+      "url": "https://tushare.pro/document/2?doc_id=31",
+      "bytes": 23,
+      "sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "in_ledger": false,
+      "content_status": "document_missing_http_200",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "47",
+      "url": "https://tushare.pro/document/2?doc_id=47",
+      "bytes": 23,
+      "sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "in_ledger": false,
+      "content_status": "document_missing_http_200",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "49",
+      "url": "https://tushare.pro/document/2?doc_id=49",
+      "bytes": 23,
+      "sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "in_ledger": false,
+      "content_status": "document_missing_http_200",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "122",
+      "url": "https://tushare.pro/document/2?doc_id=122",
+      "bytes": 36313,
+      "sha256": "a94d946270a0128ba3aa2538c032798febb1f1205e6f64511b489d26d9701b23",
+      "in_ledger": false,
+      "content_status": "document_present",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "234",
+      "url": "https://tushare.pro/document/2?doc_id=234",
+      "bytes": 61355,
+      "sha256": "eb57a4e7ad5a22bf081c269ef0e99d7bc63e5e4febec00202032cbd35020f714",
+      "in_ledger": false,
+      "content_status": "document_present",
+      "api_candidates": [
+        "pro_bar"
+      ],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "290",
+      "url": "https://tushare.pro/document/2?doc_id=290",
+      "bytes": 39276,
+      "sha256": "18e4557232524672da08f47d89eef2a384919103de24680c37021e9641000d80",
+      "in_ledger": false,
+      "content_status": "document_present",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "372",
+      "url": "https://tushare.pro/document/2?doc_id=372",
+      "bytes": 35548,
+      "sha256": "58905ec12e31c14a168bb781892ee3c89547d879252ac9ebbaad1062bb755912",
+      "in_ledger": false,
+      "content_status": "document_present",
+      "api_candidates": [
+        "rt_k"
+      ],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "400",
+      "url": "https://tushare.pro/document/2?doc_id=400",
+      "bytes": 34910,
+      "sha256": "4395c969142c0818405e4ce17fea6a1bbefde370a287edfa52c05253b5e5c478",
+      "in_ledger": false,
+      "content_status": "document_present",
+      "api_candidates": [
+        "rt_etf_k"
+      ],
+      "permission_status": "unverified"
+    }
+  ],
+  "second_hop_edges": [
+    {
+      "from": "290",
+      "to": "372"
+    },
+    {
+      "from": "290",
+      "to": "400"
+    }
+  ],
+  "scope_limit": "Does not claim recursive whole-site closure or runtime permission verification; no data API calls."
+}
