@@ -74,7 +74,11 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
           }
         }
       } catch (err) {
-        if (!stopped) setError(errorText(err));
+        if (!stopped) {
+          node.current = null; scope.current = null; selectedId.current = null;
+          setCap(null); setRuns([]); setSelected(null); setPending(null);
+          setError(errorText(err));
+        }
       } finally {
         if (!stopped) timer = setTimeout(poll, 3000);
       }
