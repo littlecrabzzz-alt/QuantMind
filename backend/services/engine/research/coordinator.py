@@ -238,7 +238,7 @@ def finish(case_dir, state, row):
         m = exp.get("result", {}).get("summary", {}).get("comparison", {}).get("model")
         lines.append(f"|{exp['id']}|{exp['proposal']['kind']}|{m['total_return']:.4%}|{m['max_drawdown']:.4%}|已核验|" if m else
                      f"|{exp['id']}|{exp['proposal']['kind']}|—|—|失败，证据保留|")
-    lines += ["", "## 模型选择说明（解释，不代表数值已被模型核验）", "", json.dumps(state["selection"], ensure_ascii=False, indent=2)]
+    lines += ["", "## 模型选择记录（压力验证前生成；实际完成情况以上表为准）", "", json.dumps(state["selection"], ensure_ascii=False, indent=2)]
     (case_dir / "REPORT.md").write_text("\n".join(lines)+"\n")
     state["report_sha256"] = runtime.frozen.sha256(case_dir / "REPORT.md")
     state["research_status"] = "needs_independent_validation"
