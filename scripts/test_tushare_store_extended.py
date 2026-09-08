@@ -199,7 +199,7 @@ class FixedStore(unittest.TestCase):
             with self.subTest(api=api):
                 self.assertEqual(store.read_dataset(self.root, pinned, api).num_rows, 1)
         self.assertEqual(store.read_dataset(self.root, pinned, "income").num_rows, 1)
-        self.assertEqual(len(fixtures), 129)
+        self.assertEqual(len(fixtures), 131)
 
     def test_dates_codes_and_macro_periods(self):
         pinned = release(
