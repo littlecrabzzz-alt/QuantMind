@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 from datetime import datetime, timezone
@@ -136,7 +137,9 @@ def parse_document(html, doc_id, title):
     }
 
 
-def assess_response(payload, row_cap, required_fields, nullable_fields=()):
+def assess_response(
+    payload, row_cap, required_fields, nullable_fields=(), positive_fields=()
+):
     """A successful sample never certifies the completeness of its history."""
     if not isinstance(payload, dict):
         return {"status": "invalid_response"}
@@ -164,11 +167,26 @@ def assess_response(payload, row_cap, required_fields, nullable_fields=()):
         for f in required_fields
         if f in fields
     }
+    invalid = {}
+    for field in positive_fields:
+        if field in fields:
+            index = fields.index(field)
+            invalid[field] = sum(
+                not (
+                    isinstance(row[index], (int, float))
+                    and not isinstance(row[index], bool)
+                    and math.isfinite(row[index])
+                    and row[index] > 0
+                )
+                for row in items
+            )
     status = "sample_ok"
     if not items:
         status = "empty_unverified"
     elif missing or any(n for f, n in nulls.items() if f not in nullable_fields):
         status = "schema_gap"
+    elif any(invalid.values()):
+        status = "invalid_values"
     # Reaching the documented cap (or conservative threshold) stays unresolved.
     if len(items) >= row_cap:
         status = "possibly_truncated"
@@ -177,6 +195,7 @@ def assess_response(payload, row_cap, required_fields, nullable_fields=()):
         "row_count": len(items),
         "missing_fields": missing,
         "null_counts": nulls,
+        "invalid_positive_counts": invalid,
         "history_complete": False,
         "pit_verified": False,
     }
@@ -204,6 +223,7 @@ def capture_sample(client, token, job, root: Path):
             job["row_cap"],
             job["required_fields"],
             job.get("nullable_fields", ()),
+            job.get("positive_fields", ()),
         )
     except httpx.HTTPError as exc:
         # Do not serialize exception messages/request bodies (could contain token).
@@ -284,3 +304,39 @@ def verify_release(root: Path, release_id: str):
         "unarchived_requests": len(results) - verified,
         "rrg_status": "blocked_data",
     }
+
+
+def read_samples(root: Path, release_id: str, api_name: str):
+    """Read a fixed release without credentials, refresh, or upstream fallback.
+
+    Observations stay separate: current/historical members and ETF listing states
+    must not be silently merged. Raw supplier codes, units and fields survive.
+    """
+    verify_release(root, release_id)
+    manifest = json.loads(
+        (root / "releases" / release_id / "manifest.json").read_bytes()
+    )
+    samples = []
+    for result in manifest["results"]:
+        if result["api_name"] != api_name:
+            continue
+        if "observation" not in result:
+            samples.append({"assessment": result, "data": None})
+            continue
+        observed = json.loads(
+            (root / "observations" / result["observation"]).read_bytes()
+        )
+        payload = json.loads(
+            (root / "objects" / (result["object_sha256"] + ".json")).read_bytes()
+        )
+        samples.append(
+            {
+                "request": observed["request"],
+                "fetched_at": observed["fetched_at"],
+                "assessment": observed["assessment"],
+                "data": payload.get("data") if isinstance(payload, dict) else None,
+            }
+        )
+    if not samples:
+        raise ValueError("Dataset absent from selected release; no upstream fallback")
+    return samples

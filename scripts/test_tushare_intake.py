@@ -4,6 +4,7 @@ import json
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 import httpx
@@ -15,6 +16,7 @@ from backend.shared.tushare_intake import (
     capture_sample,
     json_bytes,
     parse_document,
+    read_samples,
     verify_release,
 )
 from scripts.tushare_intake import probe_jobs
@@ -63,6 +65,18 @@ class IntakeAcceptance(unittest.TestCase):
         self.assertEqual(result["output_fields"], ["title", "content"])
 
     def test_schema_cap_empty_and_permission_are_distinct(self):
+        price_check = assess_response(
+            {
+                "code": 0,
+                "data": {"fields": ["open"], "items": [[0], [-1], [float("nan")]]},
+            },
+            4000,
+            ["open"],
+            positive_fields=["open"],
+        )
+        self.assertEqual(price_check["status"], "invalid_values")
+        self.assertEqual(price_check["invalid_positive_counts"], {"open": 3})
+
         def assess(items, fields=("open",), cap=2, required=("open",), nullable=()):
             return assess_response(
                 {"code": 0, "data": {"fields": list(fields), "items": items}},
@@ -150,6 +164,21 @@ class IntakeAcceptance(unittest.TestCase):
                 json_bytes({"results": results})
             )
             self.assertEqual(verify_release(root, release)["observations"], 3)
+            with (
+                patch(
+                    "socket.socket.connect",
+                    side_effect=AssertionError("network forbidden"),
+                ),
+                patch(
+                    "backend.shared.runtime_secrets.get_secret",
+                    side_effect=AssertionError("secret forbidden"),
+                ),
+            ):
+                samples = read_samples(root, release, "ci_daily")
+                self.assertEqual(len(samples), 3)
+                self.assertEqual(samples[0]["data"]["items"], [[1, "extra"]])
+                with self.assertRaises(ValueError):
+                    read_samples(root, release, "missing_dataset")
             obj = root / "objects" / (results[0]["object_sha256"] + ".json")
             obj.write_text("corrupted")
             with self.assertRaises(ValueError):

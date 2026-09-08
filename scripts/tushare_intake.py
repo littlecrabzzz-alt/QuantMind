@@ -26,6 +26,7 @@ from backend.shared.tushare_intake import (
     capture_sample,
     digest,
     parse_document,
+    read_samples,
     utc_now,
     verify_release,
 )
@@ -156,7 +157,14 @@ def probe_jobs(catalog, date, fund=None, period=None):
                 if api in {"trade_cal", "fund_portfolio"}
                 else "official_documentation",
                 "required_fields": required,
-                "nullable_fields": ["out_date"] if api == "ci_index_member" else [],
+                "nullable_fields": ["out_date"]
+                if api == "ci_index_member"
+                else ["list_date"]
+                if api == "etf_basic" and params.get("list_status") == "P"
+                else [],
+                "positive_fields": [
+                    f for f in ("open", "close", "adj_factor") if f in required
+                ],
                 "source_docs": [e["url"] for e in docs],
             }
         )
@@ -182,12 +190,22 @@ def main():
     verify = commands.add_parser("verify")
     verify.add_argument("--root", type=Path, required=True)
     verify.add_argument("--release-id", required=True)
+    read = commands.add_parser("read")
+    read.add_argument("--root", type=Path, required=True)
+    read.add_argument("--release-id", required=True)
+    read.add_argument("--api-name", required=True)
+    read.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.command == "catalog":
         print(json.dumps(refresh_catalog(args.output), ensure_ascii=False))
         return 0
     if args.command == "verify":
         print(json.dumps(verify_release(args.root, args.release_id)))
+        return 0
+    if args.command == "read":
+        samples = read_samples(args.root, args.release_id, args.api_name)
+        write_json(args.output, {"release_id": args.release_id, "samples": samples})
+        print(json.dumps({"status": "read_from_storage", "observations": len(samples)}))
         return 0
     catalog_bytes = args.catalog.read_bytes()
     jobs = probe_jobs(json.loads(catalog_bytes), args.date, args.fund, args.period)
