@@ -316,13 +316,40 @@ class Pipeline:
         observed = json.loads(
             (self.root / "observations" / result["observation"]).read_bytes()
         )
+        identity_fields = contract_for(result["api_name"]).get(
+            "request_identity_fields", []
+        )
+        if not isinstance(identity_fields, (list, tuple)) or any(
+            not isinstance(field, str)
+            or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", field)
+            for field in identity_fields
+        ):
+            raise ValueError("Invalid contract request identity fields")
+        request = observed.get("request")
+        params = request.get("params", {}) if isinstance(request, dict) else {}
+        params = params if isinstance(params, dict) else {}
+        request_identity = {field: params.get(field) for field in identity_fields}
+        missing = [
+            field
+            for field in identity_fields
+            if params.get(field) is None or params.get(field) == ""
+        ]
+        request_json = json_bytes(request_identity).decode("utf-8")
         for row in rows:
-            row["_row_identity"] = digest(json_bytes(row))
+            raw_identity = digest(json_bytes(row))
+            row["_row_identity"] = raw_identity
+            if identity_fields:
+                row["_raw_row_identity"] = raw_identity
+                row["_request_identity"] = request_json
+                row["_request_identity_status"] = (
+                    "incomplete" if missing else "complete"
+                )
+                row["_request_identity_missing"] = json_bytes(missing).decode("utf-8")
+                row["_row_identity"] = digest(
+                    (raw_identity + "\n" + request_json).encode("utf-8")
+                )
             row["_source"] = (
-                observed["request"]["params"].get("src")
-                or row.get("src")
-                or row.get("src_site")
-                or ""
+                params.get("src") or row.get("src") or row.get("src_site") or ""
             )
             row["_api_name"] = result["api_name"]
             for key in (

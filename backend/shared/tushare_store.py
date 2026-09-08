@@ -164,7 +164,204 @@ def _dataset(root, release_id, api_name):
         keys = list(KEYS[api_name])
         if not set(keys + ["_fetched_at", "_observation"]).issubset(columns):
             raise ValueError("Stored dataset lacks natural-key or observation fields")
-        distinct_rows = CONTRACTS.get(api_name, {}).get("preserve_distinct_rows", False)
+        spec = CONTRACTS.get(api_name, {})
+        identity_fields = spec.get("request_identity_fields", [])
+        identity_observations = 0
+        if not isinstance(identity_fields, (list, tuple)) or any(
+            not isinstance(field, str)
+            or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", field)
+            for field in identity_fields
+        ):
+            raise ValueError("Invalid contract request identity fields")
+        if identity_fields:
+            # Verify immutable request provenance, including for legacy Parquet
+            # that hashed only the raw payload. This is a query-local projection;
+            # no old partitions or observation files are rewritten.
+            if "_row_identity" not in columns:
+                raise ValueError("Request identity gap: missing raw row identity")
+            db.execute(
+                "CREATE TEMP TABLE request_identity_map(observation VARCHAR PRIMARY KEY, identity_json VARCHAR)"
+            )
+            observations = relation.project('"_observation"').distinct().fetchall()
+            for (observation,) in observations:
+                if not isinstance(observation, str) or not re.fullmatch(
+                    r"[a-f0-9]{32,64}\.json", observation
+                ):
+                    raise ValueError(
+                        "Request identity gap: invalid observation reference"
+                    )
+                name = "observations/" + observation
+                expected = manifest["files"].get(name)
+                if not isinstance(expected, dict):
+                    raise ValueError(
+                        "Request identity gap: observation outside fixed release"
+                    )
+                path = root / name
+                if (
+                    path.is_symlink()
+                    or path.parent.is_symlink()
+                    or path.resolve().parent != root / "observations"
+                ):
+                    raise ValueError("Request identity gap: unsafe observation path")
+                try:
+                    raw = path.read_bytes()
+                except OSError as exc:
+                    raise ValueError(
+                        "Request identity gap: observation unavailable"
+                    ) from exc
+                if len(raw) != expected.get("bytes") or hashlib.sha256(
+                    raw
+                ).hexdigest() != expected.get("sha256"):
+                    raise ValueError(
+                        "Request identity gap: observation checksum mismatch"
+                    )
+                observed = json.loads(raw)
+                request = (
+                    observed.get("request") if isinstance(observed, dict) else None
+                )
+                if (
+                    not isinstance(request, dict)
+                    or request.get("api_name") not in aliases
+                ):
+                    raise ValueError("Request identity gap: observation API mismatch")
+                params = request.get("params")
+                if not isinstance(params, dict):
+                    raise ValueError(
+                        "Request identity gap: request parameters unavailable"
+                    )
+                missing = [
+                    field
+                    for field in identity_fields
+                    if params.get(field) is None or params.get(field) == ""
+                ]
+                if missing:
+                    raise ValueError(
+                        "Request identity gap: missing request fields "
+                        + ",".join(missing)
+                    )
+                identity_json = json.dumps(
+                    {field: params[field] for field in identity_fields},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+                db.execute(
+                    "INSERT INTO request_identity_map VALUES (?,?)",
+                    [observation, identity_json],
+                )
+                identity_observations += 1
+            relation.create_view("request_identity_source")
+            raw_identity = 's."_row_identity"'
+            if "_raw_row_identity" in columns:
+                # Null generated fields on union_by_name legacy rows identify the
+                # old payload-hash protocol. A partially populated modern row is
+                # not silently reinterpreted as that legacy protocol.
+                legacy = (
+                    " AND ".join(
+                        "s." + _identifier(field, columns) + " IS NULL"
+                        for field in (
+                            "_request_identity",
+                            "_request_identity_status",
+                            "_request_identity_missing",
+                        )
+                        if field in columns
+                    )
+                    or "TRUE"
+                )
+                raw_identity = (
+                    'CASE WHEN s."_raw_row_identity" IS NOT NULL THEN s."_raw_row_identity" WHEN '
+                    + legacy
+                    + ' THEN s."_row_identity" ELSE NULL END'
+                )
+            if db.execute(
+                "SELECT 1 FROM request_identity_source s WHERE "
+                + raw_identity
+                + " IS NULL OR NOT regexp_full_match(CAST("
+                + raw_identity
+                + " AS VARCHAR), '[a-f0-9]{64}') LIMIT 1"
+            ).fetchone():
+                raise ValueError(
+                    "Request identity gap: missing or malformed raw row hash"
+                )
+            modern_fields = (
+                "_request_identity",
+                "_request_identity_status",
+                "_request_identity_missing",
+            )
+            if "_raw_row_identity" not in columns:
+                populated = " OR ".join(
+                    _identifier(field, columns) + " IS NOT NULL"
+                    for field in modern_fields
+                    if field in columns
+                )
+                if populated and relation.filter(populated).limit(1).fetchone():
+                    raise ValueError(
+                        "Request identity gap: modern row lacks raw payload hash"
+                    )
+            elif not all(field in columns for field in modern_fields):
+                if (
+                    relation.filter('"_raw_row_identity" IS NOT NULL')
+                    .limit(1)
+                    .fetchone()
+                ):
+                    raise ValueError("Request identity gap: partial modern provenance")
+            else:
+                incomplete = " OR ".join(
+                    "s." + _identifier(field, columns) + " IS NULL"
+                    for field in modern_fields
+                )
+                inconsistent = (
+                    "(s._raw_row_identity IS NOT NULL AND ("
+                    + incomplete
+                    + " OR s._row_identity IS NULL OR s._row_identity <> sha256(CAST(s._raw_row_identity AS VARCHAR) || chr(10) || m.identity_json) OR s._request_identity_missing <> '[]'))"
+                )
+                if db.execute(
+                    "SELECT 1 FROM request_identity_source s JOIN request_identity_map m ON s._observation=m.observation WHERE "
+                    + inconsistent
+                    + " LIMIT 1"
+                ).fetchone():
+                    raise ValueError(
+                        "Request identity gap: partial or inconsistent modern provenance"
+                    )
+            if "_request_identity" in columns:
+                invalid = 's."_request_identity" IS NOT NULL AND s."_request_identity" <> m.identity_json'
+                if "_request_identity_status" in columns:
+                    invalid += " OR (s._request_identity_status IS NOT NULL AND s._request_identity_status <> 'complete')"
+                if db.execute(
+                    "SELECT 1 FROM request_identity_source s JOIN request_identity_map m ON s._observation=m.observation WHERE "
+                    + invalid
+                    + " LIMIT 1"
+                ).fetchone():
+                    raise ValueError(
+                        "Request identity gap: stored provenance conflicts with observation"
+                    )
+            derived = {
+                "_raw_row_identity",
+                "_row_identity",
+                "_request_identity",
+                "_request_identity_status",
+                "_request_identity_missing",
+            }
+            preserved = [
+                "s." + _identifier(field, columns)
+                for field in columns
+                if field not in derived
+            ]
+            relation = db.sql(
+                "SELECT "
+                + ",".join(preserved)
+                + ","
+                + raw_identity
+                + ' AS "_raw_row_identity", '
+                + "sha256(CAST("
+                + raw_identity
+                + ' AS VARCHAR) || chr(10) || m.identity_json) AS "_row_identity", '
+                + "m.identity_json AS _request_identity, 'complete' AS _request_identity_status, '[]' AS _request_identity_missing "
+                + 'FROM request_identity_source s JOIN request_identity_map m ON s."_observation"=m.observation'
+            )
+            columns = relation.columns
+        distinct_rows = bool(
+            spec.get("preserve_distinct_rows", False) or identity_fields
+        )
         if distinct_rows:
             if "_row_identity" not in columns:
                 raise ValueError("Stored event dataset lacks source row identity")
@@ -209,6 +406,13 @@ def _dataset(root, release_id, api_name):
         relation.create_view("stored")
         metadata = _metadata(manifest, release_id, api_name, aliases)
         metadata["source_api_names"] = sorted(source_apis)
+        if identity_fields:
+            metadata["request_identity_fields"] = list(identity_fields)
+            metadata["request_identity_status"] = "verified_from_immutable_observations"
+            metadata["request_identity_observations"] = identity_observations
+            metadata["request_identity_note"] = (
+                "Legacy identity is reconstructed only in this query; no Parquet files are rewritten. Missing identity raises an explicit gap."
+            )
         if distinct_rows:
             metadata["deduplication_mode"] = "distinct_supplier_rows"
             metadata["row_identity_note"] = CONTRACTS[api_name]["row_identity_note"]
