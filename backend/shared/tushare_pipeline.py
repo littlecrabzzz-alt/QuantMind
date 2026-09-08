@@ -64,7 +64,7 @@ class Pipeline:
         self.db = sqlite3.connect(self.root / "pipeline.sqlite", timeout=10)
         self.db.row_factory = sqlite3.Row
         version = self.db.execute("pragma user_version").fetchone()[0]
-        if version not in (0, 1):
+        if version not in (0, 1, 2):
             raise ValueError("Unsupported pipeline schema version")
         # Version 1 migration: SQLite is acquisition state, never copied live.
         if version == 0:
@@ -77,6 +77,68 @@ class Pipeline:
                 CREATE INDEX jobs_pending ON jobs(state, priority, retry_after);
                 PRAGMA user_version=1;
             """)
+
+        if version < 2:
+            # v2: rate reservations survive worker replacement; one cloud writer.
+            self.db.executescript("""
+                CREATE TABLE IF NOT EXISTS request_gates (
+                    scope TEXT PRIMARY KEY, next_at REAL NOT NULL);
+                PRAGMA user_version=2;
+            """)
+
+    def next_job(self, config, deadline):
+        rpm = config.get("requests_per_minute")
+        if rpm is None:
+            return self.db.execute(
+                "SELECT * FROM jobs WHERE state='pending' AND retry_after<=? ORDER BY priority,rowid LIMIT 1",
+                (time.time(),),
+            ).fetchone()
+        if not 1 <= int(rpm) <= 500:
+            raise ValueError("Invalid account request rate")
+        while time.monotonic() < deadline:
+            now = time.time()
+            account = self.db.execute(
+                "SELECT next_at FROM request_gates WHERE scope='account'"
+            ).fetchone()
+            account_wait = max(0, account[0] - now) if account else 0
+            if account_wait:
+                if account_wait >= deadline - time.monotonic():
+                    return None
+                time.sleep(account_wait)
+                continue
+            row = self.db.execute(
+                """
+                SELECT j.* FROM jobs j LEFT JOIN request_gates g
+                ON g.scope='api:' || json_extract(j.job,'$.api_name')
+                WHERE j.state='pending' AND j.retry_after<=? AND COALESCE(g.next_at,0)<=?
+                ORDER BY j.priority,j.rowid LIMIT 1
+            """,
+                (now, now),
+            ).fetchone()
+            if row:
+                api = json.loads(row["job"])["api_name"]
+                api_rpm = int(config.get("api_requests_per_minute", {}).get(api, 200))
+                if not 1 <= api_rpm <= 500:
+                    raise ValueError("Invalid API request rate")
+                self.db.executemany(
+                    "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=excluded.next_at",
+                    [
+                        ("account", now + 60 / int(rpm)),
+                        ("api:" + api, now + 60 / api_rpm),
+                    ],
+                )
+                self.db.commit()  # reserve before issuing the request, including failures
+                return row
+            earliest = self.db.execute("""
+                SELECT MIN(MAX(j.retry_after,COALESCE(g.next_at,0)))
+                FROM jobs j LEFT JOIN request_gates g ON g.scope='api:' || json_extract(j.job,'$.api_name')
+                WHERE j.state='pending'
+            """).fetchone()[0]
+            delay = max(0.01, earliest - now) if earliest is not None else None
+            if delay is None or delay >= deadline - time.monotonic():
+                return None
+            time.sleep(delay)
+        return None
 
     def close(self):
         self.db.close()
@@ -291,10 +353,7 @@ class Pipeline:
         completed = 0
         while completed < max_requests and time.monotonic() - started < max_seconds:
             self.expand(config)
-            row = self.db.execute(
-                "SELECT * FROM jobs WHERE state='pending' AND retry_after<=? ORDER BY priority,rowid LIMIT 1",
-                (time.time(),),
-            ).fetchone()
+            row = self.next_job(config, started + max_seconds)
             if row is None:
                 break
             job = json.loads(row["job"])
@@ -303,8 +362,18 @@ class Pipeline:
             state = "done" if status == "sample_ok" else "quality"
             if status == "empty_unverified":
                 state = "empty"
-            if status in ("transport_error", "api_error", "invalid_response"):
+            if status in (
+                "transport_error",
+                "api_error",
+                "invalid_response",
+                "rate_limited",
+            ):
                 state = "blocked" if row["tries"] >= 4 else "pending"
+            if status == "rate_limited":
+                self.db.execute(
+                    "INSERT INTO request_gates(scope,next_at) VALUES('account',?) ON CONFLICT(scope) DO UPDATE SET next_at=excluded.next_at",
+                    (time.time() + 60,),
+                )
             if status == "permission_denied":
                 state = "blocked"
             if status == "possibly_truncated":
@@ -371,7 +440,11 @@ class Pipeline:
             if pause:
                 time.sleep(pause)
         self.expand(config)
-        return {"requests": completed, **self.status()}
+        return {
+            "requests": completed,
+            "elapsed_seconds": round(time.monotonic() - started, 3),
+            **self.status(),
+        }
 
     def status(self):
         return {
@@ -449,11 +522,20 @@ class Pipeline:
         return release
 
 
-def tick(max_requests=100, max_seconds=100):
+def tick(max_requests=None, max_seconds=None):
     authority()
     if not (ROOT / "ENABLED").exists():
         return {"status": "disabled"}
     config = json.loads((ROOT / "pipeline-config.json").read_bytes())
+    config.setdefault("requests_per_minute", 240)
+    max_requests = (
+        max_requests if max_requests is not None else config.get("batch_requests", 360)
+    )
+    max_seconds = (
+        max_seconds if max_seconds is not None else config.get("batch_seconds", 100)
+    )
+    if not 1 <= int(max_requests) <= 1000 or not 1 <= float(max_seconds) <= 100:
+        raise ValueError("Invalid bounded batch limits")
     catalog = json.loads(
         (
             Path(__file__).resolve().parents[2] / "config/tushare-catalog.json"
@@ -476,7 +558,9 @@ def tick(max_requests=100, max_seconds=100):
             with httpx.Client(
                 trust_env=False, timeout=30, follow_redirects=False
             ) as client:
-                report = pipeline.run(client, token, config, max_requests, max_seconds)
+                report = pipeline.run(
+                    client, token, config, max_requests, max_seconds, pause=0
+                )
             report.update(release_id=pipeline.publish(), updated_at=utc_now())
             atomic_json(ROOT / "pipeline-status.json", report)
             return report

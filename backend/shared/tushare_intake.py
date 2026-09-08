@@ -146,7 +146,15 @@ def assess_response(
     code = payload.get("code")
     if code != 0:
         return {
-            "status": "permission_denied" if code == 2002 else "api_error",
+            "status": "rate_limited"
+            if re.search(
+                r"每分钟|每小时|频率|频次|too many|rate.limit",
+                str(payload.get("msg", "")),
+                re.I,
+            )
+            else "permission_denied"
+            if code == 2002
+            else "api_error",
             "code": code,
         }
     data = payload.get("data")
@@ -225,6 +233,15 @@ def capture_sample(client, token, job, root: Path):
             job.get("nullable_fields", ()),
             job.get("positive_fields", ()),
         )
+    except httpx.HTTPStatusError as exc:
+        return {
+            "api_name": job["api_name"],
+            "status": "rate_limited"
+            if exc.response.status_code == 429
+            else "transport_error",
+            "error_type": type(exc).__name__,
+            "http_status": exc.response.status_code,
+        }
     except httpx.HTTPError as exc:
         # Do not serialize exception messages/request bodies (could contain token).
         return {

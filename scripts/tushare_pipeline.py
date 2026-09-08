@@ -14,8 +14,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser("run")
-    run.add_argument("--max-requests", type=int, default=100)
-    run.add_argument("--max-seconds", type=int, default=100)
+    run.add_argument("--max-requests", type=int)
+    run.add_argument("--max-seconds", type=int)
     for name in ("verify", "status", "query"):
         p = commands.add_parser(name)
         p.add_argument("--root", type=Path, required=True)
