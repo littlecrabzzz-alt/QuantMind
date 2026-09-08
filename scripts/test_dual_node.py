@@ -6,7 +6,7 @@ import plistlib
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import dual_node_deploy
 from dual_node_sync import desired, topology
@@ -16,6 +16,20 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class DeploymentBoundary(unittest.TestCase):
+    def test_completed_initial_snapshot_is_reused(self):
+        opener = MagicMock()
+        opener.open.return_value.__enter__.return_value.status = 200
+        with patch.object(dual_node_deploy, "remote", return_value=subprocess.CompletedProcess([], 0)) as remote, \
+             patch.object(dual_node_deploy, "stage"), \
+             patch.object(dual_node_deploy, "run") as run, \
+             patch.object(dual_node_deploy, "ready"), \
+             patch.object(dual_node_deploy.urllib.request, "build_opener", return_value=opener):
+            dual_node_deploy.deploy(None)
+        self.assertEqual(remote.call_count, 2)
+        self.assertIn("snapshots/latest/COMPLETE", remote.call_args.args[0])
+        self.assertEqual(run.call_count, 2)
+        run.assert_called_with("python3", "scripts/dual_node_snapshot.py", "pull")
+
     def test_resume_refuses_running_writer(self):
         with tempfile.TemporaryDirectory(prefix="dual-node-test-", dir=ROOT / "logs") as directory:
             backup = pathlib.Path(directory)
@@ -25,7 +39,8 @@ class DeploymentBoundary(unittest.TestCase):
                 (backup / name).write_text("fixture")
             binaries = backup / "bin"
             binaries.mkdir()
-            for name, code in {"ssh": "exit 0", "docker": '[ "$1" != inspect ] || echo true'}.items():
+            for name, code in {"ssh": "exit 0", "mkdir": "exit 0", "rmdir": "exit 0",
+                               "docker": '[ "$1" != inspect ] || echo true'}.items():
                 command = binaries / name
                 command.write_text("#!/bin/sh\n" + code + "\n")
                 command.chmod(0o700)
