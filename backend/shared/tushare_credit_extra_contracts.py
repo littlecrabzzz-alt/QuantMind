@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 import re
 
 from backend.shared.tushare_equity_event_contracts import _stocks
+from backend.shared.tushare_market_contracts import _codes
 from backend.shared.tushare_structured_contracts import _contract, _parse
 
 FIELDS = {
@@ -174,11 +175,13 @@ def _starts(config, enabled):
 
 
 def credit_identifiers(identifiers=None, enabled_apis=None):
-    """Union source stock/eligible listed-fund codes, retaining retired/T identities.
+    """Union stock and listed-fund source codes, retaining retired/T identities.
 
     Fund master may contain off-exchange .OF codes: these are valid input records
     but are not margin-market codes. Preserve their raw master elsewhere, omit
     them from this outbound union. No exchange/prefix conversion is performed.
+    Seven-digit supplier fund codes are opaque distinct identities, not aliases of six-digit listings or proof
+    of a tradable/credit-eligible instrument.
     """
     ids = identifiers if identifiers is not None else {}
     if not isinstance(ids, dict):
@@ -199,15 +202,22 @@ def credit_identifiers(identifiers=None, enabled_apis=None):
         if not isinstance(funds, (list, tuple)):
             raise ValueError("funds must contain supplier codes or discovery records")
         listed = []
-        for row in funds:
-            code = row.get("ts_code") if isinstance(row, dict) else row
-            if not isinstance(code, str) or not re.fullmatch(
-                r"[0-9]{6}\.(SH|SZ|BJ|OF)", code
-            ):
+        for code in _codes(ids, "funds"):
+            if not re.fullmatch(r"[0-9]{6,7}\.(SH|SZ|BJ|OF)", code):
                 raise ValueError("Invalid supplier fund code")
             if not code.endswith(".OF"):
                 listed.append(code)
-        observed = _stocks({"stocks": ids.get("credit_securities", ())})
+        values = ids.get("credit_securities", ())
+        if not isinstance(values, (list, tuple)):
+            raise ValueError(
+                "credit_securities must contain supplier codes or discovery records"
+            )
+        observed = []
+        for code in _codes(ids, "credit_securities"):
+            if not re.fullmatch(r"(?:T[0-9]{6}|[0-9]{6,7})\.(SH|SZ|BJ|OF)", code):
+                raise ValueError("Invalid supplier credit security code")
+            if not code.endswith(".OF"):
+                observed.append(code)
         result["credit_securities"] = sorted(set(stocks) | set(listed) | set(observed))
     return result
 
@@ -235,6 +245,22 @@ def credit_extra_prerequisites(identifiers=None, enabled_apis=None, config=None)
                     "universe_complete": False,
                 }
             )
+        if family == "credit_securities":
+            opaque = [
+                code
+                for code in ids[family]
+                if re.fullmatch(r"[0-9]{7}\.(SH|SZ|BJ)", code)
+            ]
+            if opaque:
+                gaps.append(
+                    {
+                        "api_name": api,
+                        "dependencies": [],
+                        "reason": "opaque_fund_identity_unverified",
+                        "observed_codes": len(opaque),
+                        "detail": "Seven-digit supplier fund identities remain distinct raw stored/request codes. Canonical internal prefix mapping and credit/trading eligibility are unverified; never truncate to six digits.",
+                    }
+                )
         gaps.append(
             {
                 "api_name": api,

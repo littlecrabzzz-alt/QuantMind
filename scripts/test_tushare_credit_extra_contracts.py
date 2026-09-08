@@ -111,6 +111,35 @@ class CreditExtra(unittest.TestCase):
             identities["stocks"],
         )
 
+    def test_seven_digit_fund_sources_remain_distinct_and_reentrant(self):
+        funds = "0000371.OF 1610142.OF 4720072.OF 1500011.SZ 1601231.SZ 1604221.SZ 1610221.SZ 1612111.SZ 1612301.SZ 1618111.SZ 1627171.SZ 1638271.SZ 1642051.SZ 1648141.SZ 1660071.SZ 5010021.SH 5010491.SH 5010631.SH 5020001.SH 5020201.SH 5020561.SH".split()
+        inputs = {
+            "stocks": ["600018.SH", "T600018.SH"],
+            "funds": [{"ts_code": c, "status": "D"} for c in funds] + ["150001.SZ"],
+            "credit_securities": ["1500011.SZ", "0000371.OF"],
+        }
+        before = json.dumps(inputs, sort_keys=True)
+        ids = credit_identifiers(inputs)
+        self.assertEqual(
+            set(ids["credit_securities"]),
+            {c for c in funds if not c.endswith(".OF")}
+            | {"150001.SZ", "600018.SH", "T600018.SH"},
+        )
+        self.assertEqual(credit_identifiers({**inputs, **ids}), ids)
+        self.assertEqual(json.dumps(inputs, sort_keys=True), before)
+        gaps = credit_extra_prerequisites(inputs, config={"history_start": "19900101"})
+        identity = [g for g in gaps if g["reason"] == "opaque_fund_identity_unverified"]
+        self.assertEqual(
+            {g["api_name"] for g in identity},
+            {"margin_detail", "margin_secs", "block_trade"},
+        )
+        self.assertTrue(all(g["observed_codes"] == 18 for g in identity))
+        with self.assertRaises(ValueError):
+            credit_identifiers({"stocks": ["1500011.SZ"]})
+        for code in ("15000111.SZ", "1500011.US", "T1500011.SZ", "1500011.SZ\n"):
+            with self.assertRaises(ValueError):
+                credit_identifiers({"funds": [code]})
+
     def test_legal_offline_requests_recent_first_and_fair_history(self):
         config = {"history_start": "20240227", "planning_epoch": "fixture"}
         with (
