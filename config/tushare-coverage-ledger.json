@@ -4,7 +4,7 @@
   "catalog_index_sha256": "182240e4826c7e65a6b63ef83efdc4e14b7b3589a6249ed54cd36ac66c937dce",
   "reviewed_at": "2026-09-09",
   "entry_count": 263,
-  "scope": "Every entry in pinned official catalogue. VIP aliases stay within their source document. Static implementation ledger: runtime observations are authoritative for permissions and coverage.",
+  "scope": "Every entry in pinned official catalogue plus independently discovered linked entries. entry_count remains the immutable baseline count, not a scope ceiling. Runtime evidence controls entitlement and coverage.",
   "entries": [
     {
       "doc_id": "14",
@@ -14,7 +14,19 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+        "reviewed_at": "2026-09-08T21:03:57.833828+00:00",
+        "source_sha256": "182240e4826c7e65a6b63ef83efdc4e14b7b3589a6249ed54cd36ac66c937dce",
+        "missing_body_doc_ids": [
+          "104",
+          "31"
+        ]
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "24",
@@ -24,7 +36,18 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+        "reviewed_at": "2026-09-08T21:03:57.833828+00:00",
+        "source_sha256": "e45d1c1e07013fc851113eced99b8af8df2688d01d99c5a2fc32504958663057",
+        "missing_body_doc_ids": [
+          "104"
+        ]
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "25",
@@ -216,7 +239,18 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+        "reviewed_at": "2026-09-08T21:03:57.833828+00:00",
+        "source_sha256": "53c69722c6acd6cc5c574b89e72a3254157cad250ecb731faf81c3688850bb8a",
+        "missing_body_doc_ids": [
+          "31"
+        ]
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "27",
@@ -306,7 +340,18 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Review SDK derived calculation and underlying API dependencies; no fabricated pro_bar HTTP request.",
+      "catalog_review": {
+        "classification": "sdk_derived",
+        "api_candidates": [
+          "pro_bar"
+        ],
+        "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+        "reviewed_at": "2026-09-08T21:03:57.833828+00:00",
+        "source_sha256": "dc139e26a4460225cdaedc134495627bdd0bdeb112f91a8e4e64b7703ab927cf",
+        "missing_body_doc_ids": []
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "336",
@@ -396,7 +441,22 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Review SDK derived calculation and underlying API dependencies; no fabricated pro_bar HTTP request.",
+      "catalog_review": {
+        "classification": "sdk_derived",
+        "api_candidates": [
+          "pro_bar"
+        ],
+        "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+        "reviewed_at": "2026-09-08T21:03:57.833828+00:00",
+        "source_sha256": "f5dc778655ba71657b4d06f11b2d2dedd8ef03db79829a5e1df12c7c19ce3598",
+        "missing_body_doc_ids": [
+          "122",
+          "290",
+          "234"
+        ]
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "183",
@@ -462,7 +522,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+        "reviewed_at": "2026-09-08T21:03:57.833828+00:00",
+        "source_sha256": "9b2262dc1faae5dc98865fd0b53bd504d06e9cfc099931ee6a1580553997210d",
+        "missing_body_doc_ids": []
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "33",
@@ -658,9 +727,17 @@
       "acquisition_api_names": [
         "fina_audit"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/extra13-acceptance.json",
+        "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
+        "checked_at": "2026-09-08T21:09:03.140115+00:00",
+        "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
+        "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+      }
     },
     {
       "doc_id": "81",
@@ -672,9 +749,17 @@
       "acquisition_api_names": [
         "fina_mainbz"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/extra13-acceptance.json",
+        "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
+        "checked_at": "2026-09-08T21:09:03.140115+00:00",
+        "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
+        "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+      }
     },
     {
       "doc_id": "162",
@@ -686,9 +771,17 @@
       "acquisition_api_names": [
         "disclosure_date"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/extra13-acceptance.json",
+        "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
+        "checked_at": "2026-09-08T21:09:03.140115+00:00",
+        "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
+        "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+      }
     },
     {
       "doc_id": "17",
@@ -698,7 +791,19 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+        "reviewed_at": "2026-09-08T21:03:57.833828+00:00",
+        "source_sha256": "5ab828c050db1aa7b121511ee35703878ea3d294e18760a7c56b7cdeac4594e5",
+        "missing_body_doc_ids": [
+          "47",
+          "49"
+        ]
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "451",
@@ -988,7 +1093,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+        "reviewed_at": "2026-09-08T21:03:57.833828+00:00",
+        "source_sha256": "a60df90321155e183443b3f700b04dced6c10c211d56ddd9d06160aaf024a1d1",
+        "missing_body_doc_ids": []
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "292",
@@ -1000,9 +1114,17 @@
       "acquisition_api_names": [
         "report_rc"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/extra13-acceptance.json",
+        "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
+        "checked_at": "2026-09-08T21:09:03.140115+00:00",
+        "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
+        "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+      }
     },
     {
       "doc_id": "293",
@@ -1126,9 +1248,17 @@
       "acquisition_api_names": [
         "stk_surv"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/extra13-acceptance.json",
+        "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
+        "checked_at": "2026-09-08T21:09:03.140115+00:00",
+        "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
+        "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+      }
     },
     {
       "doc_id": "267",
@@ -1140,9 +1270,17 @@
       "acquisition_api_names": [
         "broker_recommend"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/extra13-acceptance.json",
+        "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
+        "checked_at": "2026-09-08T21:09:03.140115+00:00",
+        "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
+        "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+      }
     },
     {
       "doc_id": "330",
@@ -1152,7 +1290,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+        "reviewed_at": "2026-09-08T21:03:57.833828+00:00",
+        "source_sha256": "8379f56cdcc02c05d998633c1ca71d47ad97262546f70299e79ac0923dda584a",
+        "missing_body_doc_ids": []
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "58",
@@ -1260,7 +1407,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+        "reviewed_at": "2026-09-08T21:03:57.833828+00:00",
+        "source_sha256": "6671bb46ab74b7ae2084dc3a146edddffdd5407f0d61c9a1e043ff5a749fbf84",
+        "missing_body_doc_ids": []
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "170",
@@ -1410,7 +1566,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-2.evidence.json",
+        "reviewed_at": "2026-09-08T21:11:07.316380+00:00",
+        "source_sha256": "7b68d3e77c87aedaf96b196a98828e0763c617cc8f7d56a2d6d11a98eaa4b3c3",
+        "missing_body_doc_ids": []
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "106",
@@ -1728,7 +1893,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-2.evidence.json",
+        "reviewed_at": "2026-09-08T21:11:07.316380+00:00",
+        "source_sha256": "b92a9b73227c633d37fee0ad4950aceb09d1cc3e63c9f8000f96204f80a0744c",
+        "missing_body_doc_ids": []
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "385",
@@ -1906,7 +2080,18 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category_and_identifier_spec",
+        "api_candidates": [
+          "index_member"
+        ],
+        "evidence": "docs/tushare-catalog-special-review-2.evidence.json",
+        "reviewed_at": "2026-09-08T21:11:07.316380+00:00",
+        "source_sha256": "41acade4ba7303860c2208a281f153120f4e4a5edace9212e69b5f20b1c24886",
+        "missing_body_doc_ids": []
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "94",
@@ -2232,7 +2417,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-2.evidence.json",
+        "reviewed_at": "2026-09-08T21:11:07.316380+00:00",
+        "source_sha256": "e7bef5783d7d02bfee8ff94874bac8877b0f9d8ee38546b26a5dc650c3a1ca86",
+        "missing_body_doc_ids": []
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "19",
@@ -2382,7 +2576,18 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category_and_identifier_spec",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-2.evidence.json",
+        "reviewed_at": "2026-09-08T21:11:07.316380+00:00",
+        "source_sha256": "923179e1542e3a9a09d044b401bc830e044e4251effc8648f1be53513f983210",
+        "missing_body_doc_ids": [
+          "137"
+        ]
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "135",
@@ -2408,9 +2613,17 @@
       "acquisition_api_names": [
         "fut_trade_cal"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/extra13-acceptance.json",
+        "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
+        "checked_at": "2026-09-08T21:09:03.140115+00:00",
+        "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
+        "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+      }
     },
     {
       "doc_id": "138",
@@ -2436,9 +2649,17 @@
       "acquisition_api_names": [
         "fut_daily_adj"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/extra13-acceptance.json",
+        "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
+        "checked_at": "2026-09-08T21:09:03.140115+00:00",
+        "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
+        "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+      }
     },
     {
       "doc_id": "337",
@@ -2450,9 +2671,17 @@
       "acquisition_api_names": [
         "fut_weekly_monthly"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/extra13-acceptance.json",
+        "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
+        "checked_at": "2026-09-08T21:09:03.140115+00:00",
+        "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
+        "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+      }
     },
     {
       "doc_id": "340",
@@ -2518,7 +2747,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Verify external CSV delivery entitlement; preserve supplied artifacts without fabricating an HTTP endpoint.",
+      "catalog_review": {
+        "classification": "external_delivery",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-2.evidence.json",
+        "reviewed_at": "2026-09-08T21:11:07.316380+00:00",
+        "source_sha256": "51814b9d304672fc03c1d50677855afdec3890012ac97209b9f019f0f564bb72",
+        "missing_body_doc_ids": []
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "139",
@@ -2530,9 +2768,17 @@
       "acquisition_api_names": [
         "fut_holding"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/extra13-acceptance.json",
+        "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
+        "checked_at": "2026-09-08T21:09:03.140115+00:00",
+        "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
+        "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+      }
     },
     {
       "doc_id": "468",
@@ -2544,9 +2790,17 @@
       "acquisition_api_names": [
         "fut_index_daily"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/extra13-acceptance.json",
+        "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
+        "checked_at": "2026-09-08T21:09:03.140115+00:00",
+        "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
+        "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+      }
     },
     {
       "doc_id": "189",
@@ -2572,9 +2826,17 @@
       "acquisition_api_names": [
         "fut_weekly_detail"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/extra13-acceptance.json",
+        "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
+        "checked_at": "2026-09-08T21:09:03.140115+00:00",
+        "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
+        "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+      }
     },
     {
       "doc_id": "368",
@@ -2586,9 +2848,17 @@
       "acquisition_api_names": [
         "ft_limit"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted history/revision planning and terminal partition gaps; verify offline fixed-release consumption. Futures week identifiers and paired holding partitions require explicit recovery.",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/extra13-acceptance.json",
+        "release_id": "data-f34cdc844d78788466e2244eff1b9f590a1f23c7348d574418c0c93f1dbefebd",
+        "checked_at": "2026-09-08T21:09:03.140115+00:00",
+        "scope": "Bounded samples, full-history and PIT not established; empty requests and saturated results retained.",
+        "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
+        "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
+      }
     },
     {
       "doc_id": "283",
@@ -2598,7 +2868,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-2.evidence.json",
+        "reviewed_at": "2026-09-08T21:11:07.316380+00:00",
+        "source_sha256": "f10050b2e4d99fc8234747ca5bf6327bb61954661a3dbd9cbeb4508320dac5f4",
+        "missing_body_doc_ids": []
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "284",
@@ -2660,7 +2939,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category_and_identifier_spec",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-2.evidence.json",
+        "reviewed_at": "2026-09-08T21:11:07.316380+00:00",
+        "source_sha256": "15dd124227264e7462ccdaa46e4c37d30d7bb759fb6a883733c1b55fa0245858",
+        "missing_body_doc_ids": []
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "158",
@@ -2736,7 +3024,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-2.evidence.json",
+        "reviewed_at": "2026-09-08T21:11:07.316380+00:00",
+        "source_sha256": "999e089202ade8a9c8beb345253a164b9359e72e0a9546cfbef3555f3db14508",
+        "missing_body_doc_ids": []
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "185",
@@ -2984,7 +3281,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-2.evidence.json",
+        "reviewed_at": "2026-09-08T21:11:07.316380+00:00",
+        "source_sha256": "9fc486f9eddbbcea8bbc2c3c62ca6e7d4c21b71ae414b202139b67f369b5a202",
+        "missing_body_doc_ids": []
+      },
+      "auto_acquisition": false
     },
     {
       "doc_id": "178",
@@ -3046,7 +3352,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "ed1d987310d7f5b34b93bfa419568d7008d194b31f7ec0dd3a142d8a8ca8156b",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "191",
@@ -3252,7 +3567,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "d87c2692d7d13c9791f873768f3f3f3cfbc17d638543677959c64bdb609209b9",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "252",
@@ -3442,7 +3766,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "5fdd89677dc2957c4f7f75a5c75b2f00ebd99528126f05c7f273e841c097972b",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "224",
@@ -3452,7 +3785,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "f0a5df0a783cad7d915cd905f5e1d3e6c7475a8c70550bf5566ea5d43b38dd3f",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "461",
@@ -3476,7 +3818,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "e89918270bae75c76ffd734aad4c2e3b6a1ca199c1082691428b63f8d5c9ffd7",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "149",
@@ -3632,7 +3983,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "a8abb111e149482be1f0e99a2c7625b8e79329af651b13c529010e95060f80b8",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "227",
@@ -3656,7 +4016,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "30d19130f9d996febbaf62bbc316825bf303d42d2f218976d7b66f03a6d2bbbc",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "228",
@@ -3694,7 +4063,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "02f0eb0679610f6e3c96342599f8520767d2c6b047b41b3d6f7de78165e39988",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "241",
@@ -3704,7 +4082,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "615b97626659b875938b040381fc30a0ed9b098854f63d2fe72f96b3679b7d91",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "242",
@@ -3728,7 +4115,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "eccfb454d08a1b83f45ce2c4d1c635707c2a071a96a3890e38c0f80573a260c3",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "310",
@@ -3752,7 +4148,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "85207512c24b650ba0ad7169bd4c009c30ee0b7f5313f0731bed0cae89690eb8",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "325",
@@ -3776,7 +4181,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "c6f30c236c03471dbb108d460e62b024f38ca62f39913b8757f3a7f18963377a",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "218",
@@ -3786,7 +4200,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "bcc885bf1787c38eac9b83dca06ca01bed04a8cf8a34a693ea3e860b795baab1",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "219",
@@ -3926,7 +4349,18 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "5a6f5dba5d9cb137583bb3320a6d8e290725b2024185e7dbd11411454dd174e7",
+        "missing_body_doc_ids": [
+          "213"
+        ]
+      }
     },
     {
       "doc_id": "406",
@@ -4062,7 +4496,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category_with_api_examples",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "96eab4eb2a986a466a65ad080afcc453ccef4e89f01753e2d2e0fdbb57125b0f",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "486",
@@ -4100,7 +4543,16 @@
       "acquisition_api_names": [],
       "status": "review_required",
       "permission_status": "unverified",
-      "next_action": "Classify category/special page; inspect linked endpoints and undocumented aliases."
+      "next_action": "Retain child endpoint coverage obligations and unresolved references; a category is not an acquisition endpoint.",
+      "auto_acquisition": false,
+      "catalog_review": {
+        "classification": "category_with_account_mutations",
+        "api_candidates": [],
+        "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+        "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+        "source_sha256": "8263245938dc1f135d8df80ca884e500cf32a95ac0308643fdbb89bcec18311e",
+        "missing_body_doc_ids": []
+      }
     },
     {
       "doc_id": "446",
@@ -4142,7 +4594,8 @@
       ],
       "status": "excluded_mutation",
       "permission_status": "unverified",
-      "next_action": "Do not probe: account write/delete operation, not data acquisition."
+      "next_action": "Do not probe: account write/delete operation, not data acquisition.",
+      "auto_acquisition": false
     },
     {
       "doc_id": "447",
@@ -4156,7 +4609,168 @@
       ],
       "status": "excluded_mutation",
       "permission_status": "unverified",
-      "next_action": "Do not probe: account write/delete operation, not data acquisition."
+      "next_action": "Do not probe: account write/delete operation, not data acquisition.",
+      "auto_acquisition": false
+    }
+  ],
+  "discovered_entries": [
+    {
+      "doc_id": "104",
+      "url": "https://tushare.pro/document/2?doc_id=104",
+      "api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_missing_http_200",
+      "source_sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+      "next_action": "Resolve linked documentation and classify scope; do not infer an API from a missing document."
+    },
+    {
+      "doc_id": "31",
+      "url": "https://tushare.pro/document/2?doc_id=31",
+      "api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_missing_http_200",
+      "source_sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+      "next_action": "Resolve linked documentation and classify scope; do not infer an API from a missing document."
+    },
+    {
+      "doc_id": "47",
+      "url": "https://tushare.pro/document/2?doc_id=47",
+      "api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_missing_http_200",
+      "source_sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+      "next_action": "Resolve linked documentation and classify scope; do not infer an API from a missing document."
+    },
+    {
+      "doc_id": "49",
+      "url": "https://tushare.pro/document/2?doc_id=49",
+      "api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_missing_http_200",
+      "source_sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+      "next_action": "Resolve linked documentation and classify scope; do not infer an API from a missing document."
+    },
+    {
+      "doc_id": "122",
+      "url": "https://tushare.pro/document/2?doc_id=122",
+      "api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "a94d946270a0128ba3aa2538c032798febb1f1205e6f64511b489d26d9701b23",
+      "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+      "next_action": "Resolve linked documentation and classify scope; do not infer an API from a missing document."
+    },
+    {
+      "doc_id": "234",
+      "url": "https://tushare.pro/document/2?doc_id=234",
+      "api_names": [
+        "pro_bar"
+      ],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "eb57a4e7ad5a22bf081c269ef0e99d7bc63e5e4febec00202032cbd35020f714",
+      "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+      "next_action": "Resolve linked documentation and classify scope; do not infer an API from a missing document."
+    },
+    {
+      "doc_id": "290",
+      "url": "https://tushare.pro/document/2?doc_id=290",
+      "api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "18e4557232524672da08f47d89eef2a384919103de24680c37021e9641000d80",
+      "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+      "next_action": "Resolve linked documentation and classify scope; do not infer an API from a missing document."
+    },
+    {
+      "doc_id": "372",
+      "url": "https://tushare.pro/document/2?doc_id=372",
+      "api_names": [
+        "rt_k"
+      ],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "58905ec12e31c14a168bb781892ee3c89547d879252ac9ebbaad1062bb755912",
+      "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+      "next_action": "Verify independent entitlement and acquisition contract."
+    },
+    {
+      "doc_id": "400",
+      "url": "https://tushare.pro/document/2?doc_id=400",
+      "api_names": [
+        "rt_etf_k"
+      ],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "4395c969142c0818405e4ce17fea6a1bbefde370a287edfa52c05253b5e5c478",
+      "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
+      "next_action": "Verify independent entitlement and acquisition contract."
+    },
+    {
+      "doc_id": "137",
+      "url": "https://tushare.pro/document/2?doc_id=137",
+      "api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_missing",
+      "source_sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "evidence": "docs/tushare-catalog-special-review-2.evidence.json",
+      "next_action": "Resolve linked document identity and missing content; do not substitute another calendar endpoint."
+    },
+    {
+      "doc_id": "213",
+      "url": "https://tushare.pro/document/2?doc_id=213",
+      "api_names": [],
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_missing",
+      "source_sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "evidence": "docs/tushare-catalog-special-review-3.evidence.json",
+      "next_action": "Resolve linked documentation identity/content; do not infer an API or substitute an unrelated endpoint."
+    }
+  ],
+  "unresolved_api_mentions": [
+    {
+      "source_doc_id": "93",
+      "api_name": "index_member",
+      "status": "official_overview_name_only_no_link_or_contract_confirmed"
+    },
+    {
+      "source_doc_id": "177",
+      "name": "在岸人民币",
+      "status": "announced_without_api_name_or_link"
+    },
+    {
+      "source_doc_id": "18",
+      "name": "私募基金",
+      "status": "future_scope_without_api_name_or_link"
+    }
+  ],
+  "discovery_seeds": [
+    {
+      "doc_id": "188",
+      "api_candidate": "hk_hold",
+      "status": "requires_primary_page_review",
+      "evidence": "docs/tushare-catalog-special-review-1.md"
+    },
+    {
+      "doc_id": "422",
+      "api_candidate": "dc_concept_cons",
+      "status": "requires_primary_page_review",
+      "evidence": "docs/tushare-catalog-special-review-1.md"
     }
   ]
 }
