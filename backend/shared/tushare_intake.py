@@ -399,9 +399,24 @@ def read_samples(root: Path, release_id: str, api_name: str):
         observed = json.loads(
             (root / "observations" / result["observation"]).read_bytes()
         )
-        payload = json.loads(
-            (root / "objects" / (result["object_sha256"] + ".json")).read_bytes()
-        )
+        # An archived HTTP error is evidence, even when it contains valid JSON
+        # resembling a successful API response. Keep it out of consumer data.
+        assessment = observed["assessment"]
+        payload = None
+        if (
+            assessment.get("status")
+            not in (
+                "transport_error",
+                "rate_limited",
+                "permission_denied",
+                "api_error",
+                "invalid_response",
+            )
+            and assessment.get("response_format") != "non_json"
+        ):
+            payload = json.loads(
+                (root / "objects" / (result["object_sha256"] + ".json")).read_bytes()
+            )
         samples.append(
             {
                 "request": observed["request"],

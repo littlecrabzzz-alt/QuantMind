@@ -19,8 +19,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from backend.shared import tushare_store as store  # noqa: E402
 
 
-def release(root, datasets, *, complete=True):
+def release(root, datasets, *, complete=True, observations=None):
     files, partitions = {}, []
+    for name, observation in (observations or {}).items():
+        payload = json.dumps(observation, sort_keys=True).encode()
+        (root / "observations").mkdir(exist_ok=True)
+        path = "observations/" + name
+        (root / path).write_bytes(payload)
+        files[path] = {
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "bytes": len(payload),
+        }
     (root / "parquet").mkdir(exist_ok=True)
     for api, rows in datasets:
         stream = pa.BufferOutputStream()
@@ -163,6 +172,7 @@ class FixedStore(unittest.TestCase):
 
     def test_all_contracts_and_financial_aliases(self):
         fixtures = []
+        observations = {}
         for api, keys in store.KEYS.items():
             if api not in store.CONTRACTS and api not in (
                 "trade_cal",
@@ -177,13 +187,19 @@ class FixedStore(unittest.TestCase):
             values = dict.fromkeys(keys, "key")
             if store.CONTRACTS.get(api, {}).get("preserve_distinct_rows"):
                 values["_row_identity"] = "fixture-source-row"
+            if store.CONTRACTS.get(api, {}).get("request_identity_fields"):
+                name = "a" * 32 + ".json"
+                values.update(_row_identity="b" * 64, _observation=name)
+                observations[name] = {
+                    "request": {"api_name": api, "params": {"type": "P"}}
+                }
             fixtures.append((api, [row(**values)]))
-        pinned = release(self.root, fixtures)
+        pinned = release(self.root, fixtures, observations=observations)
         for api, _ in fixtures:
             with self.subTest(api=api):
                 self.assertEqual(store.read_dataset(self.root, pinned, api).num_rows, 1)
         self.assertEqual(store.read_dataset(self.root, pinned, "income").num_rows, 1)
-        self.assertEqual(len(fixtures), 109)
+        self.assertEqual(len(fixtures), 122)
 
     def test_dates_codes_and_macro_periods(self):
         pinned = release(
