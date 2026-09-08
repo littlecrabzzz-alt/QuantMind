@@ -82,7 +82,7 @@ class Pipeline:
         self.db = sqlite3.connect(self.root / "pipeline.sqlite", timeout=10)
         self.db.row_factory = sqlite3.Row
         version = self.db.execute("pragma user_version").fetchone()[0]
-        if version not in (0, 1, 2, 3, 4):
+        if version not in (0, 1, 2, 3, 4, 5):
             raise ValueError("Unsupported pipeline schema version")
         # Version 1 migration: SQLite is acquisition state, never copied live.
         if version == 0:
@@ -138,6 +138,26 @@ class Pipeline:
             self.recover_legacy_partitions()
             self.db.execute("PRAGMA user_version=4")
             self.db.commit()
+        if version < 5:
+            # Partial indexes keep priority,rowid order without sorting every
+            # equal-priority pending job; expansion visits only unexpanded rows.
+            try:
+                self.db.executescript("""
+                    BEGIN IMMEDIATE;
+                    CREATE INDEX IF NOT EXISTS jobs_ready_group
+                        ON jobs(group_name,priority) WHERE state='pending';
+                    CREATE INDEX IF NOT EXISTS jobs_ready_order
+                        ON jobs(priority) WHERE state='pending';
+                    CREATE INDEX IF NOT EXISTS jobs_unexpanded
+                        ON jobs(state,group_name,priority,retry_after)
+                        WHERE expanded=0 AND state IN ('done','quality','empty');
+                    PRAGMA user_version=5;
+                    COMMIT;
+                """)
+            except BaseException:
+                self.db.rollback()
+                self.db.close()
+                raise
         cursor = self.db.execute(
             "SELECT value FROM scheduler_state WHERE name='family_turn'"
         ).fetchone()
@@ -154,7 +174,7 @@ class Pipeline:
         rpm = config.get("requests_per_minute")
         if rpm is None:
             return self.db.execute(
-                "SELECT * FROM jobs WHERE state='pending' AND retry_after<=? ORDER BY priority,rowid LIMIT 1",
+                "SELECT * FROM jobs INDEXED BY jobs_ready_order WHERE state='pending' AND retry_after<=? ORDER BY priority,rowid LIMIT 1",
                 (time.time(),),
             ).fetchone()
         if not 1 <= int(rpm) <= 500:
@@ -178,16 +198,20 @@ class Pipeline:
                 raise ValueError("Invalid family scheduling weight")
             groups = [name for name in groups for _ in range(int(weights.get(name, 1)))]
             group = groups[self._fair_turn % len(groups)]
-            sql = """SELECT j.* FROM jobs j LEFT JOIN request_gates g
+            sql = """SELECT j.* FROM jobs j INDEXED BY {ready_index} LEFT JOIN request_gates g
                 ON g.scope='api:' || json_extract(j.job,'$.api_name')
                 WHERE j.state='pending' AND j.retry_after<=? AND COALESCE(g.next_at,0)<=?
                 {group_filter} ORDER BY j.priority,j.rowid LIMIT 1"""
             row = self.db.execute(
-                sql.format(group_filter="AND j.group_name=?"), (now, now, group)
+                sql.format(
+                    group_filter="AND j.group_name=?", ready_index="jobs_ready_group"
+                ),
+                (now, now, group),
             ).fetchone()
             if row is None:
                 row = self.db.execute(
-                    sql.format(group_filter=""), (now, now)
+                    sql.format(group_filter="", ready_index="jobs_ready_order"),
+                    (now, now),
                 ).fetchone()
             if row:
                 api = json.loads(row["job"])["api_name"]
@@ -1430,7 +1454,7 @@ class Pipeline:
 
     def expand(self, config):
         for row in self.db.execute(
-            "SELECT * FROM jobs WHERE expanded=0 AND state IN ('done','quality','empty')"
+            "SELECT * FROM jobs INDEXED BY jobs_unexpanded WHERE expanded=0 AND state IN ('done','quality','empty')"
         ).fetchall():
             job, result = json.loads(row["job"]), json.loads(row["result"])
             if job["api_name"] == "trade_cal":
