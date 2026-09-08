@@ -176,6 +176,7 @@ def pull_snapshot(base=None, only_new=False):
     run("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", ssh, "sudo -n test -f " + remote_path + "/COMPLETE")
     base = base or PROJECT / "logs/cloud-snapshots"
     base.mkdir(parents=True, exist_ok=True, mode=0o700)
+    base = base.resolve()
     with (base / ".lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         target = base / path.name

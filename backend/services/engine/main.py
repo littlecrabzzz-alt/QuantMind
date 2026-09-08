@@ -272,6 +272,7 @@ async def auth_middleware(request: Request, call_next):
             "/api/v1/rd-agent/",
             "/api/v1/alpha-agent/",
             "/api/v1/pipeline/",
+            "/api/v1/research-runs",
             "/api/v1/admin/",
         )
         if not user_id and any(path.startswith(p) for p in protected_prefixes):
@@ -423,6 +424,12 @@ try:
     logger.info("✅ AlphaAgent integration routers loaded")
 except ImportError as e:
     logger.error(f"❌ Failed to load AlphaAgent routers: {e}")
+
+try:
+    from backend.services.engine.routers.research_runs import router as research_runs_router
+    app.include_router(research_runs_router)
+except ImportError as e:
+    logger.error(f"Failed to load research workbench: {e}")
 
 try:
     from backend.services.engine.routers.trading_agents import router as trading_agents_router

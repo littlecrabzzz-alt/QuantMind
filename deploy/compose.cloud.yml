@@ -10,6 +10,8 @@ services:
     mem_limit: 320m
     command: redis-server --appendonly yes --maxmemory 192mb --maxmemory-policy allkeys-lru --databases 16 --bind 0.0.0.0
   quantmind:
+    volumes:
+      - /root/data/disk/quantmind/secrets/glm-research-api.json:/run/secrets/research-llm.json:ro
     ports: !override
       - "127.0.0.1:18000:8000"
     mem_limit: 12g
@@ -61,6 +63,26 @@ services:
     cpus: 0.5
     environment:
       QM_NODE_ROLE: authority
+  research-worker:
+    extends:
+      file: docker-compose.yml
+      service: celery-worker
+    container_name: quantmind-research-worker
+    mem_limit: 1536m
+    cpus: 1.0
+    environment:
+      QM_NODE_ROLE: authority
+      HOST_PROJECT_PATH: /root/data/disk/quantmind/project
+      ENABLE_REAL_TRADING: "false"
+      ENABLE_TDX_PUSH: "false"
+      PYTHONPATH: /app:/app/scripts
+    volumes: !override
+      - ./data:/data
+      - ./backend:/app/backend:ro
+      - ./scripts:/app/scripts:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/data/disk/quantmind/secrets/glm-research-api.json:/run/secrets/research-llm.json:ro
+    command: celery -A backend.services.engine.research.tasks:app worker --beat -Q research --concurrency=1 --loglevel=info --schedule=/tmp/research-beat
   data-gateway:
     build:
       dockerfile: docker/Dockerfile.data-gateway-cloud

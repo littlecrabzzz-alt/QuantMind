@@ -111,10 +111,14 @@ healthy() { curl --noproxy '*' --connect-timeout 2 --max-time 3 -fsS "http://127
 
 start_local() {
   local mode=${1:-core} running service current_env
-  case "$mode" in core|full) ;; *) fail 'Mode must be core or full.' ;; esac
+  case "$mode" in core|full|research) ;; *) fail 'Mode must be core, full or research.' ;; esac
   [ -f "$STATE/READY" ] && [ -s "$STATE/SNAPSHOT_ID" ] || fail 'Run scripts/local-dev.sh init first.'
   SERVICES=(db redis quantmind)
   [ "$mode" != full ] || SERVICES+=(celery-worker data-gateway huntly rsshub qwenpaw)
+  if [ "$mode" = research ] || { [ "$mode" = full ] && [ -f "$QM_LOCAL_STATE/data/research/settings.json" ]; }; then
+    [ -f "$QM_LOCAL_STATE/data/research/settings.json" ] || fail 'Prepare the research snapshot before starting research mode.'
+    SERVICES+=(research-worker)
+  fi
   running=$("${COMPOSE[@]}" ps --status running --services)
   if [ -n "$running" ]; then
     for service in "${SERVICES[@]}"; do
@@ -148,6 +152,12 @@ start_local() {
 
 stop_local() {
   local children name
+  if [ -f "$QM_LOCAL_STATE/data/research/settings.json" ]; then
+    local research_node research_children
+    research_node=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["node_id"])' "$QM_LOCAL_STATE/data/research/settings.json")
+    research_children=$(docker ps --filter "label=quantmind.research.node=$research_node" --format '{{.Names}}')
+    [ -z "$research_children" ] || fail "Active isolated research computation: $research_children; cancel or finish it before switching backends."
+  fi
   children=$(docker ps --filter network=quantmind-dev_quantmind-net --format '{{.Names}}')
   while IFS= read -r name; do
     case "$name" in
@@ -172,5 +182,5 @@ case "${1:-help}" in
     echo "snapshot=$(cat "$STATE/SNAPSHOT_ID" 2>/dev/null || echo uninitialized)"
     "${COMPOSE[@]}" ps
     ;;
-  *) echo 'Usage: scripts/local-dev.sh {init|start [core|full]|stop|status}'; exit 2 ;;
+  *) echo 'Usage: scripts/local-dev.sh {init|start [core|full|research]|stop|status}'; exit 2 ;;
 esac

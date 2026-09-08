@@ -1,6 +1,5 @@
 import React from 'react';
 import { Sparkles, Database, BarChart3, Settings as SettingsIcon } from 'lucide-react';
-import { useTaskContext } from '../../context-v2/TaskContext';
 
 export type PageId = 'home' | 'library' | 'backtest' | 'settings' | 'mining_dashboard';
 
@@ -17,23 +16,13 @@ export const Layout: React.FC<LayoutProps> = ({
   onNavigate,
   showNavigation = true,
 }) => {
-  const { miningTask } = useTaskContext();
-
-  // Helper to determine where 'Factor Mining' nav item should go
   const handleNavClick = (itemId: PageId) => {
-    if (itemId === 'home') {
-      if (miningTask && miningTask.status !== 'idle') {
-        onNavigate('mining_dashboard');
-      } else {
-        onNavigate('home');
-      }
-    } else {
-      onNavigate(itemId);
-    }
+    onNavigate(itemId);
   };
 
   const navItems = [
-    { id: 'home' as const, label: '因子挖掘', icon: Sparkles },
+    { id: 'home' as const, label: '研究工作台', icon: Sparkles },
+    { id: 'mining_dashboard' as const, label: '因子演化', icon: Sparkles },
     { id: 'library' as const, label: '因子库', icon: Database },
     { id: 'backtest' as const, label: '回测', icon: BarChart3 },
     { id: 'settings' as const, label: '设置', icon: SettingsIcon },
@@ -53,7 +42,7 @@ export const Layout: React.FC<LayoutProps> = ({
           </div>
           <div>
             <h1 className="text-sm font-black text-slate-800 m-0 tracking-tight leading-none">QuantaAlpha</h1>
-            <p className="text-[10px] font-bold text-slate-400 m-0 leading-none mt-1">智能因子挖掘平台</p>
+            <p className="text-[10px] font-bold text-slate-400 m-0 leading-none mt-1">策略与方法研究</p>
           </div>
         </div>
 
@@ -62,7 +51,7 @@ export const Layout: React.FC<LayoutProps> = ({
           <nav className="flex items-center gap-1.5 pr-20">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = currentPage === item.id || (item.id === 'home' && currentPage === 'mining_dashboard');
+              const isActive = currentPage === item.id;
               return (
                 <button
                   key={item.id}
