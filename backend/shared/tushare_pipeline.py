@@ -339,7 +339,7 @@ class Pipeline:
                             "offset": job["params"]["offset"] + job["params"]["limit"],
                         }
                         self.enqueue("fund_adj", params, row["priority"], row["epoch"])
-                        state = "done"
+                        state = "done" if status == "sample_ok" else "quality"
             if (
                 job["api_name"] == "fund_adj"
                 and status == "empty_unverified"

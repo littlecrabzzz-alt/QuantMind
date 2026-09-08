@@ -85,6 +85,25 @@ class PipelineAcceptance(unittest.TestCase):
                 self.assertFalse(manifest["history_complete"])
                 pipeline.close()
 
+    def test_full_page_keeps_quality_failure(self):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            httpx.Client(
+                transport=httpx.MockTransport(lambda _: self.response([0, 2]))
+            ) as client,
+        ):
+            pipeline = Pipeline(tmp, CATALOG)
+            pipeline.enqueue(
+                "fund_adj", {"trade_date": "20260907", "offset": 0, "limit": 2}
+            )
+            pipeline.db.commit()
+            result = pipeline.run(
+                client, "synthetic-token", CONFIG, max_requests=1, pause=0
+            )
+            self.assertEqual(result["quality"], 1)
+            self.assertEqual(result["pending"], 1)
+            pipeline.close()
+
     def test_ignored_offset_is_blocked_not_infinite_pagination(self):
         with (
             tempfile.TemporaryDirectory() as tmp,

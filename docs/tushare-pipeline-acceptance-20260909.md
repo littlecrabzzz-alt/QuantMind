@@ -32,7 +32,7 @@
 - 第二个独立进程从已有检查点继续完成 79 请求，未重拉首轮已完成历史任务；后续自动任务再完成 100 请求。近期修订有独立世代，会按计划重新检查。
 - 云端与 Mac 对同一版本逐文件核验 SHA256/字节数，再禁止 socket.connect、DNS 与 get_secret 访问，七类数据均通过固定版本读取且行数、时间边界一致。证明的是新存储读入口，无修改现有 QuantDB/页面查询路由。
 - 真实后台镜像下载该版本 575 文件，随后手动重复执行下载 0 文件；CURRENT 只在全量校验通过后更新。模拟中断、重试、无变化和损坏恢复分别有隔离测试；没有为故障测试破坏真实权威数据或网络。
-- 隔离测试：7 项流水线测试、5 项原始留存测试通过，Ruff 通过。真实读取证据在两端镜像根目录 `validation/offline-<release_id>.json`；云端首两轮证据为 `validation/pipeline-first.json`、`pipeline-second.json`，动态状态为 `pipeline-status.json`。
+- 隔离测试：8 项流水线测试、5 项原始留存测试通过，Ruff 通过。真实读取证据在两端镜像根目录 `validation/offline-<release_id>.json`；云端首两轮证据为 `validation/pipeline-first.json`、`pipeline-second.json`，动态状态为 `pipeline-status.json`。
 
 ## 未完成与继续方式
 
