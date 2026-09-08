@@ -190,6 +190,7 @@ class DeploymentBoundary(unittest.TestCase):
         self.assertEqual(services["quantmind"]["environment"]["TRAINING_MEMORY_LIMIT_GB"], "4")
         self.assertEqual(services["quantmind"]["environment"]["OSS_EMBEDDED_CELERY"], "false")
         self.assertIn("/app/scripts/check_cloud_health.py", services["quantmind"]["healthcheck"]["test"])
+        self.assertIn("-S", services["quantmind"]["healthcheck"]["test"])
         for volume in config["volumes"].values():
             self.assertTrue(volume["driver_opts"]["device"].startswith(
                 topology()["QM_REMOTE_ROOT"] + "/volumes/"))

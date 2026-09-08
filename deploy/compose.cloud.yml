@@ -15,7 +15,8 @@ services:
     mem_limit: 6g
     cpus: 3.0
     healthcheck:
-      test: ["CMD", "python", "/app/scripts/check_cloud_health.py"]
+      # Stdlib-only probe: skip the global LiteLLM sitecustomize/network import.
+      test: ["CMD", "python", "-S", "/app/scripts/check_cloud_health.py"]
       interval: 30s
       timeout: 15s
       retries: 3
