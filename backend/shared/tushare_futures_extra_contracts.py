@@ -206,7 +206,7 @@ def _identifiers(identifiers, enabled):
             pattern = (
                 r"[A-Za-z][A-Za-z0-9]*\.NH"
                 if family == "futures_indexes"
-                else r"[A-Za-z][A-Za-z0-9]*\.(CFX|ZCE|DCE|GFE|INE|SHF)"
+                else r"[A-Za-z][A-Za-z0-9_]*\.(CFX|ZCE|DCE|GFE|INE|SHF)"
             )
             if not isinstance(code, str) or not re.fullmatch(pattern, code):
                 raise ValueError(f"Invalid supplier futures code in {family}")
