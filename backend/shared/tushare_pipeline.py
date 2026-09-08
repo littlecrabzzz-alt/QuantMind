@@ -133,7 +133,14 @@ class Pipeline:
             (self.root / "observations" / result["observation"]).read_bytes()
         )
         for row in rows:
-            for key in ("ts_code", "symbol"):
+            for key in (
+                "ts_code",
+                "symbol",
+                "l1_code",
+                "l2_code",
+                "l3_code",
+                "index_code",
+            ):
                 value = row.get(key)
                 if isinstance(value, str):
                     row["source_" + key] = value
