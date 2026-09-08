@@ -7,12 +7,14 @@ catalogue remains a separate coverage obligation. Readers never acquire data.
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import itertools
 import json
 import os
 import re
 import shutil
 import sqlite3
+import stat
 import time
 from collections import deque
 from datetime import date, datetime, timedelta
@@ -135,6 +137,7 @@ class Pipeline:
             "SELECT value FROM scheduler_state WHERE name='family_turn'"
         ).fetchone()
         self._fair_turn = cursor[0] if cursor else 0
+        self._partition_artifact_checks = {}
         self.fields = {}
         for entry in catalog["entries"]:
             for api in entry.get("api_names", []):
@@ -868,6 +871,72 @@ class Pipeline:
                 }
         return None
 
+    def partition_artifact_gap(self, parquet):
+        """Stream-verify immutable bytes; cache only while file identity is unchanged."""
+        name, expected_sha, expected_bytes = (
+            parquet.get(k) for k in ("path", "sha256", "bytes")
+        )
+        if (
+            not isinstance(name, str)
+            or Path(name).is_absolute()
+            or ".." in Path(name).parts
+            or not isinstance(expected_sha, str)
+            or not re.fullmatch(r"[a-f0-9]{64}", expected_sha)
+            or type(expected_bytes) is not int
+            or expected_bytes <= 0
+        ):
+            return "child_artifact_evidence_invalid"
+        path = self.root / name
+
+        def identity(value):
+            return (
+                value.st_dev,
+                value.st_ino,
+                value.st_mode,
+                value.st_size,
+                value.st_mtime_ns,
+                value.st_ctime_ns,
+            )
+
+        try:
+            before = path.lstat()
+            if not stat.S_ISREG(before.st_mode) or not path.resolve().is_relative_to(
+                self.root.resolve()
+            ):
+                return "child_artifact_invalid"
+            signature = (identity(before), expected_sha, expected_bytes)
+            cached = self._partition_artifact_checks.get(name)
+            if cached and cached[0] == signature:
+                return cached[1]
+            gap = "child_artifact_corrupt"
+            if before.st_size == expected_bytes:
+                with path.open("rb") as stream:
+                    if identity(os.fstat(stream.fileno())) != identity(before):
+                        return "child_artifact_changed"
+                    checksum = hashlib.sha256()
+                    observed_bytes = 0
+                    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                        observed_bytes += len(chunk)
+                        if observed_bytes > expected_bytes:
+                            return "child_artifact_changed"
+                        checksum.update(chunk)
+                    if identity(os.fstat(stream.fileno())) != identity(before):
+                        return "child_artifact_changed"
+                if identity(path.lstat()) != identity(before):
+                    return "child_artifact_changed"
+                gap = None if checksum.hexdigest() == expected_sha else gap
+            # Bound memory even when historical reconciliation visits millions of files.
+            if len(self._partition_artifact_checks) >= 4096:
+                self._partition_artifact_checks.clear()
+            self._partition_artifact_checks[name] = (signature, gap)
+            return gap
+        except FileNotFoundError:
+            self._partition_artifact_checks.pop(name, None)
+            return "child_artifact_missing"
+        except OSError:
+            self._partition_artifact_checks.pop(name, None)
+            return "child_artifact_unreadable"
+
     def reconcile_partitions(self, max_parents=1000, child_id=None):
         """Bounded, restartable closure; descendants must carry positive evidence.
 
@@ -947,11 +1016,8 @@ class Pipeline:
                     ):
                         gap = "child_not_verified"
                         break
-                    if (
-                        not parquet.get("path")
-                        or not (self.root / parquet["path"]).is_file()
-                    ):
-                        gap = "child_artifact_missing"
+                    gap = self.partition_artifact_gap(parquet)
+                    if gap:
                         break
             status = "gap" if gap else "resolved"
             changed = split["status"] != status or split["gap"] != gap
