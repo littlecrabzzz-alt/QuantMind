@@ -200,6 +200,43 @@ class Closure(unittest.TestCase):
         self.assertEqual(self.state(nested), "split_pending")
         self.assertEqual(self.state(parent), "split_pending")
 
+    def test_same_size_corruption_invalidates_cached_nested_closure(self):
+        parent, children = self.split()
+        row = self.p.db.execute(
+            "SELECT job FROM jobs WHERE id=?", (children[0],)
+        ).fetchone()
+        params = json.loads(row[0])["params"]
+        nested, leaves = self.split(params["start_date"], params["end_date"])
+        self.finish(children[1])
+        self.finish(leaves[0])
+        saved = self.finish(leaves[1])
+        path = self.root / saved["parquet"]["path"]
+        original = path.read_bytes()
+        with patch.object(
+            module.hashlib, "sha256", wraps=module.hashlib.sha256
+        ) as checksums:
+            self.p.reconcile_partitions(child_id=leaves[1])
+            self.assertEqual(self.state(parent), "resolved")
+            initial_hashes = checksums.call_count
+            self.assertGreater(initial_hashes, 0)
+            self.p.reconcile_partitions(child_id=leaves[1])
+            self.assertEqual(checksums.call_count, initial_hashes)
+            replacement = path.with_suffix(".replacement")
+            replacement.write_bytes(bytes([original[0] ^ 1]) + original[1:])
+            self.assertEqual(replacement.stat().st_size, len(original))
+            replacement.replace(path)
+            self.p.reconcile_partitions()
+            self.assertGreater(checksums.call_count, initial_hashes)
+            self.assertEqual(self.state(nested), "split_pending")
+            self.assertEqual(self.state(parent), "split_pending")
+            gap = self.p.db.execute(
+                "SELECT gap FROM partition_splits WHERE parent_id=?", (nested,)
+            ).fetchone()[0]
+            self.assertEqual(gap, "child_artifact_corrupt")
+            path.write_bytes(original)
+            self.p.reconcile_partitions(child_id=leaves[1])
+            self.assertEqual(self.state(parent), "resolved")
+
     def test_real_run_retry_closes_and_publishes_original_partial(self):
         calls = []
 
