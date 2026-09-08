@@ -27,6 +27,19 @@ def days(begin, end):
 
 
 class FuturesExtra(unittest.TestCase):
+    def test_observed_dce_underscore_codes_do_not_block_family(self):
+        # Actual fut_basic discovery includes these six supplier identifiers.
+        codes = ["L_F.DCE", "L_FL.DCE", "PP_F.DCE", "PP_FL.DCE", "V_F.DCE", "V_FL.DCE"]
+        config = {"futures_extra_apis": ["ft_limit"], "history_start": "20260901"}
+        gaps = futures_extra_prerequisites({"futures": codes}, config=config)
+        self.assertEqual(
+            next(g["observed_codes"] for g in gaps if g["dependencies"]), 6
+        )
+        self.assertTrue(list(jobs(config, date(2026, 9, 9), {"futures": codes})))
+        for bad in ("L F.DCE", "L_F.DCE/", "L_F.UNKNOWN"):
+            with self.assertRaises(ValueError):
+                futures_extra_prerequisites({"futures": [bad]}, config=config)
+
     def test_all_seven_exact_docs_fields_hidden_and_caps(self):
         expected = {
             "fut_trade_cal",
