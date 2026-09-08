@@ -18,6 +18,7 @@ from backend.shared.tushare_registry import (
     CONNECT_RUNTIME_CONTRACTS,
     TRADING_EVENT_RUNTIME_CONTRACTS,
     LISTING_EXTRA_RUNTIME_CONTRACTS,
+    LIMIT_EXTRA_RUNTIME_CONTRACTS,
 )
 from backend.shared.tushare_credit_extra_contracts import CREDIT_EXTRA_CONTRACTS
 from backend.shared.tushare_etf_basket_contracts import ETF_BASKET_CONTRACTS
@@ -42,6 +43,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **LIMIT_EXTRA_RUNTIME_CONTRACTS,
     **LISTING_EXTRA_RUNTIME_CONTRACTS,
     **TRADING_EVENT_RUNTIME_CONTRACTS,
     **CONNECT_RUNTIME_CONTRACTS,

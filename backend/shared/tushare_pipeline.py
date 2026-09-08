@@ -48,6 +48,7 @@ from backend.shared.tushare_listing_extra_contracts import (
     DAILY_INFO_STARTS,
     listing_extra_prerequisites,
 )
+from backend.shared.tushare_limit_extra_contracts import limit_extra_prerequisites
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
@@ -477,7 +478,11 @@ class Pipeline:
                 value = row.get(key)
                 if isinstance(value, str):
                     row["source_" + key] = value
-                    if result["api_name"] in OTHER_CONTRACTS and result[
+                    if key == "ts_code" and result["api_name"] == "limit_cpt_list":
+                        # Supplier concept codes are opaque within this dataset;
+                        # even stock-shaped future labels are not equity identities.
+                        row[key] = value
+                    elif result["api_name"] in OTHER_CONTRACTS and result[
                         "api_name"
                     ].startswith(("opt_", "sge_", "fx_")):
                         # Asset namespace precedes any stock-shaped symbol. Supplier
@@ -641,6 +646,10 @@ class Pipeline:
     def identifiers(self):
         families = {
             **{api: "connect_" + api for api in CONNECT_CONTRACTS},
+            "limit_list_ths": "limit_securities",
+            "limit_list_d": "limit_securities",
+            "limit_step": "limit_securities",
+            "limit_cpt_list": "limit_concepts",
             "bak_basic": "historical_listing_securities",
             "new_share": "historical_listing_securities",
             "daily_info": "market_stat_categories",
@@ -735,6 +744,11 @@ class Pipeline:
             result["stocks"] | result["bse_old_codes"] | result["bse_new_codes"]
         )
         result["market_stat_categories"].update(DAILY_INFO_STARTS)
+        result["limit_securities"].update(
+            result["stocks"]
+            | result["historical_listing_securities"]
+            | result["trading_event_securities"]
+        )
         result = {key: sorted(values) for key, values in result.items()}
         try:
             result.update(credit_identifiers(result))
@@ -899,6 +913,7 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "limit_extra": limit_extra_prerequisites,
             "listing_extra": listing_extra_prerequisites,
             "trading_event": trading_event_prerequisites,
             "connect": connect_prerequisites,
@@ -929,6 +944,12 @@ class Pipeline:
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
+            (
+                "limit_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "limit_extra", cfg, ids
+                ),
+            ),
             (
                 "listing_extra",
                 lambda cfg, ids: self.record_extra_planning_gaps(

@@ -55,6 +55,15 @@ from backend.shared.tushare_listing_extra_contracts import (
     iter_listing_extra_jobs,
 )
 
+from backend.shared.tushare_limit_extra_contracts import (
+    LIMIT_EXTRA_CONTRACTS,
+    iter_limit_extra_jobs,
+)
+
+LIMIT_EXTRA_RUNTIME_CONTRACTS = {
+    api: {**spec, "group": "limit_extra"} for api, spec in LIMIT_EXTRA_CONTRACTS.items()
+}
+
 LISTING_EXTRA_RUNTIME_CONTRACTS = {
     api: {
         **spec,
@@ -100,6 +109,7 @@ CONNECT_RUNTIME_CONTRACTS = {
 }
 
 EXTENDED_CONTRACTS = {
+    **LIMIT_EXTRA_RUNTIME_CONTRACTS,
     **LISTING_EXTRA_RUNTIME_CONTRACTS,
     **TRADING_EVENT_RUNTIME_CONTRACTS,
     **CONNECT_RUNTIME_CONTRACTS,
@@ -137,6 +147,7 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "limit_extra": iter_limit_extra_jobs,
     "listing_extra": iter_listing_extra_jobs,
     "trading_event": iter_trading_event_jobs,
     "connect": iter_connect_jobs,
