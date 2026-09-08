@@ -305,6 +305,19 @@ class GlobalContracts(unittest.TestCase):
         self.assertEqual({j["api_name"] for j in jobs}, {"hk_daily", "us_daily"})
         self.assertEqual(len(jobs), 18)
 
+    def test_hk_opaque_retirement_suffix(self):
+        from backend.shared.tushare_global_contracts import _identifiers
+
+        codes = [
+            "02121!AE.HK", "02228!AE.HK", "03636!AE.HK", "03668!AE.HK",
+            "03699!AE.HK", "02121.HK", "02121!.HK", "02121!ABCDEFGH.HK",
+        ]
+        self.assertEqual(_identifiers({"hk_stocks": codes})["hk_stocks"], sorted(codes))
+        for code in ("02121!ABCDEFGHI.HK", "02121!ae.HK", "02121!!AE.HK",
+                     "2121!AE.HK", "02121AE.HK", "02121!AE.US"):
+            with self.subTest(code=code), self.assertRaises(ValueError):
+                _identifiers({"hk_stocks": [code]})
+
     def test_validation_before_first_job(self):
         bad_configs = [
             {"global_apis": ["missing"]},
