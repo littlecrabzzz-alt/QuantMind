@@ -378,9 +378,32 @@ def fetch_document(
                 encoded = encoding not in ("", "identity") or payload.startswith(
                     b"\x1f\x8b"
                 )
+                # Narrow static signature from retained non-PDF responses. Never
+                # execute the script, derive cookies or follow its reload logic.
+                script = payload.strip() if len(payload) <= 16384 else b""
+                is_challenge = (
+                    pdf_expected
+                    and not encoded
+                    and script.startswith(b"<script>")
+                    and script.endswith(b"</script>")
+                    and all(
+                        marker in script
+                        for marker in (
+                            b"EO_Bot_Ssid=",
+                            b"__tst_status=",
+                            b"cookie",
+                            b"location.href",
+                            b"setTimeout",
+                        )
+                    )
+                )
+                if is_challenge:
+                    result["challenge_kind"] = "javascript_cookie_reload"
                 result["content_kind"] = (
                     "encoded_body"
                     if encoded
+                    else "script_challenge"
+                    if is_challenge
                     else "pdf_envelope"
                     if is_pdf
                     else "html"
@@ -394,6 +417,8 @@ def fetch_document(
                     if response.status != 200
                     else "unsupported_content_encoding"
                     if encoded
+                    else "source_challenge"
+                    if is_challenge
                     else "pdf_content_mismatch"
                     if pdf_expected and not is_pdf
                     else "mime_content_mismatch"
@@ -870,6 +895,7 @@ def _finish_document(db, owner, job, result, phase):
         "invalid_host",
         "size_limit",
         "unsupported_or_invalid_document",
+        "source_challenge",
     }
     state = "downloaded" if good else "blocked" if terminal or dtries >= 5 else "retry"
     delay = min(3600, 60 * 2 ** min(max(dtries, ptries), 6))
