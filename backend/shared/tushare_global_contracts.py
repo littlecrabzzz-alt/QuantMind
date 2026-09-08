@@ -6,6 +6,7 @@ No credentials, network, database, date truncation, or symbol normalization.
 
 from calendar import monthrange
 from datetime import date, datetime, timedelta
+from itertools import zip_longest
 import re
 
 from backend.shared.tushare_structured_contracts import _contract, _parse
@@ -239,6 +240,12 @@ _DOCS = {
 BASICS = ("hk_basic", "us_basic")
 CALENDARS = ("hk_tradecal", "us_tradecal")
 PERIOD_DAILY = ("stk_weekly_monthly", "stk_week_month_adj")
+SYMBOL_PERIODS = {
+    "weekly": "stocks",
+    "monthly": "stocks",
+    "index_weekly": "indexes",
+    "index_monthly": "indexes",
+}
 GLOBAL_CONTRACTS = {}
 for _api, (_doc, _cap, _points) in _DOCS.items():
     _keys = ("ts_code", "trade_date")
@@ -293,6 +300,25 @@ for _api, (_doc, _cap, _points) in _DOCS.items():
             saturation_dependencies=[_family],
         )
     GLOBAL_CONTRACTS[_api] = _spec
+
+# A production observation disproved the old documentation's 4500 limit.
+# 5629 is a measured lower bound ONLY: reaching it must still trigger cap handling.
+GLOBAL_CONTRACTS["monthly"].update(
+    row_cap=5629,
+    row_cap_verified=False,
+    documented_row_cap=4500,
+    observed_row_cap_lower_bound=5629,
+    cap_note="Observed 5629 rows in validation/global-vip-probe.json; actual cap unknown. Reaching 5629 remains a saturation alarm.",
+)
+for _api, _family in SYMBOL_PERIODS.items():
+    GLOBAL_CONTRACTS[_api].update(
+        dependencies=[_family],
+        planning_version="symbol_period_ranges_v2",
+        planning_note="Complete discovered supplier-code ranges; indexes use annual historical windows, stocks use the full explicit historical range. Discovery and earliest history remain unverified.",
+    )
+GLOBAL_CONTRACTS["hk_basic"]["identifier_note"] = (
+    "Retired supplier codes may contain ! (e.g. 00013!.HK); keep distinct from 00013.HK."
+)
 
 for _api in ("us_daily", "us_daily_adj"):
     GLOBAL_CONTRACTS[_api]["documented_requests_per_minute"] = 500
@@ -386,8 +412,10 @@ def _identifiers(identifiers):
                 )
             ):
                 raise ValueError(f"Invalid supplier identifier in {family}")
-            if family == "hk_stocks" and not re.fullmatch(r"[0-9]{5}\.HK", code):
-                raise ValueError("HK supplier identifiers require five digits and .HK")
+            if family == "hk_stocks" and not re.fullmatch(r"[0-9]{5}!?\.HK", code):
+                raise ValueError(
+                    "HK supplier identifiers require five digits, optional retirement !, and .HK"
+                )
             if family in ("stocks", "indexes") and not re.fullmatch(
                 r"[A-Za-z0-9]+\.[A-Z]+", code
             ):
@@ -415,7 +443,7 @@ def _starts(config, enabled):
 
 
 def global_prerequisites(identifiers=None, enabled_apis=None, config=None):
-    """Report fallback discovery and history gaps; recent cross-sections can proceed.
+    """Report discovery/history gaps; symbol-period requests need stored codes.
 
     Complete discovery must be verified by the caller, not inferred from nonempty lists.
     """
@@ -433,7 +461,9 @@ def global_prerequisites(identifiers=None, enabled_apis=None, config=None):
                 {
                     "api_name": api,
                     "dependencies": [family],
-                    "reason": "awaiting_complete_stored_discovery_for_saturation",
+                    "reason": "awaiting_stored_discovery_for_symbol_ranges"
+                    if api in SYMBOL_PERIODS
+                    else "awaiting_complete_stored_discovery_for_saturation",
                 }
             )
         if api not in BASICS and starts[api] is None:
@@ -468,21 +498,71 @@ def _day_jobs(api, day, epoch, priority):
             yield _job(api, params, epoch, priority)
 
 
-def iter_global_jobs(config, today, identifiers=None):
-    """Yield recent-first all-market dates, then complete configured historical dates.
+def _interleave(streams):
+    for batch in zip_longest(*streams):
+        for job in batch:
+            if job is not None:
+                yield job
 
-    today is a date/datetime in the caller's planning timezone. planning_epoch pins
-    refresh identity; history is immutable epoch='history'. Basic APIs request every
-    documented status plus unfiltered US classification pagination, never just active
-    listings. Missing history bounds are surfaced by global_prerequisites/metadata.
-    Parent owns persistence, full-page splits, pagination and shared rate limits.
+
+def _period_jobs(api, start, end, ids, epoch, priority):
+    # ts_code plus a range is documented for all four APIs. No weekday/month-end
+    # assumptions: holiday-shortened weeks and natural month labels stay covered.
+    window = start
+    while window <= end:
+        right = (
+            min(end, date(window.year, 12, 31))
+            if api.startswith("index_") and epoch == "history"
+            else end
+        )
+        for code in ids[SYMBOL_PERIODS[api]]:
+            yield _job(
+                api,
+                {
+                    "ts_code": code,
+                    "start_date": window.strftime("%Y%m%d"),
+                    "end_date": right.strftime("%Y%m%d"),
+                },
+                epoch,
+                priority,
+            )
+        window = right + timedelta(days=1)
+
+
+def _date_jobs(api, start, end, epoch, priority):
+    day = start
+    while day <= end:
+        yield from _day_jobs(api, day, epoch, priority)
+        day += timedelta(days=1)
+    if epoch != "history" and api in PERIOD_DAILY:
+        friday = end + timedelta(days=4 - end.weekday())
+        month_end = end.replace(day=monthrange(end.year, end.month)[1])
+        for freq, label in (("week", friday), ("month", month_end)):
+            if label > end:
+                yield _job(
+                    api,
+                    {"trade_date": label.strftime("%Y%m%d"), "freq": freq},
+                    epoch,
+                    priority,
+                )
+
+
+def iter_global_jobs(config, today, identifiers=None):
+    """Generate recent-first jobs without I/O or hidden history/universe cutoffs.
+
+    Four completed-period APIs require stored stocks/indexes. Recent work uses
+    one seven-day range per code. Historical index work uses code/year ranges;
+    historical stock work uses one full configured range per code (cap bisection
+    remains available). All other APIs keep their documented date plans.
+    Missing discovery/history is explicit in global_prerequisites/metadata.
+    Parent owns persistence, pagination, shared limits and old-plan deferral.
     """
     if isinstance(today, datetime):
         today = today.date()
     if not isinstance(today, date):
         raise ValueError("today must be a date")
     enabled = _enabled(config)
-    _identifiers(identifiers or {})
+    ids = _identifiers(identifiers or {})
     starts = _starts(config, enabled)
     if any(start and start > today for start in starts.values()):
         raise ValueError("History start cannot be after today")
@@ -493,43 +573,32 @@ def iter_global_jobs(config, today, identifiers=None):
             for status in ("L", "D", "P"):
                 yield _job(api, {"list_status": status}, epoch, 20)
         elif api == "us_basic":
-            # Omit classify to include all documented categories AND EQT/unknown
-            # categories present in official examples. Do not enumerate a closed list.
+            # Unfiltered classify retains EQT and categories absent from the table.
             for status in (None, "L", "D", "P"):
                 params = {"limit": 6000}
                 if status:
                     params["list_stauts"] = status
                 yield _job(api, params, epoch, 20)
-    day = recent
-    while day <= today:
-        for api in enabled:
-            if api not in BASICS and (starts[api] is None or day >= starts[api]):
-                yield from _day_jobs(api, day, epoch, 20)
-        day += timedelta(days=1)
-    # In-progress week/month observations are keyed to future period labels.
-    friday = today + timedelta(days=4 - today.weekday())
-    month_end = today.replace(day=monthrange(today.year, today.month)[1])
+    streams = []
     for api in enabled:
-        if api in PERIOD_DAILY:
-            for freq, label in (("week", friday), ("month", month_end)):
-                if label > today:
-                    yield _job(
-                        api,
-                        {"trade_date": label.strftime("%Y%m%d"), "freq": freq},
-                        epoch,
-                        20,
-                    )
-    history = {
-        api: start
-        for api, start in starts.items()
-        if api not in BASICS and start and start < recent
-    }
-    if not history:
-        return
-    # Interleave APIs per day; never materialize all source/date combinations.
-    day = min(history.values())
-    while day < recent:
-        for api, start in history.items():
-            if day >= start:
-                yield from _day_jobs(api, day, "history", 40)
-        day += timedelta(days=1)
+        if api in BASICS:
+            continue
+        start = max(recent, starts[api] or recent)
+        streams.append(
+            _period_jobs(api, start, today, ids, epoch, 20)
+            if api in SYMBOL_PERIODS
+            else _date_jobs(api, start, today, epoch, 20)
+        )
+    yield from _interleave(streams)
+    end = recent - timedelta(days=1)
+    streams = []
+    for api in enabled:
+        start = starts[api]
+        if api in BASICS or start is None or start > end:
+            continue
+        streams.append(
+            _period_jobs(api, start, end, ids, "history", 40)
+            if api in SYMBOL_PERIODS
+            else _date_jobs(api, start, end, "history", 40)
+        )
+    yield from _interleave(streams)
