@@ -30,6 +30,7 @@ from backend.shared.tushare_global_contracts import (
     global_prerequisites,
 )
 from backend.shared.tushare_other_contracts import OTHER_CONTRACTS, other_prerequisites
+from backend.shared.tushare_supplement_contracts import supplement_prerequisites
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
@@ -360,7 +361,10 @@ class Pipeline:
                         row[key] = StockCodeUtil.to_prefix(value)
                     elif (
                         key == "ts_code"
-                        and result["api_name"] in GLOBAL_CONTRACTS
+                        and (
+                            result["api_name"] in GLOBAL_CONTRACTS
+                            or result["api_name"] == "mkt_idx_bmk"
+                        )
                         and re.fullmatch(r"[A-Za-z0-9]+\.[A-Z]+", value)
                     ):
                         symbol, exchange = value.rsplit(".", 1)
@@ -493,6 +497,7 @@ class Pipeline:
             "hk_basic": "hk_stocks",
             "us_basic": "us_stocks",
             "index_basic": "indexes",
+            "mkt_idx_bmk": "indexes",
             "etf_basic": "funds",
             "fund_basic": "funds",
             "cb_basic": "bonds",
@@ -655,12 +660,30 @@ class Pipeline:
                 ),
             )
 
+    def record_supplement_planning_gaps(self, config, identifiers):
+        for gap in supplement_prerequisites(identifiers, config=config):
+            kind = "discovery" if gap["dependencies"] else "history"
+            self.db.execute(
+                "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
+                "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason "
+                "WHERE capability.status<>excluded.status OR capability.reason<>excluded.reason",
+                (
+                    "planning:supplement:" + gap["api_name"] + ":" + kind,
+                    "discovery_unverified"
+                    if kind == "discovery"
+                    else "history_scope_unverified",
+                    utc_now(),
+                    json.dumps(gap, sort_keys=True),
+                ),
+            )
+
     def plan_extended(self, config, today):
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
             ("other", self.record_other_planning_gaps),
             ("global", self.record_global_planning_gaps),
+            ("supplement", self.record_supplement_planning_gaps),
         ):
             if not config.get("enable_" + family, False):
                 continue
@@ -714,6 +737,8 @@ class Pipeline:
                             "global_history_start",
                             "other_apis",
                             "other_history_start",
+                            "supplement_apis",
+                            "supplement_history_start",
                         )
                     },
                     "identifiers": identifiers,
