@@ -16,6 +16,7 @@ import tempfile
 
 from backend.shared.tushare_market_contracts import MARKET_CONTRACTS
 from backend.shared.tushare_global_contracts import GLOBAL_CONTRACTS
+from backend.shared.tushare_other_contracts import OTHER_CONTRACTS
 from backend.shared.tushare_pipeline import manifest_at
 from backend.shared.tushare_structured_contracts import STRUCTURED_CONTRACTS
 from backend.shared.tushare_text_contracts import TEXT_CONTRACTS
@@ -34,6 +35,7 @@ CONTRACTS = {
     **STRUCTURED_CONTRACTS,
     **MARKET_CONTRACTS,
     **GLOBAL_CONTRACTS,
+    **OTHER_CONTRACTS,
 }
 IDENTITIES = {}
 for _api, _contract in CONTRACTS.items():
@@ -166,6 +168,15 @@ def _dataset(root, release_id, api_name):
                 for f in ("_row_identity",) + TEXT_FIELDS
                 if f in columns and f not in keys
             ]
+        if api_name.startswith("hk_") and "ts_code" in columns:
+            # Older captured HK delistings retained the supplier suffix. Project
+            # only this known legacy shape before key deduplication and filters;
+            # ! distinguishes retired listings from later reuse of the same code.
+            relation = relation.project(
+                "* REPLACE (CASE WHEN regexp_full_match(ts_code, '[0-9]{5}!?[.]HK') "
+                "THEN 'HK' || left(ts_code, length(ts_code) - 3) "
+                "ELSE ts_code END AS ts_code)"
+            )
         relation.create_view("stored")
         metadata = _metadata(manifest, release_id, api_name, aliases)
         metadata["source_api_names"] = sorted(source_apis)

@@ -100,6 +100,88 @@ def _documents(manifest):
     return json.loads(_artifact(manifest, path))
 
 
+def _document_shard(manifest, descriptor, kind):
+    path = descriptor["path"]
+    if not re.fullmatch(r"documents/[a-f0-9]{64}\.json", path):
+        raise HTTPException(409, "Invalid document shard path")
+    expected = manifest["files"].get(path, {})
+    if any(descriptor.get(key) != expected.get(key) for key in ("sha256", "bytes")):
+        raise HTTPException(409, "Document shard inventory mismatch")
+    payload = json.loads(_artifact(manifest, path))
+    if (
+        payload.get("schema_version") != 2
+        or payload.get("kind") != kind
+        or payload.get("bucket") != descriptor["bucket"]
+        or not isinstance(payload.get("items"), list)
+        or type(descriptor.get("count")) is not int
+        or any(not isinstance(item, dict) for item in payload["items"])
+        or len(payload["items"]) != descriptor["count"]
+    ):
+        raise HTTPException(409, "Invalid document shard contents")
+    return payload["items"]
+
+
+def _document_page(manifest, index, view, offset, limit):
+    if index.get("schema_version", 1) == 1:
+        items = index.get(view, [])
+        return items[offset : offset + limit], len(items)
+    if index.get("schema_version") != 2:
+        raise HTTPException(409, "Unsupported document index schema")
+    shards = index[view]
+    total = index["totals"][view]
+    if (
+        type(total) is not int
+        or total < 0
+        or any(
+            type(item.get("count")) is not int or not 1 <= item["count"] <= 1000
+            for item in shards
+        )
+        or sum(item["count"] for item in shards) != total
+    ):
+        raise HTTPException(409, "Invalid document index counts")
+    selected, position = [], 0
+    for descriptor in shards:
+        stop = position + descriptor["count"]
+        if stop > offset and position < offset + limit:
+            rows = _document_shard(manifest, descriptor, view)
+            selected.extend(
+                rows[
+                    max(0, offset - position) : min(
+                        len(rows), offset + limit - position
+                    )
+                ]
+            )
+        position = stop
+        if position >= offset + limit:
+            break
+    if view == "mappings":
+        identifiers = {row["document_id"] for row in selected if row.get("document_id")}
+        states = {}
+        # Retain only this page's documents, releasing each parsed bucket before
+        # the next. Repeated observations no longer duplicate state on disk.
+        for prefix in sorted({ident[:2] for ident in identifiers}):
+            descriptor = index["states"].get(prefix)
+            if descriptor:
+                for item in _document_shard(manifest, descriptor, "states"):
+                    if item["id"] in identifiers:
+                        states[item["id"]] = item
+        for row in selected:
+            state = states.get(row.get("document_id"), {})
+            row.update(
+                validation_observation=state.get("observation"),
+                latest_result=state.get("result"),
+            )
+            for field in (
+                "expected_mime",
+                "download_status",
+                "parse_status",
+                "download_tries",
+                "parse_tries",
+            ):
+                row[field] = state.get(field)
+    return selected, total
+
+
 def _response(value):
     # Same lossless date/decimal/binary serialization as the offline JSONL store.
     encoded = json.loads(
@@ -180,22 +262,23 @@ def query(body: DatasetQuery):
 @router.get("/documents")
 def documents(
     release_id: str = Query(pattern=RELEASE),
-    view: Literal["mappings", "files"] = "mappings",
+    view: Literal["mappings", "files", "attempts"] = "mappings",
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=2000),
 ):
     """Page frozen document metadata, including parse/download failure states."""
     with _errors():
-        inventory = _documents(_manifest(release_id))
-        items = inventory.get(view, [])
-        stop = min(len(items), offset + limit)
+        manifest = _manifest(release_id)
+        inventory = _documents(manifest)
+        items, total = _document_page(manifest, inventory, view, offset, limit)
+        stop = min(total, offset + len(items))
         return _response(
             {
                 "release_id": release_id,
                 "view": view,
-                "items": items[offset:stop],
-                "total": len(items),
-                "next_offset": stop if stop < len(items) else None,
+                "items": items,
+                "total": total,
+                "next_offset": stop if stop < total else None,
                 "status": inventory.get("status", "registered"),
                 "counts": inventory.get("counts", []),
                 "upstream_calls": 0,

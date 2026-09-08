@@ -106,6 +106,19 @@ STRUCTURED_CONTRACTS = {
     "cn_pmi": _contract(2000, ("month",), split=False),
     "sf_month": _contract(2000, ("month",), split=False),
 }
+# Demonstrated lower bounds from the 2026-09-09 authority capability probe,
+# period 20260630. These are saturation alarms, NOT verified provider maxima.
+# Using the ordinary 100-row alarm caused avoidable per-stock fanout even when
+# the VIP endpoint returned thousands of rows in a single retained response.
+VIP_OBSERVED_ROWS = {
+    "income": 9000,
+    "balancesheet": 7000,
+    "cashflow": 6400,
+    "fina_indicator": 10736,
+    "forecast": 1913,
+    "express": 66,
+}
+
 for _base in (
     "income",
     "balancesheet",
@@ -119,16 +132,22 @@ for _base in (
         _keys += ("report_type", "comp_type", "f_ann_date")
     elif _base == "forecast":
         _keys += ("type",)
-    # VIP limits are not specified separately. 100 is a conservative saturation
-    # alarm, NEVER evidence that a smaller response proves historical completeness.
+    # A response below the alarm is a usable sample, not a completeness proof.
     STRUCTURED_CONTRACTS[_base + "_vip"] = _contract(
-        100,
+        max(100, VIP_OBSERVED_ROWS[_base]),
         _keys,
         required=("ts_code", "end_date"),
         nullable=("ann_date", "f_ann_date"),
         split=_base != "fina_indicator",
         base=_base,
         cap_verified=False,
+    )
+    STRUCTURED_CONTRACTS[_base + "_vip"].update(
+        row_cap_basis="observed_response_lower_bound_not_verified_maximum",
+        row_cap_observed_rows=VIP_OBSERVED_ROWS[_base],
+        row_cap_observed_period="20260630",
+        row_cap_observed_at="2026-09-09",
+        row_cap_evidence="validation/global-vip-probe.json",
     )
     STRUCTURED_CONTRACTS[_base + "_vip"]["split_axis"] = (
         "report_period" if _base == "fina_indicator" else "announcement_date"

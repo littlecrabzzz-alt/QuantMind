@@ -119,11 +119,22 @@ class ExtendedPipeline(unittest.TestCase):
         manifest = module.verify_data(self.root, release)
         self.assertIn(artifact["path"], manifest["files"])
         portable = json.loads((self.root / manifest["documents"]["path"]).read_bytes())
-        self.assertEqual(len(portable["mappings"]), 1)
-        self.assertEqual(
-            portable["mappings"][0]["latest_result"]["parse_status"], "parse_failed"
-        )
+        self.assertEqual(portable["schema_version"], 2)
+        self.assertEqual(portable["totals"]["mappings"], 1)
+        state_shard = next(iter(portable["states"].values()))
+        state = json.loads((self.root / state_shard["path"]).read_bytes())["items"][0]
+        self.assertEqual(state["result"]["parse_status"], "parse_failed")
         self.assertEqual(release, p.publish())
+        historical = {"historical_document_index": "retained"}
+        historical_path = (
+            "documents/" + module.digest(module.json_bytes(historical)) + ".json"
+        )
+        module.atomic_json(self.root / historical_path, historical)
+        newer = p.publish()
+        self.assertIn(historical_path, module.verify_data(self.root, newer)["files"])
+        self.assertIn(
+            manifest["documents"]["path"], module.verify_data(self.root, newer)["files"]
+        )
         from backend.shared.tushare_archive import recover_archive
 
         recovery = recover_archive(self.root, max_items=1000, max_seconds=5)
@@ -503,7 +514,7 @@ class ExtendedPipeline(unittest.TestCase):
                 self.assertEqual(
                     tuple(p.db.execute("SELECT * FROM jobs").fetchone())[:10], original
                 )
-                self.assertEqual(p.db.execute("PRAGMA user_version").fetchone()[0], 3)
+                self.assertEqual(p.db.execute("PRAGMA user_version").fetchone()[0], 4)
                 self.assertEqual(
                     p.db.execute(
                         "SELECT result FROM attempts WHERE job_id='saved-id' AND attempt=2"

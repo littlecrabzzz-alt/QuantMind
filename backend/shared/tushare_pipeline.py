@@ -29,6 +29,7 @@ from backend.shared.tushare_global_contracts import (
     GLOBAL_CONTRACTS,
     global_prerequisites,
 )
+from backend.shared.tushare_other_contracts import OTHER_CONTRACTS, other_prerequisites
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
@@ -320,7 +321,16 @@ class Pipeline:
                 value = row.get(key)
                 if isinstance(value, str):
                     row["source_" + key] = value
-                    if (
+                    if result["api_name"] in OTHER_CONTRACTS and result[
+                        "api_name"
+                    ].startswith(("opt_", "sge_", "fx_")):
+                        # Asset namespace precedes any stock-shaped symbol. Supplier
+                        # values remain in source_* and the immutable raw response.
+                        namespace = {"opt": "OPT:", "sge": "SGE:", "fx": "FX:"}[
+                            result["api_name"].split("_", 1)[0]
+                        ]
+                        row[key] = namespace + value
+                    elif (
                         key == "ts_code"
                         and result["api_name"] in GLOBAL_CONTRACTS
                         and result["api_name"].startswith("us_")
@@ -330,7 +340,7 @@ class Pipeline:
                     elif (
                         key == "ts_code"
                         and result["api_name"] in GLOBAL_CONTRACTS
-                        and re.fullmatch(r"[0-9]{5}\.HK", value)
+                        and re.fullmatch(r"[0-9]{5}!?\.HK", value)
                     ):
                         row[key] = "HK" + value.removesuffix(".HK")
                     elif re.fullmatch(r"\d{6}\.(SH|SZ|BJ)", value):
@@ -475,6 +485,12 @@ class Pipeline:
             "cb_basic": "bonds",
             "index_classify": "sw_l3",
             "fut_basic": "futures",
+            "opt_basic": "options",
+            "opt_daily": "options",
+            "sge_basic": "spot_metals",
+            "sge_daily": "spot_metals",
+            "fx_obasic": "fx_instruments",
+            "fx_daily": "fx_instruments",
         }
         result = {name: set() for name in families.values()}
         result.update(
@@ -561,10 +577,108 @@ class Pipeline:
                     ),
                 )
 
+    def record_other_planning_gaps(self, config, identifiers):
+        gaps = other_prerequisites(identifiers, config=config)
+        selected = config.get("other_apis", tuple(OTHER_CONTRACTS))
+        evidence = []
+        for api in selected:
+            spec = OTHER_CONTRACTS[api]
+            family = spec.get("saturation_fallback") or {
+                "opt_basic": "options",
+                "sge_basic": "spot_metals",
+                "fx_obasic": "fx_instruments",
+            }.get(api)
+            if family:
+                count = len(identifiers.get(family, []))
+                evidence.append(
+                    (
+                        api,
+                        "discovery",
+                        "discovery_unverified" if count else "awaiting_discovery",
+                        {
+                            "family": family,
+                            "observed_codes": count,
+                            "universe_complete": False,
+                        },
+                    )
+                )
+            if not spec["row_cap_verified"]:
+                evidence.append(
+                    (
+                        api,
+                        "cap",
+                        "row_cap_unverified",
+                        {"reason": spec["cap_note"], "row_cap": spec["row_cap"]},
+                    )
+                )
+        setting = config.get("other_history_start")
+        for gap in gaps:
+            if gap["dependencies"]:
+                continue  # Discovery evidence above is retained even after first rows.
+            api = gap["api_name"]
+            explicit = setting.get(api) if isinstance(setting, dict) else setting
+            evidence.append(
+                (
+                    api,
+                    "history",
+                    "history_scope_unverified",
+                    {
+                        "reason": gap["reason"],
+                        "requested_start": explicit or config.get("history_start"),
+                        "scope_is_full_history_proof": False,
+                    },
+                )
+            )
+        for api, kind, status, reason in evidence:
+            self.db.execute(
+                "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
+                "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason "
+                "WHERE capability.status<>excluded.status OR capability.reason<>excluded.reason",
+                (
+                    f"planning:other:{api}:{kind}",
+                    status,
+                    utc_now(),
+                    json.dumps(reason, sort_keys=True),
+                ),
+            )
+
     def plan_extended(self, config, today):
         identifiers = self.identifiers()
-        if config.get("enable_global", False):
-            self.record_global_planning_gaps(config, identifiers)
+        blocked_families = set()
+        for family, validate in (
+            ("other", self.record_other_planning_gaps),
+            ("global", self.record_global_planning_gaps),
+        ):
+            if not config.get("enable_" + family, False):
+                continue
+            scope = "planning:" + family
+            try:
+                validate(config, identifiers)
+            except ValueError as error:
+                # A malformed discovery blocks only its family, not independent
+                # acquisition. Do not advance its cursor or rewrite persistent config.
+                blocked_families.add(family)
+                self.db.execute(
+                    "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,'validation_blocked',?,?) "
+                    "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
+                    (
+                        scope,
+                        utc_now(),
+                        json.dumps(
+                            {"error_type": type(error).__name__, "reason": str(error)},
+                            sort_keys=True,
+                        ),
+                    ),
+                )
+            else:
+                self.db.execute(
+                    "UPDATE capability SET status='validation_passed',checked_at=?,reason=? WHERE scope=? AND status='validation_blocked'",
+                    (
+                        utc_now(),
+                        json.dumps({"reason": "family_validation_recovered"}),
+                        scope,
+                    ),
+                )
         budget = int(config.get("plan_jobs_per_tick", 2000))
         if not 1 <= budget <= 10000:
             raise ValueError("Invalid planner batch size")
@@ -585,6 +699,8 @@ class Pipeline:
                             "market_apis",
                             "global_apis",
                             "global_history_start",
+                            "other_apis",
+                            "other_history_start",
                         )
                     },
                     "identifiers": identifiers,
@@ -594,7 +710,7 @@ class Pipeline:
         )
         stats = {}
         for family, planner in PLANNERS.items():
-            if not config.get("enable_" + family, False):
+            if family in blocked_families or not config.get("enable_" + family, False):
                 continue
             for mode in ("recent", "history"):
                 name = mode + ":" + family
@@ -648,6 +764,7 @@ class Pipeline:
                     "done": done,
                     "anchor": state["anchor"],
                 }
+        self.db.commit()  # Persist validation gaps even when every family is blocked.
         return stats
 
     def date_children(self, job):
@@ -1343,25 +1460,33 @@ class Pipeline:
             archive = {"recovery": archived["recovery"], "gaps": archived["gaps"]}
         documents = None
         if (self.root / "documents.sqlite").exists():
-            from backend.shared.tushare_documents import document_inventory
+            from backend.shared.tushare_documents import document_index
 
-            inventory = document_inventory(self.root)
+            inventory = document_index(self.root)
             for item in inventory["files"]:
                 files[item["path"]] = {"sha256": item["sha256"], "bytes": item["bytes"]}
-            raw_documents = json_bytes(inventory)
-            document_name = "documents/" + digest(raw_documents) + ".json"
-            if not (self.root / document_name).exists():
-                atomic_bytes(self.root / document_name, raw_documents)
-            files[document_name] = {
-                "sha256": digest(raw_documents),
-                "bytes": len(raw_documents),
-            }
             documents = {
-                "path": document_name,
+                "path": inventory["path"],
+                "schema_version": inventory["schema_version"],
                 "counts": inventory["counts"],
                 "reference_counts": inventory["reference_counts"],
+                "totals": inventory["totals"],
             }
-            del inventory, raw_documents
+            del inventory
+        # Retain prior immutable metadata versions as well as the current index.
+        # A fresh Mac must not depend on having mirrored every earlier release.
+        for family in ("documents", "schemas", "archives"):
+            if (self.root / family).is_symlink():
+                raise ValueError("Unsafe immutable metadata directory")
+            for path in (self.root / family).glob("*.json"):
+                if not re.fullmatch(r"[a-f0-9]{64}", path.stem):
+                    continue
+                if path.is_symlink():
+                    raise ValueError("Unsafe immutable metadata symlink")
+                files[path.relative_to(self.root).as_posix()] = {
+                    "sha256": path.stem,
+                    "bytes": path.stat().st_size,
+                }
         content = {
             "schema_version": 1,
             "files": files,

@@ -273,6 +273,7 @@ async def auth_middleware(request: Request, call_next):
             "/api/v1/alpha-agent/",
             "/api/v1/pipeline/",
             "/api/v1/research-runs",
+            "/api/v1/tushare-data",
             "/api/v1/admin/",
         )
         if not user_id and any(path.startswith(p) for p in protected_prefixes):
@@ -438,6 +439,14 @@ try:
     logger.info("✅ TradingAgents routers loaded")
 except ImportError as e:
     logger.error(f"❌ Failed to load TradingAgents routers: {e}")
+
+try:
+    from backend.services.engine.routers.tushare_data import router as tushare_data_router
+
+    app.include_router(tushare_data_router)
+    logger.info("Tushare fixed-release read router loaded")
+except ImportError as e:
+    logger.error(f"Failed to load Tushare read router: {e}")
 
 try:
     from backend.services.engine.routers.quantbot_router import router as quantbot_router

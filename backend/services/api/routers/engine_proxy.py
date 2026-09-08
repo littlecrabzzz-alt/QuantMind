@@ -10,7 +10,7 @@ import os
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from backend.services.api.routers.proxy_error_mapping import map_upstream_http_error
 from backend.services.api.user_app.middleware.auth import get_optional_user
@@ -106,6 +106,14 @@ async def _proxy(request: Request, user: dict | None = None) -> Response:
         f"❌ ENGINE PROXY FINAL FAILURE: {request.method} {url} -> {type(last_exc).__name__}: {last_exc}"
     )
     raise map_upstream_http_error("engine", last_exc or Exception("Unknown proxy error"))
+
+
+@router.api_route("/api/v1/tushare-data/{p:path}", methods=["GET", "POST", "OPTIONS"])
+async def tushare_data_proxy(request: Request, user: dict | None = Depends(get_optional_user)):
+    # Do not forward unauthenticated requests or trust client identity headers.
+    if request.method != "OPTIONS" and (not user or not user.get("user_id")):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return await _proxy(request, user)
 
 
 # 终极捕获规则：匹配所有策略、回测、推理相关的已知路径
