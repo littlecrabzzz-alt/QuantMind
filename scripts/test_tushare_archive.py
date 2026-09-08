@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline recovery fixtures: no credentials, upstream calls or production files."""
 
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
@@ -253,6 +254,226 @@ class ArchiveRecovery(unittest.TestCase):
                 "not_started",
             )
 
+    def test_incremental_release_closure_reaches_fresh_mirror(self):
+        import shutil
+
+        data, metadata = hashed(
+            self.root, "attachments", b"original binary error body", "bin"
+        )
+        seed, seed_raw = manifest(
+            self.root, {"files": [{"path": data, **metadata}]}, probe=True
+        )
+        finish(self.root)
+        retained_seed = archive.retain_release(self.root, seed)
+        first, first_raw = manifest(
+            self.root, {"files": retained_seed["files"], "datasets": [], "revision": 1}
+        )
+        # First frozen scan cannot discover the later releases. Explicit retain
+        # does not enumerate any directory or hash their inherited object files.
+        with (
+            patch.object(Path, "iterdir", side_effect=AssertionError("tree scan")),
+            patch.object(
+                archive, "_fingerprint", side_effect=AssertionError("object rehash")
+            ),
+        ):
+            retained_first = archive.retain_release(self.root, first)
+            second, second_raw = manifest(
+                self.root,
+                {"files": retained_first["files"], "datasets": [], "revision": 2},
+            )
+            retained_second = archive.retain_release(self.root, second)
+        current, current_raw = manifest(
+            self.root,
+            {
+                "files": retained_second["files"],
+                "datasets": [],
+                "archive": {
+                    "recovery": {
+                        "archived_releases": retained_second["archived_releases"]
+                    }
+                },
+            },
+        )
+        self.assertEqual(
+            {r["release_id"] for r in retained_second["archived_releases"]},
+            {seed, first, second},
+        )
+        with tempfile.TemporaryDirectory() as target:
+            mirror = Path(target)
+            dest = mirror / "releases" / current / "manifest.json"
+            dest.parent.mkdir(parents=True)
+            dest.write_bytes(current_raw)
+            # Exactly the CURRENT manifest file list is available on a new Mac.
+            for name, expected in json.loads(current_raw)["files"].items():
+                source = self.root / name
+                self.assertEqual(
+                    hashlib.sha256(source.read_bytes()).hexdigest(), expected["sha256"]
+                )
+                (mirror / name).parent.mkdir(exist_ok=True)
+                shutil.copyfile(source, mirror / name)
+            for release, raw in (
+                (seed, seed_raw),
+                (first, first_raw),
+                (second, second_raw),
+            ):
+                mapping = next(
+                    r
+                    for r in retained_second["archived_releases"]
+                    if r["release_id"] == release
+                )
+                archived = (mirror / mapping["path"]).read_bytes()
+                self.assertEqual(archived, raw)
+                self.assertEqual(
+                    hashlib.sha256(archived).hexdigest(), mapping["sha256"]
+                )
+                if release.startswith("data-"):
+                    self.assertEqual(
+                        mapping["path"], "archives/" + release[5:] + ".json"
+                    )
+            self.assertFalse((mirror / "archive.sqlite").exists())
+
+    def test_legacy_frozen_scan_gets_only_one_release_directory_catchup(self):
+        finish(self.root)
+        with closing(sqlite3.connect(self.root / "archive.sqlite")) as db, db:
+            db.execute("DELETE FROM meta WHERE key='release_catchup'")
+        late, _ = manifest(self.root, {"files": {}, "datasets": [], "later": True})
+        original = Path.iterdir
+        seen = []
+
+        def only_releases(path):
+            seen.append(path.name)
+            self.assertEqual(path, self.root / "releases")
+            return original(path)
+
+        with patch.object(Path, "iterdir", only_releases):
+            inventory = finish(self.root)
+            finish(self.root)
+        self.assertEqual(seen, ["releases"])
+        self.assertIn(
+            late, {r["release_id"] for r in inventory["recovery"]["archived_releases"]}
+        )
+        later, _ = manifest(self.root, {"files": {}, "datasets": [], "later": 2})
+        with patch.object(Path, "iterdir", only_releases):
+            archive.recover_archive(self.root, max_items=1, rescan_releases=True)
+            inventory = finish(self.root)
+        self.assertIn(
+            later, {r["release_id"] for r in inventory["recovery"]["archived_releases"]}
+        )
+        self.assertEqual(inventory["recovery"]["scan_count"], 1)
+
+    def test_release_directory_catchup_interruption_restarts_membership_atomically(
+        self,
+    ):
+        finish(self.root)
+        with closing(sqlite3.connect(self.root / "archive.sqlite")) as db, db:
+            db.execute("DELETE FROM meta WHERE key='release_catchup'")
+        expected = {
+            manifest(self.root, {"files": {}, "datasets": [], "n": n})[0]
+            for n in range(3)
+        }
+        original = archive._task
+        calls = 0
+
+        def interrupted(*args, **kwargs):
+            nonlocal calls
+            original(*args, **kwargs)
+            calls += 1
+            if calls == 2:
+                raise KeyboardInterrupt
+
+        with patch.object(archive, "_task", side_effect=interrupted):
+            with self.assertRaises(KeyboardInterrupt):
+                archive.recover_archive(self.root)
+        with closing(sqlite3.connect(self.root / "archive.sqlite")) as db:
+            self.assertIsNone(
+                db.execute(
+                    "SELECT value FROM meta WHERE key='release_catchup'"
+                ).fetchone()
+            )
+        inventory = finish(self.root, budget=1)
+        self.assertEqual(
+            {r["release_id"] for r in inventory["recovery"]["archived_releases"]},
+            expected,
+        )
+
+    def test_retention_interrupt_after_copy_resumes_without_losing_original(self):
+        release, raw = manifest(self.root, {"files": {}, "datasets": []})
+        real = archive._register
+        with patch.object(archive, "_register", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                archive.retain_release(self.root, release)
+        expected = self.root / "archives" / (hashlib.sha256(raw).hexdigest() + ".json")
+        self.assertEqual(expected.read_bytes(), raw)
+        with patch.object(archive, "_register", wraps=real):
+            first = archive.retain_release(self.root, release)
+        self.assertEqual(first, archive.retain_release(self.root, release))
+        self.assertEqual(len(first["archived_releases"]), 1)
+        self.assertEqual(
+            (self.root / "releases" / release / "manifest.json").read_bytes(), raw
+        )
+
+    def test_missing_and_same_size_tamper_are_not_claimed_verified(self):
+        path, metadata = hashed(self.root, "attachments", b"original", "bin")
+        release, raw = manifest(self.root, {"files": {path: metadata}, "datasets": []})
+        (self.root / path).unlink()
+        retained = archive.retain_release(self.root, release)
+        self.assertEqual(
+            retained["verification"], "manifest_verified_references_expected"
+        )
+        self.assertNotIn(path, archive.archive_inventory(self.root)["files"])
+        missing = finish(self.root)
+        self.assertIn("FileNotFoundError", {g["reason"] for g in missing["gaps"]})
+        (self.root / path).write_bytes(b"tampered")
+        archive.recover_archive(self.root, rescan=True)
+        damaged = finish(self.root)
+        self.assertIn(
+            "filename_checksum_mismatch", {g["reason"] for g in damaged["gaps"]}
+        )
+        self.assertNotIn(path, damaged["files"])
+        (self.root / "releases" / release / "manifest.json").write_bytes(
+            raw.replace(b"files", b"fakes")
+        )
+        with self.assertRaisesRegex(archive.ArchiveError, "manifest_checksum_mismatch"):
+            archive.retain_release(self.root, release)
+
+    def test_legacy_identity_conflicts_and_unknown_file_metadata_remain_explicit(self):
+        path, _ = hashed(self.root, "attachments", b"legacy bytes", "bin")
+        seed, _ = manifest(self.root, {"files": [path]}, probe=True)
+        first = archive.retain_release(self.root, seed)
+        inventory = finish(self.root)
+        self.assertIn(
+            "legacy_file_metadata_observed_without_manifest_anchor",
+            {g["reason"] for g in inventory["gaps"]},
+        )
+        self.assertIn(path, inventory["files"])
+        manifest(self.root, {"files": [path], "changed": True}, probe=True)
+        with self.assertRaisesRegex(archive.ArchiveError, "immutable_release_conflict"):
+            archive.retain_release(self.root, seed)
+        self.assertEqual(
+            first["archived_releases"],
+            archive.archive_inventory(self.root)["recovery"]["archived_releases"],
+        )
+
+    def test_retention_rejects_symlinks_bad_metadata_and_non_attachment_bin(self):
+        for badpath in (
+            "../escape.json",
+            "objects/" + "a" * 64 + ".bin",
+            "extracted/" + "a" * 64 + ".bin",
+        ):
+            release, _ = manifest(
+                self.root,
+                {"files": {badpath: {"sha256": "a" * 64, "bytes": 0}}, "datasets": []},
+            )
+            with self.assertRaisesRegex(archive.ArchiveError, "invalid_immutable_path"):
+                archive.retain_release(self.root, release)
+        release, _ = manifest(self.root, {"files": {}, "datasets": []})
+        path = self.root / "releases" / release / "manifest.json"
+        original = self.root / "original.json"
+        path.rename(original)
+        path.symlink_to(original)
+        with self.assertRaisesRegex(archive.ArchiveError, "symlink"):
+            archive.retain_release(self.root, release)
+
     def test_symlinks_are_not_followed_and_rescan_resolves_missing_reference(self):
         external = self.root / "outside"
         external.write_bytes(b"do not read through link")
@@ -275,7 +496,7 @@ class ArchiveRecovery(unittest.TestCase):
         inventory = finish(self.root)
         self.assertIn(path, inventory["files"])
         self.assertFalse(any(g["path"] == path for g in inventory["gaps"]))
-        with sqlite3.connect(self.root / "archive.sqlite") as db:
+        with closing(sqlite3.connect(self.root / "archive.sqlite")) as db, db:
             self.assertGreater(
                 db.execute("SELECT COUNT(*) FROM gaps WHERE resolved=1").fetchone()[0],
                 0,
