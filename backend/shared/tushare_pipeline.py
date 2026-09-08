@@ -1689,14 +1689,25 @@ def tick(max_requests=None, max_seconds=None):
 def manifest_at(root, release_id):
     if not re.fullmatch(r"data-[a-f0-9]{64}", release_id):
         raise ValueError("Invalid release ID")
-    raw = (Path(root) / "releases" / release_id / "manifest.json").read_bytes()
+    root = Path(root).resolve()
+    path = root / "releases" / release_id / "manifest.json"
+    if path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
+        raise ValueError("Unsafe manifest path")
+    if not path.exists():
+        path = root / "archives" / (release_id.removeprefix("data-") + ".json")
+        if path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
+            raise ValueError("Unsafe archived manifest path")
+    raw = path.read_bytes()
     if digest(raw) != release_id.removeprefix("data-"):
         raise ValueError("Manifest checksum mismatch")
     manifest = json.loads(raw)
     for path in manifest["files"]:
-        if not re.fullmatch(
-            r"(?:objects|observations|parquet|schemas|attachments|extracted|documents|archives)/[a-f0-9]+\.(?:json|parquet|pdf|html)",
-            path,
+        if not (
+            re.fullmatch(
+                r"(?:objects|observations|parquet|schemas|attachments|extracted|documents|archives)/[a-f0-9]+\.(?:json|parquet|pdf|html)",
+                path,
+            )
+            or re.fullmatch(r"attachments/[a-f0-9]{64}\.bin", path)
         ):
             raise ValueError("Invalid object path")
     return manifest

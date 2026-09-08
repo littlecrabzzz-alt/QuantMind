@@ -146,8 +146,18 @@ class PipelineAcceptance(unittest.TestCase):
 
     def test_mirror_interruption_retry_noop_and_corruption(self):
         with tempfile.TemporaryDirectory() as tmp:
-            source, target = Path(tmp) / "cloud", Path(tmp) / "mac"
+            source, target = Path(tmp).resolve() / "cloud", Path(tmp).resolve() / "mac"
             pipeline = Pipeline(source, CATALOG)
+            from backend.shared import tushare_documents as documents
+
+            documents._document_db(source).close()
+            evidence = documents._save(
+                source,
+                "attachments",
+                ".bin",
+                b"<html>Unexpected response</html>",
+                "application/octet-stream",
+            )
             with httpx.Client(
                 transport=httpx.MockTransport(lambda _: self.response([1]))
             ) as client:
@@ -206,6 +216,11 @@ class PipelineAcceptance(unittest.TestCase):
                         self.assertEqual(unchanged["downloaded_files"], 0)
                         self.assertEqual(checked.call_count, unchanged["files"])
                 manifest = verify_data(target, second)
+                self.assertIn(evidence["path"], manifest["files"])
+                self.assertEqual(
+                    (target / evidence["path"]).read_bytes(),
+                    b"<html>Unexpected response</html>",
+                )
                 one = next(iter(manifest["files"]))
                 (target / one).write_bytes(b"corrupted")
                 with self.assertRaises(ValueError):
@@ -448,6 +463,49 @@ class PipelineAcceptance(unittest.TestCase):
             atomic_json(Path(tmp) / "releases" / release / "manifest.json", body)
             with self.assertRaises(ValueError):
                 manifest_at(Path(tmp), release)
+
+    def test_archived_manifest_fallback_rejects_corruption_and_symlinks(self):
+        from backend.shared.tushare_intake import digest, json_bytes
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            raw = json_bytes({"files": {}, "datasets": []})
+            sha = digest(raw)
+            archived = root / "archives" / (sha + ".json")
+            archived.parent.mkdir()
+            archived.write_bytes(raw)
+            self.assertEqual(manifest_at(root, "data-" + sha)["datasets"], [])
+            original = root / "releases" / ("data-" + sha) / "manifest.json"
+            original.parent.mkdir(parents=True)
+            original.write_bytes(b"corrupted")
+            with self.assertRaisesRegex(ValueError, "checksum"):
+                manifest_at(root, "data-" + sha)
+            original.unlink()
+            original.symlink_to(archived)
+            with self.assertRaisesRegex(ValueError, "Unsafe"):
+                manifest_at(root, "data-" + sha)
+            original.unlink()
+            archived.write_bytes(b"corrupted")
+            with self.assertRaisesRegex(ValueError, "checksum"):
+                manifest_at(root, "data-" + sha)
+
+    def test_binary_evidence_only_allowed_under_attachments(self):
+        from backend.shared.tushare_intake import digest, json_bytes
+
+        with tempfile.TemporaryDirectory() as tmp:
+            for family in ("objects", "parquet", "documents", "archives"):
+                body = {
+                    "files": {
+                        family + "/" + "a" * 64 + ".bin": {
+                            "sha256": "a" * 64,
+                            "bytes": 0,
+                        }
+                    }
+                }
+                release = "data-" + digest(json_bytes(body))
+                atomic_json(Path(tmp) / "releases" / release / "manifest.json", body)
+                with self.assertRaisesRegex(ValueError, "Invalid object path"):
+                    manifest_at(Path(tmp), release)
 
 
 if __name__ == "__main__":
