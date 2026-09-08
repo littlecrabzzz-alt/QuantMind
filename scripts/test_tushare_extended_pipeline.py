@@ -125,6 +125,16 @@ class ExtendedPipeline(unittest.TestCase):
         state = json.loads((self.root / state_shard["path"]).read_bytes())["items"][0]
         self.assertEqual(state["result"]["parse_status"], "parse_failed")
         self.assertEqual(release, p.publish())
+        historical = {"historical_document_index": "retained"}
+        historical_path = (
+            "documents/" + module.digest(module.json_bytes(historical)) + ".json"
+        )
+        module.atomic_json(self.root / historical_path, historical)
+        newer = p.publish()
+        self.assertIn(historical_path, module.verify_data(self.root, newer)["files"])
+        self.assertIn(
+            manifest["documents"]["path"], module.verify_data(self.root, newer)["files"]
+        )
         from backend.shared.tushare_archive import recover_archive
 
         recovery = recover_archive(self.root, max_items=1000, max_seconds=5)

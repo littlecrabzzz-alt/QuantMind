@@ -1473,6 +1473,20 @@ class Pipeline:
                 "totals": inventory["totals"],
             }
             del inventory
+        # Retain prior immutable metadata versions as well as the current index.
+        # A fresh Mac must not depend on having mirrored every earlier release.
+        for family in ("documents", "schemas", "archives"):
+            if (self.root / family).is_symlink():
+                raise ValueError("Unsafe immutable metadata directory")
+            for path in (self.root / family).glob("*.json"):
+                if not re.fullmatch(r"[a-f0-9]{64}", path.stem):
+                    continue
+                if path.is_symlink():
+                    raise ValueError("Unsafe immutable metadata symlink")
+                files[path.relative_to(self.root).as_posix()] = {
+                    "sha256": path.stem,
+                    "bytes": path.stat().st_size,
+                }
         content = {
             "schema_version": 1,
             "files": files,
