@@ -11,13 +11,13 @@
 
 | 工作项 | 状态 | 验收/下一步 |
 |---|---|---|
-| 全目录逐项台账 | 263 项目录已有快照；能力/权限尚未逐项实测 | 建立无遗漏覆盖台账，映射别名/类别/变更接口，未知不能算已覆盖 |
+| 全目录逐项台账 | 263 项基线及原 36 特殊页面已分类复核；额外 11 个正文链接另入发现台账 | 263 不是范围上限；分类页不等于子接口取全，目录外接口与失效文档继续核验 |
 | 现有回填提速 | 已部署，首批360次/93.105秒，恢复自动消费 | SQLite v2 持久账号/接口频控，默认总上限 240/min、单接口 200/min；按实际批次吞吐重算 ETA |
 | 已购九个文本 API | 九个合同已部署；首轮真实请求已完成，分来源历史回填中 | 主执行者集成、云端逐项实测后启用；保存默认隐藏字段与响应原文 |
 | 结构化下一批 | 49 个合同已合入候选分支，覆盖主数据、A股/财务/宏观及基金/指数/可转债/期货 | 主数据发现、分区和满页细分、权限实测与本地查询 |
 | 其余目录接口 | 未完成，全部保持台账计划项 | 按依赖逐批实现；无权限/停更/未知分别登记，不能静默缩小到上述首批 |
 | PDF/附件、HTML正文与解析 | 云端已下载并解析15份；Mac真实PDF首页面核对通过，独立附件消费者接入中 | 安全下载、独立状态/重试，公告与研报各一份真实 PDF 页码核验，全部原文纳入镜像 |
-| 通用查询与 API/Agent 消费 | 97接口和6财务别名已有合同及离线读/schema；API/Agent云端固定版真实读取通过，15类other待实测 | 目录/schema、日期/标的/字段/关键词/as_of 筛选、JSONL/Parquet 导出；Agent 引用真实已存原文 |
+| 通用查询与 API/Agent 消费 | 122 数据集及 6 财务别名已注册；本批 13 接口 Mac 固定版离线读取通过，已有 API/Agent 基础链路通过 | 新接口的逐项 HTTP/Agent 消费、全历史及单位口径仍分别验收 |
 | 全历史回填、修订与缺口补齐 | RRG、文本、结构化、market四组持续回填；未证实上游全历史完整 | 分接口/来源/标的/日期/字段统计，满页细分、不可证实窗口保留 partial |
 | 全范围镜像与版本增长 | 文档清单v2分片已部署，保留旧元数据对象；全部历史release索引闭包仍待补齐 | 纳入 schema/目录/所有历史对象，清单分块避免每轮复制完整大清单；固定输入与故障恢复 |
 | 容量与运行监测 | 每轮保留 100 GiB 云端余量，尚缺长期增长预测 | 采集/文件/清单/备份按真实规模估算，需扩容提前报告，不能用容量缩小目标 |
@@ -136,3 +136,15 @@
 
 - 04:35恢复验收：5b4ec20经双端handoff passed（4390文件）后，maintenance复用pipeline锁修复两个真实饱和父分区：moneyflow_dc发现外补115代码，共6024子任务；share_float5909子任务，父记录的4股票完整保留。两个父分区仍split_pending/universe_complete=false。事件recent/history各规划500项、planning:equity_event已validation_passed，证据validation/observed-fanout-recovery.json。只重启quantmind与专属acquire worker，专属documents未在本轮重启；全部三个容器running/healthy/OOM=false，两专属队列已恢复且各有真实活动任务。
 - Mac最终固定data-dcb1c3839a99d210ec466603811ce46d104daf60a941aaa7616aa5f810c029ce共70482文件校验通过（本轮再补2375）；T600018.SH/SHT600018与600018.SH/SH600018禁网分别读取，保留不同源身份，证据/tmp/tushare-historical-stock-identity-verified.json。运行汇总validation/supplement-events-runtime.json；余量核查305.97GiB，无须本轮扩盘。新批次处理中的快照不能用前一批状态时间冒充新吞吐。
+
+## 2026-09-09 05:20 补充13接口生产与离线验收
+
+- b0e1845 双端 handoff passed，随后仅重启 Tushare 采集 worker 接入阶段耗时和 DCE 标识修复；此前228db0d已部署13接口。当前注册122数据集及6财务别名。250项Tushare回归通过，后续目录一致性5项定向检查通过。信用7运行候选2a4bbb1尚未部署，不能计入122之外的生产覆盖。
+- 15次首轮请求5.906秒，11接口非空；追加两个不带原过滤条件的发现请求1.172秒，fut_holding与fut_weekly_detail各4000行。全部13已取得非空样本，共9868行原始记录。两个4000与stk_surv400均保留饱和缺口；stk_surv已建立5909个证券子任务，发现集合仍未证明完整。
+- 原文、观察SHA256与Parquet逐字段相等，P/D/I分别35/10/4行，所有144文档字段包含空响应的schema均已返回。Mac固定版 `data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5` 共81278文件完成镜像；断网且禁止密钥读取，全部13逐字段对账和固定版查询通过、upstream_calls=0。云端证据 `validation/extra13-probe.json`、`extra13-empty-discovery.json`、`extra13-acceptance.json`；Mac证据 `/tmp/tushare-extra13-mac-verified.json`。
+- 实际fut_basic有11204个代码，其中6个L_F/L_FL/PP_F/PP_FL/V_F/V_FL带下划线。过严校验曾只阻塞futures_extra组，已修复且实际planning:futures_extra于21:16:10Z恢复validation_passed。未删发现代码或修改正式配置绕过验证。
+- 新实际口径缺口：周统计返回20191、201904等混合宽度的供应商周编号；无条件4000行仅覆盖本次返回的2019—2020部分，不能据2026查询为空断言停更或全历史完整。期货周线trade_date=20260904却返回end_date=20260831/20260907/20260908，两个日期轴按原值保留，计算截止口径与历史可知性仍未验证。持仓排名需要exchange/symbol成对补齐，不能只用股票式单参数fanout。
+- Mac自动镜像曾因plist指向已清理的uv临时Python而以78退出；改为固定`tushare-client/.venv/bin/python -I`，已有健康环境离线复用，新环境准备失败不替换旧任务。实际LaunchAgent安装后退出0且完成新固定版镜像；保持每900秒运行。详见[tushare-mirror-installation.md](tushare-mirror-installation.md)。
+- 阶段计时第一真实批263请求/90.028秒，总110.677秒：initialize2.551、planning4.336、archive5.093、acquire90.184、document_registration0.020、publish8.491秒，failed_stage=null。不能把90秒当整批墙钟；保持240/min账号门、接口独立门及160/180秒任务边界。下一性能候选针对已测重复SQL扫描与排序，尚未据模拟索引收益宣称生产提速。
+- 原36个无常规API页面已全部复核：33分类/说明、2个SDK pro_bar页面、1个CSV交付页。直接子目录均在基线，但正文另发现11个链接文档，其中rt_k/rt_etf_k为独立权限接口，6个链接当前正文缺失。新增discovered_entries保留，不改原263基线count。188/422仍作为需正文复核的种子；因子库独立权益、SDK与CSV交付、账户写/删均不能凭积分或目录存在自动纳入HTTP回填。
+- RRG固定价格/日历切片结构通过，下一可并行步骤是固定输入消费适配与因果性技术验收；历史行业定义、成员known_at、ETF映射/可交易性仍独立blocked。全量数据回填不作为这一步隐含依赖，但未运行策略发现、完整回测或更改研究case。
