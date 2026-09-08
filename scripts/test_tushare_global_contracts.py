@@ -52,7 +52,7 @@ class GlobalContracts(unittest.TestCase):
 
     def test_full_leap_range_recent_first_and_interleaved(self):
         config = {
-            "global_apis": ["us_daily", "hk_tradecal", "monthly"],
+            "global_apis": ["us_daily", "hk_tradecal"],
             "global_history_start": "20240227",
             "planning_epoch": "20240312T03",
         }
@@ -66,7 +66,7 @@ class GlobalContracts(unittest.TestCase):
         self.assertTrue(all(j["epoch"] == "20240312T03" for j in jobs[:first_history]))
         self.assertTrue(all(j["priority"] == 40 for j in jobs[first_history:]))
         self.assertEqual(
-            [j["api_name"] for j in jobs[first_history : first_history + 3]],
+            [j["api_name"] for j in jobs[first_history : first_history + 2]],
             config["global_apis"],
         )
         expected = {
@@ -176,7 +176,9 @@ class GlobalContracts(unittest.TestCase):
         )
 
     def test_permissions_caps_and_adjustment_revisions(self):
-        self.assertEqual(GLOBAL_CONTRACTS["monthly"]["row_cap"], 4500)
+        self.assertEqual(GLOBAL_CONTRACTS["monthly"]["row_cap"], 5629)
+        self.assertEqual(GLOBAL_CONTRACTS["monthly"]["documented_row_cap"], 4500)
+        self.assertFalse(GLOBAL_CONTRACTS["monthly"]["row_cap_verified"])
         self.assertEqual(GLOBAL_CONTRACTS["us_adjfactor"]["row_cap"], 15000)
         self.assertFalse(GLOBAL_CONTRACTS["hk_basic"]["row_cap_verified"])
         for api in (
@@ -199,6 +201,109 @@ class GlobalContracts(unittest.TestCase):
         self.assertIn(
             "close_price", GLOBAL_CONTRACTS["us_adjfactor"]["nullable_fields"]
         )
+
+    def test_symbol_period_ranges_cover_every_day_and_retired_universe(self):
+        config = {
+            "global_apis": ["weekly", "monthly", "index_weekly", "index_monthly"],
+            "global_history_start": "20240227",
+        }
+        ids = {
+            "stocks": [{"ts_code": "600000.SH", "list_status": "D"}, "920061.BJ"],
+            "indexes": ["000001.SH", "000300.CSI", "HSI.HI"],
+        }
+        today = date(2026, 1, 10)
+        jobs = list(iter_global_jobs(config, today, ids))
+        first_history = next(
+            i for i, job in enumerate(jobs) if job["epoch"] == "history"
+        )
+        self.assertTrue(all(j["epoch"] == "history" for j in jobs[first_history:]))
+        expected = {
+            (date(2024, 2, 27) + timedelta(days=i)).strftime("%Y%m%d")
+            for i in range((today - date(2024, 2, 27)).days + 1)
+        }
+        for api in config["global_apis"]:
+            codes = (
+                ["000001.SH", "000300.CSI", "HSI.HI"]
+                if api.startswith("index_")
+                else ["600000.SH", "920061.BJ"]
+            )
+            for code in codes:
+                selected = [
+                    j
+                    for j in jobs
+                    if j["api_name"] == api and j["params"]["ts_code"] == code
+                ]
+                covered = []
+                for job in selected:
+                    params = job["params"]
+                    self.assertEqual(set(params), {"ts_code", "start_date", "end_date"})
+                    start = date(
+                        int(params["start_date"][:4]),
+                        int(params["start_date"][4:6]),
+                        int(params["start_date"][6:]),
+                    )
+                    end = date(
+                        int(params["end_date"][:4]),
+                        int(params["end_date"][4:6]),
+                        int(params["end_date"][6:]),
+                    )
+                    covered.extend(
+                        (start + timedelta(days=i)).strftime("%Y%m%d")
+                        for i in range((end - start).days + 1)
+                    )
+                    if job["epoch"] == "history" and api.startswith("index_"):
+                        self.assertEqual(start.year, end.year)
+                self.assertEqual(set(covered), expected)
+                self.assertEqual(len(covered), len(expected))
+                self.assertEqual(len(selected), 4 if api.startswith("index_") else 2)
+        self.assertEqual(jobs, list(iter_global_jobs(config, today, ids)))
+        # 2024 spring holiday's pre-Friday closing day stays inside a full range.
+        self.assertIn("20240403", expected)
+        self.assertIn("20240229", expected)
+
+    def test_periods_wait_for_discovery_without_cross_section_explosion(self):
+        config = {
+            "global_apis": ["weekly", "monthly", "index_weekly", "index_monthly"],
+            "global_history_start": "19900101",
+        }
+        self.assertEqual(list(iter_global_jobs(config, date(2026, 9, 9))), [])
+        gaps = global_prerequisites(config=config)
+        self.assertEqual(len(gaps), 4)
+        self.assertTrue(
+            all(
+                g["reason"] == "awaiting_stored_discovery_for_symbol_ranges"
+                for g in gaps
+            )
+        )
+        ids = {"indexes": [f"{n:06d}.CSI" for n in range(1000)]}
+        index_config = {
+            "global_apis": ["index_weekly", "index_monthly"],
+            "global_history_start": "20250101",
+        }
+        jobs = list(iter_global_jobs(index_config, date(2026, 1, 10), ids))
+        self.assertEqual(
+            len(jobs), 6000
+        )  # 2 APIs * 1000 codes * (recent + 2 year windows)
+        self.assertFalse(any("trade_date" in j["params"] for j in jobs))
+
+    def test_retired_hk_bang_remains_distinct_and_does_not_abort_other_apis(self):
+        from backend.shared.tushare_global_contracts import _identifiers
+
+        ids = {
+            "hk_stocks": [
+                "00013!.HK",
+                "00013.HK",
+                {"ts_code": "00013!.HK", "list_status": "D"},
+            ]
+        }
+        self.assertEqual(_identifiers(ids)["hk_stocks"], ["00013!.HK", "00013.HK"])
+        config = {
+            "global_apis": ["hk_daily", "us_daily"],
+            "global_history_start": "20260901",
+        }
+        jobs = list(iter_global_jobs(config, date(2026, 9, 9), ids))
+        self.assertEqual({j["api_name"] for j in jobs}, {"hk_daily", "us_daily"})
+        self.assertEqual(len(jobs), 18)
 
     def test_validation_before_first_job(self):
         bad_configs = [
