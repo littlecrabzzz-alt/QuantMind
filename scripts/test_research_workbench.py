@@ -1,18 +1,19 @@
 """Isolated numerical and contract checks; no API, DB or production data."""
 import copy
+import asyncio
 import json
 from pathlib import Path
 import tempfile
 import time
 import unittest
 import urllib.error
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 import numpy as np
 import pandas as pd
 
 import research_expression as expression
-from backend.services.engine.research.coordinator import experiment_config, allowed_candidates
+from backend.services.engine.research.coordinator import experiment_config, allowed_candidates, advance
 from backend.services.engine.research import runtime
 from backend.services.engine.routers.research_runs import NewResearch
 
@@ -86,6 +87,23 @@ class FactorContractTests(unittest.TestCase):
             runtime.frozen.write(folder / "response.json", {"choices": [{"message": {"content": "no tool call"}}]})
             with self.assertRaises(runtime.InvalidDecision):
                 runtime.model_decision(folder, contract, "choose", {"selected": {}}, "fixture", time.time()+300)
+
+    def test_assignment_is_returned_for_model_correction_without_computing(self):
+        base = json.loads((Path(__file__).parents[1]/"config/research_controls_cn_l1.json").read_text())
+        state = {"stage": "propose", "experiments": [], "candidate_count": 0}
+        row = {"run_id": "fixture", "case_id": "a"*32, "status": "running", "kind": "method", "goal": "fixture",
+               "deadline_epoch": time.time()+1000, "checkpoint": state,
+               "contract": {"base_config": base, "candidate_limit": 1, "acceptance": {}}}
+        decision = {"hypothesis": "fixture", "expected_outcome": "fixture", "evidence": "fixture",
+                    "expression": "research_signal = rank(mom_ret_20d)"}
+        store = AsyncMock()
+        with tempfile.TemporaryDirectory() as tmp, patch.object(runtime, "ROOT", Path(tmp)), \
+                patch.object(runtime, "model_decision", return_value=decision):
+            asyncio.run(advance(row, store, "fixture"))
+        self.assertEqual(state["candidate_count"], 0)
+        self.assertNotIn("active", state)
+        self.assertIn("纯表达式", state["corrections"]["candidate-1"][0])
+        store.checkpoint.assert_awaited_once()
 
 
 if __name__ == "__main__":
