@@ -21,7 +21,11 @@ from backend.shared.tushare_limit_extra_contracts import (
     HIDDEN_THS_FIELDS,
 )
 from backend.shared.tushare_registry import contract_for
-from backend.shared.tushare_store import read_dataset, CONTRACTS as READ_CONTRACTS
+from backend.shared.tushare_store import (
+    read_dataset,
+    export_jsonl,
+    CONTRACTS as READ_CONTRACTS,
+)
 
 CATALOG = json.loads((ROOT / "config/tushare-catalog.json").read_bytes())
 
@@ -296,6 +300,16 @@ class LimitExtraRuntime(unittest.TestCase):
         self.assertEqual(row["source_ts_code"], "600001.SH")
         self.assertEqual(self.p.identifiers()["limit_concepts"], ["600001.SH"])
         self.assertEqual(self.p.identifiers()["stocks"], [])
+        selected = read_dataset(
+            self.root, release, "limit_cpt_list", codes=["600001.SH"]
+        ).to_pylist()
+        self.assertEqual(selected, [row])
+        with tempfile.TemporaryDirectory() as output:
+            path = Path(output) / "concept.jsonl"
+            export_jsonl(
+                self.root, release, "limit_cpt_list", path, codes=["600001.SH"]
+            )
+            self.assertEqual(json.loads(path.read_text())["ts_code"], "600001.SH")
 
     def test_terminal_saturation_blocks_and_d_pool_exchange_survives_range_split(self):
         row, job, result = self.capture(

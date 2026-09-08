@@ -545,6 +545,7 @@ def _query(
     db,
     columns,
     keys,
+    api_name,
     *,
     fields=None,
     date_field=None,
@@ -595,7 +596,8 @@ def _query(
             "o_code",
             "n_code",
         }.issubset(columns)
-        if not mapping_source and any(
+        concept_source = api_name == "limit_cpt_list" and code_field == "ts_code"
+        if not (mapping_source or concept_source) and any(
             re.fullmatch(r"[0-9]{6}\.(SH|SZ|BJ)", c) for c in codes
         ):
             raise ValueError("Use internal prefix stock codes, for example SH600036")
@@ -678,7 +680,7 @@ def read_dataset(root, release_id, api_name, **filters):
     observation-time caveat. Legacy releases mark observation history incomplete.
     """
     with _dataset(root, release_id, api_name) as (db, columns, keys, metadata):
-        table = _query(db, columns, keys, **filters).fetch_arrow_table()
+        table = _query(db, columns, keys, api_name, **filters).fetch_arrow_table()
         metadata["as_of"] = _as_of(filters.get("as_of"))
         return table.replace_schema_metadata(
             {b"tushare": json.dumps(metadata, ensure_ascii=False).encode("utf-8")}
@@ -708,7 +710,7 @@ def export_jsonl(root, release_id, api_name, destination, **filters):
             "Export must not overwrite immutable dataset storage or symlinks"
         )
     with _dataset(root, release_id, api_name) as (db, columns, keys, metadata):
-        batches = _query(db, columns, keys, **filters).fetch_record_batch(65536)
+        batches = _query(db, columns, keys, api_name, **filters).fetch_record_batch(65536)
         destination.parent.mkdir(parents=True, exist_ok=True)
         fd, temporary = tempfile.mkstemp(
             prefix=".tushare-export-", dir=destination.parent
