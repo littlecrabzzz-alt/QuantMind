@@ -137,7 +137,7 @@ def pull_snapshot():
         target = base / path.name
         target.mkdir(exist_ok=True)
         rsync = "/opt/homebrew/bin/rsync" if Path("/opt/homebrew/bin/rsync").exists() else "rsync"
-        args = [rsync, "-a", "--checksum", "--no-owner", "--no-group", "--compress", "--partial", "--rsync-path=sudo -n rsync"]
+        args = [rsync, "-a", "--checksum", "--no-owner", "--no-group", "--compress", "--partial", "--stats", "--rsync-path=sudo -n rsync"]
         previous = (base / "latest").resolve()
         metadata_args = list(args)
         data_args = list(args)
