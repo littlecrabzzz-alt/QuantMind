@@ -409,13 +409,23 @@ class ExtendedPipeline(unittest.TestCase):
                             else []
                         )
                     )
+                    # Full requested schema; optional source values may be null.
+                    # Pagination/repeated-page identity is still driven by values.
+                    fields = payload["fields"].split(",")
+                    source_fields = ["ts_code", "name", "begin_date", "ann_date"]
+                    records = [
+                        dict(zip(source_fields, row, strict=True)) for row in values
+                    ]
                     return httpx.Response(
                         200,
                         json={
                             "code": 0,
                             "data": {
-                                "fields": ["ts_code", "name", "begin_date", "ann_date"],
-                                "items": values,
+                                "fields": fields,
+                                "items": [
+                                    [row.get(field) for field in fields]
+                                    for row in records
+                                ],
                             },
                         },
                     )

@@ -256,8 +256,16 @@ class Closure(unittest.TestCase):
                 json={
                     "code": 0,
                     "data": {
-                        "fields": ["ts_code", "trade_date"],
-                        "items": [["000001.SH", day] for day in dates],
+                        # Retain the retry/date partition fixture while supplying
+                        # requested optional metrics as nullable source columns.
+                        "fields": body["fields"].split(","),
+                        "items": [
+                            [
+                                {"ts_code": "000001.SH", "trade_date": day}.get(field)
+                                for field in body["fields"].split(",")
+                            ]
+                            for day in dates
+                        ],
                     },
                 },
             )
