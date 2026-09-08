@@ -17,6 +17,7 @@ import re
 import socket
 import signal
 import sqlite3
+import stat
 import ssl
 import subprocess
 import sys
@@ -1375,33 +1376,69 @@ def document_index(root):
         rebuilt_descriptors = 0
         for prefix, descriptors in sorted(state_groups.items()):
             descriptor = cached_groups.get(prefix)
-            if descriptor is None or prefix in changed_groups:
-                descriptors.sort(key=lambda item: item["bucket"])
-                saved = _save(
-                    root,
-                    "documents",
-                    ".json",
-                    _json(
-                        {
-                            "schema_version": 2,
-                            "kind": "state_descriptors",
-                            "bucket": prefix,
-                            "items": descriptors,
-                        }
-                    ),
-                    "application/json",
-                )
-                descriptor = {
-                    **saved,
+            descriptors.sort(key=lambda item: item["bucket"])
+            payload = _json(
+                {
+                    "schema_version": 2,
+                    "kind": "state_descriptors",
                     "bucket": prefix,
-                    "count": len(descriptors),
-                    "state_count": sum(item["count"] for item in descriptors),
+                    "items": descriptors,
                 }
+            )
+            digest = hashlib.sha256(payload).hexdigest()
+            expected = {
+                "path": f"documents/{digest}.json",
+                "sha256": digest,
+                "bytes": len(payload),
+                "mime": "application/json",
+                "bucket": prefix,
+                "count": len(descriptors),
+                "state_count": sum(item["count"] for item in descriptors),
+            }
+            if descriptor is None or prefix in changed_groups:
+                _save(root, "documents", ".json", payload, "application/json")
+                descriptor = expected
                 db.execute(
                     "INSERT INTO document_index_cache VALUES('state_descriptors',?,?) ON CONFLICT(kind,bucket) DO UPDATE SET descriptor=excluded.descriptor",
                     (prefix, _json(descriptor).decode()),
                 )
                 rebuilt_descriptors += 1
+            else:
+                # At most16 small descriptor blocks: compare exact canonical
+                # bytes and leaf references to the cache, not just file length.
+                # Large cached leaf bodies remain separately verified by readers.
+                if descriptor != expected:
+                    raise DocumentError("cached_state_descriptor_references_mismatch")
+                path = root / expected["path"]
+                if path.parent.is_symlink() or path.is_symlink():
+                    raise DocumentError("unsafe_cached_state_descriptor")
+                fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                with os.fdopen(fd, "rb") as stream:
+                    before = os.fstat(stream.fileno())
+                    if not stat.S_ISREG(before.st_mode) or before.st_size != len(
+                        payload
+                    ):
+                        raise DocumentError("cached_state_descriptor_checksum_mismatch")
+                    raw = stream.read(len(payload) + 1)
+                    after = os.fstat(stream.fileno())
+                current = path.lstat()
+                if (
+                    raw != payload
+                    or path.parent.is_symlink()
+                    or not stat.S_ISREG(current.st_mode)
+                    or any(
+                        getattr(before, field) != getattr(info, field)
+                        for info in (after, current)
+                        for field in (
+                            "st_dev",
+                            "st_ino",
+                            "st_size",
+                            "st_mtime_ns",
+                            "st_ctime_ns",
+                        )
+                    )
+                ):
+                    raise DocumentError("cached_state_descriptor_checksum_mismatch")
             index["states"][prefix] = descriptor
             files.append(
                 {key: descriptor[key] for key in ("path", "sha256", "bytes", "mime")}
