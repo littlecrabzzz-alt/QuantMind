@@ -1,0 +1,5 @@
+# Bounded document transfer overlap candidate
+- /root/structured_contracts, Mac isolated worktree codex/tushare-structured. Current documents module matches masterca2eca7; own only backend/shared/tushare_documents.py and new scripts/test_tushare_document_parallel.py. Parent owns production/main pipeline/tasks call wiring.
+- Parent approved opt-in download_workers=2 (default1 rollback): at most2 download-only subprocesses; no PDF parsing overlaps them, parser remains single. Preserve global document.lock and resource/URL/size policies. New versioned durable claims guard each document until child absolute deadline plus grace, with late-result fencing and expired-claim recovery.
+- Before edit audited serial selection/download+parse coupling and full remaining-stage timeout. No production/OOM claims. Child wall deadline must survive parent death; raw download result committed before local parse. Existing queue/index schemas and observation references retained.
+- Temp-only delay/process mocks and socket-denial tests; report CPU/memory ceilings and measured simulated speed before parent integrates/deploys.

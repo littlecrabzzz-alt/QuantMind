@@ -1,0 +1,11 @@
+# Decade bucket optimization ready
+
+Commit 2c43a19; text_contracts releases global contracts and original contract tests. Isolated branch codex/tushare-text is clean. No production access/config changes; prior pending tasks and observations untouched.
+
+Four completed-period APIs now use fixed closed natural-decade buckets (e.g.1990-1999), one unclosed-decade tail through completed year end, one current-year tail through completed month end, and at most one older completed-week tail before the two-period recent review. Ten years per code contain at most roughly523 weekly /120 monthly period rows, below index guard1000; unexpected full pages still require conservative parent splitting. Full decades retain request identities across week/month/year changes. Tail end changes only at the corresponding calendar boundary. Recent range may overlap the last year/month tail intentionally; original observations are retained. Unknown history bounds and incomplete discovery gaps remain.
+
+Actual streamed offline plan for 9643 index identifiers, scope19900101, as of20260909: old cf18792 had70 history/code/index_weekly +42 history/code/index_monthly =1080016 historical jobs (1099302 including recent). New code has5 history/code/API =96430 historical jobs (115716 including recent):91.1% fewer historical candidates. At20260923 one weekly tail yields6 weekly+5 monthly historical/code,106073 history /125359 total. The simpler36years*2APIs estimate694296 also falls86.1% to96430. Stocks receive the same reduction per code, without filtering delisted identifiers.
+
+17 contract tests +7 existing global pipeline tests pass. Tests verify single-bucket bounds, contiguous whole-range coverage through closed period, cross-year/cross-decade/leap boundaries, daily stability and actual9643-identifier streaming count. Ruff and git diff --check pass.
+
+Parent owns pipeline history cursor: do not reset an unfinished history plan at each new period; finish its anchor first, then plan the newest anchor. Existing older plan tasks require explicit safe supersession/provenance if deferred; no automatic deletion. Open calendar periods and late revisions outside recent two-period review retain their documented wait/gap status.
