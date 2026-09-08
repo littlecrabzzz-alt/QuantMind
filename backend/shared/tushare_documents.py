@@ -906,6 +906,234 @@ def document_inventory(root):
         db.close()
 
 
+INDEX_SHARD_ROWS = 1000
+
+
+def _index_setup(db):
+    """Version index metadata separately; old queue-v2 writers keep working.
+
+    SQLite triggers see writes from already running consumers as well. A deleted
+    or updated old row invalidates its stable range rather than hiding history.
+    """
+    exists = db.execute(
+        "SELECT 1 FROM sqlite_master WHERE name='document_index_meta'"
+    ).fetchone()
+    if exists:
+        saved = db.execute("SELECT version FROM document_index_meta").fetchone()
+        if saved is None or saved[0] != 1:
+            raise DocumentError("unsupported_document_index_schema")
+        return
+    with db:
+        db.execute("BEGIN IMMEDIATE")
+        db.execute("CREATE TABLE document_index_meta(version INTEGER NOT NULL)")
+        db.execute("INSERT INTO document_index_meta VALUES(1)")
+        db.execute(
+            "CREATE TABLE document_index_cache(kind TEXT,bucket TEXT,descriptor TEXT NOT NULL,PRIMARY KEY(kind,bucket))"
+        )
+        db.execute(
+            "CREATE TABLE document_index_dirty(kind TEXT,bucket TEXT,PRIMARY KEY(kind,bucket))"
+        )
+        db.execute(
+            "CREATE TABLE document_index_files(path TEXT PRIMARY KEY,sha256 TEXT NOT NULL,bytes INTEGER NOT NULL,mime TEXT NOT NULL)"
+        )
+        for table, kind in (
+            ("document_refs", "mappings"),
+            ("document_attempts", "attempts"),
+            ("documents", "states"),
+            ("document_index_files", "files"),
+        ):
+            expression = (
+                "substr({row}.id,1,2)"
+                if kind == "states"
+                else "CAST(({row}.rowid-1)/1000 AS INTEGER)"
+            )
+            for operation, rows in (
+                ("INSERT", ("NEW",)),
+                ("UPDATE", ("OLD", "NEW")),
+                ("DELETE", ("OLD",)),
+            ):
+                statements = ";".join(
+                    "INSERT OR IGNORE INTO document_index_dirty VALUES('"
+                    + kind
+                    + "',"
+                    + expression.format(row=row)
+                    + ")"
+                    for row in rows
+                )
+                db.execute(
+                    f"CREATE TRIGGER document_index_{kind}_{operation.lower()} AFTER {operation} ON {table} BEGIN {statements}; END"
+                )
+            key = expression.format(row=table)
+            db.execute(
+                f"INSERT OR IGNORE INTO document_index_dirty SELECT '{kind}',{key} FROM {table}"
+            )
+        db.execute(
+            "CREATE INDEX document_index_state_bucket ON documents(substr(id,1,2))"
+        )
+
+
+def _index_original_files(root, db):
+    # Keep committed orphan evidence. Only compact file metadata is scanned;
+    # large reference and attempt histories are never loaded here.
+    for directory, extensions in (
+        ("attachments", {"pdf": "application/pdf", "html": "text/html"}),
+        ("extracted", {"json": "application/json"}),
+    ):
+        parent = root / directory
+        if parent.is_symlink():
+            raise DocumentError("unsafe_storage_path")
+        if not parent.exists():
+            continue
+        for path in parent.iterdir():
+            if path.name.startswith(".document-"):
+                continue
+            if (
+                path.is_symlink()
+                or not path.is_file()
+                or not re.fullmatch(r"[a-f0-9]{64}\.(pdf|html|json)", path.name)
+                or path.suffix[1:] not in extensions
+            ):
+                raise DocumentError("unsafe_storage_path")
+            db.execute(
+                "INSERT INTO document_index_files VALUES(?,?,?,?) ON CONFLICT(path) DO NOTHING",
+                (
+                    str(path.relative_to(root)),
+                    path.stem,
+                    path.stat().st_size,
+                    extensions[path.suffix[1:]],
+                ),
+            )
+
+
+def document_index(root):
+    """Publish compact v2 index, reusing unchanged content-addressed shards.
+
+    Return path/hash/bytes, counts and a flat files list for the parent manifest.
+    No old v1 inventory or shard is removed. A consistent SQLite transaction
+    prevents mixing reference/state generations; first build briefly blocks queue
+    writers while encoding the initial shards. Later builds process dirty ranges.
+    """
+    root = Path(root).resolve()
+    db = _document_db(root)
+    try:
+        _index_setup(db)
+        db.execute("BEGIN IMMEDIATE")
+        _index_original_files(root, db)
+        dirty = list(
+            db.execute(
+                "SELECT kind,bucket FROM document_index_dirty ORDER BY kind,bucket"
+            )
+        )
+        for kind, bucket in dirty:
+            table = {
+                "mappings": "document_refs",
+                "attempts": "document_attempts",
+                "states": "documents",
+                "files": "document_index_files",
+            }[kind]
+            if kind == "states":
+                records = [
+                    dict(row)
+                    for row in db.execute(
+                        "SELECT * FROM documents WHERE substr(id,1,2)=? ORDER BY id",
+                        (bucket,),
+                    )
+                ]
+            else:
+                start = int(bucket) * INDEX_SHARD_ROWS + 1
+                records = [
+                    dict(row)
+                    for row in db.execute(
+                        f"SELECT * FROM {table} WHERE rowid>=? AND rowid<? ORDER BY rowid",
+                        (start, start + INDEX_SHARD_ROWS),
+                    )
+                ]
+            for row in records:
+                if kind in ("states", "attempts"):
+                    row["result"] = json.loads(row["result"])
+            if records:
+                saved = _save(
+                    root,
+                    "documents",
+                    ".json",
+                    _json(
+                        {
+                            "schema_version": 2,
+                            "kind": kind,
+                            "bucket": bucket,
+                            "items": records,
+                        }
+                    ),
+                    "application/json",
+                )
+                descriptor = {**saved, "count": len(records), "bucket": bucket}
+                db.execute(
+                    "INSERT INTO document_index_cache VALUES(?,?,?) ON CONFLICT(kind,bucket) DO UPDATE SET descriptor=excluded.descriptor",
+                    (kind, bucket, _json(descriptor).decode()),
+                )
+            else:
+                db.execute(
+                    "DELETE FROM document_index_cache WHERE kind=? AND bucket=?",
+                    (kind, bucket),
+                )
+            db.execute(
+                "DELETE FROM document_index_dirty WHERE kind=? AND bucket=?",
+                (kind, bucket),
+            )
+        index = {
+            "schema_version": 2,
+            "shard_rows": INDEX_SHARD_ROWS,
+            "mappings": [],
+            "attempts": [],
+            "files": [],
+            "states": {},
+            "counts": _document_counts(db),
+            "reference_counts": [
+                dict(row)
+                for row in db.execute(
+                    "SELECT status,count(*) AS references_count FROM document_refs GROUP BY status"
+                )
+            ],
+        }
+        files = [
+            dict(row)
+            for row in db.execute("SELECT * FROM document_index_files ORDER BY rowid")
+        ]
+        for row in db.execute(
+            "SELECT kind,bucket,descriptor FROM document_index_cache ORDER BY kind,CAST(bucket AS INTEGER),bucket"
+        ):
+            kind, bucket, raw = row
+            descriptor = json.loads(raw)
+            files.append(
+                {key: descriptor[key] for key in ("path", "sha256", "bytes", "mime")}
+            )
+            if kind == "states":
+                index["states"][bucket] = descriptor
+            else:
+                index[kind].append(descriptor)
+        index["totals"] = {
+            kind: sum(item["count"] for item in index[kind])
+            for kind in ("mappings", "attempts", "files")
+        }
+        saved = _save(root, "documents", ".json", _json(index), "application/json")
+        files.append(saved)
+        db.commit()
+        return {
+            **saved,
+            "schema_version": 2,
+            "files": files,
+            "counts": index["counts"],
+            "reference_counts": index["reference_counts"],
+            "totals": index["totals"],
+            "rebuilt_shards": len(dirty),
+        }
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "--parse-pdf":
         print(_json(_parse_worker(sys.argv[2])).decode("utf-8"))
