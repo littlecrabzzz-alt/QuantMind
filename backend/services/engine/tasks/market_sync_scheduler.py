@@ -38,9 +38,9 @@ DEFAULT_SCHEDULE = {
 
 # 各市场在无 Redis 配置时的默认定时（显式保存的配置总是覆盖这里的值）。
 # 未列入的市场保持 enabled=False，需要在前端手动开启。
-# A 股走独立的 daily-data-sync beat 任务（23:00 后由 quantdb 同步顺带南向），
-# 各海外市场与它错峰：
-#   HK       23:50  雅虎/akshare/CCASS 晚间陆续就绪，排 A 股同步之后
+# A 股与其他市场统一走 Redis 配置；旧独立 daily-data-sync 已移除。
+# 各海外市场默认时间：
+#   HK       23:50  雅虎/akshare/CCASS 晚间陆续就绪，晚间错峰
 #   US       05:30  美股收盘(北京约 04:00/05:00)后，EOD 数据已稳定
 #   BC       04:15  加密市场全天候交易，选凌晨低谷时段拉取
 #   FUTURES  18:00  日盘收盘结算发布后、夜盘主力时段前
@@ -123,8 +123,38 @@ def run_market_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
     if market == "A":
         from backend.scripts.quantdb_daily_sync import run_daily_sync
 
-        result["result"] = run_daily_sync(skip_pg=True)
-        return result
+        from uuid import uuid4
+        from backend.shared.quantdb_sync_jobs import (
+            acquire_lock, release_lock, new_celery_job, celery_progress_cb,
+            upsert_job, _now_iso,
+        )
+
+        token = uuid4().hex
+        key = "quantmind:daily_sync:lock"
+        if not acquire_lock(key, token, ttl=7200):
+            return {"market": market, "status": "skipped", "reason": "sync busy or Redis unavailable"}
+        job_id = None
+        try:
+            job_id = new_celery_job(datasets=datasets or None, with_pg=True, with_qlib=with_qlib)["job_id"]
+            data = run_daily_sync(datasets=datasets or None, skip_pg=False,
+                                  skip_qlib=not with_qlib,
+                                  progress_cb=celery_progress_cb(job_id))
+            failed = bool((data.get("parquet") or {}).get("errors")) or any(
+                isinstance(value, dict) and value.get("status") == "error"
+                for value in data.values()
+            )
+            result.update(result=data, job_id=job_id,
+                          status="partial" if failed else "completed",
+                          finished=datetime.now().isoformat())
+            upsert_job(job_id, status="failed" if failed else "completed",
+                       stage="done", finished_at=_now_iso())
+            return result
+        except Exception:
+            if job_id:
+                upsert_job(job_id, status="failed", finished_at=_now_iso())
+            raise
+        finally:
+            release_lock(key, token)
 
     if market == "US":
         from backend.scripts.quantus_daily_sync import run

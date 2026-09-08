@@ -1,5 +1,11 @@
 {
   "history_start": "19900101",
   "priority_start": "20200101",
-  "seed_release": "probe-aab8a026df944573aec4d7ab8681c1c3"
+  "seed_release": "probe-aab8a026df944573aec4d7ab8681c1c3",
+  "requests_per_minute": 240,
+  "api_requests_per_minute": {
+    "fund_portfolio": 240
+  },
+  "batch_requests": 360,
+  "batch_seconds": 100
 }
