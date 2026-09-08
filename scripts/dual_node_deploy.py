@@ -64,7 +64,7 @@ sys.exit(0 if all(item["State"]["Running"] and
 
 def deploy(wait_for):
     if wait_for:
-        stage("waiting_for_existing_preseed", wait_pid=wait_for)
+        stage("waiting_for_existing_migration", wait_pid=wait_for)
         def signature():
             return subprocess.run(["ps", "-p", str(wait_for), "-o", "lstart="], text=True, capture_output=True).stdout.strip()
         original = signature()
@@ -135,7 +135,7 @@ def deploy(wait_for):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--wait-for", type=int, help="Existing preseed process to join before proceeding")
+    parser.add_argument("--wait-for", type=int, help="Existing migration process to join before proceeding")
     args = parser.parse_args()
     STATE.parent.mkdir(exist_ok=True)
     os.umask(0o077)
