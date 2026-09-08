@@ -1,0 +1,937 @@
+{
+  "reviewed_at": "2026-09-08T21:17:19.300057+00:00",
+  "baseline_commit": "d83c402",
+  "ledger_sha256": "f2b4f70add642dee5a28c0af15ff926186294a15c57379547fb593a6a568346c",
+  "ledger_entry_count": 263,
+  "selection_rule": "all remaining original36 empty-api review_required entries excluding batch1 and batch2 doc_ids",
+  "skipped_doc_ids": [
+    "14",
+    "24",
+    "15",
+    "146",
+    "109",
+    "16",
+    "17",
+    "291",
+    "330",
+    "342",
+    "346",
+    "384",
+    "93",
+    "18",
+    "134",
+    "314",
+    "283",
+    "157",
+    "184",
+    "177"
+  ],
+  "selected_doc_ids": [
+    "190",
+    "251",
+    "147",
+    "224",
+    "148",
+    "225",
+    "226",
+    "240",
+    "241",
+    "309",
+    "324",
+    "217",
+    "218",
+    "142",
+    "485",
+    "474"
+  ],
+  "review": [
+    {
+      "doc_id": "190",
+      "url": "https://tushare.pro/document/2?doc_id=190",
+      "html_sha256": "ed1d987310d7f5b34b93bfa419568d7008d194b31f7ec0dd3a142d8a8ca8156b",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "191",
+          "text": "港股基础信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hk_basic"
+          ]
+        },
+        {
+          "doc_id": "250",
+          "text": "港股交易日历",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hk_tradecal"
+          ]
+        },
+        {
+          "doc_id": "192",
+          "text": "港股日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hk_daily"
+          ]
+        },
+        {
+          "doc_id": "339",
+          "text": "港股复权行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hk_daily_adj"
+          ]
+        },
+        {
+          "doc_id": "401",
+          "text": "港股复权因子",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hk_adjfactor"
+          ]
+        },
+        {
+          "doc_id": "304",
+          "text": "港股分钟行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hk_mins"
+          ]
+        },
+        {
+          "doc_id": "389",
+          "text": "港股利润表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hk_income"
+          ]
+        },
+        {
+          "doc_id": "390",
+          "text": "港股资产负债表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hk_balancesheet"
+          ]
+        },
+        {
+          "doc_id": "391",
+          "text": "港股现金流量表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hk_cashflow"
+          ]
+        },
+        {
+          "doc_id": "388",
+          "text": "港股财务指标数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hk_fina_indicator"
+          ]
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "191",
+          "text": "港股列表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hk_basic"
+          ]
+        },
+        {
+          "doc_id": "192",
+          "text": "港股日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hk_daily"
+          ]
+        }
+      ],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "251",
+      "url": "https://tushare.pro/document/2?doc_id=251",
+      "html_sha256": "d87c2692d7d13c9791f873768f3f3f3cfbc17d638543677959c64bdb609209b9",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "252",
+          "text": "美股基础信息",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "us_basic"
+          ]
+        },
+        {
+          "doc_id": "253",
+          "text": "美股交易日历",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "us_tradecal"
+          ]
+        },
+        {
+          "doc_id": "254",
+          "text": "美股日线行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "us_daily"
+          ]
+        },
+        {
+          "doc_id": "338",
+          "text": "美股复权行情",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "us_daily_adj"
+          ]
+        },
+        {
+          "doc_id": "402",
+          "text": "美股复权因子",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "us_adjfactor"
+          ]
+        },
+        {
+          "doc_id": "394",
+          "text": "美股利润表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "us_income"
+          ]
+        },
+        {
+          "doc_id": "395",
+          "text": "美股资产负债表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "us_balancesheet"
+          ]
+        },
+        {
+          "doc_id": "396",
+          "text": "美股现金流量表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "us_cashflow"
+          ]
+        },
+        {
+          "doc_id": "393",
+          "text": "美股财务指标数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "us_fina_indicator"
+          ]
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "147",
+      "url": "https://tushare.pro/document/2?doc_id=147",
+      "html_sha256": "5fdd89677dc2957c4f7f75a5c75b2f00ebd99528126f05c7f273e841c097972b",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "224",
+          "text": "国内宏观",
+          "in_ledger": true,
+          "ledger_api_names": []
+        },
+        {
+          "doc_id": "217",
+          "text": "国际宏观",
+          "in_ledger": true,
+          "ledger_api_names": []
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "224",
+      "url": "https://tushare.pro/document/2?doc_id=224",
+      "html_sha256": "f0a5df0a783cad7d915cd905f5e1d3e6c7475a8c70550bf5566ea5d43b38dd3f",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "461",
+          "text": "中国经济数据发布日程",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cn_schedule"
+          ]
+        },
+        {
+          "doc_id": "148",
+          "text": "利率数据",
+          "in_ledger": true,
+          "ledger_api_names": []
+        },
+        {
+          "doc_id": "225",
+          "text": "国民经济",
+          "in_ledger": true,
+          "ledger_api_names": []
+        },
+        {
+          "doc_id": "226",
+          "text": "价格指数",
+          "in_ledger": true,
+          "ledger_api_names": []
+        },
+        {
+          "doc_id": "240",
+          "text": "金融",
+          "in_ledger": true,
+          "ledger_api_names": []
+        },
+        {
+          "doc_id": "324",
+          "text": "景气度",
+          "in_ledger": true,
+          "ledger_api_names": []
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "148",
+      "url": "https://tushare.pro/document/2?doc_id=148",
+      "html_sha256": "e89918270bae75c76ffd734aad4c2e3b6a1ca199c1082691428b63f8d5c9ffd7",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "149",
+          "text": "Shibor利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "shibor"
+          ]
+        },
+        {
+          "doc_id": "150",
+          "text": "Shibor报价数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "shibor_quote"
+          ]
+        },
+        {
+          "doc_id": "151",
+          "text": "LPR贷款基础利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "shibor_lpr"
+          ]
+        },
+        {
+          "doc_id": "152",
+          "text": "Libor利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "libor"
+          ]
+        },
+        {
+          "doc_id": "153",
+          "text": "Hibor利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hibor"
+          ]
+        },
+        {
+          "doc_id": "173",
+          "text": "温州民间借贷利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "wz_index"
+          ]
+        },
+        {
+          "doc_id": "174",
+          "text": "广州民间借贷利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "gz_index"
+          ]
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "149",
+          "text": "Shibor利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "shibor"
+          ]
+        },
+        {
+          "doc_id": "150",
+          "text": "Shibor报价数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "shibor_quote"
+          ]
+        },
+        {
+          "doc_id": "151",
+          "text": "LPR贷款基础利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "shibor_lpr"
+          ]
+        },
+        {
+          "doc_id": "152",
+          "text": "Libor利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "libor"
+          ]
+        },
+        {
+          "doc_id": "153",
+          "text": "Hibor利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "hibor"
+          ]
+        }
+      ],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "225",
+      "url": "https://tushare.pro/document/2?doc_id=225",
+      "html_sha256": "a8abb111e149482be1f0e99a2c7625b8e79329af651b13c529010e95060f80b8",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "227",
+          "text": "国内生产总值（GDP）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cn_gdp"
+          ]
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "227",
+          "text": "国内生产总值（GDP）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cn_gdp"
+          ]
+        }
+      ],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "226",
+      "url": "https://tushare.pro/document/2?doc_id=226",
+      "html_sha256": "30d19130f9d996febbaf62bbc316825bf303d42d2f218976d7b66f03a6d2bbbc",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "228",
+          "text": "居民消费价格指数（CPI）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cn_cpi"
+          ]
+        },
+        {
+          "doc_id": "245",
+          "text": "工业生产者出厂价格指数（PPI）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cn_ppi"
+          ]
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "228",
+          "text": "居民消费价格指数（CPI）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cn_cpi"
+          ]
+        },
+        {
+          "doc_id": "245",
+          "text": "工业生产者出厂价格指数（PPI）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cn_ppi"
+          ]
+        }
+      ],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "240",
+      "url": "https://tushare.pro/document/2?doc_id=240",
+      "html_sha256": "02f0eb0679610f6e3c96342599f8520767d2c6b047b41b3d6f7de78165e39988",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "241",
+          "text": "货币供应量",
+          "in_ledger": true,
+          "ledger_api_names": []
+        },
+        {
+          "doc_id": "309",
+          "text": "社会融资",
+          "in_ledger": true,
+          "ledger_api_names": []
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "241",
+      "url": "https://tushare.pro/document/2?doc_id=241",
+      "html_sha256": "615b97626659b875938b040381fc30a0ed9b098854f63d2fe72f96b3679b7d91",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "242",
+          "text": "货币供应量（月）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cn_m"
+          ]
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "309",
+      "url": "https://tushare.pro/document/2?doc_id=309",
+      "html_sha256": "eccfb454d08a1b83f45ce2c4d1c635707c2a071a96a3890e38c0f80573a260c3",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "310",
+          "text": "社融增量（月度）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "sf_month"
+          ]
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "324",
+      "url": "https://tushare.pro/document/2?doc_id=324",
+      "html_sha256": "85207512c24b650ba0ad7169bd4c009c30ee0b7f5313f0731bed0cae89690eb8",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "325",
+          "text": "采购经理指数（PMI）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cn_pmi"
+          ]
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "217",
+      "url": "https://tushare.pro/document/2?doc_id=217",
+      "html_sha256": "c6f30c236c03471dbb108d460e62b024f38ca62f39913b8757f3a7f18963377a",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "218",
+          "text": "美国利率",
+          "in_ledger": true,
+          "ledger_api_names": []
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "218",
+      "url": "https://tushare.pro/document/2?doc_id=218",
+      "html_sha256": "bcc885bf1787c38eac9b83dca06ca01bed04a8cf8a34a693ea3e860b795baab1",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "219",
+          "text": "国债收益率曲线利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "us_tycr"
+          ]
+        },
+        {
+          "doc_id": "220",
+          "text": "国债实际收益率曲线利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "us_trycr"
+          ]
+        },
+        {
+          "doc_id": "221",
+          "text": "短期国债利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "us_tbr"
+          ]
+        },
+        {
+          "doc_id": "222",
+          "text": "国债长期利率",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "us_tltr"
+          ]
+        },
+        {
+          "doc_id": "223",
+          "text": "国债长期利率平均值",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "us_trltr"
+          ]
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "142",
+      "url": "https://tushare.pro/document/2?doc_id=142",
+      "html_sha256": "5a6f5dba5d9cb137583bb3320a6d8e290725b2024185e7dbd11411454dd174e7",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "406",
+          "text": "国家政策库",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "npr"
+          ]
+        },
+        {
+          "doc_id": "415",
+          "text": "券商研究报告",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "research_report"
+          ]
+        },
+        {
+          "doc_id": "465",
+          "text": "央行货币政策执行报告",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "monetary_policy"
+          ]
+        },
+        {
+          "doc_id": "143",
+          "text": "新闻快讯（短讯）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "news"
+          ]
+        },
+        {
+          "doc_id": "195",
+          "text": "新闻通讯（长篇）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "major_news"
+          ]
+        },
+        {
+          "doc_id": "154",
+          "text": "新闻联播文字稿",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cctv_news"
+          ]
+        },
+        {
+          "doc_id": "176",
+          "text": "上市公司公告",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "anns_d"
+          ]
+        },
+        {
+          "doc_id": "366",
+          "text": "上证e互动问答",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "irm_qa_sh"
+          ]
+        },
+        {
+          "doc_id": "367",
+          "text": "深证易互动问答",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "irm_qa_sz"
+          ]
+        }
+      ],
+      "body_links": [
+        {
+          "doc_id": "143",
+          "text": "新闻快讯",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "news"
+          ]
+        },
+        {
+          "doc_id": "195",
+          "text": "新闻通讯（长篇新闻）",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "major_news"
+          ]
+        },
+        {
+          "doc_id": "154",
+          "text": "新闻联播文字稿",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "cctv_news"
+          ]
+        },
+        {
+          "doc_id": "176",
+          "text": "公告原文",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "anns_d"
+          ]
+        },
+        {
+          "doc_id": "213",
+          "text": "全球新冠疫情数据",
+          "in_ledger": false,
+          "ledger_api_names": []
+        }
+      ],
+      "missing_body_ids": [
+        "213"
+      ],
+      "classification": "category",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "485",
+      "url": "https://tushare.pro/document/2?doc_id=485",
+      "html_sha256": "96eab4eb2a986a466a65ad080afcc453ccef4e89f01753e2d2e0fdbb57125b0f",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "486",
+          "text": "因子列表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "factor_list"
+          ]
+        },
+        {
+          "doc_id": "490",
+          "text": "因子数据",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "factor_value"
+          ]
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category_with_api_examples",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    },
+    {
+      "doc_id": "474",
+      "url": "https://tushare.pro/document/2?doc_id=474",
+      "html_sha256": "8263245938dc1f135d8df80ca884e500cf32a95ac0308643fdbb89bcec18311e",
+      "http_status": 200,
+      "children": [
+        {
+          "doc_id": "446",
+          "text": "组合列表",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "p_list"
+          ]
+        },
+        {
+          "doc_id": "449",
+          "text": "成分查询",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "p_get"
+          ]
+        },
+        {
+          "doc_id": "445",
+          "text": "组合保存",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "p_save"
+          ]
+        },
+        {
+          "doc_id": "447",
+          "text": "组合删除",
+          "in_ledger": true,
+          "ledger_api_names": [
+            "p_delete"
+          ]
+        }
+      ],
+      "body_links": [],
+      "missing_body_ids": [],
+      "classification": "category_with_account_mutations",
+      "api_candidates": [],
+      "permission_status": "unverified"
+    }
+  ],
+  "linked_evidence": [
+    {
+      "doc_id": "213",
+      "url": "https://tushare.pro/document/2?doc_id=213",
+      "http_status": 200,
+      "bytes": 23,
+      "sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "content_status": "document_missing",
+      "in_baseline_ledger": false
+    },
+    {
+      "doc_id": "486",
+      "url": "https://tushare.pro/document/2?doc_id=486",
+      "http_status": 200,
+      "bytes": 101034,
+      "sha256": "799b1716dd674500e499bee73be4015307df014c16064219e751bbbfb45650f2",
+      "content_status": "document_present",
+      "in_baseline_ledger": true
+    },
+    {
+      "doc_id": "490",
+      "url": "https://tushare.pro/document/2?doc_id=490",
+      "http_status": 200,
+      "bytes": 36360,
+      "sha256": "3328603c3cc38b1d305a1b45d2e8adefda75fe0bd37b2baea300e21b95fd0962",
+      "content_status": "document_present",
+      "in_baseline_ledger": true
+    },
+    {
+      "doc_id": "445",
+      "url": "https://tushare.pro/document/2?doc_id=445",
+      "http_status": 200,
+      "bytes": 34853,
+      "sha256": "8942ec7d0acf97123d6c01623fd304befc74b0a5abe04e527c2e10efa4d4ca0a",
+      "content_status": "document_present",
+      "in_baseline_ledger": true
+    },
+    {
+      "doc_id": "447",
+      "url": "https://tushare.pro/document/2?doc_id=447",
+      "http_status": 200,
+      "bytes": 31689,
+      "sha256": "08d5c520bb6df1e88998e8ac8dbbef9219ef43fc4243c20f07808229e84759b9",
+      "content_status": "document_present",
+      "in_baseline_ledger": true
+    }
+  ],
+  "existing_special_apis": [
+    {
+      "api_name": "factor_list",
+      "doc_id": "486",
+      "permission": "independent_factor_library_unverified"
+    },
+    {
+      "api_name": "factor_value",
+      "doc_id": "490",
+      "permission": "independent_factor_library_trial_not_full_permission",
+      "constraint": "ts_code or factor_name required; row cap6000"
+    },
+    {
+      "api_name": "p_save",
+      "doc_id": "445",
+      "operation": "create_or_overwrite_account_portfolio"
+    },
+    {
+      "api_name": "p_delete",
+      "doc_id": "447",
+      "operation": "delete_account_portfolio"
+    }
+  ],
+  "scope_limit": "Classification of original36 special pages complete across3batches, not all-site recursive/API/permission/history closure. No data API calls or account mutations."
+}
