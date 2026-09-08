@@ -36,9 +36,9 @@ bash scripts/local-dev.sh start core
 npm run dev:react --workspace=electron -- --host 127.0.0.1
 ```
 
-`start` 会卸载原先承载 8000/18080 的云端隧道，8000 改为本地 API；`stop` 停本地容器、保留沙盒数据并恢复云端隧道。因此同一个 Vite 3000 页面在切换后可能写入不同数据库：切换前停止交互和任务，切换后刷新页面、重新确认后端角色再写入。`start` 当前不是热重启命令；已有沙盒运行时先检查状态，不能盲目重复启动。停止命令为 `bash scripts/local-dev.sh stop`，断网时其恢复隧道检查可能失败，要分别确认本地容器确已停止和云端连接状态。
+`start` 会卸载原先承载 8000/18080 的云端隧道，8000 改为本地 API；`stop` 停本地容器、保留沙盒数据并恢复云端隧道。因此同一个 Vite 3000 页面在切换后可能写入不同数据库：切换前停止交互和任务，切换后刷新页面、重新确认后端角色再写入。重复 `start` 对满足所选模式且健康的沙盒不做改动；切换 core/full 或修复部分启动状态时先检查再 `stop`。启停会验证本地 Docker Desktop endpoint 并串行加锁；首次启动失败会停掉本次启动的服务并恢复此前存在的隧道。停止命令为 `bash scripts/local-dev.sh stop`，断网时其恢复隧道检查可能失败，要分别确认本地容器确已停止和云端连接状态。
 
-沙盒数据固定在 `.local-dev/SNAPSHOT_ID`；离线可使用本地已有数据与依赖，外部 LLM/行情源需要网络。`.env.local`、`config/runtime.env` 仍是共享配置，不要写入机器专属路径/角色；本地角色配置放 `deploy/compose.local-dev.yml`。涉及 Docker 子容器的训练/Agent 作业，要核对其实际挂载也指向沙盒后才启动：父容器标记为 sandbox 不等于任意子进程自动隔离。Mac 当前复用的后端镜像是 `linux/amd64`，Apple Silicon 上使用本机算力但存在架构转换开销；依赖、虚拟环境和构建产物按平台分别安装，不双向复制。
+沙盒数据固定在 `.local-dev/SNAPSHOT_ID`；离线可使用本地已有数据与依赖，外部 LLM/行情源需要网络。`.env.local`、`config/runtime.env` 仍是共享配置，不要写入机器专属路径/角色；本地角色配置放 `deploy/compose.local-dev.yml`。涉及 Docker 子容器的训练/Agent 作业，要核对其实际挂载也指向沙盒后才启动：训练、AI-IDE 和 RD-Agent 的受管子容器通过 `HOST_RUNTIME_PATH` 映射沙盒数据，`HOST_PROJECT_PATH` 仅定位源码；任意持有 Docker socket 的命令仍须核对挂载。Mac 当前复用的后端镜像是 `linux/amd64`，Apple Silicon 上使用本机算力但存在架构转换开销；依赖、虚拟环境和构建产物按平台分别安装，不双向复制。
 
 ### Linux：云端开发与发布
 
@@ -48,7 +48,7 @@ Linux 预检：`sudo -n python3 scripts/dual_node_check.py --node cloud`，它�
 
 ### 交接与提交
 
-换端开发时先结束当前任务，等待 Syncthing 完成，核对冲突、工作树和 Git 分支/HEAD。源码和共享配置双向同步，`.git` 独立传递；活跃数据库、`.local-dev`、模型输出与运行数据不双向合并。即使平时只有一端开发，也保留这些检查。
+换端开发时先结束当前任务，等待 Syncthing 完成，在 Mac 执行 `bash scripts/dual-node.sh handoff` 核对冲突、工作树和 Git 分支/HEAD。只有 HEAD 落后且源码哈希一致时，显式指定 `handoff --align-git mac` 或 `handoff --align-git cloud`，以指定端为提交来源快进另一端的 Git 元数据；分支不一致、非快进、有暂存改动或 Git 操作进行中均拒绝。它保留工作文件，不做 checkout，不自动提交研究改动，也不推送 GitHub。源码和共享配置双向同步，`.git` 独立传递；活跃数据库、`.local-dev`、模型输出与运行数据不双向合并。即使平时只有一端开发，也保留这些检查。
 
 仅暂存本次明确文件，保留已有未提交工作。修改文档或提交代码不等于授权重启服务；只有任务包含发布时才构建/重启，并选择没有活动研究任务的窗口。源码同步可能影响云端延迟导入的 Python 文件，高风险改动先在共享树之外测试。`AGENTS.md` 是环境规则主入口，`CLAUDE.md` 引用本节，详细数据规则统一维护在 `docs/development-data-contract.md`。
 

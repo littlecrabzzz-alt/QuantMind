@@ -25,7 +25,11 @@ def runtime_path(relative):
     return True
 
 
-def inventory(project):
+def stat_key(stat):
+    return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+
+
+def inventory(project, cache=None, tolerate_changes=False):
     for root in runtime_roots(project):
         for path in sorted(root.rglob("*")):
             relative = path.relative_to(project)
@@ -35,16 +39,30 @@ def inventory(project):
                 raise RuntimeError(f"Review runtime symlink before migration: {relative}")
             if not path.is_file():
                 continue
-            before = path.stat()
-            digest = hashlib.sha256()
-            with path.open("rb") as stream:
-                for block in iter(lambda: stream.read(4 * 1024 * 1024), b""):
-                    digest.update(block)
-            after = path.stat()
-            if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+            try:
+                before = path.stat()
+                cached = cache.get(str(relative)) if cache is not None else None
+                if cached and cached[0] == stat_key(before):
+                    record = cached[1]
+                else:
+                    digest = hashlib.sha256()
+                    with path.open("rb") as stream:
+                        for block in iter(lambda: stream.read(4 * 1024 * 1024), b""):
+                            digest.update(block)
+                    record = {"path": relative.as_posix(), "bytes": before.st_size,
+                              "sha256": digest.hexdigest()}
+                after = path.stat()
+            except FileNotFoundError:
+                if tolerate_changes:
+                    continue
+                raise
+            if stat_key(before) != stat_key(after):
+                if tolerate_changes:
+                    continue
                 raise RuntimeError(f"File changed during inventory: {relative}")
-            yield {"path": relative.as_posix(), "bytes": after.st_size,
-                   "sha256": digest.hexdigest()}
+            if cache is not None:
+                cache[str(relative)] = (stat_key(after), record)
+            yield record
 
 
 if __name__ == "__main__":

@@ -2,6 +2,14 @@
 
 更新：2026-09-08。数据迁移已完成；开发规范见 `docs/development-data-contract.md`，日常验收入口为 `python3 scripts/dual_node_check.py`。本文保留迁移历史并区分已验证与未实现的边界。
 
+## 开发保护修复
+
+- 训练、AI-IDE 与 RD-Agent 子容器的数据/工作目录使用独立 `HOST_RUNTIME_PATH`，源码仍由 `HOST_PROJECT_PATH` 定位；Mac 沙盒缺少或错配数据根目录时拒绝受管路径映射。
+- 本地 init/start/stop 增加 Docker Desktop endpoint 校验、互斥锁、PostgreSQL 卷保护、重复启动处理和失败恢复；不会删除已有数据卷。
+- Mac 换端入口：`bash scripts/dual-node.sh handoff`；显式快进 Git 元数据用 `handoff --align-git mac|cloud`，参数指定提交来源，保留同步工作文件和未提交研究改动。
+- Mac 刷新入口：`bash scripts/dual-node.sh snapshot-refresh`。在线预计算源文件校验，停写只做变化补算/增量复制/冷数据捕获；恢复后完成副本校验与冷卷压缩再发布。固定沙盒快照可落后于 latest。完整数据的新停写耗时待维护窗口实测。
+- 回归：`python3 scripts/test_dual_node_safety.py`；显式运行临时 Docker 挂载验收：`QM_TEST_LOCAL_DOCKER=1 python3 scripts/test_dual_node_safety.py DockerMounts`。测试只使用临时夹具，不运行正式训练或创建全量快照。
+
 ## 2026-09-08 开发前验收补充
 
 - 主容器上限按用户要求提高至 **12 GiB**（Compose 与实际 Docker 均确认），训练子容器维持独立 4 GiB 预算；因子查询上限 4 GB，OHLCV 补给按请求日期裁剪。
