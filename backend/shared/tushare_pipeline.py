@@ -1151,6 +1151,130 @@ class Pipeline:
                     ),
                 )
 
+    def split_observed_futures(self, row, job, result, existing):
+        """Only source-observed partitions; no complete-universe inference."""
+        api, params = job["api_name"], job["params"]
+        fields = (
+            ("exchange", "symbol")
+            if api == "fut_holding"
+            else ("exchange", "prd")
+            if "week" in params
+            else ("week",)
+        )
+        saved = result if result is not None else json.loads(row["result"] or "{}")
+        records = self.records(saved) if saved.get("object_sha256") else []
+        issues = {}
+        observed = {}
+
+        def gap(kind):
+            issues[kind] = issues.get(kind, 0) + 1
+
+        def usable(field, value):
+            if (
+                field == "week"
+                and isinstance(value, int)
+                and not isinstance(value, bool)
+            ):
+                return value > 0
+            return (
+                isinstance(value, str)
+                and 0 < len(value) <= 128
+                and not any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in value)
+            )
+
+        for record in records:
+            # Check only explicit equality constraints, never reinterpret range
+            # bounds or derive a supplier week from week_date.
+            constrained = tuple(
+                field
+                for field in ("trade_date", "week", "exchange", "symbol", "prd")
+                if field in params
+            )
+            required = set(fields) | set(constrained)
+            if any(field not in record or record[field] is None for field in required):
+                gap("missing_partition_fields")
+                continue
+            if any(not usable(field, record[field]) for field in required):
+                gap("invalid_partition_values")
+                continue
+            if any(record[field] != params[field] for field in constrained):
+                gap("parent_filter_mismatch")
+                continue
+            child = {**params, **{field: record[field] for field in fields}}
+            if child == params:
+                gap("saturated_terminal_partition")
+                continue
+            observed[json_bytes(child)] = child
+        if not records:
+            gap("missing_source_partition_rows")
+        previous = {
+            child[0]
+            for child in self.db.execute(
+                "SELECT child_id FROM partition_children WHERE parent_id=?",
+                (row["id"],),
+            )
+        }
+        children = previous | {
+            self.enqueue(api, child, row["priority"] + 1, row["epoch"])
+            for _, child in sorted(observed.items())
+        }
+        evidence = (
+            json.loads(existing["evidence"])
+            if existing
+            else {"origin": "observed_futures"}
+        )
+        evidence.update(universe_complete=False, partition_fields=list(fields))
+        sources = evidence.setdefault("source_observations", {})
+        observation_key = digest(
+            json_bytes([saved.get("observation"), saved.get("object_sha256")])
+        )
+        sources.setdefault(
+            observation_key,
+            {
+                "observation": saved.get("observation"),
+                "object_sha256": saved.get("object_sha256"),
+                "observed_partitions": len(observed),
+                "gaps": issues,
+            },
+        )
+        # Per-observation gaps remain independent even if reconciliation later
+        # reports the encompassing universe_unverified gap.
+        if existing:
+            for child in children - previous:
+                cycle = self.db.execute(
+                    "WITH RECURSIVE descendants(id) AS (SELECT child_id FROM partition_children WHERE parent_id=? "
+                    "UNION SELECT c.child_id FROM partition_children c JOIN descendants d ON c.parent_id=d.id) "
+                    "SELECT 1 FROM descendants WHERE id=? LIMIT 1",
+                    (child, row["id"]),
+                ).fetchone()
+                if child == row["id"] or cycle:
+                    raise ValueError("Partition relationship would create a cycle")
+            self.db.executemany(
+                "INSERT OR IGNORE INTO partition_children VALUES(?,?)",
+                [(row["id"], child) for child in sorted(children - previous)],
+            )
+            self.db.execute(
+                "UPDATE partition_splits SET method='observed_futures_fanout',expected_children=?,coverage_proven=0,evidence=?,status='gap',gap='universe_unverified' WHERE parent_id=?",
+                (len(children), json.dumps(evidence, sort_keys=True), row["id"]),
+            )
+        elif children:
+            self.record_partition(
+                row["id"], sorted(children), "observed_futures_fanout", False, evidence
+            )
+        else:
+            self.db.execute(
+                "INSERT INTO partition_splits VALUES(?,'observed_futures_fanout',0,0,?,'gap','universe_unverified')",
+                (row["id"], json.dumps(evidence, sort_keys=True)),
+            )
+        return {
+            "method": "observed_futures_fanout",
+            "children": len(children),
+            "universe_complete": False,
+            "observed_partitions": len(observed),
+            "added_children": len(children - previous),
+            "gaps": issues,
+        }
+
     def split_request(self, row, job, result=None):
         spec = contract_for(job["api_name"])
         params = job["params"]
@@ -1166,6 +1290,10 @@ class Pipeline:
             existing
             and existing["expected_children"]
             and not (existing["method"] == "identifier_fanout" and fanout)
+            and not (
+                existing["method"] == "observed_futures_fanout"
+                and job["api_name"] in ("fut_holding", "fut_weekly_detail")
+            )
         ):
             return {
                 "method": existing["method"],
@@ -1186,6 +1314,8 @@ class Pipeline:
                 {"origin": "v4", "date_coverage": "exhaustive"},
             )
             return {"method": "date_bisection", "children": len(ids)}
+        if job["api_name"] in ("fut_holding", "fut_weekly_detail"):
+            return self.split_observed_futures(row, job, result, existing)
         if fanout:
 
             def usable(code):
