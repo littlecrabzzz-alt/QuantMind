@@ -195,6 +195,10 @@ def observe(case_dir, experiment, contract, stop=False):
         info = inspect(experiment["container_name"])
     if info["State"]["Running"]:
         return None
+    if not (directory / "execution.log").exists():
+        with docker_client() as client:
+            log = client.api.logs(info["Id"], stdout=True, stderr=True, tail=2000)
+        (directory / "execution.log").write_bytes(log)
     experiment["container_id"] = info["Id"]
     experiment["exit_code"] = info["State"]["ExitCode"]
     experiment["finished_at"] = info["State"]["FinishedAt"]
@@ -203,6 +207,10 @@ def observe(case_dir, experiment, contract, stop=False):
         return {"stopped": True}
     if info["State"]["ExitCode"] != 0:
         experiment["status"] = "failed"
+        experiment["result"] = {"summary": {"comparison": {"model": {}}},
+            "failure": "计算进程退出失败，查看 execution.log",
+            "artifacts": {name: frozen.sha256(directory/name) for name in
+                          ("execution.log", "config.json", "proposal.json") if (directory/name).exists()}}
         raise ValueError("研究计算退出失败；日志与产物已保留")
     summary = frozen.read(directory / "summary.json")
     if not summary.get("checks_passed"):

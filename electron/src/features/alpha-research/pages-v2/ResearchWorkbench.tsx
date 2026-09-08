@@ -233,7 +233,7 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
             { title: '净收益', render: (_, e) => fmt(e.result?.summary.comparison.model.total_return, true) },
             { title: '最大回撤', render: (_, e) => fmt(e.result?.summary.comparison.model.max_drawdown, true) },
             { title: '费用（元）', render: (_, e) => fmt(e.result?.summary.comparison.model.transaction_cost) },
-            { title: '结论', render: (_, e) => e.status !== 'completed' ? '失败，证据保留' : e.gates ? Object.values(e.gates).every(Boolean) ? '通过开发门槛' : '未通过开发门槛' : '已核验' },
+            { title: '结论', render: (_, e) => e.status !== 'completed' ? <Space>失败，证据保留{e.result?.artifacts['execution.log'] && <Button size="small" onClick={() => void download(e, 'execution.log')}>日志</Button>}</Space> : e.gates ? Object.values(e.gates).every(Boolean) ? '通过开发门槛' : '未通过开发门槛' : '已核验' },
           ]} />
           {experiments.filter(e => e.result?.factor_analysis).map(e => {
             const m = e.result!.factor_analysis!.splits.valid;
@@ -246,7 +246,7 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
                 <Text>Rank ICIR {fmt(m.rank_icir)}</Text><Text>正 Rank IC 比例 {fmt(m.positive_rank_ic_fraction, true)}</Text></Space>
             </Card>;
           })}
-          {selected.selection && <div><h4>模型选择说明（解释）</h4><Paragraph>{selected.selection.reason}</Paragraph><Text type="secondary">下一问题：{selected.selection.next_question}</Text></div>}
+          {selected.selection && <div><h4>模型选择记录（压力验证前生成）</h4><Paragraph>{selected.selection.reason}</Paragraph><Text type="secondary">当时提出的问题：{selected.selection.next_question}</Text></div>}
           <div><h4>研究进展</h4>{selected.events?.slice(-12).map((e, i) => <div key={`${e.at}-${i}`} className="py-1"><Text type="secondary">{new Date(e.at * 1000).toLocaleTimeString()} </Text>{e.message}</div>)}</div>
           <Text type="secondary">已完成调用 {selected.usage?.calls ?? 0} 次 · 已确认 Token {fmt(selected.usage ? selected.usage.input_tokens + selected.usage.output_tokens : null)} · 用量未知 {selected.usage?.unknown_usage ?? 0} 次 · 服务退避 {selected.usage?.retryable ?? 0} 次 · 金额未返回</Text>
         </div>

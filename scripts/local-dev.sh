@@ -177,15 +177,17 @@ require_mac
 case "${1:-help}" in
   init) lock_operation; initialize ;;
   start) lock_operation; start_local "${2:-core}" ;;
-  restart-research-worker)
+  restart-research-worker|restart-backend)
     lock_operation
-    [ "$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' quantmind-dev-research-worker | grep '^QM_NODE_ROLE=')" = QM_NODE_ROLE=sandbox ] || fail 'Expected the isolated research worker.'
-    "${COMPOSE[@]}" restart research-worker
+    service=research-worker; container=quantmind-dev-research-worker
+    if [ "$1" = restart-backend ]; then service=quantmind; container=quantmind-dev; fi
+    [ "$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$container" | grep '^QM_NODE_ROLE=')" = QM_NODE_ROLE=sandbox ] || fail 'Expected an isolated sandbox service.'
+    "${COMPOSE[@]}" restart "$service"
     ;;
   stop) lock_operation; stop_local ;;
   status)
     echo "snapshot=$(cat "$STATE/SNAPSHOT_ID" 2>/dev/null || echo uninitialized)"
     "${COMPOSE[@]}" ps
     ;;
-  *) echo 'Usage: scripts/local-dev.sh {init|start [core|full|research]|restart-research-worker|stop|status}'; exit 2 ;;
+  *) echo 'Usage: scripts/local-dev.sh {init|start [core|full|research]|restart-research-worker|restart-backend|stop|status}'; exit 2 ;;
 esac

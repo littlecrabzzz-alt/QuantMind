@@ -55,6 +55,12 @@ def allowed_candidates(state):
             and (e["proposal"]["kind"] == "baseline" or all(e.get("gates", {}).values()) and e.get("gates"))]
 
 
+def require_method_result(row, state):
+    if row["kind"] == "method" and not any(
+        e["status"] == "completed" and e.get("result", {}).get("factor_analysis") for e in state["experiments"]):
+        raise ValueError("没有实际完成并核验的新因子，不能将方法研究标记为完成；请检查失败实验的数据与日志")
+
+
 def usage(case_dir):
     attempts = [runtime.frozen.read(p) for p in (case_dir / "api").glob("**/attempt-*.json")]
     done = [a for a in attempts if a["status"] == "completed"]
@@ -133,6 +139,8 @@ async def advance(row, store, lease):
         proposal = {"kind": "baseline", "hypothesis": "复现冻结基线与两组固定对照", "changes": {}}
     elif state["stage"] in ("propose", "select"):
         selecting = state["stage"] == "select"
+        if selecting:
+            require_method_result(row, state)
         index = state["candidate_count"] + 1
         label = "selection" if selecting else f"candidate-{index}"
         correction = state.setdefault("corrections", {}).get(label, [])
@@ -226,6 +234,7 @@ async def advance(row, store, lease):
 
 
 def finish(case_dir, state, row):
+    require_method_result(row, state)
     for exp in state["experiments"]:
         if exp["status"] != "completed":
             continue
@@ -238,7 +247,7 @@ def finish(case_dir, state, row):
         m = exp.get("result", {}).get("summary", {}).get("comparison", {}).get("model")
         lines.append(f"|{exp['id']}|{exp['proposal']['kind']}|{m['total_return']:.4%}|{m['max_drawdown']:.4%}|已核验|" if m else
                      f"|{exp['id']}|{exp['proposal']['kind']}|—|—|失败，证据保留|")
-    lines += ["", "## 模型选择说明（解释，不代表数值已被模型核验）", "", json.dumps(state["selection"], ensure_ascii=False, indent=2)]
+    lines += ["", "## 模型选择记录（压力验证前生成；实际完成情况以上表为准）", "", json.dumps(state["selection"], ensure_ascii=False, indent=2)]
     (case_dir / "REPORT.md").write_text("\n".join(lines)+"\n")
     state["report_sha256"] = runtime.frozen.sha256(case_dir / "REPORT.md")
     state["research_status"] = "needs_independent_validation"

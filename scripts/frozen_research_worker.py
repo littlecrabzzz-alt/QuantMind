@@ -204,7 +204,7 @@ def main():
         if derived["name"] != "research_signal" or features != source_features + [derived["name"]]:
             raise ValueError("Derived factor must augment the frozen baseline once")
         raw_factor = reader.read_range(source, features=source_features,
-            start=(pd.Timestamp(train_start) - timedelta(days=365)).date().isoformat(), end=test_end)
+            start=train_start, end=test_end)
         raw_factor = raw_factor[raw_factor.symbol.isin(universe)].copy()
         trading_calendar = D.calendar(start_time=raw_factor.trade_date.min(), end_time=test_end, freq="day")
         raw_factor = raw_factor[raw_factor.trade_date.isin(trading_calendar)].sort_values(["symbol", "trade_date"])
@@ -216,7 +216,11 @@ def main():
                             on=["symbol", "trade_date"], validate="one_to_one")
         values = raw_factor[["symbol", "trade_date", derived["name"], "forward_return", "label_end"]]
         values.to_parquet(OUT / "factor-values.parquet", index=False)
-        write("factor-analysis.json", diagnostics(raw_factor, derived["name"], source_features, cfg))
+        analysis = diagnostics(raw_factor, derived["name"], source_features, cfg)
+        analysis["history_start"] = str(raw_factor.trade_date.min().date())
+        analysis["required_history_observations"] = validate(derived["expression"], source_features)["lookback"]
+        analysis["warmup_note"] = "Snapshot begins at train_start; unavailable initial rolling values remain missing and are included in coverage."
+        write("factor-analysis.json", analysis)
         write("factor-definition.json", derived)
         if frame[derived["name"]].notna().mean() < .5 or frame[derived["name"]].nunique() < 2:
             raise ValueError("Generated factor has insufficient coverage or is constant")
