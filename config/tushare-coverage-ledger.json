@@ -256,9 +256,21 @@
       "acquisition_api_names": [
         "weekly"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "weekly",
+            "missing_fields": [],
+            "row_count": 5630,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "145",
@@ -270,9 +282,21 @@
       "acquisition_api_names": [
         "monthly"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "monthly",
+            "missing_fields": [],
+            "row_count": 5629,
+            "status": "possibly_truncated"
+          }
+        ]
+      }
     },
     {
       "doc_id": "146",
@@ -294,9 +318,21 @@
       "acquisition_api_names": [
         "stk_weekly_monthly"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "stk_weekly_monthly",
+            "missing_fields": [],
+            "row_count": 5552,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "365",
@@ -308,9 +344,21 @@
       "acquisition_api_names": [
         "stk_week_month_adj"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "stk_week_month_adj",
+            "missing_fields": [],
+            "row_count": 5552,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "28",
@@ -426,9 +474,21 @@
       "acquisition_api_names": [
         "income_vip"
       ],
-      "status": "implementing",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "income_vip",
+            "missing_fields": [],
+            "row_count": 9000,
+            "status": "possibly_truncated"
+          }
+        ]
+      }
     },
     {
       "doc_id": "36",
@@ -440,9 +500,21 @@
       "acquisition_api_names": [
         "balancesheet_vip"
       ],
-      "status": "implementing",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "balancesheet_vip",
+            "missing_fields": [],
+            "row_count": 7000,
+            "status": "possibly_truncated"
+          }
+        ]
+      }
     },
     {
       "doc_id": "44",
@@ -454,9 +526,21 @@
       "acquisition_api_names": [
         "cashflow_vip"
       ],
-      "status": "implementing",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "cashflow_vip",
+            "missing_fields": [],
+            "row_count": 6400,
+            "status": "possibly_truncated"
+          }
+        ]
+      }
     },
     {
       "doc_id": "45",
@@ -468,9 +552,21 @@
       "acquisition_api_names": [
         "forecast_vip"
       ],
-      "status": "implementing",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "forecast_vip",
+            "missing_fields": [],
+            "row_count": 1913,
+            "status": "possibly_truncated"
+          }
+        ]
+      }
     },
     {
       "doc_id": "46",
@@ -482,9 +578,21 @@
       "acquisition_api_names": [
         "express_vip"
       ],
-      "status": "implementing",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "express_vip",
+            "missing_fields": [],
+            "row_count": 66,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "103",
@@ -510,9 +618,21 @@
       "acquisition_api_names": [
         "fina_indicator_vip"
       ],
-      "status": "implementing",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "fina_indicator_vip",
+            "missing_fields": [],
+            "row_count": 10736,
+            "status": "possibly_truncated"
+          }
+        ]
+      }
     },
     {
       "doc_id": "80",
@@ -1700,9 +1820,21 @@
       "acquisition_api_names": [
         "index_weekly"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "index_weekly",
+            "missing_fields": [],
+            "row_count": 1000,
+            "status": "possibly_truncated"
+          }
+        ]
+      }
     },
     {
       "doc_id": "419",
@@ -1728,9 +1860,21 @@
       "acquisition_api_names": [
         "index_monthly"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "index_monthly",
+            "missing_fields": [],
+            "row_count": 1000,
+            "status": "possibly_truncated"
+          }
+        ]
+      }
     },
     {
       "doc_id": "96",
@@ -1756,9 +1900,21 @@
       "acquisition_api_names": [
         "index_dailybasic"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "index_dailybasic",
+            "missing_fields": [],
+            "row_count": 12,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "181",
@@ -2662,9 +2818,21 @@
       "acquisition_api_names": [
         "hk_basic"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "hk_basic",
+            "missing_fields": [],
+            "row_count": 2784,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "250",
@@ -2676,9 +2844,21 @@
       "acquisition_api_names": [
         "hk_tradecal"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "hk_tradecal",
+            "missing_fields": [],
+            "row_count": 4,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "192",
@@ -2690,9 +2870,21 @@
       "acquisition_api_names": [
         "hk_daily"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "hk_daily",
+            "missing_fields": [],
+            "row_count": 2286,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "339",
@@ -2704,9 +2896,19 @@
       "acquisition_api_names": [
         "hk_daily_adj"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "No upstream data access in this account probe; keep in total catalogue and recheck on entitlement change.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "hk_daily_adj",
+            "status": "permission_denied"
+          }
+        ]
+      }
     },
     {
       "doc_id": "401",
@@ -2718,9 +2920,19 @@
       "acquisition_api_names": [
         "hk_adjfactor"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "No upstream data access in this account probe; keep in total catalogue and recheck on entitlement change.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "hk_adjfactor",
+            "status": "permission_denied"
+          }
+        ]
+      }
     },
     {
       "doc_id": "304",
@@ -2812,9 +3024,21 @@
       "acquisition_api_names": [
         "us_basic"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "us_basic",
+            "missing_fields": [],
+            "row_count": 6000,
+            "status": "possibly_truncated"
+          }
+        ]
+      }
     },
     {
       "doc_id": "253",
@@ -2826,9 +3050,21 @@
       "acquisition_api_names": [
         "us_tradecal"
       ],
-      "status": "planned",
+      "status": "ingested_partial",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Retained live sample and contract implemented; continue complete historical partitions and separate saturation/permission gaps. Runtime capability is authoritative.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "us_tradecal",
+            "missing_fields": [],
+            "row_count": 4,
+            "status": "sample_ok"
+          }
+        ]
+      }
     },
     {
       "doc_id": "254",
@@ -2840,9 +3076,19 @@
       "acquisition_api_names": [
         "us_daily"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "No upstream data access in this account probe; keep in total catalogue and recheck on entitlement change.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "us_daily",
+            "status": "permission_denied"
+          }
+        ]
+      }
     },
     {
       "doc_id": "338",
@@ -2854,9 +3100,19 @@
       "acquisition_api_names": [
         "us_daily_adj"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "No upstream data access in this account probe; keep in total catalogue and recheck on entitlement change.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "us_daily_adj",
+            "status": "permission_denied"
+          }
+        ]
+      }
     },
     {
       "doc_id": "402",
@@ -2868,9 +3124,19 @@
       "acquisition_api_names": [
         "us_adjfactor"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "No upstream data access in this account probe; keep in total catalogue and recheck on entitlement change.",
+      "capability_observation": {
+        "checked_at": "2026-09-08T18:38:00.351685+00:00",
+        "evidence": "validation/global-vip-probe.json",
+        "results": [
+          {
+            "api_name": "us_adjfactor",
+            "status": "permission_denied"
+          }
+        ]
+      }
     },
     {
       "doc_id": "394",

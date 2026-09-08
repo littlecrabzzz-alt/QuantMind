@@ -503,7 +503,7 @@ class ExtendedPipeline(unittest.TestCase):
                 self.assertEqual(
                     tuple(p.db.execute("SELECT * FROM jobs").fetchone())[:10], original
                 )
-                self.assertEqual(p.db.execute("PRAGMA user_version").fetchone()[0], 3)
+                self.assertEqual(p.db.execute("PRAGMA user_version").fetchone()[0], 4)
                 self.assertEqual(
                     p.db.execute(
                         "SELECT result FROM attempts WHERE job_id='saved-id' AND attempt=2"
