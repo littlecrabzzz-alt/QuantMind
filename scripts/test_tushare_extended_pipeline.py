@@ -119,9 +119,13 @@ class ExtendedPipeline(unittest.TestCase):
         manifest = module.verify_data(self.root, release)
         self.assertIn(artifact["path"], manifest["files"])
         portable = json.loads((self.root / manifest["documents"]["path"]).read_bytes())
-        self.assertEqual(portable["schema_version"], 2)
+        self.assertEqual(portable["schema_version"], 3)
         self.assertEqual(portable["totals"]["mappings"], 1)
-        state_shard = next(iter(portable["states"].values()))
+        descriptor_shard = next(iter(portable["states"].values()))
+        descriptors = json.loads((self.root / descriptor_shard["path"]).read_bytes())
+        self.assertEqual(descriptors["kind"], "state_descriptors")
+        self.assertEqual(descriptor_shard["state_count"], 1)
+        state_shard = descriptors["items"][0]
         state = json.loads((self.root / state_shard["path"]).read_bytes())["items"][0]
         self.assertEqual(state["result"]["parse_status"], "parse_failed")
         self.assertEqual(release, p.publish())

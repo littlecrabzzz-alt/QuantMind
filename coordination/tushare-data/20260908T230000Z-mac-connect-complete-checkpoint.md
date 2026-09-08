@@ -1,0 +1,10 @@
+# Connect5生产/API/Mac完成与下一轮候选
+
+- 本轮为progress：runtime93b6343（d1ac3e5运行+93b6343通用request fixture），319全tests/Ruff通过并合入GitHub/master/云端，之前handoff4499文件passed。Connect5全11方向/type实测6292行/58字段，raw/observation hash/Parquet全部字段和请求日期/维度一致；enable_connect已开，recent77新、history首批423新，旧11家族未重置。136采集API+6财务别名，非历史取全。
+- 固定2e5f447c：云端API按codes分批15次/6292行全列一致，upstream_calls0、匿名401（内部服务身份）；Mac111764文件全验证且禁网禁密钥逐字段对账完成。/tmp/tushare-connect-{probe,acceptance,mac-verified}.json，云端validation/connect-{probe,acceptance,api-acceptance,runtime}.json。本轮主容器quantmind与acquire worker重启过，文档恢复。最终消费者都恢复，无暂停遗留；通用US任务88fe98db未动，research空。
+- 旧4API首次raw-only已探测：moneyflow_hsgt exact0904=1行；ggt_daily空params1000行(20220526..20260907)/has_more true；ggt_top10空params50101参数失败；ggt_monthly40101名称拒绝。实际raw字段和错误都保留，未猜完整schema/权限/历史。首次retain_release未把返回引用并入p.publish，Mac发现4raw未在fixed清单；已用既有archive._file逐字节定向校验/register8引用文件并p.publish闭包b93d6be5。最新Mac b93d6be5405e42c5ae4c2cee7b27876f65e2eea09af25920b398761c2c55a65c共114928文件，4raw+4obs SHA全部通过。报告validation/connect-legacy-closure.json、/tmp/tushare-connect-legacy-mac-verified.json。勿重复首轮探测。
+- 代码/覆盖doc本轮更新：ledger 5项ingested_partial/available_observed，47/49保存能力结果，196/197新增discovered（原263不变，11→13）。目录test允许有非空探测证据覆盖初始unverified，5相关tests+Ruff通过；所有其他研究者脏文件保留。
+- 下轮优先候选：schema3累积9cf3a60+增量0ea2e88，尚未parent pick/部署。text原50 focused、修复29，structured Python3.10独立审查35+3closure检查并复现0ea阻止损坏descriptor推进CURRENT；旧缓存leaf/mapping/attempt/历史metadata损坏的发布前完整性风险仍未扩范围，API/mirror拒损坏。证据/var/folders/6m/svdmp5hd6lj09292v8mt73fw0000gn/T/quantmind-schema3-review-b74unxci/和本主题224755Z/225016Z/225541Z。
+- 另一候选：remaining纯4d2f953+runtime b5b6a80（基于93b6343），top_list/top_inst/hm_list/hm_detail。40相关tests通过，hm_list catalog定点删3错误示例字段，hm_detail.tag显式请求缺列schema_gap；历史stocks+观测事件证券fanout，hm_name二级饱和仍gap。尚未父pick/部署/账号探测。
+- 旧Connect下一轮最多4请求清单/tmp/tushare-connect-legacy-next-probes.json：moneyflow range0903..0904、ggt_daily exact0904及20220523..0527、ggt_top10 exact0904。daily日期参数仍hypothesis_under_test；top10依据官方repo issue1637非维护者合同且报告过错列，需全原列保留。monthly不猜改名/不代算。各agent当前已交付，不假设仍在运行。
+- 原完整目标保持：全部权限可用数据、历史/修订/原文/附件/本地离线/远端服务器单写者同步继续；RRG价格坐标验收不解除PIT/ETF准入。下一轮先查live Git/queues/coord，不用旧status/锁文件猜运行。

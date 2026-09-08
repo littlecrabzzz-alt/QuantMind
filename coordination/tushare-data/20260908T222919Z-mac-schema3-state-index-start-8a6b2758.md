@@ -1,0 +1,1 @@
+Owner text_contracts; isolated codex/tushare-text. Continue candidate c62cb54+5c521f1, implement schema3 two-level state descriptors per316831 benchmark c23d9f9. Own tushare_documents.py, router document state reader, index tests; no archive/mirror alias edits. Preserve all old metadata/records; no production operations or deployment. Parent integrates c62cb54 independently.

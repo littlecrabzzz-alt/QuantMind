@@ -1,0 +1,13 @@
+# 17e2332 依赖与周期追赶独立复核
+- Mac remaining_markets；codex/tushare-planner-progress；仅追加 scripts/test_tushare_planning_progress.py，未改父pipeline。
+- 接续 20260908T221339Z-mac-planner-progress-ready-993ad27a.md；完成，增量commit见本记录所在交接消息。
+
+未发现现有注册planner因依赖投影丢请求的缺陷。逐个读完11个实际planner的config读取、直接IDs消费与日期轴；新增实际纯函数对照测试，对124个API逐个选择、再对11个family默认全选，共135组比较：完整发现字典 vs _planning_inputs必要投影产生完全相同的有序job列表。fixture含stocks/indexes/funds/ETF/bonds/SW/futures/options/FX/HK退市!/US等来源标识；覆盖2025-12-01—2026-09-09含季度边界，纯规划无API请求。
+
+配置：已覆盖当前每个planner实际读入的family_apis、history_start、family_history_start与text_history_starts/text_history_window。text_history_start确实由family_history_start键包含；planning_epoch由父注入固定快照而非外部配置决定。当前history_start或per-API起点字典中“已被更具体设置遮蔽/未选择API”的值变化仍可能使本family保守重扫，属于可进一步收窄的性能余量，没有跨family重新失效或日期遗漏证据。
+
+标识：structured仅namechange→stocks、index_daily→indexes直接影响枚举；VIP股票集合仅饱和fallback不改变季度主请求。market直接消费funds/indexes/bonds/sw_l3与spec.dependencies一致；global SYMBOL_PERIODS四API直接stocks/indexes依赖齐全。其它仅validator/饱和读取的ID族移出纯planner快照不会改变实际请求序列；split层仍独立live发现，本复核不宣称其历史split闭包已完成。
+
+日期：新增周/月真实planner的6日anchor串联，四个SYMBOL_PERIODS的请求区间覆盖整个已闭合周/月范围；新增income_vip低预算跨2026-06-25→2026-07-25追赶，3/31与6/30两期均生成，最终anchor追到7/25、done=true，固定today继续调用返回{}且不新增job。structured/market虽然忽略planning_epoch，使用的是被冻结的anchor生成epoch和日期，因此扫描内幂等不漂移；实际daily与fund_nav跨9/1→9/20的1预算扫描也验证旧扫epoch仍9/1，随后有限补扫追至9/20并停止新增。允许不同观察epoch重新刷新同一报告期，不属于无限重建。
+
+验证：新增4个测试（包含135组真实planner对照），完整test_tushare_planning_progress.py共14项通过；ruff/diff通过。全部临时SQLite/纯planner，无生产/网络/密钥。既有62项证据仍来自17e2332，本次只增测试，不改实现。不把有限fixture证明扩大为所有未来合同或源数据PIT的证明；新增planner/配置/枚举依赖时必须更新依赖元数据与测试。

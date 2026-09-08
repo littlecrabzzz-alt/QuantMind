@@ -163,3 +163,39 @@
 
 - 05:53完成追加：Mac固定data-e12e0274cf2c5acd3b36c99f0a7ab52abd43e86c5fab435b200c367129a7d597共88800文件校验通过，本次补2758文件。其保留的credit验收版data-90d7f3967529f2253f546d1b26c3a135ebdf6c8a81a15ff07484877e5dc1f75a禁网逐字段核对9242原始行通过；block_trade视图135、pledge_detail164与原文重复数对应，slb_len空观察保留、查询明确不可用且无上游回退。证据/tmp/tushare-credit7-mac-verified.json。
 - RRG父独立断网复验通过：28行业×968日=27104坐标，220/60/20预热、3截点截断/未来扰动、逐行业缩放、同走势中心100、缺值拒绝通过；CSV SHA256 66d4ca27445090b528f346499aff1a8d661771c57b7676dc84b1d5d0be83b0e6与子验收一致。报告/tmp/quantmind-rrg-coordinate-parent-review-20260909/report.json；48个月末有47个下一交易日映射，末端边界仍gap，整体blocked_data不变。消费验收脚本及PCF纯合同已合入675301b，PCF尚未注册运行。信用7位修复4e414e4（22项隔离测试）已交付独立候选，下一轮部署恢复。
+
+
+## 2026-09-09 06:15 信用恢复与ETF篮子生产验收
+
+- 44d1748 已合入/push master并经双端handoff passed（4470文件，摘要e7b21fb1f7a7dd6ecf443998ebf113d6197640b4befb04518b8a1cee7b99e862）。本批290项Tushare专项隔离回归通过；131个数据集、6财务查询别名（store总键137），不等于完整历史覆盖。仅采集consumer自然排空；只重启quantmind和tushare-worker，document及普通/research worker未重启，当前采集/附件均已恢复。
+- 信用7位源基金身份兼容已实测恢复planning:credit_extra=validation_passed，funds22205、专属etfs1829、credit_securities8877。7位代码保持独立，.OF原文保留但不进入信用请求；统一内部前缀及交易信用资格仍有明确gap。recent信用31项、history500项初始规划成功，未删旧任务/原始发现。22:13Z自动作业（排除capability探测）信用done24/empty41/pending7843/split_pending1，证明自动回填已推进，仍非全历史完成。
+- PCF两接口及转融资宽范围发现合计3请求1.125秒：etf_sh_cons(517030.SH/20260615)300行，etf_sz_cons(159051.SZ/20260625)100行，slb_len无日期2811行。slb本次覆盖20140102—20250725，不能由上界断言停更或历史全集；原20260904空观察仍保留。27个文档字段全返回，原文/观察hash/Parquet逐字段、原始scalar类型及请求日期/代码匹配通过。证据validation/etf-basket-probe.json、etf-basket-acceptance.json。
+- SH样本72条qty=0且含HK/SH/SZ；SZ14条qty=0且含BJ/SH/SZ与1条申赎现金，均未筛除。PCF数字/字符串/空值混列不能直接存Arrow：原数量字段为nullable text，每行_raw_numeric_json保存原JSON类型；schema.source_scalar_encodings说明如何还原，Arrow/JSONL/API不会自动还原。全部原始响应与raw row identity不变。篮子数量不是持仓权重，精确known_at及完整PCF表头/申赎单位仍未知。
+- 两PCF已启用recent/history各500起始规划；22:13Z自动done49/empty17/pending1934。云端API固定版查询SH300/SZ100行，约1.008/1.234秒，原文/Parquet/API全部值和scalar类型对账通过，upstream_calls=0、匿名401；本次为既有内部服务身份，非用户JWT登录验收。证据validation/etf-basket-api-acceptance.json。
+- Mac持久runtime已更新新模块，LaunchAgent此前自动一轮exit0；随后固定data-cdf881db31f95b1aefcbdc92de75fdc6e65d8e47b9baec75d6b459ef6f25a680共96064文件校验通过（已有自动镜像基础上补12文件）。断网且禁凭据的两个PCF+slb共3211行原文/Parquet/查询审计通过，字段编码说明可读；证据/tmp/tushare-etf-basket-mac-verified.json。没有改动其他研究配置或回灌Mac旧主库。
+- 当前生产批22:12:08Z316请求/89.953秒采集、112.814秒整批，failed_stage=null；云端余量298.54GiB。只读全scope评估时Tushare目录约20.123GiB分配量、41.7万待采集任务与31.6万待下载附件；队列还会扩展，不能当最终分母或线性ETA。细分JSON /tmp/quantmind-fullscope-assessment-20260909.json及本主题220033Z记录。
+- 找到两项影响持续进度的实际机制：全局signature让不相关family的历史游标反复回退（9500→3000→1500等真实manifest证据，任务未丢但重复规划消耗预算）；documents状态256桶在新增1000随机记录时约98%桶变脏，manifest归档也有重复字节。规划修复17e2332已有62测试和原版3/3复现失败，独立候选未部署；元数据分块/安全硬链接候选由text隔离开发，未动生产/既有文件。
+- 新5项互联互通/板块资金流纯合同已合入bb1fc15，5项离线测试通过，尚未runtime或探测。47/49/196/197当前官方正文缺失继续保留历史获取义务，正查已存官方抓取/官方Git历史以准备有界探测，不推定停更/无权限。全263基线+11发现文档义务、全部历史/修订/PDF仍未完成，goal持续active；RRG价格坐标技术验收不解除整体PIT/ETF准入限制。
+
+
+## 2026-09-09 06:35 有限规划进度与不可变清单去重
+
+- eb3bf64已合入并推送master，双端handoff passed（4487文件，源码摘要083ab607482cf1fd6cb3d3515d021b628161b56de6745725aea85074fa70eb41）。315项Tushare测试、Ruff与diff检查通过；含124 API及11家族共135组实际生成器依赖投影一致性验证。
+- 规划签名改为每家族的选中合同/配置与有限发现快照，未完成的历史/近期扫描保持固定anchor；新增发现等待本轮完成再进入，真正配置变更仍重建该家族计划。近期跨日按最多6天重叠窗口追赶。旧签名首次迁移安全重扫一次，作业身份与已采集结果保留；没有声称已消除islice前缀扫描成本。
+- 云端两次真实规划后，11个history游标500→1000且第二次reset_reason均为null；481106作业与36529尝试数量不变，两轮各识别5500已存在作业、0新作业（迁移仍在重扫旧前缀），约3.22/3.06秒。备份validation/pre-finite-planning-state.json，验收validation/finite-planning-alias-acceptance.json。schema仍5，无数据库迁移。
+- 固定发布data-40ef395ff3b9e7358cc98e55a88380ad1237d2469dbf31d2134e36e44d6ffe8b，前版data-7c4df2b4375be23a4e1b505233876b4bc69d5c9c6f228b5eeccd8d8308d30ae1的51612576字节清单已验证archive/release同inode、相同SHA。新清单采用经路径/字节校验的安全hardlink，同盘不额外复制；原有重复文件未清理，不能说回收了历史空间。Mac mirror保留远端manifest原始字节，避免重排JSON破坏摘要，持久client已刷新。
+- 专属消费者自然排空后仅重启tushare-worker，文档消费者恢复；新真实采集任务1f80c34c与文档任务234c1a72均活跃，两个队列恢复。research为空；通用US同步未被本轮停止。后续实际正常批次与Mac固定镜像验收另补。
+- 并行继续Connect5 runtime、schema3两层文档状态索引、龙虎榜/游资4接口合同。schema3合成写入减少约74%-87%仍非生产收益且初建inode更多；四个旧互联互通正文缺失保留缺口，不阻塞已知接口。完整历史、原文附件与RRG PIT准入义务仍未完成。
+- 正常运行追加证据：22:36:45Z 326请求/122.069秒，22:38:45Z 334请求/119.488秒，均failed_stage=null、无规划reset。发布仍占约18秒，不能据此声称吞吐全面提升；新作业0说明有限迁移扫描仍经过既有前缀，并非没有后续历史义务。
+- Mac两轮均verified：第一版40ef395f共106578文件、补5335；第二版data-e45c6159e515a82a9ae020d12c05bb619f7789e8c2c22206a0c8495922267f96共107697文件、补1118。第二轮将本机已有40ef395f清单复用为archives，54300820字节、同inode/SHA验证通过；全清单逐文件校验后才切CURRENT。证据/tmp/tushare-planning-alias-mac-verified.json。
+
+
+## 2026-09-09 06:56 Connect5生产接入与旧接口证据
+
+- 93b6343已合入master/GitHub/云端；完整319 tests、Ruff及双端handoff passed（4499文件）。实际11方向/类型请求8.412秒、6292原始行、58输出字段，原文/观察SHA/Parquet/固定读库及请求日期/type全部一致。5接口已enable_connect，近期77新作业，历史初始423新作业；动态签名确认原11家族历史未重置。现136采集API及6财务查询别名，不代表全量历史完成。
+- fixed data-2e5f447c9fc136fc016c864d19c21a953ae872c1969a255a116b71e6ebe77012：云端API15次分批全列6292行与存储一致、upstream_calls=0、匿名401。Mac补4066文件、共111764全部校验；禁网禁凭据逐字段原文和查询验收通过。报告validation/connect-acceptance.json、connect-api-acceptance.json、/tmp/tushare-connect-mac-verified.json。
+- 22:51:17Z正常批331请求/125.204秒、failed_stage=null，发布19.344秒；Connect自动非probe done19/empty12（当次快照），history已推进1500，完整任务仍扩展。云端可用295.69GiB，本轮无需扩盘。仅重启quantmind+tushare-worker，文档队列恢复且新任务3cef7903、采集523080b8实测；通用US/研究未中断。
+- 4个旧接口有界raw探测：moneyflow_hsgt 1行；ggt_daily 1000行、has_more=true；ggt_top10空参数校验失败50101；ggt_monthly名称拒绝40101。后两者不视为无权限，月度历史义务不删。仅保留归档清单不足以镜像新raw；已定向验证并归档8引用文件、发布b93d6be5，证据validation/connect-legacy-closure.json，Mac闭包复核另记。
+- 覆盖台账5条改ingested_partial/available_observed；47补当前能力证据，196/197作为额外发现条目补入，原263基线保持、discovered由11至13。目录测试改为允许有非空原始探测证据支持的权限更新，不能把初次unverified固定成永远未知。
+- 并行候选：schema3 9cf3a60 + descriptor校验0ea2e88，独立Python3.10审查证明损坏descriptor不再推进CURRENT；旧缓存leaf等完整性风险仍记录。龙虎榜/游资纯4d2f953+runtime b5b6a80，含hm_list错误字段定点修正、hm_detail.tag显式请求，未部署；hm_name二级拆分仍gap。
+- 旧接口引用闭包Mac复核完成：固定data-b93d6be5405e42c5ae4c2cee7b27876f65e2eea09af25920b398761c2c55a65c共114928文件、补2029，四个原始response及四个observation全部在发布清单内并通过SHA。/tmp/tushare-connect-legacy-mac-verified.json；不增加未审API归一化注册数。修复闭包时只自然排空采集消费者，随后已恢复，无再次重启服务。

@@ -34,7 +34,19 @@ class CatalogReview(unittest.TestCase):
                 if link["doc_id"] not in baseline:
                     actual = discovered[link["doc_id"]]
                     self.assertEqual(actual["source_sha256"], link["sha256"])
-                    self.assertEqual(actual["permission_status"], "unverified")
+                    if actual["permission_status"] != "unverified":
+                        # A later account probe can supersede the original
+                        # documentation-only permission assessment.
+                        self.assertEqual(
+                            actual["permission_status"], "available_observed"
+                        )
+                        observed = actual["runtime_evidence"]
+                        self.assertIn(
+                            observed["status"], ("sample_ok", "possibly_truncated")
+                        )
+                        self.assertGreater(observed["row_count"], 0)
+                        self.assertTrue(observed["path"])
+                        self.assertTrue(observed["probe_release_id"].startswith("probe-"))
                     self.assertTrue(actual["next_action"])
         self.assertEqual(len(reviewed), 36)
         self.assertEqual(

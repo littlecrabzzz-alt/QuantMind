@@ -1,0 +1,1 @@
+Owner text_contracts; isolated codex/tushare-text merged fef5233. Scope registry/store/mirror and pipeline identifiers/plan_extended related small blocks plus new ETF basket pipeline tests. No production/config operations; parent owns credit module. Reuse existing family integration and preserve raw cash/overseas data; discovery etf_basic only.

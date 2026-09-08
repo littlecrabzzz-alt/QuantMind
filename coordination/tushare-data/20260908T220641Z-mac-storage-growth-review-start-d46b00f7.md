@@ -1,0 +1,1 @@
+Owner text_contracts. Read-only review of documents v2 chunks, retain_release/archive and mirror/publish at 44d1748, plus existing /tmp/quantmind-fullscope-assessment-20260909.json. No production scans or edits to shared code. Candidate recommendation only, no deletion/history weakening; parent owns active publication.

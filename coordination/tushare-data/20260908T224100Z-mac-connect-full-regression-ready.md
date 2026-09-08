@@ -1,0 +1,4 @@
+# Connect候选完整回归已通过
+
+更正/接续224000Z检查点：structured修复46772f7已由父pick为7a4231e（前一5a23b1e为Connect runtime）。根因是通用测试多个API共用observation名覆写且固定type=P；只修测试真实请求维度和独立内容哈希文件，读库校验未降低。完整319 Tushare tests通过，日志/tmp/tushare-connect-runtime-regression.log。父worktree clean，候选仍未合入master或部署。
+主线85e1cf0含本轮已上线eb3bf64与完整生产/Mac验收记录，勿混淆候选与生产。下轮接父7a4231e，先与新的主线文档提交合并/重放再实际探测Connect5。schema3候选9cf3a60尚未pick，remaining继续龙虎榜4合同；已部署队列无暂停遗留。

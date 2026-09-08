@@ -39,6 +39,11 @@ from backend.shared.tushare_credit_extra_contracts import (
     credit_identifiers,
     credit_extra_prerequisites,
 )
+from backend.shared.tushare_connect_contracts import (
+    CONNECT_CONTRACTS,
+    connect_prerequisites,
+)
+from backend.shared.tushare_trading_event_contracts import trading_event_prerequisites
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
@@ -53,6 +58,55 @@ CONTRACTS = {
     "fund_adj": (2000, ["ts_code", "trade_date", "adj_factor"]),
     "fund_portfolio": (2000, ["ts_code", "ann_date", "end_date", "symbol", "mkv"]),
 }
+
+
+def _planning_inputs(family, config, identifiers):
+    """Only request-planner dependencies affect a family's enumeration.
+
+    Saturation-only universes remain live in date_children; they do not change
+    the planner stream and must not restart it. Legacy structured declarations
+    omit two direct dependencies, so retain those explicit adapter mappings.
+    """
+    contracts = {
+        api: spec for api, spec in EXTENDED_CONTRACTS.items() if spec["group"] == family
+    }
+    selected = config.get(family + "_apis", tuple(contracts))
+    if any(api not in contracts for api in selected):
+        raise ValueError("Unknown " + family + " API")
+    contracts = {api: contracts[api] for api in selected}
+    dependencies = {
+        dep for spec in contracts.values() for dep in spec.get("dependencies", ())
+    }
+    for api, dependency in (("namechange", "stocks"), ("index_daily", "indexes")):
+        if api in contracts:
+            dependencies.add(dependency)
+    keys = {"history_start", family + "_apis"}
+    if family not in ("structured", "market"):
+        keys.add(family + "_history_start")
+    if family == "text":
+        keys.update(("text_history_starts", "text_history_window"))
+    policy = digest(
+        json_bytes(
+            {
+                "config": {key: config[key] for key in sorted(keys) if key in config},
+                "contracts": contracts,
+            }
+        )
+    )
+    # Copy only necessary discovery. Stored snapshots survive process restarts;
+    # no contracts or configuration values are repeated in manifest planning.
+    frozen = {key: identifiers.get(key, []) for key in sorted(dependencies)}
+    return policy, frozen
+
+
+def _planning_snapshot(state):
+    if state is None:
+        return None
+    try:
+        value = json.loads(state["signature"])
+    except (ValueError, TypeError):
+        return None  # Legacy global digest: one conservative, idempotent replay.
+    return value if isinstance(value, dict) and value.get("version") == 1 else None
 
 
 def atomic_json(path, value):
@@ -582,6 +636,11 @@ class Pipeline:
 
     def identifiers(self):
         families = {
+            **{api: "connect_" + api for api in CONNECT_CONTRACTS},
+            "top_list": "trading_event_securities",
+            "top_inst": "trading_event_securities",
+            "hm_detail": "trading_event_securities",
+            "hm_list": "hot_money_names",
             "stock_basic": "stocks",
             "margin_secs": "credit_securities",
             "hk_basic": "hk_stocks",
@@ -636,11 +695,24 @@ class Pipeline:
                     and record.get("level") != "L3"
                 ):
                     continue
+                if saved["api_name"] == "hm_list":
+                    if isinstance(record.get("name"), str) and record["name"]:
+                        result["hot_money_names"].add(record["name"])
+                    continue
+                if (
+                    saved["api_name"] == "hm_detail"
+                    and isinstance(record.get("hm_name"), str)
+                    and record["hm_name"]
+                ):
+                    result["hot_money_names"].add(record["hm_name"])
                 code = record.get("ts_code") or record.get("index_code")
                 if code:
                     result[families[saved["api_name"]]].add(code)
                     if saved["api_name"] == "etf_basic":
                         result["etfs"].add(code)
+        # Retain historical/T stock identities and securities discovered in any
+        # saved event response, including saturated attempts and retired codes.
+        result["trading_event_securities"].update(result["stocks"])
         result = {key: sorted(values) for key, values in result.items()}
         try:
             result.update(credit_identifiers(result))
@@ -805,6 +877,8 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "trading_event": trading_event_prerequisites,
+            "connect": connect_prerequisites,
             "etf_basket": etf_basket_prerequisites,
             "credit_extra": credit_extra_prerequisites,
             "futures_extra": futures_extra_prerequisites,
@@ -832,6 +906,16 @@ class Pipeline:
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
+            (
+                "trading_event",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "trading_event", cfg, ids
+                ),
+            ),
+            (
+                "connect",
+                lambda cfg, ids: self.record_extra_planning_gaps("connect", cfg, ids),
+            ),
             (
                 "etf_basket",
                 lambda cfg, ids: self.record_extra_planning_gaps(
@@ -894,48 +978,11 @@ class Pipeline:
         budget = int(config.get("plan_jobs_per_tick", 2000))
         if not 1 <= budget <= 10000:
             raise ValueError("Invalid planner batch size")
-        signature = digest(
-            json_bytes(
-                {
-                    "config": {
-                        k: v
-                        for k, v in config.items()
-                        if k
-                        in (
-                            "history_start",
-                            "text_history_start",
-                            "text_history_starts",
-                            "text_history_window",
-                            "text_apis",
-                            "structured_apis",
-                            "market_apis",
-                            "global_apis",
-                            "global_history_start",
-                            "other_apis",
-                            "other_history_start",
-                            "supplement_apis",
-                            "supplement_history_start",
-                            "equity_event_apis",
-                            "equity_event_history_start",
-                            "futures_extra_apis",
-                            "futures_extra_history_start",
-                            "research_extra_apis",
-                            "research_extra_history_start",
-                            "etf_basket_apis",
-                            "etf_basket_history_start",
-                            "credit_extra_apis",
-                            "credit_extra_history_start",
-                        )
-                    },
-                    "identifiers": identifiers,
-                    "contracts": EXTENDED_CONTRACTS,
-                }
-            )
-        )
         stats = {}
         for family, planner in PLANNERS.items():
             if family in blocked_families or not config.get("enable_" + family, False):
                 continue
+            policy, current_ids = _planning_inputs(family, config, identifiers)
             for mode in ("recent", "history"):
                 name = mode + ":" + family
                 epoch = (
@@ -943,10 +990,7 @@ class Pipeline:
                     if family == "text"
                     else today.strftime("%Y%m%d")
                 )
-                revision = signature + ":" + epoch if mode == "recent" else signature
-                state = self.db.execute(
-                    "SELECT * FROM planning_state WHERE name=?", (name,)
-                ).fetchone()
+                refresh = epoch if mode == "recent" else "history"
                 if (
                     mode == "history"
                     and family == "global"
@@ -954,25 +998,56 @@ class Pipeline:
                         ("weekly", "monthly", "index_weekly", "index_monthly")
                     )
                 ):
-                    # Finish a bounded historical enumeration before advancing its
-                    # anchor. Resetting an unfinished large universe every week can
-                    # permanently starve its tail. Stable job keys make the next
-                    # completed-period sweep reuse already planned history.
-                    week_end = today - timedelta(days=today.weekday() + 1)
-                    month_end = today.replace(day=1) - timedelta(days=1)
-                    revision = (
-                        signature + ":periods:" + str(week_end) + ":" + str(month_end)
+                    refresh = (
+                        "periods:"
+                        + str(today - timedelta(days=today.weekday() + 1))
+                        + ":"
+                        + str(today.replace(day=1) - timedelta(days=1))
                     )
-                    if (
-                        state is not None
-                        and not state["done"]
-                        and state["signature"].startswith(signature + ":periods:")
-                    ):
-                        revision = state["signature"]
-                if state is None or state["signature"] != revision:
+                state = self.db.execute(
+                    "SELECT * FROM planning_state WHERE name=?", (name,)
+                ).fetchone()
+                snapshot = _planning_snapshot(state)
+                policy_changed = snapshot is None or snapshot["policy"] != policy
+                # Finish one finite input/date snapshot before incorporating
+                # discoveries or rolling the clock. Otherwise growth can starve
+                # the historical tail (and a large recent universe) forever.
+                refresh_due = snapshot is not None and (
+                    snapshot["identifiers"] != current_ids
+                    or snapshot["refresh"] != refresh
+                    or (
+                        mode == "recent" and state["anchor"] != today.strftime("%Y%m%d")
+                    )
+                )
+                reset = policy_changed or (state["done"] and refresh_due)
+                reset_reason = None
+                if reset:
+                    anchor = today
+                    if mode == "recent" and not policy_changed:
+                        # Every current planner covers at least six preceding
+                        # calendar days. Catch up in overlapping windows if a
+                        # finite sweep crossed >6 days, without creating holes.
+                        previous = datetime.strptime(state["anchor"], "%Y%m%d").date()
+                        anchor = min(today, previous + timedelta(days=6))
+                    snapshot = {
+                        "version": 1,
+                        "policy": policy,
+                        "identifiers": current_ids,
+                        "refresh": refresh,
+                        "epoch": epoch,
+                    }
+                    reset_reason = (
+                        "policy_or_legacy_change"
+                        if policy_changed
+                        else "completed_snapshot_refresh"
+                    )
                     self.db.execute(
                         "INSERT INTO planning_state(name,anchor,signature,offset,done) VALUES(?,?,?,0,0) ON CONFLICT(name) DO UPDATE SET anchor=excluded.anchor,signature=excluded.signature,offset=0,done=0",
-                        (name, today.strftime("%Y%m%d"), revision),
+                        (
+                            name,
+                            anchor.strftime("%Y%m%d"),
+                            json_bytes(snapshot).decode(),
+                        ),
                     )
                     state = self.db.execute(
                         "SELECT * FROM planning_state WHERE name=?", (name,)
@@ -982,23 +1057,29 @@ class Pipeline:
                 anchor = datetime.strptime(state["anchor"], "%Y%m%d").date()
                 plan_config = {
                     **config,
-                    "planning_epoch": epoch if mode == "recent" else state["anchor"],
+                    "planning_epoch": snapshot["epoch"]
+                    if mode == "recent"
+                    else state["anchor"],
                 }
-                stream = iter(planner(plan_config, anchor, identifiers))
+                stream = iter(planner(plan_config, anchor, snapshot["identifiers"]))
                 stream = itertools.islice(stream, state["offset"], None)
                 count, done = 0, False
+                attempted, inserted = 0, 0
                 for _ in range(budget):
                     job = next(stream, None)
                     if job is None or (mode == "recent" and job["epoch"] == "history"):
                         done = True
                         break
                     if mode != "history" or job["epoch"] == "history":
+                        attempted += 1
+                        before = self.db.total_changes
                         self.enqueue(
                             job["api_name"],
                             job["params"],
                             job["priority"],
                             job["epoch"],
                         )
+                        inserted += self.db.total_changes - before
                     count += 1
                 self.db.execute(
                     "UPDATE planning_state SET offset=offset+?,done=? WHERE name=?",
@@ -1007,8 +1088,13 @@ class Pipeline:
                 self.db.commit()
                 stats[name] = {
                     "planned": count,
+                    "new_jobs": inserted,
+                    "existing_jobs": attempted - inserted,
+                    "skipped_recent": count - attempted,
                     "done": done,
                     "anchor": state["anchor"],
+                    "reset_reason": reset_reason,
+                    "discovery_refresh_pending": snapshot["identifiers"] != current_ids,
                 }
         self.db.commit()  # Persist validation gaps even when every family is blocked.
         return stats
