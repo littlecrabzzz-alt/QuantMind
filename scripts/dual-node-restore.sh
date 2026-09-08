@@ -35,5 +35,7 @@ docker exec -i quantmind-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -A
 cmp "$backup/postgres-counts.txt" "$backup/cloud-postgres-counts.txt"
 # Written before any writer starts: a failure from here must NOT restart the Mac primary.
 printf 'authority=lzy-vm\ncutover_utc=%s\nbackup=%s\n' "$(date -u +%FT%TZ)" "$backup" > "$QM_REMOTE_ROOT/AUTHORITY"
+# Capture the initial offline baseline while no application writers exist yet.
+python3 scripts/dual_node_snapshot.py create
 "${compose[@]}" up -d --no-build redis data-gateway rsshub huntly quantmind qwenpaw celery-worker celery-beat web
 "${compose[@]}" ps

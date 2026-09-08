@@ -111,8 +111,12 @@ def deploy(wait_for):
             time.sleep(2)
     else:
         raise RuntimeError("Local SSH tunnel is not serving the cloud web entry")
-    stage("creating_cloud_snapshot")
-    while True:
+    stage("checking_cloud_snapshot")
+    snapshot = remote("sudo -n test -f " + ROOT + "/snapshots/latest/COMPLETE")
+    if snapshot.returncode not in (0, 1):
+        snapshot.check_returncode()
+    while snapshot.returncode == 1:
+        stage("creating_cloud_snapshot")
         # The cloud must finish thawing writers even if the Mac disconnects.
         result = remote("sudo -n systemd-run --unit=quantmind-snapshot-create --wait --collect "
                         "--property=RequiresMountsFor=/root/data/disk /usr/bin/python3 " +
