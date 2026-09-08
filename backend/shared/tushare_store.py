@@ -15,6 +15,7 @@ import re
 import tempfile
 
 from backend.shared.tushare_market_contracts import MARKET_CONTRACTS
+from backend.shared.tushare_global_contracts import GLOBAL_CONTRACTS
 from backend.shared.tushare_pipeline import manifest_at
 from backend.shared.tushare_structured_contracts import STRUCTURED_CONTRACTS
 from backend.shared.tushare_text_contracts import TEXT_CONTRACTS
@@ -28,7 +29,12 @@ KEYS = {
     "fund_adj": ("ts_code", "trade_date"),
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
-CONTRACTS = {**TEXT_CONTRACTS, **STRUCTURED_CONTRACTS, **MARKET_CONTRACTS}
+CONTRACTS = {
+    **TEXT_CONTRACTS,
+    **STRUCTURED_CONTRACTS,
+    **MARKET_CONTRACTS,
+    **GLOBAL_CONTRACTS,
+}
 IDENTITIES = {}
 for _api, _contract in CONTRACTS.items():
     KEYS[_api] = tuple(_contract["keys"])

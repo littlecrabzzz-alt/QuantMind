@@ -3,6 +3,7 @@
 
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 import plistlib
@@ -15,9 +16,31 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from backend.shared.tushare_intake import digest
-from backend.shared.tushare_pipeline import atomic_json, manifest_at, verify_data
+from backend.shared.tushare_pipeline import atomic_json, manifest_at
 
 PROJECT = Path(__file__).resolve().parents[1]
+
+
+def fingerprint(path):
+    if path.is_symlink() or path.parent.is_symlink():
+        raise ValueError("Refusing mirrored symlink")
+    info = path.stat()
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
+def checked_file(path, expected):
+    """Hash with bounded memory and reject a file changed during verification."""
+    before = fingerprint(path)
+    if before[2] != expected["bytes"]:
+        return None
+    sha = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            sha.update(block)
+    after = fingerprint(path)
+    if before != after:
+        raise ValueError("Mirrored file changed during verification")
+    return after if sha.hexdigest() == expected["sha256"] else None
 
 
 def install_schedule(root):
@@ -43,6 +66,7 @@ def install_schedule(root):
         "backend/shared/tushare_text_contracts.py",
         "backend/shared/tushare_structured_contracts.py",
         "backend/shared/tushare_market_contracts.py",
+        "backend/shared/tushare_global_contracts.py",
         "backend/shared/runtime_secrets.py",
         "backend/shared/stock_utils.py",
         "deploy/dual-node.env",
@@ -134,17 +158,16 @@ def mirror(root):
         manifest_path = root / "releases" / release / "manifest.json"
         atomic_json(manifest_path, json.loads(raw))
         manifest = manifest_at(root, release)
-        missing = []
+        missing, verified = [], {}
         for name, expected in manifest["files"].items():
             path = root / name
-            if path.is_symlink():
+            if path.is_symlink() or path.parent.is_symlink():
                 raise ValueError("Refusing mirrored symlink")
-            if (
-                not path.exists()
-                or path.stat().st_size != expected["bytes"]
-                or digest(path.read_bytes()) != expected["sha256"]
-            ):
+            stamp = checked_file(path, expected) if path.exists() else None
+            if stamp is None:
                 missing.append(name)
+            else:
+                verified[name] = stamp
         if missing:
             with tempfile.NamedTemporaryFile(
                 mode="w", dir=root, prefix=".files-"
@@ -167,7 +190,13 @@ def mirror(root):
                     ],
                     check=True,
                 )
-        verify_data(root, release)
+        # Existing immutable files were already hashed above. Recheck their
+        # identity after transfer; hash new, repaired or externally changed files.
+        for name, expected in manifest["files"].items():
+            path = root / name
+            if verified.get(name) != fingerprint(path):
+                if checked_file(path, expected) is None:
+                    raise ValueError("Dataset object checksum mismatch")
         atomic_json(root / "CURRENT.json", pointer)
         result = {
             "status": "verified",

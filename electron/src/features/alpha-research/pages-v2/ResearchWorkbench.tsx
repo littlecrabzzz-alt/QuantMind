@@ -27,6 +27,7 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
   const scope = useRef<string | null>(null);
   const endpoint = useRef(String(SERVICE_ENDPOINTS.AI_STRATEGY));
   const [error, setError] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
   const [goal, setGoal] = useState('');
@@ -73,11 +74,12 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
             }
           }
         }
+        if (!stopped) setConnectionError(null);
       } catch (err) {
         if (!stopped) {
           node.current = null; scope.current = null; selectedId.current = null;
           setCap(null); setRuns([]); setSelected(null); setPending(null);
-          setError(errorText(err));
+          setConnectionError(errorText(err));
         }
       } finally {
         if (!stopped) timer = setTimeout(poll, 3000);
@@ -177,7 +179,7 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
           {cap?.environment || '正在核对执行环境'}{cap?.ready ? ' · 可运行' : ''}
         </Tag>
       </div>
-      {error && <Alert type="error" message={error} closable onClose={() => setError(null)} />}
+      {(connectionError || error) && <Alert type="error" message={connectionError || error} closable onClose={() => { setError(null); setConnectionError(null); }} />}
       {cap && !cap.ready && <Alert type="warning" message={cap.reason || '执行服务不可用'}
         description="当前任务仍保存在服务端。完成配置或恢复执行服务后即可开始；这里不会切换到演示结果。" />}
       {pending && <Alert type="info" message="上次提交尚待确认，重试会沿用同一任务标识。"
@@ -235,7 +237,7 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
             { title: '费用（元）', render: (_, e) => fmt(e.result?.summary.comparison.model.transaction_cost) },
             { title: '结论', render: (_, e) => e.status !== 'completed' ? <Space>失败，证据保留{e.result?.artifacts['execution.log'] && <Button size="small" onClick={() => void download(e, 'execution.log')}>日志</Button>}</Space> : e.gates ? Object.values(e.gates).every(Boolean) ? '通过开发门槛' : '未通过开发门槛' : '已核验' },
           ]} />
-          {experiments.filter(e => e.result?.factor_analysis).map(e => {
+          {experiments.filter(e => e.proposal.kind === 'candidate' && e.proposal.factor && e.result?.factor_analysis).map(e => {
             const m = e.result!.factor_analysis!.splits.valid;
             return <Card key={e.id} size="small" title={`${e.id} · 因子验证`} extra={<Space>
               <Button onClick={() => void download(e, 'factor-analysis.json')}>指标明细</Button>
