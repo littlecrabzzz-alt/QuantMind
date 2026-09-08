@@ -18,6 +18,21 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class DeploymentBoundary(unittest.TestCase):
+    def test_docker_desktop_mount_prefix_preserves_isolation(self):
+        from dual_node_check import sandbox_mount_path
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory).resolve()
+            isolated = root / ".local-dev/project"
+            isolated.mkdir(parents=True)
+            for prefix in ("", "/host_mnt"):
+                self.assertEqual(sandbox_mount_path(prefix + str(isolated / "data"), root), isolated / "data")
+                for target in (root / "data", isolated / "../../data"):
+                    with self.assertRaises(RuntimeError):
+                        sandbox_mount_path(prefix + str(target), root)
+            (isolated / "escape").symlink_to(root, target_is_directory=True)
+            with self.assertRaises(RuntimeError):
+                sandbox_mount_path("/host_mnt" + str(isolated / "escape/data"), root)
+
     def test_embedded_agent_images_use_the_proxy_prefix(self):
         source = (ROOT / "backend/services/api/routers/qwenpaw_ui_proxy.py").read_text()
         tree = ast.parse(source)

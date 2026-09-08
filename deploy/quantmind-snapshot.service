@@ -1,0 +1,17 @@
+[Unit]
+Description=Publish consistent QuantMind offline snapshot
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+RequiresMountsFor=/root/data/disk
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/data/disk/quantmind/project
+ExecStartPre=/usr/bin/test -f /root/data/disk/quantmind/AUTHORITY
+ExecStart=/usr/bin/python3 scripts/dual_node_snapshot.py create
+TimeoutStartSec=infinity
+TimeoutStopSec=600
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

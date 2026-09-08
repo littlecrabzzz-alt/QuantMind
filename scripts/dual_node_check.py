@@ -27,6 +27,17 @@ def require(condition, reason):
         raise RuntimeError(reason)
 
 
+def sandbox_mount_path(source, project):
+    # Called only after local Docker Desktop and Mac host checks.
+    # Docker Desktop may expose the VM mount prefix in docker inspect.
+    if source.startswith("/host_mnt/"):
+        source = source.removeprefix("/host_mnt")
+    path = Path(source).resolve()
+    require(path.is_relative_to((project / ".local-dev/project").resolve()),
+            "Local sandbox mount escaped isolation")
+    return path
+
+
 def node(role):
     if role == "mac":
         require(sys.platform == "darwin", "Run the two-node check on the Mac host")
@@ -95,8 +106,7 @@ def node(role):
                     "Local sandbox can restart automatically")
             sources = {m["Destination"]: m["Source"] for m in development["Mounts"] if m["Type"] == "bind"}
             for destination in ("/data", "/app/db", "/app/models", "/app/logs", "/app/user_pools_local"):
-                require(Path(sources[destination]).resolve().is_relative_to(PROJECT / ".local-dev/project"),
-                        f"Local sandbox mount escaped isolation: {destination}")
+                sandbox_mount_path(sources[destination], PROJECT)
             require(env.get("HOST_RUNTIME_PATH") == str(PROJECT / ".local-dev/project"),
                     "Local child jobs lack the sandbox runtime root; recreate the sandbox containers")
             validate_sandbox_snapshot(PROJECT)
@@ -163,7 +173,7 @@ def main():
         local = node("mac")
         remote = json.loads(output("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
                                    SETTINGS["QM_SSH_TARGET"], command))
-    for key in ("head", "branch", "snapshot"):
+    for key in ("head", "branch"):
         require(local[key] == remote[key], f"Two-node {key} differs; resolve before development")
     for key in ("contentFiles", "contentDigest"):
         require(local["sync"][key] == remote["sync"][key], "Working trees differ; wait for sync or resolve conflicts")
@@ -176,7 +186,9 @@ def main():
     print(json.dumps({"status": "passed", "head": local["head"],
                       "source_files": local["sync"]["contentFiles"],
                       "source_digest": local["sync"]["contentDigest"],
-                      "snapshot": local["snapshot"], "data_authority": "lzy-vm",
+                      "snapshot": local["snapshot"], "cloud_snapshot": remote["snapshot"],
+                      "snapshot_pending_pull": local["snapshot"] != remote["snapshot"],
+                      "data_authority": "lzy-vm",
                       "mac_mode": local["mode"],
                       "sandbox_snapshot": local["sandbox_snapshot"],
                       "local_writers": "old authority stopped; restart=no"}, indent=2))

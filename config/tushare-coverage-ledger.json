@@ -38,7 +38,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "329",
@@ -122,7 +122,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "112",
@@ -136,7 +136,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "193",
@@ -230,7 +230,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "370",
@@ -324,7 +324,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "32",
@@ -338,7 +338,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "109",
@@ -362,7 +362,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "214",
@@ -376,7 +376,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "48",
@@ -428,7 +428,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "36",
@@ -442,7 +442,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "44",
@@ -456,7 +456,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "45",
@@ -470,7 +470,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "46",
@@ -484,7 +484,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "103",
@@ -512,7 +512,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "80",
@@ -1056,7 +1056,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "348",
@@ -1494,9 +1494,9 @@
       "acquisition_api_names": [
         "etf_index"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "387",
@@ -1646,7 +1646,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "95",
@@ -1660,7 +1660,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "403",
@@ -1742,9 +1742,9 @@
       "acquisition_api_names": [
         "index_weight"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "128",
@@ -1770,9 +1770,9 @@
       "acquisition_api_names": [
         "index_classify"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "335",
@@ -1784,9 +1784,9 @@
       "acquisition_api_names": [
         "index_member_all"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "327",
@@ -1798,9 +1798,9 @@
       "acquisition_api_names": [
         "sw_daily"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "417",
@@ -1934,9 +1934,9 @@
       "acquisition_api_names": [
         "fund_basic"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "118",
@@ -1948,9 +1948,9 @@
       "acquisition_api_names": [
         "fund_company"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "208",
@@ -1962,9 +1962,9 @@
       "acquisition_api_names": [
         "fund_manager"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "462",
@@ -1990,9 +1990,9 @@
       "acquisition_api_names": [
         "fund_share"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "119",
@@ -2004,9 +2004,9 @@
       "acquisition_api_names": [
         "fund_nav"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "120",
@@ -2018,9 +2018,9 @@
       "acquisition_api_names": [
         "fund_div"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "121",
@@ -2070,9 +2070,9 @@
       "acquisition_api_names": [
         "fut_basic"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "467",
@@ -2098,9 +2098,9 @@
       "acquisition_api_names": [
         "fut_daily"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "492",
@@ -2154,9 +2154,9 @@
       "acquisition_api_names": [
         "fut_wsr"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "141",
@@ -2168,9 +2168,9 @@
       "acquisition_api_names": [
         "fut_settle"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "313",
@@ -2234,9 +2234,9 @@
       "acquisition_api_names": [
         "fut_mapping"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "216",
@@ -2376,9 +2376,9 @@
       "acquisition_api_names": [
         "cb_basic"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "186",
@@ -2390,9 +2390,9 @@
       "acquisition_api_names": [
         "cb_issue"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "269",
@@ -2404,9 +2404,9 @@
       "acquisition_api_names": [
         "cb_call"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "305",
@@ -2418,9 +2418,9 @@
       "acquisition_api_names": [
         "cb_rate"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "187",
@@ -2432,9 +2432,9 @@
       "acquisition_api_names": [
         "cb_daily"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "459",
@@ -2474,9 +2474,9 @@
       "acquisition_api_names": [
         "cb_price_chg"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "247",
@@ -2488,9 +2488,9 @@
       "acquisition_api_names": [
         "cb_share"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "458",
@@ -2984,7 +2984,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "150",
@@ -2998,7 +2998,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "151",
@@ -3012,7 +3012,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "152",
@@ -3092,7 +3092,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "226",
@@ -3116,7 +3116,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "245",
@@ -3130,7 +3130,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "240",
@@ -3164,7 +3164,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "309",
@@ -3188,7 +3188,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "324",
@@ -3212,7 +3212,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Reviewed structured planner; integrate shared collector, probe permissions/caps, and backfill."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "217",
@@ -3326,7 +3326,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "415",
@@ -3340,7 +3340,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "465",
@@ -3354,7 +3354,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "143",
@@ -3368,7 +3368,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "195",
@@ -3382,7 +3382,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "154",
@@ -3396,7 +3396,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "176",
@@ -3410,7 +3410,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "366",
@@ -3424,7 +3424,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "367",
@@ -3438,7 +3438,7 @@
       ],
       "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Parallel text contracts; integrate, probe each source and validate body/attachments."
+      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
     },
     {
       "doc_id": "485",

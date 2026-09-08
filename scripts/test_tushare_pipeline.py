@@ -268,6 +268,101 @@ class PipelineAcceptance(unittest.TestCase):
             self.assertGreater(pipeline.status()["pending"], count)
             pipeline.close()
 
+    def test_rate_reservation_survives_worker_reopen(self):
+        now = [100.0]
+        posts = []
+
+        def sleep(seconds):
+            now[0] += seconds
+
+        def response(_):
+            posts.append(now[0])
+            return self.response([1])
+
+        config = {
+            **CONFIG,
+            "requests_per_minute": 240,
+            "api_requests_per_minute": {"fund_adj": 60},
+        }
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch(
+                "backend.shared.tushare_pipeline.time.time", side_effect=lambda: now[0]
+            ),
+            patch(
+                "backend.shared.tushare_pipeline.time.monotonic",
+                side_effect=lambda: now[0],
+            ),
+            patch("backend.shared.tushare_pipeline.time.sleep", side_effect=sleep),
+            httpx.Client(transport=httpx.MockTransport(response)) as client,
+        ):
+            for epoch in ("first", "second"):
+                p = Pipeline(tmp, CATALOG)
+                p.enqueue(
+                    "fund_adj",
+                    {"trade_date": "20260907", "offset": 0, "limit": 2},
+                    epoch=epoch,
+                )
+                p.db.commit()
+                p.run(client, "synthetic-token", config, max_requests=1, pause=0)
+                p.close()
+            self.assertGreaterEqual(posts[1] - posts[0], 1)
+
+    def test_slow_api_does_not_block_ready_other_api(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            import time
+
+            p = Pipeline(tmp, CATALOG)
+            p.enqueue(
+                "fund_adj",
+                {"trade_date": "20260907", "offset": 0, "limit": 2},
+                priority=0,
+            )
+            p.enqueue("fund_daily", {"trade_date": "20260907"}, priority=1)
+            p.db.execute(
+                "INSERT INTO request_gates VALUES(?,?)",
+                ("api:fund_adj", time.time() + 60),
+            )
+            p.db.commit()
+            row = p.next_job({"requests_per_minute": 240}, time.monotonic() + 1)
+            self.assertEqual(json.loads(row["job"])["api_name"], "fund_daily")
+            p.close()
+
+    def test_frequency_error_is_not_permission_denial(self):
+        from backend.shared.tushare_intake import assess_response, capture_sample
+
+        self.assertEqual(
+            assess_response(
+                {"code": 2002, "msg": "每分钟最多访问该接口500次"}, 1000, []
+            )["status"],
+            "rate_limited",
+        )
+        self.assertEqual(
+            assess_response({"code": 40203, "msg": "没有访问该接口的权限"}, 1000, [])[
+                "status"
+            ],
+            "permission_denied",
+        )
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            httpx.Client(
+                transport=httpx.MockTransport(lambda _: httpx.Response(429))
+            ) as client,
+        ):
+            result = capture_sample(
+                client,
+                "synthetic-token",
+                {
+                    "api_name": "news",
+                    "params": {},
+                    "fields": "title",
+                    "row_cap": 1000,
+                    "required_fields": [],
+                },
+                Path(tmp),
+            )
+            self.assertEqual(result["status"], "rate_limited")
+
     def test_manifest_rejects_path_escape(self):
         with tempfile.TemporaryDirectory() as tmp:
             from backend.shared.tushare_intake import digest, json_bytes

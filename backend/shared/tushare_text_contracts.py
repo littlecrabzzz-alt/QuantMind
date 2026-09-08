@@ -5,6 +5,7 @@ not no history. Source/permission/attachment completion must be measured by the
 pipeline; producing a plan does not prove that the supplier returned all rows.
 """
 
+from calendar import monthrange
 from datetime import date, datetime, timedelta
 
 NEWS_SOURCES = (
@@ -235,22 +236,29 @@ def _date(value):
     return datetime.strptime(value, "%Y%m%d").date()
 
 
-def _params(api, day):
+def _params(api, day, start=None):
+    start = day if start is None else start
     if api == "cctv_news":
         return {"date": day.strftime("%Y%m%d")}
     if TEXT_CONTRACTS[api]["split"]["precision"] == "second":
         # Shared midnight boundaries deliberately overlap: supplier inclusivity
         # is undocumented; storage deduplicates identical rows by identity.
         return {
-            "start_date": day.isoformat() + " 00:00:00",
+            "start_date": start.isoformat() + " 00:00:00",
             "end_date": (day + timedelta(days=1)).isoformat() + " 00:00:00",
         }
-    value = day.strftime("%Y%m%d")
-    return {"start_date": value, "end_date": value}
+    return {"start_date": start.strftime("%Y%m%d"), "end_date": day.strftime("%Y%m%d")}
 
 
 def iter_text_jobs(config, today):
     """Yield all source/windows, recent first; historical monetary reports yearly.
+
+    ``text_history_window`` defaults to ``day`` for checkpoint compatibility.
+    ``month`` groups range-capable historical requests into calendar months;
+    monetary_policy stays yearly and date-only cctv_news stays daily. A capped
+    month must be split by the pipeline, never accepted as complete. Both Q&A
+    question and reply axes are included for historical months. Source sets,
+    earliest bounds, recent daily requests and unknown-prefix sweeps are retained.
 
     ``text_apis`` defaults to all nine. ``history_start`` is required (or use
     ``text_history_start``); ``text_history_starts`` optionally overrides each
@@ -265,6 +273,9 @@ def iter_text_jobs(config, today):
     paginate/split capped responses, and keep ongoing-day coverage incomplete.
     """
     today = _date(today)
+    history_window = config.get("text_history_window", "day")
+    if history_window not in ("day", "month"):
+        raise ValueError("text_history_window must be day or month")
     selected = tuple(config.get("text_apis", TEXT_CONTRACTS))
     if len(set(selected)) != len(selected) or set(selected) - TEXT_CONTRACTS.keys():
         raise ValueError("Unknown or duplicate text API")
@@ -295,21 +306,24 @@ def iter_text_jobs(config, today):
                 if api == "news"
                 else ((None,) + MAJOR_NEWS_SOURCES if api == "major_news" else (None,))
             )
+            left = day
+            if not recent and (
+                api == "monetary_policy"
+                or (history_window == "month" and TEXT_CONTRACTS[api]["split"])
+            ):
+                month = 12 if api == "monetary_policy" else day.month
+                end = min(
+                    date(day.year, month, monthrange(day.year, month)[1]),
+                    recent_start - timedelta(days=1),
+                )
+                if day != end:
+                    continue
+                left = max(
+                    date(day.year, 1 if api == "monetary_policy" else day.month, 1),
+                    starts[api],
+                )
             for source in sources:
-                if api == "monetary_policy" and not recent:
-                    # Four reports/year: one historical year window avoids
-                    # thousands of empty daily requests; recent remains daily.
-                    end = min(date(day.year, 12, 31), recent_start - timedelta(days=1))
-                    if day != end:
-                        continue
-                    params = {
-                        "start_date": max(date(day.year, 1, 1), starts[api]).strftime(
-                            "%Y%m%d"
-                        ),
-                        "end_date": day.strftime("%Y%m%d"),
-                    }
-                else:
-                    params = _params(api, day)
+                params = _params(api, day, left)
                 if source is not None:
                     params["src"] = source
                 yield {
@@ -320,19 +334,22 @@ def iter_text_jobs(config, today):
                     if recent
                     else "history",
                 }
-            if recent and api in ("irm_qa_sh", "irm_qa_sz"):
-                # Catch today's replies to questions outside the seven-day
-                # question-date window; neither axis replaces the other.
+            if (recent or history_window == "month") and api in (
+                "irm_qa_sh",
+                "irm_qa_sz",
+            ):
+                # Reply-time windows supplement question-date windows, including
+                # historical months in month mode; neither axis replaces the other.
                 yield {
                     "api_name": api,
                     "params": {
-                        "pub_start": day.isoformat() + " 00:00:00",
+                        "pub_start": left.isoformat() + " 00:00:00",
                         "pub_end": (day + timedelta(days=1)).isoformat() + " 00:00:00",
                     },
-                    "priority": 20,
-                    "epoch": str(
-                        config.get("planning_epoch", today.strftime("%Y%m%d"))
-                    ),
+                    "priority": 20 if recent else 40,
+                    "epoch": str(config.get("planning_epoch", today.strftime("%Y%m%d")))
+                    if recent
+                    else "history",
                 }
         day -= timedelta(days=1)
     # Optional-date APIs can query everything before the requested start. Keep

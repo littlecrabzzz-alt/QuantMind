@@ -161,6 +161,8 @@ def main():
         raise RuntimeError("Training module was imported outside the frozen code tree")
     cfg = json.loads((FROZEN / "config.json").read_text())
     features = cfg["features"]
+    derived = cfg.get("derived_factor")
+    source_features = cfg.get("source_features", features) if derived else features
     source = cfg["factor_source"]
     factor = cfg["portfolio"]["single_factor"]
     write("runtime.json", {"packages": {name: importlib.metadata.version(name) for name in
@@ -176,7 +178,7 @@ def main():
     train_start, train_end = cfg["split"]["train"]
     test_start, test_end = cfg["split"]["test"]
     liquidity_start = (pd.Timestamp(train_end) - timedelta(days=180)).date().isoformat()
-    history = reader.read_range(source, features=features, start=liquidity_start, end=train_end)
+    history = reader.read_range(source, features=source_features, start=liquidity_start, end=train_end)
     available = {StockCodeUtil.to_prefix(symbol) for symbol in D.list_instruments(
         D.instruments("all"), start_time=liquidity_start, end_time=train_end, as_list=True)}
     # Keep main-board names only: the inherited 9.5% limit approximation is not
@@ -188,12 +190,40 @@ def main():
     print("Universe selected using training history:", len(universe), flush=True)
     del history
     frame, actual_features = train.load_data(
-        train_start, train_end, features, target_horizon_days=1,
+        train_start, train_end, source_features, target_horizon_days=1,
         valid_end=cfg["split"]["valid"][1], test_end=test_end,
         local_dir="/frozen/quantdb", quantdb_dir="/frozen/quantdb", factor_source=source)
-    if actual_features != features:
+    if actual_features != source_features:
         raise RuntimeError("Training silently changed requested features")
     frame = frame[frame["symbol"].isin(universe)].copy()
+    raw_factor = None
+    if derived:
+        from research_expression import diagnostics, evaluate, validate
+
+        validate(derived["expression"], source_features)
+        if derived["name"] != "research_signal" or features != source_features + [derived["name"]]:
+            raise ValueError("Derived factor must augment the frozen baseline once")
+        raw_factor = reader.read_range(source, features=source_features,
+            start=train_start, end=test_end)
+        raw_factor = raw_factor[raw_factor.symbol.isin(universe)].copy()
+        trading_calendar = D.calendar(start_time=raw_factor.trade_date.min(), end_time=test_end, freq="day")
+        raw_factor = raw_factor[raw_factor.trade_date.isin(trading_calendar)].sort_values(["symbol", "trade_date"])
+        raw_factor[derived["name"]] = evaluate(raw_factor, derived["expression"], source_features)
+        grouped = raw_factor.groupby("symbol")
+        raw_factor["forward_return"] = grouped.close.shift(-2) / grouped.close.shift(-1) - 1
+        raw_factor["label_end"] = grouped.trade_date.shift(-2)
+        frame = frame.merge(raw_factor[["symbol", "trade_date", derived["name"]]],
+                            on=["symbol", "trade_date"], validate="one_to_one")
+        values = raw_factor[["symbol", "trade_date", derived["name"], "forward_return", "label_end"]]
+        values.to_parquet(OUT / "factor-values.parquet", index=False)
+        analysis = diagnostics(raw_factor, derived["name"], source_features, cfg)
+        analysis["history_start"] = str(raw_factor.trade_date.min().date())
+        analysis["required_history_observations"] = validate(derived["expression"], source_features)["lookback"]
+        analysis["warmup_note"] = "Snapshot begins at train_start; unavailable initial rolling values remain missing and are included in coverage."
+        write("factor-analysis.json", analysis)
+        write("factor-definition.json", derived)
+        if frame[derived["name"]].notna().mean() < .5 or frame[derived["name"]].nunique() < 2:
+            raise ValueError("Generated factor has insufficient coverage or is constant")
     frame[features] = frame[features].replace([np.inf, -np.inf], np.nan)
     fit, valid, test = train._split_data(frame, cfg)
     model_result = train._train_single_model("lightgbm", fit, valid, test, frame,
@@ -207,7 +237,8 @@ def main():
                                          end_time=test_end, freq="day"))
     previous_day = calendar[calendar < pd.Timestamp(test_start)][-1]
     signal_days = calendar[(calendar >= previous_day) & (calendar < pd.Timestamp(test_end))]
-    batch = reader.read_range(source, features=features, start=str(previous_day.date()), end=test_end)
+    batch = (raw_factor.copy() if derived else
+             reader.read_range(source, features=features, start=str(previous_day.date()), end=test_end))
     batch = eligible(batch, universe, features, factor)
     batch = batch[batch["trade_date"].isin(signal_days)].copy()
     model = lgb.Booster(model_file=str(OUT / "model.lgb"))
@@ -219,8 +250,14 @@ def main():
     batch["model"] = predict(batch)
     replay = []
     for index, day in enumerate(signal_days, 1):
-        daily = eligible(reader.read_day(source, features=features, trade_date=str(day.date())),
-                         universe, features, factor)
+        if derived:
+            # Recompute from a prefix containing no rows after today's observation.
+            prefix = raw_factor[raw_factor.trade_date <= day].copy()
+            prefix[derived["name"]] = evaluate(prefix, derived["expression"], source_features)
+            daily = eligible(prefix[prefix.trade_date == day], universe, features, factor)
+        else:
+            daily = eligible(reader.read_day(source, features=features, trade_date=str(day.date())),
+                             universe, features, factor)
         daily["score"] = predict(daily)
         replay.append(daily[["trade_date", "symbol", "score"]])
         if index % 10 == 0:

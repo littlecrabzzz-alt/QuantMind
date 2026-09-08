@@ -33,8 +33,16 @@ def install_schedule(root):
     # Runtime copies are refreshed by reinstalling, never by the data mirror.
     for name in (
         "scripts/tushare_mirror.py",
+        "scripts/tushare_pipeline.py",
+        "backend/shared/tushare_store.py",
         "backend/shared/tushare_pipeline.py",
         "backend/shared/tushare_intake.py",
+        "backend/shared/tushare_registry.py",
+        "backend/shared/tushare_documents.py",
+        "backend/shared/tushare_archive.py",
+        "backend/shared/tushare_text_contracts.py",
+        "backend/shared/tushare_structured_contracts.py",
+        "backend/shared/tushare_market_contracts.py",
         "backend/shared/runtime_secrets.py",
         "backend/shared/stock_utils.py",
         "deploy/dual-node.env",

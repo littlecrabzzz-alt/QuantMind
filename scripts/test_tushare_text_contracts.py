@@ -3,7 +3,7 @@
 
 import json
 from collections import Counter
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 import sys
 import unittest
@@ -111,6 +111,122 @@ class TextPlans(unittest.TestCase):
             self.assertIn(api, TEXT_CONTRACT_NOTES)
         self.assertIn("file_name", TEXT_CONTRACTS["research_report"]["extra_fields"])
         self.assertIn("_source", TEXT_CONTRACTS["news"]["keys"])
+
+    def test_month_mode_covers_all_days_sources_and_both_qa_axes(self):
+        start, today = date(2024, 1, 29), date(2024, 3, 8)
+        jobs = list(
+            iter_text_jobs(
+                {"history_start": "20240129", "text_history_window": "month"}, today
+            )
+        )
+        expected = {start + timedelta(days=n) for n in range((today - start).days + 1)}
+        histories = [i for i, job in enumerate(jobs) if job["epoch"] == "history"]
+        self.assertTrue(
+            all(job["epoch"] != "history" for job in jobs[: min(histories)])
+        )
+        for api in TEXT_CONTRACTS:
+            sources = (
+                NEWS_SOURCES
+                if api == "news"
+                else ((None,) + MAJOR_NEWS_SOURCES if api == "major_news" else (None,))
+            )
+            axes = (
+                ("question", "reply")
+                if api in ("irm_qa_sh", "irm_qa_sz")
+                else ("question",)
+            )
+            for source in sources:
+                for axis in axes:
+                    with self.subTest(api=api, source=source, axis=axis):
+                        covered = []
+                        for job in jobs:
+                            params = job["params"]
+                            if job["api_name"] != api or params.get("src") != source:
+                                continue
+                            if axis == "reply":
+                                if "pub_start" not in params:
+                                    continue
+                                left = datetime.fromisoformat(
+                                    params["pub_start"]
+                                ).date()
+                                right = datetime.fromisoformat(
+                                    params["pub_end"]
+                                ).date() - timedelta(days=1)
+                            elif "pub_start" in params:
+                                continue
+                            elif "date" in params:
+                                left = right = datetime.strptime(
+                                    params["date"], "%Y%m%d"
+                                ).date()
+                            elif "start_date" not in params:
+                                continue  # Preserve unbounded-prefix requests separately.
+                            elif " " in params["start_date"]:
+                                left = datetime.fromisoformat(
+                                    params["start_date"]
+                                ).date()
+                                right = datetime.fromisoformat(
+                                    params["end_date"]
+                                ).date() - timedelta(days=1)
+                            else:
+                                left = datetime.strptime(
+                                    params["start_date"], "%Y%m%d"
+                                ).date()
+                                right = datetime.strptime(
+                                    params["end_date"], "%Y%m%d"
+                                ).date()
+                            covered.extend(
+                                left + timedelta(days=n)
+                                for n in range((right - left).days + 1)
+                            )
+                        self.assertEqual(set(covered), expected)
+                        self.assertEqual(len(covered), len(expected))
+        self.assertEqual(len(jobs), len({json.dumps(j, sort_keys=True) for j in jobs}))
+        qa_history = [
+            j for j in jobs if j["api_name"] == "irm_qa_sz" and j["epoch"] == "history"
+        ]
+        self.assertEqual(sum("pub_start" in j["params"] for j in qa_history), 3)
+        self.assertEqual(sum("start_date" in j["params"] for j in qa_history), 3)
+        # February's complete leap-month interval is present for every source.
+        feb = [
+            j
+            for j in jobs
+            if j["api_name"] == "news"
+            and j["params"].get("start_date") == "2024-02-01 00:00:00"
+        ]
+        self.assertEqual(len(feb), len(NEWS_SOURCES))
+        self.assertTrue(
+            all(j["params"]["end_date"] == "2024-03-01 00:00:00" for j in feb)
+        )
+
+    def test_month_mode_preserves_recent_prefixes_and_yearly_monetary(self):
+        cfg = {
+            "history_start": "20220129",
+            "text_apis": ["npr", "news", "cctv_news", "monetary_policy"],
+        }
+        daily = list(iter_text_jobs(cfg, "20240308"))
+        monthly = list(
+            iter_text_jobs({**cfg, "text_history_window": "month"}, "20240308")
+        )
+        self.assertEqual(
+            [j for j in daily if j["epoch"] != "history"],
+            [j for j in monthly if j["epoch"] != "history"],
+        )
+        self.assertEqual(
+            [j for j in daily if set(j["params"]) == {"end_date"}],
+            [j for j in monthly if set(j["params"]) == {"end_date"}],
+        )
+        for api in ("monetary_policy", "cctv_news"):
+            self.assertEqual(
+                [j for j in daily if j["api_name"] == api],
+                [j for j in monthly if j["api_name"] == api],
+            )
+        self.assertLess(len(monthly), len(daily) // 5)
+        self.assertEqual(
+            daily,
+            list(iter_text_jobs({**cfg, "text_history_window": "day"}, "20240308")),
+        )
+        with self.assertRaises(ValueError):
+            list(iter_text_jobs({**cfg, "text_history_window": "week"}, "20240308"))
 
     def test_bad_config_and_streaming(self):
         for cfg in (

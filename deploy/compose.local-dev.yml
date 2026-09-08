@@ -45,6 +45,7 @@ services:
       - ./docker/conda-shim:/usr/local/bin/conda:ro
       - ./docker/litellm_sitecustomize.py:/usr/local/lib/python3.10/site-packages/sitecustomize.py:ro
       - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.config/quantmind/glm-research-api.json:/run/secrets/research-llm.json:ro
       - qwenpaw-shared:/qwenpaw-shared
     restart: "no"
   celery-worker:
@@ -86,6 +87,28 @@ services:
       - ${QM_LOCAL_STATE}/logs:/app/logs
       - ${QM_LOCAL_STATE}/data:/data
       - ${QM_LOCAL_STATE}/db:/app/db
+    restart: "no"
+  research-worker:
+    extends:
+      file: docker-compose.yml
+      service: celery-worker
+    container_name: quantmind-dev-research-worker
+    environment:
+      QM_NODE_ROLE: sandbox
+      HOST_PROJECT_PATH: ${QM_LOCAL_PROJECT}
+      HOST_RUNTIME_PATH: ${QM_LOCAL_STATE}
+      ENABLE_REAL_TRADING: "false"
+      ENABLE_TDX_PUSH: "false"
+      PYTHONPATH: /app:/app/scripts
+    volumes: !override
+      - ${QM_LOCAL_STATE}/data:/data
+      - ./backend:/app/backend:ro
+      - ./scripts:/app/scripts:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.config/quantmind/glm-research-api.json:/run/secrets/research-llm.json:ro
+    command: celery -A backend.services.engine.research.tasks:app worker --beat -Q research --concurrency=1 --loglevel=info --schedule=/tmp/research-beat
+    mem_limit: 1536m
+    cpus: 1.0
     restart: "no"
   data-gateway:
     container_name: quantmind-dev-data-gateway
