@@ -199,3 +199,12 @@
 - 覆盖台账5条改ingested_partial/available_observed；47补当前能力证据，196/197作为额外发现条目补入，原263基线保持、discovered由11至13。目录测试改为允许有非空原始探测证据支持的权限更新，不能把初次unverified固定成永远未知。
 - 并行候选：schema3 9cf3a60 + descriptor校验0ea2e88，独立Python3.10审查证明损坏descriptor不再推进CURRENT；旧缓存leaf等完整性风险仍记录。龙虎榜/游资纯4d2f953+runtime b5b6a80，含hm_list错误字段定点修正、hm_detail.tag显式请求，未部署；hm_name二级拆分仍gap。
 - 旧接口引用闭包Mac复核完成：固定data-b93d6be5405e42c5ae4c2cee7b27876f65e2eea09af25920b398761c2c55a65c共114928文件、补2029，四个原始response及四个observation全部在发布清单内并通过SHA。/tmp/tushare-connect-legacy-mac-verified.json；不增加未审API归一化注册数。修复闭包时只自然排空采集消费者，随后已恢复，无再次重启服务。
+
+## 2026-09-09 07:22 并行集成与等待发布记录
+
+- 用户要求减少串行等待：历史采集与文档作业继续；独立工作树并行推进接口合同、字段审计及吞吐评估。父候选 `d6cc1fe` 已集成文档schema3两层索引、龙虎榜/游资4接口、历史列表/IPO/BSE映射/市场统计4接口及显式请求字段覆盖检查；364项Tushare隔离回归11.152秒通过，Ruff和diff检查通过。仍未进入共享master或生产，不计入136个生产采集接口。
+- 字段保护补充Shibor/LPR的1w、1y、5y等数字开头列；非空响应漏回显式请求列保存原数据并标schema_gap。基金经理分页及指数分区重试两处测试原mock漏列，补齐请求字段后原闭合断言通过，没有弱化保护。13个已核对非空实样本未发现请求列遗漏，不能据此证明供应商所有隐藏字段已取全。
+- 23:18:44Z生产批328请求/90.416秒采集/117.602秒整批，publish13.744秒、planning6.468秒；pending463704、done26414、empty14784。队列仍扩展，此数不作全历史分母或固定ETA。云盘df约264GiB可用，包含在建全量备份占用，不将磁盘变化全归因Tushare。
+- 07:00全量快照PID422770先完成在线预复制/扫描，07:19:53因`Celery work active`以75/TEMPFAIL退出；未发布新快照，现有服务仍running。期间父未暂停任何消费者，也未执行schema3迁移或新接口probe。备份失败独立记录，不阻止离线开发，不自动重试或停止其他活动任务。
+- 本机已准备但未执行 `/tmp/tushare-schema3-migrate.py`、`/tmp/tushare-trading-event-probe.py`、`/tmp/tushare-listing-extra-probe.py`及旧互联互通过滤探测。下一步发布前重查活动任务/双端一致性，自然排空两专属消费者；新API读取器先兼容旧/新索引，正式DB备份、meta1→3迁移、全核心表与全部便携行SHA比对，再做账号样本、固定API和Mac禁网验收，恢复并核验两队列。不能直接回退旧DB覆盖新增进度。
+- 全263基线+13额外发现义务不缩减；RRG固定坐标技术验收已通过，但历史成分可知性/ETF等仍blocked_data。无需等待所有PDF下载才继续RRG数据消费验证。

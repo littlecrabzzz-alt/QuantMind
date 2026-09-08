@@ -239,7 +239,7 @@ class FixedStore(unittest.TestCase):
             }
             <= {api for api, _ in fixtures}
         )
-        self.assertEqual(len(fixtures), 140)
+        self.assertEqual(len(fixtures), 144)
 
     def test_dates_codes_and_macro_periods(self):
         pinned = release(

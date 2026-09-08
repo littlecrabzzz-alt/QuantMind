@@ -50,6 +50,32 @@ from backend.shared.tushare_trading_event_contracts import (
     iter_trading_event_jobs,
 )
 
+from backend.shared.tushare_listing_extra_contracts import (
+    LISTING_EXTRA_CONTRACTS,
+    iter_listing_extra_jobs,
+)
+
+LISTING_EXTRA_RUNTIME_CONTRACTS = {
+    api: {
+        **spec,
+        "group": "listing_extra",
+        **(
+            {"saturation_fallback": "historical_listing_securities"}
+            if api == "bak_basic"
+            else {}
+        ),
+        **(
+            {
+                "saturation_fallback": "market_stat_categories",
+                "saturation_param": "ts_code",
+            }
+            if api == "daily_info"
+            else {}
+        ),
+    }
+    for api, spec in LISTING_EXTRA_CONTRACTS.items()
+}
+
 TRADING_EVENT_RUNTIME_CONTRACTS = {
     api: {
         **spec,
@@ -74,6 +100,7 @@ CONNECT_RUNTIME_CONTRACTS = {
 }
 
 EXTENDED_CONTRACTS = {
+    **LISTING_EXTRA_RUNTIME_CONTRACTS,
     **TRADING_EVENT_RUNTIME_CONTRACTS,
     **CONNECT_RUNTIME_CONTRACTS,
     **{
@@ -110,6 +137,7 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "listing_extra": iter_listing_extra_jobs,
     "trading_event": iter_trading_event_jobs,
     "connect": iter_connect_jobs,
     "etf_basket": iter_etf_basket_jobs,
