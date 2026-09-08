@@ -7,5 +7,16 @@
     "fund_portfolio": 240
   },
   "batch_requests": 360,
-  "batch_seconds": 100
+  "batch_seconds": 100,
+  "enable_text": true,
+  "enable_structured": true,
+  "enable_market": true,
+  "text_history_window": "month",
+  "plan_jobs_per_tick": 500,
+  "group_weights": {
+    "rrg": 3,
+    "text": 1,
+    "structured": 1,
+    "market": 1
+  }
 }
