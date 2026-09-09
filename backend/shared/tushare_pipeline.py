@@ -38,6 +38,10 @@ from backend.shared.tushare_registry import (
     market_sentiment_prerequisites,
     EXTENDED_CONTRACTS,
     PLANNERS,
+    APPEND_PLANNERS,
+    MARKET_MEMBER_APIS,
+    MARKET_MEMBER_DEPENDENCIES,
+    market_member_prerequisites,
     contract_for,
     risk_event_runtime_prerequisites,
     technical_extra_runtime_prerequisites,
@@ -99,6 +103,8 @@ def _planning_inputs(family, config, identifiers):
     contracts = {
         api: spec for api, spec in EXTENDED_CONTRACTS.items() if spec["group"] == family
     }
+    if family == "market_members":
+        contracts = {api: EXTENDED_CONTRACTS[api] for api in MARKET_MEMBER_APIS}
     selected = config.get(family + "_apis", tuple(contracts))
     if any(api not in contracts for api in selected):
         raise ValueError("Unknown " + family + " API")
@@ -109,7 +115,11 @@ def _planning_inputs(family, config, identifiers):
     for api, dependency in (("namechange", "stocks"), ("index_daily", "indexes")):
         if api in contracts:
             dependencies.add(dependency)
+    if family == "market_members":
+        dependencies.update(MARKET_MEMBER_DEPENDENCIES[api] for api in contracts)
     keys = {"history_start", family + "_apis"}
+    if family == "market_members":
+        keys.remove("history_start")
     if family not in ("structured", "market"):
         keys.add(family + "_history_start")
     if family == "foreign_financial":
@@ -1310,6 +1320,7 @@ class Pipeline:
             "cross_asset_extra": cross_asset_runtime_prerequisites,
             "bond_extra": bond_extra_runtime_prerequisites,
             "market_sentiment": market_sentiment_prerequisites,
+            "market_members": market_member_prerequisites,
             "foreign_financial": foreign_financial_runtime_prerequisites,
             "stock_context": stock_context_runtime_prerequisites,
             "technical_extra": technical_extra_runtime_prerequisites,
@@ -1382,6 +1393,10 @@ class Pipeline:
             (
                 "factor_library",
                 lambda cfg, ids: self.record_extra_planning_gaps("factor_library", cfg, ids),
+            ),
+            (
+                "market_members",
+                lambda cfg, ids: self.record_extra_planning_gaps("market_members", cfg, ids),
             ),
             (
                 "bond_extra",
@@ -1526,7 +1541,7 @@ class Pipeline:
         ):
             raise ValueError("Invalid historical planner time limit")
         stats = {}
-        for family, planner in PLANNERS.items():
+        for family, planner in {**PLANNERS, **APPEND_PLANNERS}.items():
             self.planning_timing["active_stage"] = family + ":policy"
             if family in blocked_families or not config.get("enable_" + family, False):
                 continue

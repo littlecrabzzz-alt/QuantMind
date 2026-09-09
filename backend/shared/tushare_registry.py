@@ -189,6 +189,84 @@ FACTOR_LIBRARY_RUNTIME_CONTRACTS = {
     for api, spec in FACTOR_LIBRARY_CONTRACTS.items()
 }
 
+# Independent planning scope, deliberately absent from PLANNERS consumption
+# groups. Contracts, job identities, permissions and fair group remain unchanged.
+MARKET_MEMBER_APIS = ("tdx_member", "kpl_concept_cons")
+MARKET_MEMBER_DEPENDENCIES = {
+    "tdx_member": "tdx_indices", "kpl_concept_cons": "kpl_concepts"
+}
+
+
+def _market_member_config(config):
+    if not config.get("enable_market_sentiment"):
+        raise ValueError("market_members requires enabled market_sentiment group")
+    old = config.get("market_sentiment_apis", tuple(MARKET_SENTIMENT_CONTRACTS))
+    if (
+        not isinstance(old, (list, tuple))
+        or any(not isinstance(api, str) or api not in MARKET_SENTIMENT_CONTRACTS for api in old)
+        or set(old).intersection(MARKET_MEMBER_APIS)
+    ):
+        raise ValueError("market_sentiment_apis must exclude both member APIs")
+    selected = config.get("market_members_apis", MARKET_MEMBER_APIS)
+    if not isinstance(selected, (list, tuple)) or not selected or any(
+        api not in MARKET_MEMBER_APIS for api in selected
+    ):
+        raise ValueError("market_members_apis must select reviewed member APIs")
+    start = config.get("market_members_history_start")
+    if isinstance(start, dict) and set(start) - set(MARKET_MEMBER_APIS):
+        raise ValueError("Unknown market_members history API")
+    # The old family's start is not evidence for this new scope's history.
+    return {
+        "market_sentiment_apis": list(dict.fromkeys(selected)),
+        "market_sentiment_history_start": start,
+        **({"planning_epoch": config["planning_epoch"]} if "planning_epoch" in config else {}),
+    }
+
+
+def _market_member_codes(identifiers, selected):
+    import re
+
+    result = {}
+    for api in selected:
+        codes = identifiers.get(MARKET_MEMBER_DEPENDENCIES[api], [])
+        suffix = "TDX" if api == "tdx_member" else "KP"
+        if not isinstance(codes, (list, tuple, set)) or any(
+            not isinstance(code, str) or not re.fullmatch(r"[0-9]{6}\." + suffix, code)
+            for code in codes
+        ):
+            raise ValueError("Invalid observed member board namespace: " + api)
+        result[api] = sorted(set(codes))
+    return result
+
+
+def market_member_prerequisites(identifiers=None, config=None):
+    projected = _market_member_config(config or {})
+    selected = projected["market_sentiment_apis"]
+    codes = _market_member_codes(identifiers or {}, selected)
+    gaps = market_sentiment_prerequisites(identifiers, config=projected)
+    for api in selected:
+        gaps.append({
+            "api_name": api, "dependencies": [MARKET_MEMBER_DEPENDENCIES[api]],
+            "reason": "observed_board_scope_not_universe",
+            "observed_boards": len(codes[api]), "universe_complete": False,
+            "detail": "Bulk discovery plus observed boards; second member axis, historical universe and PIT remain unverified.",
+        })
+    return gaps
+
+
+def iter_market_member_jobs(config, today, identifiers=None):
+    projected = _market_member_config(config)
+    codes = _market_member_codes(identifiers or {}, projected["market_sentiment_apis"])
+    for job in iter_market_sentiment_jobs(projected, today, identifiers):
+        # Retain the bulk request: known boards must not hide future discoveries.
+        yield job
+        for code in codes[job["api_name"]]:
+            yield {**job, "params": {**job["params"], "ts_code": code}}
+
+
+APPEND_PLANNERS = {"market_members": iter_market_member_jobs}
+
+
 from backend.shared.tushare_bond_extra_contracts import (
     BOND_EXTRA_CONTRACTS,
     iter_bond_extra_jobs,
