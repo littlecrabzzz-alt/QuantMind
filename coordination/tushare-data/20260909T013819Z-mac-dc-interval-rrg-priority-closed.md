@@ -1,0 +1,6 @@
+# DC2、真实发布周期与RRG优先切片阶段闭环
+
+本轮为实质进展：DC2 runtime e87生产启用，固定0a801f56529c55444386be12892cdaaa1d864c2aa64e4a5bef86ce0131897ad1全9069原始/9053去重行、17字段、12云HTTP与Mac禁网校验；154采集API+6查询别名。RRG适配f7aa20c复用既有坐标和日历，36008/1934行、48个下一日映射，仍blocked_data。
+interval900已真实自动验收947秒：e9da1c41→6a46d2c09cc5038ad359a7f18919abbe2d0ca26d7519e2b057b7e43d5ae9780b，6438文件/261619850字节+173文档尝试进入新manifest，5个deferred批约1秒检查。标准Macmirror新增6448/共188149文件通过，父再次逐个重算此6438增量SHA通过；报告/tmp/tushare-live-interval-acceptance/report.json、state.json及/tmp/tushare-live-interval-mac-acceptance.json。全部历史完整性仍未证，不把API源DB尝试计数称新镜像元数据格式。
+RRG定向操作rrg-window-20260909-de9677e3c154482bb4432954c6cbd998于01:35:16Zcommit：81现有任务priority24+30缺失daily_basic history任务。111目标、全planning/config/旧tries-result保持，schema不变、无调用/手动发布/停队列。preparedSHA f0142841114db94b77249a6e9c018a0bd52e94f73d08b517daab32aec04a638c；云端validation/rrg-priority-adjustments/有prepared/committed/verified三份证据。01:37后置核查通过，16目标新尝试：daily5done/2empty、adj5done/2empty、basic2done。其它目标仍pending，最新响应尚未随下一固定版发布/镜像；不能缩减完整研究区间为本次90任务。
+父候选codex/tushare-data-intake HEAD8c2e938已push（1b94a74风险纯+8c2e938 runtime），442tests13.218s+Ruff通过，风险5尚未上生产。下轮从主线当前docs进展合入父候选再继续；/tmp/tushare-risk-probe-handoff.md含9请求真实probe与同版云/Mac验证。remaining以8c为基线做技术指标/筹码/备份行情纯5，text只读分析structured组内饥饿。主线仅文档/新离线脚本在e87之后增加，生产无需为文档重启；两队列持续运行、US普通同步保留。全目标仍active，263+13/剩余接口/完整历史修订/PDF/PIT继续。
