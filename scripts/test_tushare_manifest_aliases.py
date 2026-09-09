@@ -148,6 +148,17 @@ class ManifestAliases(unittest.TestCase):
         (project / "deploy/dual-node.env").write_text(
             "QM_SSH_TARGET=fixture\nQM_REMOTE_PROJECT=/fixture\n"
         )
+
+        def transfer_manifest(cmd, **kwargs):
+            listing = next(
+                v.split("=", 1)[1] for v in cmd if v.startswith("--files-from=")
+            )
+            names = Path(listing).read_text().splitlines()
+            self.assertEqual(names, [f"releases/{current}/manifest.json"])
+            incoming = Path(cmd[-1]) / names[0]
+            incoming.parent.mkdir(parents=True, exist_ok=True)
+            incoming.write_bytes(raw)
+
         with (
             patch.object(mirror_module, "PROJECT", project),
             patch.object(
@@ -160,7 +171,7 @@ class ManifestAliases(unittest.TestCase):
             patch.object(
                 mirror_module.subprocess,
                 "run",
-                side_effect=AssertionError("No rsync needed"),
+                side_effect=transfer_manifest,
             ),
         ):
             first = mirror_module.mirror(self.root)
