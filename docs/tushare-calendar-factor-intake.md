@@ -42,3 +42,18 @@
 `486.html SHA256 799b1716dd674500e499bee73be4015307df014c16064219e751bbbfb45650f2`
 
 验证：`python3 -B scripts/test_tushare_calendar_factor_contracts.py`，9项离线测试（socket/DNS禁止），含26字段、合法参数、闰年/跨年/月初尾、历史无重叠、真实名称与资产冲突、未知权限/历史/cap缺口。纯候选通过不等于已接入。
+
+## Runtime候选（基线79f4498 + pure5aa26e1 + parser f024021）
+
+已接入registry、两family PLANNERS/前置gap、来源发现、规范化及固定reader；默认`enable_calendar_extra=false`、`enable_factor_library=false`，本提交不修改配置。没有probe、启用、生产写入或部署。镜像安装复制项由父单独集成。本节更新“未来接线”状态，但实际权益、历史全集、附件正文与PIT缺口仍未通过真实验收。
+
+- `factor_library_factors`仅来自factor_list原文中`factor_name + asset_type`身份，去除重复身份但不改大小写、名字或资产类型；定义文本修订不重置规划名字流，原文/Parquet仍保留完整定义和修订。值接口输出不能补出不存在的asset_type，因此不会反向伪造列表发现。
+- `factor_library_stocks`是独立历史股票发现集合，含既有历史/退市/T、technical来源和自身合法STK源代码；不扩大旧stocks族。值只接受T?六位.SH/SZ/BJ规范成交易所前缀并保留source_ts_code；外国/未知拼写保留原始响应并要求schema核查，不能误归A股。calendar和factor_list中的标签不参与证券规范化。
+- 原26列继续要求presence，包括缺失列判schema_gap；允许非身份源空值，不把正常空前值/预测值变成失败。eco保留date非空，schedule保留month非空，ann保留ann_date非空；列表保留factor_name/asset_type非空，值保留factor_name/ts_code/trade_date非空。自然键之外的不同全行保留，数值与单位不重算。
+- 仅股票code的factor_value请求合法，原文和固定reader已覆盖；如果factor_list空/拒权而code-only值可用，现阶段自动值规划仍等待实际列表身份。明确保留`code_only_discovery_gap`，样本可读不等于自动可跑。待真实权益审计再决定有证据的code-only历史分片，不能由已注册状态或观察到名字猜资产。
+- 默认日期轴已按上表实现；factor_list默认None，日期筛选拒绝，没有伪造trade_date。eco/index range使用既有连续日二分；schedule m-only不可日二分。单日/单股/月末饱和保持blocked，所有原文和观察保留。
+- idx_anns url接既有文档登记入口；测试只验证登记调用，不做网络下载。链接正文/附件仍未probe，不能把登记或标题当归档完成。data_api始终为返回数据，不执行接口发现/调用。
+- 新family配置、名称/资产发现与股票饱和发现不会改变旧family签名；因子规划只冻结实际name/asset依赖，饱和股票集合保持实时。默认关闭和重复规划幂等已验证，未改通用历史游标、预算、next_job/tick/publish或schema版本。
+- catalog486过时gap已改成修复证据note，原差异事实保留；运行测试基于f024021，避免enqueue重新加入错误9列。
+
+Python3.10：本批9纯 + 8运行 = 17项通过；运行包含26全列原文→Parquet→固定读取、空值/未知列/修订、独立发现、旧签名、code-only、5种饱和真实执行路径（HTTP MockTransport）和附件登记。3.10全套初跑592项，8个旧测试使用`date.fromisoformat('YYYYMMDD')`报兼容错误，涉及7份未修改的历史测试；不是本批runtime通过的替代证据，父单独修复后统一重跑。日志Mac `/tmp/tushare-calendar-factor-runtime-full310.log`，本批通过日志`/tmp/tushare-calendar-factor-related310.log`，改动方法/旧测试未变证据`/tmp/tushare-calendar-factor-runtime-scope.json`。

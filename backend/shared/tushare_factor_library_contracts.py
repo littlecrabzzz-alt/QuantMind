@@ -89,6 +89,12 @@ for _api, _doc, _cap, _axis, _keys in (
         _cap,
         _keys,
         required=FIELDS[_api],
+        nullable=[
+            f
+            for f in FIELDS[_api]
+            if f
+            not in (("factor_name", "asset_type") if _api == "factor_list" else _keys)
+        ],
         extra=FIELDS[_api],
         split=_api == "factor_value",
         rpm=30,
@@ -130,12 +136,13 @@ for _api, _doc, _cap, _axis, _keys in (
     )
     FACTOR_LIBRARY_CONTRACTS[_api] = spec
 FACTOR_LIBRARY_CONTRACTS["factor_list"].update(
-    catalog_gap="Saved486 catalog has13 output fields: true4 plus9 explanatory category labels. The schema is ONLY the table headed 名称/类型/默认显示/描述; later category/formula tables are not output fields. Parent must correct catalog separately while retaining original HTML evidence.",
+    catalog_note="Historical486 catalog mixed9 explanatory categories with4 real output fields. Parser/catalog correction f024021 is documented in docs/tushare-factor-catalog-schema.evidence.json with original HTML SHA and exact differences. Only the 名称/类型/默认显示/描述 schema table supplies fields; category/formula prose is not schema.",
     discovery_gap="factor_name is the actual lookup identifier; no factor_id exists. Snapshot all assets without filters, retain names/case/asset_type/factor_type/factor_desc, and discover values from actual STK rows. Current202-factor/9-category prose is neither a seed list nor a frozen universe.",
     history_scope_gap="List has no date/history filter or valid-from metadata. A snapshot cannot reconstruct old/removed definitions, and history_start must not be sent to this API.",
     saturation_gap="Page says one request returns the entire list but gives no numeric cap.10000 is a local guard, not a provider cap. Optional name/asset/type filters cannot certify the complete universe without separate evidence.",
 )
 FACTOR_LIBRARY_CONTRACTS["factor_value"].update(
+    code_only_discovery_gap="A legal ts_code-only probe can succeed while factor_list is empty or denied. Such value rows lack asset_type and do not seed automatic names. Until actual permissions and an audited code-only partition plan are available, no factor_value auto-jobs are produced without list discovery; sample availability is not automatic readiness.",
     input_constraint="At least one of ts_code or factor_name is required. Automatic planning uses actual discovered factor_name; code-only queries are legally documented but not this candidate auto-plan.",
     exact_date_param="trade_date",
     source_namespace="mainland_equity_only_preserve_source_ts_code",

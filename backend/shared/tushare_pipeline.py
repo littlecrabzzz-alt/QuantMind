@@ -25,6 +25,10 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from backend.shared.tushare_registry import (
+    CALENDAR_EXTRA_RUNTIME_CONTRACTS,
+    FACTOR_LIBRARY_RUNTIME_CONTRACTS,
+    calendar_extra_prerequisites,
+    factor_library_prerequisites,
     BOND_EXTRA_RUNTIME_CONTRACTS,
     bond_extra_runtime_prerequisites,
     CROSS_ASSET_RUNTIME_CONTRACTS,
@@ -630,6 +634,14 @@ class Pipeline:
                 for field in ("con_code", "leading_code"):
                     if isinstance(row.get(field), str):
                         row["source_" + field] = row[field]
+            if result["api_name"] == "factor_value":
+                code, name = row.get("ts_code"), row.get("factor_name")
+                if (
+                    not isinstance(code, str)
+                    or not re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", code)
+                    or not isinstance(name, str) or not name.strip()
+                ):
+                    raise ValueError("Factor value requires a source STK code and factor_name; schema review required")
             if result["api_name"] in BOND_EXTRA_RUNTIME_CONTRACTS:
                 value = row.get("ts_code")
                 if not isinstance(value, str) or not value:
@@ -682,6 +694,10 @@ class Pipeline:
                 "l3_code",
                 "index_code",
             ):
+                if result["api_name"] in CALENDAR_EXTRA_RUNTIME_CONTRACTS or result["api_name"] == "factor_list":
+                    continue  # Calendar/factor taxonomy labels are not securities.
+                if result["api_name"] == "factor_value" and key != "ts_code":
+                    continue
                 if key == "ts_code" and (result["api_name"] in MARKET_SENTIMENT_RUNTIME_CONTRACTS or result["api_name"] in BOND_EXTRA_RUNTIME_CONTRACTS):
                     continue
                 value = row.get(key)
@@ -876,7 +892,10 @@ class Pipeline:
 
     def identifiers(self):
         bond_source_apis = ("cb_daily", "cb_issue", "cb_call", "cb_rate", "cb_price_chg", "cb_share")
+        factor_records = {}
         families = {
+            "factor_list": "factor_library_factors",
+            "factor_value": "factor_library_stocks",
             **dict.fromkeys(bond_source_apis, "bond_extra_convertibles"),
             **{api: spec.get("saturation_fallback", "bond_extra_convertibles") for api, spec in BOND_EXTRA_RUNTIME_CONTRACTS.items()},
             "tdx_index": "tdx_indices",
@@ -957,6 +976,7 @@ class Pipeline:
             (
                 "ts_code", "index_code", "level", "fut_code", "o_code", "n_code",
                 "name", "hm_name", "l1_code", "l2_code", "l3_code", "con_code",
+                "factor_name", "asset_type",
             )
         )
         placeholders = ",".join("?" for _ in families)
@@ -1011,6 +1031,17 @@ class Pipeline:
             discovery["bypassed"] += int(bypass)
             discovery["body_reads"] += int(bool(eligible))
             for record in self.records(saved, fields=discovery_fields):
+                if saved["api_name"] == "factor_list":
+                    # Actual list identity only, not descriptions/demo IDs or
+                    # factor_value outputs that cannot establish asset_type.
+                    identity = {field: record.get(field) for field in ("factor_name", "asset_type")}
+                    factor_records[json_bytes(identity)] = identity
+                    continue
+                if saved["api_name"] == "factor_value":
+                    code = record.get("ts_code")
+                    if isinstance(code, str) and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", code):
+                        result["factor_library_stocks"].add(code)
+                    continue
                 if saved["api_name"] == "ci_index_member":
                     for field in ("l1_code", "l2_code", "l3_code"):
                         value = record.get(field)
@@ -1087,6 +1118,7 @@ class Pipeline:
         result["technical_stocks"].update(
             result["risk_stocks"] | result["limit_securities"]
         )
+        result["factor_library_stocks"].update(result["technical_stocks"])
         result["stock_context_stocks"].update(result["technical_stocks"])
         result["market_sentiment_stocks"].update(result["stock_context_stocks"])
         result["risk_securities"].update(
@@ -1099,6 +1131,7 @@ class Pipeline:
         result["bond_extra_convertibles"].update(result["cross_asset_bonds"])
         result["cross_asset_etfs"].update(result["etfs"])
         result = {key: sorted(values) for key, values in result.items()}
+        result["factor_library_factors"] = [factor_records[key] for key in sorted(factor_records)]
         for api, spec in CROSS_ASSET_RUNTIME_CONTRACTS.items():
             family = spec["saturation_fallback"]
             logical = EXTENDED_CONTRACTS[api].get("discovery_dependencies", [family])[0]
@@ -1272,6 +1305,8 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "calendar_extra": calendar_extra_prerequisites,
+            "factor_library": factor_library_prerequisites,
             "cross_asset_extra": cross_asset_runtime_prerequisites,
             "bond_extra": bond_extra_runtime_prerequisites,
             "market_sentiment": market_sentiment_prerequisites,
@@ -1340,6 +1375,14 @@ class Pipeline:
         self.planning_timing["active_stage"] = "validation_and_snapshots"
         blocked_families = set()
         for family, validate in (
+            (
+                "calendar_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps("calendar_extra", cfg, ids),
+            ),
+            (
+                "factor_library",
+                lambda cfg, ids: self.record_extra_planning_gaps("factor_library", cfg, ids),
+            ),
             (
                 "bond_extra",
                 lambda cfg, ids: self.record_extra_planning_gaps("bond_extra", cfg, ids),

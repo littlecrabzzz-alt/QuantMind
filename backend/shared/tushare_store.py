@@ -15,6 +15,8 @@ import re
 import tempfile
 
 from backend.shared.tushare_registry import (
+    CALENDAR_EXTRA_RUNTIME_CONTRACTS,
+    FACTOR_LIBRARY_RUNTIME_CONTRACTS,
     BOND_EXTRA_RUNTIME_CONTRACTS,
     CROSS_ASSET_RUNTIME_CONTRACTS,
     MARKET_SENTIMENT_RUNTIME_CONTRACTS,
@@ -52,6 +54,8 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **CALENDAR_EXTRA_RUNTIME_CONTRACTS,
+    **FACTOR_LIBRARY_RUNTIME_CONTRACTS,
     **BOND_EXTRA_RUNTIME_CONTRACTS,
     **CROSS_ASSET_RUNTIME_CONTRACTS,
     **MARKET_SENTIMENT_RUNTIME_CONTRACTS,
@@ -527,7 +531,7 @@ def _dataset(root, release_id, api_name):
             ):
                 if spec.get(note):
                     metadata[note] = spec[note]
-        if api_name in BOND_EXTRA_RUNTIME_CONTRACTS:
+        if api_name in BOND_EXTRA_RUNTIME_CONTRACTS or api_name in CALENDAR_EXTRA_RUNTIME_CONTRACTS or api_name in FACTOR_LIBRARY_RUNTIME_CONTRACTS:
             for note, value in spec.items():
                 if note.endswith(("_gap", "_note")) or note in (
                     "field_gaps", "field_metadata", "hidden_fields", "permission_status",
@@ -650,6 +654,10 @@ def _date_expression(field, columns):
 
 
 def _default_date_field(api_name, columns):
+    if api_name in CALENDAR_EXTRA_RUNTIME_CONTRACTS:
+        return CALENDAR_EXTRA_RUNTIME_CONTRACTS[api_name]["date_field"]
+    if api_name in FACTOR_LIBRARY_RUNTIME_CONTRACTS:
+        return FACTOR_LIBRARY_RUNTIME_CONTRACTS[api_name]["date_field"]
     if api_name in BOND_EXTRA_RUNTIME_CONTRACTS:
         return BOND_EXTRA_RUNTIME_CONTRACTS[api_name]["date_field"]
     if api_name in CROSS_ASSET_RUNTIME_CONTRACTS or api_name in MARKET_SENTIMENT_RUNTIME_CONTRACTS:

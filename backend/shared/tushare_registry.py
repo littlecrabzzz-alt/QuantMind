@@ -164,6 +164,31 @@ MARKET_SENTIMENT_RUNTIME_CONTRACTS = {
     for api, spec in MARKET_SENTIMENT_CONTRACTS.items()
 }
 
+from backend.shared.tushare_calendar_extra_contracts import (
+    CALENDAR_EXTRA_CONTRACTS,
+    iter_calendar_extra_jobs,
+    calendar_extra_prerequisites,
+)
+from backend.shared.tushare_factor_library_contracts import (
+    FACTOR_LIBRARY_CONTRACTS,
+    iter_factor_library_jobs,
+    factor_library_prerequisites,
+)
+
+CALENDAR_EXTRA_RUNTIME_CONTRACTS = {
+    api: {**spec, "group": "calendar_extra"}
+    for api, spec in CALENDAR_EXTRA_CONTRACTS.items()
+}
+FACTOR_LIBRARY_RUNTIME_CONTRACTS = {
+    api: {
+        **spec, "group": "factor_library",
+        **({"saturation_fallback": "factor_library_stocks",
+            "saturation_dependencies": ["factor_library_stocks"]}
+           if api == "factor_value" else {}),
+    }
+    for api, spec in FACTOR_LIBRARY_CONTRACTS.items()
+}
+
 from backend.shared.tushare_bond_extra_contracts import (
     BOND_EXTRA_CONTRACTS,
     iter_bond_extra_jobs,
@@ -372,6 +397,8 @@ CONNECT_RUNTIME_CONTRACTS = {
 }
 
 EXTENDED_CONTRACTS = {
+    **CALENDAR_EXTRA_RUNTIME_CONTRACTS,
+    **FACTOR_LIBRARY_RUNTIME_CONTRACTS,
     **BOND_EXTRA_RUNTIME_CONTRACTS,
     **CROSS_ASSET_RUNTIME_CONTRACTS,
     **MARKET_SENTIMENT_RUNTIME_CONTRACTS,
@@ -419,6 +446,8 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "calendar_extra": iter_calendar_extra_jobs,
+    "factor_library": iter_factor_library_jobs,
     "bond_extra": lambda config, today, ids: iter_bond_extra_jobs(config, today, _bond_extra_identifiers(ids)),
     "cross_asset_extra": iter_cross_asset_extra_jobs,
     "market_sentiment": iter_market_sentiment_jobs,
