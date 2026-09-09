@@ -267,10 +267,19 @@ class Pipeline:
                 )
 
     def _next_structured_job(self, now, check_gates=True):
-        """Seek actual pending APIs in a stable circle; return uncommitted checkpoints."""
-        prefix = "structured_api_turn:"
+        return self._next_family_job("structured", now, check_gates)
+
+    def _next_family_job(self, family, now, check_gates=True):
+        """Seek pending APIs; preserve structured keys and isolate other families."""
+        namespace = (
+            "structured_"
+            if family == "structured"
+            else "family:" + family.encode("utf-8").hex() + ":"
+        )
+        prefix = namespace + "api_turn:"
         previous = self.db.execute(
-            "SELECT name,value FROM scheduler_state WHERE name GLOB 'structured_api_turn:*' ORDER BY value DESC,name LIMIT 1"
+            "SELECT name,value FROM scheduler_state WHERE name GLOB ? ORDER BY value DESC,name LIMIT 1",
+            (prefix + "*",),
         ).fetchone()
         cursor = previous["name"][len(prefix) :] if previous else None
         turn = previous["value"] + 1 if previous else 1
@@ -278,7 +287,7 @@ class Pipeline:
         while True:
             sql = """SELECT json_extract(job,'$.api_name') AS api
                 FROM jobs INDEXED BY jobs_ready_api_history
-                WHERE state='pending' AND group_name='structured' {after}
+                WHERE state='pending' AND group_name=? {after}
                 ORDER BY json_extract(job,'$.api_name') LIMIT 1"""
             candidate = self.db.execute(
                 sql.format(
@@ -286,7 +295,7 @@ class Pipeline:
                     if cursor is not None
                     else ""
                 ),
-                (cursor,) if cursor is not None else (),
+                (family, cursor) if cursor is not None else (family,),
             ).fetchone()
             if candidate is None and cursor is not None:
                 cursor = None
@@ -296,7 +305,7 @@ class Pipeline:
             api = candidate["api"]
             if not isinstance(api, str) or not api:
                 raise ValueError(
-                    "Structured pending job has missing/invalid api_name; queue preserved"
+                    f"{family} pending job has missing/invalid api_name; queue preserved"
                 )
             if api in seen:
                 return None, []
@@ -308,7 +317,7 @@ class Pipeline:
                 ).fetchone()
                 if gate and gate[0] > now:
                     continue
-            phase_name = "structured_phase:" + api
+            phase_name = namespace + "phase:" + api
             phase_row = self.db.execute(
                 "SELECT value FROM scheduler_state WHERE name=?", (phase_name,)
             ).fetchone()
@@ -317,10 +326,10 @@ class Pipeline:
             for bucket in (history, 1 - history):
                 row = self.db.execute(
                     """SELECT * FROM jobs INDEXED BY jobs_ready_api_history
-                    WHERE state='pending' AND group_name='structured'
+                    WHERE state='pending' AND group_name=?
                       AND json_extract(job,'$.api_name')=? AND (epoch='history')=?
                       AND retry_after<=? ORDER BY priority,rowid LIMIT 1""",
-                    (api, bucket, now),
+                    (family, api, bucket, now),
                 ).fetchone()
                 if row:
                     # Advance the scheduled opportunity even when an empty bucket
@@ -328,6 +337,10 @@ class Pipeline:
                     return row, [(prefix + api, turn), (phase_name, (phase + 1) % 4)]
 
     def next_job(self, config, deadline):
+        # Preserve legacy structured fallback behavior; extend only enabled families.
+        fair_families = {"structured"} | {
+            name for name in PLANNERS if name != "rrg" and config.get("enable_" + name)
+        }
         rpm = config.get("requests_per_minute")
         if rpm is None:
             now = time.time()
@@ -335,8 +348,10 @@ class Pipeline:
                 "SELECT * FROM jobs INDEXED BY jobs_ready_order WHERE state='pending' AND retry_after<=? ORDER BY priority,rowid LIMIT 1",
                 (now,),
             ).fetchone()
-            if row and row["group_name"] == "structured":
-                row, checkpoints = self._next_structured_job(now, check_gates=False)
+            if row and row["group_name"] in fair_families:
+                row, checkpoints = self._next_family_job(
+                    row["group_name"], now, check_gates=False
+                )
                 try:
                     self.db.executemany(
                         "INSERT INTO scheduler_state(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
@@ -373,8 +388,8 @@ class Pipeline:
                 WHERE j.state='pending' AND j.retry_after<=? AND COALESCE(g.next_at,0)<=?
                 {group_filter} ORDER BY j.priority,j.rowid LIMIT 1"""
             checkpoints = []
-            if group == "structured":
-                row, checkpoints = self._next_structured_job(now)
+            if group in fair_families:
+                row, checkpoints = self._next_family_job(group, now)
             else:
                 row = self.db.execute(
                     sql.format(
@@ -388,8 +403,8 @@ class Pipeline:
                     sql.format(group_filter="", ready_index="jobs_ready_order"),
                     (now, now),
                 ).fetchone()
-                if row and row["group_name"] == "structured":
-                    row, checkpoints = self._next_structured_job(now)
+                if row and row["group_name"] in fair_families:
+                    row, checkpoints = self._next_family_job(row["group_name"], now)
             if row:
                 api = json.loads(row["job"])["api_name"]
                 api_rpm = min(

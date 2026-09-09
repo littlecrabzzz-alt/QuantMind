@@ -211,7 +211,7 @@ class StructuredFairnessTest(unittest.TestCase):
         )
         with self.assertRaises(sqlite3.DatabaseError):
             self.p.next_job(CONFIG, 1)
-        self.p.db.set_authorizer(None)
+        self.p.db.set_authorizer(lambda *args: sqlite3.SQLITE_OK)
         self.assertEqual(
             self.p.db.execute("SELECT count(*) FROM request_gates").fetchone()[0], 0
         )
@@ -232,7 +232,7 @@ class StructuredFairnessTest(unittest.TestCase):
         )
         with self.assertRaises(sqlite3.DatabaseError):
             self.p.next_job(CONFIG, 1)
-        self.p.db.set_authorizer(None)
+        self.p.db.set_authorizer(lambda *args: sqlite3.SQLITE_OK)
         self.assertEqual(
             self.p.db.execute("SELECT count(*) FROM request_gates").fetchone()[0], 0
         )
