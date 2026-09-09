@@ -8469,16 +8469,7 @@
         "factor_name",
         "asset_type",
         "factor_type",
-        "factor_desc",
-        "Alpha101",
-        "Growth",
-        "Liquidity",
-        "Momentum",
-        "Quality",
-        "Reversal",
-        "Risk",
-        "Size",
-        "Value"
+        "factor_desc"
       ],
       "audit_status": "schema_extracted",
       "permission_status": "unprobed",

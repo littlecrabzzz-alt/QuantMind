@@ -1,0 +1,371 @@
+{
+  "doc_id": "486",
+  "api_name": "factor_list",
+  "source_url": "https://tushare.pro/document/2?doc_id=486",
+  "source_html_path": "/tmp/tushare-calendar-factor-docs/486.html",
+  "source_html_sha256": "799b1716dd674500e499bee73be4015307df014c16064219e751bbbfb45650f2",
+  "source_bytes": 101034,
+  "catalog_html_sha256_preserved": true,
+  "baseline_entries": 263,
+  "before": {
+    "doc_id": "486",
+    "title": "因子列表",
+    "url": "https://tushare.pro/document/2?doc_id=486",
+    "html_sha256": "799b1716dd674500e499bee73be4015307df014c16064219e751bbbfb45650f2",
+    "api_names": [
+      "factor_list"
+    ],
+    "input_fields": [
+      "factor_name",
+      "asset_type",
+      "factor_type"
+    ],
+    "output_fields": [
+      "factor_name",
+      "asset_type",
+      "factor_type",
+      "factor_desc",
+      "Alpha101",
+      "Growth",
+      "Liquidity",
+      "Momentum",
+      "Quality",
+      "Reversal",
+      "Risk",
+      "Size",
+      "Value"
+    ],
+    "audit_status": "schema_extracted",
+    "permission_status": "unprobed",
+    "coverage_status": "not_ingested"
+  },
+  "after": {
+    "doc_id": "486",
+    "title": "因子列表",
+    "url": "https://tushare.pro/document/2?doc_id=486",
+    "html_sha256": "799b1716dd674500e499bee73be4015307df014c16064219e751bbbfb45650f2",
+    "api_names": [
+      "factor_list"
+    ],
+    "input_fields": [
+      "factor_name",
+      "asset_type",
+      "factor_type"
+    ],
+    "output_fields": [
+      "factor_name",
+      "asset_type",
+      "factor_type",
+      "factor_desc"
+    ],
+    "audit_status": "schema_extracted",
+    "permission_status": "unprobed",
+    "coverage_status": "not_ingested"
+  },
+  "removed_output_fields": [
+    "Alpha101",
+    "Growth",
+    "Liquidity",
+    "Momentum",
+    "Quality",
+    "Reversal",
+    "Risk",
+    "Size",
+    "Value"
+  ],
+  "added_output_fields": [],
+  "schema_table": {
+    "section": "output",
+    "rows": [
+      [
+        "名称",
+        "类型",
+        "默认显示",
+        "描述"
+      ],
+      [
+        "factor_name",
+        "str",
+        "Y",
+        "因子名称"
+      ],
+      [
+        "asset_type",
+        "str",
+        "Y",
+        "证券类型：STK股票，IDX指数，ETF，CB可转债 【当前只提供STK股票】"
+      ],
+      [
+        "factor_type",
+        "str",
+        "Y",
+        "因子分类"
+      ],
+      [
+        "factor_desc",
+        "str",
+        "Y",
+        "因子描述及算法逻辑"
+      ]
+    ]
+  },
+  "ignored_table_headers": [
+    [
+      "分类名",
+      "中文名称",
+      "因子数量",
+      "说明"
+    ],
+    [
+      "序号",
+      "因子名称",
+      "算法逻辑"
+    ],
+    [
+      "序号",
+      "因子名称",
+      "算法逻辑"
+    ],
+    [
+      "序号",
+      "因子名称",
+      "算法逻辑"
+    ],
+    [
+      "序号",
+      "因子名称",
+      "算法逻辑"
+    ],
+    [
+      "序号",
+      "因子名称",
+      "算法逻辑"
+    ],
+    [
+      "序号",
+      "因子名称",
+      "算法逻辑"
+    ],
+    [
+      "序号",
+      "因子名称",
+      "算法逻辑"
+    ],
+    [
+      "序号",
+      "因子名称",
+      "算法逻辑"
+    ],
+    [
+      "序号",
+      "因子名称",
+      "算法逻辑"
+    ]
+  ],
+  "ignored_category_names": [
+    "Alpha101",
+    "Growth",
+    "Liquidity",
+    "Momentum",
+    "Quality",
+    "Reversal",
+    "Risk",
+    "Size",
+    "Value",
+    "合计"
+  ],
+  "ignored_formula_row_first_cells": [
+    "1",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "2",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "3",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "4",
+    "40",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "5",
+    "50",
+    "51",
+    "52",
+    "53",
+    "54",
+    "55",
+    "56",
+    "57",
+    "58",
+    "59",
+    "6",
+    "7",
+    "8",
+    "9"
+  ],
+  "reason": "Section output persists into explanatory category/formula tables. Require field schema header 名称; retain compact schemas and numeric-leading data fields. Current parser would also incorrectly include numbered formula rows on refresh; catalog previously retained only nine category labels.",
+  "scope": "Only486 output_fields corrected; original HTML/SHA, API name, input fields, permission, audit/coverage statuses and all other entries unchanged.",
+  "offline_saved_page_replay": {
+    "saved_html_pages_checked": 51,
+    "changed_doc_ids": [
+      "486",
+      "268",
+      "211"
+    ],
+    "changes": [
+      {
+        "doc_id": "486",
+        "removed": {
+          "input_fields": [],
+          "output_fields": [
+            "Alpha101",
+            "Growth",
+            "Liquidity",
+            "Momentum",
+            "Quality",
+            "Reversal",
+            "Risk",
+            "Size",
+            "Value",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            "14",
+            "15",
+            "16",
+            "17",
+            "18",
+            "19",
+            "20",
+            "21",
+            "22",
+            "23",
+            "24",
+            "25",
+            "26",
+            "27",
+            "28",
+            "29",
+            "30",
+            "31",
+            "32",
+            "33",
+            "34",
+            "35",
+            "36",
+            "37",
+            "38",
+            "39",
+            "40",
+            "41",
+            "42",
+            "43",
+            "44",
+            "45",
+            "46",
+            "47",
+            "48",
+            "49",
+            "50",
+            "51",
+            "52",
+            "53",
+            "54",
+            "55",
+            "56",
+            "57",
+            "58",
+            "59"
+          ]
+        },
+        "path": "/tmp/tushare-calendar-factor-docs/486.html"
+      },
+      {
+        "doc_id": "268",
+        "removed": {
+          "input_fields": [
+            "ETF",
+            "LOF",
+            "ABS"
+          ],
+          "output_fields": []
+        },
+        "path": "/tmp/tushare-cross-asset-extra-docs/268.html"
+      },
+      {
+        "doc_id": "211",
+        "removed": {
+          "input_fields": [
+            "XIN9",
+            "HSI",
+            "HKTECH",
+            "HKAH",
+            "DJI",
+            "SPX",
+            "IXIC",
+            "FTSE",
+            "FCHI",
+            "GDAXI",
+            "N225",
+            "KS11",
+            "AS51",
+            "SENSEX",
+            "IBOVESPA",
+            "RTS",
+            "TWII",
+            "CKLSE",
+            "SPTSX",
+            "CSX5P",
+            "RUT"
+          ],
+          "output_fields": []
+        },
+        "path": "/tmp/tushare-cross-asset-extra-docs/211.html"
+      }
+    ],
+    "catalog_only_486_output_fields_changed": true
+  },
+  "other_reference_table_note": "268 and211 input code-reference tables are correctly ignored on reparse; actual input schema retained. This commit changes only486 catalog entry, not268/211 catalog rows."
+}
