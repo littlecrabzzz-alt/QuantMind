@@ -2789,7 +2789,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -2798,12 +2798,12 @@
         "hidden_fields": [],
         "actual_permission_probed": true,
         "production_registered": true,
-        "automatically_enabled": false,
+        "automatically_enabled": true,
         "history_complete": false,
         "pit_verified": false,
         "production_commit": "30b3194"
       },
-      "auto_acquisition": false,
+      "auto_acquisition": true,
       "runtime_evidence": {
         "path": "/data/tushare/validation/sentiment7-probe.json",
         "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
@@ -2908,13 +2908,21 @@
           }
         ],
         "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
-        "enabled": false,
+        "enabled": true,
         "source_statuses": [
           "sample_ok"
         ],
-        "offline_status": "pending_fixed_verification",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 9714,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-mac-verified.json",
+        "offline_evidence_sha256": "93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -2929,7 +2937,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -2938,12 +2946,12 @@
         "hidden_fields": [],
         "actual_permission_probed": true,
         "production_registered": true,
-        "automatically_enabled": false,
+        "automatically_enabled": true,
         "history_complete": false,
         "pit_verified": false,
         "production_commit": "30b3194"
       },
-      "auto_acquisition": false,
+      "auto_acquisition": true,
       "runtime_evidence": {
         "path": "/data/tushare/validation/sentiment7-probe.json",
         "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
@@ -3048,13 +3056,21 @@
           }
         ],
         "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
-        "enabled": false,
+        "enabled": true,
         "source_statuses": [
           "sample_ok"
         ],
-        "offline_status": "pending_fixed_verification",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 14011,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-mac-verified.json",
+        "offline_evidence_sha256": "93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -3069,7 +3085,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -3078,12 +3094,12 @@
         "hidden_fields": [],
         "actual_permission_probed": true,
         "production_registered": true,
-        "automatically_enabled": false,
+        "automatically_enabled": true,
         "history_complete": false,
         "pit_verified": false,
         "production_commit": "30b3194"
       },
-      "auto_acquisition": false,
+      "auto_acquisition": true,
       "runtime_evidence": {
         "path": "/data/tushare/validation/sentiment7-probe.json",
         "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
@@ -3108,13 +3124,21 @@
           }
         ],
         "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
-        "enabled": false,
+        "enabled": true,
         "source_statuses": [
           "sample_ok"
         ],
-        "offline_status": "pending_fixed_verification",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 613,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-mac-verified.json",
+        "offline_evidence_sha256": "93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -3129,7 +3153,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
+      "next_action": "Resolve saturated bulk members through legal partitions and verified universe before enablement; keep stored source rows and historical/PIT gaps.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -3159,9 +3183,21 @@
         "source_statuses": [
           "possibly_truncated"
         ],
-        "offline_status": "pending_fixed_verification",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "enabled_release_id": null,
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 3000,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-mac-verified.json",
+        "offline_evidence_sha256": "93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": [
+          "audit_gap:empty_or_non_success_not_completeness",
+          "audit_gap:saturation_unresolved",
+          "saturation_unresolved_status"
+        ]
       }
     },
     {
@@ -3176,7 +3212,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -3185,12 +3221,12 @@
         "hidden_fields": [],
         "actual_permission_probed": true,
         "production_registered": true,
-        "automatically_enabled": false,
+        "automatically_enabled": true,
         "history_complete": false,
         "pit_verified": false,
         "production_commit": "30b3194"
       },
-      "auto_acquisition": false,
+      "auto_acquisition": true,
       "runtime_evidence": {
         "path": "/data/tushare/validation/sentiment7-probe.json",
         "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
@@ -3206,13 +3242,21 @@
           }
         ],
         "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
-        "enabled": false,
+        "enabled": true,
         "source_statuses": [
           "sample_ok"
         ],
-        "offline_status": "pending_fixed_verification",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 616,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-mac-verified.json",
+        "offline_evidence_sha256": "93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -3227,7 +3271,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -3236,12 +3280,12 @@
         "hidden_fields": [],
         "actual_permission_probed": true,
         "production_registered": true,
-        "automatically_enabled": false,
+        "automatically_enabled": true,
         "history_complete": false,
         "pit_verified": false,
         "production_commit": "30b3194"
       },
-      "auto_acquisition": false,
+      "auto_acquisition": true,
       "runtime_evidence": {
         "path": "/data/tushare/validation/sentiment7-probe.json",
         "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
@@ -3270,13 +3314,21 @@
           }
         ],
         "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
-        "enabled": false,
+        "enabled": true,
         "source_statuses": [
           "sample_ok"
         ],
-        "offline_status": "pending_fixed_verification",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 293,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-mac-verified.json",
+        "offline_evidence_sha256": "93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -3291,7 +3343,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
+      "next_action": "Resolve saturated bulk members through legal partitions and verified universe before enablement; keep stored source rows and historical/PIT gaps.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -3327,9 +3379,21 @@
           "possibly_truncated",
           "sample_ok"
         ],
-        "offline_status": "pending_fixed_verification",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "enabled_release_id": null,
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 3000,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-mac-verified.json",
+        "offline_evidence_sha256": "93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": [
+          "audit_gap:empty_or_non_success_not_completeness",
+          "audit_gap:saturation_unresolved",
+          "saturation_unresolved_status"
+        ]
       }
     },
     {
@@ -3433,7 +3497,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -3446,12 +3510,12 @@
         ],
         "actual_permission_probed": true,
         "production_registered": true,
-        "automatically_enabled": false,
+        "automatically_enabled": true,
         "history_complete": false,
         "pit_verified": false,
         "production_commit": "30b3194"
       },
-      "auto_acquisition": false,
+      "auto_acquisition": true,
       "runtime_evidence": {
         "path": "/data/tushare/validation/cross6-probe.json",
         "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
@@ -3468,13 +3532,21 @@
           }
         ],
         "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
-        "enabled": false,
+        "enabled": true,
         "source_statuses": [
           "sample_ok"
         ],
-        "offline_status": "pending_fixed_verification",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 2146,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-mac-verified.json",
+        "offline_evidence_sha256": "ebc9b7b608081a7a4771b9e94376448faf2eee528c680452897fe177f9385720",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -3876,7 +3948,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -3887,12 +3959,12 @@
         ],
         "actual_permission_probed": true,
         "production_registered": true,
-        "automatically_enabled": false,
+        "automatically_enabled": true,
         "history_complete": false,
         "pit_verified": false,
         "production_commit": "30b3194"
       },
-      "auto_acquisition": false,
+      "auto_acquisition": true,
       "runtime_evidence": {
         "path": "/data/tushare/validation/cross6-probe.json",
         "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
@@ -3909,13 +3981,21 @@
           }
         ],
         "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
-        "enabled": false,
+        "enabled": true,
         "source_statuses": [
           "sample_ok"
         ],
-        "offline_status": "pending_fixed_verification",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 22,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-mac-verified.json",
+        "offline_evidence_sha256": "ebc9b7b608081a7a4771b9e94376448faf2eee528c680452897fe177f9385720",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -3930,7 +4010,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -3939,12 +4019,12 @@
         "hidden_fields": [],
         "actual_permission_probed": true,
         "production_registered": true,
-        "automatically_enabled": false,
+        "automatically_enabled": true,
         "history_complete": false,
         "pit_verified": false,
         "production_commit": "30b3194"
       },
-      "auto_acquisition": false,
+      "auto_acquisition": true,
       "runtime_evidence": {
         "path": "/data/tushare/validation/cross6-probe.json",
         "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
@@ -3961,13 +4041,21 @@
           }
         ],
         "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
-        "enabled": false,
+        "enabled": true,
         "source_statuses": [
           "sample_ok"
         ],
-        "offline_status": "pending_fixed_verification",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 3392,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-mac-verified.json",
+        "offline_evidence_sha256": "ebc9b7b608081a7a4771b9e94376448faf2eee528c680452897fe177f9385720",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -4011,7 +4099,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -4020,12 +4108,12 @@
         "hidden_fields": [],
         "actual_permission_probed": true,
         "production_registered": true,
-        "automatically_enabled": false,
+        "automatically_enabled": true,
         "history_complete": false,
         "pit_verified": false,
         "production_commit": "30b3194"
       },
-      "auto_acquisition": false,
+      "auto_acquisition": true,
       "runtime_evidence": {
         "path": "/data/tushare/validation/cross6-probe.json",
         "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
@@ -4042,13 +4130,21 @@
           }
         ],
         "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
-        "enabled": false,
+        "enabled": true,
         "source_statuses": [
           "sample_ok"
         ],
-        "offline_status": "pending_fixed_verification",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 14,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-mac-verified.json",
+        "offline_evidence_sha256": "ebc9b7b608081a7a4771b9e94376448faf2eee528c680452897fe177f9385720",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -4208,7 +4304,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -4217,12 +4313,12 @@
         "hidden_fields": [],
         "actual_permission_probed": true,
         "production_registered": true,
-        "automatically_enabled": false,
+        "automatically_enabled": true,
         "history_complete": false,
         "pit_verified": false,
         "production_commit": "30b3194"
       },
-      "auto_acquisition": false,
+      "auto_acquisition": true,
       "runtime_evidence": {
         "path": "/data/tushare/validation/cross6-probe.json",
         "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
@@ -4239,13 +4335,21 @@
           }
         ],
         "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
-        "enabled": false,
+        "enabled": true,
         "source_statuses": [
           "sample_ok"
         ],
-        "offline_status": "pending_fixed_verification",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 2114,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-mac-verified.json",
+        "offline_evidence_sha256": "ebc9b7b608081a7a4771b9e94376448faf2eee528c680452897fe177f9385720",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -4813,7 +4917,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -4822,12 +4926,12 @@
         "hidden_fields": [],
         "actual_permission_probed": true,
         "production_registered": true,
-        "automatically_enabled": false,
+        "automatically_enabled": true,
         "history_complete": false,
         "pit_verified": false,
         "production_commit": "30b3194"
       },
-      "auto_acquisition": false,
+      "auto_acquisition": true,
       "runtime_evidence": {
         "path": "/data/tushare/validation/cross6-probe.json",
         "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
@@ -4844,13 +4948,21 @@
           }
         ],
         "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
-        "enabled": false,
+        "enabled": true,
         "source_statuses": [
           "sample_ok"
         ],
-        "offline_status": "pending_fixed_verification",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 315,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-mac-verified.json",
+        "offline_evidence_sha256": "ebc9b7b608081a7a4771b9e94376448faf2eee528c680452897fe177f9385720",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {

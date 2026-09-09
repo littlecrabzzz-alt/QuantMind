@@ -337,3 +337,13 @@
 - 上一86aebb固定版的14历史观察/30目标文件独立Mac验收已通过：CYQ22+3586行全部源值/身份/as_of一致，456关联文件校验；12空响应仍不代表历史完整。报告/tmp/tushare-family-history-offline-verified.json，SHA7e0b49a2fd62c230792d67a3f3b45df68b15c59184209fc1ecf323a8a8157be8。
 - 新计时首批9038aaee在document_registration阶段SoftTimeLimitExceeded失败：已持久化209响应，规划39.55秒、标的发现34.20秒；后批cf4df246成功220请求，发现28.19秒。原文去重真实命中0，不宣称已提速。最小字段投影b385c59→2295b84保留全部12发现列与严格行长/重复列语义；106项Python3.10相关测试和父558联合测试通过。宽表夹具输出同、临时峰值179→102MB，生产收益尚未验证。
 - 不等全量历史：独立并行准备债券/可转债下一8接口；核查RRG单时点最小补数，20250903—30的20开市日×daily/adj_factor共40已有任务pending，无需新增。优先调整尚未执行；历史成员PIT与ETF数据仍单独缺口。完整263基线+13发现、历史/修订/附件范围保留。
+
+
+## 2026-09-09 12:29 十一接口启用、本地闭包与RRG四十项优先
+
+- 固定41d91a两份云端verifier完成：cross6零gap，sentiment7保留2饱和、2完整性提示及35市场输出映射未验。397已知字段、61原始请求全部来源/Parquet/reader全列、日期/代码过滤和9组非空对照通过。云端匿名401+7受限查询共8HTTP，大表仅明确code子集，不称所有行全部经HTTP。
+- 标准Mac mirror已完成8758新增/247648文件校验；同固定41d91a禁网禁凭据独立读取与云报告6共同键逐项相等。数据去重后cross6共8003行、sentiment7共31247行。两份Mac报告SHA分别ebc9b7b608081a7a4771b9e94376448faf2eee528c680452897fe177f9385720和93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b。
+- 逐API评估后启用cross6全部及tdx_index/tdx_daily/kpl_list/ths_hot/dc_hot，共11个；tdx_member与kpl_concept_cons保持禁用，已有3000行各自完整存档，分片/全集未验继续待办。新增两family规划1000history+350recent任务，旧配置与无关规划记录保持；无上游请求。启用发布eac7f042完整ID见台账，配置审计/data/tushare/validation/cross-sentiment-enable-20260909T042558Z-274e6062.json。热榜市场语义未知仍保留，不借启用宣称PIT。
+- 99fb562源码/Git双端已核对，4727文件，source_digest86fcb7892291a4064a4bd7ed9a2cf686f6a43ddb96693c69f94311c0363b8042。采集04:19:54Z暂停接新任务、04:20:54Z自然排空，只重启tushare-worker，04:23:54Z恢复；文档/US消费者保持，4服务健康检查通过。新真实d7ac29bf批SUCCESS，184请求/137.67秒，规划28.01/发现23.23秒。较前成功批发现少17.6%，但整批131.18→137.67秒，尚无整体吞吐提升证据。
+- RRG40优先事务真实commit（04:25:48Z）：operation rrg-diffusion40-20260909-b0b0f1b914894a928565212be8f0fd28，40已有pending任务priority45→24，0新增，config/planning/scheduler提交时保持。后置只读40身份/优先级一致，04:27:42Z仍pending/无attempt，不把排队当已下载。prepared SHA71bcb2332d83eff05b8841d74274d7766ac47913e2f43f8c52d19d230f759a7c；收据在validation/rrg-priority-adjustments。完整日历骨架、历史成分PIT和ETF缺口仍待办。
+- 下一bond8纯合同91d5e7d已在独立分支推送：70完整字段/22默认隐藏列，7隔离测试通过，runtime继续并行准备，尚未生产或探测。各原文报告/两个verifier/镜像/部署/提权helper证据已归档validation/intake-batch-20260909T035512Z。完整263基线+13发现范围不缩减，继续历史/修订/权限/附件接入。
