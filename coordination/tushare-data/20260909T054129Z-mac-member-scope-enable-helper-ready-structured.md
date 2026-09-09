@@ -1,0 +1,6 @@
+任务：成员scope一次性启用helper候选，仅/tmp；无生产执行/源码或配置修改。基于06acf3a自动alias（父dd7279d集成）。
+主helper /tmp/tushare-member-scope-enable.py SHA a59a4dd1663218eee774cdd19cbe48730d841eb5d8e59cad0229b63083da2b97；完整文件白名单/命令/约束见 /tmp/member-scope-enable-handoff.md。
+7项Python3.10临时库tests通过；旧job/cursor/attempt/gate/partition写guard和失败回滚、发布失败不冒成功覆盖。/tmp/test_tushare_member_scope_enable.py SHA360118086bfa0f4539a21a8ec8eb94d53dcd55c16abf17fe89404de859235479。
+本机固定data-0a5af2a613b00f3c8cf088662215614fb1d56ba38c162f480a270634370103a1重新禁网a3b1审计，与原17f5云/Mac报告逐共同键一致：6样本/985行/11字段/27files，父子subset通过。复核报告/tmp/member-scope-enable-evidence-recheck.json SHA2c64f6c724e04435063f3211bdd2805c80ae39dbba81af4e0c1390aba76664a3。
+仅追加enable_market_members、两API清单、market_members_history_start=19900101（请求范围，非最早可得证明）；保留旧五接口顺序/config/state/身份/观察/门控/原饱和及universe/PIT/第二轴gap。原planner封装500recent+500history，旧组依赖语义保留。备份prepared先写，事务内不提交旧状态更改；commit后业务publish。跨文件进程崩溃仍需按收据人工核对，不宣称JSON+SQLite原子事务。
+下一步仅父review/复制/执行/发布验收；helperbytes冻结，文件归属释放。
