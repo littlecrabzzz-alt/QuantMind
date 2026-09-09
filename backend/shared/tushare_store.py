@@ -23,6 +23,7 @@ from backend.shared.tushare_registry import (
     DC_EXTRA_RUNTIME_CONTRACTS,
     RISK_EVENT_RUNTIME_CONTRACTS,
     TECHNICAL_EXTRA_RUNTIME_CONTRACTS,
+    STOCK_CONTEXT_RUNTIME_CONTRACTS,
 )
 from backend.shared.tushare_credit_extra_contracts import CREDIT_EXTRA_CONTRACTS
 from backend.shared.tushare_etf_basket_contracts import ETF_BASKET_CONTRACTS
@@ -47,6 +48,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **STOCK_CONTEXT_RUNTIME_CONTRACTS,
     **RISK_EVENT_RUNTIME_CONTRACTS,
     **TECHNICAL_EXTRA_RUNTIME_CONTRACTS,
     **DC_EXTRA_RUNTIME_CONTRACTS,
@@ -498,6 +500,16 @@ def _dataset(root, release_id, api_name):
             ):
                 if spec.get(note):
                     metadata[note] = spec[note]
+        if api_name in STOCK_CONTEXT_RUNTIME_CONTRACTS:
+            for note, value in spec.items():
+                if note.endswith(("_gap", "_note")) or note in (
+                    "field_gaps",
+                    "hidden_fields",
+                    "permission_status",
+                    "date_field",
+                    "documented_update_time",
+                ):
+                    metadata[note] = value
         if api_name in TECHNICAL_EXTRA_RUNTIME_CONTRACTS:
             for note in (
                 "namespace_note",
@@ -590,6 +602,8 @@ def _date_expression(field, columns):
 
 
 def _default_date_field(api_name, columns):
+    if api_name in STOCK_CONTEXT_RUNTIME_CONTRACTS:
+        return STOCK_CONTEXT_RUNTIME_CONTRACTS[api_name]["date_field"]
     if api_name in RISK_EVENT_RUNTIME_CONTRACTS:
         return RISK_EVENT_RUNTIME_CONTRACTS[api_name]["date_field"]
     return next((field for field in DATE_FIELDS if field in columns), None)
