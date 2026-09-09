@@ -190,6 +190,7 @@ class FixedStore(unittest.TestCase):
             "moneyflow_ind_dc": {"trade_date": "20260904", "content_type": "行业"},
         }
         identity_params.update({api: {"freq": "1min"} for api in store.HISTORY_MINUTES_RUNTIME_CONTRACTS})
+        identity_params.update({api: {field: {"freq": "1MIN", "ts_code": "CU2609.SHF" if "fut" in api else "000001.SH", "date_str": "2026-09-08", "ts_type": "STK", "topic": "HQ_FND_TICK"}[field] for field in spec["request_identity_fields"]} for api, spec in store.REALTIME_RUNTIME_CONTRACTS.items() if spec["request_identity_fields"]})
         for api, keys in store.KEYS.items():
             if api not in store.CONTRACTS and api not in (
                 "trade_cal",
@@ -218,6 +219,11 @@ class FixedStore(unittest.TestCase):
                 )
                 values.update(_row_identity="b" * 64, _observation=name)
                 observations[name] = observation
+                if api in store.REALTIME_RUNTIME_CONTRACTS:
+                    request_json = json.dumps({field: identity_params[api].get(field) for field in store.CONTRACTS[api]["request_identity_fields"]}, sort_keys=True)
+                    values.update(_raw_row_identity="b" * 64, _request_identity=request_json,
+                                  _request_identity_status="complete", _request_identity_missing="[]",
+                                  _row_identity=hashlib.sha256(("b" * 64 + "\n" + request_json).encode()).hexdigest())
             fixtures.append((api, [row(**values)]))
         pinned = release(self.root, fixtures, observations=observations)
         for api, _ in fixtures:
@@ -263,7 +269,7 @@ class FixedStore(unittest.TestCase):
             }
             <= {api for api, _ in fixtures}
         )
-        self.assertEqual(len(fixtures), 217)
+        self.assertEqual(len(fixtures), 227)
 
     def test_dates_codes_and_macro_periods(self):
         pinned = release(
