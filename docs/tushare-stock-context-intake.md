@@ -27,3 +27,12 @@
 研究限制也留在合同：盘前近2年/次日与两次更新的版本保存未实现，不把晚上回抓当早盘可知；竞价盘后才能获得，不把9:30标签当时可用；AH两地休市/滞后价格/汇率与溢价算法未知；竞价与九转成交量、金额单位/复权不明，不套daily倍率。盘前股本万股、薪酬元/持股股数按原表保留。七日重叠不能证明旧订正、删除或任期/PIT完整性。
 
 验证：`python3 -B scripts/test_tushare_stock_context_contracts.py`，8项通过；全68字段、隐藏resume缺列、合法参数、公告/报告/时间戳差异、闰日连续无重复、未知范围、1990请求范围与已知下界、退市T、权限/未知上限、既有response assessor及date_children保留过滤器均覆盖。Ruff通过；无上游数据请求、启用、发布或研究准入。
+
+
+## 默认关闭的运行候选
+
+纯提交之后的增量接入 registry `stock_context`，由既有 `enable_stock_context`（缺省 false）控制；没有改生产配置或完成真实权限探测。独立 `stock_context_stocks` 继承已存历史/T/退市、技术/风险/事件观察，并加入本批来源记录；ETF和概念主数据不混入。只有 rewards 的枚举依赖这份发现；其余接口仅饱和时使用，未知全集仍不证明完整。
+
+固定读取复用既有自然键和来源行身份，不改 schema、release 或 manifest 格式。管理层/薪酬默认 `ann_date`，报告 cohort 显式 `end_date`；其他默认 `trade_date`。九转保留完整时间戳及 immutable request freq。AH额外规范化 `hk_code` 的五位后缀为 HK 前缀，保留前导零、历史 `!` 标识及 `source_hk_code`；未知形状不猜。所有68列、额外未知列、null、原始行SHA和来源代码保留。相同行的重复观察去重，不同来源行/修订与AH配对保留。无合法第二维或日期切分时保持 blocked，不猜 offset/report-period/HK全集。
+
+专项 `test_tushare_stock_context_pipeline.py` 用临时目录、MockTransport及断socket/DNS/provider secret验证实际capture→normalize→publish→固定读、全68字段、隐藏resume、AH历史与当前代码、日期轴、默认关闭、规划幂等/独立校验、历史发现及七接口饱和拒绝伪完成。本候选尚未部署、启用或探测，原权限/日内版本/分钟频率/历史/PIT/单位缺口全部继续有效。

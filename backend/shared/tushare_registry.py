@@ -108,6 +108,46 @@ def foreign_financial_runtime_prerequisites(identifiers, config=None):
         _foreign_financial_identifiers(identifiers), config=config
     )
 
+from backend.shared.tushare_stock_context_contracts import (
+    STOCK_CONTEXT_CONTRACTS,
+    iter_stock_context_jobs,
+    stock_context_prerequisites,
+)
+
+STOCK_CONTEXT_RUNTIME_CONTRACTS = {
+    api: {
+        **spec,
+        "group": "stock_context",
+        "dependencies": ["stock_context_stocks"] if spec.get("dependencies") else [],
+        "saturation_fallback": "stock_context_stocks",
+        "saturation_dependencies": ["stock_context_stocks"],
+    }
+    for api, spec in STOCK_CONTEXT_CONTRACTS.items()
+}
+
+STOCK_CONTEXT_RUNTIME_CONTRACTS["stk_ah_comparison"]["namespace_note"] = (
+    STOCK_CONTEXT_CONTRACTS["stk_ah_comparison"]["namespace_note"].replace(
+        "HK canonical field projection still needs runtime integration.",
+        "Runtime canonicalizes only validated five-digit HK suffix identities; unknown shapes remain source values and require namespace review.",
+    )
+)
+
+
+def _stock_context_identifiers(identifiers):
+    return {"stocks": identifiers.get("stock_context_stocks", [])}
+
+
+def stock_context_runtime_prerequisites(identifiers, config=None):
+    return [
+        {
+            **gap,
+            "dependencies": ["stock_context_stocks"] if gap.get("dependencies") else [],
+        }
+        for gap in stock_context_prerequisites(
+            _stock_context_identifiers(identifiers), config=config
+        )
+    ]
+
 
 TECHNICAL_EXTRA_RUNTIME_CONTRACTS = {
     api: {
@@ -224,6 +264,7 @@ CONNECT_RUNTIME_CONTRACTS = {
 
 EXTENDED_CONTRACTS = {
     **FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
+    **STOCK_CONTEXT_RUNTIME_CONTRACTS,
     **TECHNICAL_EXTRA_RUNTIME_CONTRACTS,
     **RISK_EVENT_RUNTIME_CONTRACTS,
     **DC_EXTRA_RUNTIME_CONTRACTS,
@@ -268,6 +309,9 @@ EXTENDED_CONTRACTS = {
 PLANNERS = {
     "foreign_financial": lambda config, today, ids: iter_foreign_financial_jobs(
         config, today, _foreign_financial_identifiers(ids)
+    ),
+    "stock_context": lambda config, today, ids: iter_stock_context_jobs(
+        config, today, _stock_context_identifiers(ids)
     ),
     "technical_extra": lambda config, today, ids: iter_technical_extra_jobs(
         config, today, _technical_identifiers(ids)

@@ -181,6 +181,7 @@ def install_schedule(root):
         "backend/shared/tushare_dc_extra_contracts.py",
         "backend/shared/tushare_risk_event_contracts.py",
         "backend/shared/tushare_technical_extra_contracts.py",
+        "backend/shared/tushare_stock_context_contracts.py",
         "backend/shared/runtime_secrets.py",
         "backend/shared/stock_utils.py",
         "deploy/dual-node.env",
