@@ -1,0 +1,13 @@
+# Cross6/sentiment7 enable helper review (pure, no production)
+
+text_contracts readonly review of parent-owned /tmp/tushare-cross-sentiment-enable.py; didnotedithelper, import/callmain, requestupstream, touchproductionDB/config, ordispatch. Fixed reviewedSHA2355463645dd75777ac35c394f73209c945102d1d9c8a678c2a69a0cabb0b51f.
+
+Initialpure review reproduced len+set multiplicity weakness (plannedA,A,B vsobservedA,B,B accepted), statuspossibly_truncatedwithoutduplicatedgap accepted, and identified oldunfinishedhistory incompatiblepolicy branch leftoldenable=True whileenabledreport=[] ifsiblingenabled. Parentfixedallthree:Counterexactandnoduplicates, directstatussaturationblock, entireapplyValueErrorbeforeconfig/planchanges. Re-review confirmsfixes.
+
+Evidence /tmp/review-cross-sentiment-enable-fixed-20260909.json (7cases includesduplicate/multiplicity/saturation/missingfield/filter/allempty), /tmp/test-cross-sentiment-enable-review-20260909.json (9additionalassertednegativecases), /tmp/review-cross-sentiment-unfinished-fixed-20260909.json (actualfamily-loop ASTguardraises; cfg andoldsignature/offset remainunchanged). Pure ASTloop extraction avoidsproductionmain. Sourceorderconfirmsguardbeforeconfigbackup/write, p.plan_extended andp.publish; existing Pipelineconstruction occursbeforeguard, unchangedhelperbehavior, notclaimedexecutionproof ofentiremainwithactualDB.
+
+Verifiedguards:reportedknownmissingcolumn blocks regardlessnullable (NONCOREempty); raw→Parquetcount/datequery, filtermismatch, missingactualrequests, differentvariantparams, nonofflineaudit, permissiondenied, saturationstatus/gap, missing/falseallcolumncomparison block. Allemptyblockswith all_samples_empty_or_unavailable, notpermissiondenied. No fieldfill/drop shortcut.
+
+Boundary:assesscomparesagainstprovidedplannedrequests ratherthan independentlyrebuildingall46variantrecipe. A forgedself-consistentone-variantverifiedauditcanpasspureassess; actualsentiment verifier independentlyasserts BASE_REQUESTS subsetanddistinctresults (lines370–383), so currentapprovedflowcoversrecipecompleteness. Keepthatverifiercheck; helperaloneisnottrustedstandalonevalidation. Crossverifier enforces6APIpresence/max2requestsandrequiresbulk/codecomparison. Sentimentverifier explicitlyvalidatesimmutable requestidentity/rowhash perhotmarket, comparisonfilters supersetsamebaselinemarket/datevariant, andall-column raw→Parquet→read values. Thussamepayloadacrossmarketsisnotcollapsedbycurrentend-to-endverifier. This reviewdidnotconstruct46/49productiondataorassertrealpermission.
+
+No additionaldeploymentblocker found afterthreefixes withinreviewedscope. Parentretainshelperownership andmustuseactualfixedauditsha/reporthash gating beforeauthorizedapply. No helper/sourcecommit created.
