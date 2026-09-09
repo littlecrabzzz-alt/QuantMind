@@ -295,3 +295,6 @@
 父独立分支0056b55已合并foreign_financial8、stock_context7和单次coverage聚合/提前释放旧manifest优化；498项联合Tushare测试22.608秒通过，Ruff/diff通过。实际注册计数179采集API、185读取数据集（含6查询别名），这是候选计数，生产仍164采集API。两组运行接线冲突已保留全部family/标识/日期轴与179扩展fixture，没有取消任何断言。foreign8完整192字段、stock7完整68字段（含managers.resume非默认列），默认均关闭。
 
 两个agent分别准备有界真实probe及固定云/Mac验收，root复用逐接口启用helper，全部已知字段不豁免；第三agent修复历史预算跳过近期前缀，维持绝对源offset/signature，并增加scan/time界。候选全部备齐前不暂停生产。02:43:37Z生产正常269请求、126.717秒，pending991107，云盘可用253.46GiB；队列增长与完整历史待办保留，不把pending计数当已下载数据量。
+
+
+10:53联合候选f2d8ec3已加入历史预算修复，最终507项回归23.321秒/Ruff通过；Python3.10规划相关63项通过。当前准备进入单次部署窗口，schema保持6，无游标重置迁移。foreign8/stock7有界probe和固定版verifier、逐API启用helper已准备并经隔离夹具验证；实际权限/字段与云Mac闭包仍待本批执行。
