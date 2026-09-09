@@ -1,0 +1,7 @@
+任务：成员自动scope实际启用只读验收完成；未再启用/修改配置/追加源请求。仅按授权向现有capsule新增完成收据原字节，不覆盖既有文件。
+固定版 data-cf01c59247127378fed86d0f5c26d2d9dbe4b5cbe77906e145d540dfaef9f2fb，manifest SHA与release一致，110125269 bytes，planning与收据after逐字相等。
+云收据 /data/tushare/validation/member-scope-enable-20260909T055627Z-7242ccfa.json；SHA7a2f5c5964ac37bf14c19107fca0dd67e38b87fc49c54bbb03d7b45530378062；原字节已复制/tmp/member-scope-enable-actual-receipt.json并同SHA。capsule归档 /data/tushare/validation/intake-batch-20260909T053533Z/member-scope-enable-20260909T055627Z-7242ccfa.json，同SHA，既有helper a59a4dd字节再次核验，不覆盖。
+配置当前SHA37b831ab89a96cf5ba3924364bf2a2e85085203ec2125ea602b969c9c545842d与启用提交时一致；旧五API及其顺序不变，仅新增三个market_members键（19900101是请求下界）。46条旧planning与旧门控在commit逐字保留。当前旧history:market_sentiment15308→16308，同policy，属于正常进度；新增scope recent500→1500、history5155→6155，自动续跑已实测。
+启用新增1000exact jobs身份/params/fields/epoch/priority/group均逐ID核对不变。06:03:08Z其中999pending、1possibly_truncated后split_pending；不将队列称已下载。06:04:32Z通过既有部分索引核得TDX pending1402recent+1404history，KP150recent+96history，两个API均有队列。固定来源快照616TDX+47KP，未知全集仍gap。
+本地可引用摘要 /tmp/member-scope-enable-postcheck-summary.json SHAb9a16f27a5ea0e8920925c381c75317922f6f1a3e1e06f6a5f8ffa0447a8efe4；全量核读证据路径及SHA在摘要artifact_sha256。只读脚本/tmp/member-scope-enable-postcheck-readonly.py与/tmp/member-scope-enable-queue-readonly.py可复核有限列表（前者读固定manifest一次，没有全旧jobs扫描）。
+限制：旧jobs/attempts不修改依据受审写guard+实际收据，未全表重hash旧jobs；本次不是新raw全列审计或新Mac镜像验收。全集/历史完整/PIT/第二轴仍未证明；正常采集后的可变state不归因enable操作。upstream_calls=0；权威数据库写入0。
