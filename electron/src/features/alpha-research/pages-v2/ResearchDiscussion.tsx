@@ -187,6 +187,10 @@ export default function ResearchDiscussion({ cap, seed, onRun }: {
           {Object.entries(draft.inventory.dates).map(([name, dates]) => <div key={name}>{({ train: '训练区间', valid: '验证区间', test: '开发比较区间' } as Record<string, string>)[name] || name}：{dates.join(' 至 ')}</div>)}
           <Paragraph>当前模板字段：{draft.inventory.features.join('、')}</Paragraph>{bullets(draft.inventory.unavailable.map(v => `尚未支持：${v}`))}
         </div> }]} />}
+        {entry.admission.ready && draft.inventory?.execution_steps && <div className="border rounded p-3">
+          <Text strong>确认后程序实际会做什么</Text>{bullets(draft.inventory.execution_steps)}
+          <Text type="secondary">以上来自执行工具定义。若与你想要的研究不一致，请返回讨论调整。</Text>
+        </div>}
         <Space wrap>
           {!entry.run_id && <Button type="primary" disabled={!canApprove || busy || !cap.ready || !!draft.run && active.has(draft.run.status)} onClick={() => beginReview('start')}>审阅并确认执行</Button>}
           {entry.run_id && latest && draft.run_id && <Button onClick={() => onRun(draft.run_id!)}>查看本计划的执行过程</Button>}

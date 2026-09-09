@@ -85,7 +85,7 @@ export interface ResearchDraft {
   plan: PlanVersion | null; plans?: PlanVersion[]; run?: ResearchRun;
   job: { id: string; mode: string; status: string; error: string | null; deadline: number } | null;
   messages?: Array<{ role: string; content: string; mode?: string; at: number; job_id: string }>;
-  inventory?: { snapshot_id: string; market: string; universe: { size: number }; dates: Record<string, string[]>;
+  inventory?: { baselines?: Record<string, string>; execution_steps?: string[]; snapshot_id: string; market: string; universe: { size: number }; dates: Record<string, string[]>;
     features: string[]; portfolio: { initial_capital: number }; unavailable: string[] };
   discussion_usage?: ResearchRun['usage'];
 }
