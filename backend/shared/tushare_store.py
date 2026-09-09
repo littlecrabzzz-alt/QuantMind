@@ -15,6 +15,7 @@ import re
 import tempfile
 
 from backend.shared.tushare_registry import (
+    MARKET_SENTIMENT_RUNTIME_CONTRACTS,
     FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
     CONNECT_RUNTIME_CONTRACTS,
     TRADING_EVENT_RUNTIME_CONTRACTS,
@@ -49,6 +50,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **MARKET_SENTIMENT_RUNTIME_CONTRACTS,
     **FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
     **STOCK_CONTEXT_RUNTIME_CONTRACTS,
     **RISK_EVENT_RUNTIME_CONTRACTS,
@@ -521,6 +523,13 @@ def _dataset(root, release_id, api_name):
             ):
                 if spec.get(note):
                     metadata[note] = spec[note]
+        if api_name in MARKET_SENTIMENT_RUNTIME_CONTRACTS:
+            for note, value in spec.items():
+                if note.endswith(("_gap", "_note")) or note in (
+                    "field_gaps", "field_metadata", "hidden_fields", "permission_status",
+                    "date_field",
+                ):
+                    metadata[note] = value
         if api_name in STOCK_CONTEXT_RUNTIME_CONTRACTS:
             for note, value in spec.items():
                 if note.endswith(("_gap", "_note")) or note in (
@@ -623,6 +632,8 @@ def _date_expression(field, columns):
 
 
 def _default_date_field(api_name, columns):
+    if api_name in MARKET_SENTIMENT_RUNTIME_CONTRACTS:
+        return "trade_date"
     if api_name in FOREIGN_FINANCIAL_RUNTIME_CONTRACTS:
         return "end_date"
     if api_name in STOCK_CONTEXT_RUNTIME_CONTRACTS:

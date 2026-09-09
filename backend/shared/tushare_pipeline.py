@@ -25,6 +25,8 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from backend.shared.tushare_registry import (
+    MARKET_SENTIMENT_RUNTIME_CONTRACTS,
+    market_sentiment_prerequisites,
     EXTENDED_CONTRACTS,
     PLANNERS,
     contract_for,
@@ -606,6 +608,38 @@ class Pipeline:
                 for field in ("con_code", "leading_code"):
                     if isinstance(row.get(field), str):
                         row["source_" + field] = row[field]
+            if result["api_name"] in MARKET_SENTIMENT_RUNTIME_CONTRACTS:
+                api = result["api_name"]
+                namespace = (
+                    "TDX" if api.startswith("tdx_") else
+                    "KP" if api == "kpl_concept_cons" else
+                    "CN" if api == "kpl_list" else
+                    {
+                        "热股": "CN", "A股市场": "CN",
+                        "ETF": "FUND", "ETF基金": "FUND", "热基": "FUND",
+                        "可转债": "CB", "行业板块": "THS:I",
+                        "概念板块": "THS:N", "期货": "FUT",
+                        "港股": "HK", "港股市场": "HK",
+                        "美股": "US", "美股市场": "US",
+                    }.get(params.get("market"), "UNVERIFIED_MARKET")
+                )
+                for field in ("ts_code", "con_code"):
+                    value = row.get(field)
+                    if not isinstance(value, str):
+                        continue
+                    row["source_" + field] = value
+                    kind = "CN" if field == "con_code" else namespace
+                    if kind == "CN" and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", value):
+                        symbol, exchange = value.rsplit(".", 1)
+                        row[field] = exchange + symbol
+                    elif kind == "HK" and re.fullmatch(r"[0-9]{5}(?:![A-Z]{0,8})?\.HK", value):
+                        row[field] = "HK" + value.removesuffix(".HK")
+                    elif kind == "US":
+                        row[field] = "US" + value
+                    else:
+                        # Unknown spellings keep an explicit asset namespace;
+                        # only the immutable request can identify a ranking market.
+                        row[field] = kind + ":" + value
             if result["api_name"] == "stk_ah_comparison":
                 value = row.get("hk_code")
                 if isinstance(value, str):
@@ -620,6 +654,8 @@ class Pipeline:
                 "l3_code",
                 "index_code",
             ):
+                if key == "ts_code" and result["api_name"] in MARKET_SENTIMENT_RUNTIME_CONTRACTS:
+                    continue
                 value = row.get(key)
                 if isinstance(value, str):
                     row["source_" + key] = value
@@ -800,6 +836,11 @@ class Pipeline:
 
     def identifiers(self):
         families = {
+            "tdx_index": "tdx_indices",
+            "tdx_member": "tdx_indices",
+            "tdx_daily": "tdx_indices",
+            "kpl_concept_cons": "kpl_concepts",
+            "kpl_list": "market_sentiment_stocks",
             **{
                 api: spec["dependencies"][0]
                 for api, spec in FOREIGN_FINANCIAL_RUNTIME_CONTRACTS.items()
@@ -907,6 +948,10 @@ class Pipeline:
                     and record["hm_name"]
                 ):
                     result["hot_money_names"].add(record["hm_name"])
+                if saved["api_name"] in ("tdx_member", "kpl_concept_cons"):
+                    member = record.get("con_code")
+                    if isinstance(member, str) and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", member):
+                        result["market_sentiment_stocks"].add(member)
                 code = record.get("ts_code") or record.get("index_code")
                 if code:
                     result[families[saved["api_name"]]].add(code)
@@ -935,6 +980,7 @@ class Pipeline:
             result["risk_stocks"] | result["limit_securities"]
         )
         result["stock_context_stocks"].update(result["technical_stocks"])
+        result["market_sentiment_stocks"].update(result["stock_context_stocks"])
         result["risk_securities"].update(
             result["risk_stocks"] | result["funds"] | result["etfs"]
         )
@@ -1102,6 +1148,7 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "market_sentiment": market_sentiment_prerequisites,
             "foreign_financial": foreign_financial_runtime_prerequisites,
             "stock_context": stock_context_runtime_prerequisites,
             "technical_extra": technical_extra_runtime_prerequisites,
@@ -1139,6 +1186,10 @@ class Pipeline:
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
+            (
+                "market_sentiment",
+                lambda cfg, ids: self.record_extra_planning_gaps("market_sentiment", cfg, ids),
+            ),
             (
                 "foreign_financial",
                 lambda cfg, ids: self.record_extra_planning_gaps(
