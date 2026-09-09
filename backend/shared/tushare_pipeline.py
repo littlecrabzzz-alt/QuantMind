@@ -2345,6 +2345,9 @@ def tick(max_requests=None, max_seconds=None):
     )
     if not 1 <= int(max_requests) <= 1000 or not 1 <= float(max_seconds) <= 100:
         raise ValueError("Invalid bounded batch limits")
+    publish_interval = config.get("publish_interval_seconds", 0)
+    if type(publish_interval) is not int or publish_interval < 0:
+        raise ValueError("Invalid publication interval")
     catalog = json.loads(
         (
             Path(__file__).resolve().parents[2] / "config/tushare-catalog.json"
@@ -2360,7 +2363,15 @@ def tick(max_requests=None, max_seconds=None):
         token = get_secret("TUSHARE_TOKEN")
         if not token:
             return {"status": "blocked_missing_token"}
-        report = {}
+        publication = {
+            "interval_seconds": publish_interval,
+            "status": "not_attempted",
+            "performed": False,
+            "pending": True,
+            "current_release_id": None,
+            "mirror_status": "not_checked",
+        }
+        report = {"publication": publication}
         stage_seconds = {}
         completed_stages = []
         failed_stage = None
@@ -2427,7 +2438,57 @@ def tick(max_requests=None, max_seconds=None):
                                 ),
                             )
                 with measure("publish"):
-                    report["release_id"] = pipeline.publish()
+                    due = True
+                    if publish_interval:
+                        pointer = ROOT / "CURRENT.json"
+                        if pointer.exists() or pointer.is_symlink():
+                            if pointer.is_symlink():
+                                raise ValueError("Unsafe current pointer")
+                            current = json.loads(pointer.read_bytes())
+                            release_id = current["release_id"]
+                            if current.get("manifest_sha256") != release_id[5:]:
+                                raise ValueError("Current manifest identity mismatch")
+                            manifest_at(ROOT, release_id)
+                            publication["current_release_id"] = release_id
+                            saved = pipeline.db.execute(
+                                "SELECT value FROM scheduler_state WHERE name='publish_success_at'"
+                            ).fetchone()
+                            if saved:
+                                last_success = saved[0]
+                                if type(last_success) is not int or last_success < 0:
+                                    raise ValueError("Invalid publication checkpoint")
+                                publication["last_success_at"] = last_success
+                                publication["next_due_at"] = (
+                                    last_success + publish_interval
+                                )
+                                # Clock rollback forces a real publication check, never
+                                # an unbounded postponement based on a future timestamp.
+                                elapsed = time.time() - last_success
+                                due = not 0 <= elapsed < publish_interval
+                    if due:
+                        publication["status"] = "publishing"
+                        release_id = pipeline.publish()
+                        report["release_id"] = release_id
+                        publication.update(
+                            status="published",
+                            performed=True,
+                            pending=False,
+                            current_release_id=release_id,
+                        )
+                        if publish_interval:
+                            successful_at = int(time.time())
+                            pipeline.db.execute(
+                                "INSERT INTO scheduler_state(name,value) VALUES('publish_success_at',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                                (successful_at,),
+                            )
+                            pipeline.db.commit()
+                            publication.update(
+                                last_success_at=successful_at,
+                                next_due_at=successful_at + publish_interval,
+                            )
+                    else:
+                        report["release_id"] = publication["current_release_id"]
+                        publication["status"] = "deferred"
             finally:
                 if pipeline is not None:
                     with measure("close"):
@@ -2435,6 +2496,8 @@ def tick(max_requests=None, max_seconds=None):
             return report
         except BaseException as exc:
             failed = True
+            if publication["status"] == "publishing":
+                publication["status"] = "failed"
             report.update(status="error", error_type=type(exc).__name__)
             raise
         finally:
