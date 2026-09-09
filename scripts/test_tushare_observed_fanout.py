@@ -202,7 +202,7 @@ class ObservedFanout(unittest.TestCase):
         self.assertEqual(again["children"], 2)
         self.assertTrue(again["universe_complete"])
 
-    def test_run_passes_just_captured_parent_before_result_is_stored(self):
+    def test_run_resumes_captured_parent_without_repeating_http(self):
         spec = module.EXTENDED_CONTRACTS["moneyflow_dc"]
         with patch.dict(spec, {"row_cap": 2}):
             row, _ = self.parent()
@@ -242,6 +242,16 @@ class ObservedFanout(unittest.TestCase):
                 max_seconds=2,
                 pause=0,
             )
+            self.assertEqual(self.children(row), [])
+            resumed = self.p.run(
+                client,
+                "fixture-only",
+                {"priority_start": "20200101"},
+                max_requests=1,
+                max_seconds=2,
+                pause=0,
+            )
+            self.assertEqual(resumed["requests"], 0)
         self.assertEqual(seen, [{"trade_date": "20260904"}])
         self.assertEqual(
             {x["ts_code"] for x in self.children(row)}, {"600036.SH", "830001.BJ"}
