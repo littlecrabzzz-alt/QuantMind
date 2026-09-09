@@ -135,7 +135,7 @@ class LendingRuntime(unittest.TestCase):
         )
         cfg = {
             "enable_" + FAMILY: True,
-            FAMILY + "_history_start": "20240601",
+            "securities_lending_history_start": "20240601",
             "plan_jobs_per_tick": 4,
         }
         stats = self.p.plan_extended(cfg, date(2024, 6, 20))
@@ -165,7 +165,7 @@ class LendingRuntime(unittest.TestCase):
         self.assertNotEqual(
             policy1,
             module._planning_inputs(
-                FAMILY, {**cfg, FAMILY + "_history_start": "20240602"}, ids
+                FAMILY, {**cfg, "securities_lending_history_start": "20240602"}, ids
             ),
         )
         self.assertNotEqual(
@@ -187,6 +187,76 @@ class LendingRuntime(unittest.TestCase):
         scopes = [r[0] for r in self.p.db.execute("SELECT scope FROM capability")]
         self.assertTrue(any(scope.endswith(":pit_gap") for scope in scopes))
         self.assertTrue(any(scope.endswith(":discovery") for scope in scopes))
+
+    def test_real_scope_key_refreshes_completed_plan_without_rewriting_old_jobs(self):
+        cfg = {
+            "enable_securities_lending_history": True,
+            "securities_lending_history_start": "20240610",
+            "plan_jobs_per_tick": 1000,
+        }
+        self.p.plan_extended(cfg, date(2024, 6, 20))
+        before = dict(
+            self.p.db.execute(
+                "SELECT * FROM planning_state WHERE name=?", ("history:" + FAMILY,)
+            ).fetchone()
+        )
+        self.assertTrue(before["done"])
+        old_jobs = {r["id"]: dict(r) for r in self.p.db.execute("SELECT * FROM jobs")}
+
+        def history_dates():
+            return {
+                json.loads(r[0])["params"]["trade_date"]
+                for r in self.p.db.execute(
+                    "SELECT job FROM jobs WHERE group_name=? AND epoch='history'",
+                    (FAMILY,),
+                )
+            }
+
+        self.assertEqual(
+            history_dates(), {"20240610", "20240611", "20240612", "20240613"}
+        )
+        # Typo/inert config is not a planner dependency. Actual one-key change is.
+        inputs = module._planning_inputs(FAMILY, cfg, {})
+        self.assertEqual(
+            inputs,
+            module._planning_inputs(
+                FAMILY,
+                {**cfg, "securities_lending_history_history_start": "19900101"},
+                {},
+            ),
+        )
+        changed = {**cfg, "securities_lending_history_start": "20240609"}
+        self.assertNotEqual(inputs, module._planning_inputs(FAMILY, changed, {}))
+        self.p.plan_extended(changed, date(2024, 6, 20))
+        after = dict(
+            self.p.db.execute(
+                "SELECT * FROM planning_state WHERE name=?", ("history:" + FAMILY,)
+            ).fetchone()
+        )
+        self.assertTrue(after["done"])
+        self.assertNotEqual(after["signature"], before["signature"])
+        self.assertEqual(
+            history_dates(),
+            {"20240609", "20240610", "20240611", "20240612", "20240613"},
+        )
+        for key, old in old_jobs.items():
+            self.assertEqual(
+                dict(
+                    self.p.db.execute(
+                        "SELECT * FROM jobs WHERE id=?", (key,)
+                    ).fetchone()
+                ),
+                old,
+            )
+        self.discovery("stock_basic", [{"ts_code": "T600018.SH", "list_status": "D"}])
+        self.p.plan_extended(changed, date(2024, 6, 20))
+        unchanged = dict(
+            self.p.db.execute(
+                "SELECT * FROM planning_state WHERE name=?", ("history:" + FAMILY,)
+            ).fetchone()
+        )
+        self.assertEqual(unchanged["signature"], after["signature"])
+        self.assertEqual(unchanged["offset"], after["offset"])
 
     def test_saturated_day_fanout_retains_observed_universe_gap_and_date_split(self):
         self.discovery("stock_basic", [{"ts_code": "600018.SH", "list_status": "D"}])
@@ -382,7 +452,7 @@ class LendingRuntime(unittest.TestCase):
                     {
                         **cfg,
                         "enable_" + FAMILY: True,
-                        FAMILY + "_history_start": "20000101",
+                        "securities_lending_history_start": "20000101",
                         FAMILY + "_apis": ["slb_sec"],
                     },
                     ids,

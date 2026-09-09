@@ -133,7 +133,13 @@ def _planning_inputs(family, config, identifiers):
     if family == "market_members":
         keys.remove("history_start")
     if family not in ("structured", "market"):
-        keys.add(family + "_history_start")
+        # This family name already ends in history; its public scope key does not
+        # repeat that suffix. Hash the key actually consumed by its pure planner.
+        keys.add(
+            "securities_lending_history_start"
+            if family == "securities_lending_history"
+            else family + "_history_start"
+        )
     if family == "history_minutes":
         keys.add("history_minutes_frequencies")
     if family == "factor_library":
