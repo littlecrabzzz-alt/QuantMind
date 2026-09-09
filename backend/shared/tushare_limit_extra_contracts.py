@@ -1,5 +1,6 @@
 """Pure daily price-limit pools, limit ladders and concept heat contracts."""
 
+from calendar import monthrange
 from datetime import date, datetime, timedelta
 
 from backend.shared.tushare_structured_contracts import _contract, _parse
@@ -54,6 +55,9 @@ for _api, (_doc, _cap, _points, _start, _keys) in _DOCS.items():
     )
     spec.update(
         source_url=f"https://tushare.pro/document/2?doc_id={_doc}",
+        # Part of the existing family fingerprint: never reuse a daily cursor
+        # against the shorter monthly enumeration after this planner change.
+        history_partition="calendar_month_v1",
         input_fields=INPUT_FIELDS[_api],
         requested_fields=FIELDS[_api].copy(),
         hidden_fields=HIDDEN_THS_FIELDS.copy() if _api == "limit_list_ths" else [],
@@ -213,6 +217,21 @@ def _days(api, begin, end):
         day += timedelta(days=1)
 
 
+def _months(api, begin, end):
+    day = begin
+    while day <= end:
+        last = min(end, date(day.year, day.month, monthrange(day.year, day.month)[1]))
+        for variant in VARIANTS[api]:
+            yield {
+                "start_date": day.strftime("%Y%m%d"),
+                "end_date": last.strftime("%Y%m%d"),
+                **variant,
+            }
+        if last == end:
+            return
+        day = last + timedelta(days=1)
+
+
 def iter_limit_extra_jobs(config, today, identifiers=None):
     """Explicit all-pool recent requests, then lazy fair historical partitions."""
     if isinstance(today, datetime):
@@ -237,7 +256,7 @@ def iter_limit_extra_jobs(config, today, identifiers=None):
                 "epoch": epoch,
             }
         if start and start < recent:
-            histories[api] = iter(_days(api, start, recent - timedelta(days=1)))
+            histories[api] = iter(_months(api, start, recent - timedelta(days=1)))
     while histories:
         for api in tuple(histories):
             params = next(histories[api], None)
