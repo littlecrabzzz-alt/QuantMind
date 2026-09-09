@@ -1,0 +1,7 @@
+# Calendar3 / factor-library2 pure candidate ready
+- Mac independent worktree quantmind-tushare-calendar-factor, branch codex/tushare-calendar-factor, base092dedf, pure delta5aa26e1；only four declared new files. No runtime/catalog/ledger edits or upstream/production access.
+- eco_cal233/cn_schedule461/idx_anns460/factor_list486/factor_value490: full26 fields, allY, explicit fields; actual rights unprobed. Two families calendar_extra / factor_library, matching exports and per-family history config.
+- factor_library_factors requires actual source records factor_name+asset_type. No factor_id/demo seed; non-STK/name collision retains gap. Factor list has no date filter; factor values daily name partitions. Schedule is m-only; eco date and index ann_date are separate. Finite future7days/month lookahead, old revision/universe/PIT/cap gaps preserved.
+- 486 catalog known13→4 schema discrepancy evidence, exact9-field difference and HTML SHA in docs/tushare-calendar-factor-intake.md. Parent owns parser/catalog correction; no other category/API removed.
+- Validation:9 offline tests pass0.003s, socket/DNS disabled; Ruff and diff-check pass. Test accepts only existing known486 diff or corrected empty diff. All other4 schema/input catalogs exact.
+- Next: parent review/pick5aa26e1 only. Future runtime must map date/month axes, actual discovery, historical stock saturation universe, linked index announcement archive. Candidate is not enable/probe/collected.

@@ -1,0 +1,5 @@
+# bond_extra8 runtime candidate start
+
+remaining_markets; parent-authorized independent codex/tushare-bond-extra worktree, merged99fb562 on top of pure91d5e7d. Own registry/store/pipeline necessary newfamily wiring, new scripts/test_tushare_bond_extra_pipeline.py, existing all-store fixture YCidentity/count, own intake doc. Parent not editingcore, text observes only. No mirror/ledger/progress/config/production edits or actual probes/enabling.
+
+Preserve discovery projection/body dedup and priorfamily behavior. Dedicated bond_extra_convertibles wraps pure bonds discovery; historical CB raw/retired/T sources without widening legacy stocks/bonds. Repo/trade/curve/OTC discovery isolated. Opaque CB:/REPO:/BOND:/YC: prefixes+source retention; YC0/1 immutable identity, report end_date vsrating ann_date. Unknown curve example alias/numerictypes remain schema/mapping gap, no guessed stocks conversion. Existinglegal datesplit only, saturatedterminal remainsgap. Relatedoffline/fullTushare tests then single runtime delta; mirror copy item remains parent follow-up.
