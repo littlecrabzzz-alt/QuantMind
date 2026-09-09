@@ -159,11 +159,12 @@ class QuantDBDataHub:
     _instance: Optional[QuantDBDataHub] = None
     _instance_lock = threading.Lock()
 
-    def __init__(self, data_dir: str | Path | None = None) -> None:
+    def __init__(self, data_dir: str | Path | None = None, *, duckdb_config: dict | None = None) -> None:
         if data_dir is not None:
             self._data_dir = Path(data_dir)
         else:
             self._data_dir = _resolve_data_dir()
+        self._duckdb_config = dict(duckdb_config or {})
         self._local = threading.local()
         self._views_mounted_per_conn: set[int] = set()  # track which conn ids have views mounted
 
@@ -210,7 +211,7 @@ class QuantDBDataHub:
                 import duckdb
             except ImportError:
                 raise RuntimeError("duckdb 未安装，请运行 pip install duckdb")
-            self._local.duck_conn = duckdb.connect(":memory:")
+            self._local.duck_conn = duckdb.connect(":memory:", config=self._duckdb_config)
             self._mount_views(self._local.duck_conn)
             self._views_mounted_per_conn.add(id(self._local.duck_conn))
         return self._local.duck_conn
@@ -405,16 +406,20 @@ class QuantDBDataHub:
         end: date,
     ) -> pd.DataFrame:
         """读取指数日线 K 线。"""
-        if not self._view_exists("qdb_index_daily"):
+        # An index lookup must not bind every factor/financial view: their
+        # Parquet metadata alone can exceed a small cache-builder's memory budget.
+        source = self._data_dir / "1_kline_data" / "index_daily"
+        if not source.is_dir() or not any(source.glob("dt=*/data.parquet")):
             return pd.DataFrame()
+        import duckdb
 
-        conn = self._get_duck_conn()
-
-        conditions = [f"symbol = '{symbol}'"] + _dt_conditions(start, end)
-        where = " AND ".join(conditions)
-        df = conn.execute(
-            f"SELECT * FROM qdb_index_daily WHERE {where} ORDER BY dt"
-        ).fetchdf()
+        conditions = " AND ".join(_dt_conditions(start, end))
+        with duckdb.connect(":memory:", config=self._duckdb_config) as conn:
+            df = conn.execute(
+                f"SELECT * FROM read_parquet(?, hive_partitioning=true, union_by_name=true) "
+                f"WHERE symbol = ? AND {conditions} ORDER BY dt",
+                [str(source / "dt=*/data.parquet"), symbol],
+            ).fetchdf()
 
         return self._normalize_kline(df)
 
