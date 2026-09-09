@@ -23,6 +23,9 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
   const [runs, setRuns] = useState<ResearchRun[]>([]);
   const [selected, setSelected] = useState<ResearchRun | null>(null);
   const selectedId = useRef<string | null>(null);
+  const detailPanel = useRef<HTMLDivElement>(null);
+  const [openingRun, setOpeningRun] = useState<string | null>(null);
+  const [detailNavigation, setDetailNavigation] = useState(0);
   const node = useRef<string | null>(null);
   const scope = useRef<string | null>(null);
   const endpoint = useRef(String(SERVICE_ENDPOINTS.AI_STRATEGY));
@@ -92,6 +95,24 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
   useEffect(() => {
     if (cap?.models.length && !cap.models.includes(model)) setModel(cap.models[0]);
   }, [cap, model]);
+
+  useEffect(() => {
+    if (!detailNavigation) return;
+    detailPanel.current?.focus({ preventScroll: true });
+    detailPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [detailNavigation]);
+
+  const openRun = async (row: ResearchRun) => {
+    selectedId.current = row.run_id;
+    setOpeningRun(row.run_id); setError(null);
+    try {
+      const detail = await researchRuns.detail(row.run_id, row.node_id);
+      if (node.current !== row.node_id || selectedId.current !== row.run_id) return;
+      setSelected(detail);
+      setDetailNavigation(value => value + 1);
+    } catch (err) { setError(errorText(err)); }
+    finally { setOpeningRun(current => current === row.run_id ? null : current); }
+  };
 
   const create = async (request: ResearchRequest) => {
     if (submitting.current || request.node_id !== node.current) return;
@@ -210,13 +231,15 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
       </Space>}>
         <Table size="small" rowKey="run_id" pagination={{ pageSize: 5 }} locale={{ emptyText: <Empty description="还没有研究，选择上方模板开始" /> }}
           dataSource={runs.filter(r => (filter === 'all' || r.kind === filter) && (statusFilter === 'all' || r.status === statusFilter))}
-          columns={[{ title: '研究', dataIndex: 'goal', render: (value: string, row: ResearchRun) => <Button type="link" className="whitespace-normal text-left h-auto" onClick={() => { selectedId.current = row.run_id; void researchRuns.detail(row.run_id, row.node_id).then(detail => { if (node.current === row.node_id && selectedId.current === row.run_id) setSelected(detail); }).catch(e => setError(errorText(e))); }}>{value}</Button> },
+          columns={[{ title: '研究', dataIndex: 'goal', render: (value: string, row: ResearchRun) => <Button type="link" className="whitespace-normal text-left h-auto" loading={openingRun === row.run_id} aria-pressed={selected?.run_id === row.run_id} onClick={() => void openRun(row)}>{value}</Button> },
             { title: '类型', dataIndex: 'kind', render: (kind: string) => kind === 'method' ? '方法 / 因子' : '策略' },
             { title: '状态', dataIndex: 'status', render: (s: string) => <Tag color={s === 'completed' ? 'green' : s === 'blocked' ? 'orange' : 'blue'}>{statuses[s] || s}</Tag> },
             { title: '已核验实验', dataIndex: 'completed_experiments' },
             { title: '开始时间', dataIndex: 'started_at', render: (s: string) => new Date(s).toLocaleString() }]} />
       </Card>
-      {selected && <Card title={selected.goal} extra={<Space wrap>
+      {selected && <Card ref={detailPanel} tabIndex={-1} aria-label="研究详情" style={{ scrollMarginTop: 144 }}
+        styles={{ header: { flexWrap: 'wrap', gap: 12, paddingBlock: 12 }, title: { whiteSpace: 'normal', minWidth: 180 } }}
+        title={selected.goal} extra={<Space wrap>
         {activeStatuses.has(selected.status) && <><Button loading={busy} icon={<Pause size={14} />} onClick={() => void control('pause')}>暂停后续</Button>
           <Button danger loading={busy} icon={<Square size={14} />} onClick={() => void control('cancel')}>取消研究</Button></>}
         {resumable.has(selected.status) && <Button loading={busy} icon={<Play size={14} />} onClick={() => void control('continue')}>继续研究</Button>}
