@@ -253,7 +253,13 @@ class DurableQuota(unittest.TestCase):
             )
 
         original_reserve = quota.reserve
+        started = time.monotonic()
         with (
+            patch.object(
+                pmod.time,
+                "time",
+                side_effect=lambda: self.day + time.monotonic() - started,
+            ),
             patch.object(
                 quota,
                 "reserve",
