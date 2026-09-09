@@ -25,6 +25,8 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from backend.shared.tushare_registry import (
+    SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS,
+    securities_lending_history_prerequisites,
     HISTORY_MINUTES_RUNTIME_CONTRACTS,
     MINUTE_SOURCE_FAMILIES,
     history_minutes_runtime_prerequisites,
@@ -658,6 +660,10 @@ class Pipeline:
                 for field in ("con_code", "leading_code"):
                     if isinstance(row.get(field), str):
                         row["source_" + field] = row[field]
+            if result["api_name"] in SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS:
+                code = row.get("ts_code")
+                if not isinstance(code, str) or not re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", code):
+                    raise ValueError("Lending source stock code requires schema review")
             if result["api_name"] == "factor_value":
                 code, name = row.get("ts_code"), row.get("factor_name")
                 if (
@@ -927,6 +933,7 @@ class Pipeline:
         bond_source_apis = ("cb_daily", "cb_issue", "cb_call", "cb_rate", "cb_price_chg", "cb_share")
         factor_records = {}
         families = {
+            **dict.fromkeys(SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS, "stocks"),
             "factor_list": "factor_library_factors",
             "factor_value": "factor_library_stocks",
             **dict.fromkeys(bond_source_apis, "bond_extra_convertibles"),
@@ -1140,6 +1147,11 @@ class Pipeline:
                     if isinstance(code, str) and code:
                         result[families[saved["api_name"]]].add(code)
                     continue
+                if saved["api_name"] in SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS:
+                    code = record.get("ts_code")
+                    if isinstance(code, str) and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", code):
+                        result["stocks"].add(code)
+                    continue  # Malformed source remains raw/quality, not guessed discovery.
                 code = record.get("ts_code") or record.get("index_code")
                 if code:
                     result[families[saved["api_name"]]].add(code)
@@ -1354,6 +1366,7 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "securities_lending_history": securities_lending_history_prerequisites,
             "history_minutes": history_minutes_runtime_prerequisites,
             "calendar_extra": calendar_extra_prerequisites,
             "factor_library": factor_library_prerequisites,
@@ -1426,6 +1439,10 @@ class Pipeline:
         self.planning_timing["active_stage"] = "validation_and_snapshots"
         blocked_families = set()
         for family, validate in (
+            (
+                "securities_lending_history",
+                lambda cfg, ids: self.record_extra_planning_gaps("securities_lending_history", cfg, ids),
+            ),
             ("history_minutes", lambda cfg, ids: self.record_extra_planning_gaps("history_minutes", cfg, ids)),
             (
                 "calendar_extra",
