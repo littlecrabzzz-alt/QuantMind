@@ -2363,27 +2363,33 @@ class Pipeline:
                         "bytes": path.stat().st_size,
                     }
         with measure("coverage_and_closure"):
+            # One complete aggregation also supplies status totals and scope.
+            # SQL ordering preserves DISTINCT's SQLite ordering, including NULL
+            # and unknown API names; no fixed state/API allowlist can omit gaps.
+            coverage_by_api = [
+                dict(r)
+                for r in self.db.execute(
+                    "SELECT json_extract(job, '$.api_name') AS api_name,state,count(*) AS partitions FROM jobs GROUP BY api_name,state ORDER BY api_name,state"
+                )
+            ]
+            coverage = {}
+            scope = []
+            for row in coverage_by_api:
+                state = row["state"]
+                coverage[state] = coverage.get(state, 0) + row["partitions"]
+                if not scope or scope[-1] != row["api_name"]:
+                    scope.append(row["api_name"])
             content = {
                 "schema_version": 1,
                 "files": files,
                 "datasets": list(active.values()),
-                "coverage": self.status(),
-                "coverage_by_api": [
-                    dict(r)
-                    for r in self.db.execute(
-                        "SELECT json_extract(job, '$.api_name') AS api_name,state,count(*) AS partitions FROM jobs GROUP BY api_name,state"
-                    )
-                ],
+                "coverage": coverage,
+                "coverage_by_api": coverage_by_api,
                 "gaps": gaps,
                 "history_complete": False,
                 "partition_closure": self.partition_inventory(),
                 "rrg_status": "blocked_data",
-                "scope": [
-                    r[0]
-                    for r in self.db.execute(
-                        "SELECT DISTINCT json_extract(job,'$.api_name') AS api FROM jobs ORDER BY api"
-                    )
-                ],
+                "scope": scope,
                 "implemented_contracts": sorted(set(CONTRACTS) | set(EXTENDED_CONTRACTS)),
                 "schema_path": schema_name,
                 "documents": documents,
@@ -2481,6 +2487,10 @@ class Pipeline:
                     }
                 )
         with measure("serialize_manifest"):
+            # Comparison and the final inherited archive mapping are finished.
+            # Keep needed shared file/mapping entries through content, but release
+            # the old manifest's other containers before allocating JSON bytes.
+            previous = None
             raw = json_bytes(content)
             sha = digest(raw)
             release = "data-" + sha
