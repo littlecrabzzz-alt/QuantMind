@@ -164,6 +164,38 @@ MARKET_SENTIMENT_RUNTIME_CONTRACTS = {
     for api, spec in MARKET_SENTIMENT_CONTRACTS.items()
 }
 
+from backend.shared.tushare_bond_extra_contracts import (
+    BOND_EXTRA_CONTRACTS,
+    iter_bond_extra_jobs,
+    bond_extra_prerequisites,
+)
+
+BOND_EXTRA_RUNTIME_CONTRACTS = {
+    api: {
+        **spec,
+        "group": "bond_extra",
+        "dependencies": ["bond_extra_convertibles"] if spec["dependencies"] else [],
+        "source_namespace": spec["source_namespace"].split("<", 1)[0],
+        "namespace_note": spec["namespace_note"].replace(
+            "Namespace conversion belongs to future runtime integration, not this pure planner.", ""
+        )
+        + " Runtime prefixes the unchanged source string with this asset namespace and preserves source_ts_code. Non-string source codes require schema review; no inferred curve-code alias or A-share conversion.",
+    }
+    for api, spec in BOND_EXTRA_CONTRACTS.items()
+}
+
+
+def _bond_extra_identifiers(identifiers):
+    return {"bonds": identifiers.get("bond_extra_convertibles", [])}
+
+
+def bond_extra_runtime_prerequisites(identifiers, config=None):
+    return [
+        {**gap, "dependencies": ["bond_extra_convertibles" if name == "bonds" else name for name in gap.get("dependencies", [])]}
+        for gap in bond_extra_prerequisites(_bond_extra_identifiers(identifiers), config=config)
+    ]
+
+
 FOREIGN_FINANCIAL_RUNTIME_CONTRACTS = {
     api: {
         **spec,
@@ -340,6 +372,7 @@ CONNECT_RUNTIME_CONTRACTS = {
 }
 
 EXTENDED_CONTRACTS = {
+    **BOND_EXTRA_RUNTIME_CONTRACTS,
     **CROSS_ASSET_RUNTIME_CONTRACTS,
     **MARKET_SENTIMENT_RUNTIME_CONTRACTS,
     **FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
@@ -386,6 +419,7 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "bond_extra": lambda config, today, ids: iter_bond_extra_jobs(config, today, _bond_extra_identifiers(ids)),
     "cross_asset_extra": iter_cross_asset_extra_jobs,
     "market_sentiment": iter_market_sentiment_jobs,
     "foreign_financial": lambda config, today, ids: iter_foreign_financial_jobs(

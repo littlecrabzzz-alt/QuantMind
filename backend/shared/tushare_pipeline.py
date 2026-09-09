@@ -25,6 +25,8 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from backend.shared.tushare_registry import (
+    BOND_EXTRA_RUNTIME_CONTRACTS,
+    bond_extra_runtime_prerequisites,
     CROSS_ASSET_RUNTIME_CONTRACTS,
     cross_asset_runtime_prerequisites,
     cross_asset_identifiers,
@@ -628,6 +630,12 @@ class Pipeline:
                 for field in ("con_code", "leading_code"):
                     if isinstance(row.get(field), str):
                         row["source_" + field] = row[field]
+            if result["api_name"] in BOND_EXTRA_RUNTIME_CONTRACTS:
+                value = row.get("ts_code")
+                if not isinstance(value, str) or not value:
+                    raise ValueError("Bond source code must be a string; schema review required")
+                row["source_ts_code"] = value
+                row["ts_code"] = BOND_EXTRA_RUNTIME_CONTRACTS[result["api_name"]]["source_namespace"] + value
             if result["api_name"] in MARKET_SENTIMENT_RUNTIME_CONTRACTS:
                 api = result["api_name"]
                 namespace = (
@@ -674,7 +682,7 @@ class Pipeline:
                 "l3_code",
                 "index_code",
             ):
-                if key == "ts_code" and result["api_name"] in MARKET_SENTIMENT_RUNTIME_CONTRACTS:
+                if key == "ts_code" and (result["api_name"] in MARKET_SENTIMENT_RUNTIME_CONTRACTS or result["api_name"] in BOND_EXTRA_RUNTIME_CONTRACTS):
                     continue
                 value = row.get(key)
                 if isinstance(value, str):
@@ -867,7 +875,10 @@ class Pipeline:
         self.db.commit()
 
     def identifiers(self):
+        bond_source_apis = ("cb_daily", "cb_issue", "cb_call", "cb_rate", "cb_price_chg", "cb_share")
         families = {
+            **dict.fromkeys(bond_source_apis, "bond_extra_convertibles"),
+            **{api: spec.get("saturation_fallback", "bond_extra_convertibles") for api, spec in BOND_EXTRA_RUNTIME_CONTRACTS.items()},
             "tdx_index": "tdx_indices",
             "tdx_member": "tdx_indices",
             "tdx_daily": "tdx_indices",
@@ -1042,6 +1053,13 @@ class Pipeline:
                     member = record.get("con_code")
                     if isinstance(member, str) and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", member):
                         result["market_sentiment_stocks"].add(member)
+                if saved["api_name"] in BOND_EXTRA_RUNTIME_CONTRACTS or saved["api_name"] in bond_source_apis:
+                    code = record.get("ts_code")
+                    # Numeric/malformed schemas remain raw/quality evidence, not
+                    # invented request codes or mixed-type global sort failures.
+                    if isinstance(code, str) and code:
+                        result[families[saved["api_name"]]].add(code)
+                    continue
                 code = record.get("ts_code") or record.get("index_code")
                 if code:
                     result[families[saved["api_name"]]].add(code)
@@ -1078,6 +1096,7 @@ class Pipeline:
         result["cross_asset_indexes"].update(result["indexes"] | result["sw_indexes"])
         result["cross_asset_funds"].update(result["funds"] | result["etfs"])
         result["cross_asset_bonds"].update(result["bonds"])
+        result["bond_extra_convertibles"].update(result["cross_asset_bonds"])
         result["cross_asset_etfs"].update(result["etfs"])
         result = {key: sorted(values) for key, values in result.items()}
         for api, spec in CROSS_ASSET_RUNTIME_CONTRACTS.items():
@@ -1254,6 +1273,7 @@ class Pipeline:
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
             "cross_asset_extra": cross_asset_runtime_prerequisites,
+            "bond_extra": bond_extra_runtime_prerequisites,
             "market_sentiment": market_sentiment_prerequisites,
             "foreign_financial": foreign_financial_runtime_prerequisites,
             "stock_context": stock_context_runtime_prerequisites,
@@ -1320,6 +1340,10 @@ class Pipeline:
         self.planning_timing["active_stage"] = "validation_and_snapshots"
         blocked_families = set()
         for family, validate in (
+            (
+                "bond_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps("bond_extra", cfg, ids),
+            ),
             (
                 "cross_asset_extra",
                 lambda cfg, ids: self.record_extra_planning_gaps(
