@@ -228,3 +228,13 @@
 - 重启quantmind和两专属worker后，采集4c3447b8-ea3f-49d2-9ca8-c154a5e3a094、附件ba365ffd-bdc6-4b78-b098-9378578a65e1及两队列实测恢复；US88fe98db-f897-42a9-932c-cc1a84860e10保持。00:11:51Z正常批329请求/118.014秒、failed_stage=null；发布14.069秒，其中coverage/closure4.065、attempts/stat2.432、retain_previous2.178秒。单批定位不等于持续收益，账户本地预算240次/分，不能靠多worker线性加速。云盘可用260.67GiB。
 - research_report精确trade_date=20260121、正常11列请求仍回85行/10列，file_name缺失，不是仅范围请求或1000行满额所致。原文/schema_gap保留，known_field_gaps增加证据；不删字段、不推断永久无权限。此前10个近期/历史固定样本只读比较见本主题记录。
 - 下一concept4已并行准备：e1041f2→03d8d74→55848e1，40相关测试；未合入生产、未probe、未启用。先独立整合测试再安排发布，保留THS成员历史/PIT/未知cap。旧互联互通精确过滤探测仍未执行；263基线+13发现、全历史/修订/附件及RRG准入仍未完成。
+
+
+## 2026-09-09 08:36 concept4生产闭环与下一批并行
+
+- 上一turn为实质进展，本轮继续全目标：e1041f2→03d8d74→55848e1已集成为100e4df并发布master/GitHub/cloud，404隔离tests+Ruff通过。152采集API+6财务查询别名，未缩减263基线+13发现范围。期间采集仅在备齐候选/脚本后自然排空，恢复后再做固定版验收。
+- THS目录/日线/最新成员、DC三类别已启用。8请求6.139秒、5803行、40已知输出字段全部返回；目录A/HK/US及七类type保留，隐藏市值非空，成员三个历史/权重字段均null。目录A/typeBB样本实际全.HK成员，目录count306/成员309不一致，全部保留、不按目录exchange/count过滤，历史PIT限制仍在。
+- 固定e1386fc1全5803行原文/Parquet/独立查询及30HTTP对账通过（匿名401、上游0）；Mac新增4058/共159836文件校验、24样本证据SHA及禁网禁凭据查询通过。详情与完整release ID/报告路径见docs/tushare-concept-extra-intake.md。
+- 两专属队列恢复，真实采集1f84450c-2506-4d74-90bb-b9768b49878d、文档768c6e8e-d036-415a-9a75-a164eaa33ddd活跃，US88fe98db保持。00:33:56Z正常批265请求/120.401秒、failed_stage=null，较少请求不直接等同退化（成员响应更大且共享负载变化）。自动DC done18/empty3、THS daily done4/empty3、index done1、member done11/blocked4/pending1956；四阻塞为返回5099—5549行超过本地未知cap保护值，原始全行保留且不推断真实截断。history目前仍在跳过成员近期项，未称历史完成。空间259.74GiB可用。
+- 并行耗时复核：部署前两正常批335请求、118.729/119.694秒，发布约15.1秒；coverage/closure约4.48、attempt+stat2.43—2.68、retain_previous2.22秒。固定120秒节拍下，单缩短publish不能承诺提高请求数，暂不为这点增加迁移。物理元数据占用审计另由structured整理，未删数据或改schema。
+- 下一dc_member/dc_daily纯候选523d32b已push codex/tushare-dc-extra（17字段、7tests），runtime在独立worktree继续，未上线/未probe/未enable。补每日历史成分与OHLCV，官方历史下界/PIT/分类映射/单板块饱和仍待验。旧互联互通过滤探测、全目录剩余接口、全部历史/修订/PDF/RRG准入继续推进。

@@ -2074,9 +2074,24 @@
       "acquisition_api_names": [
         "ths_index"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted reference/member snapshots and daily/history coverage; retain unknown caps, removed-board discovery, cross-market semantics, revisions and membership PIT gaps.",
+      "contract_evidence": "docs/tushare-concept-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/concept-acceptance.json",
+        "release_id": "data-e1386fc1f304f2ef6ef34d3c59ec99b4f3d1ec34fd49c9841ddd7591a74e1bce",
+        "checked_at": "2026-09-09T00:29:17.364741+00:00",
+        "sample_rows": 2517,
+        "sample_requests": [
+          {}
+        ],
+        "requested_fields": 6,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-e1386fc1f304f2ef6ef34d3c59ec99b4f3d1ec34fd49c9841ddd7591a74e1bce",
+        "offline_evidence": "/tmp/concept4-mac-offline-verified-20260909.json",
+        "scope": "8 actual requests, 5803 source rows and 40 reviewed fields verified through raw, Parquet, 30 cloud queries and offline Mac. Source codes and DC request categories preserved; not full history or membership PIT."
+      }
     },
     {
       "doc_id": "260",
@@ -2088,9 +2103,26 @@
       "acquisition_api_names": [
         "ths_daily"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted reference/member snapshots and daily/history coverage; retain unknown caps, removed-board discovery, cross-market semantics, revisions and membership PIT gaps.",
+      "contract_evidence": "docs/tushare-concept-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/concept-acceptance.json",
+        "release_id": "data-e1386fc1f304f2ef6ef34d3c59ec99b4f3d1ec34fd49c9841ddd7591a74e1bce",
+        "checked_at": "2026-09-09T00:29:17.364741+00:00",
+        "sample_rows": 1877,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          }
+        ],
+        "requested_fields": 14,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-e1386fc1f304f2ef6ef34d3c59ec99b4f3d1ec34fd49c9841ddd7591a74e1bce",
+        "offline_evidence": "/tmp/concept4-mac-offline-verified-20260909.json",
+        "scope": "8 actual requests, 5803 source rows and 40 reviewed fields verified through raw, Parquet, 30 cloud queries and offline Mac. Source codes and DC request categories preserved; not full history or membership PIT."
+      }
     },
     {
       "doc_id": "261",
@@ -2102,9 +2134,32 @@
       "acquisition_api_names": [
         "ths_member"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted reference/member snapshots and daily/history coverage; retain unknown caps, removed-board discovery, cross-market semantics, revisions and membership PIT gaps.",
+      "contract_evidence": "docs/tushare-concept-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/concept-acceptance.json",
+        "release_id": "data-e1386fc1f304f2ef6ef34d3c59ec99b4f3d1ec34fd49c9841ddd7591a74e1bce",
+        "checked_at": "2026-09-09T00:29:17.364741+00:00",
+        "sample_rows": 378,
+        "sample_requests": [
+          {
+            "ts_code": "700014.TI"
+          },
+          {
+            "ts_code": "871001.TI"
+          },
+          {
+            "ts_code": "861001.TI"
+          }
+        ],
+        "requested_fields": 7,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-e1386fc1f304f2ef6ef34d3c59ec99b4f3d1ec34fd49c9841ddd7591a74e1bce",
+        "offline_evidence": "/tmp/concept4-mac-offline-verified-20260909.json",
+        "scope": "8 actual requests, 5803 source rows and 40 reviewed fields verified through raw, Parquet, 30 cloud queries and offline Mac. Source codes and DC request categories preserved; not full history or membership PIT."
+      }
     },
     {
       "doc_id": "362",
@@ -2116,9 +2171,35 @@
       "acquisition_api_names": [
         "dc_index"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue persisted reference/member snapshots and daily/history coverage; retain unknown caps, removed-board discovery, cross-market semantics, revisions and membership PIT gaps.",
+      "contract_evidence": "docs/tushare-concept-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/concept-acceptance.json",
+        "release_id": "data-e1386fc1f304f2ef6ef34d3c59ec99b4f3d1ec34fd49c9841ddd7591a74e1bce",
+        "checked_at": "2026-09-09T00:29:17.364741+00:00",
+        "sample_rows": 1031,
+        "sample_requests": [
+          {
+            "idx_type": "行业板块",
+            "trade_date": "20260904"
+          },
+          {
+            "idx_type": "概念板块",
+            "trade_date": "20260904"
+          },
+          {
+            "idx_type": "地域板块",
+            "trade_date": "20260904"
+          }
+        ],
+        "requested_fields": 13,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-e1386fc1f304f2ef6ef34d3c59ec99b4f3d1ec34fd49c9841ddd7591a74e1bce",
+        "offline_evidence": "/tmp/concept4-mac-offline-verified-20260909.json",
+        "scope": "8 actual requests, 5803 source rows and 40 reviewed fields verified through raw, Parquet, 30 cloud queries and offline Mac. Source codes and DC request categories preserved; not full history or membership PIT."
+      }
     },
     {
       "doc_id": "363",

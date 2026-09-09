@@ -1,6 +1,6 @@
-# THS/DC 板块 4 接口纯候选
+# THS/DC 板块 4 接口接入
 
-从 263 项固定目录、13 项额外发现与正式 144 + 待集成涨跌停 4 接口对比，选择 `ths_index/ths_daily/ths_member/dc_index`。只新增纯合同、专属测试和本文，不改运行模块、目录台账、生产或 RRG 研究准入。
+本组接入 `ths_index/ths_daily/ths_member/dc_index`，完整保留目录、行情、最新成员和分类来源。范围仍为263项固定目录与13项额外发现，接口上线不解除RRG的历史成员/PIT限制。
 
 | 官方接口 | 页面门槛 / 行数限制 | 日期与字段关键约束 |
 |---|---|---|
@@ -11,11 +11,11 @@
 
 40 个官方输出字段、全部输入参数与现有目录一致。所有已知列放入 required/requested/extra 字段清单，非核心代码/日期允许 null；这不会把文档“暂无”变成已经可获取。实际未返回某列必须记录字段 gap，保留完整原始响应、未知新增列，不能用默认字段或静默补空宣告采集完整。
 
-实际权限全部 `unprobed`，用户 10100 积分只是超过页面数值门槛。合同运行上限 50 rpm 不等于账户频率，独立权益与返回字段仍需业务探测。
+合同初始权限为 `unprobed`；实际账户样本与启用状态见下方验收。用户10100积分本身不代替访问证据，合同50rpm是本地运行上限。
 
 ## 纯计划及接入边界
 
-导出 `CONCEPT_EXTRA_CONTRACTS`、`iter_concept_extra_jobs(config,today,identifiers=None)`、`concept_extra_prerequisites(...)`。未来组建议 `concept_extra`；配置 `concept_extra_apis`、`concept_extra_history_start`（字符串或每 API 字典），回退 `history_start`。
+导出 `CONCEPT_EXTRA_CONTRACTS`、`iter_concept_extra_jobs(config,today,identifiers=None)`、`concept_extra_prerequisites(...)`。运行组为 `concept_extra`；配置 `concept_extra_apis`、`concept_extra_history_start`（字符串或每 API 字典），回退 `history_start`。
 
 `ths_index` 每次刷新 epoch 只生成一个无筛选请求；`ths_member` 对存储发现的 `ths_indices` 每代码生成一个当前快照，不按日期循环、不查询伪历史参数。该依赖写入合同 `dependencies`，既有有限规划器才能在新代码发现后安排补齐。日线和 DC 最近覆盖 7 个自然日；历史下界全部未知，没有显式起点时不生成历史日期，配置后轮转惰性回填。无成员时仍可规划目录、日线和 DC，并保留待发现 gap。
 
@@ -31,3 +31,13 @@
 - `weight/in_date/out_date` 不可用，`is_new` 也不建立历史可知时点。当前成分、上市日期、事后榜单及本系统抓取时间不能取代 PIT 成员证据；旧修订和删除仍未闭合，RRG 的整体数据阻塞不解除。
 
 复验：`python3 -S -B scripts/test_tushare_concept_extra_contracts.py`。8 个测试覆盖完整字段、隐藏/暂无列、单次目录快照、跨市场/退役代码保留、三类 DC 请求、闰日分区、未知起点及按真实依赖校验；无 Pipeline、账户或生产访问。
+
+
+## 2026-09-09 08:36 生产与固定版验收
+
+- runtime100e4df已合入master/GitHub/cloud，404隔离tests（12.380秒）、Ruff和diff检查通过；双端源4574文件/hash b13bc9862198982a70eb86f1b3228497c9cbcfb929aeeee871a90a48182508a0一致。共152采集接口、6财务查询别名（KEYS158；扩展145+基础7）。此次无schema迁移。
+- 8真实请求耗时6.139秒：ths_index2517行（A/HK/US、七种type均观察到），ths_daily1877行，DC三类496/504/31行，三个ths_member快照309/15/54行，合计5803。40个显式字段全部返回，无日期/代码/类别过滤错配；raw/观察SHA及Parquet全列、请求identity通过。
+- THS日线total_mv/float_mv样本均非空；成员weight/in_date/out_date的378行全部null，is_new全部Y，不能推断历史区间。目录标A/typeBB的700014.TI成员实际309个.HK代码，目录count306与返回309不一致；目录exchange不是成员市场证明。HK目录871001.TI返回15个.HK；US目录861001.TI返回54条含.O/.N/.A代码。全部原码保留，不强转A股、不过滤超出目录count的记录；本次未宣称真实A股成员样本已验。
+- 四接口已启用，首轮近期500新任务；history游标先跳过500个近期项、尚未进入历史尾部，仍需持续推进，不能把此状态称为历史已下载。原13个未完成history签名/offset保留；limit历史规划已完成，不重置它。
+- 固定data-e1386fc1f304f2ef6ef34d3c59ec99b4f3d1ec34fd49c9841ddd7591a74e1bce：30次云端HTTP查询与独立raw/Parquet/去重结果全5803行一致，匿名401、upstream_calls=0。Mac新增4058、共159836镜像文件校验，禁socket/DNS/凭据同样5803行全列通过，24样本证据文件SHA通过；snapshot查询不套用日期过滤，DC三类别身份/THS成员与领涨股原码均保留。
+- 证据在云端validation/concept-extra-probe.json、concept-acceptance.json、concept4-api-acceptance.json、concept-runtime.json；Mac /tmp/concept4-mac-offline-verified-20260909.json。自动任务已有四个ths_member返回5549/5424/5216/5099行，因未知官方上限和本地5000guard标possibly_truncated/blocked，完整原文仍归档；这不是证明源实际截断。其余成员与日期任务继续。全历史/旧修订/退出成员/PIT和所有供应商隐藏字段全集仍未证完整。
