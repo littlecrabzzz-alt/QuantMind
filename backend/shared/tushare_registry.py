@@ -523,7 +523,37 @@ SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS = {
     for api, spec in SECURITIES_LENDING_HISTORY_CONTRACTS.items()
 }
 
+from backend.shared.tushare_account_history_contracts import (
+    ACCOUNT_HISTORY_CONTRACTS,
+    iter_account_history_jobs,
+    account_history_prerequisites,
+    project_account_period,
+)
+
+ACCOUNT_HISTORY_RUNTIME_CONTRACTS = {
+    api: {
+        **spec,
+        "date_field": "date",
+        "local_date_filter_note": (
+            "Default date filtering uses inclusive overlap of the recognized source "
+            "period; explicit _period_start or _period_end filters that endpoint. "
+            "This local interpretation does not establish supplier range semantics."
+            if api == "stk_account_old" else
+            "Date filtering compares the weekly source label without inventing a week start or a trading-day series."
+        ),
+    }
+    for api, spec in ACCOUNT_HISTORY_CONTRACTS.items()
+}
+
+# Output period parsing does not establish the supplier's range-selection axis.
+# Keep a saturated old-series window unresolved until that coverage is proven.
+ACCOUNT_HISTORY_RUNTIME_CONTRACTS["stk_account_old"].update(
+    split=None,
+    saturation_gap="Unverified local1000-row guard. Automatic range subdivision is disabled while supplier period-range coverage is unknown; retain raw/Parquet and the unresolved cap, with no invented offset or date parameter.",
+)
+
 EXTENDED_CONTRACTS = {
+    **ACCOUNT_HISTORY_RUNTIME_CONTRACTS,
     **SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS,
     **HISTORY_MINUTES_RUNTIME_CONTRACTS,
     **CALENDAR_EXTRA_RUNTIME_CONTRACTS,
@@ -575,6 +605,7 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "account_history": iter_account_history_jobs,
     "securities_lending_history": iter_securities_lending_history_jobs,
     "history_minutes": iter_history_minutes_jobs,
     "calendar_extra": iter_calendar_extra_jobs,

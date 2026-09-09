@@ -15,6 +15,7 @@ import re
 import tempfile
 
 from backend.shared.tushare_registry import (
+    ACCOUNT_HISTORY_RUNTIME_CONTRACTS,
     SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS,
     HISTORY_MINUTES_RUNTIME_CONTRACTS,
     CALENDAR_EXTRA_RUNTIME_CONTRACTS,
@@ -56,6 +57,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **ACCOUNT_HISTORY_RUNTIME_CONTRACTS,
     **SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS,
     **HISTORY_MINUTES_RUNTIME_CONTRACTS,
     **CALENDAR_EXTRA_RUNTIME_CONTRACTS,
@@ -535,6 +537,22 @@ def _dataset(root, release_id, api_name):
             ):
                 if spec.get(note):
                     metadata[note] = spec[note]
+        if api_name in ACCOUNT_HISTORY_RUNTIME_CONTRACTS:
+            for name, value in spec.items():
+                if name.endswith(("_gap", "_note")) or name in (
+                    "field_metadata", "hidden_fields", "permission_status", "date_field",
+                    "stopped_updates", "history_bound_verified", "row_cap_verified",
+                    "documented_row_cap", "documented_history_start_month", "documented_history_end",
+                ):
+                    metadata[name] = value
+            if api_name == "stk_account_old":
+                period_columns = {"_period_start", "_period_end", "_period_projection_status"}
+                metadata["period_projection_columns_present"] = period_columns.issubset(columns)
+                metadata["period_projection_unverified_rows"] = (
+                    db.execute("SELECT count(*) FROM stored WHERE _period_projection_status IS DISTINCT FROM 'projected' OR _period_start IS NULL OR _period_end IS NULL").fetchone()[0]
+                    if period_columns.issubset(columns) else relation.count("*").fetchone()[0]
+                )
+                metadata["period_date_semantics"] = spec["local_date_filter_note"]
         if api_name in SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS:
             for name, value in spec.items():
                 if name.endswith(("_gap", "_note")) or name in (
@@ -677,6 +695,8 @@ def _date_expression(field, columns):
 
 
 def _default_date_field(api_name, columns):
+    if api_name in ACCOUNT_HISTORY_RUNTIME_CONTRACTS:
+        return "date"
     if api_name in HISTORY_MINUTES_RUNTIME_CONTRACTS:
         return "trade_time"
     if api_name in CALENDAR_EXTRA_RUNTIME_CONTRACTS:
@@ -730,19 +750,39 @@ def _query(
         params.append(cutoff)
     if start_date is not None or end_date is not None:
         date_field = date_field or _default_date_field(api_name, columns)
+        old_period = api_name == "stk_account_old"
+        if old_period:
+            if date_field not in ("date", "_period_start", "_period_end"):
+                raise ValueError("Choose date overlap, _period_start or _period_end for old account periods")
+            if not {"_period_start", "_period_end", "_period_projection_status"}.issubset(columns):
+                raise ValueError("period_projection_unverified: stored projection missing; raw data remains available")
+            invalid = "(_period_projection_status IS DISTINCT FROM 'projected' OR _period_start IS NULL OR _period_end IS NULL)"
+            check_params = []
+            if cutoff:
+                invalid += ' AND TRY_CAST("_fetched_at" AS TIMESTAMPTZ) <= CAST(? AS TIMESTAMPTZ)'
+                check_params.append(cutoff)
+            if db.execute("SELECT 1 FROM stored WHERE " + invalid + " LIMIT 1", check_params).fetchone():
+                raise ValueError("period_projection_unverified: date filtering could omit unrecognized source periods; raw unfiltered read remains available")
         minute = api_name in HISTORY_MINUTES_RUNTIME_CONTRACTS and date_field == "trade_time"
         if minute:
             column = "CAST(" + _identifier(date_field, columns) + " AS VARCHAR)"
             expression = "TRY_STRPTIME(replace(" + column + ", 'T', ' '), '%Y-%m-%d %H:%M:%S')"
         else:
-            expression = _date_expression(date_field, columns)
+            expression = _date_expression(
+                "_period_end" if old_period and date_field == "date" else date_field, columns
+            )
         start = (_minute_time(start_date) if minute else _date(start_date)) if start_date is not None else None
         end = (_minute_time(end_date, end=True) if minute else _date(end_date)) if end_date is not None else None
         if start and end and start > end:
             raise ValueError("start_date is after end_date")
         for value, operator in ((start, ">="), (end, "<=")):
             if value:
-                filters.append(expression + operator + ("CAST(? AS TIMESTAMP)" if minute else "CAST(? AS DATE)"))
+                boundary = (
+                    _date_expression("_period_start", columns)
+                    if old_period and date_field == "date" and operator == "<="
+                    else expression
+                )
+                filters.append(boundary + operator + ("CAST(? AS TIMESTAMP)" if minute else "CAST(? AS DATE)"))
                 params.append(value)
     elif date_field is not None:
         _identifier(date_field, columns)
@@ -837,7 +877,7 @@ def dataset_schema(root, release_id, api_name):
             ],
             "keys": keys,
             "default_date_field": _default_date_field(api_name, columns),
-            "period_date_semantics": "month and quarter filters use the period's first calendar day",
+            "period_date_semantics": metadata.get("period_date_semantics", "month and quarter filters use the period's first calendar day"),
         }
 
 

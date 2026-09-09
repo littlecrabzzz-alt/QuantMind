@@ -25,6 +25,9 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from backend.shared.tushare_registry import (
+    ACCOUNT_HISTORY_RUNTIME_CONTRACTS,
+    account_history_prerequisites,
+    project_account_period,
     SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS,
     securities_lending_history_prerequisites,
     HISTORY_MINUTES_RUNTIME_CONTRACTS,
@@ -666,6 +669,16 @@ class Pipeline:
                 for field in ("con_code", "leading_code"):
                     if isinstance(row.get(field), str):
                         row["source_" + field] = row[field]
+            if result["api_name"] == "stk_account_old":
+                try:
+                    begin, end = project_account_period(row.get("date"))
+                except ValueError:
+                    begin, end = None, None
+                row["_period_start"] = begin
+                row["_period_end"] = end
+                row["_period_projection_status"] = (
+                    "projected" if begin else "period_projection_unverified"
+                )
             if result["api_name"] in SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS:
                 code = row.get("ts_code")
                 if not isinstance(code, str) or not re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", code):
@@ -730,7 +743,7 @@ class Pipeline:
                 "l3_code",
                 "index_code",
             ):
-                if result["api_name"] in CALENDAR_EXTRA_RUNTIME_CONTRACTS or result["api_name"] == "factor_list":
+                if result["api_name"] in CALENDAR_EXTRA_RUNTIME_CONTRACTS or result["api_name"] in ACCOUNT_HISTORY_RUNTIME_CONTRACTS or result["api_name"] == "factor_list":
                     continue  # Calendar/factor taxonomy labels are not securities.
                 if result["api_name"] == "factor_value" and key != "ts_code":
                     continue
@@ -841,6 +854,14 @@ class Pipeline:
                 "sha256": sha,
                 "bytes": destination.stat().st_size,
             }
+            if result["api_name"] == "stk_account_old":
+                unverified = sum(row["_period_projection_status"] != "projected" for row in rows)
+                result["period_projection_unverified_rows"] = unverified
+                if unverified:
+                    # Keep the complete Parquet and raw evidence. The existing run
+                    # error path records blocked plus this explicit reason.
+                    result["period_projection_gap"] = "period_projection_unverified"
+                    raise ValueError("period_projection_unverified: raw periods retained")
             return result
         finally:
             tmp.unlink(missing_ok=True)
@@ -1372,6 +1393,7 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "account_history": account_history_prerequisites,
             "securities_lending_history": securities_lending_history_prerequisites,
             "history_minutes": history_minutes_runtime_prerequisites,
             "calendar_extra": calendar_extra_prerequisites,
@@ -1445,6 +1467,10 @@ class Pipeline:
         self.planning_timing["active_stage"] = "validation_and_snapshots"
         blocked_families = set()
         for family, validate in (
+            (
+                "account_history",
+                lambda cfg, ids: self.record_extra_planning_gaps("account_history", cfg, ids),
+            ),
             (
                 "securities_lending_history",
                 lambda cfg, ids: self.record_extra_planning_gaps("securities_lending_history", cfg, ids),
