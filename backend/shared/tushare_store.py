@@ -19,6 +19,7 @@ from backend.shared.tushare_registry import (
     TRADING_EVENT_RUNTIME_CONTRACTS,
     LISTING_EXTRA_RUNTIME_CONTRACTS,
     LIMIT_EXTRA_RUNTIME_CONTRACTS,
+    CONCEPT_EXTRA_RUNTIME_CONTRACTS,
 )
 from backend.shared.tushare_credit_extra_contracts import CREDIT_EXTRA_CONTRACTS
 from backend.shared.tushare_etf_basket_contracts import ETF_BASKET_CONTRACTS
@@ -43,6 +44,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **CONCEPT_EXTRA_RUNTIME_CONTRACTS,
     **LIMIT_EXTRA_RUNTIME_CONTRACTS,
     **LISTING_EXTRA_RUNTIME_CONTRACTS,
     **TRADING_EVENT_RUNTIME_CONTRACTS,
@@ -406,8 +408,10 @@ def _dataset(root, release_id, api_name):
                 for f in ("_row_identity",) + TEXT_FIELDS
                 if f in columns and f not in keys
             ]
-        if "ts_code" in columns and not api_name.startswith(
-            ("opt_", "sge_", "fx_", "us_")
+        if (
+            "ts_code" in columns
+            and api_name not in CONCEPT_EXTRA_RUNTIME_CONTRACTS
+            and not api_name.startswith(("opt_", "sge_", "fx_", "us_"))
         ):
             # Canonicalize the old stored supplier spelling without rewriting
             # immutable partitions or merging its distinct historical identity.
@@ -462,8 +466,11 @@ def _dataset(root, release_id, api_name):
                 metadata["source_scalar_note"] = (
                     "Legacy PCF numeric encoding unknown; never assume strings are encoded JSON."
                 )
-        if api_name in LISTING_EXTRA_RUNTIME_CONTRACTS:
-            for note in ("date_axis_note", "namespace_note", "history_gap"):
+        if (
+            api_name in LISTING_EXTRA_RUNTIME_CONTRACTS
+            or api_name in CONCEPT_EXTRA_RUNTIME_CONTRACTS
+        ):
+            for note in ("date_axis_note", "namespace_note", "history_gap", "cap_note"):
                 if spec.get(note):
                     metadata[note] = spec[note]
         if identity_fields:
@@ -596,7 +603,10 @@ def _query(
             "o_code",
             "n_code",
         }.issubset(columns)
-        concept_source = api_name == "limit_cpt_list" and code_field == "ts_code"
+        concept_source = (api_name == "limit_cpt_list" and code_field == "ts_code") or (
+            api_name in CONCEPT_EXTRA_RUNTIME_CONTRACTS
+            and code_field in ("ts_code", "con_code", "leading_code")
+        )
         if not (mapping_source or concept_source) and any(
             re.fullmatch(r"[0-9]{6}\.(SH|SZ|BJ)", c) for c in codes
         ):
