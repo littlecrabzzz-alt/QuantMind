@@ -15,6 +15,7 @@ import re
 import tempfile
 
 from backend.shared.tushare_registry import (
+    HISTORY_MINUTES_RUNTIME_CONTRACTS,
     CALENDAR_EXTRA_RUNTIME_CONTRACTS,
     FACTOR_LIBRARY_RUNTIME_CONTRACTS,
     BOND_EXTRA_RUNTIME_CONTRACTS,
@@ -54,6 +55,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **HISTORY_MINUTES_RUNTIME_CONTRACTS,
     **CALENDAR_EXTRA_RUNTIME_CONTRACTS,
     **FACTOR_LIBRARY_RUNTIME_CONTRACTS,
     **BOND_EXTRA_RUNTIME_CONTRACTS,
@@ -531,7 +533,7 @@ def _dataset(root, release_id, api_name):
             ):
                 if spec.get(note):
                     metadata[note] = spec[note]
-        if api_name in BOND_EXTRA_RUNTIME_CONTRACTS or api_name in CALENDAR_EXTRA_RUNTIME_CONTRACTS or api_name in FACTOR_LIBRARY_RUNTIME_CONTRACTS:
+        if api_name in BOND_EXTRA_RUNTIME_CONTRACTS or api_name in CALENDAR_EXTRA_RUNTIME_CONTRACTS or api_name in FACTOR_LIBRARY_RUNTIME_CONTRACTS or api_name in HISTORY_MINUTES_RUNTIME_CONTRACTS:
             for note, value in spec.items():
                 if note.endswith(("_gap", "_note")) or note in (
                     "field_gaps", "field_metadata", "hidden_fields", "permission_status",
@@ -609,6 +611,17 @@ def _date(value):
         raise ValueError("Expected a valid calendar date") from exc
 
 
+def _minute_time(value, *, end=False):
+    """Naive supplier wall time only; dates select the whole wall-clock day."""
+    if isinstance(value, datetime):
+        if value.tzinfo is not None or value.microsecond:
+            raise ValueError("Minute bounds require seconds and no inferred timezone")
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(value, str) and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}:[0-9]{2}", value):
+        return datetime.strptime(value.replace("T", " "), "%Y-%m-%d %H:%M:%S").strftime("%Y-%m-%d %H:%M:%S")
+    return _date(value) + (" 23:59:59" if end else " 00:00:00")
+
+
 def _as_of(value):
     if value is None:
         return None
@@ -654,6 +667,8 @@ def _date_expression(field, columns):
 
 
 def _default_date_field(api_name, columns):
+    if api_name in HISTORY_MINUTES_RUNTIME_CONTRACTS:
+        return "trade_time"
     if api_name in CALENDAR_EXTRA_RUNTIME_CONTRACTS:
         return CALENDAR_EXTRA_RUNTIME_CONTRACTS[api_name]["date_field"]
     if api_name in FACTOR_LIBRARY_RUNTIME_CONTRACTS:
@@ -705,14 +720,19 @@ def _query(
         params.append(cutoff)
     if start_date is not None or end_date is not None:
         date_field = date_field or _default_date_field(api_name, columns)
-        expression = _date_expression(date_field, columns)
-        start = _date(start_date) if start_date is not None else None
-        end = _date(end_date) if end_date is not None else None
+        minute = api_name in HISTORY_MINUTES_RUNTIME_CONTRACTS and date_field == "trade_time"
+        if minute:
+            column = "CAST(" + _identifier(date_field, columns) + " AS VARCHAR)"
+            expression = "TRY_STRPTIME(replace(" + column + ", 'T', ' '), '%Y-%m-%d %H:%M:%S')"
+        else:
+            expression = _date_expression(date_field, columns)
+        start = (_minute_time(start_date) if minute else _date(start_date)) if start_date is not None else None
+        end = (_minute_time(end_date, end=True) if minute else _date(end_date)) if end_date is not None else None
         if start and end and start > end:
             raise ValueError("start_date is after end_date")
         for value, operator in ((start, ">="), (end, "<=")):
             if value:
-                filters.append(expression + operator + "CAST(? AS DATE)")
+                filters.append(expression + operator + ("CAST(? AS TIMESTAMP)" if minute else "CAST(? AS DATE)"))
                 params.append(value)
     elif date_field is not None:
         _identifier(date_field, columns)
