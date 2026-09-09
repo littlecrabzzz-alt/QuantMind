@@ -2211,9 +2211,38 @@
       "acquisition_api_names": [
         "dc_member"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue all historical DC dates and board fanout; preserve source has_more saturation, retired-universe and intraday/PIT gaps. Do not treat the wide member sample or category mapping samples as complete historical coverage.",
+      "contract_evidence": "docs/tushare-dc-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/dc-acceptance.json",
+        "release_id": "data-0a801f56529c55444386be12892cdaaa1d864c2aa64e4a5bef86ce0131897ad1",
+        "checked_at": "2026-09-09T01:06:24.723863+00:00",
+        "sample_rows": 8038,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "trade_date": "20260904",
+            "ts_code": "BK1230.DC"
+          },
+          {
+            "trade_date": "20260904",
+            "ts_code": "BK0805.DC"
+          },
+          {
+            "trade_date": "20260904",
+            "ts_code": "BK0162.DC"
+          }
+        ],
+        "requested_fields": 4,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-0a801f56529c55444386be12892cdaaa1d864c2aa64e4a5bef86ce0131897ad1",
+        "offline_evidence": "/tmp/dc2-mac-offline-verified-20260909.json",
+        "scope": "Seven actual requests, 9069 raw rows and 17 reviewed fields; 16 overlapping member rows deduplicated to 9053 query rows. Raw/Parquet, 12 authenticated cloud queries and offline Mac agree. Wide member response has_more=true remains incomplete."
+      }
     },
     {
       "doc_id": "382",
@@ -2225,9 +2254,35 @@
       "acquisition_api_names": [
         "dc_daily"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue all historical DC dates and board fanout; preserve source has_more saturation, retired-universe and intraday/PIT gaps. Do not treat the wide member sample or category mapping samples as complete historical coverage.",
+      "contract_evidence": "docs/tushare-dc-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/dc-acceptance.json",
+        "release_id": "data-0a801f56529c55444386be12892cdaaa1d864c2aa64e4a5bef86ce0131897ad1",
+        "checked_at": "2026-09-09T01:06:24.723863+00:00",
+        "sample_rows": 1031,
+        "sample_requests": [
+          {
+            "idx_type": "行业板块",
+            "trade_date": "20260904"
+          },
+          {
+            "idx_type": "概念板块",
+            "trade_date": "20260904"
+          },
+          {
+            "idx_type": "地域板块",
+            "trade_date": "20260904"
+          }
+        ],
+        "requested_fields": 13,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-0a801f56529c55444386be12892cdaaa1d864c2aa64e4a5bef86ce0131897ad1",
+        "offline_evidence": "/tmp/dc2-mac-offline-verified-20260909.json",
+        "scope": "Seven actual requests, 9069 raw rows and 17 reviewed fields; 16 overlapping member rows deduplicated to 9053 query rows. Raw/Parquet, 12 authenticated cloud queries and offline Mac agree. Wide member response has_more=true remains incomplete."
+      }
     },
     {
       "doc_id": "369",
