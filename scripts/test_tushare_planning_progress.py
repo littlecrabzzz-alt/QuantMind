@@ -2,7 +2,7 @@
 """Offline regression for family signatures and finite discovery snapshots."""
 
 from copy import deepcopy
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import json
 from pathlib import Path
 import sys
@@ -252,13 +252,17 @@ class PlanningProgress(unittest.TestCase):
             ("history:structured", "20250101", "0" * 64, 9000, 1),
         )
         self.p.db.commit()
-        self.tick()
+        stats = self.tick()["history:structured"]
         first = self.state()
-        self.assertEqual(first["offset"], 2)
+        self.assertEqual(first["offset"], 4)  # Two recent source entries, two history.
+        self.assertEqual(stats["skipped_recent"], 2)
+        self.assertEqual(stats["new_jobs"] + stats["existing_jobs"], 2)
         self.assertEqual(json.loads(first["signature"])["version"], 1)
-        self.tick()
+        stats = self.tick()["history:structured"]
         self.assertEqual(self.state()["signature"], first["signature"])
-        self.assertEqual(self.state()["offset"], 4)
+        self.assertEqual(self.state()["offset"], 6)
+        self.assertEqual(stats["skipped_recent"], 0)
+        self.assertEqual(stats["new_jobs"] + stats["existing_jobs"], 2)
 
     def test_actual_declared_and_implicit_dependencies(self):
         expected = [
@@ -378,8 +382,8 @@ class PlanningProgress(unittest.TestCase):
                 if job["epoch"] == "history":
                     continue
                 params = job["params"]
-                left = date.fromisoformat(params["start_date"])
-                right = date.fromisoformat(params["end_date"])
+                left = datetime.strptime(params["start_date"], "%Y%m%d").date()
+                right = datetime.strptime(params["end_date"], "%Y%m%d").date()
                 ranges.setdefault(job["api_name"], set()).update(
                     left + timedelta(days=n) for n in range((right - left).days + 1)
                 )
