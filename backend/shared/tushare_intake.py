@@ -119,7 +119,9 @@ def parse_document(html, doc_id, title):
         if key not in schemas:
             continue
         for row in table["rows"][1:]:
-            if row and re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", row[0]):
+            # Supplier fields include rate tenors (1w) and returns (3day).
+            # They are quoted data columns, not Python/API identifiers.
+            if row and re.fullmatch(r"[A-Za-z0-9_]+", row[0]):
                 if row[0] not in schemas[key]:
                     schemas[key].append(row[0])
     return {
