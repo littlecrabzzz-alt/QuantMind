@@ -49,3 +49,5 @@ Typecheck 通过；本地窄屏真实点击及重复点击后详情 top=144、�
 - 原 `test_research_persistence.py` 通过，包含真实临时 Docker 取消、暂停、恢复、租约与幂等。
 - 原数值/合同/Agent/GLM 17 项单元检查通过；前端 `npm run typecheck --workspace=electron` 通过。
 - 保存、讨论、计划生成的验收不授权新研究计算；以前取消的课题没有被继续。两端上线与真实模型结果另在下方追加，隔离检查不冒充线上完成。
+
+真实规划首次暴露 high/6000 输出预算被推理消耗：finish_reason=length，6000 completion tokens 中5980为reasoning，未得到工具参数；没有据此生成计划/执行。讨论请求改为单独冻结 low/12000，执行候选沿用既有默认。GLM-5.3不可关闭思考，low支持依据 [提供商参数说明](https://docs.bigmodel.cn/cn/guide/models/text/glm-5.3)。Mac宿主 Python 初次 SSL 证书链缺失产生 uncertain 记录；隔离测试指定 certifi CA 后恢复，未关闭 TLS 验证。正式容器沿用其既有证书环境。

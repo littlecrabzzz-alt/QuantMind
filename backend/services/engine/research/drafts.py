@@ -78,7 +78,7 @@ class DraftStore:
                 "current_plan": s["plans"][-1]["plan"] if s["plans"] else None,
                 "history": s["messages"][-12:], "execution_evidence": evidence}
             s["job"] = {"id": job_id, "mode": mode, "status": "queued", "prompt": json.dumps(context, ensure_ascii=False),
-                        "contract": {"model": model, "model_base_url": model_url}, "deadline": time.time()+900,
+                        "contract": {"model": model, "model_base_url": model_url, "reasoning_effort": "low", "max_tokens": 12000}, "deadline": time.time()+900,
                         "corrections": [], "error": None}
             if mode != "ask":
                 s["needs_plan"] = True
