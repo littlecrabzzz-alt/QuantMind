@@ -356,3 +356,14 @@
 - 正在准备最大23真实请求的probe与全列固定verifier；逐API启用helper由原审核版缩为单family，8个隔离负例通过，含隐藏字段缺失、YC类型未验、饱和、过滤、缺对照、重复请求和权限阻断。所有脚本齐备才部署，不为等脚本暂停生产。
 - RRG40于04:34:08Z只读核查2done/38pending；20250930 daily5423与adj_factor5437，共10860来源行、6raw/obs/Parquet文件SHA/全列通过，无空或失败。所查云固定8f9d1c65与Mac41d91a尚未包含新6文件，不能宣称完整窗口离线。报告/tmp/tushare-rrg40-current-evidence.json SHA f91fa69e73a363542cbfdd7628df2ff133c12755e1f85ad2c4976a830c252ac9。
 - TDX/KP成员先准备6个实际已存板块的合法code分区探测，父3000行仅下界；保留未知板块/成员全集、第二维、PIT缺口。将2API加入已运行market_sentiment会改变旧交织历史policy，需单独追加scope迁移；本轮不重置旧游标来放行。完整目录/历史/修订/附件范围继续。
+
+
+## 2026-09-09 13:12 六个债券接口启用与并行验收
+
+- 092dedf已部署master/GitHub/cloud，200采集API/206读取dataset；4745文件、source_digest36ff07ee8b5780454240fde6cebbc080a74badc1456a807c99ee1ba55267c048。仅采集消费者04:46:07Z暂停接新任务，04:47:42Z自然排空，04:51:06Z恢复；文档和US消费者保留。四服务健康检查通过。
+- bond8初次11 HTTP/12结果遗漏了可用CB种子；有限发现修复优先已验cross6原文，同epoch补9请求/382行，旧12观察/对象均未重抓，累计20调用/21结果。19项隔离测试通过。云/Mac固定0a5af2a6全部原文、70已知字段、61相关文件及reader对账通过，共同证据一致；YC独立权限拒绝；bc_otcqt bulk2000保护阈值，精确09/04范围却含09/07—09/09三行，保持饱和和过滤阻断。
+- top10_cb_holders、cb_rating、repo_daily、bond_blk、bond_blk_detail、bc_bestotcqt六接口已按验收启用；新增500近期+500历史任务，旧无关配置/规划/请求门控保持。启用无上游调用，审计validation/bond8-enable-20260909T050941Z-b53f05c7.json，发布data-6ef5044ed2d8d677129d4d96d2d751709e1fd9c97c9763a038998ba055268039。有限样本和启用不代表完整历史。
+- TDX/KP六个合法成员分片真实985行，11字段/27相关文件云/Mac固定验收相同（完整报告同SHA17f5dafdb03172fede12f6a914e68940040beeefc9b6c3bd8660e69ccfd9785c）。父已见子集不缺，未知全集、第二维、PIT及追加scope迁移8项缺口保留；两个成员API仍不启用，不重置旧历史策略。
+- 标准Mac mirror固定data-0a5af2a613b00f3c8cf088662215614fb1d56ba38c162f480a270634370103a1已校验267257文件，新增6798；bond Mac报告SHA78a547f9a16783e5ecae4b82d54b080328b5564b074143b8eab269fb7a9e19a0。此验收不声称Mac已追平后续启用版。证据归档validation/intake-batch-20260909T044559Z。
+- RRG40于05:01:54Z为14 done/26 pending，75992行、空/失败0；当时e79fc1f4云/Mac已含8项，另外6已落盘。未重复扫描后续当前数，完整日历/成员PIT/ETF映射仍待验收。RRG优先窗口、其他接口开发、固定验收和镜像并行，不等全目录历史结束。
+- 下一calendar/factor5纯候选5aa26e1（26字段）及目录解析候选f024021（12相关测试）已独立推送，未合入或部署。后者只修复schema表头并定点486输出13→真实4，保留数字起首字段和全部源HTML证据。263基线+13发现及完整历史、修订、附件范围不缩减。
