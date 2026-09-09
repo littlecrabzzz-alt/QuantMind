@@ -29,6 +29,8 @@ from backend.shared.tushare_registry import (
     PLANNERS,
     contract_for,
     risk_event_runtime_prerequisites,
+    technical_extra_runtime_prerequisites,
+    TECHNICAL_EXTRA_RUNTIME_CONTRACTS,
 )
 from backend.shared.tushare_global_contracts import (
     GLOBAL_CONTRACTS,
@@ -663,6 +665,10 @@ class Pipeline:
 
     def identifiers(self):
         families = {
+            **dict.fromkeys(TECHNICAL_EXTRA_RUNTIME_CONTRACTS, "technical_stocks"),
+            "daily": "technical_stocks",
+            "daily_basic": "technical_stocks",
+            "adj_factor": "technical_stocks",
             "stock_st": "risk_stocks",
             "st": "risk_stocks",
             "stk_shock": "risk_stocks",
@@ -782,6 +788,11 @@ class Pipeline:
             result["stocks"]
             | result["historical_listing_securities"]
             | result["trading_event_securities"]
+        )
+        # Keep technical history wider than current listings, in its own namespace.
+        # Source attempts include retired/T codes and saturated observations.
+        result["technical_stocks"].update(
+            result["risk_stocks"] | result["limit_securities"]
         )
         result["risk_securities"].update(
             result["risk_stocks"] | result["funds"] | result["etfs"]
@@ -950,6 +961,7 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "technical_extra": technical_extra_runtime_prerequisites,
             "risk_event": risk_event_runtime_prerequisites,
             "dc_extra": dc_extra_prerequisites,
             "concept_extra": concept_extra_prerequisites,
@@ -984,6 +996,12 @@ class Pipeline:
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
+            (
+                "technical_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "technical_extra", cfg, ids
+                ),
+            ),
             (
                 "risk_event",
                 lambda cfg, ids: self.record_extra_planning_gaps(
