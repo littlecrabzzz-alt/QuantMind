@@ -241,3 +241,12 @@
 
 - 空间专项只读核算：/data/tushare所选文件按device+inode去重后28.16GiB，其中元数据17.68GiB（62.8%）；release/archive10.45GiB、历史文档索引7.03GiB、原始响应6.35GiB、Parquet1.99GiB、附件0.86GiB。此数不含目录、未列子目录、数据库及外部备份，不是整盘总量。164对旧release/archive同大小不同inode，潜在去重3.628GiB，尚未逐对SHA验证或实际回收；当前新别名已安全硬链接。最新不同版本manifest约66.7MB，若大小不变且每120秒产生新版，静态估算44.72GiB/日；不是实测日增长。证据/tmp/tushare-storage-review-20260909.json及003856Z主题记录。
 - 优先并行准备常规tick发布间隔候选（默认0兼容，后续可设900秒最小间隔）：API采集、原文、observations/attempts、文档尝试继续每批持久化，手动publish立即，减少重复全量清单；保留审查确认后续固定版仍包含全部原文/观察/尝试，减少的是中间状态索引快照。尚未实现上线或修改生产频率，实际新鲜度还受120秒tick和Mac15分钟轮询影响，不能承诺严格15分钟。旧副本去重另留方案，不删除历史、不改manifest schema。
+
+
+## 2026-09-09 09:17 DC2闭环与RRG优先级核验
+
+- 上轮e87dc2b集成是进展；本轮已发布DC历史成员/板块日线并启用，154采集API+6查询别名。7真实请求6.447秒、9069原始行、17字段；去重16重叠成员后9053行，经12云端HTTP和Mac禁网读取全列一致。Mac新增9439/共180862文件校验，固定0a801f56完整ID/报告见docs/tushare-dc-extra-intake.md。wide成员has_more=true明确缺口，不将8000行称完整。12个未完旧history游标保持。
+- interval900于01:07:09Z启用。首次自动发布01:09:52Z，333请求/130.596秒，发布24.962秒；随后两次真实deferred为01:11:37Z与01:13:23Z，整批104.882/105.522秒，CURRENT校验1.014/0.982秒，采集继续且固定release保持e9da1c41。最早01:24:52Z才到期，最终新manifest闭包尚待真实验证；不可将此记录视为完整节奏验收。证据由structured保存在/tmp/tushare-live-interval-acceptance/，水位从manifest实际覆盖的API55186/doc4432算起，未误把抓取时新增181/12条当已发布。
+- 并行RRG薄适配da146cf→f7aa20c仅3新增文件，父重跑3专项tests及3产物SHA通过。固定输入36008价格行、1934日历行，48月末映射含20260831→20260901；复用既有坐标报告，不重算策略。input-report SHA490dad76ec985055155534cdcb7662de4b07684850de4666a3c356669331ab8f，位置/tmp/quantmind-rrg-case-inputs-20260909-final/。industry_members/etf_prices/etf_holdings/etf_pcf仍未准备，gates unknown/blocked_data，未改他人研究文件。
+- RRG关键股票三API已启用且20260908真实sample_ok，停在各1分区的原因是structured同优先级namechange前缀、后续8712个index_daily及API顺序历史枚举；daily_basic历史尚未排到，不能误诊为权限或下载完。准备对原队列的21近日期+最多90研究切片作有界优先级调整，不重置tries/result/历史游标，不变更其他数据组份额；尚未执行时不宣称已提速。
+- 风险5纯1e701c6与runtime1e6716a已在独立分支通过439tests，下一批准备中，未上线/未probe/未enable。父尚未pick；实际probe与云/Mac固定版验收脚本已备好，见/tmp/tushare-risk-probe-handoff.md。全263基线+13发现、剩余接口/历史/修订/PDF与RRG准入继续推进。

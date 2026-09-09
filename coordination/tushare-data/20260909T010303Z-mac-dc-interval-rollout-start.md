@@ -1,0 +1,5 @@
+# DC2 与发布间隔正式部署开始
+
+上一turn是进展：e87dc2b集成425tests/Ruff通过并push，主线尚d57。发布前handoff passed：4589文件/ba4c123293a3a2766eee2a613c2df322dd083e903f924b36aaffa04e09570b12，两端d57及snapshot一致。
+2026-09-09T01:02:13Z仅取消自有两个消费队列，等待acquire92af0819-bc32-4e87-8497-7967f6261ad6和documents f9b1c971-ee15-4d21-ad86-b8e331b7cdb7自然完成。research空，普通US任务88fe98db仍保持；没有撤销/终止任务。
+下一步排空确认后快进master到e87、handoff对齐，再业务容器执行已准备7请求DC探测及审计/启用。interval以900真实时间验证，保存首次自动publish与deferred增量水位，未过真实到期不得称生产节奏验收完成。恢复quantmind及两个专属worker后立刻继续采集，固定版API/Mac验证与其他开发并行。若发布受阻，先恢复两个已取消队列。父只持有部署与验收脚本；风险runtime和RRG薄适配在独立worktree继续。
