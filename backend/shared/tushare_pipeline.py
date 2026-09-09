@@ -2973,19 +2973,6 @@ def tick(max_requests=None, max_seconds=None):
     authority()
     if not (ROOT / "ENABLED").exists():
         return {"status": "disabled"}
-    config = json.loads((ROOT / "pipeline-config.json").read_bytes())
-    config.setdefault("requests_per_minute", 240)
-    max_requests = (
-        max_requests if max_requests is not None else config.get("batch_requests", 360)
-    )
-    max_seconds = (
-        max_seconds if max_seconds is not None else config.get("batch_seconds", 100)
-    )
-    if not 1 <= int(max_requests) <= 1000 or not 1 <= float(max_seconds) <= 100:
-        raise ValueError("Invalid bounded batch limits")
-    publish_interval = config.get("publish_interval_seconds", 0)
-    if type(publish_interval) is not int or publish_interval < 0:
-        raise ValueError("Invalid publication interval")
     catalog = json.loads(
         (
             Path(__file__).resolve().parents[2] / "config/tushare-catalog.json"
@@ -2996,6 +2983,22 @@ def tick(max_requests=None, max_seconds=None):
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return {"status": "already_running"}
+        pending_migration = ROOT / "factor-month-migration.pending.json"
+        if pending_migration.exists() or pending_migration.is_symlink():
+            return {"status": "blocked_pending_migration", "migration": "factor_month"}
+        config = json.loads((ROOT / "pipeline-config.json").read_bytes())
+        config.setdefault("requests_per_minute", 240)
+        max_requests = (
+            max_requests if max_requests is not None else config.get("batch_requests", 360)
+        )
+        max_seconds = (
+            max_seconds if max_seconds is not None else config.get("batch_seconds", 100)
+        )
+        if not 1 <= int(max_requests) <= 1000 or not 1 <= float(max_seconds) <= 100:
+            raise ValueError("Invalid bounded batch limits")
+        publish_interval = config.get("publish_interval_seconds", 0)
+        if type(publish_interval) is not int or publish_interval < 0:
+            raise ValueError("Invalid publication interval")
         if shutil.disk_usage(ROOT).free < 100 * 2**30:
             return {"status": "blocked_disk_reserve"}
         token = None

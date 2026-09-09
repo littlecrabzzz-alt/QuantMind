@@ -1,6 +1,6 @@
 # 因子值历史月窗口候选
 
-新增显式 `factor_library_history_window: "month"`，只接受 `factor_library_value_mode: "code_only"`。省略或设为 `"daily"` 均保持现有按日请求和有效 policy 字节不变；默认名称模式仍照旧按日。没有修改默认启用范围、供应商参数、四个字段、6000 行阈值或证券发现。这里只交候选，不启用、不迁移生产队列。
+新增显式 `factor_library_history_window: "month"`，只接受 `factor_library_value_mode: "code_only"`。省略或设为 `"daily"` 均保持现有按日请求和有效 policy 字节不变；默认名称模式仍照旧按日。没有修改默认启用范围、供应商参数、四个字段、6000 行阈值或证券发现。这里只交候选，未启用或迁移生产队列。
 
 ```json
 {
@@ -40,32 +40,50 @@ probe SHA `0f08f3f950accdf373de33102df6f7ea0bf172e82371b749ace0631af6548fab`。
 
 1. 保存审计前像：完整旧配置及SHA、`recent:factor_library` 与 `history:factor_library` 的 anchor/signature/offset/done、冻结 identifiers/epoch，以及受影响确切 job ID、job内容、state、tries、result、priority、retry_after。保留只读可恢复的旧游标副本和旧日义务范围；原记录、raw/observation/Parquet/attempt 不删除、不改写。
 2. 在纯规划层证明转换：使用**旧冻结股票集合、起点及 anchor**，对旧历史 `[start,anchor-7天]` 建立代码×区间的月覆盖证明。每个区间起止连续，相邻端点差一天；输出区间证明摘要及SHA，不需要物化千万个日期。旧游标尚未枚举的尾部也在证明范围内。旧近期义务保持原队列，不移作历史；新股票和新 anchor 待独立策略接续。
-3. 在所有旧游标及配置前像仍匹配时，原子保存旧日检查点与迁移映射，再创建从0开始的月规划状态。新 policy 和新 offset 属于新流，绝不复用旧日 offset。需要对开始前/中途崩溃、重复执行、同时新增发现进行故障注入；如无法原子保存与切换则整次拒绝。这里没有新增运行时迁移代码或宣布可以直接操作。
+3. 在所有旧游标及配置前像仍匹配时，原子保存旧日检查点与迁移映射，再创建从0开始的月规划状态。新 policy 和新 offset 属于新流，绝不复用旧日 offset。需要对开始前/中途崩溃、重复执行、同时新增发现进行故障注入；如无法原子保存与切换则整次拒绝。具体可恢复协议见下节；仍不能跳过审计直接改配置。
 4. 已有日任务可继续消费。若为减少重复而采用可逆 deferred 状态，必须使用逐 job ID 审计映射保留原值，并证明其日期、代码落在对应新月范围。**仅新月已入队不足以放弃旧义务**：月任务失败、空/缺字段、权限不足、饱和未闭合时，旧日义务仍为未解决并可恢复。只有来源/字段/过滤及完整子分区闭包验证通过后，才可按明确覆盖规则处理对应待执行日任务；done、已有尝试及正在执行的任务不做替换。
 5. 回滚不能恢复旧整库覆盖新增进度。按迁移审计精确撤回仍符合前像的配置/状态；保留新月已经取得的原文/尝试。恢复旧冻结日游标继续枚举，已存在 logical key 由现有 enqueue 幂等复用。迁移清单随完成状态登记，不能把归档旧游标或 deferred 数量当作数据完成。
 
 需要的迁移验收：旧非零 offset、在近期前缀内/历史中、不同冻结发现、部分月份饱和嵌套、失败/空/月成功后故障、审计中断重跑、回滚后旧任务新增进度不丢，以及所有原 job/attempt/raw SHA 不变。必须先证明义务和恢复，再做生产切换。
 
-## 可复跑的只读迁移预检
+## 可恢复切换协议（候选，未生产执行）
 
-新增 `scripts/tushare_factor_month_migration.py`，当前**只有 plan-only，没有 execute/apply/rollback 开关**。源码确认有两个阻碍：`pipeline-config.json` 的文件 replace 与 SQLite 不共用事务；`tick()` 还在取得 `pipeline.lock` 前读取配置。仅在 helper 内加共享锁，并不能阻止已拿到旧配置的 worker 对新状态再次按日 policy 重建。这个提交不越过该边界，不把“先写一份、再写另一份”称作原子迁移。
+`scripts/tushare_factor_month_migration.py` 提供分开的 `plan`、`execute`、`recover` 模式，默认仍只读 `plan`。此前只有预检，原因是 JSON 配置与 SQLite 无共同事务且 tick 锁前读配置。本候选只在 tick 配置读取附近修复这两个问题：配置改为在现有 `pipeline.lock` 内读取；锁内首先检查固定 `factor-month-migration.pending.json`，存在或是符号链接都返回 `blocked_pending_migration`，不读配置/凭据、不构造 Pipeline、不执行采集或发布。没有触碰 publish、retain、发现或缓存。
 
-预检使用现有非阻塞 `pipeline.lock` 和 `mode=ro/query_only`，仅按主键读取两个因子检查点，无 jobs/attempts 扫描。不构造 Pipeline、不读取凭据或网络、不改配置/状态/数据。整个 CLI 硬限30秒；状态不是schema6、旧签名未知、配置与冻结 policy 不同、发现不足、offset超出旧流或月规划未安装时拒绝。应在已经安装本月规划候选的代码路径下运行：
+预检保持 schema6、共享非阻塞锁、`mode=ro/query_only` 两个规划状态的主键读取，不扫描 jobs。schema2 审计冻结完整配置字节 SHA（不复制配置内容）、两个检查点原文及SHA、冻结 identifiers/anchor/signature/offset/done、纯合同和 pipeline 源码 SHA、月覆盖证明与候选状态。近期 offset/done/anchor 保持原样，只有其 policy 改为月模式；历史从新月流 offset0/done0 开始。所有原日任务继续运行，不批量 deferred、不迁移旧 offset 的含义。
 
-```sh
-python3 -S scripts/tushare_factor_month_migration.py \
-  --root /data/tushare --output /tmp/factor-month-migration-preflight.json
-```
-
-输出在权威数据目录外，包含完整 config 字节SHA（不复制配置内容/凭据）、两个检查点精确前像及SHA、源代码SHA、冻结代码和月区间覆盖证明、旧流绝对offset位置及尚未枚举日尾部数量。用一只实际冻结代码调用当前纯月 planner 核对全部窗口，余下代码遵循同一笛卡尔积。候选状态只写进审计文件：历史新流建议从0开始；近期流不变、只建议更新policy，不直接迁移其offset。证明覆盖全部旧历史请求义务，不认证已取得数据。
-
-审计文件原子、不可覆盖；同一前像重复生成内容相同。已有审计的复验必须同时提供文件SHA：
+旧 schema1/e00… 预检仍保留作证据，但**不能用于新协议 execute**：安装完整候选后必须重新生成、审阅 schema2 audit，因为源码 SHA 变化且实际规划游标可能已推进。只能用指定真实 authority 容器挂载执行，helper 再调用既有 authority 边界；没有绕过权限的 CLI 参数。每个 CLI 硬限30秒，超时后按以下同样规则恢复。
 
 ```sh
+# 默认plan，不接触配置/队列；输出必须在数据根之外
 python3 -S scripts/tushare_factor_month_migration.py \
-  --root /data/tushare --output /tmp/factor-month-migration-preflight.json \
-  --revalidate /tmp/factor-month-migration-preflight.json \
-  --expected-audit-sha256 REVIEWED_AUDIT_SHA256
+  --root /data/tushare --output /tmp/factor-month-audit.json
+
+# 独立审阅审计后，固定helper和audit的SHA；不发任何Tushare请求
+python3 -S scripts/tushare_factor_month_migration.py --mode execute \
+  --root /data/tushare --output /tmp/factor-month-execution.json \
+  --revalidate /tmp/factor-month-audit.json \
+  --expected-audit-sha256 REVIEWED_AUDIT_SHA256 \
+  --helper-sha256 REVIEWED_HELPER_SHA256
+
+# 只有pending存在才使用recover；同一已审计版本和参数
+python3 -S scripts/tushare_factor_month_migration.py --mode recover \
+  --root /data/tushare --output /tmp/factor-month-execution.json \
+  --revalidate /tmp/factor-month-audit.json \
+  --expected-audit-sha256 REVIEWED_AUDIT_SHA256 \
+  --helper-sha256 REVIEWED_HELPER_SHA256
 ```
 
-配置、任一规划游标/冻结发现或候选源码变化均拒绝复验，不恢复旧值。普通旧日任务在此期间完成、增加原文/attempt时不会被回滚；本 helper 从来不改这些行，也不批量 deferred。审计写入前/原子安装后崩溃不影响权威数据，重跑复用完整审计。`apply_allowed=false` 和两个阻塞原因始终保留。真正切换需要后续单独审查运行时协议（至少锁内读取配置，以及worker可识别、可恢复的配置/游标切换提交点），不能仅凭这份预检直接操作。
+执行在同一共享锁内再次核对审计的配置、状态、来源 SHA。旧/新配置只差 `factor_library_history_window=month`，不提高任何预算、不变更开关/权重/其他 family。发现凭据类键、授权头、私钥或凭据URL等配置时在创建 journal 前拒绝；不通过脱敏修改恢复所需的配置。配置文件按既有约定只能包含非密钥操作参数，不是 `.env`。
+
+按顺序完成以下步骤：
+
+1. 将包含审计、完整旧/新配置 UTF-8、两个旧/新 state、helper/audit SHA 的不可变 journal 写入临时文件，fsync 文件，再安装固定 pending 名称并 fsync 根目录。此后任何普通 tick 都被拦截。恢复已有 pending 时也先同步目录，防上次停在安装后但未 fsync 的边界。
+2. SQLite `BEGIN IMMEDIATE` 内校验当前配置字节只能精确等于旧或新；两个 state 必须整体精确等于旧组或新组，混合、额外offset进度、配置漂移均拒绝并保留 pending。原子 replace 新配置并 fsync 同目录，然后同一 SQLite 事务 UPDATE 两个 canonical state，使用 `synchronous=FULL` 提交。没有对 jobs/attempts/raw/Parquet/done/pending 普通任务做 UPDATE/DELETE。
+3. 提交成功后，将 pending 同目录原子 rename 为 `factor-month-migration.<auditSHA>.completed.json`，再 fsync 根目录。这个 rename 是解除 tick 拦截的提交点：此时配置和 SQLite 已经持久化。receipt 保留 journal 全部旧值供审计，绝不恢复旧整库。
+
+中断后状态可能是旧配置+旧states、新配置+旧states或新配置+新states；恢复只接受审核过的精确旧/新组合并补完缺的步骤。数据库事务写到第一个state即中断也会回滚两者；完成收据已存在时重复 execute/recover 只确认 receipt，不重置后来新增的任务/游标。CLI 执行结果单独保存为稳定的 completed receipt 引用，幂等重跑不覆盖不同审计。
+
+不要删除 pending 来“解锁”，不要升级正在恢复中的 helper/pipeline，也不要用新配置或新epoch绕过漂移检查。错误/不完整 journal 或任意不可确认状态保持拦截，必须根据原审计定位原因；不存在强制恢复或整库回滚参数。原日任务与其未枚举尾部义务由审计月覆盖证明保留；月任务仍需走正常采集、6000拆分和真实质量检查，迁移完成不是数据完成。
+
+持久性依赖本机文件系统正确实现 fsync 与同目录原子 rename（既有权威目录同文件系统）；不将此协议扩展到跨文件系统/NFS。隔离测试注入 journal安装前后、配置替换后、第一条state写入后、SQLite提交前后、receipt重命名前后以及目录fsync异常；逐次验证 pending 拦截、精确恢复、所有旧任务/尝试/原文不变。真实CLI子进程覆盖参数/依赖/显式执行和幂等输出，仅测试中mock authority边界指向临时目录。实际 tick 加真实 plan_extended 也验证月计划入队且签名不被重置，采集/发布在测试中替换为零请求。
