@@ -326,7 +326,7 @@ class Closure(unittest.TestCase):
         )
         self.p.db.commit()
         self.reopen()
-        self.assertEqual(self.p.db.execute("PRAGMA user_version").fetchone()[0], 5)
+        self.assertEqual(self.p.db.execute("PRAGMA user_version").fetchone()[0], 6)
         self.p.reconcile_partitions()
         self.assertEqual(self.state(valid), "resolved")
         for parent in (missing, mismatch):
@@ -402,7 +402,7 @@ class Closure(unittest.TestCase):
                 db.commit()
                 db.close()
                 p = module.Pipeline(tmp, CATALOG)
-                self.assertEqual(p.db.execute("PRAGMA user_version").fetchone()[0], 5)
+                self.assertEqual(p.db.execute("PRAGMA user_version").fetchone()[0], 6)
                 self.assertEqual(
                     tuple(p.db.execute("SELECT * FROM jobs").fetchone())[:10], values
                 )

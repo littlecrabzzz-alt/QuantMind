@@ -155,7 +155,7 @@ class Pipeline:
         self.db = sqlite3.connect(self.root / "pipeline.sqlite", timeout=10)
         self.db.row_factory = sqlite3.Row
         version = self.db.execute("pragma user_version").fetchone()[0]
-        if version not in (0, 1, 2, 3, 4, 5):
+        if version not in (0, 1, 2, 3, 4, 5, 6):
             raise ValueError("Unsupported pipeline schema version")
         # Version 1 migration: SQLite is acquisition state, never copied live.
         if version == 0:
@@ -231,6 +231,23 @@ class Pipeline:
                 self.db.rollback()
                 self.db.close()
                 raise
+        if version < 6:
+            # API seeks and bucket heads avoid scanning the structured backlog.
+            # No job, observation or planning cursor is rewritten by migration.
+            try:
+                self.db.executescript("""
+                    BEGIN IMMEDIATE;
+                    CREATE INDEX IF NOT EXISTS jobs_ready_api_history
+                        ON jobs(group_name,json_extract(job,'$.api_name'),
+                                (epoch='history'),priority)
+                        WHERE state='pending';
+                    PRAGMA user_version=6;
+                    COMMIT;
+                """)
+            except BaseException:
+                self.db.rollback()
+                self.db.close()
+                raise
         cursor = self.db.execute(
             "SELECT value FROM scheduler_state WHERE name='family_turn'"
         ).fetchone()
@@ -243,13 +260,87 @@ class Pipeline:
                     entry.get("output_fields", [])
                 )
 
+    def _next_structured_job(self, now, check_gates=True):
+        """Seek actual pending APIs in a stable circle; return uncommitted checkpoints."""
+        prefix = "structured_api_turn:"
+        previous = self.db.execute(
+            "SELECT name,value FROM scheduler_state WHERE name GLOB 'structured_api_turn:*' ORDER BY value DESC,name LIMIT 1"
+        ).fetchone()
+        cursor = previous["name"][len(prefix) :] if previous else None
+        turn = previous["value"] + 1 if previous else 1
+        seen = set()
+        while True:
+            sql = """SELECT json_extract(job,'$.api_name') AS api
+                FROM jobs INDEXED BY jobs_ready_api_history
+                WHERE state='pending' AND group_name='structured' {after}
+                ORDER BY json_extract(job,'$.api_name') LIMIT 1"""
+            candidate = self.db.execute(
+                sql.format(
+                    after="AND json_extract(job,'$.api_name')>?"
+                    if cursor is not None
+                    else ""
+                ),
+                (cursor,) if cursor is not None else (),
+            ).fetchone()
+            if candidate is None and cursor is not None:
+                cursor = None
+                continue
+            if candidate is None:
+                return None, []
+            api = candidate["api"]
+            if not isinstance(api, str) or not api:
+                raise ValueError(
+                    "Structured pending job has missing/invalid api_name; queue preserved"
+                )
+            if api in seen:
+                return None, []
+            seen.add(api)
+            cursor = api
+            if check_gates:
+                gate = self.db.execute(
+                    "SELECT next_at FROM request_gates WHERE scope=?", ("api:" + api,)
+                ).fetchone()
+                if gate and gate[0] > now:
+                    continue
+            phase_name = "structured_phase:" + api
+            phase_row = self.db.execute(
+                "SELECT value FROM scheduler_state WHERE name=?", (phase_name,)
+            ).fetchone()
+            phase = phase_row[0] % 4 if phase_row else 0
+            history = int(phase == 3)
+            for bucket in (history, 1 - history):
+                row = self.db.execute(
+                    """SELECT * FROM jobs INDEXED BY jobs_ready_api_history
+                    WHERE state='pending' AND group_name='structured'
+                      AND json_extract(job,'$.api_name')=? AND (epoch='history')=?
+                      AND retry_after<=? ORDER BY priority,rowid LIMIT 1""",
+                    (api, bucket, now),
+                ).fetchone()
+                if row:
+                    # Advance the scheduled opportunity even when an empty bucket
+                    # borrowed the other one, or the ensuing request later fails.
+                    return row, [(prefix + api, turn), (phase_name, (phase + 1) % 4)]
+
     def next_job(self, config, deadline):
         rpm = config.get("requests_per_minute")
         if rpm is None:
-            return self.db.execute(
+            now = time.time()
+            row = self.db.execute(
                 "SELECT * FROM jobs INDEXED BY jobs_ready_order WHERE state='pending' AND retry_after<=? ORDER BY priority,rowid LIMIT 1",
-                (time.time(),),
+                (now,),
             ).fetchone()
+            if row and row["group_name"] == "structured":
+                row, checkpoints = self._next_structured_job(now, check_gates=False)
+                try:
+                    self.db.executemany(
+                        "INSERT INTO scheduler_state(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                        checkpoints,
+                    )
+                    self.db.commit()
+                except BaseException:
+                    self.db.rollback()
+                    raise
+            return row
         if not 1 <= int(rpm) <= 500:
             raise ValueError("Invalid account request rate")
         while time.monotonic() < deadline:
@@ -275,17 +366,24 @@ class Pipeline:
                 ON g.scope='api:' || json_extract(j.job,'$.api_name')
                 WHERE j.state='pending' AND j.retry_after<=? AND COALESCE(g.next_at,0)<=?
                 {group_filter} ORDER BY j.priority,j.rowid LIMIT 1"""
-            row = self.db.execute(
-                sql.format(
-                    group_filter="AND j.group_name=?", ready_index="jobs_ready_group"
-                ),
-                (now, now, group),
-            ).fetchone()
+            checkpoints = []
+            if group == "structured":
+                row, checkpoints = self._next_structured_job(now)
+            else:
+                row = self.db.execute(
+                    sql.format(
+                        group_filter="AND j.group_name=?",
+                        ready_index="jobs_ready_group",
+                    ),
+                    (now, now, group),
+                ).fetchone()
             if row is None:
                 row = self.db.execute(
                     sql.format(group_filter="", ready_index="jobs_ready_order"),
                     (now, now),
                 ).fetchone()
+                if row and row["group_name"] == "structured":
+                    row, checkpoints = self._next_structured_job(now)
             if row:
                 api = json.loads(row["job"])["api_name"]
                 api_rpm = min(
@@ -307,19 +405,23 @@ class Pipeline:
                 ).fetchone()
                 if quota:
                     interval = max(interval, json.loads(quota[0])["interval_seconds"])
-                self.db.executemany(
-                    "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=excluded.next_at",
-                    [
-                        ("account", now + 60 / int(rpm)),
-                        ("api:" + api, now + max(60 / api_rpm, interval)),
-                    ],
-                )
+                try:
+                    self.db.executemany(
+                        "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=excluded.next_at",
+                        [
+                            ("account", now + 60 / int(rpm)),
+                            ("api:" + api, now + max(60 / api_rpm, interval)),
+                        ],
+                    )
+                    self.db.executemany(
+                        "INSERT INTO scheduler_state(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                        checkpoints + [("family_turn", self._fair_turn + 1)],
+                    )
+                    self.db.commit()  # reserve before the request, including failures
+                except BaseException:
+                    self.db.rollback()
+                    raise
                 self._fair_turn += 1
-                self.db.execute(
-                    "INSERT INTO scheduler_state(name,value) VALUES('family_turn',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
-                    (self._fair_turn,),
-                )
-                self.db.commit()  # reserve before issuing the request, including failures
                 return row
             earliest = self.db.execute("""
                 SELECT MIN(MAX(j.retry_after,COALESCE(g.next_at,0)))

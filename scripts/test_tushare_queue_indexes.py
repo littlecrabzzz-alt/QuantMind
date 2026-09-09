@@ -75,7 +75,7 @@ class QueueIndexTest(unittest.TestCase):
         )
         self.to_v4()
         self.p = module.Pipeline(self.root, {"entries": []})
-        self.assertEqual(self.p.db.execute("PRAGMA user_version").fetchone()[0], 5)
+        self.assertEqual(self.p.db.execute("PRAGMA user_version").fetchone()[0], 6)
         self.assertEqual(
             before,
             list(
