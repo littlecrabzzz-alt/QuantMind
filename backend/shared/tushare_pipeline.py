@@ -1033,136 +1033,152 @@ class Pipeline:
         seen = set()
         discovery = {"results": 0, "duplicate_bodies": 0, "bypassed": 0, "body_reads": 0}
         self.identifier_timing = discovery
-        for row in self.db.execute(
-            "SELECT result FROM jobs WHERE result IS NOT NULL AND json_extract(job,'$.api_name') IN ("
-            + placeholders
-            + ") UNION SELECT result FROM attempts WHERE json_extract(result,'$.api_name') IN ("
-            + placeholders
-            + ")",
-            tuple(families) + tuple(families),
-        ):
-            saved = json.loads(row[0])
-            discovery["results"] += 1
-            api, sha = saved.get("api_name"), saved.get("object_sha256")
-            # Request-aware discovery must opt in separately. Current hot-list
-            # market labels live in immutable requests, not necessarily the body.
-            bypass = api in ("ths_hot", "dc_hot") or bool(
-                contract_for(api).get("request_identity_fields")
-            )
-            eligible = (
-                sha
-                and saved.get("status")
-                not in (
-                    "transport_error",
-                    "rate_limited",
-                    "permission_denied",
-                    "api_error",
-                    "invalid_response",
+        # Derived disk state is opt-in and never substitutes the metadata scan.
+        from backend.shared.tushare_discovery_cache import DiscoveryCache
+
+        with DiscoveryCache(
+            self.root, enabled=os.environ.get("TUSHARE_DISCOVERY_CACHE") == "1"
+        ) as cache:
+            if os.environ.get("TUSHARE_DISCOVERY_CACHE") == "1":
+                discovery["disk_cache"] = cache.stats
+            for row in self.db.execute(
+                "SELECT result FROM jobs WHERE result IS NOT NULL AND json_extract(job,'$.api_name') IN ("
+                + placeholders
+                + ") UNION SELECT result FROM attempts WHERE json_extract(result,'$.api_name') IN ("
+                + placeholders
+                + ")",
+                tuple(families) + tuple(families),
+            ):
+                saved = json.loads(row[0])
+                discovery["results"] += 1
+                api, sha = saved.get("api_name"), saved.get("object_sha256")
+                # Request-aware discovery must opt in separately. Current hot-list
+                # market labels live in immutable requests, not necessarily the body.
+                bypass = api in ("ths_hot", "dc_hot") or bool(
+                    contract_for(api).get("request_identity_fields")
                 )
-                and saved.get("response_format") != "non_json"
-            )
-            if eligible and not bypass:
-                stat = (self.root / "objects" / (sha + ".json")).stat()
-                key = (
-                    api,
-                    sha,
-                    saved.get("status"),
-                    saved.get("response_format"),
-                    stat.st_dev,
-                    stat.st_ino,
-                    stat.st_size,
-                    stat.st_mtime_ns,
-                    stat.st_ctime_ns,
+                eligible = (
+                    sha
+                    and saved.get("status")
+                    not in (
+                        "transport_error",
+                        "rate_limited",
+                        "permission_denied",
+                        "api_error",
+                        "invalid_response",
+                    )
+                    and saved.get("response_format") != "non_json"
                 )
-                if key in seen:
-                    discovery["duplicate_bodies"] += 1
-                    continue
-                seen.add(key)
-            discovery["bypassed"] += int(bypass)
-            discovery["body_reads"] += int(bool(eligible))
-            for record in self.records(saved, fields=discovery_fields):
-                minute_family = MINUTE_SOURCE_FAMILIES.get(api)
-                if minute_family:
-                    field = "mapping_ts_code" if api == "fut_mapping" else "index_code" if api == "index_classify" else "ts_code"
-                    code = record.get(field)
-                    if isinstance(code, str) and code:
-                        if minute_family == "minute_futures" and code.split(".")[0].endswith(("L", "L1", "L2", "L3", "8888", "9999")):
-                            result["minute_futures_unmapped"].add(code)
-                        else:
-                            result[minute_family].add(code)
-                if families[api] == "minute_source_only":
-                    continue
-                if saved["api_name"] == "factor_list":
-                    # Actual list identity only, not descriptions/demo IDs or
-                    # factor_value outputs that cannot establish asset_type.
-                    identity = {field: record.get(field) for field in ("factor_name", "asset_type")}
-                    factor_records[json_bytes(identity)] = identity
-                    continue
-                if saved["api_name"] == "factor_value":
-                    code = record.get("ts_code")
-                    if isinstance(code, str) and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", code):
-                        result["factor_library_stocks"].add(code)
-                    continue
-                if saved["api_name"] == "ci_index_member":
-                    for field in ("l1_code", "l2_code", "l3_code"):
-                        value = record.get(field)
-                        if isinstance(value, str) and value:
-                            result["cross_asset_indexes"].add(value)
-                            result["minute_indexes"].add(value)
-                    continue  # Constituent ts_code is not an index identifier.
-                if saved["api_name"] == "index_classify" and record.get("index_code"):
-                    result["sw_indexes"].add(record["index_code"])
-                if saved["api_name"] == "fut_basic":
-                    if record.get("fut_code"):
-                        result["futures_products"].add(record["fut_code"])
-                    if (
-                        str(record.get("ts_code", ""))
-                        .split(".")[0]
-                        .endswith(("L", "L1", "L2", "L3"))
-                    ):
-                        result["futures_continuous"].add(record["ts_code"])
-                if saved["api_name"] == "index_classify" and record.get("level") != "L3":
-                    continue
-                if saved["api_name"] == "bse_mapping":
-                    for field, family in (
-                        ("o_code", "bse_old_codes"),
-                        ("n_code", "bse_new_codes"),
-                    ):
+                if eligible and not bypass:
+                    stat = (self.root / "objects" / (sha + ".json")).stat()
+                    key = (
+                        api,
+                        sha,
+                        saved.get("status"),
+                        saved.get("response_format"),
+                        stat.st_dev,
+                        stat.st_ino,
+                        stat.st_size,
+                        stat.st_mtime_ns,
+                        stat.st_ctime_ns,
+                    )
+                    if key in seen:
+                        discovery["duplicate_bodies"] += 1
+                        continue
+                    seen.add(key)
+                discovery["bypassed"] += int(bypass)
+                discovery["body_reads"] += int(bool(eligible))
+                previous_hits = cache.stats["hits"]
+                records = cache.read(
+                    self.root / "objects" / (str(sha) + ".json"),
+                    key if eligible and not bypass else None,
+                    discovery_fields,
+                    lambda: self.records(saved, fields=discovery_fields),
+                )
+                discovery["body_reads"] -= cache.stats["hits"] - previous_hits
+                for record in records:
+                    minute_family = MINUTE_SOURCE_FAMILIES.get(api)
+                    if minute_family:
+                        field = "mapping_ts_code" if api == "fut_mapping" else "index_code" if api == "index_classify" else "ts_code"
                         code = record.get(field)
                         if isinstance(code, str) and code:
-                            result[family].add(code)
-                    continue
-                if saved["api_name"] == "hm_list":
-                    if isinstance(record.get("name"), str) and record["name"]:
-                        result["hot_money_names"].add(record["name"])
-                    continue
-                if (
-                    saved["api_name"] == "hm_detail"
-                    and isinstance(record.get("hm_name"), str)
-                    and record["hm_name"]
-                ):
-                    result["hot_money_names"].add(record["hm_name"])
-                if saved["api_name"] in ("tdx_member", "kpl_concept_cons"):
-                    member = record.get("con_code")
-                    if isinstance(member, str) and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", member):
-                        result["market_sentiment_stocks"].add(member)
-                if saved["api_name"] in BOND_EXTRA_RUNTIME_CONTRACTS or saved["api_name"] in bond_source_apis:
-                    code = record.get("ts_code")
-                    # Numeric/malformed schemas remain raw/quality evidence, not
-                    # invented request codes or mixed-type global sort failures.
-                    if isinstance(code, str) and code:
+                            if minute_family == "minute_futures" and code.split(".")[0].endswith(("L", "L1", "L2", "L3", "8888", "9999")):
+                                result["minute_futures_unmapped"].add(code)
+                            else:
+                                result[minute_family].add(code)
+                    if families[api] == "minute_source_only":
+                        continue
+                    if saved["api_name"] == "factor_list":
+                        # Actual list identity only, not descriptions/demo IDs or
+                        # factor_value outputs that cannot establish asset_type.
+                        identity = {field: record.get(field) for field in ("factor_name", "asset_type")}
+                        factor_records[json_bytes(identity)] = identity
+                        continue
+                    if saved["api_name"] == "factor_value":
+                        code = record.get("ts_code")
+                        if isinstance(code, str) and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", code):
+                            result["factor_library_stocks"].add(code)
+                        continue
+                    if saved["api_name"] == "ci_index_member":
+                        for field in ("l1_code", "l2_code", "l3_code"):
+                            value = record.get(field)
+                            if isinstance(value, str) and value:
+                                result["cross_asset_indexes"].add(value)
+                                result["minute_indexes"].add(value)
+                        continue  # Constituent ts_code is not an index identifier.
+                    if saved["api_name"] == "index_classify" and record.get("index_code"):
+                        result["sw_indexes"].add(record["index_code"])
+                    if saved["api_name"] == "fut_basic":
+                        if record.get("fut_code"):
+                            result["futures_products"].add(record["fut_code"])
+                        if (
+                            str(record.get("ts_code", ""))
+                            .split(".")[0]
+                            .endswith(("L", "L1", "L2", "L3"))
+                        ):
+                            result["futures_continuous"].add(record["ts_code"])
+                    if saved["api_name"] == "index_classify" and record.get("level") != "L3":
+                        continue
+                    if saved["api_name"] == "bse_mapping":
+                        for field, family in (
+                            ("o_code", "bse_old_codes"),
+                            ("n_code", "bse_new_codes"),
+                        ):
+                            code = record.get(field)
+                            if isinstance(code, str) and code:
+                                result[family].add(code)
+                        continue
+                    if saved["api_name"] == "hm_list":
+                        if isinstance(record.get("name"), str) and record["name"]:
+                            result["hot_money_names"].add(record["name"])
+                        continue
+                    if (
+                        saved["api_name"] == "hm_detail"
+                        and isinstance(record.get("hm_name"), str)
+                        and record["hm_name"]
+                    ):
+                        result["hot_money_names"].add(record["hm_name"])
+                    if saved["api_name"] in ("tdx_member", "kpl_concept_cons"):
+                        member = record.get("con_code")
+                        if isinstance(member, str) and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", member):
+                            result["market_sentiment_stocks"].add(member)
+                    if saved["api_name"] in BOND_EXTRA_RUNTIME_CONTRACTS or saved["api_name"] in bond_source_apis:
+                        code = record.get("ts_code")
+                        # Numeric/malformed schemas remain raw/quality evidence, not
+                        # invented request codes or mixed-type global sort failures.
+                        if isinstance(code, str) and code:
+                            result[families[saved["api_name"]]].add(code)
+                        continue
+                    if saved["api_name"] in SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS:
+                        code = record.get("ts_code")
+                        if isinstance(code, str) and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", code):
+                            result["stocks"].add(code)
+                        continue  # Malformed source remains raw/quality, not guessed discovery.
+                    code = record.get("ts_code") or record.get("index_code")
+                    if code:
                         result[families[saved["api_name"]]].add(code)
-                    continue
-                if saved["api_name"] in SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS:
-                    code = record.get("ts_code")
-                    if isinstance(code, str) and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", code):
-                        result["stocks"].add(code)
-                    continue  # Malformed source remains raw/quality, not guessed discovery.
-                code = record.get("ts_code") or record.get("index_code")
-                if code:
-                    result[families[saved["api_name"]]].add(code)
-                    if saved["api_name"] == "etf_basic":
-                        result["etfs"].add(code)
+                        if saved["api_name"] == "etf_basic":
+                            result["etfs"].add(code)
         # Retain historical/T stock identities and securities discovered in any
         # saved event response, including saturated attempts and retired codes.
         result["trading_event_securities"].update(result["stocks"])
