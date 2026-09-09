@@ -1245,6 +1245,7 @@ class Pipeline:
                         result[families[saved["api_name"]]].add(code)
                         if saved["api_name"] == "etf_basic":
                             result["etfs"].add(code)
+                del records  # Do not retain a previous body during the next decode.
         # Retain historical/T stock identities and securities discovered in any
         # saved event response, including saturated attempts and retired codes.
         result["trading_event_securities"].update(result["stocks"])
