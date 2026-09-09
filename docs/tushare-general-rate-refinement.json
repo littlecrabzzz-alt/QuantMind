@@ -1,0 +1,4557 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "492c43b",
+  "baseline_report_sha256": "3628347c5c32cebf22772f0e418ba77c9e8ba9d62bbd98c3095c310cc39808d9",
+  "official_category_url": "https://tushare.pro/document/2?doc_id=290",
+  "official_category_html_sha256": "18e4557232524672da08f47d89eef2a384919103de24680c37021e9641000d80",
+  "counts": {
+    "regular_500": 147,
+    "special_300": 3,
+    "uncertain": 5
+  },
+  "api_sets": {
+    "regular_500": [
+      "adj_factor",
+      "bak_basic",
+      "bak_daily",
+      "balancesheet_vip",
+      "bc_bestotcqt",
+      "bc_otcqt",
+      "block_trade",
+      "bond_blk",
+      "bond_blk_detail",
+      "bse_mapping",
+      "cashflow_vip",
+      "cb_basic",
+      "cb_call",
+      "cb_daily",
+      "cb_issue",
+      "cb_rate",
+      "cb_rating",
+      "cb_share",
+      "ci_daily",
+      "ci_index_member",
+      "cn_cpi",
+      "cn_gdp",
+      "cn_m",
+      "cn_pmi",
+      "cn_ppi",
+      "cn_schedule",
+      "daily_basic",
+      "daily_info",
+      "dc_daily",
+      "dc_hot",
+      "dc_index",
+      "dc_member",
+      "disclosure_date",
+      "dividend",
+      "eco_cal",
+      "etf_basic",
+      "etf_index",
+      "etf_limit",
+      "etf_sh_cons",
+      "etf_share_size",
+      "etf_sz_cons",
+      "express_vip",
+      "fina_audit",
+      "fina_indicator_vip",
+      "fina_mainbz",
+      "forecast_vip",
+      "ft_limit",
+      "fund_adj",
+      "fund_basic",
+      "fund_company",
+      "fund_daily",
+      "fund_div",
+      "fund_manager",
+      "fund_nav",
+      "fund_share",
+      "fut_basic",
+      "fut_daily",
+      "fut_daily_adj",
+      "fut_holding",
+      "fut_index_daily",
+      "fut_mapping",
+      "fut_settle",
+      "fut_trade_cal",
+      "fut_weekly_detail",
+      "fut_wsr",
+      "fx_daily",
+      "fx_obasic",
+      "gz_index",
+      "hibor",
+      "hm_list",
+      "idx_anns",
+      "income_vip",
+      "index_basic",
+      "index_classify",
+      "index_daily",
+      "index_dailybasic",
+      "index_global",
+      "index_member_all",
+      "index_monthly",
+      "index_weekly",
+      "index_weight",
+      "kpl_concept_cons",
+      "libor",
+      "margin",
+      "margin_detail",
+      "margin_secs",
+      "mkt_idx_bmk",
+      "moneyflow",
+      "moneyflow_cnt_ths",
+      "moneyflow_dc",
+      "moneyflow_ind_dc",
+      "moneyflow_ind_ths",
+      "moneyflow_mkt_dc",
+      "moneyflow_ths",
+      "monthly",
+      "new_share",
+      "opt_basic",
+      "opt_daily",
+      "pledge_detail",
+      "pledge_stat",
+      "repo_daily",
+      "repurchase",
+      "sf_month",
+      "sge_basic",
+      "sge_daily",
+      "share_float",
+      "shibor",
+      "shibor_lpr",
+      "shibor_quote",
+      "st",
+      "stk_account",
+      "stk_account_old",
+      "stk_alert",
+      "stk_high_shock",
+      "stk_holdernumber",
+      "stk_holdertrade",
+      "stk_limit",
+      "stk_managers",
+      "stk_rewards",
+      "stk_shock",
+      "stk_week_month_adj",
+      "stk_weekly_monthly",
+      "stock_company",
+      "stock_hsgt",
+      "stock_st",
+      "suspend_d",
+      "sw_daily",
+      "sz_daily_info",
+      "tdx_daily",
+      "tdx_index",
+      "tdx_member",
+      "ths_daily",
+      "ths_hot",
+      "ths_index",
+      "top10_cb_holders",
+      "top10_floatholders",
+      "top10_holders",
+      "top_inst",
+      "top_list",
+      "trade_cal",
+      "us_tbr",
+      "us_tltr",
+      "us_trltr",
+      "us_trycr",
+      "us_tycr",
+      "weekly",
+      "wz_index"
+    ],
+    "special_300": [
+      "stk_ah_comparison",
+      "stk_nineturn",
+      "stk_surv"
+    ],
+    "uncertain": [
+      "hk_basic",
+      "hk_tradecal",
+      "hm_detail",
+      "us_basic",
+      "us_tradecal"
+    ]
+  },
+  "apis": {
+    "adj_factor": {
+      "api_name": "adj_factor",
+      "source_doc_id": "28",
+      "official_category_path": [
+        "14",
+        "15",
+        "28"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "ee3cd25daa2bdabb3ead42cc1508f3a3d1df927b49f031072269f4d35f50c7cc",
+      "source_url": "https://tushare.pro/document/2?doc_id=28",
+      "category_labels": [
+        "股票数据",
+        "行情数据",
+        "复权因子"
+      ],
+      "source_policy_line_sha256": [
+        "0d96c0356068a6bbd1f813ec1cf7a30bdd0bdfb67d128c97d9b93724f9bc3329"
+      ]
+    },
+    "bak_basic": {
+      "api_name": "bak_basic",
+      "source_doc_id": "262",
+      "official_category_path": [
+        "14",
+        "24",
+        "262"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "eba067f7367efb4b7ffa330b765bccab9e7093bee7e939f3366d944ed2f1ae86",
+      "source_url": "https://tushare.pro/document/2?doc_id=262",
+      "category_labels": [
+        "股票数据",
+        "基础数据",
+        "股票历史列表"
+      ],
+      "source_policy_line_sha256": [
+        "cfa71713eebe48a378eec4adfc9a9faf2814b0e08c7b5093b2020df8a6a3df6a"
+      ]
+    },
+    "bak_daily": {
+      "api_name": "bak_daily",
+      "source_doc_id": "255",
+      "official_category_path": [
+        "14",
+        "15",
+        "255"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "f02c879ec2fef02e078809fd78c656cd8194e98c57b986036a2489854e74ebb1",
+      "source_url": "https://tushare.pro/document/2?doc_id=255",
+      "category_labels": [
+        "股票数据",
+        "行情数据",
+        "备用行情"
+      ],
+      "source_policy_line_sha256": [
+        "e618d27ccc543cc70304cb23c9a35cd191b078780a9873f002728da60d330027"
+      ]
+    },
+    "balancesheet_vip": {
+      "api_name": "balancesheet_vip",
+      "source_doc_id": "36",
+      "official_category_path": [
+        "14",
+        "16",
+        "36"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "7c61d55b93798d4ebabd723c5b4b476d6564d82da648b95c3d0ca09ccd04f040",
+      "source_url": "https://tushare.pro/document/2?doc_id=36",
+      "category_labels": [
+        "股票数据",
+        "财务数据",
+        "资产负债表"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e",
+        "cb5c81ddfe99dbae5c1b25d1041c2991aa8a34f16b558c69c3b7a37dccfa0eed"
+      ]
+    },
+    "bc_bestotcqt": {
+      "api_name": "bc_bestotcqt",
+      "source_doc_id": "323",
+      "official_category_path": [
+        "184",
+        "323"
+      ],
+      "mentioned_points": [
+        500,
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "d26cda769f97faf24860950c396fe3d79b378f73e6aa1166bfebb142221496f6",
+      "source_url": "https://tushare.pro/document/2?doc_id=323",
+      "category_labels": [
+        "债券专题",
+        "柜台流通式债券最优报价"
+      ],
+      "source_policy_line_sha256": [
+        "91f7a152f0c99755bf9c7d66ec9358f744c4d64770a79b43f903fd9cc8b7eb6a"
+      ]
+    },
+    "bc_otcqt": {
+      "api_name": "bc_otcqt",
+      "source_doc_id": "322",
+      "official_category_path": [
+        "184",
+        "322"
+      ],
+      "mentioned_points": [
+        500,
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "5a53292cdce3aecb3aa4b18be9b1c7103693557043b5e897b777b98de6aef222",
+      "source_url": "https://tushare.pro/document/2?doc_id=322",
+      "category_labels": [
+        "债券专题",
+        "柜台流通式债券报价"
+      ],
+      "source_policy_line_sha256": [
+        "91f7a152f0c99755bf9c7d66ec9358f744c4d64770a79b43f903fd9cc8b7eb6a"
+      ]
+    },
+    "block_trade": {
+      "api_name": "block_trade",
+      "source_doc_id": "161",
+      "official_category_path": [
+        "14",
+        "17",
+        "161"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "119b8e301bb4a56a9c466582dc140182f741436d3688eb64f203fd0d3a334a12",
+      "source_url": "https://tushare.pro/document/2?doc_id=161",
+      "category_labels": [
+        "股票数据",
+        "参考数据",
+        "大宗交易"
+      ],
+      "source_policy_line_sha256": [
+        "32f138b42ff739d45e19fc5938b042cc6a925189af38485c80d69bfe596b424e"
+      ]
+    },
+    "bond_blk": {
+      "api_name": "bond_blk",
+      "source_doc_id": "271",
+      "official_category_path": [
+        "184",
+        "271"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "5b158da91011539b84cf8e6850331215112b87122a0ffd55d4ee8ad494ec542e",
+      "source_url": "https://tushare.pro/document/2?doc_id=271",
+      "category_labels": [
+        "债券专题",
+        "大宗交易"
+      ],
+      "source_policy_line_sha256": [
+        "3a5d9e35ba36489a4a114a4a49ad03ff175770096f6a6e465f70872f54ee5c0c"
+      ]
+    },
+    "bond_blk_detail": {
+      "api_name": "bond_blk_detail",
+      "source_doc_id": "272",
+      "official_category_path": [
+        "184",
+        "272"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "03c488a5340ced35881e0da9753e827d42becd40d88de987a3aa8d1a0482ccd1",
+      "source_url": "https://tushare.pro/document/2?doc_id=272",
+      "category_labels": [
+        "债券专题",
+        "大宗交易明细"
+      ],
+      "source_policy_line_sha256": [
+        "3a5d9e35ba36489a4a114a4a49ad03ff175770096f6a6e465f70872f54ee5c0c"
+      ]
+    },
+    "bse_mapping": {
+      "api_name": "bse_mapping",
+      "source_doc_id": "375",
+      "official_category_path": [
+        "14",
+        "24",
+        "375"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "5d05ee12b4931b687f92ede84076c93f288f24a39f96f72b35523d15edafd9de",
+      "source_url": "https://tushare.pro/document/2?doc_id=375",
+      "category_labels": [
+        "股票数据",
+        "基础数据",
+        "北交所新旧代码对照"
+      ],
+      "source_policy_line_sha256": [
+        "9a5d7a222d194d21b64c044330b4e3cfad634e3cd244c49d6e9942dff11c29ee"
+      ]
+    },
+    "cashflow_vip": {
+      "api_name": "cashflow_vip",
+      "source_doc_id": "44",
+      "official_category_path": [
+        "14",
+        "16",
+        "44"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "c1499b298b817810c0dbcf49cc3893e019b3330877a90d7195ec15a48535fbf5",
+      "source_url": "https://tushare.pro/document/2?doc_id=44",
+      "category_labels": [
+        "股票数据",
+        "财务数据",
+        "现金流量表"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e",
+        "c3753195cb75b394d5b1edc4ede80a8da461ea68d0f5367058171c85dfbf34b5"
+      ]
+    },
+    "cb_basic": {
+      "api_name": "cb_basic",
+      "source_doc_id": "185",
+      "official_category_path": [
+        "184",
+        "185"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "298df56da0dcaa491eb2b8d17cdea7d0ec0e4bd2200d46864dab2994a185d9b1",
+      "source_url": "https://tushare.pro/document/2?doc_id=185",
+      "category_labels": [
+        "债券专题",
+        "可转债基础信息"
+      ],
+      "source_policy_line_sha256": [
+        "c068dedff1a6177f2c58f73e73d76489263177b67dc66571c6dd4b3b5d94978a"
+      ]
+    },
+    "cb_call": {
+      "api_name": "cb_call",
+      "source_doc_id": "269",
+      "official_category_path": [
+        "184",
+        "269"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "934ab414c46742f764cb97dac890ec046dafbc67f88ef670a361143d9dc7ee94",
+      "source_url": "https://tushare.pro/document/2?doc_id=269",
+      "category_labels": [
+        "债券专题",
+        "可转债赎回信息"
+      ],
+      "source_policy_line_sha256": [
+        "ba2368f579272a887763b1a9f721ffd9cd6d5537ca126276d43efeba06169855"
+      ]
+    },
+    "cb_daily": {
+      "api_name": "cb_daily",
+      "source_doc_id": "187",
+      "official_category_path": [
+        "184",
+        "187"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "8a64afa8a7bf989ccd160742b27f57460f24d6894cfb70b31cca703adf387b7b",
+      "source_url": "https://tushare.pro/document/2?doc_id=187",
+      "category_labels": [
+        "债券专题",
+        "可转债行情"
+      ],
+      "source_policy_line_sha256": [
+        "8ed22bb91bf2da356426aed29cb4cfeba13cdf184abbe941a08212bd1300d86d"
+      ]
+    },
+    "cb_issue": {
+      "api_name": "cb_issue",
+      "source_doc_id": "186",
+      "official_category_path": [
+        "184",
+        "186"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "366d82f3beb5e018f9f955e4dc60c46248f28ac1b48f97ec07a9aff8d0ca5921",
+      "source_url": "https://tushare.pro/document/2?doc_id=186",
+      "category_labels": [
+        "债券专题",
+        "可转债发行"
+      ],
+      "source_policy_line_sha256": [
+        "8ed22bb91bf2da356426aed29cb4cfeba13cdf184abbe941a08212bd1300d86d"
+      ]
+    },
+    "cb_rate": {
+      "api_name": "cb_rate",
+      "source_doc_id": "305",
+      "official_category_path": [
+        "184",
+        "305"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "c062f8d72a5cd6e10d61ada4db4c9b94634312428426c3d5ae4c1ffaa706265d",
+      "source_url": "https://tushare.pro/document/2?doc_id=305",
+      "category_labels": [
+        "债券专题",
+        "可转债票面利率"
+      ],
+      "source_policy_line_sha256": [
+        "362c01d817ace5d20d515c90ec812a1f72300859a2177887c11994a951755123"
+      ]
+    },
+    "cb_rating": {
+      "api_name": "cb_rating",
+      "source_doc_id": "458",
+      "official_category_path": [
+        "184",
+        "458"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "3c4eb3a8dcad0e5c3f64c25f06256d3461d0d91dc70d5f73d3d63cd83c12b7cb",
+      "source_url": "https://tushare.pro/document/2?doc_id=458",
+      "category_labels": [
+        "债券专题",
+        "可转债债券评级"
+      ],
+      "source_policy_line_sha256": [
+        "4f475a79f68fa57a8c570db0b2ddc6014cf7e913d08e611f480443ab79d7b4de"
+      ]
+    },
+    "cb_share": {
+      "api_name": "cb_share",
+      "source_doc_id": "247",
+      "official_category_path": [
+        "184",
+        "247"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "7345d58d9918868cb27aeaff35fe7f7a8ca438ac31b2a37f6a018b40400946dd",
+      "source_url": "https://tushare.pro/document/2?doc_id=247",
+      "category_labels": [
+        "债券专题",
+        "可转债转股结果"
+      ],
+      "source_policy_line_sha256": [
+        "c068dedff1a6177f2c58f73e73d76489263177b67dc66571c6dd4b3b5d94978a"
+      ]
+    },
+    "ci_daily": {
+      "api_name": "ci_daily",
+      "source_doc_id": "308",
+      "official_category_path": [
+        "93",
+        "308"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "38a12945900040485d59422d299f23a9b34c331b4f1b38cb289f6480d2a8030b",
+      "source_url": "https://tushare.pro/document/2?doc_id=308",
+      "category_labels": [
+        "指数专题",
+        "中信行业指数日行情"
+      ],
+      "source_policy_line_sha256": [
+        "dac0afcd742f1cd2584679f3c2915afad1f4978dac5af64fc8770367b3dfd2b7"
+      ]
+    },
+    "ci_index_member": {
+      "api_name": "ci_index_member",
+      "source_doc_id": "373",
+      "official_category_path": [
+        "93",
+        "373"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "7005d63746bfaeb39f4049c3fc54a81410d47e34dfda63d4ac2978f97c683846",
+      "source_url": "https://tushare.pro/document/2?doc_id=373",
+      "category_labels": [
+        "指数专题",
+        "中信行业成分"
+      ],
+      "source_policy_line_sha256": [
+        "7c2f7ff445515d527f12814172d2dff4255ae434b6b786b670ced362f3a053ad"
+      ]
+    },
+    "cn_cpi": {
+      "api_name": "cn_cpi",
+      "source_doc_id": "228",
+      "official_category_path": [
+        "147",
+        "224",
+        "226",
+        "228"
+      ],
+      "mentioned_points": [
+        600
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "6a94fa89b18fdf8d47feb993170a5aa0bdd47187ef2907a23f4118e892466576",
+      "source_url": "https://tushare.pro/document/2?doc_id=228",
+      "category_labels": [
+        "宏观经济",
+        "国内宏观",
+        "价格指数",
+        "居民消费价格指数（CPI）"
+      ],
+      "source_policy_line_sha256": [
+        "d6386cb263dd2f4eaf8452e597bd82fe9c15d022925fc390300c1fc8e100eb3c"
+      ]
+    },
+    "cn_gdp": {
+      "api_name": "cn_gdp",
+      "source_doc_id": "227",
+      "official_category_path": [
+        "147",
+        "224",
+        "225",
+        "227"
+      ],
+      "mentioned_points": [
+        600
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "4a6127ea9a94d6bad737938fa3cce7de520e76cfbb6952f6b61a17e6e26c34fb",
+      "source_url": "https://tushare.pro/document/2?doc_id=227",
+      "category_labels": [
+        "宏观经济",
+        "国内宏观",
+        "国民经济",
+        "国内生产总值（GDP）"
+      ],
+      "source_policy_line_sha256": [
+        "d6386cb263dd2f4eaf8452e597bd82fe9c15d022925fc390300c1fc8e100eb3c"
+      ]
+    },
+    "cn_m": {
+      "api_name": "cn_m",
+      "source_doc_id": "242",
+      "official_category_path": [
+        "147",
+        "224",
+        "240",
+        "241",
+        "242"
+      ],
+      "mentioned_points": [
+        600
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "92f25097001cca8d3616d131109ce20f7d2616e546a3846f672e528ec6411b05",
+      "source_url": "https://tushare.pro/document/2?doc_id=242",
+      "category_labels": [
+        "宏观经济",
+        "国内宏观",
+        "金融",
+        "货币供应量",
+        "货币供应量（月）"
+      ],
+      "source_policy_line_sha256": [
+        "d6386cb263dd2f4eaf8452e597bd82fe9c15d022925fc390300c1fc8e100eb3c"
+      ]
+    },
+    "cn_pmi": {
+      "api_name": "cn_pmi",
+      "source_doc_id": "325",
+      "official_category_path": [
+        "147",
+        "224",
+        "324",
+        "325"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "9b127daf88d88d729e52b067fc11776a20c15fac20235cdb0e5bca048b6f8c67",
+      "source_url": "https://tushare.pro/document/2?doc_id=325",
+      "category_labels": [
+        "宏观经济",
+        "国内宏观",
+        "景气度",
+        "采购经理指数（PMI）"
+      ],
+      "source_policy_line_sha256": [
+        "74a83291bd31a52a09c185fa8ae030d0466a429ac29d54b41c22a3a1337ba7b4"
+      ]
+    },
+    "cn_ppi": {
+      "api_name": "cn_ppi",
+      "source_doc_id": "245",
+      "official_category_path": [
+        "147",
+        "224",
+        "226",
+        "245"
+      ],
+      "mentioned_points": [
+        600
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "f8ca645751ff510bd74a75d85d29f0da1f34fbe0c6baec83ba89f39684f93e63",
+      "source_url": "https://tushare.pro/document/2?doc_id=245",
+      "category_labels": [
+        "宏观经济",
+        "国内宏观",
+        "价格指数",
+        "工业生产者出厂价格指数（PPI）"
+      ],
+      "source_policy_line_sha256": [
+        "12d6f15e638cb605dde01a5621a36106a21f83dbd701b1446eabd22e102ef916"
+      ]
+    },
+    "cn_schedule": {
+      "api_name": "cn_schedule",
+      "source_doc_id": "461",
+      "official_category_path": [
+        "147",
+        "224",
+        "461"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "a3f72721345c07aa72480ea6beaab247b9a772ebe34697702f8020035090fc62",
+      "source_url": "https://tushare.pro/document/2?doc_id=461",
+      "category_labels": [
+        "宏观经济",
+        "国内宏观",
+        "中国经济数据发布日程"
+      ],
+      "source_policy_line_sha256": [
+        "4f475a79f68fa57a8c570db0b2ddc6014cf7e913d08e611f480443ab79d7b4de"
+      ]
+    },
+    "daily_basic": {
+      "api_name": "daily_basic",
+      "source_doc_id": "32",
+      "official_category_path": [
+        "14",
+        "15",
+        "32"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "c95ac0aac1d24c2ff1ac98546aafc6acf9b531e59731a994e24b63864e1a5248",
+      "source_url": "https://tushare.pro/document/2?doc_id=32",
+      "category_labels": [
+        "股票数据",
+        "行情数据",
+        "每日指标"
+      ],
+      "source_policy_line_sha256": [
+        "5fe7d645e3a8e89e7c1078d27505f335494a602bcca7aafddd41f02bcbdbcc1e"
+      ]
+    },
+    "daily_info": {
+      "api_name": "daily_info",
+      "source_doc_id": "215",
+      "official_category_path": [
+        "93",
+        "215"
+      ],
+      "mentioned_points": [
+        600,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "15df88d3827e3e6b28fa904833651a052ccb0495690aa9186cfd7a2bd7ed8010",
+      "source_url": "https://tushare.pro/document/2?doc_id=215",
+      "category_labels": [
+        "指数专题",
+        "沪深市场每日交易统计"
+      ],
+      "source_policy_line_sha256": [
+        "4f80cadae9d23fa003713204ad60648fc98d14fbc27eb73470020726b6ba178c"
+      ]
+    },
+    "dc_daily": {
+      "api_name": "dc_daily",
+      "source_doc_id": "382",
+      "official_category_path": [
+        "14",
+        "346",
+        "382"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "3475dc4ff41affe7055c78e383dc21109868687ef7290f477b87b2dd16adfa8c",
+      "source_url": "https://tushare.pro/document/2?doc_id=382",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "DC概念板块行情"
+      ],
+      "source_policy_line_sha256": [
+        "3b82cb50aae29c87ec3f234cb2a46057483cdb2115fb74964fff5c3c8b9a4953"
+      ]
+    },
+    "dc_hot": {
+      "api_name": "dc_hot",
+      "source_doc_id": "321",
+      "official_category_path": [
+        "14",
+        "346",
+        "321"
+      ],
+      "mentioned_points": [
+        8000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "90701ed78b217c5f21c0addc97ee632a1066a117ca6fe00062f8830a1194ffaa",
+      "source_url": "https://tushare.pro/document/2?doc_id=321",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "DC热榜"
+      ],
+      "source_policy_line_sha256": [
+        "0d9a4065cfef9b996dc715a27274405d85d4674f9a40080a6835fdd07fa560e1"
+      ]
+    },
+    "dc_index": {
+      "api_name": "dc_index",
+      "source_doc_id": "362",
+      "official_category_path": [
+        "14",
+        "346",
+        "362"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "d57cbb589e5b9270b9cdd637c1ccc1a07b313ef0040cdc020b73a9918b110a4b",
+      "source_url": "https://tushare.pro/document/2?doc_id=362",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "DC概念板块分类"
+      ],
+      "source_policy_line_sha256": [
+        "3b82cb50aae29c87ec3f234cb2a46057483cdb2115fb74964fff5c3c8b9a4953"
+      ]
+    },
+    "dc_member": {
+      "api_name": "dc_member",
+      "source_doc_id": "363",
+      "official_category_path": [
+        "14",
+        "346",
+        "363"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "bdb719da179b798fb9ced5eb3d904c23bd19f478b291155a65175870d5248257",
+      "source_url": "https://tushare.pro/document/2?doc_id=363",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "DC概念板块成分"
+      ],
+      "source_policy_line_sha256": [
+        "3b82cb50aae29c87ec3f234cb2a46057483cdb2115fb74964fff5c3c8b9a4953"
+      ]
+    },
+    "disclosure_date": {
+      "api_name": "disclosure_date",
+      "source_doc_id": "162",
+      "official_category_path": [
+        "14",
+        "16",
+        "162"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "8c50f3a187e0116d52fff5ced6be935e098dfa86d8526dd91bc62dc3ae6fdc4e",
+      "source_url": "https://tushare.pro/document/2?doc_id=162",
+      "category_labels": [
+        "股票数据",
+        "财务数据",
+        "财报披露日期表"
+      ],
+      "source_policy_line_sha256": [
+        "0519af1fa10a7423ede05005ea2132fc1ab2bf79d3bb3341dd80ad74ba7803c3"
+      ]
+    },
+    "dividend": {
+      "api_name": "dividend",
+      "source_doc_id": "103",
+      "official_category_path": [
+        "14",
+        "16",
+        "103"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "ab2a47832bfac5b3055da9d22888222c637e867e265b8d6d56b12764c634e435",
+      "source_url": "https://tushare.pro/document/2?doc_id=103",
+      "category_labels": [
+        "股票数据",
+        "财务数据",
+        "分红送股数据"
+      ],
+      "source_policy_line_sha256": [
+        "2e6c04e685d3aeee579c2d1cbcf4b2fe3bb21adece72cf6ce5ca4917db666b55"
+      ]
+    },
+    "eco_cal": {
+      "api_name": "eco_cal",
+      "source_doc_id": "233",
+      "official_category_path": [
+        "184",
+        "233"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "67e141e4439009435769a8f2c783967b36b896c860806b557923b56b35d73fab",
+      "source_url": "https://tushare.pro/document/2?doc_id=233",
+      "category_labels": [
+        "债券专题",
+        "全球财经事件"
+      ],
+      "source_policy_line_sha256": [
+        "723e21ea1736c915839dcb6e8f67512fc76a5ab00ccdaa5c2cf435389e9c6849"
+      ]
+    },
+    "etf_basic": {
+      "api_name": "etf_basic",
+      "source_doc_id": "385",
+      "official_category_path": [
+        "384",
+        "385"
+      ],
+      "mentioned_points": [
+        8000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "2b1dcf47c2df1baef2d88ed9e762cddad37a0a850510f5922ea3b2aa1972827b",
+      "source_url": "https://tushare.pro/document/2?doc_id=385",
+      "category_labels": [
+        "ETF专题",
+        "ETF基本信息"
+      ],
+      "source_policy_line_sha256": [
+        "9f674e1e427366f77e9f13a98f2cf9bcb52e7c0e72a29d211a6267645a22b722"
+      ]
+    },
+    "etf_index": {
+      "api_name": "etf_index",
+      "source_doc_id": "386",
+      "official_category_path": [
+        "384",
+        "386"
+      ],
+      "mentioned_points": [
+        8000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "a7cbb79cd58eab39e28b57d95e89a153216229fbccc610e277d6078b70d8ac68",
+      "source_url": "https://tushare.pro/document/2?doc_id=386",
+      "category_labels": [
+        "ETF专题",
+        "ETF跟踪指数"
+      ],
+      "source_policy_line_sha256": [
+        "564d519233874eb743995d87855fce7759e7a78dc821569118d982d9e79be324"
+      ]
+    },
+    "etf_limit": {
+      "api_name": "etf_limit",
+      "source_doc_id": "491",
+      "official_category_path": [
+        "384",
+        "491"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "534dd19bb5899733f3e368890836cecf82e86cefc550b7e39a65f2c816338601",
+      "source_url": "https://tushare.pro/document/2?doc_id=491",
+      "category_labels": [
+        "ETF专题",
+        "ETF每日涨跌停价格"
+      ],
+      "source_policy_line_sha256": [
+        "4f475a79f68fa57a8c570db0b2ddc6014cf7e913d08e611f480443ab79d7b4de"
+      ]
+    },
+    "etf_sh_cons": {
+      "api_name": "etf_sh_cons",
+      "source_doc_id": "471",
+      "official_category_path": [
+        "384",
+        "471"
+      ],
+      "mentioned_points": [
+        8000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "43d3d5a2d2e6a0ca29e6e19a2a182d777086b2d6de40c1604e4467715d152922",
+      "source_url": "https://tushare.pro/document/2?doc_id=471",
+      "category_labels": [
+        "ETF专题",
+        "每日篮子组合(沪市PCF）"
+      ],
+      "source_policy_line_sha256": [
+        "7ca33c42c5ea10f490c474fc45c8fb43226f62bd3dad19264e4b33b587a97da9"
+      ]
+    },
+    "etf_share_size": {
+      "api_name": "etf_share_size",
+      "source_doc_id": "408",
+      "official_category_path": [
+        "384",
+        "408"
+      ],
+      "mentioned_points": [
+        8000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "0036783759ca1454bb6234c5927c280510261a2bb9c5870dcd44683eacda7c29",
+      "source_url": "https://tushare.pro/document/2?doc_id=408",
+      "category_labels": [
+        "ETF专题",
+        "ETF份额规模"
+      ],
+      "source_policy_line_sha256": [
+        "7ca33c42c5ea10f490c474fc45c8fb43226f62bd3dad19264e4b33b587a97da9"
+      ]
+    },
+    "etf_sz_cons": {
+      "api_name": "etf_sz_cons",
+      "source_doc_id": "472",
+      "official_category_path": [
+        "384",
+        "472"
+      ],
+      "mentioned_points": [
+        8000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "3baa70389eefea0f78d1ff5ee98ab2ce1536ef376bf156d4e29a601560268be7",
+      "source_url": "https://tushare.pro/document/2?doc_id=472",
+      "category_labels": [
+        "ETF专题",
+        "每日篮子组合(深市PCF）"
+      ],
+      "source_policy_line_sha256": [
+        "7ca33c42c5ea10f490c474fc45c8fb43226f62bd3dad19264e4b33b587a97da9"
+      ]
+    },
+    "express_vip": {
+      "api_name": "express_vip",
+      "source_doc_id": "46",
+      "official_category_path": [
+        "14",
+        "16",
+        "46"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "42f5173086ae9f909bb3c47aad9837651f7e8b2d2547afb29c528623a92ebe6b",
+      "source_url": "https://tushare.pro/document/2?doc_id=46",
+      "category_labels": [
+        "股票数据",
+        "财务数据",
+        "业绩快报"
+      ],
+      "source_policy_line_sha256": [
+        "1954343dcd57e65b9e7e5e80237c9322c3a086a7d970f9ac4d02569ba37036b7",
+        "c1295a332b26a32a4fb50da864684e4e2e9dd1bf40e819653bc380079e37cfd0"
+      ]
+    },
+    "fina_audit": {
+      "api_name": "fina_audit",
+      "source_doc_id": "80",
+      "official_category_path": [
+        "14",
+        "16",
+        "80"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "b0c547284019eabc652a09e1c5fff6d674a1b2d468f51fd586a91b633ad5193a",
+      "source_url": "https://tushare.pro/document/2?doc_id=80",
+      "category_labels": [
+        "股票数据",
+        "财务数据",
+        "财务审计意见"
+      ],
+      "source_policy_line_sha256": [
+        "1954343dcd57e65b9e7e5e80237c9322c3a086a7d970f9ac4d02569ba37036b7"
+      ]
+    },
+    "fina_indicator_vip": {
+      "api_name": "fina_indicator_vip",
+      "source_doc_id": "79",
+      "official_category_path": [
+        "14",
+        "16",
+        "79"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "e385b21fb2146adb428db638aca8a51619108c791f8fbe2ea569dc9d3486f56e",
+      "source_url": "https://tushare.pro/document/2?doc_id=79",
+      "category_labels": [
+        "股票数据",
+        "财务数据",
+        "财务指标数据"
+      ],
+      "source_policy_line_sha256": [
+        "1954343dcd57e65b9e7e5e80237c9322c3a086a7d970f9ac4d02569ba37036b7",
+        "e661f8c04265ba79c82c15ec23535ba75073b3659b2fb6e4499d5977709b5d4a"
+      ]
+    },
+    "fina_mainbz": {
+      "api_name": "fina_mainbz",
+      "source_doc_id": "81",
+      "official_category_path": [
+        "14",
+        "16",
+        "81"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "d9eb10fb4eeae03dd76f00c5239348b0a0952ca254d2f23551f21878b9fc8a07",
+      "source_url": "https://tushare.pro/document/2?doc_id=81",
+      "category_labels": [
+        "股票数据",
+        "财务数据",
+        "主营业务构成"
+      ],
+      "source_policy_line_sha256": [
+        "2c9c521f7bd2ec17d6bfef3e9b7b98a69d6f755389845e59c1c9e7ed267d3fc3",
+        "938b44a0fd5e90a69f74abadfa57054dcbf154f78d3b861acac7b06cf4ec1dbe"
+      ]
+    },
+    "forecast_vip": {
+      "api_name": "forecast_vip",
+      "source_doc_id": "45",
+      "official_category_path": [
+        "14",
+        "16",
+        "45"
+      ],
+      "mentioned_points": [
+        20,
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "a8f00dadd1d3e9ab23f5f50a6d88a5ab15130d4b6161ffd92304e1e5dfa59f3d",
+      "source_url": "https://tushare.pro/document/2?doc_id=45",
+      "category_labels": [
+        "股票数据",
+        "财务数据",
+        "业绩预告"
+      ],
+      "source_policy_line_sha256": [
+        "4b6ccde433eac9faada7c462663177755def950892ca4e36fe1c4876f5c84faa",
+        "c8fad1ac5bf41a933962a29648ca4d56eff5e2bbe45b87afeb7033792d911978"
+      ]
+    },
+    "ft_limit": {
+      "api_name": "ft_limit",
+      "source_doc_id": "368",
+      "official_category_path": [
+        "134",
+        "368"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "5aede42bb70cdd094a1e7faf2488646ab36528212bc3072e9fc4627e3a7ce721",
+      "source_url": "https://tushare.pro/document/2?doc_id=368",
+      "category_labels": [
+        "期货数据",
+        "期货合约涨跌停价格"
+      ],
+      "source_policy_line_sha256": [
+        "70ef7af55a1cc351a54dfaa48d0bed747f1d89ba42b75c12b6fba9156708018b"
+      ]
+    },
+    "fund_adj": {
+      "api_name": "fund_adj",
+      "source_doc_id": "199",
+      "official_category_path": [
+        "384",
+        "199"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "52094eec8fd55a2cb6579302c3568ffec821f7480716a08cf760a97a1a573fcf",
+      "source_url": "https://tushare.pro/document/2?doc_id=199",
+      "category_labels": [
+        "ETF专题",
+        "ETF复权因子"
+      ],
+      "source_policy_line_sha256": [
+        "6432525ccfdd2a702d5ab29f13863a84cdfb2cfdf5d8fbff8d473f64904b8356"
+      ]
+    },
+    "fund_basic": {
+      "api_name": "fund_basic",
+      "source_doc_id": "19",
+      "official_category_path": [
+        "18",
+        "19"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "9489b3c5ff78cd1546808d264cd16eb9e55322297ac91d178332c5e22a9432b4",
+      "source_url": "https://tushare.pro/document/2?doc_id=19",
+      "category_labels": [
+        "公募基金",
+        "基金列表"
+      ],
+      "source_policy_line_sha256": [
+        "9ae6f3a4d40d38888bf0d36959174ace17edfdd477fd88de25ab9d88a1f99509"
+      ]
+    },
+    "fund_company": {
+      "api_name": "fund_company",
+      "source_doc_id": "118",
+      "official_category_path": [
+        "18",
+        "118"
+      ],
+      "mentioned_points": [
+        1500
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "14fcf1ad9e233a90bc683607c2f9ef3bcd4dd2eebd90982e787d57bb03b48dd2",
+      "source_url": "https://tushare.pro/document/2?doc_id=118",
+      "category_labels": [
+        "公募基金",
+        "基金管理人"
+      ],
+      "source_policy_line_sha256": [
+        "9e48a096ee842c731c8ea15788a6592a79e61e5ba96b5118ae90a9f327424dca"
+      ]
+    },
+    "fund_daily": {
+      "api_name": "fund_daily",
+      "source_doc_id": "127",
+      "official_category_path": [
+        "384",
+        "127"
+      ],
+      "mentioned_points": [
+        5000,
+        8000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "ac9f43990cc00bc0b7510a345082e5bdf12461bc0c85b7175d0faf3d602e2024",
+      "source_url": "https://tushare.pro/document/2?doc_id=127",
+      "category_labels": [
+        "ETF专题",
+        "ETF日线行情"
+      ],
+      "source_policy_line_sha256": [
+        "e385ad7f26c1fddcedd690c962a85de52a7a7ddb0528fad0d443375c3d257ddf"
+      ]
+    },
+    "fund_div": {
+      "api_name": "fund_div",
+      "source_doc_id": "120",
+      "official_category_path": [
+        "18",
+        "120"
+      ],
+      "mentioned_points": [
+        400
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "c24025d63f8a2ec74895a245e5d725af7cf947742a9ea7b9cccd141ecef484b8",
+      "source_url": "https://tushare.pro/document/2?doc_id=120",
+      "category_labels": [
+        "公募基金",
+        "基金分红"
+      ],
+      "source_policy_line_sha256": [
+        "eef1c6ad977e146b818f3a7fca1aba54b1d3b1e78e787bbb338f6e6e8015a78e"
+      ]
+    },
+    "fund_manager": {
+      "api_name": "fund_manager",
+      "source_doc_id": "208",
+      "official_category_path": [
+        "18",
+        "208"
+      ],
+      "mentioned_points": [
+        500,
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "32a90070927fd8ff6558b24252d971b0b2e951090bfecf46a48e144d57fd30bc",
+      "source_url": "https://tushare.pro/document/2?doc_id=208",
+      "category_labels": [
+        "公募基金",
+        "基金经理"
+      ],
+      "source_policy_line_sha256": [
+        "2dd9b0006fd0dcd987a64fbe60788a5cccca37c424e8a7f721f3d082d5376d65"
+      ]
+    },
+    "fund_nav": {
+      "api_name": "fund_nav",
+      "source_doc_id": "119",
+      "official_category_path": [
+        "18",
+        "119"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "83b800627399578683f1bede7b1b17d7f80f1f5fd06e075cc1739bcb24c3a480",
+      "source_url": "https://tushare.pro/document/2?doc_id=119",
+      "category_labels": [
+        "公募基金",
+        "基金净值"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "fund_share": {
+      "api_name": "fund_share",
+      "source_doc_id": "207",
+      "official_category_path": [
+        "18",
+        "207"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "9c73e788af8e3141c7dfea18ae7876e2144c57faaafba19bd0bfb309c80ff52e",
+      "source_url": "https://tushare.pro/document/2?doc_id=207",
+      "category_labels": [
+        "公募基金",
+        "基金规模"
+      ],
+      "source_policy_line_sha256": [
+        "2a6a75e8a1209ae4ed08b1e20830ee1564aaeb19efa95b595c4fd17225d0f673"
+      ]
+    },
+    "fut_basic": {
+      "api_name": "fut_basic",
+      "source_doc_id": "135",
+      "official_category_path": [
+        "134",
+        "135"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "e3cdf637ab6031e2adee946b6eaba2c7b130d082d971fe43763fd33753514b27",
+      "source_url": "https://tushare.pro/document/2?doc_id=135",
+      "category_labels": [
+        "期货数据",
+        "合约信息"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "fut_daily": {
+      "api_name": "fut_daily",
+      "source_doc_id": "138",
+      "official_category_path": [
+        "134",
+        "138"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "92722e36bf0aa3de5ac281f723a221ab56e21e6f3ed74325e5971f61d83bdcf0",
+      "source_url": "https://tushare.pro/document/2?doc_id=138",
+      "category_labels": [
+        "期货数据",
+        "期货日线行情"
+      ],
+      "source_policy_line_sha256": [
+        "ade161d543a525ee0a99d0adae577205657aac171382e7d3e769cea742f4389d"
+      ]
+    },
+    "fut_daily_adj": {
+      "api_name": "fut_daily_adj",
+      "source_doc_id": "492",
+      "official_category_path": [
+        "134",
+        "492"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "2cf094956c4d06b33dc6537028d0fc0fa692935ff5277b46342585408b7da6bd",
+      "source_url": "https://tushare.pro/document/2?doc_id=492",
+      "category_labels": [
+        "期货数据",
+        "期货复权行情"
+      ],
+      "source_policy_line_sha256": [
+        "f77fd2dab1896adb794ee701c74d5a7a6c510a55e891158839bec92a0c8b54a6"
+      ]
+    },
+    "fut_holding": {
+      "api_name": "fut_holding",
+      "source_doc_id": "139",
+      "official_category_path": [
+        "134",
+        "139"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "2c3067fa51ead06130f5be4f4bcb8cad70788469ef7c2a165b85a1e2543bbd3d",
+      "source_url": "https://tushare.pro/document/2?doc_id=139",
+      "category_labels": [
+        "期货数据",
+        "每日持仓排名"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "fut_index_daily": {
+      "api_name": "fut_index_daily",
+      "source_doc_id": "468",
+      "official_category_path": [
+        "134",
+        "468"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "37a7cc13398bb8c249dc2c478bdac1e02124c39e0339657ed29ff6dd388b201f",
+      "source_url": "https://tushare.pro/document/2?doc_id=468",
+      "category_labels": [
+        "期货数据",
+        "南华期货指数日线行情"
+      ],
+      "source_policy_line_sha256": [
+        "5c07836c0db99d90930b2dc5b33badc1b054f132b8e03789692238b8cb8a2d45"
+      ]
+    },
+    "fut_mapping": {
+      "api_name": "fut_mapping",
+      "source_doc_id": "189",
+      "official_category_path": [
+        "134",
+        "189"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "13c0da200a10ccc50c78659a758f71a83fefd75b731b1598e676d235fceac654",
+      "source_url": "https://tushare.pro/document/2?doc_id=189",
+      "category_labels": [
+        "期货数据",
+        "期货主力与连续合约"
+      ],
+      "source_policy_line_sha256": [
+        "70a3416c7ef89bfa2fdba86771a7fbe78dd9ca3624377945665acfa2431b11a2"
+      ]
+    },
+    "fut_settle": {
+      "api_name": "fut_settle",
+      "source_doc_id": "141",
+      "official_category_path": [
+        "134",
+        "141"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "5e17ce3787381bd313ba5df6b6f30746bdf463b1d1d3d8c9f79a2755f747fa28",
+      "source_url": "https://tushare.pro/document/2?doc_id=141",
+      "category_labels": [
+        "期货数据",
+        "每日结算参数"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "fut_trade_cal": {
+      "api_name": "fut_trade_cal",
+      "source_doc_id": "467",
+      "official_category_path": [
+        "134",
+        "467"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "ff220bb8945ed78196042c190e35624ab686717255383c75248050dfcbfb2801",
+      "source_url": "https://tushare.pro/document/2?doc_id=467",
+      "category_labels": [
+        "期货数据",
+        "期货交易日历"
+      ],
+      "source_policy_line_sha256": [
+        "1bc3a52c05ae4871b0eaad7ff06b8146d67a82865e5e4a60bafd4e3d2d18125b"
+      ]
+    },
+    "fut_weekly_detail": {
+      "api_name": "fut_weekly_detail",
+      "source_doc_id": "216",
+      "official_category_path": [
+        "134",
+        "216"
+      ],
+      "mentioned_points": [
+        600,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "ecf281a22bb633603613cabec17d4210a544814076e6f54551cc20b458031ad2",
+      "source_url": "https://tushare.pro/document/2?doc_id=216",
+      "category_labels": [
+        "期货数据",
+        "期货主要品种交易周报"
+      ],
+      "source_policy_line_sha256": [
+        "3331731abc840325ff805ccbc28a971931140fc5ae418a1d2adf6b12a45c6fdb"
+      ]
+    },
+    "fut_wsr": {
+      "api_name": "fut_wsr",
+      "source_doc_id": "140",
+      "official_category_path": [
+        "134",
+        "140"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "29aeb2aa6cf00a698ed0d15bd86fdbf4d3fc0f5e81189843c0633591ae7e8bc0",
+      "source_url": "https://tushare.pro/document/2?doc_id=140",
+      "category_labels": [
+        "期货数据",
+        "仓单日报"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "fx_daily": {
+      "api_name": "fx_daily",
+      "source_doc_id": "179",
+      "official_category_path": [
+        "177",
+        "179"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "a50c642f25f9345c16f88fcd3362b8452c43356f0e280604d264a2efd421e545",
+      "source_url": "https://tushare.pro/document/2?doc_id=179",
+      "category_labels": [
+        "外汇数据",
+        "外汇日线行情"
+      ],
+      "source_policy_line_sha256": [
+        "ddd8f3605104cda7dc67a0601fd4f284914ecbe66bd42d5902eacb7e2b95a635"
+      ]
+    },
+    "fx_obasic": {
+      "api_name": "fx_obasic",
+      "source_doc_id": "178",
+      "official_category_path": [
+        "177",
+        "178"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "995b4b2611aeb38f5e12275b8e07deb1bce9d0040818e23c030a279c358f3161",
+      "source_url": "https://tushare.pro/document/2?doc_id=178",
+      "category_labels": [
+        "外汇数据",
+        "外汇基础信息（海外）"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "gz_index": {
+      "api_name": "gz_index",
+      "source_doc_id": "174",
+      "official_category_path": [
+        "147",
+        "224",
+        "148",
+        "174"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "32c91038d5bf3aad7648b562d3068e11efdd5fb8b43a95e723a18c2c2111ca14",
+      "source_url": "https://tushare.pro/document/2?doc_id=174",
+      "category_labels": [
+        "宏观经济",
+        "国内宏观",
+        "利率数据",
+        "广州民间借贷利率"
+      ],
+      "source_policy_line_sha256": [
+        "a56db95664c8b757143780cc76b2a550966c68e09e12b5f155dffde9f5612d07"
+      ]
+    },
+    "hibor": {
+      "api_name": "hibor",
+      "source_doc_id": "153",
+      "official_category_path": [
+        "147",
+        "224",
+        "148",
+        "153"
+      ],
+      "mentioned_points": [
+        120
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "0ca08070e4509f58c096899ac82106bb10ac4e761e092325b66c8f1d70507e00",
+      "source_url": "https://tushare.pro/document/2?doc_id=153",
+      "category_labels": [
+        "宏观经济",
+        "国内宏观",
+        "利率数据",
+        "Hibor利率"
+      ],
+      "source_policy_line_sha256": [
+        "b884c9900b6cf46334b9ef8150e64d4ab4af98bea8c33edc50adcb8a73724c8b"
+      ]
+    },
+    "hk_basic": {
+      "api_name": "hk_basic",
+      "source_doc_id": "191",
+      "official_category_path": [
+        "190",
+        "191"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "uncertain",
+      "rpm_at_10100": null,
+      "rpm_after_2026_12_05_at_8100": null,
+      "reason": "Leaf has points-based access but 290 broadly excludes HK/US permissions from points. Do not resolve that scope conflict by choosing the higher rate.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "d33c2bd69436008fdf269df324af28452b6ebf50254e41763d4befb1a8a620da",
+      "source_url": "https://tushare.pro/document/2?doc_id=191",
+      "category_labels": [
+        "港股数据",
+        "港股基础信息"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "hk_tradecal": {
+      "api_name": "hk_tradecal",
+      "source_doc_id": "250",
+      "official_category_path": [
+        "190",
+        "250"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "uncertain",
+      "rpm_at_10100": null,
+      "rpm_after_2026_12_05_at_8100": null,
+      "reason": "Leaf has points-based access but 290 broadly excludes HK/US permissions from points. Do not resolve that scope conflict by choosing the higher rate.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "b43ece5ab02bd76c76e39dae92dff28cbd16a247129ebdaef0ab08b6048bb6a2",
+      "source_url": "https://tushare.pro/document/2?doc_id=250",
+      "category_labels": [
+        "港股数据",
+        "港股交易日历"
+      ],
+      "source_policy_line_sha256": [
+        "d6dad1c8b45ef52419b09e34f78e84e82c30df2e666b1e82c86b4bee586d6910"
+      ]
+    },
+    "hm_detail": {
+      "api_name": "hm_detail",
+      "source_doc_id": "312",
+      "official_category_path": [
+        "14",
+        "346",
+        "312"
+      ],
+      "mentioned_points": [
+        10000
+      ],
+      "rate_class": "uncertain",
+      "rpm_at_10100": null,
+      "rpm_after_2026_12_05_at_8100": null,
+      "reason": "Leaf points condition cannot be certified to survive the declared 8100 balance; hm_detail explicitly requires 10000.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "64e42c09934c74aea5bd28fe1f0f439ae64fed68a372fdfbac045217a42adc7b",
+      "source_url": "https://tushare.pro/document/2?doc_id=312",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "游资交易每日明细"
+      ],
+      "source_policy_line_sha256": [
+        "a477adb0057f9c790c76d81a9b516ae735cc34f32d53b4ec40ad0a68a722cf16"
+      ]
+    },
+    "hm_list": {
+      "api_name": "hm_list",
+      "source_doc_id": "311",
+      "official_category_path": [
+        "14",
+        "346",
+        "311"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "6ea2c654c4c31b413f527d7d97fa603a9eea0390658684fcbe13120b2ce6d7a4",
+      "source_url": "https://tushare.pro/document/2?doc_id=311",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "市场游资最全名录"
+      ],
+      "source_policy_line_sha256": [
+        "3916b9f983825ac7d67eefc441accc748c6adaf2a4682b1f705311f1c6bc6f91"
+      ]
+    },
+    "idx_anns": {
+      "api_name": "idx_anns",
+      "source_doc_id": "460",
+      "official_category_path": [
+        "384",
+        "460"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "cb22ad7a7531c5eb65a4773d28f018d726337ac29e76cbb4ff26c42acf857bee",
+      "source_url": "https://tushare.pro/document/2?doc_id=460",
+      "category_labels": [
+        "ETF专题",
+        "指数公司公告"
+      ],
+      "source_policy_line_sha256": [
+        "b819e7095b77c61727278243bb77f038bc4d24faf79535e9d1da5a0edd0ccbf8"
+      ]
+    },
+    "income_vip": {
+      "api_name": "income_vip",
+      "source_doc_id": "33",
+      "official_category_path": [
+        "14",
+        "16",
+        "33"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "f2b3f2bb11eb46933bd9b7d540a6b3a764adcce9e2bd665c28789b5651c7b801",
+      "source_url": "https://tushare.pro/document/2?doc_id=33",
+      "category_labels": [
+        "股票数据",
+        "财务数据",
+        "利润表"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e",
+        "bc33a33750b7689fe7a03e7de081994ab8d4214af67e63e662bc22a37e173cd7"
+      ]
+    },
+    "index_basic": {
+      "api_name": "index_basic",
+      "source_doc_id": "94",
+      "official_category_path": [
+        "93",
+        "94"
+      ],
+      "mentioned_points": [
+        2000,
+        8000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "be4ef1df3df824ca39bdfc13537503f7eee1e1541fa5854d921aee66112267b0",
+      "source_url": "https://tushare.pro/document/2?doc_id=94",
+      "category_labels": [
+        "指数专题",
+        "指数基本信息"
+      ],
+      "source_policy_line_sha256": [
+        "4f624f09ca8d5d74a7a0e76a671270f352441ccddfa103d282cddbac513fc9aa"
+      ]
+    },
+    "index_classify": {
+      "api_name": "index_classify",
+      "source_doc_id": "181",
+      "official_category_path": [
+        "93",
+        "181"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "f0092b3a4a195018659359d0583884dc9bc6224744ad39fc3f818dd87477fc75",
+      "source_url": "https://tushare.pro/document/2?doc_id=181",
+      "category_labels": [
+        "指数专题",
+        "申万行业分类"
+      ],
+      "source_policy_line_sha256": [
+        "53f459f8236474665867c7fc64a795568e6f45b4d4fbe948ea215d1353212f6f"
+      ]
+    },
+    "index_daily": {
+      "api_name": "index_daily",
+      "source_doc_id": "95",
+      "official_category_path": [
+        "93",
+        "95"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "9684d516440d56dc2a0239f8a0e3050aecb9cde05b1c3d7c241bcd190d3a4447",
+      "source_url": "https://tushare.pro/document/2?doc_id=95",
+      "category_labels": [
+        "指数专题",
+        "指数日线行情"
+      ],
+      "source_policy_line_sha256": [
+        "eee80bfa08087d95404cbd7dde089895ae314974ba6ef78bb691eaf4e3fe338b"
+      ]
+    },
+    "index_dailybasic": {
+      "api_name": "index_dailybasic",
+      "source_doc_id": "128",
+      "official_category_path": [
+        "93",
+        "128"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "6abb1481397aab42cd47bec688c634d520d99e6fc3f1bbf129e8795bd4654553",
+      "source_url": "https://tushare.pro/document/2?doc_id=128",
+      "category_labels": [
+        "指数专题",
+        "大盘指数每日指标"
+      ],
+      "source_policy_line_sha256": [
+        "2a14b72122e739f52ed5da6469fd2c88310c9245943c8ca21b0494ac25e5ecf7"
+      ]
+    },
+    "index_global": {
+      "api_name": "index_global",
+      "source_doc_id": "211",
+      "official_category_path": [
+        "93",
+        "211"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "d609b225c655a55bde5a0d6cdbfe3dc12fd0b36eab07003adaff4d375145387c",
+      "source_url": "https://tushare.pro/document/2?doc_id=211",
+      "category_labels": [
+        "指数专题",
+        "国际主要指数"
+      ],
+      "source_policy_line_sha256": [
+        "5b0eee2be9d87098b7a299217fb34d16e50ec7e80d2aa315df73fb882074ab42"
+      ]
+    },
+    "index_member_all": {
+      "api_name": "index_member_all",
+      "source_doc_id": "335",
+      "official_category_path": [
+        "93",
+        "335"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "272953176497f0b277e7a6e65d5734dc2aeb5c71ed081f6db84cbe4692f111e0",
+      "source_url": "https://tushare.pro/document/2?doc_id=335",
+      "category_labels": [
+        "指数专题",
+        "申万行业成分（分级）"
+      ],
+      "source_policy_line_sha256": [
+        "9be48782441c9b9993064b7c9bb4bd50fadc27a387b302014b9c6b0141a80818"
+      ]
+    },
+    "index_monthly": {
+      "api_name": "index_monthly",
+      "source_doc_id": "172",
+      "official_category_path": [
+        "93",
+        "172"
+      ],
+      "mentioned_points": [
+        600
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "e51fe9e376a9f4f2c8186e53760c4bd49982c8fa6fc73f8c2a258c103c354cd5",
+      "source_url": "https://tushare.pro/document/2?doc_id=172",
+      "category_labels": [
+        "指数专题",
+        "指数月线行情"
+      ],
+      "source_policy_line_sha256": [
+        "c7a38343ed58063953c78dd0d95d5ea6063616c8c6c23fdde100521160f25353"
+      ]
+    },
+    "index_weekly": {
+      "api_name": "index_weekly",
+      "source_doc_id": "171",
+      "official_category_path": [
+        "93",
+        "171"
+      ],
+      "mentioned_points": [
+        600
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "386aa8b0d7a79cfbbf07d4ff95024fa725be0517addf5344eea19f70d01a9325",
+      "source_url": "https://tushare.pro/document/2?doc_id=171",
+      "category_labels": [
+        "指数专题",
+        "指数周线行情"
+      ],
+      "source_policy_line_sha256": [
+        "c7a38343ed58063953c78dd0d95d5ea6063616c8c6c23fdde100521160f25353"
+      ]
+    },
+    "index_weight": {
+      "api_name": "index_weight",
+      "source_doc_id": "96",
+      "official_category_path": [
+        "93",
+        "96"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "65ed3bc2b44cb73acaefa0ca9964fd41c20e1a6f04515859c64f26b17a5e71de",
+      "source_url": "https://tushare.pro/document/2?doc_id=96",
+      "category_labels": [
+        "指数专题",
+        "指数成分和权重"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "kpl_concept_cons": {
+      "api_name": "kpl_concept_cons",
+      "source_doc_id": "351",
+      "official_category_path": [
+        "14",
+        "346",
+        "351"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "e250e114696b3854f0256e9ae0c15b34e654dd72b8ee08429929f02c51b311e8",
+      "source_url": "https://tushare.pro/document/2?doc_id=351",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "题材成分（KP）"
+      ],
+      "source_policy_line_sha256": [
+        "fcca3e5c5a758e49b3605c3281ba4572fc28f88b0840809a28e2002afbf7ad9f"
+      ]
+    },
+    "libor": {
+      "api_name": "libor",
+      "source_doc_id": "152",
+      "official_category_path": [
+        "147",
+        "224",
+        "148",
+        "152"
+      ],
+      "mentioned_points": [
+        120
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "29aa41e0d8a81bda45856521dd34891ec00cc59a4ff4a41e42a16c9f41d83e42",
+      "source_url": "https://tushare.pro/document/2?doc_id=152",
+      "category_labels": [
+        "宏观经济",
+        "国内宏观",
+        "利率数据",
+        "Libor利率"
+      ],
+      "source_policy_line_sha256": [
+        "b884c9900b6cf46334b9ef8150e64d4ab4af98bea8c33edc50adcb8a73724c8b"
+      ]
+    },
+    "margin": {
+      "api_name": "margin",
+      "source_doc_id": "58",
+      "official_category_path": [
+        "14",
+        "330",
+        "58"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "39781f8802495e32c158996a29f74db277765558296da0fc825eb98eaa8bd9c6",
+      "source_url": "https://tushare.pro/document/2?doc_id=58",
+      "category_labels": [
+        "股票数据",
+        "两融及转融通",
+        "融资融券交易汇总"
+      ],
+      "source_policy_line_sha256": [
+        "0945a9f2951d39b30d76d7324f38628b00078e78a317ef43d7b8c989340efcbf"
+      ]
+    },
+    "margin_detail": {
+      "api_name": "margin_detail",
+      "source_doc_id": "59",
+      "official_category_path": [
+        "14",
+        "330",
+        "59"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "6285f63a3da7ddd6458c7add0727701a802799ef296eed16c8954a9f6a4f5b76",
+      "source_url": "https://tushare.pro/document/2?doc_id=59",
+      "category_labels": [
+        "股票数据",
+        "两融及转融通",
+        "融资融券交易明细"
+      ],
+      "source_policy_line_sha256": [
+        "0945a9f2951d39b30d76d7324f38628b00078e78a317ef43d7b8c989340efcbf"
+      ]
+    },
+    "margin_secs": {
+      "api_name": "margin_secs",
+      "source_doc_id": "326",
+      "official_category_path": [
+        "14",
+        "330",
+        "326"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "9f3601d9271519ead625521251f68607635f0be352af8fa459fab0ab681b6415",
+      "source_url": "https://tushare.pro/document/2?doc_id=326",
+      "category_labels": [
+        "股票数据",
+        "两融及转融通",
+        "融资融券标的（盘前）"
+      ],
+      "source_policy_line_sha256": [
+        "14379c19acd1867e6962ec7c06ceed50fbe1354c424cca4e2180fec951f01d0b"
+      ]
+    },
+    "mkt_idx_bmk": {
+      "api_name": "mkt_idx_bmk",
+      "source_doc_id": "462",
+      "official_category_path": [
+        "18",
+        "462"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "bcf216560904dd8f33ec3af0ebd017d9cf7005b1ca70a496a71e35d2fe4c2909",
+      "source_url": "https://tushare.pro/document/2?doc_id=462",
+      "category_labels": [
+        "公募基金",
+        "基金业绩基准"
+      ],
+      "source_policy_line_sha256": [
+        "f77fd2dab1896adb794ee701c74d5a7a6c510a55e891158839bec92a0c8b54a6"
+      ]
+    },
+    "moneyflow": {
+      "api_name": "moneyflow",
+      "source_doc_id": "170",
+      "official_category_path": [
+        "14",
+        "342",
+        "170"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "b8a0d7673c2f0e4b43ddb54fc7be64cf3accfd0953da881fd8597dc5fe6e43c2",
+      "source_url": "https://tushare.pro/document/2?doc_id=170",
+      "category_labels": [
+        "股票数据",
+        "资金流向数据",
+        "个股资金流向"
+      ],
+      "source_policy_line_sha256": [
+        "9392da7423f37cf92f01c980e002ec586d9899386b3fbc82e2faf46d45a7eca6"
+      ]
+    },
+    "moneyflow_cnt_ths": {
+      "api_name": "moneyflow_cnt_ths",
+      "source_doc_id": "371",
+      "official_category_path": [
+        "14",
+        "342",
+        "371"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "9e4f486746c7145cf68941cf4242fef7117d77a0dfd57d60182a43b3372d3947",
+      "source_url": "https://tushare.pro/document/2?doc_id=371",
+      "category_labels": [
+        "股票数据",
+        "资金流向数据",
+        "板块资金流向（THS)"
+      ],
+      "source_policy_line_sha256": [
+        "572d2fd8c7c75c2702496abee8484fd2d0c3b2437f9d09528259f7c4e919b09e"
+      ]
+    },
+    "moneyflow_dc": {
+      "api_name": "moneyflow_dc",
+      "source_doc_id": "349",
+      "official_category_path": [
+        "14",
+        "342",
+        "349"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "996c2dbaa9d62b42c77a58159443df2574945ff4bb3ea1ab53a82adef75019ae",
+      "source_url": "https://tushare.pro/document/2?doc_id=349",
+      "category_labels": [
+        "股票数据",
+        "资金流向数据",
+        "个股资金流向（DC）"
+      ],
+      "source_policy_line_sha256": [
+        "ad126af337a4bd4b6c8050c076a801ec6822630acf7a2d00f3134880b79c0090"
+      ]
+    },
+    "moneyflow_ind_dc": {
+      "api_name": "moneyflow_ind_dc",
+      "source_doc_id": "344",
+      "official_category_path": [
+        "14",
+        "342",
+        "344"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "b6add81884b34d4ba9ff344b680fea46b362f26a0422c40374c5f55c051f888e",
+      "source_url": "https://tushare.pro/document/2?doc_id=344",
+      "category_labels": [
+        "股票数据",
+        "资金流向数据",
+        "板块资金流向（DC）"
+      ],
+      "source_policy_line_sha256": [
+        "572d2fd8c7c75c2702496abee8484fd2d0c3b2437f9d09528259f7c4e919b09e"
+      ]
+    },
+    "moneyflow_ind_ths": {
+      "api_name": "moneyflow_ind_ths",
+      "source_doc_id": "343",
+      "official_category_path": [
+        "14",
+        "342",
+        "343"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "43e72c86c54dede3c17dc077d25c5991c0cfb925187af56fd9bebc12a8d94d4a",
+      "source_url": "https://tushare.pro/document/2?doc_id=343",
+      "category_labels": [
+        "股票数据",
+        "资金流向数据",
+        "行业资金流向（THS）"
+      ],
+      "source_policy_line_sha256": [
+        "572d2fd8c7c75c2702496abee8484fd2d0c3b2437f9d09528259f7c4e919b09e"
+      ]
+    },
+    "moneyflow_mkt_dc": {
+      "api_name": "moneyflow_mkt_dc",
+      "source_doc_id": "345",
+      "official_category_path": [
+        "14",
+        "342",
+        "345"
+      ],
+      "mentioned_points": [
+        120,
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "22daa685789cb3428715d13b80435e4c0eebdc42c6b6a3486b0de0cc6432ee64",
+      "source_url": "https://tushare.pro/document/2?doc_id=345",
+      "category_labels": [
+        "股票数据",
+        "资金流向数据",
+        "大盘资金流向（DC）"
+      ],
+      "source_policy_line_sha256": [
+        "9072824f5f6ff118231b629099bc4b460abe4e2e047dc729b38a2df1caeb75ae"
+      ]
+    },
+    "moneyflow_ths": {
+      "api_name": "moneyflow_ths",
+      "source_doc_id": "348",
+      "official_category_path": [
+        "14",
+        "342",
+        "348"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "c163857c9ed8011542414e74976573d1781698f044ecbfd8bd2a37483b71cb70",
+      "source_url": "https://tushare.pro/document/2?doc_id=348",
+      "category_labels": [
+        "股票数据",
+        "资金流向数据",
+        "个股资金流向（THS）"
+      ],
+      "source_policy_line_sha256": [
+        "7deb876660ee05f214d879824b317a5f1aab384b81f55b5e4b281c815351bd24"
+      ]
+    },
+    "monthly": {
+      "api_name": "monthly",
+      "source_doc_id": "145",
+      "official_category_path": [
+        "14",
+        "15",
+        "145"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "8e92e7cee5c0299b401bc89c373efbac336199a51b3f8f865a88131ff595e2ee",
+      "source_url": "https://tushare.pro/document/2?doc_id=145",
+      "category_labels": [
+        "股票数据",
+        "行情数据",
+        "月线行情"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "new_share": {
+      "api_name": "new_share",
+      "source_doc_id": "123",
+      "official_category_path": [
+        "14",
+        "24",
+        "123"
+      ],
+      "mentioned_points": [
+        120
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "f560b8f2be80d95ffd145ff31c056eac6cdf9d8834196a779cc44a3135009180",
+      "source_url": "https://tushare.pro/document/2?doc_id=123",
+      "category_labels": [
+        "股票数据",
+        "基础数据",
+        "IPO新股上市"
+      ],
+      "source_policy_line_sha256": [
+        "3972be51979ef5c87c3d5afc6a71a56298b2484b35faac4d1a4c2161f4db8fda"
+      ]
+    },
+    "opt_basic": {
+      "api_name": "opt_basic",
+      "source_doc_id": "158",
+      "official_category_path": [
+        "157",
+        "158"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "328b6c9f55f3042913a80fc5a96a8d0a212aee6e0518f6e50e9fcc5029485e9d",
+      "source_url": "https://tushare.pro/document/2?doc_id=158",
+      "category_labels": [
+        "期权数据",
+        "期权合约信息"
+      ],
+      "source_policy_line_sha256": [
+        "77edb15aa98bf2b5dc690e8b115c74bb9b35b3773feaaaf2a24a2ad4e3f754be"
+      ]
+    },
+    "opt_daily": {
+      "api_name": "opt_daily",
+      "source_doc_id": "159",
+      "official_category_path": [
+        "157",
+        "159"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "98b5f131d3f2e0888337aa8c3a42a102bc94401076a517b982e48e8d111a8d83",
+      "source_url": "https://tushare.pro/document/2?doc_id=159",
+      "category_labels": [
+        "期权数据",
+        "期权日线行情"
+      ],
+      "source_policy_line_sha256": [
+        "0e062f04f87db48ca8ec769310ce0b5acf02e4817e88a12ec36eab82544fa59f"
+      ]
+    },
+    "pledge_detail": {
+      "api_name": "pledge_detail",
+      "source_doc_id": "111",
+      "official_category_path": [
+        "14",
+        "17",
+        "111"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "2b74c8168c7e00632e2db3a62559188f9a83eeb3c6a6d36af1c1419d8be1fd95",
+      "source_url": "https://tushare.pro/document/2?doc_id=111",
+      "category_labels": [
+        "股票数据",
+        "参考数据",
+        "股权质押明细数据"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "pledge_stat": {
+      "api_name": "pledge_stat",
+      "source_doc_id": "110",
+      "official_category_path": [
+        "14",
+        "17",
+        "110"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "13fbb356ea80a00b272abbf02792d708e2ff08a6b6621a428babc35ac47013de",
+      "source_url": "https://tushare.pro/document/2?doc_id=110",
+      "category_labels": [
+        "股票数据",
+        "参考数据",
+        "股权质押统计数据"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "repo_daily": {
+      "api_name": "repo_daily",
+      "source_doc_id": "256",
+      "official_category_path": [
+        "184",
+        "256"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "e3882534637261d360475d5707339d0732f3b54af3f6615233dbb11a77e890ba",
+      "source_url": "https://tushare.pro/document/2?doc_id=256",
+      "category_labels": [
+        "债券专题",
+        "债券回购日行情"
+      ],
+      "source_policy_line_sha256": [
+        "5c07836c0db99d90930b2dc5b33badc1b054f132b8e03789692238b8cb8a2d45"
+      ]
+    },
+    "repurchase": {
+      "api_name": "repurchase",
+      "source_doc_id": "124",
+      "official_category_path": [
+        "14",
+        "17",
+        "124"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "53a1482102afa65ac0a8a408e1189f1e4576fc350f1aa9d96f31865d44eef100",
+      "source_url": "https://tushare.pro/document/2?doc_id=124",
+      "category_labels": [
+        "股票数据",
+        "参考数据",
+        "股票回购"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "sf_month": {
+      "api_name": "sf_month",
+      "source_doc_id": "310",
+      "official_category_path": [
+        "147",
+        "224",
+        "240",
+        "309",
+        "310"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "f676afa694ac63823e12b5bf9e7884e61e28fe6242a08434a72438de56319a8e",
+      "source_url": "https://tushare.pro/document/2?doc_id=310",
+      "category_labels": [
+        "宏观经济",
+        "国内宏观",
+        "金融",
+        "社会融资",
+        "社融增量（月度）"
+      ],
+      "source_policy_line_sha256": [
+        "e4f8556d5b0b7067360dea47b3c92dcbd0b4623e39ae5650484008a5443300fa"
+      ]
+    },
+    "sge_basic": {
+      "api_name": "sge_basic",
+      "source_doc_id": "284",
+      "official_category_path": [
+        "283",
+        "284"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "1bc2550ad07419e32d7d5b51ec13d167724f4c01c44060e2fb8b4a82da7ad3ce",
+      "source_url": "https://tushare.pro/document/2?doc_id=284",
+      "category_labels": [
+        "现货数据",
+        "上海黄金基础信息"
+      ],
+      "source_policy_line_sha256": [
+        "8b5839c62dc5b4d2aaf2c9b2652e9f2f382c1c118f3476081a05e5a632e96b03"
+      ]
+    },
+    "sge_daily": {
+      "api_name": "sge_daily",
+      "source_doc_id": "285",
+      "official_category_path": [
+        "283",
+        "285"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "e0a8722a1cd500feee2b74263b224c1c32532840dd7d67629274b66e68f72798",
+      "source_url": "https://tushare.pro/document/2?doc_id=285",
+      "category_labels": [
+        "现货数据",
+        "上海黄金现货日行情"
+      ],
+      "source_policy_line_sha256": [
+        "9b57ba79b75cb71a9b6bb4ceb90348757e36243586dd313f15c736fd8de38379"
+      ]
+    },
+    "share_float": {
+      "api_name": "share_float",
+      "source_doc_id": "160",
+      "official_category_path": [
+        "14",
+        "17",
+        "160"
+      ],
+      "mentioned_points": [
+        120,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "9d6bc8fe2fa654d81db1db867cefb6610cbb15065f7e8f5256ca7502f08cab8a",
+      "source_url": "https://tushare.pro/document/2?doc_id=160",
+      "category_labels": [
+        "股票数据",
+        "参考数据",
+        "限售股解禁"
+      ],
+      "source_policy_line_sha256": [
+        "f8b107f17dd4cb03622a1f802e57c7faa0bbf788450a8d01b37b53e4013cc201"
+      ]
+    },
+    "shibor": {
+      "api_name": "shibor",
+      "source_doc_id": "149",
+      "official_category_path": [
+        "147",
+        "224",
+        "148",
+        "149"
+      ],
+      "mentioned_points": [
+        120
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "e985ef6374e65bbec4e5faa834b91b938e38d3f0df749ccf4af1c559d38b192a",
+      "source_url": "https://tushare.pro/document/2?doc_id=149",
+      "category_labels": [
+        "宏观经济",
+        "国内宏观",
+        "利率数据",
+        "Shibor利率"
+      ],
+      "source_policy_line_sha256": [
+        "b884c9900b6cf46334b9ef8150e64d4ab4af98bea8c33edc50adcb8a73724c8b"
+      ]
+    },
+    "shibor_lpr": {
+      "api_name": "shibor_lpr",
+      "source_doc_id": "151",
+      "official_category_path": [
+        "147",
+        "224",
+        "148",
+        "151"
+      ],
+      "mentioned_points": [
+        120
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "735b064e0e68367b1cb289eb9e615bcdf5529fa3e1dab9c8ed4043bd1fc0d156",
+      "source_url": "https://tushare.pro/document/2?doc_id=151",
+      "category_labels": [
+        "宏观经济",
+        "国内宏观",
+        "利率数据",
+        "LPR贷款基础利率"
+      ],
+      "source_policy_line_sha256": [
+        "b884c9900b6cf46334b9ef8150e64d4ab4af98bea8c33edc50adcb8a73724c8b"
+      ]
+    },
+    "shibor_quote": {
+      "api_name": "shibor_quote",
+      "source_doc_id": "150",
+      "official_category_path": [
+        "147",
+        "224",
+        "148",
+        "150"
+      ],
+      "mentioned_points": [
+        120
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "267dc6dd2b9150b12aaaa2d0dc3943208d3789a20211992fe8a90d1b08b0b8d1",
+      "source_url": "https://tushare.pro/document/2?doc_id=150",
+      "category_labels": [
+        "宏观经济",
+        "国内宏观",
+        "利率数据",
+        "Shibor报价数据"
+      ],
+      "source_policy_line_sha256": [
+        "b884c9900b6cf46334b9ef8150e64d4ab4af98bea8c33edc50adcb8a73724c8b"
+      ]
+    },
+    "st": {
+      "api_name": "st",
+      "source_doc_id": "423",
+      "official_category_path": [
+        "14",
+        "24",
+        "423"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "bef3d5af612384ee6077cb6b8cf40cbe223e7be05cecc555edd0f5f1b7608cde",
+      "source_url": "https://tushare.pro/document/2?doc_id=423",
+      "category_labels": [
+        "股票数据",
+        "基础数据",
+        "ST风险警示板股票"
+      ],
+      "source_policy_line_sha256": [
+        "3b467b0da875c9328b0a580b9238f9dc54b67f7d89931c8827d4c5c562e2c327"
+      ]
+    },
+    "stk_account": {
+      "api_name": "stk_account",
+      "source_doc_id": "164",
+      "official_category_path": [
+        "14",
+        "17",
+        "164"
+      ],
+      "mentioned_points": [
+        600
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "158c2a71d6eba4df9aff9abaccf9defc74355bf15976811fe11b0049be444e56",
+      "source_url": "https://tushare.pro/document/2?doc_id=164",
+      "category_labels": [
+        "股票数据",
+        "参考数据",
+        "股票开户数据（停）"
+      ],
+      "source_policy_line_sha256": [
+        "0d69eceb5add233e6e8a5077373aee1bc2843471028a17c5227e12a3d8355802"
+      ]
+    },
+    "stk_account_old": {
+      "api_name": "stk_account_old",
+      "source_doc_id": "165",
+      "official_category_path": [
+        "14",
+        "17",
+        "165"
+      ],
+      "mentioned_points": [
+        600
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "edb40049e18b303b3dcb6bee3c4c0248fcd5e97bd8f105ce56ec0c6ce0fcf617",
+      "source_url": "https://tushare.pro/document/2?doc_id=165",
+      "category_labels": [
+        "股票数据",
+        "参考数据",
+        "股票开户数据（旧）"
+      ],
+      "source_policy_line_sha256": [
+        "0d69eceb5add233e6e8a5077373aee1bc2843471028a17c5227e12a3d8355802"
+      ]
+    },
+    "stk_ah_comparison": {
+      "api_name": "stk_ah_comparison",
+      "source_doc_id": "399",
+      "official_category_path": [
+        "14",
+        "291",
+        "399"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "special_300",
+      "rpm_at_10100": 300,
+      "rpm_after_2026_12_05_at_8100": null,
+      "reason": "Official 290 links special category 291; this leaf is a descendant. Independent and explicit overrides were excluded before this refinement.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2026-12-05",
+      "source_html_sha256": "b35e72d0fed6446c28a32e34a61b04830025b1ee68cf83e00ab2f141cc4d1be5",
+      "source_url": "https://tushare.pro/document/2?doc_id=399",
+      "category_labels": [
+        "股票数据",
+        "特色数据",
+        "AH股比价"
+      ],
+      "source_policy_line_sha256": [
+        "bf15b478fcb59237d0d724ddd7fe965722b0178bea77926123c642cb4c5b8425"
+      ]
+    },
+    "stk_alert": {
+      "api_name": "stk_alert",
+      "source_doc_id": "453",
+      "official_category_path": [
+        "14",
+        "17",
+        "453"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "4babe517949452a955cea9b03aaf51709a811b4195fe81f1e123f2d3292a7eaf",
+      "source_url": "https://tushare.pro/document/2?doc_id=453",
+      "category_labels": [
+        "股票数据",
+        "参考数据",
+        "交易所重点提示证券"
+      ],
+      "source_policy_line_sha256": [
+        "b819e7095b77c61727278243bb77f038bc4d24faf79535e9d1da5a0edd0ccbf8"
+      ]
+    },
+    "stk_high_shock": {
+      "api_name": "stk_high_shock",
+      "source_doc_id": "452",
+      "official_category_path": [
+        "14",
+        "17",
+        "452"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "e5e868e438b31671adbbfd065b0fbcad2ba29908d0456093ad858adcdb5d8cf9",
+      "source_url": "https://tushare.pro/document/2?doc_id=452",
+      "category_labels": [
+        "股票数据",
+        "参考数据",
+        "个股严重异常波动"
+      ],
+      "source_policy_line_sha256": [
+        "b819e7095b77c61727278243bb77f038bc4d24faf79535e9d1da5a0edd0ccbf8"
+      ]
+    },
+    "stk_holdernumber": {
+      "api_name": "stk_holdernumber",
+      "source_doc_id": "166",
+      "official_category_path": [
+        "14",
+        "17",
+        "166"
+      ],
+      "mentioned_points": [
+        200,
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "739a3cdd4dbe547b4eea06cec5d34417062926f56242605ade61830d71ab48f2",
+      "source_url": "https://tushare.pro/document/2?doc_id=166",
+      "category_labels": [
+        "股票数据",
+        "参考数据",
+        "股东人数"
+      ],
+      "source_policy_line_sha256": [
+        "5cc290701cb1cb743c0eb7758fe8f437bee7a39d189331d409a8c4a20fcea421"
+      ]
+    },
+    "stk_holdertrade": {
+      "api_name": "stk_holdertrade",
+      "source_doc_id": "175",
+      "official_category_path": [
+        "14",
+        "17",
+        "175"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "b616d4aa6adec234c71613e8fb147f3b82e79a68dabf0319011d590caea723c1",
+      "source_url": "https://tushare.pro/document/2?doc_id=175",
+      "category_labels": [
+        "股票数据",
+        "参考数据",
+        "股东增减持"
+      ],
+      "source_policy_line_sha256": [
+        "4e3bf1f0a3a2605bb75763307a9ffe166b22df5c65cf4e1afb7b72cecbd5f061"
+      ]
+    },
+    "stk_limit": {
+      "api_name": "stk_limit",
+      "source_doc_id": "183",
+      "official_category_path": [
+        "14",
+        "15",
+        "183"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "bf86cd421163f15058c4a32a5cb77686e02c618e7ffc7a593a15d26340c24f79",
+      "source_url": "https://tushare.pro/document/2?doc_id=183",
+      "category_labels": [
+        "股票数据",
+        "行情数据",
+        "每日涨跌停价格"
+      ],
+      "source_policy_line_sha256": [
+        "d130afcafc78c41ec252432496355b83e7975d45361cfc73ae23658109206acd"
+      ]
+    },
+    "stk_managers": {
+      "api_name": "stk_managers",
+      "source_doc_id": "193",
+      "official_category_path": [
+        "14",
+        "24",
+        "193"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "41dc0600cc48ebc9e630ae93ecf98c5d538613ede151b6847a7676e5307e4c8c",
+      "source_url": "https://tushare.pro/document/2?doc_id=193",
+      "category_labels": [
+        "股票数据",
+        "基础数据",
+        "上市公司管理层"
+      ],
+      "source_policy_line_sha256": [
+        "996a581ad6f84bd28b5c5cc298c5fccdbca0507478e86f3141b6f131a1a0bbba"
+      ]
+    },
+    "stk_nineturn": {
+      "api_name": "stk_nineturn",
+      "source_doc_id": "364",
+      "official_category_path": [
+        "14",
+        "291",
+        "364"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "special_300",
+      "rpm_at_10100": 300,
+      "rpm_after_2026_12_05_at_8100": null,
+      "reason": "Official 290 links special category 291; this leaf is a descendant. Independent and explicit overrides were excluded before this refinement.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2026-12-05",
+      "source_html_sha256": "6a07a3aa58d89c5736a1de6adfb2a4a072456ae8b5250b49117247bf18039a5c",
+      "source_url": "https://tushare.pro/document/2?doc_id=364",
+      "category_labels": [
+        "股票数据",
+        "特色数据",
+        "神奇九转指标"
+      ],
+      "source_policy_line_sha256": [
+        "d04f337b6da9a672edecf6941ff876a944f462411167849d13930033f87b111d"
+      ]
+    },
+    "stk_rewards": {
+      "api_name": "stk_rewards",
+      "source_doc_id": "194",
+      "official_category_path": [
+        "14",
+        "24",
+        "194"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "f640e1ef2120aab9af52459fa460e9cbdbd34bae02bd473c9abdb9e6256bef19",
+      "source_url": "https://tushare.pro/document/2?doc_id=194",
+      "category_labels": [
+        "股票数据",
+        "基础数据",
+        "管理层薪酬和持股"
+      ],
+      "source_policy_line_sha256": [
+        "996a581ad6f84bd28b5c5cc298c5fccdbca0507478e86f3141b6f131a1a0bbba"
+      ]
+    },
+    "stk_shock": {
+      "api_name": "stk_shock",
+      "source_doc_id": "451",
+      "official_category_path": [
+        "14",
+        "17",
+        "451"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "8e696306198726ecba8398c662b1b814faaeb171fecd2612f7bf3769b08b498a",
+      "source_url": "https://tushare.pro/document/2?doc_id=451",
+      "category_labels": [
+        "股票数据",
+        "参考数据",
+        "个股异常波动"
+      ],
+      "source_policy_line_sha256": [
+        "b819e7095b77c61727278243bb77f038bc4d24faf79535e9d1da5a0edd0ccbf8"
+      ]
+    },
+    "stk_surv": {
+      "api_name": "stk_surv",
+      "source_doc_id": "275",
+      "official_category_path": [
+        "14",
+        "291",
+        "275"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "special_300",
+      "rpm_at_10100": 300,
+      "rpm_after_2026_12_05_at_8100": null,
+      "reason": "Official 290 links special category 291; this leaf is a descendant. Independent and explicit overrides were excluded before this refinement.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2026-12-05",
+      "source_html_sha256": "25f1568ab7a5f411186c74d35f7ec690b49cf49a592c502ba983b1a08d5acab0",
+      "source_url": "https://tushare.pro/document/2?doc_id=275",
+      "category_labels": [
+        "股票数据",
+        "特色数据",
+        "机构调研数据"
+      ],
+      "source_policy_line_sha256": [
+        "13892bf259f338fd70be8ec9c4b8429caedfb1e0c70d60ea8439624bb5fdfb43"
+      ]
+    },
+    "stk_week_month_adj": {
+      "api_name": "stk_week_month_adj",
+      "source_doc_id": "365",
+      "official_category_path": [
+        "14",
+        "15",
+        "365"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "81327109d007eaf7bbbf759c2e937c7a06df99074ce8538066a50b8282957a45",
+      "source_url": "https://tushare.pro/document/2?doc_id=365",
+      "category_labels": [
+        "股票数据",
+        "行情数据",
+        "周/月线复权行情(每日更新)"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "stk_weekly_monthly": {
+      "api_name": "stk_weekly_monthly",
+      "source_doc_id": "336",
+      "official_category_path": [
+        "14",
+        "15",
+        "336"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "371e6c141b5f3f2b2db83c78dce658b7c67b93cd23e46a80b48faef37ecf2521",
+      "source_url": "https://tushare.pro/document/2?doc_id=336",
+      "category_labels": [
+        "股票数据",
+        "行情数据",
+        "周/月线行情(每日更新)"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "stock_company": {
+      "api_name": "stock_company",
+      "source_doc_id": "112",
+      "official_category_path": [
+        "14",
+        "24",
+        "112"
+      ],
+      "mentioned_points": [
+        120
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "4d6178cf696fa086a86714d4b01a32f4f8cb59e7ee4b361087ae119f1d13db86",
+      "source_url": "https://tushare.pro/document/2?doc_id=112",
+      "category_labels": [
+        "股票数据",
+        "基础数据",
+        "上市公司基本信息"
+      ],
+      "source_policy_line_sha256": [
+        "3972be51979ef5c87c3d5afc6a71a56298b2484b35faac4d1a4c2161f4db8fda"
+      ]
+    },
+    "stock_hsgt": {
+      "api_name": "stock_hsgt",
+      "source_doc_id": "398",
+      "official_category_path": [
+        "14",
+        "24",
+        "398"
+      ],
+      "mentioned_points": [
+        3000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "b2c42ccbf8d9fec459cdbcf0d812db217773a7496a8e3b34e0a1c64d77ad80a4",
+      "source_url": "https://tushare.pro/document/2?doc_id=398",
+      "category_labels": [
+        "股票数据",
+        "基础数据",
+        "沪深港通股票列表"
+      ],
+      "source_policy_line_sha256": [
+        "a3e66b75389d870f5dae39cb49090b155ba66e3007f41a59a3999cc9491f90db"
+      ]
+    },
+    "stock_st": {
+      "api_name": "stock_st",
+      "source_doc_id": "397",
+      "official_category_path": [
+        "14",
+        "24",
+        "397"
+      ],
+      "mentioned_points": [
+        3000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "3f743ad646adbb1bc324732a84c59dd15f5e32b1a4ffa847351f55eae75ad212",
+      "source_url": "https://tushare.pro/document/2?doc_id=397",
+      "category_labels": [
+        "股票数据",
+        "基础数据",
+        "ST股票列表"
+      ],
+      "source_policy_line_sha256": [
+        "a3e66b75389d870f5dae39cb49090b155ba66e3007f41a59a3999cc9491f90db"
+      ]
+    },
+    "suspend_d": {
+      "api_name": "suspend_d",
+      "source_doc_id": "214",
+      "official_category_path": [
+        "14",
+        "15",
+        "214"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "d933c04694e26298c597286844cbe4108a3bf1d998df3ec4a414598853e775a1",
+      "source_url": "https://tushare.pro/document/2?doc_id=214",
+      "category_labels": [
+        "股票数据",
+        "行情数据",
+        "每日停复牌信息"
+      ],
+      "source_policy_line_sha256": [
+        "a737c2cc6fc06fe61819b3a90438db9809b94f33d5dc91ca26ed606a4d3cfd3e"
+      ]
+    },
+    "sw_daily": {
+      "api_name": "sw_daily",
+      "source_doc_id": "327",
+      "official_category_path": [
+        "93",
+        "327"
+      ],
+      "mentioned_points": [
+        18,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "d2bc57a56ec7271cf7cb19b4b3d050e9e3fb9c3f3d772c6e380bc308096ba069",
+      "source_url": "https://tushare.pro/document/2?doc_id=327",
+      "category_labels": [
+        "指数专题",
+        "申万日线行情"
+      ],
+      "source_policy_line_sha256": [
+        "2802900858d93600b43c59f4fbba02b2b63149c09c5a5a269525ac65f7c15a68"
+      ]
+    },
+    "sz_daily_info": {
+      "api_name": "sz_daily_info",
+      "source_doc_id": "268",
+      "official_category_path": [
+        "93",
+        "268"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "801db76a7d3a0f8331ddd57492771c9e18670d3f8d0649876d702aaf14e74604",
+      "source_url": "https://tushare.pro/document/2?doc_id=268",
+      "category_labels": [
+        "指数专题",
+        "深圳市场每日交易情况"
+      ],
+      "source_policy_line_sha256": [
+        "f6cd590cafcfa16f8ae4a5e43e4dafc9674079e00be84a4d0b1243afe5ba855f"
+      ]
+    },
+    "tdx_daily": {
+      "api_name": "tdx_daily",
+      "source_doc_id": "378",
+      "official_category_path": [
+        "14",
+        "346",
+        "378"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "6a2f2ace60309bb06218a1d59333090f48772120306ac26bcb99c8a9ea6d468d",
+      "source_url": "https://tushare.pro/document/2?doc_id=378",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "TDX概念板块行情"
+      ],
+      "source_policy_line_sha256": [
+        "3b82cb50aae29c87ec3f234cb2a46057483cdb2115fb74964fff5c3c8b9a4953"
+      ]
+    },
+    "tdx_index": {
+      "api_name": "tdx_index",
+      "source_doc_id": "376",
+      "official_category_path": [
+        "14",
+        "346",
+        "376"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "9b9d093314fc4efa148f5b5caa4ee7d0f50f8e65605e520f7f0e77949074ee0f",
+      "source_url": "https://tushare.pro/document/2?doc_id=376",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "TDX概念板块分类"
+      ],
+      "source_policy_line_sha256": [
+        "3b82cb50aae29c87ec3f234cb2a46057483cdb2115fb74964fff5c3c8b9a4953"
+      ]
+    },
+    "tdx_member": {
+      "api_name": "tdx_member",
+      "source_doc_id": "377",
+      "official_category_path": [
+        "14",
+        "346",
+        "377"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "7f144546fcec1d711af9e9059049bbaf24923d867b4d72bab62c66833af0f17a",
+      "source_url": "https://tushare.pro/document/2?doc_id=377",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "TDX概念板块成分"
+      ],
+      "source_policy_line_sha256": [
+        "3b82cb50aae29c87ec3f234cb2a46057483cdb2115fb74964fff5c3c8b9a4953"
+      ]
+    },
+    "ths_daily": {
+      "api_name": "ths_daily",
+      "source_doc_id": "260",
+      "official_category_path": [
+        "14",
+        "346",
+        "260"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "d497dfeff82af84a0ccb25523d00407fe5757373112a8a885fdb4f6e57192963",
+      "source_url": "https://tushare.pro/document/2?doc_id=260",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "THS概念板块行情"
+      ],
+      "source_policy_line_sha256": [
+        "488f3c40391e99200da36f33093941f5d7c0b34ace97ee11a307d500d5685577"
+      ]
+    },
+    "ths_hot": {
+      "api_name": "ths_hot",
+      "source_doc_id": "320",
+      "official_category_path": [
+        "14",
+        "346",
+        "320"
+      ],
+      "mentioned_points": [
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "c71476d3c547a276ef489ff1bda7234619c6db4291829bbe5fa1914a78bdb4a0",
+      "source_url": "https://tushare.pro/document/2?doc_id=320",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "THS热榜"
+      ],
+      "source_policy_line_sha256": [
+        "fb943c3993e24c3f42c08c83d1973d67f14dc47aa5bdbe5ca40147ff3594df8f"
+      ]
+    },
+    "ths_index": {
+      "api_name": "ths_index",
+      "source_doc_id": "259",
+      "official_category_path": [
+        "14",
+        "346",
+        "259"
+      ],
+      "mentioned_points": [
+        5000,
+        6000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "37c23372f0d5eaab6c0f1b9b8ebcd940095c5d439defa8bab2633f0495a02ca9",
+      "source_url": "https://tushare.pro/document/2?doc_id=259",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "THS概念板块分类"
+      ],
+      "source_policy_line_sha256": [
+        "739eeb0a46791903e8c2e818076e1390ddc377711d6114ba1dd2fddbcfca0cec"
+      ]
+    },
+    "top10_cb_holders": {
+      "api_name": "top10_cb_holders",
+      "source_doc_id": "459",
+      "official_category_path": [
+        "184",
+        "459"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "473e1add1765855490560a2521f2e794e5c2d468ac98df822e28e48af25d396d",
+      "source_url": "https://tushare.pro/document/2?doc_id=459",
+      "category_labels": [
+        "债券专题",
+        "可转债十大持有人"
+      ],
+      "source_policy_line_sha256": [
+        "f77fd2dab1896adb794ee701c74d5a7a6c510a55e891158839bec92a0c8b54a6"
+      ]
+    },
+    "top10_floatholders": {
+      "api_name": "top10_floatholders",
+      "source_doc_id": "62",
+      "official_category_path": [
+        "14",
+        "17",
+        "62"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "a2ffeb3c9eeca050f2e822099b362a3d513e471c6ff4a57e208516e2dfb247ce",
+      "source_url": "https://tushare.pro/document/2?doc_id=62",
+      "category_labels": [
+        "股票数据",
+        "参考数据",
+        "前十大流通股东"
+      ],
+      "source_policy_line_sha256": [
+        "c995fdca35387f1bb9377983fb9ad5d64d369a2fab6ec42920aea7f88846f022"
+      ]
+    },
+    "top10_holders": {
+      "api_name": "top10_holders",
+      "source_doc_id": "61",
+      "official_category_path": [
+        "14",
+        "17",
+        "61"
+      ],
+      "mentioned_points": [
+        2000,
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "ac65ea86d9acc3f851f0d42d1089086e76c62004e9e82043a2d413c9fe08bf06",
+      "source_url": "https://tushare.pro/document/2?doc_id=61",
+      "category_labels": [
+        "股票数据",
+        "参考数据",
+        "前十大股东"
+      ],
+      "source_policy_line_sha256": [
+        "c995fdca35387f1bb9377983fb9ad5d64d369a2fab6ec42920aea7f88846f022"
+      ]
+    },
+    "top_inst": {
+      "api_name": "top_inst",
+      "source_doc_id": "107",
+      "official_category_path": [
+        "14",
+        "346",
+        "107"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "9da4e8fff195e2d35319fb2ee92d1394b7f713b9f24ed3322daec05b8d887d0f",
+      "source_url": "https://tushare.pro/document/2?doc_id=107",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "龙虎榜机构交易单"
+      ],
+      "source_policy_line_sha256": [
+        "ad126af337a4bd4b6c8050c076a801ec6822630acf7a2d00f3134880b79c0090"
+      ]
+    },
+    "top_list": {
+      "api_name": "top_list",
+      "source_doc_id": "106",
+      "official_category_path": [
+        "14",
+        "346",
+        "106"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "c6896f3bbba618d9aa7ce08e869cfd2426ff451f2a3466e5c1cfc9320c29207e",
+      "source_url": "https://tushare.pro/document/2?doc_id=106",
+      "category_labels": [
+        "股票数据",
+        "打板专题数据",
+        "龙虎榜每日统计单"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "trade_cal": {
+      "api_name": "trade_cal",
+      "source_doc_id": "26",
+      "official_category_path": [
+        "14",
+        "24",
+        "26"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "ba19399a37d883c1943a6ef6dc753d1f0b524fb5b51cd5cf89385fe86df74fd3",
+      "source_url": "https://tushare.pro/document/2?doc_id=26",
+      "category_labels": [
+        "股票数据",
+        "基础数据",
+        "交易日历"
+      ],
+      "source_policy_line_sha256": [
+        "e4f8556d5b0b7067360dea47b3c92dcbd0b4623e39ae5650484008a5443300fa"
+      ]
+    },
+    "us_basic": {
+      "api_name": "us_basic",
+      "source_doc_id": "252",
+      "official_category_path": [
+        "251",
+        "252"
+      ],
+      "mentioned_points": [
+        120,
+        5000
+      ],
+      "rate_class": "uncertain",
+      "rpm_at_10100": null,
+      "rpm_after_2026_12_05_at_8100": null,
+      "reason": "Leaf has points-based access but 290 broadly excludes HK/US permissions from points. Do not resolve that scope conflict by choosing the higher rate.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "e33da066e8c79f3887d9192027737c27de0fc9f53b29616c83c4227e58bd916c",
+      "source_url": "https://tushare.pro/document/2?doc_id=252",
+      "category_labels": [
+        "美股数据",
+        "美股基础信息"
+      ],
+      "source_policy_line_sha256": [
+        "40a98822c6904c979c5b095eab4f94baf2de22d77e40ac30fd92d17a905cd600"
+      ]
+    },
+    "us_tbr": {
+      "api_name": "us_tbr",
+      "source_doc_id": "221",
+      "official_category_path": [
+        "147",
+        "217",
+        "218",
+        "221"
+      ],
+      "mentioned_points": [
+        120
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "ff3a164f6eadafa8145d6f303d54eca7404b47e0468dca615ffdd3d0a4912693",
+      "source_url": "https://tushare.pro/document/2?doc_id=221",
+      "category_labels": [
+        "宏观经济",
+        "国际宏观",
+        "美国利率",
+        "短期国债利率"
+      ],
+      "source_policy_line_sha256": [
+        "5c69821b3544795c0abc510247a0cc4b7d45ecd8c41e85afabc672c61f4a6041"
+      ]
+    },
+    "us_tltr": {
+      "api_name": "us_tltr",
+      "source_doc_id": "222",
+      "official_category_path": [
+        "147",
+        "217",
+        "218",
+        "222"
+      ],
+      "mentioned_points": [
+        120
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "c19c917be1f90150ce7f04aa788338bddd234e876e5cf5a5447ce2e6a8f303fe",
+      "source_url": "https://tushare.pro/document/2?doc_id=222",
+      "category_labels": [
+        "宏观经济",
+        "国际宏观",
+        "美国利率",
+        "国债长期利率"
+      ],
+      "source_policy_line_sha256": [
+        "5c69821b3544795c0abc510247a0cc4b7d45ecd8c41e85afabc672c61f4a6041"
+      ]
+    },
+    "us_tradecal": {
+      "api_name": "us_tradecal",
+      "source_doc_id": "253",
+      "official_category_path": [
+        "251",
+        "253"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "uncertain",
+      "rpm_at_10100": null,
+      "rpm_after_2026_12_05_at_8100": null,
+      "reason": "Leaf has points-based access but 290 broadly excludes HK/US permissions from points. Do not resolve that scope conflict by choosing the higher rate.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "80f9f457da29c873e8428d4d808433c6f3e1c232336e70e5344b6fa9f4783a4a",
+      "source_url": "https://tushare.pro/document/2?doc_id=253",
+      "category_labels": [
+        "美股数据",
+        "美股交易日历"
+      ],
+      "source_policy_line_sha256": [
+        "f1125cece20b58687554d91649acff0e683b4c050d7eadad1209cf0ff928899f"
+      ]
+    },
+    "us_trltr": {
+      "api_name": "us_trltr",
+      "source_doc_id": "223",
+      "official_category_path": [
+        "147",
+        "217",
+        "218",
+        "223"
+      ],
+      "mentioned_points": [
+        120
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "013159181007b2aa7cd18d951fb48cdfb13ebfa23ada31a5e3b6429d3ec2834c",
+      "source_url": "https://tushare.pro/document/2?doc_id=223",
+      "category_labels": [
+        "宏观经济",
+        "国际宏观",
+        "美国利率",
+        "国债长期利率平均值"
+      ],
+      "source_policy_line_sha256": [
+        "5c69821b3544795c0abc510247a0cc4b7d45ecd8c41e85afabc672c61f4a6041"
+      ]
+    },
+    "us_trycr": {
+      "api_name": "us_trycr",
+      "source_doc_id": "220",
+      "official_category_path": [
+        "147",
+        "217",
+        "218",
+        "220"
+      ],
+      "mentioned_points": [
+        120
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "051b6b77885d3d45d825b1188e404ff0a0afb2105439e6245d93636932ff38a6",
+      "source_url": "https://tushare.pro/document/2?doc_id=220",
+      "category_labels": [
+        "宏观经济",
+        "国际宏观",
+        "美国利率",
+        "国债实际收益率曲线利率"
+      ],
+      "source_policy_line_sha256": [
+        "5c69821b3544795c0abc510247a0cc4b7d45ecd8c41e85afabc672c61f4a6041"
+      ]
+    },
+    "us_tycr": {
+      "api_name": "us_tycr",
+      "source_doc_id": "219",
+      "official_category_path": [
+        "147",
+        "217",
+        "218",
+        "219"
+      ],
+      "mentioned_points": [
+        120
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "5a0526dff8184a554e05e63b70302e2ec31445259a1d6b5180c0477830055ead",
+      "source_url": "https://tushare.pro/document/2?doc_id=219",
+      "category_labels": [
+        "宏观经济",
+        "国际宏观",
+        "美国利率",
+        "国债收益率曲线利率"
+      ],
+      "source_policy_line_sha256": [
+        "5c69821b3544795c0abc510247a0cc4b7d45ecd8c41e85afabc672c61f4a6041"
+      ]
+    },
+    "weekly": {
+      "api_name": "weekly",
+      "source_doc_id": "144",
+      "official_category_path": [
+        "14",
+        "15",
+        "144"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "3b0a66cdaac3f60838e73cce709a1f254398c94fea48748ef3657a61aede0863",
+      "source_url": "https://tushare.pro/document/2?doc_id=144",
+      "category_labels": [
+        "股票数据",
+        "行情数据",
+        "周线行情"
+      ],
+      "source_policy_line_sha256": [
+        "67dd01f4c397b1900909e6f3a329d3df17c89e20fb770671a0106d055420d85e"
+      ]
+    },
+    "wz_index": {
+      "api_name": "wz_index",
+      "source_doc_id": "173",
+      "official_category_path": [
+        "147",
+        "224",
+        "148",
+        "173"
+      ],
+      "mentioned_points": [
+        2000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "7aeb42f1636779a0bc095c097720b38bad71bb9733f483f9fb57d71542dd0803",
+      "source_url": "https://tushare.pro/document/2?doc_id=173",
+      "category_labels": [
+        "宏观经济",
+        "国内宏观",
+        "利率数据",
+        "温州民间借贷利率"
+      ],
+      "source_policy_line_sha256": [
+        "a56db95664c8b757143780cc76b2a550966c68e09e12b5f155dffde9f5612d07"
+      ]
+    }
+  },
+  "excluded_from_refinement": {
+    "anns_d": "purchased_special",
+    "broker_recommend": "points_special",
+    "cb_factor_pro": "per_api_override",
+    "cb_price_chg": "independent_unverified",
+    "cctv_news": "purchased_special",
+    "cyq_chips": "per_api_override",
+    "cyq_perf": "points_special",
+    "daily": "per_api_override",
+    "etf_mins": "independent_unverified",
+    "factor_list": "independent_unverified",
+    "factor_value": "independent_unverified",
+    "ft_mins": "independent_unverified",
+    "fund_factor_pro": "per_api_override",
+    "fund_portfolio": "per_api_override",
+    "fut_weekly_monthly": "unknown",
+    "hk_adjfactor": "independent_unverified",
+    "hk_balancesheet": "independent_unverified",
+    "hk_cashflow": "independent_unverified",
+    "hk_daily": "independent_unverified",
+    "hk_daily_adj": "independent_unverified",
+    "hk_fina_indicator": "independent_unverified",
+    "hk_income": "independent_unverified",
+    "hk_mins": "independent_unverified",
+    "hsgt_top10": "unknown",
+    "idx_factor_pro": "per_api_override",
+    "idx_mins": "independent_unverified",
+    "irm_qa_sh": "purchased_special",
+    "irm_qa_sz": "purchased_special",
+    "kpl_list": "per_api_override",
+    "limit_cpt_list": "per_api_override",
+    "limit_list_d": "per_api_override",
+    "limit_list_ths": "per_api_override",
+    "limit_step": "per_api_override",
+    "major_news": "purchased_special",
+    "monetary_policy": "purchased_special",
+    "namechange": "unknown",
+    "news": "purchased_special",
+    "npr": "purchased_special",
+    "opt_mins": "independent_unverified",
+    "report_rc": "points_special",
+    "research_report": "purchased_special",
+    "rt_etf_k": "independent_unverified",
+    "rt_etf_sz_iopv": "independent_unverified",
+    "rt_fut_min": "independent_unverified",
+    "rt_fut_min_daily": "independent_unverified",
+    "rt_idx_k": "independent_unverified",
+    "rt_idx_min": "independent_unverified",
+    "rt_idx_min_daily": "independent_unverified",
+    "rt_k": "independent_unverified",
+    "rt_sw_k": "independent_unverified",
+    "slb_len": "per_api_override",
+    "slb_len_mm": "per_api_override",
+    "slb_sec": "per_api_override",
+    "slb_sec_detail": "per_api_override",
+    "stk_auction": "independent_unverified",
+    "stk_auction_c": "independent_unverified",
+    "stk_auction_o": "independent_unverified",
+    "stk_factor": "per_api_override",
+    "stk_factor_pro": "per_api_override",
+    "stk_mins": "independent_unverified",
+    "stk_premarket": "independent_unverified",
+    "stock_basic": "per_api_override",
+    "sw_mins": "independent_unverified",
+    "ths_member": "per_api_override",
+    "us_adjfactor": "independent_unverified",
+    "us_balancesheet": "independent_unverified",
+    "us_cashflow": "independent_unverified",
+    "us_daily": "independent_unverified",
+    "us_daily_adj": "independent_unverified",
+    "us_fina_indicator": "independent_unverified",
+    "us_income": "independent_unverified",
+    "yc_cb": "independent_unverified"
+  },
+  "constraints": [
+    "No runtime policy changed. Regular500 remains subject to live entitlement, account/API gates and observed cooldowns.",
+    "Only the frozen 155 candidates are refined; purchased, independent, explicit overrides and earlier unknowns are preserved.",
+    "8100 is conditional on the user-declared tranche dates and no other balance change. Expiry clock/timezone/renewal not inspected.",
+    "Special300 eligibility requires review when the 10000 tier ends; null at8100 means no rate authorization from this audit, not necessarily no supplier access.",
+    "Official category and leaf statements are dated evidence, not permanent API rights."
+  ]
+}

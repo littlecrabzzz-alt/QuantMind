@@ -51,3 +51,15 @@ PYTHONPATH=scripts:. python -m unittest test_tushare_rate_evidence
 脚本本身无网络代码。当前公开页290 SHA `18e4557232524672da08f47d89eef2a384919103de24680c37021e9641000d80`、490 SHA `3328603c3cc38b1d305a1b45d2e8adefda75fe0bd37b2baea300e21b95fd0962`，原HTML/采集时刻保存在上述`current-doc-dir`。旧叶子页以各自归档SHA为准，未声称重新访问227页。
 
 Python3.10：8项专项测试通过，含真实CLI临时fixture、购买到期、行数/试用不冒充rpm、单页覆盖、冲突保留、邻接不继承、缺文档unknown、解析边界及禁网；Ruff通过。无新依赖、无生产改动。
+
+## 155 项一般候选的进一步分类
+
+新增 [精确集合及证据](tushare-general-rate-refinement.json)，只细化原155项，其他72项原类别不变。`api_sets.regular_500` 是明确147项 allowlist，不应以“227减去几个例外”的反向逻辑扩充。每项附现行290侧栏的类别祖先ID/名称、归档单页SHA、政策行SHA与积分条件。
+
+- **147 项 regular_500**：归档单页明确积分制，官方类别路径不在290正文所链接的特色分类291之下，也不属于本轮发现的权益歧义；其引言所列积分档均不高于8100。按290的一般5000以上档，本次积分声明由10100降到8100后仍可保留500频次证据。这里的“可”仍以前置权限、单接口实际错误quota、account gate、最小间隔及冷却为条件，不代表解除它们。下一次已知积分到期为2027-09-08。
+- **3 项 special_300**：`stk_ah_comparison`、`stk_nineturn`、`stk_surv`。290正文明确链接291特色类别，现行侧栏把这三个叶子放在其下，不能仅因它们不在总表的四个举例中而当作常规。10100时按特色300条件档，2026-12-05失去10000档后必须review；单页6000等访问条件仍可能满足，不代表届时完全无权，但本审计不自动续给300或升500。
+- **5 项 uncertain**：`hk_basic`、`hk_tradecal`、`us_basic`、`us_tradecal` 的叶子说明积分可用，与290对港美股权限的总述存在范围张力；`hm_detail` 的单页10000门槛在8100时不满足。需要澄清或重新确认，不能列入跨到期日常规500白名单。
+
+原特色3（report_rc/cyq_perf/broker_recommend）、cyq_chips等显式覆盖、9已购、38独立及原3unknown全部保持原审计，不被这次细化吞掉。`factor_value` 仍为独立且官方频次未知。
+
+复跑：`python scripts/refine_tushare_general_rates.py --baseline docs/tushare-rate-evidence-32fe472.json --category-html /tmp/tushare-rate-evidence-20260909/290.html --archive-dir /tmp/tushare-full-schema-audit-20260909 --output /tmp/tushare-rate-refined.json`。脚本验证每个叶子与原审计HTML SHA一致，类别缺失/正文漂移不猜填。新增6项测试，连同原8项共14项Python3.10通过；含147+3+5完整分区、源篡改拒绝、嵌套类别不串到兄弟、8100与特色review边界、真实CLI。无网络代码、数据API或runtime修改。
