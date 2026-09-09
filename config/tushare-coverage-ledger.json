@@ -465,7 +465,19 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Stock 1min source241 rows and exact-second local reader verified; narrow supplier control hit observed1request/60s. Separate bounded follow-up only after shared cooldown; permission product/history/frequency/time semantics remain unverified.",
+      "next_action": "Stock 1min source241 rows and exact-second local reader verified. One later narrow control returned explicit2requests/day after the earlier1request/60s response; persistent quota recorded, no further same-day probe. Permission product/history/frequency/time semantics remain unverified.",
+      "followup_evidence": {
+        "path": "/data/tushare/validation/stk-narrow-followup-probe.json",
+        "sha256": "4fc6f7ec889d5231e0b58e440a405370151350fc610513a3bcd00f42b6441311",
+        "release_id": "data-1d96532aa0b2380a7b1e6d0d42cbe63fe7bd454056d55a3806bef1f436518367",
+        "actual_upstream_calls": 1,
+        "response_status": "rate_limited",
+        "observed_requests": 2,
+        "observed_window_seconds": 86400,
+        "cloud_mac_fixed_audit_sha256": "93ed0fe3a8a13a511d0624dbdd8dd7224c0be76e1a179cd76bb553608e514af7",
+        "fixed_audit_status": "unavailable_no_success_claim",
+        "new_data_claimed": false
+      },
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
