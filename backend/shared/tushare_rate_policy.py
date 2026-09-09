@@ -23,8 +23,178 @@ PAGE_RPM = {
     "limit_step": 500,
     "kpl_list": 500,
 }
-UNKNOWN_APIS = {"fut_weekly_monthly", "hsgt_top10", "namechange"}
-SPECIAL = {"report_rc", "cyq_perf", "cyq_chips", "broker_recommend"}
+# Explicit category audit, never the complement of the registered API set.
+# /tmp/tushare-rate-refined.json SHA256 f0e1b6adca065edf6a77eecd9f72029308872fe9f7055603e83b45584af53bbe
+REGULAR_APIS = frozenset(
+    [
+        "adj_factor",
+        "bak_basic",
+        "bak_daily",
+        "balancesheet_vip",
+        "bc_bestotcqt",
+        "bc_otcqt",
+        "block_trade",
+        "bond_blk",
+        "bond_blk_detail",
+        "bse_mapping",
+        "cashflow_vip",
+        "cb_basic",
+        "cb_call",
+        "cb_daily",
+        "cb_issue",
+        "cb_rate",
+        "cb_rating",
+        "cb_share",
+        "ci_daily",
+        "ci_index_member",
+        "cn_cpi",
+        "cn_gdp",
+        "cn_m",
+        "cn_pmi",
+        "cn_ppi",
+        "cn_schedule",
+        "daily_basic",
+        "daily_info",
+        "dc_daily",
+        "dc_hot",
+        "dc_index",
+        "dc_member",
+        "disclosure_date",
+        "dividend",
+        "eco_cal",
+        "etf_basic",
+        "etf_index",
+        "etf_limit",
+        "etf_sh_cons",
+        "etf_share_size",
+        "etf_sz_cons",
+        "express_vip",
+        "fina_audit",
+        "fina_indicator_vip",
+        "fina_mainbz",
+        "forecast_vip",
+        "ft_limit",
+        "fund_adj",
+        "fund_basic",
+        "fund_company",
+        "fund_daily",
+        "fund_div",
+        "fund_manager",
+        "fund_nav",
+        "fund_share",
+        "fut_basic",
+        "fut_daily",
+        "fut_daily_adj",
+        "fut_holding",
+        "fut_index_daily",
+        "fut_mapping",
+        "fut_settle",
+        "fut_trade_cal",
+        "fut_weekly_detail",
+        "fut_wsr",
+        "fx_daily",
+        "fx_obasic",
+        "gz_index",
+        "hibor",
+        "hm_list",
+        "idx_anns",
+        "income_vip",
+        "index_basic",
+        "index_classify",
+        "index_daily",
+        "index_dailybasic",
+        "index_global",
+        "index_member_all",
+        "index_monthly",
+        "index_weekly",
+        "index_weight",
+        "kpl_concept_cons",
+        "libor",
+        "margin",
+        "margin_detail",
+        "margin_secs",
+        "mkt_idx_bmk",
+        "moneyflow",
+        "moneyflow_cnt_ths",
+        "moneyflow_dc",
+        "moneyflow_ind_dc",
+        "moneyflow_ind_ths",
+        "moneyflow_mkt_dc",
+        "moneyflow_ths",
+        "monthly",
+        "new_share",
+        "opt_basic",
+        "opt_daily",
+        "pledge_detail",
+        "pledge_stat",
+        "repo_daily",
+        "repurchase",
+        "sf_month",
+        "sge_basic",
+        "sge_daily",
+        "share_float",
+        "shibor",
+        "shibor_lpr",
+        "shibor_quote",
+        "st",
+        "stk_account",
+        "stk_account_old",
+        "stk_alert",
+        "stk_high_shock",
+        "stk_holdernumber",
+        "stk_holdertrade",
+        "stk_limit",
+        "stk_managers",
+        "stk_rewards",
+        "stk_shock",
+        "stk_week_month_adj",
+        "stk_weekly_monthly",
+        "stock_company",
+        "stock_hsgt",
+        "stock_st",
+        "suspend_d",
+        "sw_daily",
+        "sz_daily_info",
+        "tdx_daily",
+        "tdx_index",
+        "tdx_member",
+        "ths_daily",
+        "ths_hot",
+        "ths_index",
+        "top10_cb_holders",
+        "top10_floatholders",
+        "top10_holders",
+        "top_inst",
+        "top_list",
+        "trade_cal",
+        "us_tbr",
+        "us_tltr",
+        "us_trltr",
+        "us_trycr",
+        "us_tycr",
+        "weekly",
+        "wz_index",
+    ]
+)
+UNKNOWN_APIS = {
+    "namechange",
+    "us_tradecal",
+    "us_basic",
+    "hm_detail",
+    "hk_tradecal",
+    "hsgt_top10",
+    "fut_weekly_monthly",
+    "hk_basic",
+}
+SPECIAL = {
+    "broker_recommend",
+    "cyq_chips",
+    "stk_ah_comparison",
+    "stk_surv",
+    "report_rc",
+    "stk_nineturn",
+    "cyq_perf",
+}
 
 
 def enabled(config):
@@ -157,13 +327,27 @@ def resolved_api_rate(api, spec, config, now=None):
             )
     elif api in SPECIAL:
         rpm, source = (
-            (300 if points >= 10000 else 200 if points >= 5000 else 50),
-            "points_special_doc290",
+            (
+                300
+                if points >= 10000
+                else min(
+                    200 if points >= 5000 else 50,
+                    int(spec.get("requests_per_minute", 200)),
+                )
+            ),
+            "points_special_doc290"
+            if points >= 10000
+            else "special_points_review_required",
         )
     elif independent or api in UNKNOWN_APIS or api in ("factor_value", "factor_list"):
         rpm, source = (
             min(200, int(spec.get("requests_per_minute", 200))),
             "unknown_permission_conservative",
+        )
+    elif api in REGULAR_APIS:
+        rpm, source = (
+            (500 if points >= 5000 else 200 if points >= 2000 else 50),
+            "points_regular_allowlist_doc290",
         )
     else:
         rpm, source = (
@@ -201,7 +385,26 @@ def resolved_api_rate(api, spec, config, now=None):
     if override is not None:
         rpm = min(rpm, positive_int(override, "configured API rate"))
         source += "+config_ceiling"
-    return {"rpm": positive_int(rpm, "resolved API rate"), "source": source}
+    minimum = spec.get("minimum_points")
+    unmet = type(minimum) is int and points < minimum
+    review = unmet or source.startswith(
+        (
+            "unknown_",
+            "special_points_review",
+            "independent_expired",
+            "points_unspecified",
+        )
+    )
+    return {
+        "rpm": positive_int(rpm, "resolved API rate"),
+        "source": source,
+        "review_required": review,
+        "review_reason": "points_below_documented_minimum"
+        if unmet
+        else "entitlement_or_leaf_requires_review"
+        if review
+        else None,
+    }
 
 
 def policy_report(config, now=None):
