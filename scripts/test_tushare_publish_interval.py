@@ -125,8 +125,8 @@ class PublicationInterval(unittest.TestCase):
         self.assertEqual(due["release_id"], first["release_id"])
         self.assertEqual(self.checkpoint(), self.now)
         self.assertEqual(len(list((self.root / "releases").iterdir())), 1)
-        self.assertEqual(self.acquisitions, 5)
-        self.assertEqual(self.registrations, 5)
+        self.assertEqual(self.acquisitions, 3)
+        self.assertEqual(self.registrations, 3)
         self.assertEqual(self.tick(120)["publication"]["status"], "deferred")
 
     def test_default_zero_preserves_each_tick_publish_and_does_not_write_checkpoint(
@@ -208,6 +208,69 @@ class PublicationInterval(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "checksum mismatch"):
             self.tick()
         self.assertEqual(self.checkpoint(), checkpoint)
+
+    def test_due_publish_needs_no_provider_token_client_or_planning(self):
+        with (
+            patch.object(
+                module, "get_secret", side_effect=AssertionError("no token read")
+            ),
+            patch.object(module.Pipeline, "initialize") as initialize,
+            patch.object(module.Pipeline, "plan_extended") as plan,
+            patch.object(module.httpx, "Client") as client,
+        ):
+            report = self.tick()
+        self.assertEqual(report["status"], "publish_only")
+        self.assertEqual(report["requests"], 0)
+        self.assertEqual(report["publication"]["mode"], "publish_only")
+        self.assertEqual(
+            report["timing"]["completed_stages"],
+            ["open", "publication_check", "publish", "close"],
+        )
+        initialize.assert_not_called()
+        plan.assert_not_called()
+        client.assert_not_called()
+        self.assertEqual(self.acquisitions, 0)
+        self.assertEqual(self.registrations, 0)
+        deferred = self.tick(120)
+        self.assertEqual(deferred["publication"]["mode"], "acquire_only")
+        self.assertEqual(self.acquisitions, 1)
+        self.assertEqual(self.registrations, 1)
+
+    def test_60_second_publish_and_90_second_acquire_never_share_interval_tick(self):
+        elapsed = [0.0]
+        original = module.Pipeline.publish
+
+        def slow_publish(pipeline):
+            elapsed[0] += 60
+            self.now += 60
+            return original(pipeline)
+
+        def slow_collect():
+            elapsed[0] += 90
+            self.now += 90
+            return {"requests": 10}
+
+        self.collect = slow_collect
+        with (
+            patch.object(module.time, "monotonic", side_effect=lambda: elapsed[0]),
+            patch.object(module.Pipeline, "publish", slow_publish),
+        ):
+            initial = self.tick()
+            self.assertEqual(initial["timing"]["total_elapsed_seconds"], 60)
+            checkpoint = self.checkpoint()
+            # Starting one second before due must finish acquisition without adding
+            # a 60s publish; the next automatic tick handles the durable backlog.
+            acquire = self.tick(899)
+            self.assertEqual(acquire["timing"]["total_elapsed_seconds"], 90)
+            self.assertEqual(acquire["publication"]["status"], "deferred")
+            self.assertEqual(self.checkpoint(), checkpoint)
+            due = self.tick()
+            self.assertEqual(due["timing"]["total_elapsed_seconds"], 60)
+            self.assertEqual(due["requests"], 0)
+            self.assertNotIn("acquire", due["timing"]["stage_seconds"])
+            self.assertEqual(self.acquisitions, 1)
+            self.assertEqual(self.registrations, 1)
+            self.assertEqual(self.checkpoint(), self.now)
 
     def test_interval_rejects_invalid_values_before_collecting(self):
         for value in (-1, True, 1.5, "900", None):
@@ -300,10 +363,13 @@ class PublicationInterval(unittest.TestCase):
         self.collect = collect
         first = self.tick()
         pointer = (self.root / "CURRENT.json").read_bytes()
-        self.assertEqual(self.tick(120)["publication"]["status"], "deferred")
-        self.assertEqual(self.tick(120)["publication"]["status"], "deferred")
+        for _ in range(4):
+            self.assertEqual(self.tick(120)["publication"]["status"], "deferred")
         self.assertEqual((self.root / "CURRENT.json").read_bytes(), pointer)
-        last = self.tick(660)
+        last = self.tick(420)
+        self.assertEqual(last["status"], "publish_only")
+        self.assertEqual(last["requests"], 0)
+        self.assertEqual(self.acquisitions, 4)
         manifest = module.verify_data(self.root, last["release_id"])
         self.assertNotEqual(last["release_id"], first["release_id"])
         self.assertEqual(len(manifest["datasets"]), 4)
