@@ -274,6 +274,144 @@ class CalendarFactorContracts(unittest.TestCase):
             [{"ann_date": "20260908"}, {"ann_date": "20260909"}],
         )
 
+    def test_explicit_code_only_independent_of_denied_or_malformed_list(self):
+        cfg = {
+            "factor_library_apis": ["factor_value"],
+            "factor_library_value_mode": "code_only",
+        }
+        ids = {
+            "factor_library_stocks": [
+                "T600001.SH",
+                "600001.SH",
+                "000001.SZ",
+                "000001.SZ",
+            ],
+            "factor_library_factors": [{"factor_name": None}],
+        }
+        jobs = list(fac.iter_factor_library_jobs(cfg, self.today, ids))
+        self.assertEqual(len(jobs), 21)
+        self.assertEqual(
+            {j["params"]["ts_code"] for j in jobs},
+            {"T600001.SH", "600001.SH", "000001.SZ"},
+        )
+        for job in jobs:
+            self.assertEqual(set(job["params"]), {"ts_code", "trade_date"})
+            self.assertEqual(job["fields"].split(","), fac.FIELDS["factor_value"])
+        gaps = fac.factor_library_prerequisites(ids, config=cfg)
+        self.assertNotIn("missing_factor_list_discovery", {g["reason"] for g in gaps})
+        stock_gap = next(
+            g for g in gaps if g["reason"] == "code_only_stock_universe_unverified"
+        )
+        self.assertEqual(stock_gap["observed_codes"], 3)
+        self.assertFalse(stock_gap["catalog_complete"])
+        self.assertFalse(stock_gap["asset_type_verified"])
+        self.assertFalse(stock_gap["formula_verified"])
+        self.assertIn("pit_gap", {g["reason"] for g in gaps})
+        self.assertIn("history_gap", {g["reason"] for g in gaps})
+
+    def test_code_only_no_codes_no_guessed_values_or_name_fallback(self):
+        cfg = {"factor_library_value_mode": "code_only"}
+        jobs = list(fac.iter_factor_library_jobs(cfg, self.today, self.ids))
+        self.assertEqual([j["api_name"] for j in jobs], ["factor_list"])
+        gaps = fac.factor_library_prerequisites(self.ids, config=cfg)
+        self.assertIn(
+            "missing_factor_value_stock_discovery", {g["reason"] for g in gaps}
+        )
+        for bad in (
+            "000001.SZ",
+            [1],
+            ["SZ000001"],
+            ["000001.SZ "],
+            ["110075.SH;"],
+            ["AAPL.US"],
+        ):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                list(
+                    fac.iter_factor_library_jobs(
+                        cfg, self.today, {"factor_library_stocks": bad}
+                    )
+                )
+
+    def test_code_only_calendar_history_leap_and_resume_absolute_stream(self):
+        today = date(2024, 3, 3)
+        cfg = {
+            "factor_library_value_mode": "code_only",
+            "factor_library_apis": ["factor_value"],
+            "history_start": "20240201",
+            "planning_epoch": "frozen",
+        }
+        ids = {"factor_library_stocks": ["920001.BJ", "T000001.SZ"]}
+        stream = list(fac.iter_factor_library_jobs(cfg, today, ids))
+        self.assertEqual(len(stream), 32 * 2)
+        expected = {
+            (code, (date(2024, 2, 1) + timedelta(days=i)).strftime("%Y%m%d"))
+            for code in ids["factor_library_stocks"]
+            for i in range(32)
+        }
+        self.assertEqual(
+            {(j["params"]["ts_code"], j["params"]["trade_date"]) for j in stream},
+            expected,
+        )
+        self.assertEqual(
+            len({json.dumps(j, sort_keys=True) for j in stream}), len(stream)
+        )
+        self.assertTrue(all(j["epoch"] == "frozen" for j in stream[:14]))
+        self.assertTrue(all(j["epoch"] == "history" for j in stream[14:]))
+        for offset in (0, 5, 14, 27, len(stream)):
+            self.assertEqual(
+                list(
+                    islice(fac.iter_factor_library_jobs(cfg, today, ids), offset, None)
+                ),
+                stream[offset:],
+            )
+
+    def test_code_mode_is_explicit_legacy_stream_and_dependencies_unchanged(self):
+        cfg = {"history_start": "20260830"}
+        ids = {**self.ids, "factor_library_stocks": ["000001.SZ"]}
+        self.assertEqual(
+            list(fac.iter_factor_library_jobs(cfg, self.today, ids)),
+            list(
+                fac.iter_factor_library_jobs(
+                    {**cfg, "factor_library_value_mode": "factor_name"}, self.today, ids
+                )
+            ),
+        )
+        spec = fac.FACTOR_LIBRARY_CONTRACTS["factor_value"]
+        self.assertEqual(spec["dependencies"], ["factor_library_factors"])
+        self.assertEqual(
+            spec["planning_dependencies_by_value_mode"],
+            {
+                "factor_name": ["factor_library_factors"],
+                "code_only": ["factor_library_stocks"],
+            },
+        )
+        self.assertEqual(spec["row_cap"], 6000)
+        self.assertTrue(spec["preserve_distinct_rows"])
+        for mode in (None, "auto", "STK", "", 0):
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                list(
+                    fac.iter_factor_library_jobs(
+                        {"factor_library_value_mode": mode}, self.today, ids
+                    )
+                )
+
+    def test_code_only_long_history_remains_lazy_and_unknown_not_truncated(self):
+        cfg = {
+            "factor_library_value_mode": "code_only",
+            "factor_library_apis": ["factor_value"],
+            "history_start": "19900101",
+        }
+        ids = {"factor_library_stocks": ["000001.SZ", "T600001.SH"]}
+        jobs = list(islice(fac.iter_factor_library_jobs(cfg, self.today, ids), 16))
+        self.assertEqual(
+            [j["params"]["trade_date"] for j in jobs[-2:]], ["19900101", "19900101"]
+        )
+        self.assertTrue(all(j["epoch"] == "history" for j in jobs[-2:]))
+        gaps = fac.factor_library_prerequisites(ids, config=cfg)
+        self.assertIn(
+            "configured_scope_not_verified_complete", {g["reason"] for g in gaps}
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

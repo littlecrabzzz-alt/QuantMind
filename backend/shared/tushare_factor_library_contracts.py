@@ -1,6 +1,7 @@
 """Pure reviewed calendar/announcement or factor-library acquisition contracts."""
 
 from datetime import date, datetime, timedelta
+import re
 
 from backend.shared.tushare_structured_contracts import _contract, _parse
 from backend.shared.tushare_technical_extra_contracts import _days
@@ -142,18 +143,23 @@ FACTOR_LIBRARY_CONTRACTS["factor_list"].update(
     saturation_gap="Page says one request returns the entire list but gives no numeric cap.10000 is a local guard, not a provider cap. Optional name/asset/type filters cannot certify the complete universe without separate evidence.",
 )
 FACTOR_LIBRARY_CONTRACTS["factor_value"].update(
-    code_only_discovery_gap="A legal ts_code-only probe can succeed while factor_list is empty or denied. Such value rows lack asset_type and do not seed automatic names. Until actual permissions and an audited code-only partition plan are available, no factor_value auto-jobs are produced without list discovery; sample availability is not automatic readiness.",
-    input_constraint="At least one of ts_code or factor_name is required. Automatic planning uses actual discovered factor_name; code-only queries are legally documented but not this candidate auto-plan.",
+    code_only_discovery_gap="Explicit code_only planning uses actual factor_library_stocks source codes independently of factor_list permissions. Returned names do not certify catalog completeness, asset_type, formulas or historical definitions. Sample access/filter verification is distinct from full-universe coverage.",
+    input_constraint="At least one of ts_code or factor_name is required. Default factor_name planning uses observed STK list records; explicit code_only planning uses only observed equity source codes and never invents factor names or asset_type.",
+    value_mode_note="factor_library_value_mode is factor_name by default for existing stream compatibility, or explicit code_only. Mode and its actual discovery family must be frozen in the planning policy; never reinterpret an unfinished cursor under another mode.",
+    planning_dependencies_by_value_mode={
+        "factor_name": ["factor_library_factors"],
+        "code_only": ["factor_library_stocks"],
+    },
     exact_date_param="trade_date",
     source_namespace="mainland_equity_only_preserve_source_ts_code",
     saturation_fallback="stocks",
     saturation_param="ts_code",
     saturation_dependencies=["stocks"],
-    discovery_gap="Requires actual factor_list records with factor_name and asset_type. Current source supports STK only; other assets and name collisions stay explicit gaps because factor_value has no asset_type filter. Stock fallback must include historical/delisted/T and source-observed stocks, never current listings alone.",
+    discovery_gap="Default name mode requires actual factor_list records with factor_name/asset_type; explicit code_only requires actual factor_library_stocks. Neither source proves all historical stocks or factors. Include historical/delisted/T source stocks; no current-listing-only filter. Value rows cannot establish catalog asset_type or formulas.",
     date_note="trade_date is the factor observation date, not first-public availability. Source update18:30–19:30 timezone unspecified. Calendar-day planning includes holidays; empty results do not establish factor coverage.",
     documentation_gap="Page request example names MACD and20260812 but displayed rows have other names and20100104. Validate actual name/date filters; these sample values are neither seed identifiers nor historical lower bounds.",
     unit_note="factor_value is a floating source scalar whose scale/unit/adjustment depends on factor_desc and may be unspecified. Do not rescale percentages, rank values or assume equivalence to local factor implementations.",
-    saturation_gap="6000-row factor/date cross-section may need legal ts_code fanout from the complete historical equity universe. Single-factor/code/day cap has no further legal cursor; keep it blocked. Do not split by undocumented asset_type or factor_type.",
+    saturation_gap="6000-row name/date cross-section may need legal source-code fanout. Code-only/day is already code-bounded: reaching6000 does not prove all factors; keep unresolved unless independently verified legal smaller scope exists. Single-factor/code/day has no documented cursor. No guessed names or undocumented asset/type filters.",
     refresh_gap="Recent7 overlap does not cover all older corrections; newly discovered and removed factors need historical reconciliation, not a claim that current names represent every historical factor.",
 )
 
@@ -204,14 +210,42 @@ def _factor_names(identifiers):
     return sorted(name for name, kinds in assets.items() if kinds == {"STK"}), assets
 
 
+def _value_mode(config):
+    mode = config.get("factor_library_value_mode", "factor_name")
+    if mode not in ("factor_name", "code_only"):
+        raise ValueError("factor_library_value_mode must be factor_name or code_only")
+    return mode
+
+
+def _stock_codes(identifiers):
+    """Caller supplies observed source stocks; preserve historical T identities."""
+    codes = (identifiers or {}).get("factor_library_stocks", ())
+    if not isinstance(codes, (list, tuple, set)) or any(
+        not isinstance(code, str) or not re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", code)
+        for code in codes
+    ):
+        raise ValueError(
+            "factor_library_stocks must contain original observed equity codes"
+        )
+    return sorted(set(codes))
+
+
 def factor_library_prerequisites(identifiers=None, enabled_apis=None, config=None):
     config = dict(config or {})
     if enabled_apis is not None:
         config["factor_library_apis"] = enabled_apis
     enabled = _enabled(config)
     starts = _starts(config, enabled)
+    mode = _value_mode(config)
     names, assets = (
-        _factor_names(identifiers) if "factor_value" in enabled else ([], {})
+        _factor_names(identifiers)
+        if "factor_value" in enabled and mode == "factor_name"
+        else ([], {})
+    )
+    codes = (
+        _stock_codes(identifiers)
+        if "factor_value" in enabled and mode == "code_only"
+        else []
     )
     gaps = []
     for api in enabled:
@@ -229,7 +263,22 @@ def factor_library_prerequisites(identifiers=None, enabled_apis=None, config=Non
                 else "unknown_history_start_requires_scope",
             }
         )
-        if api == "factor_value":
+        if api == "factor_value" and mode == "code_only":
+            gaps.append(
+                {
+                    "api_name": api,
+                    "dependencies": ["factor_library_stocks"],
+                    "reason": "code_only_stock_universe_unverified"
+                    if codes
+                    else "missing_factor_value_stock_discovery",
+                    "observed_codes": len(codes),
+                    "universe_complete": False,
+                    "catalog_complete": False,
+                    "asset_type_verified": False,
+                    "formula_verified": False,
+                }
+            )
+        elif api == "factor_value":
             gaps.append(
                 {
                     "api_name": api,
@@ -257,7 +306,7 @@ def factor_library_prerequisites(identifiers=None, enabled_apis=None, config=Non
 
 
 def iter_factor_library_jobs(config, today, identifiers=None):
-    """Full list snapshot plus recent7/history daily cross-sections per observed STK name."""
+    """Full optional list snapshot; recent7/history daily requests by actual name or code."""
     if isinstance(today, datetime):
         today = today.date()
     if not isinstance(today, date):
@@ -266,7 +315,15 @@ def iter_factor_library_jobs(config, today, identifiers=None):
     starts = _starts(config, enabled)
     if any(v and v > today for v in starts.values()):
         raise ValueError("History start cannot be after today")
-    names, _ = _factor_names(identifiers) if "factor_value" in enabled else ([], {})
+    mode = _value_mode(config)
+    selectors = []
+    if "factor_value" in enabled:
+        selectors = (
+            _stock_codes(identifiers)
+            if mode == "code_only"
+            else _factor_names(identifiers)[0]
+        )
+    selector_key = "ts_code" if mode == "code_only" else "factor_name"
     recent = today - timedelta(days=6)
     epoch = str(config.get("planning_epoch", today.strftime("%Y%m%d")))
     if "factor_list" in enabled:
@@ -277,7 +334,7 @@ def iter_factor_library_jobs(config, today, identifiers=None):
             "epoch": epoch,
             "priority": 20,
         }
-    if "factor_value" not in enabled or not names:
+    if "factor_value" not in enabled or not selectors:
         return
     start = starts["factor_value"]
     for history in (False, True):
@@ -288,10 +345,10 @@ def iter_factor_library_jobs(config, today, identifiers=None):
         else:
             begin, end = max(start or recent, recent), today
         for params in _days(begin, end):
-            for name in names:
+            for selector in selectors:
                 yield {
                     "api_name": "factor_value",
-                    "params": {**params, "factor_name": name},
+                    "params": {**params, selector_key: selector},
                     "fields": ",".join(FIELDS["factor_value"]),
                     "epoch": "history" if history else epoch,
                     "priority": 55 if history else 20,
