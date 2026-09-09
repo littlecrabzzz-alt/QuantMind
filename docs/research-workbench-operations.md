@@ -1,6 +1,45 @@
 # 研究工作台运行说明
 
-实现范围与设计见 [持续研究方案第 10 节](continuous-research-and-strategy-plan.md#10-产品化一个入口两种研究模板本地与远端一致)。当前版本为冻结八因子模板上的受控研究：策略更改特征子集或模型参数；方法研究计算受限因果公式并与原模型作增量比较。任意论文算法、外部数据下载和模拟交易不在本版本自动执行范围内。
+实现范围与设计见 [持续研究 Plan](continuous-research-and-strategy-plan.md)。当前版本为冻结八因子模板上的受控研究：策略更改特征子集或模型参数；方法研究计算受限因果公式并与原模型作增量比较。任意论文算法、外部数据下载和模拟交易不在本版本自动执行范围内。
+
+## 当前实现索引
+
+以下为 2026-09-09 源码核对结果。此文记录现有实现，待开发优先级统一在 Plan 第 5 节维护。
+
+| 职责 | 代码入口 | 实际行为 |
+| --- | --- | --- |
+| 研究页面 | [ResearchWorkbench.tsx](../electron/src/features/alpha-research/pages-v2/ResearchWorkbench.tsx) | 两种启动、设置、记录/详情/净值、控制与下载；显式打开记录后加载并滚动/聚焦，后台轮询不抢位置 |
+| 页面请求 | [researchRuns.ts](../electron/src/features/alpha-research/services-v2/researchRuns.ts) | 固定请求节点与认证连接，拒绝切换后迟到结果 |
+| 认证 API | [research_runs.py](../backend/services/engine/routers/research_runs.py) | 合同校验、归属、因子引用、曲线/下载完整性核验 |
+| 持久化 | [store.py](../backend/services/engine/research/store.py)、[迁移 SQL](../scripts/research_workbench_v1.sql) | 课题/窗口、幂等与排他租约、最新窗口继续及累计检查点 |
+| 专用调度 | [tasks.py](../backend/services/engine/research/tasks.py) | 独立 research 队列，Beat 每 5 秒触发，任务软/硬期限 220/240 秒；不是实验总时长 |
+| 阶段协调 | [coordinator.py](../backend/services/engine/research/coordinator.py) | baseline → propose → select → finish；模型提案/修正、候选门槛、压力与核验 |
+| 隔离运行 | [runtime.py](../backend/services/engine/research/runtime.py) | 宿主角色、私有凭据、冻结输入/代码、Docker 运行与截止控制 |
+| 因子与计算 | [research_expression.py](../scripts/research_expression.py)、[frozen_research_worker.py](../scripts/frozen_research_worker.py) | 受限 AST 因果公式、实际因子值、训练/逐日推理与回测 |
+| 独立账务 | [verify_agent_research.py](../scripts/verify_agent_research.py) | 从 CSV 独立复算资金、资产、费用、收益与回撤 |
+| 准备及部署 | [prepare_research_workbench.py](../scripts/prepare_research_workbench.py)、[本地入口](../scripts/local-dev.sh)、[双端入口](../scripts/dual-node.sh) | 模板复制、迁移与角色检查；复用现有部署入口 |
+
+当前持久化窗口状态为 queued、running、pause_requested、paused、cancel_requested、cancelled、expired、completed、blocked、failed。窗口生命周期与结果的 `needs_independent_validation` 不同：completed 表示受限工作流完成，不是策略准入。
+
+`case_id` 固定课题合同，`run_id` 标识一次窗口。继续仅允许最新的暂停/到期/取消/失败/阻塞窗口，沿用合同及累计候选数；不能以“继续”修改已冻结候选上限。列表当前返回最近 100 个窗口，因此一个课题的失败与继续记录可能同名，不是重复提交。跨节点/所有历史记录分页及更清晰的课题分组尚待扩展。
+
+## 已有 API 与页面用法
+
+统一前缀 `/api/v1/research-runs`，所有请求要求认证。页面携带 `X-Research-Node`，服务端核对当前节点及租户/用户；节点不符返回 409，无权限的课题不暴露详情。
+
+| 方法 / 相对路径 | 用途 |
+| --- | --- |
+| GET `/capabilities` | 节点身份、模板、模型和执行服务可用性；不可用显示原因 |
+| POST 空路径 | 幂等创建策略或方法研究，提交后由队列推进 |
+| GET 空路径、GET `/{run_id}` | 当前账户/节点的窗口列表和详情 |
+| POST `/{run_id}/controls/pause`、`/controls/cancel` | 请求暂停后续或取消当前研究 |
+| POST `/{run_id}/continue-window` | 沿用课题合同创建一个新的受限窗口 |
+| GET `/{run_id}/report/download` | 已完成且哈希匹配的 Markdown 报告 |
+| GET `/{run_id}/artifacts/{experiment_id}/{name}` | 清单内已完成/失败实验的已核验产物或日志 |
+
+页面目标可留空使用默认课题；首次配置好后直接点击启动卡片。创建固定 `kind`、`model`、`hours`（0.1–8）、`candidate_limit`（1–2）、可选 `expression/source_text` 与幂等键；关联策略还引用 `source_run_id/source_experiment_id`。不上传主机任意路径或密钥。继续只提交节点、时长及幂等键。
+
+使用时先确认页面“本地沙盒研究/云端研究”与可运行状态。点击列表课题名查看其详情；窄屏会自动定位，标题可换行。暂停和取消语义见下文；发布新前端后旧页面需刷新。报告下载失败时保留任务并显示错误，不重新提交研究。
 
 ## 准备与启动
 

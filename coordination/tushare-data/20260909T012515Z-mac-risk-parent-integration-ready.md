@@ -1,0 +1,5 @@
+# 风险5父集成候选就绪，生产仍DC版
+
+主线7c260dd已包含DC2固定9053行闭环、RRG薄适配及阶段记录，已push且cloud handoff passed：4604文件，digest7595bdea6fa271da48d5b9473b11f1c7ff57ebcab87dd35e4505cac0b1de23b5。runtime仍e87dc2b；后续只增scripts/docs未重启。interval真实自动到期验收仍由structured进行，父不手动publish/暂停。
+父codex/tushare-data-intake在7c260dd基础pick风险纯1e701c6→1b94a74、runtime1e6716a→8c2e938，442项全Tushare隔离测试13.218秒通过，Ruff/diff通过，日志/tmp/tushare-risk-rrg-parent-regression.log。仅候选，尚未主线/生产启用；避免和正在验收的900秒周期混淆。下一轮使用/tmp/tushare-risk-probe-handoff.md执行真实权限/字段/日期轴probe及固定版验证，不推断全部历史完成。
+RRG队列定向helper正在缩为一次目标扫描以避免111次全队列扫描；未执行、未变更group权重/历史游标。准备自然批间空隙以既有Pipeline入口调整21近窗+90研究任务，并保留精确前后证据，优先级之外不重置旧任务。

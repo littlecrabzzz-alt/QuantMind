@@ -76,6 +76,37 @@ from backend.shared.tushare_risk_event_contracts import (
     risk_event_prerequisites,
 )
 
+from backend.shared.tushare_technical_extra_contracts import (
+    TECHNICAL_EXTRA_CONTRACTS,
+    iter_technical_extra_jobs,
+    technical_extra_prerequisites,
+)
+
+TECHNICAL_EXTRA_RUNTIME_CONTRACTS = {
+    api: {
+        **spec,
+        "group": "technical_extra",
+        "dependencies": ["technical_stocks"] if spec.get("dependencies") else [],
+        "saturation_fallback": "technical_stocks",
+        "saturation_dependencies": ["technical_stocks"],
+    }
+    for api, spec in TECHNICAL_EXTRA_CONTRACTS.items()
+}
+
+
+def _technical_identifiers(identifiers):
+    return {"stocks": identifiers.get("technical_stocks", [])}
+
+
+def technical_extra_runtime_prerequisites(identifiers, config=None):
+    return [
+        {**gap, "dependencies": ["technical_stocks"] if gap.get("dependencies") else []}
+        for gap in technical_extra_prerequisites(
+            _technical_identifiers(identifiers), config=config
+        )
+    ]
+
+
 RISK_EVENT_RUNTIME_CONTRACTS = {
     api: {
         **spec,
@@ -165,6 +196,7 @@ CONNECT_RUNTIME_CONTRACTS = {
 }
 
 EXTENDED_CONTRACTS = {
+    **TECHNICAL_EXTRA_RUNTIME_CONTRACTS,
     **RISK_EVENT_RUNTIME_CONTRACTS,
     **DC_EXTRA_RUNTIME_CONTRACTS,
     **CONCEPT_EXTRA_RUNTIME_CONTRACTS,
@@ -206,6 +238,9 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "technical_extra": lambda config, today, ids: iter_technical_extra_jobs(
+        config, today, _technical_identifiers(ids)
+    ),
     "risk_event": lambda config, today, ids: iter_risk_event_jobs(
         config, today, _risk_identifiers(ids)
     ),

@@ -1,0 +1,11 @@
+# 技术5 bounded probe/fixed-release验收脚本就绪
+- Mac remaining_markets；candidate c36f629；仅/tmp脚本+本条coord，无运行源码/配置变更，无生产/上游调用。
+- /tmp/tushare-technical-probe.py：最多8请求/90秒采集及normalize，共享gates/既有lock，先5API各一次，再CYQ2的9月1–4 clipped月窗与pro单股对照，全部342列；拒权后同API不继续、缓存拒权也跳过，不retry/promote/enable/publish。
+- /tmp/technical5-fixed-verify.py：显式固定release/root/report/repo/output，raw与所有相关旧probe原文SHA→Parquet→独立去重→全列fixedread；默认trade_date，units/adjustment/field_gaps校验；输出必须data root外。Mac socket/DNS/providersecret禁用。
+- cloud-api选项仅loopback8001 trust_envFalse/redirectFalse，用INTERNAL_CALL_SECRET既有X-Internal-Call及X-User-Id:tushare-technical-acceptance，匿名401；最多12 HTTP(常规11含匿名)。HTTP2000上限采用明确code/day子范围并报excluded counts，不冒充全量HTTP，单股单日仍超限记gap不截断；固定本地全量核对与HTTP抽验范围分开。
+- 具体父执行阶段/命令：/tmp/tushare-technical-probe-handoff.md。父先probe审计后自行enable/manualpublish，云/Mac同一release；月窗仅局部样本，不等于完整月份/历史权限完成。
+- /tmp/test-technical5-verifier-fixture.py离线通过5API/342列/旧probe来源校验/10查询/3非空全列对照/11 mockHTTP/2001行HTTPterminalgap/8拒权gap；scripts AST通过。未实际执行probe main。
+- SHA256 /tmp/tushare-technical-probe.py: 30bccbe8c306780c2d84a8906442ec11a730b9b890ff1d01ca0048514f3b7a27
+- SHA256 /tmp/technical5-fixed-verify.py: dda7ca83cf59f0d41dda6cf4958d34c7ed2c440658d6f5e78ce229e9ad373dfc
+- SHA256 /tmp/test-technical5-verifier-fixture.py: 683fc164206e80f40f22bbefc7b3f686c3326f5c36420fac8df7f3dfb56cef07
+- SHA256 /tmp/tushare-technical-probe-handoff.md: 8cbd286bdb053a6c2cbbfcf9ecf0b3602c2bb120490bce5308ece86cd367712a
