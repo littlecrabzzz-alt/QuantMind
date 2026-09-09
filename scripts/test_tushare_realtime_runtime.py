@@ -250,7 +250,12 @@ class RealtimeRuntime(unittest.TestCase):
         self.assertEqual(self.p.plan_extended({}, date(2026, 9, 9)), {})
 
     def test_dispatch_all_nine_reject_old_future_invalid_with_zero_http(self):
-        config = {"enable_realtime_extra": True, "enable_realtime_replay": True}
+        config = {
+            "enable_realtime_extra": True,
+            "enable_realtime_replay": True,
+            "realtime_extra_snapshot_epoch": "20260909T080000Z",
+            "realtime_replay_snapshot_epoch": "20260909T080000Z",
+        }
         midnight = datetime(2026, 9, 9, 16, 0, tzinfo=timezone.utc).timestamp()
         self.assertEqual(
             module.realtime_dispatch_status(
@@ -260,7 +265,10 @@ class RealtimeRuntime(unittest.TestCase):
         )
         self.assertIsNone(
             module.realtime_dispatch_status(
-                "rt_idx_k", "snapshot-20260909T160000Z", config, midnight
+                "rt_idx_k",
+                "snapshot-20260909T160000Z",
+                {**config, "realtime_extra_snapshot_epoch": "20260909T160000Z"},
+                midnight,
             )
         )
         self.assertEqual(
@@ -323,6 +331,123 @@ class RealtimeRuntime(unittest.TestCase):
             )
         self.assertEqual(result["requests"], 9)
         self.assertEqual(capture.call_count, 9)
+
+    def test_same_day_old_slot_is_zero_http_and_new_config_slot_executes(self):
+        config = {
+            "enable_realtime_extra": True,
+            "enable_realtime_replay": True,
+            "realtime_extra_snapshot_epoch": "20260909T090000Z",
+            "realtime_replay_snapshot_epoch": "20260909T090000Z",
+        }
+        now = datetime(2026, 9, 9, 9, 30, tzinfo=timezone.utc).timestamp()
+        old_ids, current_ids = [], []
+        for api, spec in CONTRACTS.items():
+            if api == "stk_auction":
+                continue
+            old_ids.append(
+                self.p.enqueue(api, params(api), epoch="snapshot-20260909T080000Z")
+            )
+            current_ids.append(
+                self.p.enqueue(api, params(api), epoch="snapshot-20260909T090000Z")
+            )
+            self.assertEqual(
+                module.realtime_dispatch_status(
+                    api, "snapshot-20260909T080000Z", config, now
+                ),
+                "snapshot_superseded",
+            )
+            for invalid in (
+                None,
+                "",
+                "bad",
+                "20260230T090000Z",
+                "20260910T090000Z",
+                "20260909T100000Z",
+                "snapshot-20260909T090000Z",
+            ):
+                self.assertEqual(
+                    module.realtime_dispatch_status(
+                        api,
+                        "snapshot-20260909T090000Z",
+                        {**config, spec["group"] + "_snapshot_epoch": invalid},
+                        now,
+                    ),
+                    "snapshot_invalid_config_epoch",
+                )
+        self.p.db.commit()
+        with (
+            patch.object(module.time, "time", return_value=now),
+            patch.object(
+                module,
+                "capture_sample",
+                side_effect=lambda client, token, job, root: {
+                    "api_name": job["api_name"],
+                    "status": "empty_unverified",
+                    "row_count": 0,
+                },
+            ) as capture,
+        ):
+            result = self.p.run(
+                None, "fixture", config, max_requests=9, max_seconds=2, pause=0
+            )
+        self.assertEqual(result["requests"], 9)
+        self.assertEqual(capture.call_count, 9)
+        self.assertEqual(len(set(old_ids + current_ids)), 18)
+        for key in old_ids:
+            row = self.p.db.execute(
+                "SELECT state,tries,result FROM jobs WHERE id=?", (key,)
+            ).fetchone()
+            self.assertEqual(tuple(row), ("snapshot_superseded", 0, None))
+            self.assertEqual(
+                self.p.db.execute(
+                    "SELECT count(*) FROM attempts WHERE job_id=?", (key,)
+                ).fetchone()[0],
+                0,
+            )
+        for key in current_ids:
+            self.assertEqual(
+                self.p.db.execute(
+                    "SELECT state,tries FROM jobs WHERE id=?", (key,)
+                ).fetchone()[0],
+                "empty",
+            )
+        no_slot_ids = [
+            self.p.enqueue(api, params(api), epoch="snapshot-20260909T091500Z")
+            for api in CONTRACTS
+            if api != "stk_auction"
+        ]
+        self.p.db.commit()
+        with (
+            patch.object(module.time, "time", return_value=now),
+            patch.object(
+                module,
+                "capture_sample",
+                side_effect=AssertionError("missing config must not send"),
+            ),
+        ):
+            self.assertEqual(
+                self.p.run(
+                    None,
+                    "fixture",
+                    {"enable_realtime_extra": True, "enable_realtime_replay": True},
+                    max_requests=9,
+                    max_seconds=2,
+                    pause=0,
+                )["requests"],
+                0,
+            )
+        for key in no_slot_ids:
+            self.assertEqual(
+                tuple(
+                    self.p.db.execute(
+                        "SELECT state,tries,result FROM jobs WHERE id=?", (key,)
+                    ).fetchone()
+                ),
+                ("snapshot_invalid_config_epoch", 0, None),
+            )
+        self.assertIsNone(
+            module.realtime_dispatch_status("stk_auction", "history", {}, now)
+        )
 
     def test_auction_history_cursor_survives_snapshot_slot_changes(self):
         cfg = {
