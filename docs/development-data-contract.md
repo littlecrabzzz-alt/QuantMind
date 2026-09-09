@@ -69,3 +69,10 @@ Mac 全栈沙盒首次执行 `scripts/local-dev.sh init`：它从 `logs/cloud-sn
 Mac `com.quantmind.snapshot-pull` 每 3600 秒检查云端完整版本。新版本通过 SSH/rsync 续传并逐文件 SHA256 校验，成功才写本地 COMPLETE/VERIFIED 和更新 latest；已验证同版直接跳过传输，失败保留旧 latest。下载区移至 `~/Library/Application Support/QuantMind/cloud-snapshots`，原 `logs/cloud-snapshots` 是指向该目录的软链接，避免 macOS 后台 Documents 权限问题，不增加第二份数据副本。安装客户端只复制现有三份脚本和不含凭据的拓扑配置；代码更新后重新安装，数据拉取不承担代码发布。
 
 快照之间复用未变文件，不自动删除历史；数据库 dump 和变化文件仍会占新增空间，保留至少 100 GiB 云端恢复余量。定时下载不修改 `.local-dev/SNAPSHOT_ID`、沙盒文件或数据库卷，也不从 Mac 回灌。查看/安装命令见部署记录。
+
+
+## Qlib 构建的内存与发布边界
+
+Qlib 是 QuantDB 的派生缓存。每日调度、控制台和维护脚本统一调用 `QlibDataBuilder.build_all`：DuckDB 使用 256MB、单线程预算并允许临时磁盘溢出；Python 分块读取有序查询，仅保留当前标的历史，不再全市场 `fetchdf`。指数查询只绑定指数分区，兼容分区 schema 差异，不顺带绑定因子/财务视图。容器限额与服务器空闲内存独立；不能把 DuckDB 上限当成 Python 或整个容器的内存上限。
+
+构建在实际缓存目录的同盘临时目录中进行，以文件锁串行化；所有字段长度、日期索引和股票数据截止日校验通过后，在 Linux/macOS 原子交换整个目录。失败保留原发布版本；构建成功才整体替换，不先发布日历。临时磁盘和旧派生缓存随后回收，不增加长期快照层；异常强杀留下的临时目录须确认作业已结束后再处理。局部标的构建使用独立输出目录，禁止覆盖现有完整缓存。Mac 固定沙盒和正式原始数据不因缓存重建而改写。

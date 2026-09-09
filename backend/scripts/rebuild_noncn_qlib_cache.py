@@ -3,7 +3,7 @@
 背景：qlib 的 FileFeatureStorage 强制 instrument.lower() 拼路径，而旧缓存
 用原始大小写写目录（hk_00700.HK / us_AAPL / bc_AAVEUSDT），导致特征读取
 静默返回空。修复已并入 qlib_data_builder._feat_dir_name（非 CN 小写）。
-本脚本把旧 features 目录改名备份后走 build_features_bulk 重建。
+本脚本复用完整构建与原子发布入口，失败保留原缓存。
 
 用法（容器内）：
     docker exec quantmind python /app/backend/scripts/rebuild_noncn_qlib_cache.py [MARKET...]
@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
 import sys
 from pathlib import Path
 
@@ -42,20 +41,7 @@ def rebuild(market: str) -> None:
         logger.warning("%s 数据目录不可用，跳过", market)
         return
 
-    # 确保日历和 instruments 是最新的
-    n_cal = builder.build_calendar()
-    n_inst = builder.build_instruments()
-    logger.info("%s: calendar=%d, instruments=%d", market, n_cal, n_inst)
-
-    # 备份旧 features（保留一次回滚机会）
-    backup = qlib_dir / "features.old_case"
-    if features_dir.is_dir():
-        if backup.exists():
-            shutil.rmtree(backup)
-        shutil.move(str(features_dir), str(backup))
-        logger.info("%s: 旧 features 已备份到 %s", market, backup)
-
-    result = builder.build_features_bulk()
+    result = builder.build_all(incremental=True)
     logger.info("%s: 重建完成 %s", market, result)
 
     # 校验：抽样一个目录，确认小写且 bin 可读

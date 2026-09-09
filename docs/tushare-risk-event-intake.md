@@ -36,3 +36,10 @@
 新增独立 `risk_stocks` 发现来自已存历史股票、历史列表、交易事件及 ST/异常观测；`risk_securities` 再并入基金/ETF 与 alert 观测。registry 将 `risk_stocks` 适配为纯 planner 的逻辑 stocks，并将真实规划依赖声明为 `risk_stocks`，不污染其他组的 stocks。前三类风险股票接口和 st 饱和使用股票集合；alert 使用更宽的证券集合。仅被 alert 观察且类型未知的证券不被猜成股票，集合始终未证穷尽。
 
 专项测试在临时目录模拟采集→规范化→发布→固定版读取/导出，覆盖 29 列与未知列、同日不同来源行、T/ETF 标识、公告与实施/参考截止分离、默认与显式日期筛选、历史发现适配、独立家族验证、日期二分和真实 1000 行终端饱和。终端及不完整集合保持 gap/blocked；未构造 offset 或 st 日期范围。此候选仍未 probe、未发布、未启用，不能据测试提升真实权限/覆盖或 RRG 准入结论。
+
+
+## 2026-09-09 生产与固定版样本验收
+
+以上“候选/未probe”描述为开发阶段记录，当前a68c6d9已部署。9次实际请求中stock_st203行、st8行（去重6）、stk_shock12行，三接口已启用；stk_high_shock和stk_alert仅返回空样本，仍禁用且权限unverified。29个已知字段中18个经非空样本验证；另外11个仅空表头，不提升为全字段通过。
+
+固定cc8ed219…db55完成云端原文/Parquet/实际reader、认证HTTP与Mac禁网读取，去重221行；ST公告/实施日期的精确与无界请求逐行比较通过。Mac报告/tmp/risk5-mac-verified.json，原probe SHA03335b6da5338ef86f39a15db3f4dce80d2f9c3f0c05efd4e484fc4714d55f38。完整版本与上线证据见tushare-progress 10:36记录。全部历史、完整来源字段、当时可知性仍未完成，8项样本/语义gap保留。

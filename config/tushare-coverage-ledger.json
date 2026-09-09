@@ -101,9 +101,29 @@
       "acquisition_api_names": [
         "stock_st"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical universe, partitions and revisions; retain unit/formula/PIT and saturation gaps. Fixed sample validation is not complete historical coverage.",
+      "contract_evidence": "docs/tushare-risk-event-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/risk-event-probe.json",
+        "release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "checked_at": "2026-09-09T02:38:32.274483+00:00",
+        "sample_rows": 203,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          }
+        ],
+        "requested_fields": 5,
+        "field_coverage": "complete_for_nonempty_explicit_sample",
+        "offline_release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "offline_evidence": "/tmp/risk5-mac-verified.json",
+        "probe_report_sha256": "03335b6da5338ef86f39a15db3f4dce80d2f9c3f0c05efd4e484fc4714d55f38",
+        "enabled": true,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "423",
@@ -115,9 +135,37 @@
       "acquisition_api_names": [
         "st"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical universe, partitions and revisions; retain unit/formula/PIT and saturation gaps. Fixed sample validation is not complete historical coverage.",
+      "contract_evidence": "docs/tushare-risk-event-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/risk-event-probe.json",
+        "release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "checked_at": "2026-09-09T02:38:32.274483+00:00",
+        "sample_rows": 8,
+        "sample_requests": [
+          {
+            "pub_date": "20250424",
+            "ts_code": "300125.SZ"
+          },
+          {
+            "imp_date": "20250425",
+            "ts_code": "300125.SZ"
+          },
+          {
+            "ts_code": "300125.SZ"
+          }
+        ],
+        "requested_fields": 7,
+        "field_coverage": "complete_for_nonempty_explicit_sample",
+        "offline_release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "offline_evidence": "/tmp/risk5-mac-verified.json",
+        "probe_report_sha256": "03335b6da5338ef86f39a15db3f4dce80d2f9c3f0c05efd4e484fc4714d55f38",
+        "enabled": true,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "398",
@@ -578,9 +626,29 @@
       "acquisition_api_names": [
         "bak_daily"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical universe, partitions and revisions; retain unit/formula/PIT and saturation gaps. Fixed sample validation is not complete historical coverage.",
+      "contract_evidence": "docs/tushare-technical-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/technical-extra-probe.json",
+        "release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "checked_at": "2026-09-09T02:38:32.274483+00:00",
+        "sample_rows": 5566,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          }
+        ],
+        "requested_fields": 31,
+        "field_coverage": "complete_for_nonempty_explicit_sample",
+        "offline_release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "offline_evidence": "/tmp/technical5-mac-verified.json",
+        "probe_report_sha256": "8837a1ebabb9d36e3af49b7df9addc1f780637c7790066674234dda80a003b35",
+        "enabled": true,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "16",
@@ -883,9 +951,29 @@
       "acquisition_api_names": [
         "stk_shock"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical universe, partitions and revisions; retain unit/formula/PIT and saturation gaps. Fixed sample validation is not complete historical coverage.",
+      "contract_evidence": "docs/tushare-risk-event-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/risk-event-probe.json",
+        "release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "checked_at": "2026-09-09T02:38:32.274483+00:00",
+        "sample_rows": 12,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          }
+        ],
+        "requested_fields": 6,
+        "field_coverage": "complete_for_nonempty_explicit_sample",
+        "offline_release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "offline_evidence": "/tmp/risk5-mac-verified.json",
+        "probe_report_sha256": "03335b6da5338ef86f39a15db3f4dce80d2f9c3f0c05efd4e484fc4714d55f38",
+        "enabled": true,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "452",
@@ -899,7 +987,27 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Registered but disabled: tested scopes returned empty responses, not permission denial. Find a nonempty scope and validate fields/date filters before enabling; retain historical and PIT gaps.",
+      "contract_evidence": "docs/tushare-risk-event-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/risk-event-probe.json",
+        "release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "checked_at": "2026-09-09T02:38:32.274483+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          }
+        ],
+        "requested_fields": 6,
+        "field_coverage": "empty_headers_only_nonempty_schema_unverified",
+        "offline_release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "offline_evidence": "/tmp/risk5-mac-verified.json",
+        "probe_report_sha256": "03335b6da5338ef86f39a15db3f4dce80d2f9c3f0c05efd4e484fc4714d55f38",
+        "enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "453",
@@ -913,7 +1021,36 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Registered but disabled: tested scopes returned empty responses, not permission denial. Find a nonempty scope and validate fields/date filters before enabling; retain historical and PIT gaps.",
+      "contract_evidence": "docs/tushare-risk-event-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/risk-event-probe.json",
+        "release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "checked_at": "2026-09-09T02:38:32.274483+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "trade_date": "20260311"
+          },
+          {
+            "trade_date": "20260311",
+            "ts_code": "301373.SZ"
+          },
+          {
+            "end_date": "20260312",
+            "start_date": "20260310",
+            "ts_code": "301373.SZ"
+          }
+        ],
+        "requested_fields": 5,
+        "field_coverage": "empty_headers_only_nonempty_schema_unverified",
+        "offline_release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "offline_evidence": "/tmp/risk5-mac-verified.json",
+        "probe_report_sha256": "03335b6da5338ef86f39a15db3f4dce80d2f9c3f0c05efd4e484fc4714d55f38",
+        "enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "61",
@@ -1263,9 +1400,35 @@
       "acquisition_api_names": [
         "cyq_perf"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical universe, partitions and revisions; retain unit/formula/PIT and saturation gaps. Fixed sample validation is not complete historical coverage.",
+      "contract_evidence": "docs/tushare-technical-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/technical-extra-probe.json",
+        "release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "checked_at": "2026-09-09T02:38:32.274483+00:00",
+        "sample_rows": 5,
+        "sample_requests": [
+          {
+            "trade_date": "20260904",
+            "ts_code": "600000.SH"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260901",
+            "ts_code": "600000.SH"
+          }
+        ],
+        "requested_fields": 11,
+        "field_coverage": "complete_for_nonempty_explicit_sample",
+        "offline_release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "offline_evidence": "/tmp/technical5-mac-verified.json",
+        "probe_report_sha256": "8837a1ebabb9d36e3af49b7df9addc1f780637c7790066674234dda80a003b35",
+        "enabled": true,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "294",
@@ -1277,9 +1440,35 @@
       "acquisition_api_names": [
         "cyq_chips"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical universe, partitions and revisions; retain unit/formula/PIT and saturation gaps. Fixed sample validation is not complete historical coverage.",
+      "contract_evidence": "docs/tushare-technical-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/technical-extra-probe.json",
+        "release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "checked_at": "2026-09-09T02:38:32.274483+00:00",
+        "sample_rows": 670,
+        "sample_requests": [
+          {
+            "trade_date": "20260904",
+            "ts_code": "600000.SH"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260901",
+            "ts_code": "600000.SH"
+          }
+        ],
+        "requested_fields": 4,
+        "field_coverage": "complete_for_nonempty_explicit_sample",
+        "offline_release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "offline_evidence": "/tmp/technical5-mac-verified.json",
+        "probe_report_sha256": "8837a1ebabb9d36e3af49b7df9addc1f780637c7790066674234dda80a003b35",
+        "enabled": true,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "296",
@@ -1291,9 +1480,29 @@
       "acquisition_api_names": [
         "stk_factor"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical universe, partitions and revisions; retain unit/formula/PIT and saturation gaps. Fixed sample validation is not complete historical coverage.",
+      "contract_evidence": "docs/tushare-technical-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/technical-extra-probe.json",
+        "release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "checked_at": "2026-09-09T02:38:32.274483+00:00",
+        "sample_rows": 5548,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          }
+        ],
+        "requested_fields": 35,
+        "field_coverage": "complete_for_nonempty_explicit_sample",
+        "offline_release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "offline_evidence": "/tmp/technical5-mac-verified.json",
+        "probe_report_sha256": "8837a1ebabb9d36e3af49b7df9addc1f780637c7790066674234dda80a003b35",
+        "enabled": true,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "328",
@@ -1305,9 +1514,33 @@
       "acquisition_api_names": [
         "stk_factor_pro"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical universe, partitions and revisions; retain unit/formula/PIT and saturation gaps. Fixed sample validation is not complete historical coverage.",
+      "contract_evidence": "docs/tushare-technical-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/technical-extra-probe.json",
+        "release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "checked_at": "2026-09-09T02:38:32.274483+00:00",
+        "sample_rows": 5549,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "trade_date": "20260904",
+            "ts_code": "600000.SH"
+          }
+        ],
+        "requested_fields": 261,
+        "field_coverage": "complete_for_nonempty_explicit_sample",
+        "offline_release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+        "offline_evidence": "/tmp/technical5-mac-verified.json",
+        "probe_report_sha256": "8837a1ebabb9d36e3af49b7df9addc1f780637c7790066674234dda80a003b35",
+        "enabled": true,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "353",

@@ -30,7 +30,11 @@ from backend.shared.tushare_registry import (
     contract_for,
     risk_event_runtime_prerequisites,
     technical_extra_runtime_prerequisites,
+    STOCK_CONTEXT_RUNTIME_CONTRACTS,
+    stock_context_runtime_prerequisites,
     TECHNICAL_EXTRA_RUNTIME_CONTRACTS,
+    FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
+    foreign_financial_runtime_prerequisites,
 )
 from backend.shared.tushare_global_contracts import (
     GLOBAL_CONTRACTS,
@@ -97,6 +101,8 @@ def _planning_inputs(family, config, identifiers):
     keys = {"history_start", family + "_apis"}
     if family not in ("structured", "market"):
         keys.add(family + "_history_start")
+    if family == "foreign_financial":
+        keys.add("foreign_financial_recent_days")
     if family == "text":
         keys.update(("text_history_starts", "text_history_window"))
     policy = digest(
@@ -585,6 +591,12 @@ class Pipeline:
                 for field in ("con_code", "leading_code"):
                     if isinstance(row.get(field), str):
                         row["source_" + field] = row[field]
+            if result["api_name"] == "stk_ah_comparison":
+                value = row.get("hk_code")
+                if isinstance(value, str):
+                    row["source_hk_code"] = value
+                    if re.fullmatch(r"[0-9]{5}(?:![A-Z]{0,8})?\.HK", value):
+                        row["hk_code"] = "HK" + value.removesuffix(".HK")
             for key in (
                 "ts_code",
                 "symbol",
@@ -615,14 +627,20 @@ class Pipeline:
                         row[key] = namespace + value
                     elif (
                         key == "ts_code"
-                        and result["api_name"] in GLOBAL_CONTRACTS
+                        and (
+                            result["api_name"] in GLOBAL_CONTRACTS
+                            or result["api_name"] in FOREIGN_FINANCIAL_RUNTIME_CONTRACTS
+                        )
                         and result["api_name"].startswith("us_")
                     ):
                         # US symbols are opaque supplier tickers, not suffix codes.
                         row[key] = "US" + value
                     elif (
                         key == "ts_code"
-                        and result["api_name"] in GLOBAL_CONTRACTS
+                        and (
+                            result["api_name"] in GLOBAL_CONTRACTS
+                            or result["api_name"] in FOREIGN_FINANCIAL_RUNTIME_CONTRACTS
+                        )
                         and re.fullmatch(r"[0-9]{5}(?:![A-Z]{0,8})?\.HK", value)
                     ):
                         row[key] = "HK" + value.removesuffix(".HK")
@@ -767,6 +785,11 @@ class Pipeline:
 
     def identifiers(self):
         families = {
+            **{
+                api: spec["dependencies"][0]
+                for api, spec in FOREIGN_FINANCIAL_RUNTIME_CONTRACTS.items()
+            },
+            **dict.fromkeys(STOCK_CONTEXT_RUNTIME_CONTRACTS, "stock_context_stocks"),
             **dict.fromkeys(TECHNICAL_EXTRA_RUNTIME_CONTRACTS, "technical_stocks"),
             "daily": "technical_stocks",
             "daily_basic": "technical_stocks",
@@ -896,6 +919,7 @@ class Pipeline:
         result["technical_stocks"].update(
             result["risk_stocks"] | result["limit_securities"]
         )
+        result["stock_context_stocks"].update(result["technical_stocks"])
         result["risk_securities"].update(
             result["risk_stocks"] | result["funds"] | result["etfs"]
         )
@@ -1063,6 +1087,8 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "foreign_financial": foreign_financial_runtime_prerequisites,
+            "stock_context": stock_context_runtime_prerequisites,
             "technical_extra": technical_extra_runtime_prerequisites,
             "risk_event": risk_event_runtime_prerequisites,
             "dc_extra": dc_extra_prerequisites,
@@ -1098,6 +1124,18 @@ class Pipeline:
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
+            (
+                "foreign_financial",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "foreign_financial", cfg, ids
+                ),
+            ),
+            (
+                "stock_context",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "stock_context", cfg, ids
+                ),
+            ),
             (
                 "technical_extra",
                 lambda cfg, ids: self.record_extra_planning_gaps(
