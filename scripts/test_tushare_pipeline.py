@@ -290,8 +290,8 @@ class PipelineAcceptance(unittest.TestCase):
                     v.split("=", 1)[1] for v in cmd if v.startswith("--files-from=")
                 )
                 for name in Path(listing).read_text().splitlines():
-                    (target / name).parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(source / name, target / name)
+                    (Path(cmd[-1]) / name).parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source / name, Path(cmd[-1]) / name)
 
             def ssh(cmd, **kwargs):
                 if cmd[-1].endswith("CURRENT.json"):
@@ -318,7 +318,8 @@ class PipelineAcceptance(unittest.TestCase):
                     ) as checked:
                         unchanged = mirror(target)
                         self.assertEqual(unchanged["downloaded_files"], 0)
-                        self.assertEqual(checked.call_count, unchanged["files"])
+                        # Fixed local manifest gets its own SHA check before reuse.
+                        self.assertEqual(checked.call_count, unchanged["files"] + 1)
                 manifest = verify_data(target, second)
                 self.assertIn(evidence["path"], manifest["files"])
                 self.assertEqual(
