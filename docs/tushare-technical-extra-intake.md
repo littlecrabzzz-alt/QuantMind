@@ -1,0 +1,35 @@
+# 技术指标、筹码与备用行情纯候选
+
+基线 `8c2e938`，2026-09-09 官方复核。五个不同 API 均属于现有 263 基线，未注册；`stk_factor_pro` 不是 `stk_factor` 或 `pro_bar` 的别名。仅新增纯合同/惰性规划和隔离测试，未修改完整目录义务、运行注册、数据或配置，权限全部 `unprobed`。
+
+| 官方接口 | 全输出列 | 公开单次上限 | 公开权限/频率 | 历史范围 |
+|---|---:|---:|---|---|
+| [stk_factor 296](https://tushare.pro/document/2?doc_id=296) | 35 | 10000 | 5000 分 100 次/分，8000 分以上 500 次/分 | 声称全历史，无具体下界 |
+| [stk_factor_pro 328](https://tushare.pro/document/2?doc_id=328) | 261 | 10000 | 5000 分 30 次/分，8000 分以上 500 次/分 | 声称全历史，无具体下界 |
+| [cyq_perf 293](https://tushare.pro/document/2?doc_id=293) | 11 | 6000 | 5000/10000 分为每日 2万/20万次，15000 分不限日总量；每分钟未写明 | 2018 年起，首个观察日未知 |
+| [cyq_chips 294](https://tushare.pro/document/2?doc_id=294) | 4 | 6000 | 同上日配额；文档写 200 次/分 | 同上 |
+| [bak_daily 255](https://tushare.pro/document/2?doc_id=255) | 31 | 7000 | 正式权限 5000 分，接口频率未写明 | 约 2017 年中，明确部分早期日缺失 |
+
+10100 分不等于已实测授权；独立权限是否另需开通未知。纯合同统一采用保守本地 30 rpm，后续仍必须服从共享账户/API gates 与实际返回限频。筹码两接口每日约 18–19 点更新，时区/可用性时间及订正历史未验证。
+
+全部 **342** 列在模块 `_OUTPUT_TABLES` / `FIELD_METADATA` 中逐字段保存名称、类型、默认可见性、原始参数与语义，`field_gaps` 对每列保留实际返回/版本/可用时间待验证项。复核全部默认 Y，隐藏列表为空；每个 job 仍显式请求全列，不能用 `fields=''` 或部分列成功作为全字段验收，也不能拒收以后新增字段。完整表格和 HTML SHA 保存在模块；Mac 原始证据位于 `/tmp/tushare-technical-docs/{255,293,294,296,328}.{html,json,txt}`。
+
+## 规划与后续接线
+
+导出 `TECHNICAL_EXTRA_CONTRACTS`、`iter_technical_extra_jobs(config,today,identifiers=None)`、`technical_extra_prerequisites(...)`。建议 group/开关为 `technical_extra` / `enable_technical_extra`；配置 `technical_extra_apis` 与 `technical_extra_history_start`（字符串或 API 映射，回退 `history_start`）。本候选不注册这些运行入口。
+
+五接口输入均为字符串 `ts_code/trade_date/start_date/end_date`；仅 `bak_daily` 另公开字符串 `offset/limit`。筹码两接口 **必须 `ts_code`**；专业版必须 `ts_code/trade_date` 至少一项，其余两接口没有已公开的必选项。不能把筹码请求变成无代码全市场请求，也不能以专业版裸日期范围替代合法请求。
+
+近期 7 个日历日按真实 `trade_date` 生成，筹码逐股，其余全市场；API 间逐条轮转，近期结束后才历史。筹码历史按月、每只股票生成合法范围，首尾截断，日期轴仍为交易日；其余 API 历史按精确日。筹码采用 20180101 年份包络，不能宣称该日有数据；另外三接口无默认历史下界，缺显式范围只生成近期并保留 gap。全量历史股票、退市/T 代码及来源观察发现仍需补齐；不按当前股票列表或上市日裁掉旧身份。没有 stocks 时筹码阻塞但其他三 API 继续规划。
+
+复用日范围二分与 `stocks`/`ts_code` 饱和维度。自然键是 `ts_code,trade_date`，筹码分布再加 `price`；保留不同源行及原始代码，不能按股票日期压成一个筹码档位。任何单股单日满上限仍须阻塞。其他四接口没有公开 offset，不能因为文档泛称分页便伪造；备用行情确有 offset/limit，但排序、默认值和跨页稳定性未实测，本候选仅存 `documented_pagination`，不提前开启运行分页。月窗实际过滤/返回量和拆分须后续有限 probe；模拟请求数不等于真实加速。
+
+## 研究口径与未闭合事项
+
+- 普通技术指标使用前复权，文档描述历史快照与最新日锚点，并指出与 `pro_bar` 的 end_date 动态复权可能不同。专业版没有继承该快照保证；bfq/qfq/hfq 各列都保留，不以本地算法覆盖源因子。
+- 专业版 `bbi_bfq/hfq/qfq` 的 M4 原文分别 20/21/22；`kdj_bfq/hfq/qfq` 未明确标 J；`pre_close` 可能对不上前日 `close_qfq`。这些字段单列 gap，不能统一参数或据邻日修值。其余指标的种子、预热、缺失日、舍入和完整公式未获证明。
+- 技术接口成交量为手、金额千元；专业版股本万股、市值万元；备用行情内外盘为手、总/流通股本为亿股，而其 `vol/amount/float_mv/total_mv` 单位未明确。保留原单位和空值，尤其亏损 PE，不沿用主行情倍率。
+- 筹码来自社区模型估计，不是持仓账户事实。衰减、初始化、复权、历史高低价窗口、`winner_rate` 比例尺度仍有缺口；分布 `percent` 为百分比，但不能未验证就硬校验总和等于 100。
+- 数据日与观察时刻分开。估值/行业归属/动态因子未证明当时可知，七日重刷不能证明旧修订或删除已覆盖。筹码/备用价格复权、币种等不明处逐列保留源值，不能直接当作 RRG 或完整 PIT 研究准入。
+
+离线验证：`python3 -B scripts/test_tushare_technical_extra_contracts.py`，8 项通过；完整官方字段与保存目录一致、合法参数/所有列、闰月首尾无重叠遗漏、历史 T 代码、缺失依赖隔离、懒序列公平性；提取现有纯 `assess_response/date_children` 验证上限状态和筹码月窗 29 日叶分片。Ruff 通过。未调用 Tushare 数据 API、未执行生产或完整回测。
