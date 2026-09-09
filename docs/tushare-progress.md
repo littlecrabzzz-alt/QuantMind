@@ -439,3 +439,12 @@
 - 不可覆盖验收分别为`/data/tushare/validation/rate-rollout/{300,400,500}.acceptance.json`，SHA依次`5e80adeb9e4fce6c1ac9768a589d6315c3d1f4c41e51db82e7a411108236909d`、`221d88aec8c0a4f97dbcc6eab6abfba2f7ef7f16b43d4f87533a95087f133c26`、`dcc7abb4414a7e119ff84799df55b4fbc7e726285921f5b02754e4e1f04f14d9`。quantmind/tushare-worker均healthy、无OOM或意外重启；最终500档保留，采集调度继续。
 - 现存主瓶颈没有被限速改动掩盖：采集任务仍常在约78–81秒规划后，于160秒软超时期间反复解析约1GB历史标识符JSON，另有约60秒已观察API冷却；需单独优化派生标识符索引/缓存并保持原始对象、任务和历史义务。本轮灰度期间publish-only仍成功生成`data-413b5869…`和`data-703b5dc1…`固定版本。
 - 发布保留优化已由真实发布验证；factor_value历史已切月窗且1000月任务入队、旧87577日任务/尝试不删；实时10接口运行时已合入但默认关闭，有限probe待权限安全窗口；冻结命名范围236中227可读、9未登记继续保留。Mac客户端限速/日额度模块哈希与源码一致；两次pointer_fetch SSH瞬断后按原安全流程重试，固定`data-703b5dc1…`共394321文件、0新增下载完成校验，覆盖done53064/empty46404/pending2270024/permission_blocked1165/quality172/blocked428/split_pending1442/resolved490，旧完整版本未被失败覆盖。
+
+## 2026-09-10 01:19 规划与采集分批生产启用
+
+- `f01f870`把实时十接口有限probe和固定版离线验收工具纳入仓库，默认dry-run、最多15请求/120秒，复用同一账户/API门控、生产锁和日额度；专项24项及Ruff通过。本轮未执行实时probe、未开实时生产范围。跨日后暴露的旧日额度fixture已在`5b488f3`固定测试墙钟，21项重新通过，不改运行时。
+- `aae3bc8`将可选`planning_interval_seconds`纳入主线：默认0严格保留旧路径；正值要求已有正发布周期。生产设900秒后，发布到期优先独立`publish_only`，规划到期独立执行`initialize+plan_extended`并在全部成功后写持久配置指纹检查点，其余批次跳过这两个重阶段直接采集；失败、配置变化和时钟回拨不会伪造新检查点或重置各family游标。9项专项、发布/时序回归及完整810项Tushare测试45.944秒通过，Ruff通过。
+- 双端源码/Git已对齐`aae3bc8`，4928文件digest `beae4b9dd83cc0b6ddd607fa3e909f13b9aacc05a9a3d6dad77e69362032813c`。只在采集worker排空后把配置从SHA `2600c2b5f3446bd1b9fba8a839c494a23a65091ca283483f065166f38356d72c`切到`2ccb29fd53ab92aabcbebe087231d5d2e955c407b5ab5b18353c099dffb4f449`，新增唯一业务键`planning_interval_seconds=900`；500档分层限速及900秒发布周期保持。准备/提交收据SHA为`5c42d771…`/`e18ed40e…`，采集worker重启后healthy、restart0、OOM0。
+- 首个真实规划批`bf536d45…`成功：总86.034秒，其中planning78.542、identifiers71.271，0上游请求，持久检查点下次到期17:24:44Z。真实发布批`56ae4767…`成功69.274秒，生成固定版`data-0e961a88…`。两个后续纯采集批`4d3f9585…`/`3215f989…`均成功，分别44/95请求，run窗口89.938/89.981秒、acquire阶段93.150/92.735秒，总任务121.631/106.159秒；无规划/初始化重扫、无确认429或供应商频率错误。
+- 仍有一条纯采集批`abf6b9d6…`在acquire阶段157.201秒后触发160秒soft limit，说明API冷却、响应/末次归一化及文档登记仍会造成尾延迟；本次没有调大软硬超时或资源。44/95是不同任务组合的运营样本，不能宣称持续500rpm；500档连续请求约495.9rpm的单独验收仍沿用上一节证据。不可覆盖生产验收`/data/tushare/validation/planning-cadence/900.acceptance.json`，SHA `2ca27f7f8de77c98e383c43a68f4c8bad93cc18736892272930df734797242ad`。
+- 全量发现磁盘缓存候选13轮输出SHA完全一致，但普通cold/early-warm约33.9–35.8秒无收益；23.065秒full-warm要先额外priming70.911秒，且1GiB cgroup仍触顶。候选安全边界在分支`codex/tushare-discovery-cache-current-review`提交`35bb612`，生产保持关闭；不以热缓存合成结果代替规划分批的真实验收。900秒规划会把新增标的/范围发现最多延后到下次规划，并降低planner游标推进频率；当前约235万pending足够消费，待积压显著下降或启用短TTL实时范围前必须重审周期。
