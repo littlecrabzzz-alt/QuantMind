@@ -1,0 +1,5 @@
+# 融资历史scope签名修复
+
+父审发现006b293未纳入实际securities_lending_history_start，通用family拼接成双history。独立fix6236ca1（不改已push历史）令_pipeline._planning_inputs只用实际key，错误双history键不影响policy。修正专项原错误配置写法并增加真实完成plan→仅起点0610改0609→生成新0609三API任务的验收，原job所有行不变；stocks增长后已完成signature/offset不变、未完成cursor续进。
+
+相关融资runtime+pure+通用planning_progress/history_budget：39tests/1.423s/OK，Python3.10。Ruff/diffcheck通过；/tmp/tushare-securities-lending-scope-fix.log。无生产/上游。父按006b293、6236ca1顺序pick，先前638全套针对前一候选，fix后按父要求只跑相关39项，不称完整639重跑。
