@@ -236,7 +236,7 @@ class InvalidDecision(ValueError):
 def model_decision(folder, contract, name, properties, prompt, deadline):
     """One network attempt per tick; 429/503 retries do not block other research."""
     folder.mkdir(parents=True, exist_ok=True)
-    payload = {"model": contract["model"], "reasoning_effort": "high", "max_tokens": 6000,
+    payload = {"model": contract["model"], "reasoning_effort": contract.get("reasoning_effort", "high"), "max_tokens": contract.get("max_tokens", 6000),
         "messages": [{"role": "system", "content": "你是受限量化研究助手。仅调用指定函数一次；所有结论须基于给定实验。区分假设、已验证证据和开发区间表现。用中文解释，不宣称独立验证或真实盈利。"},
                      {"role": "user", "content": prompt}],
         "tools": [{"type": "function", "function": {"name": name, "parameters": {

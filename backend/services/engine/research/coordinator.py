@@ -161,6 +161,7 @@ async def advance(row, store, lease):
                         for k, v in PARAMS.items()}, "additionalProperties": False}}, "additionalProperties": False}}
         prompt = json.dumps({"task": row["goal"], "source_material": contract.get("source_text", ""),
             "contract": {k: contract[k] for k in ("base_config", "candidate_limit", "acceptance")},
+            "approved_plan": contract.get("approved_plan"),
             "prior_experiments": evidence(state), "allowed_selection": allowed_candidates(state),
             "instruction": ("选择满足全部门槛的候选或保留基线；压力实验尚未运行，不能宣称已经完成。" if selecting else
                 "提出一个新的可证伪候选。策略只改变一个轴：原特征子集或模型参数。因子研究只返回受限公式，名称固定 research_signal。"),

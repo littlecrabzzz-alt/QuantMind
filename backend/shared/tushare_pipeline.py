@@ -397,7 +397,16 @@ class Pipeline:
         fair_families = {"structured"} | {
             name for name in PLANNERS if name != "rrg" and config.get("enable_" + name)
         }
+        from backend.shared.tushare_rate_policy import enabled, positive_int, resolved_api_rate
+
         rpm = config.get("requests_per_minute")
+        if enabled(config) and rpm is None:
+            raise ValueError("Tiered rate policy requires an account ceiling")
+        if enabled(config) and config.get("rollout_account_rpm") is not None:
+            rollout = positive_int(config["rollout_account_rpm"], "rollout account rate")
+            if rpm is None:
+                raise ValueError("Tiered rate policy requires an account ceiling")
+            rpm = min(positive_int(rpm, "account request rate"), rollout)
         if rpm is None:
             now = time.time()
             row = self.db.execute(
@@ -463,10 +472,8 @@ class Pipeline:
                     row, checkpoints = self._next_family_job(row["group_name"], now)
             if row:
                 api = json.loads(row["job"])["api_name"]
-                api_rpm = min(
-                    int(config.get("api_requests_per_minute", {}).get(api, 200)),
-                    int(contract_for(api).get("requests_per_minute", 500)),
-                )
+                resolved = resolved_api_rate(api, contract_for(api), config)
+                api_rpm = resolved["rpm"]
                 if not 1 <= api_rpm <= 500:
                     raise ValueError("Invalid API request rate")
                 interval = config.get("api_min_interval_seconds", {}).get(api, 0)
@@ -482,6 +489,12 @@ class Pipeline:
                 ).fetchone()
                 if quota:
                     interval = max(interval, json.loads(quota[0])["interval_seconds"])
+                self.rate_gate_status = {
+                    "last_api": api, "resolved_api_cap": resolved,
+                    "effective_min_interval_seconds": max(60 / api_rpm, interval),
+                    "effective_account_rpm": int(rpm),
+                    "observed_quota_preserved": quota is not None,
+                }
                 try:
                     self.db.executemany(
                         "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=excluded.next_at",
@@ -2507,6 +2520,16 @@ class Pipeline:
                 self.db.commit()
                 continue
             result = capture_sample(client, token, job, self.root)
+            if result.get("local_daily_quota"):
+                daily = result["local_daily_quota"]
+                self.daily_quota_status = daily
+                self.db.execute(
+                    "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=MAX(next_at,excluded.next_at)",
+                    ("api:" + job["api_name"], daily["retry_at"]),
+                )
+                self.db.commit()
+                # No HTTP, result/tries/attempt rows or inferred supplier quota.
+                continue
             status = result["status"]
             state = "done" if status == "sample_ok" else "quality"
             if status == "empty_unverified":
@@ -3041,7 +3064,9 @@ def tick(max_requests=None, max_seconds=None):
         config = json.loads((ROOT / "pipeline-config.json").read_bytes())
         config.setdefault("requests_per_minute", 240)
         max_requests = (
-            max_requests if max_requests is not None else config.get("batch_requests", 360)
+            max_requests
+            if max_requests is not None
+            else config.get("batch_requests", 360)
         )
         max_seconds = (
             max_seconds if max_seconds is not None else config.get("batch_seconds", 100)
@@ -3051,6 +3076,13 @@ def tick(max_requests=None, max_seconds=None):
         publish_interval = config.get("publish_interval_seconds", 0)
         if type(publish_interval) is not int or publish_interval < 0:
             raise ValueError("Invalid publication interval")
+        planning_interval = config.get("planning_interval_seconds", 0)
+        if type(planning_interval) is not int or planning_interval < 0:
+            raise ValueError("Invalid planning interval")
+        if planning_interval and not publish_interval:
+            raise ValueError(
+                "Planning cadence requires a positive publication interval"
+            )
         if shutil.disk_usage(ROOT).free < 100 * 2**30:
             return {"status": "blocked_disk_reserve"}
         token = None
@@ -3066,7 +3098,18 @@ def tick(max_requests=None, max_seconds=None):
             "current_release_id": None,
             "mirror_status": "not_checked",
         }
-        report = {"publication": publication}
+        from backend.shared.tushare_rate_policy import policy_report
+
+        planning_cadence = {
+            "interval_seconds": planning_interval,
+            "status": "not_checked" if planning_interval else "legacy_every_tick",
+            "performed": False,
+        }
+        report = {
+            "publication": publication,
+            "rate_policy": policy_report(config),
+            "planning_cadence": planning_cadence,
+        }
         stage_seconds = {}
         completed_stages = []
         failed_stage = None
@@ -3153,16 +3196,91 @@ def tick(max_requests=None, max_seconds=None):
                     report["release_id"] = publication["current_release_id"]
                     publication["status"] = "deferred"
                     publication["mode"] = "acquire_only"
-                    token = get_secret("TUSHARE_TOKEN")
-                    if not token:
-                        report.update(status="blocked_missing_token", requests=0)
+                planning_due = not planning_interval
+                if planning_interval:
+                    with measure("planning_check"):
+                        # Fingerprint the whole effective config without discovering
+                        # identifiers. Only our last successful policy is retained;
+                        # A -> B -> A must not reuse A's old successful checkpoint.
+                        fingerprint = digest(
+                            json_bytes({"version": 1, "config": config})
+                        )
+                        checkpoint_name = "planning_success:" + fingerprint
+                        saved = pipeline.db.execute(
+                            "SELECT name,value FROM scheduler_state "
+                            "WHERE name GLOB 'planning_success:*'"
+                        ).fetchall()
+                        planning_due = True
+                        reason = "first_enabled"
+                        if len(saved) > 1:
+                            raise ValueError("Ambiguous planning checkpoint")
+                        if saved:
+                            name, last_success = saved[0]
+                            if (
+                                not re.fullmatch(r"planning_success:[a-f0-9]{64}", name)
+                                or type(last_success) is not int
+                                or last_success < 0
+                            ):
+                                raise ValueError("Invalid planning checkpoint")
+                            elapsed = time.time() - last_success
+                            planning_cadence.update(
+                                last_success_at=last_success,
+                                next_due_at=last_success + planning_interval,
+                            )
+                            if name != checkpoint_name:
+                                reason = "configuration_changed"
+                            elif elapsed < 0:
+                                reason = "clock_rollback"
+                            else:
+                                planning_due = elapsed >= planning_interval
+                                reason = (
+                                    "interval_due"
+                                    if planning_due
+                                    else "interval_not_due"
+                                )
+                        planning_cadence.update(
+                            config_fingerprint=fingerprint,
+                            due=planning_due,
+                            reason=reason,
+                            status="due" if planning_due else "deferred",
+                        )
+                if not planning_interval or not planning_due:
+                    if publish_interval:
+                        token = get_secret("TUSHARE_TOKEN")
+                        if not token:
+                            report.update(status="blocked_missing_token", requests=0)
+                            return report
+                if planning_due:
+                    planning_cadence["status"] = "planning"
+                    with measure("initialize"):
+                        if pipeline is None:
+                            pipeline = Pipeline(ROOT, catalog)
+                        pipeline.initialize(config, today)
+                    with measure("planning"):
+                        report["planning"] = pipeline.plan_extended(config, today)
+                    if planning_interval:
+                        # Do not checkpoint partial initialize/planning work on any
+                        # failure. Existing family cursors retain their own semantics.
+                        with measure("planning_checkpoint"):
+                            successful_at = int(time.time())
+                            with pipeline.db:
+                                pipeline.db.execute(
+                                    "DELETE FROM scheduler_state "
+                                    "WHERE name GLOB 'planning_success:*'"
+                                )
+                                pipeline.db.execute(
+                                    "INSERT INTO scheduler_state(name,value) VALUES(?,?)",
+                                    (checkpoint_name, successful_at),
+                                )
+                            planning_cadence.update(
+                                last_success_at=successful_at,
+                                next_due_at=successful_at + planning_interval,
+                            )
+                    planning_cadence.update(status="planned", performed=True)
+                    if planning_interval:
+                        report.update(status="planning_only", requests=0)
+                        publication["mode"] = "planning_only"
                         return report
-                with measure("initialize"):
-                    if pipeline is None:
-                        pipeline = Pipeline(ROOT, catalog)
-                    pipeline.initialize(config, today)
-                with measure("planning"):
-                    report["planning"] = pipeline.plan_extended(config, today)
                 with measure("archive"):
                     from backend.shared.tushare_archive import recover_archive
 
@@ -3211,6 +3329,8 @@ def tick(max_requests=None, max_seconds=None):
             failed = True
             if publication["status"] == "publishing":
                 publication["status"] = "failed"
+            if planning_cadence["status"] == "planning":
+                planning_cadence["status"] = "failed"
             report.update(status="error", error_type=type(exc).__name__)
             raise
         finally:
@@ -3225,6 +3345,17 @@ def tick(max_requests=None, max_seconds=None):
                     "total_elapsed_seconds": max(0.0, time.monotonic() - tick_started),
                 },
             )
+            from backend.shared.tushare_daily_quota import status as daily_quota_report
+
+            daily_status = daily_quota_report(ROOT, config)
+            if daily_status is not None:
+                report["rate_policy"]["daily_quota_ledger"] = daily_status
+            daily_quota_status = getattr(pipeline, "daily_quota_status", None)
+            if isinstance(daily_quota_status, dict):
+                report["rate_policy"]["daily_quota"] = daily_quota_status
+            rate_gate_status = getattr(pipeline, "rate_gate_status", None)
+            if isinstance(rate_gate_status, dict):
+                report["rate_policy"]["last_gate"] = rate_gate_status
             planning_timing = getattr(pipeline, "planning_timing", None)
             if isinstance(planning_timing, dict):
                 report["timing"]["planning"] = planning_timing
