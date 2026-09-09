@@ -50,6 +50,7 @@ from backend.shared.tushare_listing_extra_contracts import (
 )
 from backend.shared.tushare_limit_extra_contracts import limit_extra_prerequisites
 from backend.shared.tushare_concept_extra_contracts import concept_extra_prerequisites
+from backend.shared.tushare_dc_extra_contracts import dc_extra_prerequisites
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
@@ -468,7 +469,10 @@ class Pipeline:
                 for field, value in numeric.items():
                     if value is not None and not isinstance(value, str):
                         row[field] = json_bytes(value).decode("utf-8")
-            if contract_for(result["api_name"]).get("group") == "concept_extra":
+            if contract_for(result["api_name"]).get("group") in (
+                "concept_extra",
+                "dc_extra",
+            ):
                 for field in ("con_code", "leading_code"):
                     if isinstance(row.get(field), str):
                         row["source_" + field] = row[field]
@@ -486,7 +490,7 @@ class Pipeline:
                     if key == "ts_code" and (
                         result["api_name"] == "limit_cpt_list"
                         or contract_for(result["api_name"]).get("group")
-                        == "concept_extra"
+                        in ("concept_extra", "dc_extra")
                     ):
                         # Supplier concept codes are opaque within this dataset;
                         # even stock-shaped future labels are not equity identities.
@@ -658,6 +662,8 @@ class Pipeline:
             "ths_daily": "ths_indices",
             "ths_member": "ths_indices",
             "dc_index": "dc_indices",
+            "dc_member": "dc_indices",
+            "dc_daily": "dc_indices",
             **{api: "connect_" + api for api in CONNECT_CONTRACTS},
             "limit_list_ths": "limit_securities",
             "limit_list_d": "limit_securities",
@@ -926,6 +932,7 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "dc_extra": dc_extra_prerequisites,
             "concept_extra": concept_extra_prerequisites,
             "limit_extra": limit_extra_prerequisites,
             "listing_extra": listing_extra_prerequisites,
@@ -958,6 +965,10 @@ class Pipeline:
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
+            (
+                "dc_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps("dc_extra", cfg, ids),
+            ),
             (
                 "concept_extra",
                 lambda cfg, ids: self.record_extra_planning_gaps(

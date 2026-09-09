@@ -20,6 +20,7 @@ from backend.shared.tushare_registry import (
     LISTING_EXTRA_RUNTIME_CONTRACTS,
     LIMIT_EXTRA_RUNTIME_CONTRACTS,
     CONCEPT_EXTRA_RUNTIME_CONTRACTS,
+    DC_EXTRA_RUNTIME_CONTRACTS,
 )
 from backend.shared.tushare_credit_extra_contracts import CREDIT_EXTRA_CONTRACTS
 from backend.shared.tushare_etf_basket_contracts import ETF_BASKET_CONTRACTS
@@ -44,6 +45,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **DC_EXTRA_RUNTIME_CONTRACTS,
     **CONCEPT_EXTRA_RUNTIME_CONTRACTS,
     **LIMIT_EXTRA_RUNTIME_CONTRACTS,
     **LISTING_EXTRA_RUNTIME_CONTRACTS,
@@ -411,6 +413,7 @@ def _dataset(root, release_id, api_name):
         if (
             "ts_code" in columns
             and api_name not in CONCEPT_EXTRA_RUNTIME_CONTRACTS
+            and api_name not in DC_EXTRA_RUNTIME_CONTRACTS
             and not api_name.startswith(("opt_", "sge_", "fx_", "us_"))
         ):
             # Canonicalize the old stored supplier spelling without rewriting
@@ -469,8 +472,20 @@ def _dataset(root, release_id, api_name):
         if (
             api_name in LISTING_EXTRA_RUNTIME_CONTRACTS
             or api_name in CONCEPT_EXTRA_RUNTIME_CONTRACTS
+            or api_name in DC_EXTRA_RUNTIME_CONTRACTS
         ):
             for note in ("date_axis_note", "namespace_note", "history_gap", "cap_note"):
+                if spec.get(note):
+                    metadata[note] = spec[note]
+        if api_name in DC_EXTRA_RUNTIME_CONTRACTS:
+            for note in (
+                "history_note",
+                "pit_gap",
+                "saturation_gap",
+                "category_gap",
+                "member_namespace_note",
+                "unit_note",
+            ):
                 if spec.get(note):
                     metadata[note] = spec[note]
         if identity_fields:
@@ -604,7 +619,10 @@ def _query(
             "n_code",
         }.issubset(columns)
         concept_source = (api_name == "limit_cpt_list" and code_field == "ts_code") or (
-            api_name in CONCEPT_EXTRA_RUNTIME_CONTRACTS
+            (
+                api_name in CONCEPT_EXTRA_RUNTIME_CONTRACTS
+                or api_name in DC_EXTRA_RUNTIME_CONTRACTS
+            )
             and code_field in ("ts_code", "con_code", "leading_code")
         )
         if not (mapping_source or concept_source) and any(
