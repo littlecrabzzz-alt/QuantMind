@@ -15,6 +15,7 @@ import re
 import tempfile
 
 from backend.shared.tushare_registry import (
+    CROSS_ASSET_RUNTIME_CONTRACTS,
     FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
     CONNECT_RUNTIME_CONTRACTS,
     TRADING_EVENT_RUNTIME_CONTRACTS,
@@ -49,6 +50,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **CROSS_ASSET_RUNTIME_CONTRACTS,
     **FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
     **STOCK_CONTEXT_RUNTIME_CONTRACTS,
     **RISK_EVENT_RUNTIME_CONTRACTS,
@@ -521,6 +523,18 @@ def _dataset(root, release_id, api_name):
             ):
                 if spec.get(note):
                     metadata[note] = spec[note]
+        if api_name in CROSS_ASSET_RUNTIME_CONTRACTS:
+            for note, value in spec.items():
+                if note.endswith(("_gap", "_note")) or note in (
+                    "field_metadata",
+                    "hidden_fields",
+                    "source_namespace",
+                    "history_bound_verified",
+                    "documented_minimum_points",
+                    "documented_rate_tiers",
+                    "date_field",
+                ):
+                    metadata[note] = value
         if api_name in STOCK_CONTEXT_RUNTIME_CONTRACTS:
             for note, value in spec.items():
                 if note.endswith(("_gap", "_note")) or note in (
@@ -623,6 +637,8 @@ def _date_expression(field, columns):
 
 
 def _default_date_field(api_name, columns):
+    if api_name in CROSS_ASSET_RUNTIME_CONTRACTS:
+        return "trade_date"
     if api_name in FOREIGN_FINANCIAL_RUNTIME_CONTRACTS:
         return "end_date"
     if api_name in STOCK_CONTEXT_RUNTIME_CONTRACTS:
@@ -694,7 +710,10 @@ def _query(
             )
             and code_field in ("ts_code", "con_code", "leading_code")
         )
-        if not (mapping_source or concept_source) and any(
+        cross_asset_source = (
+            api_name in CROSS_ASSET_RUNTIME_CONTRACTS and code_field == "source_ts_code"
+        )
+        if not (mapping_source or concept_source or cross_asset_source) and any(
             re.fullmatch(r"[0-9]{6}\.(SH|SZ|BJ)", c) for c in codes
         ):
             raise ValueError("Use internal prefix stock codes, for example SH600036")
@@ -807,7 +826,9 @@ def export_jsonl(root, release_id, api_name, destination, **filters):
             "Export must not overwrite immutable dataset storage or symlinks"
         )
     with _dataset(root, release_id, api_name) as (db, columns, keys, metadata):
-        batches = _query(db, columns, keys, api_name, **filters).fetch_record_batch(65536)
+        batches = _query(db, columns, keys, api_name, **filters).fetch_record_batch(
+            65536
+        )
         destination.parent.mkdir(parents=True, exist_ok=True)
         fd, temporary = tempfile.mkstemp(
             prefix=".tushare-export-", dir=destination.parent
