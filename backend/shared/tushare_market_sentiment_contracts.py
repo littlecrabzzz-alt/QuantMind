@@ -395,7 +395,7 @@ MARKET_SENTIMENT_CONTRACTS["tdx_member"].update(
 )
 MARKET_SENTIMENT_CONTRACTS["tdx_daily"].update(
     unit_note="OHLC/pre_close are index points; pct_change/rise/turnover_rate/swing/horizon changes are percent; vol is lots. amount is ten-thousand monetary units BUT documentation says futures indices store open interest there. Shares and market values are hundred-million units. bm_buy_net is yuan; bm_net unit not stated. pe/pb/rise are source strings. Do not force this mixed board set into one amount/currency/asset interpretation.",
-    catalog_gap="Current saved catalog omits six digit-leading output names (3day,5day,10day,20day,60day,1year): official table has38 fields, catalog32. Contract requests all38; catalog correction is a separate integration obligation, not a reason to omit data.",
+    catalog_review_note="On 2026-09-09 the catalog parser and saved catalog were corrected against the unchanged official HTML: all38 fields now include 3day/5day/10day/20day/60day/1year. See docs/tushare-catalog-numeric-fields.md. Full response and historical coverage still require runtime evidence.",
     field_name_note="Keep exact source names 3day/5day/10day/20day/60day/1year. Existing fixed-store quoted identifiers support digit-leading columns; no renaming to Python identifiers.",
     formula_gap="Index weighting, constituents effective time, adjustments, horizon-return calculation, valuation exclusions and main-buy/main-force formulas are undocumented.",
     saturation_gap="At cap use legal date bisection and observed TDX board fanout. Single-board/day has no further documented filter or pagination.",

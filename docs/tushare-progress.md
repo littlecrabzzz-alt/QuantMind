@@ -318,3 +318,12 @@
 - 不等待历史全量结束：market_sentiment7与cross_asset_extra6独立纯合同并行；后者候选24dfca5已推送，6 API/296字段/4隐藏字段、6项Python3.10测试/Ruff通过，尚未运行接入。前者识别tdx_daily目录漏6数字起首字段，必须完整保留，后续定点修正目录。生产仍共用账户限流，不因开发并行叠加无控制采集。完整历史、修订、权限、附件、RRG成员/ETF/PIT继续未完成。
 
 11:30补充：market_sentiment纯7也已完成并推送cc0de16，101完整字段、7项离线测试/Ruff通过；与cross_asset_extra6合计13 API/397字段，均仅候选，尚未运行接线或真实权限验证。后续从两分支独立review集成，不扩大生产已启用计数。
+
+
+## 2026-09-09 11:56 下一13接口联合与目录/规划修复候选
+
+- 父独立候选合入cross6运行96515d8→bf88123、market_sentiment7运行62c1956→ff8fb26，公共注册/规范化/标的发现/固定reader/镜像接点冲突保留两组。候选192采集API、198读取数据集；仍未生产或启用。完整397字段、4隐藏列，热榜全46变体及market/is_new/hot_type/tag/idx_type身份保持，跨资产namespace隔离并保留全部source列。
+- 修复官方目录parse_document字母起首正则导致的42遗漏列：TDX6、五利率API36。六页重新读取的HTML SHA与旧目录完全相同，确认是本地提取遗漏；利率enqueue实际字段集合改前后相同，因原extra_fields已补足。目录现在完整，TDX已有gap改成已复核note；未来实际响应、历史不因目录成功而判完整。详见tushare-catalog-numeric-fields.md。
+- 最近7真实采集批共1508请求/898.38秒，约100.72次/墙钟分钟，规划191.60秒占21.33%；300最近attempt无权限/限流但含空/饱和/schema等需独立处理。没有把30rpm当瓶颈或提高资源/额度。规划诊断+单次immutable原文去重d3b9c32→8a1c259已并入：保持request维度旁路，不跨tick缓存、不改schema/旧游标/任务。重复夹具40次records→1、结果同；真实收益待生产新timing验证。详见tushare-discovery-timing.md。
+- 554联合Tushare隔离测试26.092秒通过；随后目录note/精确全列断言13专项0.703秒通过。旧21个family规划签名在基准配置逐项不变，新增2family。真实cross6探测及固定verifier已完成12项隔离验证；sentiment49call/120秒探测和固定验收仍准备中。全部helper齐备并审查后再进入集中部署窗口，生产采集继续。
+- 标准Mac mirror已实际exit0，固定data-86aebb78840094da306bdb92aaa89876e199f55733c727a9e1068927869a63e4新增7949/共230624文件校验；正在对此前14历史观察及CYQ3608源行补做该固定版独立离线对账。新13接口不在该版，不混同候选与数据完成。

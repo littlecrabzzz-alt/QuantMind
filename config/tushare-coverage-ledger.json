@@ -2789,7 +2789,19 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "contract_evidence": "docs/tushare-market-sentiment-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "8a1c259",
+        "runtime_document": "docs/tushare-market-sentiment-intake.md",
+        "reviewed_field_count": 11,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "321",
@@ -2803,7 +2815,19 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "contract_evidence": "docs/tushare-market-sentiment-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "8a1c259",
+        "runtime_document": "docs/tushare-market-sentiment-intake.md",
+        "reviewed_field_count": 8,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "376",
@@ -2817,7 +2841,19 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "contract_evidence": "docs/tushare-market-sentiment-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "8a1c259",
+        "runtime_document": "docs/tushare-market-sentiment-intake.md",
+        "reviewed_field_count": 9,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "377",
@@ -2831,7 +2867,19 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "contract_evidence": "docs/tushare-market-sentiment-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "8a1c259",
+        "runtime_document": "docs/tushare-market-sentiment-intake.md",
+        "reviewed_field_count": 4,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "378",
@@ -2845,7 +2893,19 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "contract_evidence": "docs/tushare-market-sentiment-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "8a1c259",
+        "runtime_document": "docs/tushare-market-sentiment-intake.md",
+        "reviewed_field_count": 38,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "347",
@@ -2859,7 +2919,19 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "contract_evidence": "docs/tushare-market-sentiment-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "8a1c259",
+        "runtime_document": "docs/tushare-market-sentiment-intake.md",
+        "reviewed_field_count": 24,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "351",
@@ -2873,7 +2945,19 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "contract_evidence": "docs/tushare-market-sentiment-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "8a1c259",
+        "runtime_document": "docs/tushare-market-sentiment-intake.md",
+        "reviewed_field_count": 7,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "384",
@@ -2976,7 +3060,23 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "8a1c259",
+        "runtime_document": "docs/tushare-cross-asset-extra-runtime.md",
+        "reviewed_field_count": 7,
+        "hidden_fields": [
+          "pre_close",
+          "asset_type",
+          "exchange"
+        ],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "408",
@@ -3377,7 +3477,21 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "8a1c259",
+        "runtime_document": "docs/tushare-cross-asset-extra-runtime.md",
+        "reviewed_field_count": 12,
+        "hidden_fields": [
+          "amount"
+        ],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "358",
@@ -3391,7 +3505,19 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "8a1c259",
+        "runtime_document": "docs/tushare-cross-asset-extra-runtime.md",
+        "reviewed_field_count": 89,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "215",
@@ -3434,7 +3560,19 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "8a1c259",
+        "runtime_document": "docs/tushare-cross-asset-extra-runtime.md",
+        "reviewed_field_count": 9,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "18",
@@ -3593,7 +3731,19 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "8a1c259",
+        "runtime_document": "docs/tushare-cross-asset-extra-runtime.md",
+        "reviewed_field_count": 90,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "134",
@@ -4160,7 +4310,19 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "8a1c259",
+        "runtime_document": "docs/tushare-cross-asset-extra-runtime.md",
+        "reviewed_field_count": 89,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "246",

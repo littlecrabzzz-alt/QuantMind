@@ -29,19 +29,7 @@ class MarketSentiment(unittest.TestCase):
         self.assertEqual(sum(map(len, module.FIELDS.values())), 101)
         for api, spec in C.items():
             entry = next(e for e in entries if api in e["api_names"])
-            if api == "tdx_daily":
-                # Catalog extraction omitted digit-leading names; a future
-                # audited catalog correction may add them without renaming.
-                self.assertLessEqual(
-                    set(module.FIELDS[api]) - set(entry["output_fields"]),
-                    {"3day", "5day", "10day", "20day", "60day", "1year"},
-                )
-                self.assertEqual(
-                    [f for f in module.FIELDS[api] if f in entry["output_fields"]],
-                    entry["output_fields"],
-                )
-            else:
-                self.assertEqual(module.FIELDS[api], entry["output_fields"])
+            self.assertEqual(module.FIELDS[api], entry["output_fields"])
             self.assertEqual(module.INPUT_FIELDS[api], entry["input_fields"])
             self.assertEqual(spec["required_fields"], module.FIELDS[api])
             self.assertEqual(spec["requested_fields"], module.FIELDS[api])
