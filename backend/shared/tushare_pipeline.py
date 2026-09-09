@@ -1204,6 +1204,16 @@ class Pipeline:
         budget = int(config.get("plan_jobs_per_tick", 2000))
         if not 1 <= budget <= 10000:
             raise ValueError("Invalid planner batch size")
+        history_scan_limit = config.get("history_plan_scan_limit", 100000)
+        history_seconds = config.get("history_plan_seconds", 1.0)
+        if type(history_scan_limit) is not int or not 1 <= history_scan_limit <= 100000:
+            raise ValueError("Invalid historical planner scan limit")
+        if (
+            isinstance(history_seconds, bool)
+            or not isinstance(history_seconds, (int, float))
+            or not 0 < history_seconds <= 5
+        ):
+            raise ValueError("Invalid historical planner time limit")
         stats = {}
         for family, planner in PLANNERS.items():
             if family in blocked_families or not config.get("enable_" + family, False):
@@ -1287,14 +1297,28 @@ class Pipeline:
                     if mode == "recent"
                     else state["anchor"],
                 }
+                started = time.monotonic()
                 stream = iter(planner(plan_config, anchor, snapshot["identifiers"]))
                 stream = itertools.islice(stream, state["offset"], None)
                 count, done = 0, False
                 attempted, inserted = 0, 0
-                for _ in range(budget):
+                stop_reason = "job_budget"
+                while (attempted if mode == "history" else count) < budget:
+                    if mode == "history":
+                        if count >= history_scan_limit:
+                            stop_reason = "scan_limit"
+                            break
+                        if time.monotonic() - started >= history_seconds:
+                            stop_reason = "time_limit"
+                            break
+                    # Cooperative bounds: a synchronous next() (including the
+                    # existing islice replay) must return before time is checked.
+                    # Count every consumed item, even intentionally skipped recent
+                    # entries, so persisted offsets retain their absolute meaning.
                     job = next(stream, None)
                     if job is None or (mode == "recent" and job["epoch"] == "history"):
                         done = True
+                        stop_reason = "stream_end"
                         break
                     if mode != "history" or job["epoch"] == "history":
                         attempted += 1
@@ -1321,6 +1345,7 @@ class Pipeline:
                     "anchor": state["anchor"],
                     "reset_reason": reset_reason,
                     "discovery_refresh_pending": snapshot["identifiers"] != current_ids,
+                    "stop_reason": stop_reason,
                 }
         self.db.commit()  # Persist validation gaps even when every family is blocked.
         return stats

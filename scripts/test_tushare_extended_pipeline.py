@@ -171,10 +171,26 @@ class ExtendedPipeline(unittest.TestCase):
             for _ in range(10):
                 p = self.pipeline()
                 before = p.db.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+                offsets = dict(p.db.execute("SELECT name,offset FROM planning_state"))
                 stats = p.plan_extended(config, date(2026, 1, 20))
-                self.assertTrue(all(s["planned"] <= 2 for s in stats.values()))
+                for name, item in stats.items():
+                    self.assertLessEqual(item["new_jobs"] + item["existing_jobs"], 2)
+                    self.assertEqual(
+                        item["planned"] - item["skipped_recent"],
+                        item["new_jobs"] + item["existing_jobs"],
+                    )
+                    if name.startswith("recent:"):
+                        self.assertLessEqual(item["planned"], 2)
+                        self.assertEqual(item["skipped_recent"], 0)
+                    else:
+                        self.assertLessEqual(item["planned"], 100000)
+                    offset = p.db.execute(
+                        "SELECT offset FROM planning_state WHERE name=?", (name,)
+                    ).fetchone()[0]
+                    self.assertEqual(offset, offsets.get(name, 0) + item["planned"])
                 after = p.db.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
-                self.assertLessEqual(after - before, 2)
+                self.assertEqual(after - before, sum(s["new_jobs"] for s in stats.values()))
+                self.assertLessEqual(after - before, 4)  # Two candidates per mode.
                 p.close()
             p = self.pipeline()
             rows = p.db.execute("SELECT logical_key,epoch FROM jobs").fetchall()
