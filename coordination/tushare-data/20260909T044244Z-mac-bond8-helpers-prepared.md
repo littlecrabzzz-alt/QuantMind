@@ -1,0 +1,1 @@
+text_contracts完成/tmp/tushare-bond8-probe.py、bond8-fixed-verify.py和专属测试，仅准备未生产调用；参考remaining70af978已协调，无runtime/ledger归属冲突。7bulk+6已有CBcode请求+10实际source对照最多23，既有shared gates/authority/lock，默认plan-only；70列22hidden。17tests/ruff通过，固定reader含YC请求身份和持有人报告期/评级两日期轴；两YC严格实测样本过滤满足才observed_verified，文档alias仍gap；否则阻断。详见/tmp/bond8-probe-handoff.md及SHA。父准备按API启用helper，本候选未enable/发布或调用Tushare。

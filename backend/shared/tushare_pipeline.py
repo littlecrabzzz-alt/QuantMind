@@ -25,6 +25,12 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from backend.shared.tushare_registry import (
+    CALENDAR_EXTRA_RUNTIME_CONTRACTS,
+    FACTOR_LIBRARY_RUNTIME_CONTRACTS,
+    calendar_extra_prerequisites,
+    factor_library_prerequisites,
+    BOND_EXTRA_RUNTIME_CONTRACTS,
+    bond_extra_runtime_prerequisites,
     CROSS_ASSET_RUNTIME_CONTRACTS,
     cross_asset_runtime_prerequisites,
     cross_asset_identifiers,
@@ -32,6 +38,10 @@ from backend.shared.tushare_registry import (
     market_sentiment_prerequisites,
     EXTENDED_CONTRACTS,
     PLANNERS,
+    APPEND_PLANNERS,
+    MARKET_MEMBER_APIS,
+    MARKET_MEMBER_DEPENDENCIES,
+    market_member_prerequisites,
     contract_for,
     risk_event_runtime_prerequisites,
     technical_extra_runtime_prerequisites,
@@ -93,6 +103,8 @@ def _planning_inputs(family, config, identifiers):
     contracts = {
         api: spec for api, spec in EXTENDED_CONTRACTS.items() if spec["group"] == family
     }
+    if family == "market_members":
+        contracts = {api: EXTENDED_CONTRACTS[api] for api in MARKET_MEMBER_APIS}
     selected = config.get(family + "_apis", tuple(contracts))
     if any(api not in contracts for api in selected):
         raise ValueError("Unknown " + family + " API")
@@ -103,7 +115,11 @@ def _planning_inputs(family, config, identifiers):
     for api, dependency in (("namechange", "stocks"), ("index_daily", "indexes")):
         if api in contracts:
             dependencies.add(dependency)
+    if family == "market_members":
+        dependencies.update(MARKET_MEMBER_DEPENDENCIES[api] for api in contracts)
     keys = {"history_start", family + "_apis"}
+    if family == "market_members":
+        keys.remove("history_start")
     if family not in ("structured", "market"):
         keys.add(family + "_history_start")
     if family == "foreign_financial":
@@ -628,6 +644,20 @@ class Pipeline:
                 for field in ("con_code", "leading_code"):
                     if isinstance(row.get(field), str):
                         row["source_" + field] = row[field]
+            if result["api_name"] == "factor_value":
+                code, name = row.get("ts_code"), row.get("factor_name")
+                if (
+                    not isinstance(code, str)
+                    or not re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", code)
+                    or not isinstance(name, str) or not name.strip()
+                ):
+                    raise ValueError("Factor value requires a source STK code and factor_name; schema review required")
+            if result["api_name"] in BOND_EXTRA_RUNTIME_CONTRACTS:
+                value = row.get("ts_code")
+                if not isinstance(value, str) or not value:
+                    raise ValueError("Bond source code must be a string; schema review required")
+                row["source_ts_code"] = value
+                row["ts_code"] = BOND_EXTRA_RUNTIME_CONTRACTS[result["api_name"]]["source_namespace"] + value
             if result["api_name"] in MARKET_SENTIMENT_RUNTIME_CONTRACTS:
                 api = result["api_name"]
                 namespace = (
@@ -674,7 +704,11 @@ class Pipeline:
                 "l3_code",
                 "index_code",
             ):
-                if key == "ts_code" and result["api_name"] in MARKET_SENTIMENT_RUNTIME_CONTRACTS:
+                if result["api_name"] in CALENDAR_EXTRA_RUNTIME_CONTRACTS or result["api_name"] == "factor_list":
+                    continue  # Calendar/factor taxonomy labels are not securities.
+                if result["api_name"] == "factor_value" and key != "ts_code":
+                    continue
+                if key == "ts_code" and (result["api_name"] in MARKET_SENTIMENT_RUNTIME_CONTRACTS or result["api_name"] in BOND_EXTRA_RUNTIME_CONTRACTS):
                     continue
                 value = row.get(key)
                 if isinstance(value, str):
@@ -867,7 +901,13 @@ class Pipeline:
         self.db.commit()
 
     def identifiers(self):
+        bond_source_apis = ("cb_daily", "cb_issue", "cb_call", "cb_rate", "cb_price_chg", "cb_share")
+        factor_records = {}
         families = {
+            "factor_list": "factor_library_factors",
+            "factor_value": "factor_library_stocks",
+            **dict.fromkeys(bond_source_apis, "bond_extra_convertibles"),
+            **{api: spec.get("saturation_fallback", "bond_extra_convertibles") for api, spec in BOND_EXTRA_RUNTIME_CONTRACTS.items()},
             "tdx_index": "tdx_indices",
             "tdx_member": "tdx_indices",
             "tdx_daily": "tdx_indices",
@@ -946,6 +986,7 @@ class Pipeline:
             (
                 "ts_code", "index_code", "level", "fut_code", "o_code", "n_code",
                 "name", "hm_name", "l1_code", "l2_code", "l3_code", "con_code",
+                "factor_name", "asset_type",
             )
         )
         placeholders = ",".join("?" for _ in families)
@@ -1000,6 +1041,17 @@ class Pipeline:
             discovery["bypassed"] += int(bypass)
             discovery["body_reads"] += int(bool(eligible))
             for record in self.records(saved, fields=discovery_fields):
+                if saved["api_name"] == "factor_list":
+                    # Actual list identity only, not descriptions/demo IDs or
+                    # factor_value outputs that cannot establish asset_type.
+                    identity = {field: record.get(field) for field in ("factor_name", "asset_type")}
+                    factor_records[json_bytes(identity)] = identity
+                    continue
+                if saved["api_name"] == "factor_value":
+                    code = record.get("ts_code")
+                    if isinstance(code, str) and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", code):
+                        result["factor_library_stocks"].add(code)
+                    continue
                 if saved["api_name"] == "ci_index_member":
                     for field in ("l1_code", "l2_code", "l3_code"):
                         value = record.get(field)
@@ -1042,6 +1094,13 @@ class Pipeline:
                     member = record.get("con_code")
                     if isinstance(member, str) and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", member):
                         result["market_sentiment_stocks"].add(member)
+                if saved["api_name"] in BOND_EXTRA_RUNTIME_CONTRACTS or saved["api_name"] in bond_source_apis:
+                    code = record.get("ts_code")
+                    # Numeric/malformed schemas remain raw/quality evidence, not
+                    # invented request codes or mixed-type global sort failures.
+                    if isinstance(code, str) and code:
+                        result[families[saved["api_name"]]].add(code)
+                    continue
                 code = record.get("ts_code") or record.get("index_code")
                 if code:
                     result[families[saved["api_name"]]].add(code)
@@ -1069,6 +1128,7 @@ class Pipeline:
         result["technical_stocks"].update(
             result["risk_stocks"] | result["limit_securities"]
         )
+        result["factor_library_stocks"].update(result["technical_stocks"])
         result["stock_context_stocks"].update(result["technical_stocks"])
         result["market_sentiment_stocks"].update(result["stock_context_stocks"])
         result["risk_securities"].update(
@@ -1078,8 +1138,10 @@ class Pipeline:
         result["cross_asset_indexes"].update(result["indexes"] | result["sw_indexes"])
         result["cross_asset_funds"].update(result["funds"] | result["etfs"])
         result["cross_asset_bonds"].update(result["bonds"])
+        result["bond_extra_convertibles"].update(result["cross_asset_bonds"])
         result["cross_asset_etfs"].update(result["etfs"])
         result = {key: sorted(values) for key, values in result.items()}
+        result["factor_library_factors"] = [factor_records[key] for key in sorted(factor_records)]
         for api, spec in CROSS_ASSET_RUNTIME_CONTRACTS.items():
             family = spec["saturation_fallback"]
             logical = EXTENDED_CONTRACTS[api].get("discovery_dependencies", [family])[0]
@@ -1253,8 +1315,12 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "calendar_extra": calendar_extra_prerequisites,
+            "factor_library": factor_library_prerequisites,
             "cross_asset_extra": cross_asset_runtime_prerequisites,
+            "bond_extra": bond_extra_runtime_prerequisites,
             "market_sentiment": market_sentiment_prerequisites,
+            "market_members": market_member_prerequisites,
             "foreign_financial": foreign_financial_runtime_prerequisites,
             "stock_context": stock_context_runtime_prerequisites,
             "technical_extra": technical_extra_runtime_prerequisites,
@@ -1320,6 +1386,22 @@ class Pipeline:
         self.planning_timing["active_stage"] = "validation_and_snapshots"
         blocked_families = set()
         for family, validate in (
+            (
+                "calendar_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps("calendar_extra", cfg, ids),
+            ),
+            (
+                "factor_library",
+                lambda cfg, ids: self.record_extra_planning_gaps("factor_library", cfg, ids),
+            ),
+            (
+                "market_members",
+                lambda cfg, ids: self.record_extra_planning_gaps("market_members", cfg, ids),
+            ),
+            (
+                "bond_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps("bond_extra", cfg, ids),
+            ),
             (
                 "cross_asset_extra",
                 lambda cfg, ids: self.record_extra_planning_gaps(
@@ -1459,7 +1541,7 @@ class Pipeline:
         ):
             raise ValueError("Invalid historical planner time limit")
         stats = {}
-        for family, planner in PLANNERS.items():
+        for family, planner in {**PLANNERS, **APPEND_PLANNERS}.items():
             self.planning_timing["active_stage"] = family + ":policy"
             if family in blocked_families or not config.get("enable_" + family, False):
                 continue

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "catalog_fetched_at": "2026-09-08T15:22:12.131618+00:00",
   "catalog_index_sha256": "182240e4826c7e65a6b63ef83efdc4e14b7b3589a6249ed54cd36ac66c937dce",
-  "reviewed_at": "2026-09-09",
+  "reviewed_at": "2026-09-09T05:33:30.165161+00:00",
   "entry_count": 263,
   "scope": "Every entry in pinned official catalogue plus independently discovered linked entries. entry_count remains the immutable baseline count, not a scope ceiling. Runtime evidence controls entitlement and coverage.",
   "entries": [
@@ -2787,20 +2787,142 @@
       "acquisition_api_names": [
         "ths_hot"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-market-sentiment-intake.md",
         "reviewed_field_count": 11,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
-        "automatically_enabled": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/sentiment7-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:15:57.600957+00:00",
+        "sample_rows": 9715,
+        "sample_requests": [
+          {
+            "is_new": "Y",
+            "market": "热股",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "热股",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "ETF",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "ETF",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "可转债",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "可转债",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "行业板块",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "行业板块",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "概念板块",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "概念板块",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "期货",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "期货",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "港股",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "港股",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "热基",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "热基",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "美股",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "美股",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "热股",
+            "trade_date": "20260904",
+            "ts_code": "003040.SZ"
+          }
+        ],
+        "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "fixed_release_verified_with_gaps",
+        "history_complete": false,
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 9714,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-mac-verified.json",
+        "offline_evidence_sha256": "93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -2813,20 +2935,142 @@
       "acquisition_api_names": [
         "dc_hot"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-market-sentiment-intake.md",
         "reviewed_field_count": 8,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
-        "automatically_enabled": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/sentiment7-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:15:57.600957+00:00",
+        "sample_rows": 14011,
+        "sample_requests": [
+          {
+            "hot_type": "人气榜",
+            "is_new": "Y",
+            "market": "A股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "人气榜",
+            "is_new": "N",
+            "market": "A股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "Y",
+            "market": "A股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "N",
+            "market": "A股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "人气榜",
+            "is_new": "Y",
+            "market": "ETF基金",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "人气榜",
+            "is_new": "N",
+            "market": "ETF基金",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "Y",
+            "market": "ETF基金",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "N",
+            "market": "ETF基金",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "人气榜",
+            "is_new": "Y",
+            "market": "港股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "人气榜",
+            "is_new": "N",
+            "market": "港股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "Y",
+            "market": "港股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "N",
+            "market": "港股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "人气榜",
+            "is_new": "Y",
+            "market": "美股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "人气榜",
+            "is_new": "N",
+            "market": "美股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "Y",
+            "market": "美股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "N",
+            "market": "美股市场",
+            "trade_date": "20260904"
+          }
+        ],
+        "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "fixed_release_verified_with_gaps",
+        "history_complete": false,
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 14011,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-mac-verified.json",
+        "offline_evidence_sha256": "93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -2839,20 +3083,62 @@
       "acquisition_api_names": [
         "tdx_index"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-market-sentiment-intake.md",
         "reviewed_field_count": 9,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
-        "automatically_enabled": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/sentiment7-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:15:57.600957+00:00",
+        "sample_rows": 613,
+        "sample_requests": [
+          {
+            "idx_type": "概念板块",
+            "trade_date": "20260904"
+          },
+          {
+            "idx_type": "行业板块",
+            "trade_date": "20260904"
+          },
+          {
+            "idx_type": "风格板块",
+            "trade_date": "20260904"
+          },
+          {
+            "idx_type": "地区板块",
+            "trade_date": "20260904"
+          }
+        ],
+        "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "fixed_release_verified_with_gaps",
+        "history_complete": false,
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 613,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-mac-verified.json",
+        "offline_evidence_sha256": "93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -2865,19 +3151,77 @@
       "acquisition_api_names": [
         "tdx_member"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finite legal code partitions verified on cloud and Mac. Preserve unknown supplier/member universe and PIT; additive scope migration required before enabling without resetting old history policy.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-market-sentiment-intake.md",
         "reviewed_field_count": 4,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
         "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/sentiment7-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:15:57.600957+00:00",
+        "sample_rows": 3000,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          }
+        ],
+        "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
+        "enabled": false,
+        "source_statuses": [
+          "possibly_truncated"
+        ],
+        "offline_status": "fixed_release_verified_with_gaps",
+        "history_complete": false,
+        "pit_verified": false,
+        "enabled_release_id": null,
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 3000,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-mac-verified.json",
+        "offline_evidence_sha256": "93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": [
+          "audit_gap:empty_or_non_success_not_completeness",
+          "audit_gap:saturation_unresolved",
+          "saturation_unresolved_status"
+        ]
+      },
+      "member_partition_evidence": {
+        "path": "/data/tushare/validation/member-partitions6-probe.json",
+        "probe_sha256": "45db683d70f036ab9d2b12907d1e0ecdd85effc0470372d1ef706c49801e9f29",
+        "release_id": "data-0a5af2a613b00f3c8cf088662215614fb1d56ba38c162f480a270634370103a1",
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/member-partitions6-cloud-verified.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/member-partitions6-mac-verified.json",
+        "offline_evidence_sha256": "17f5dafdb03172fede12f6a914e68940040beeefc9b6c3bd8660e69ccfd9785c",
+        "status": "verified_with_gaps",
+        "auto_acquisition": false,
+        "gaps": [
+          "supplier_board_universe_unverified",
+          "member_second_axis_coverage_unverified",
+          "historical_pit_unverified",
+          "migration_needed"
+        ]
+      },
+      "append_scope_candidate": {
+        "commit": "dd7279d",
+        "document": "docs/tushare-member-append-scope.md",
+        "status": "default_disabled_not_deployed",
+        "old_history_policy_preserved": true,
+        "automatic_recent_and_history": true,
+        "universe_complete": false,
         "pit_verified": false
       }
     },
@@ -2891,20 +3235,53 @@
       "acquisition_api_names": [
         "tdx_daily"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-market-sentiment-intake.md",
         "reviewed_field_count": 38,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
-        "automatically_enabled": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/sentiment7-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:15:57.600957+00:00",
+        "sample_rows": 617,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "trade_date": "20260904",
+            "ts_code": "881115.TDX"
+          }
+        ],
+        "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "fixed_release_verified_with_gaps",
+        "history_complete": false,
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 616,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-mac-verified.json",
+        "offline_evidence_sha256": "93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -2917,20 +3294,66 @@
       "acquisition_api_names": [
         "kpl_list"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-market-sentiment-intake.md",
         "reviewed_field_count": 24,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
-        "automatically_enabled": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/sentiment7-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:15:57.600957+00:00",
+        "sample_rows": 293,
+        "sample_requests": [
+          {
+            "tag": "涨停",
+            "trade_date": "20260904"
+          },
+          {
+            "tag": "炸板",
+            "trade_date": "20260904"
+          },
+          {
+            "tag": "跌停",
+            "trade_date": "20260904"
+          },
+          {
+            "tag": "自然涨停",
+            "trade_date": "20260904"
+          },
+          {
+            "tag": "竞价",
+            "trade_date": "20260904"
+          }
+        ],
+        "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "fixed_release_verified_with_gaps",
+        "history_complete": false,
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 293,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-mac-verified.json",
+        "offline_evidence_sha256": "93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -2943,19 +3366,83 @@
       "acquisition_api_names": [
         "kpl_concept_cons"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finite legal code partitions verified on cloud and Mac. Preserve unknown supplier/member universe and PIT; additive scope migration required before enabling without resetting old history policy.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-market-sentiment-intake.md",
         "reviewed_field_count": 7,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
         "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/sentiment7-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:15:57.600957+00:00",
+        "sample_rows": 3001,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "con_code": "688316.SH",
+            "trade_date": "20260904",
+            "ts_code": "000386.KP"
+          }
+        ],
+        "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
+        "enabled": false,
+        "source_statuses": [
+          "possibly_truncated",
+          "sample_ok"
+        ],
+        "offline_status": "fixed_release_verified_with_gaps",
+        "history_complete": false,
+        "pit_verified": false,
+        "enabled_release_id": null,
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 3000,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/sentiment7-mac-verified.json",
+        "offline_evidence_sha256": "93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": [
+          "audit_gap:empty_or_non_success_not_completeness",
+          "audit_gap:saturation_unresolved",
+          "saturation_unresolved_status"
+        ]
+      },
+      "member_partition_evidence": {
+        "path": "/data/tushare/validation/member-partitions6-probe.json",
+        "probe_sha256": "45db683d70f036ab9d2b12907d1e0ecdd85effc0470372d1ef706c49801e9f29",
+        "release_id": "data-0a5af2a613b00f3c8cf088662215614fb1d56ba38c162f480a270634370103a1",
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/member-partitions6-cloud-verified.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/member-partitions6-mac-verified.json",
+        "offline_evidence_sha256": "17f5dafdb03172fede12f6a914e68940040beeefc9b6c3bd8660e69ccfd9785c",
+        "status": "verified_with_gaps",
+        "auto_acquisition": false,
+        "gaps": [
+          "supplier_board_universe_unverified",
+          "member_second_axis_coverage_unverified",
+          "historical_pit_unverified",
+          "migration_needed"
+        ]
+      },
+      "append_scope_candidate": {
+        "commit": "dd7279d",
+        "document": "docs/tushare-member-append-scope.md",
+        "status": "default_disabled_not_deployed",
+        "old_history_policy_preserved": true,
+        "automatic_recent_and_history": true,
+        "universe_complete": false,
         "pit_verified": false
       }
     },
@@ -3058,9 +3545,9 @@
       "acquisition_api_names": [
         "etf_limit"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -3071,11 +3558,45 @@
           "asset_type",
           "exchange"
         ],
-        "actual_permission_probed": false,
-        "production_registered": false,
-        "automatically_enabled": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/cross6-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:14:21.065591+00:00",
+        "sample_rows": 2147,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "158000.SZ"
+          }
+        ],
+        "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "fixed_release_verified_with_gaps",
+        "history_complete": false,
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 2146,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-mac-verified.json",
+        "offline_evidence_sha256": "ebc9b7b608081a7a4771b9e94376448faf2eee528c680452897fe177f9385720",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -3182,7 +3703,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-calendar-factor-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "dd7279d",
+        "runtime_document": "docs/tushare-calendar-factor-intake.md",
+        "reviewed_field_count": 5,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "93",
@@ -3475,9 +4009,9 @@
       "acquisition_api_names": [
         "index_global"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -3486,11 +4020,45 @@
         "hidden_fields": [
           "amount"
         ],
-        "actual_permission_probed": false,
-        "production_registered": false,
-        "automatically_enabled": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/cross6-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:14:21.065591+00:00",
+        "sample_rows": 23,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "AS51"
+          }
+        ],
+        "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "fixed_release_verified_with_gaps",
+        "history_complete": false,
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 22,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-mac-verified.json",
+        "offline_evidence_sha256": "ebc9b7b608081a7a4771b9e94376448faf2eee528c680452897fe177f9385720",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -3503,20 +4071,54 @@
       "acquisition_api_names": [
         "idx_factor_pro"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-cross-asset-extra-runtime.md",
         "reviewed_field_count": 89,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
-        "automatically_enabled": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/cross6-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:14:21.065591+00:00",
+        "sample_rows": 3393,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "000001.SH"
+          }
+        ],
+        "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "fixed_release_verified_with_gaps",
+        "history_complete": false,
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 3392,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-mac-verified.json",
+        "offline_evidence_sha256": "ebc9b7b608081a7a4771b9e94376448faf2eee528c680452897fe177f9385720",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -3558,20 +4160,54 @@
       "acquisition_api_names": [
         "sz_daily_info"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-cross-asset-extra-runtime.md",
         "reviewed_field_count": 9,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
-        "automatically_enabled": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/cross6-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:14:21.065591+00:00",
+        "sample_rows": 15,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "ABS"
+          }
+        ],
+        "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "fixed_release_verified_with_gaps",
+        "history_complete": false,
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 14,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-mac-verified.json",
+        "offline_evidence_sha256": "ebc9b7b608081a7a4771b9e94376448faf2eee528c680452897fe177f9385720",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -3729,20 +4365,54 @@
       "acquisition_api_names": [
         "fund_factor_pro"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-cross-asset-extra-runtime.md",
         "reviewed_field_count": 90,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
-        "automatically_enabled": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/cross6-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:14:21.065591+00:00",
+        "sample_rows": 2115,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "158000.SZ"
+          }
+        ],
+        "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "fixed_release_verified_with_gaps",
+        "history_complete": false,
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 2114,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-mac-verified.json",
+        "offline_evidence_sha256": "ebc9b7b608081a7a4771b9e94376448faf2eee528c680452897fe177f9385720",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -4294,9 +4964,71 @@
       "acquisition_api_names": [
         "top10_cb_holders"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical acquisition, observed-universe refresh, revisions and PIT validation.",
+      "auto_acquisition": true,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 6,
+        "hidden_fields": [],
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "092dedf"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/bond8-probe.json",
+        "release_id": "data-0a5af2a613b00f3c8cf088662215614fb1d56ba38c162f480a270634370103a1",
+        "checked_at": "2026-09-09T05:03:51.883584+00:00",
+        "probe_report_sha256": "500426b3312a331108c650f190cfb84daed979c6229c709a0b2dc4b6d5d2d869",
+        "sample_rows": 360,
+        "sample_requests": [
+          {
+            "ts_code": "110075.SH"
+          },
+          {
+            "ts_code": "110076.SH"
+          },
+          {
+            "ts_code": "110077.SH"
+          },
+          {
+            "end_date": "20201231",
+            "start_date": "20201231",
+            "ts_code": "110075.SH"
+          },
+          {
+            "end_date": "20201231",
+            "start_date": "20201231",
+            "ts_code": "110076.SH"
+          },
+          {
+            "end_date": "20201231",
+            "start_date": "20201231",
+            "ts_code": "110077.SH"
+          }
+        ],
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "enabled": true,
+        "enabled_release_id": "data-6ef5044ed2d8d677129d4d96d2d751709e1fd9c97c9763a038998ba055268039",
+        "enable_evidence": "20260909T050941Z-b53f05c7",
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-mac-verified.json",
+        "offline_evidence_sha256": "78a547f9a16783e5ecae4b82d54b080328b5564b074143b8eab269fb7a9e19a0",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "offline_scope": "Fixed observed raw/source columns only; no full-history or PIT certification.",
+        "fixed_rows_after_dedupe": 330,
+        "blocked_reasons": [],
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "392",
@@ -4308,20 +5040,54 @@
       "acquisition_api_names": [
         "cb_factor_pro"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue full historical acquisition, observed-universe refresh, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-cross-asset-extra-runtime.md",
         "reviewed_field_count": 89,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
-        "automatically_enabled": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/cross6-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:14:21.065591+00:00",
+        "sample_rows": 316,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "110075.SH"
+          }
+        ],
+        "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "fixed_release_verified_with_gaps",
+        "history_complete": false,
+        "pit_verified": false,
+        "enabled_release_id": "data-eac7f04260640ae563ccf666403646f668db6670815a1553935d074849c5949e",
+        "enable_evidence": "20260909T042558Z-274e6062",
+        "fixed_rows_after_dedupe": 315,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T035512Z/cross6-mac-verified.json",
+        "offline_evidence_sha256": "ebc9b7b608081a7a4771b9e94376448faf2eee528c680452897fe177f9385720",
+        "offline_scope": "Fixed observed raw rows and all source columns; full history and PIT remain unverified.",
+        "blocked_reasons": []
       }
     },
     {
@@ -4362,9 +5128,56 @@
       "acquisition_api_names": [
         "cb_rating"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical acquisition, observed-universe refresh, revisions and PIT validation.",
+      "auto_acquisition": true,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 8,
+        "hidden_fields": [],
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "092dedf"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/bond8-probe.json",
+        "release_id": "data-0a5af2a613b00f3c8cf088662215614fb1d56ba38c162f480a270634370103a1",
+        "checked_at": "2026-09-09T05:03:51.883584+00:00",
+        "probe_report_sha256": "500426b3312a331108c650f190cfb84daed979c6229c709a0b2dc4b6d5d2d869",
+        "sample_rows": 22,
+        "sample_requests": [
+          {
+            "ts_code": "110075.SH"
+          },
+          {
+            "ts_code": "110076.SH"
+          },
+          {
+            "ts_code": "110077.SH"
+          }
+        ],
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "enabled": true,
+        "enabled_release_id": "data-6ef5044ed2d8d677129d4d96d2d751709e1fd9c97c9763a038998ba055268039",
+        "enable_evidence": "20260909T050941Z-b53f05c7",
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-mac-verified.json",
+        "offline_evidence_sha256": "78a547f9a16783e5ecae4b82d54b080328b5564b074143b8eab269fb7a9e19a0",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "offline_scope": "Fixed observed raw/source columns only; no full-history or PIT certification.",
+        "fixed_rows_after_dedupe": 22,
+        "blocked_reasons": [],
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "256",
@@ -4376,9 +5189,55 @@
       "acquisition_api_names": [
         "repo_daily"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical acquisition, observed-universe refresh, revisions and PIT validation.",
+      "auto_acquisition": true,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 12,
+        "hidden_fields": [],
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "092dedf"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/bond8-probe.json",
+        "release_id": "data-0a5af2a613b00f3c8cf088662215614fb1d56ba38c162f480a270634370103a1",
+        "checked_at": "2026-09-09T05:03:51.883584+00:00",
+        "probe_report_sha256": "500426b3312a331108c650f190cfb84daed979c6229c709a0b2dc4b6d5d2d869",
+        "sample_rows": 47,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "131800.SZ"
+          }
+        ],
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "enabled": true,
+        "enabled_release_id": "data-6ef5044ed2d8d677129d4d96d2d751709e1fd9c97c9763a038998ba055268039",
+        "enable_evidence": "20260909T050941Z-b53f05c7",
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-mac-verified.json",
+        "offline_evidence_sha256": "78a547f9a16783e5ecae4b82d54b080328b5564b074143b8eab269fb7a9e19a0",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "offline_scope": "Fixed observed raw/source columns only; no full-history or PIT certification.",
+        "fixed_rows_after_dedupe": 46,
+        "blocked_reasons": [],
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "322",
@@ -4390,9 +5249,78 @@
       "acquisition_api_names": [
         "bc_otcqt"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Resolve saturated bulk and observed date-filter violations before enablement; preserve all raw rows and historical/PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 13,
+        "hidden_fields": [
+          "trade_date",
+          "qt_time",
+          "bank",
+          "ts_code",
+          "name",
+          "maturity",
+          "remain_maturity",
+          "bond_type",
+          "coupon_rate",
+          "buy_price",
+          "sell_price",
+          "buy_yield",
+          "sell_yield"
+        ],
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "092dedf"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/bond8-probe.json",
+        "release_id": "data-0a5af2a613b00f3c8cf088662215614fb1d56ba38c162f480a270634370103a1",
+        "checked_at": "2026-09-09T05:03:51.883584+00:00",
+        "probe_report_sha256": "500426b3312a331108c650f190cfb84daed979c6229c709a0b2dc4b6d5d2d869",
+        "sample_rows": 2006,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "070013.BC"
+          }
+        ],
+        "source_statuses": [
+          "possibly_truncated",
+          "sample_ok"
+        ],
+        "enabled": false,
+        "enabled_release_id": null,
+        "enable_evidence": "20260909T050941Z-b53f05c7",
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-mac-verified.json",
+        "offline_evidence_sha256": "78a547f9a16783e5ecae4b82d54b080328b5564b074143b8eab269fb7a9e19a0",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "offline_scope": "Fixed observed raw/source columns only; no full-history or PIT certification.",
+        "fixed_rows_after_dedupe": 2004,
+        "blocked_reasons": [
+          "audit_gap:date_axis_overlap_unverified_or_changed",
+          "audit_gap:empty_or_non_success_not_completeness",
+          "audit_gap:saturation_unresolved",
+          "audit_gap:source_date_or_code_filter_mismatch",
+          "missing_nonempty_all_column_comparison",
+          "saturation_unresolved_status",
+          "source_filter_failed"
+        ],
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "323",
@@ -4404,9 +5332,65 @@
       "acquisition_api_names": [
         "bc_bestotcqt"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical acquisition, observed-universe refresh, revisions and PIT validation.",
+      "auto_acquisition": true,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 11,
+        "hidden_fields": [
+          "trade_date",
+          "ts_code",
+          "name",
+          "remain_maturity",
+          "bond_type",
+          "best_buy_bank",
+          "best_buy_yield",
+          "best_sell_bank",
+          "best_sell_yield"
+        ],
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "092dedf"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/bond8-probe.json",
+        "release_id": "data-0a5af2a613b00f3c8cf088662215614fb1d56ba38c162f480a270634370103a1",
+        "checked_at": "2026-09-09T05:03:51.883584+00:00",
+        "probe_report_sha256": "500426b3312a331108c650f190cfb84daed979c6229c709a0b2dc4b6d5d2d869",
+        "sample_rows": 706,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "070013.BC"
+          }
+        ],
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "enabled": true,
+        "enabled_release_id": "data-6ef5044ed2d8d677129d4d96d2d751709e1fd9c97c9763a038998ba055268039",
+        "enable_evidence": "20260909T050941Z-b53f05c7",
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-mac-verified.json",
+        "offline_evidence_sha256": "78a547f9a16783e5ecae4b82d54b080328b5564b074143b8eab269fb7a9e19a0",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "offline_scope": "Fixed observed raw/source columns only; no full-history or PIT certification.",
+        "fixed_rows_after_dedupe": 705,
+        "blocked_reasons": [],
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "271",
@@ -4418,9 +5402,55 @@
       "acquisition_api_names": [
         "bond_blk"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical acquisition, observed-universe refresh, revisions and PIT validation.",
+      "auto_acquisition": true,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 6,
+        "hidden_fields": [],
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "092dedf"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/bond8-probe.json",
+        "release_id": "data-0a5af2a613b00f3c8cf088662215614fb1d56ba38c162f480a270634370103a1",
+        "checked_at": "2026-09-09T05:03:51.883584+00:00",
+        "probe_report_sha256": "500426b3312a331108c650f190cfb84daed979c6229c709a0b2dc4b6d5d2d869",
+        "sample_rows": 5,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "123076"
+          }
+        ],
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "enabled": true,
+        "enabled_release_id": "data-6ef5044ed2d8d677129d4d96d2d751709e1fd9c97c9763a038998ba055268039",
+        "enable_evidence": "20260909T050941Z-b53f05c7",
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-mac-verified.json",
+        "offline_evidence_sha256": "78a547f9a16783e5ecae4b82d54b080328b5564b074143b8eab269fb7a9e19a0",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "offline_scope": "Fixed observed raw/source columns only; no full-history or PIT certification.",
+        "fixed_rows_after_dedupe": 4,
+        "blocked_reasons": [],
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "272",
@@ -4432,9 +5462,55 @@
       "acquisition_api_names": [
         "bond_blk_detail"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical acquisition, observed-universe refresh, revisions and PIT validation.",
+      "auto_acquisition": true,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 8,
+        "hidden_fields": [],
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "092dedf"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/bond8-probe.json",
+        "release_id": "data-0a5af2a613b00f3c8cf088662215614fb1d56ba38c162f480a270634370103a1",
+        "checked_at": "2026-09-09T05:03:51.883584+00:00",
+        "probe_report_sha256": "500426b3312a331108c650f190cfb84daed979c6229c709a0b2dc4b6d5d2d869",
+        "sample_rows": 8,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "123076"
+          }
+        ],
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "enabled": true,
+        "enabled_release_id": "data-6ef5044ed2d8d677129d4d96d2d751709e1fd9c97c9763a038998ba055268039",
+        "enable_evidence": "20260909T050941Z-b53f05c7",
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-mac-verified.json",
+        "offline_evidence_sha256": "78a547f9a16783e5ecae4b82d54b080328b5564b074143b8eab269fb7a9e19a0",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "offline_scope": "Fixed observed raw/source columns only; no full-history or PIT certification.",
+        "fixed_rows_after_dedupe": 6,
+        "blocked_reasons": [],
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "201",
@@ -4446,9 +5522,67 @@
       "acquisition_api_names": [
         "yc_cb"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Resolve observed permission denial before source retry; retain historical/PIT obligations.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 6,
+        "hidden_fields": [],
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "092dedf"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/bond8-probe.json",
+        "release_id": "data-0a5af2a613b00f3c8cf088662215614fb1d56ba38c162f480a270634370103a1",
+        "checked_at": "2026-09-09T05:03:51.883584+00:00",
+        "probe_report_sha256": "500426b3312a331108c650f190cfb84daed979c6229c709a0b2dc4b6d5d2d869",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "curve_type": "0",
+            "trade_date": "20260904"
+          },
+          {
+            "curve_type": "1",
+            "trade_date": "20260904"
+          }
+        ],
+        "source_statuses": [
+          "permission_denied",
+          "skipped_cached_permission_denied"
+        ],
+        "enabled": false,
+        "enabled_release_id": null,
+        "enable_evidence": "20260909T050941Z-b53f05c7",
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T044559Z/bond8-mac-verified.json",
+        "offline_evidence_sha256": "78a547f9a16783e5ecae4b82d54b080328b5564b074143b8eab269fb7a9e19a0",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "offline_scope": "Fixed observed raw/source columns only; no full-history or PIT certification.",
+        "fixed_rows_after_dedupe": 0,
+        "blocked_reasons": [
+          "all_samples_empty_or_unavailable",
+          "audit_gap:comparison_request_not_completed",
+          "audit_gap:no_complete_response_observation",
+          "audit_gap:no_fixed_rows_to_verify",
+          "audit_gap:response_unavailable_or_non_json",
+          "missing_nonempty_all_column_comparison",
+          "no_fixed_dataset",
+          "upstream_status:permission_denied",
+          "upstream_status:skipped_cached_permission_denied",
+          "current_capability_permission_denied"
+        ],
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "233",
@@ -4462,7 +5596,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-calendar-factor-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "dd7279d",
+        "runtime_document": "docs/tushare-calendar-factor-intake.md",
+        "reviewed_field_count": 8,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "177",
@@ -5211,7 +6358,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-calendar-factor-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "dd7279d",
+        "runtime_document": "docs/tushare-calendar-factor-intake.md",
+        "reviewed_field_count": 5,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "148",
@@ -5945,7 +7105,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-calendar-factor-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "dd7279d",
+        "runtime_document": "docs/tushare-calendar-factor-intake.md",
+        "reviewed_field_count": 4,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "490",
@@ -5959,7 +7132,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-calendar-factor-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "dd7279d",
+        "runtime_document": "docs/tushare-calendar-factor-intake.md",
+        "reviewed_field_count": 4,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "474",

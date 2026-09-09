@@ -183,11 +183,7 @@
         "trade_date",
         "type",
         "start_date",
-        "end_date",
-        "HK_SZ",
-        "SZ_HK",
-        "HK_SH",
-        "SH_HK"
+        "end_date"
       ],
       "output_fields": [
         "ts_code",
@@ -4254,14 +4250,7 @@
         "list_date",
         "weight_rule",
         "desc",
-        "exp_date",
-        "MSCI",
-        "CSI",
-        "SSE",
-        "SZSE",
-        "CICC",
-        "SW",
-        "OTH"
+        "exp_date"
       ],
       "audit_status": "schema_extracted",
       "permission_status": "unprobed",
@@ -4721,28 +4710,7 @@
         "ts_code",
         "trade_date",
         "start_date",
-        "end_date",
-        "XIN9",
-        "HSI",
-        "HKTECH",
-        "HKAH",
-        "DJI",
-        "SPX",
-        "IXIC",
-        "FTSE",
-        "FCHI",
-        "GDAXI",
-        "N225",
-        "KS11",
-        "AS51",
-        "SENSEX",
-        "IBOVESPA",
-        "RTS",
-        "TWII",
-        "CKLSE",
-        "SPTSX",
-        "CSX5P",
-        "RUT"
+        "end_date"
       ],
       "output_fields": [
         "ts_code",
@@ -4956,10 +4924,7 @@
         "trade_date",
         "ts_code",
         "start_date",
-        "end_date",
-        "ETF",
-        "LOF",
-        "ABS"
+        "end_date"
       ],
       "output_fields": [
         "trade_date",
@@ -8469,16 +8434,7 @@
         "factor_name",
         "asset_type",
         "factor_type",
-        "factor_desc",
-        "Alpha101",
-        "Growth",
-        "Liquidity",
-        "Momentum",
-        "Quality",
-        "Reversal",
-        "Risk",
-        "Size",
-        "Value"
+        "factor_desc"
       ],
       "audit_status": "schema_extracted",
       "permission_status": "unprobed",

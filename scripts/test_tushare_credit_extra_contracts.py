@@ -1,6 +1,6 @@
 """Offline credit contract scopes, source identities and legal date axes."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from itertools import islice
 import json
 from pathlib import Path
@@ -188,8 +188,8 @@ class CreditExtra(unittest.TestCase):
                 if "start_date" in p:
                     observed.extend(
                         dates(
-                            date.fromisoformat(p["start_date"]),
-                            date.fromisoformat(p["end_date"]),
+                            datetime.strptime(p["start_date"], "%Y%m%d").date(),
+                            datetime.strptime(p["end_date"], "%Y%m%d").date(),
                         )
                     )
                 else:

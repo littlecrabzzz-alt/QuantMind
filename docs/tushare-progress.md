@@ -327,3 +327,53 @@
 - 最近7真实采集批共1508请求/898.38秒，约100.72次/墙钟分钟，规划191.60秒占21.33%；300最近attempt无权限/限流但含空/饱和/schema等需独立处理。没有把30rpm当瓶颈或提高资源/额度。规划诊断+单次immutable原文去重d3b9c32→8a1c259已并入：保持request维度旁路，不跨tick缓存、不改schema/旧游标/任务。重复夹具40次records→1、结果同；真实收益待生产新timing验证。详见tushare-discovery-timing.md。
 - 554联合Tushare隔离测试26.092秒通过；随后目录note/精确全列断言13专项0.703秒通过。旧21个family规划签名在基准配置逐项不变，新增2family。真实cross6探测及固定verifier已完成12项隔离验证；sentiment49call/120秒探测和固定验收仍准备中。全部helper齐备并审查后再进入集中部署窗口，生产采集继续。
 - 标准Mac mirror已实际exit0，固定data-86aebb78840094da306bdb92aaa89876e199f55733c727a9e1068927869a63e4新增7949/共230624文件校验；正在对此前14历史观察及CYQ3608源行补做该固定版独立离线对账。新13接口不在该版，不混同候选与数据完成。
+
+
+## 2026-09-09 12:18 十三接口真实探测与并行提速
+
+- 30b3194已发布master/GitHub/cloud，4718文件/source_digest dc5e821c33d581941c82378c620b9a233facaa79ec5f4ed4e07d3b7b9faa2fbf核对通过；192采集API、198读取数据集。采集消费者03:55:12Z暂停接新任务、03:57:26Z自然排空，03:59:44Z恢复；文档和普通US消费者保持。注册不等于全历史可用。
+- cross6完成12次真实请求，8009来源行、296已知字段全部返回；sentiment7完成49次真实请求，31250来源行、101已知字段全部返回。TDX成员和开盘啦成员bulk各3000行触及保护阈值，原文完整保存、保留饱和缺口，不据此启用或称全集。热榜market/data_type和其他过滤仍以独立验收为准。两次探测沿用共享额度和现有pipeline锁，没有再暂停消费者。
+- 探测固定发布data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435于04:16:56Z完成、17.89秒，无上游调用或启用。两份云端固定verifier和标准Mac mirror并行推进，台账登记真实探测、离线验收仍pending。
+- 上一86aebb固定版的14历史观察/30目标文件独立Mac验收已通过：CYQ22+3586行全部源值/身份/as_of一致，456关联文件校验；12空响应仍不代表历史完整。报告/tmp/tushare-family-history-offline-verified.json，SHA7e0b49a2fd62c230792d67a3f3b45df68b15c59184209fc1ecf323a8a8157be8。
+- 新计时首批9038aaee在document_registration阶段SoftTimeLimitExceeded失败：已持久化209响应，规划39.55秒、标的发现34.20秒；后批cf4df246成功220请求，发现28.19秒。原文去重真实命中0，不宣称已提速。最小字段投影b385c59→2295b84保留全部12发现列与严格行长/重复列语义；106项Python3.10相关测试和父558联合测试通过。宽表夹具输出同、临时峰值179→102MB，生产收益尚未验证。
+- 不等全量历史：独立并行准备债券/可转债下一8接口；核查RRG单时点最小补数，20250903—30的20开市日×daily/adj_factor共40已有任务pending，无需新增。优先调整尚未执行；历史成员PIT与ETF数据仍单独缺口。完整263基线+13发现、历史/修订/附件范围保留。
+
+
+## 2026-09-09 12:29 十一接口启用、本地闭包与RRG四十项优先
+
+- 固定41d91a两份云端verifier完成：cross6零gap，sentiment7保留2饱和、2完整性提示及35市场输出映射未验。397已知字段、61原始请求全部来源/Parquet/reader全列、日期/代码过滤和9组非空对照通过。云端匿名401+7受限查询共8HTTP，大表仅明确code子集，不称所有行全部经HTTP。
+- 标准Mac mirror已完成8758新增/247648文件校验；同固定41d91a禁网禁凭据独立读取与云报告6共同键逐项相等。数据去重后cross6共8003行、sentiment7共31247行。两份Mac报告SHA分别ebc9b7b608081a7a4771b9e94376448faf2eee528c680452897fe177f9385720和93ead6a13669230315f47d181d8797d1e0837c38804c911d33ea1780ae85a19b。
+- 逐API评估后启用cross6全部及tdx_index/tdx_daily/kpl_list/ths_hot/dc_hot，共11个；tdx_member与kpl_concept_cons保持禁用，已有3000行各自完整存档，分片/全集未验继续待办。新增两family规划1000history+350recent任务，旧配置与无关规划记录保持；无上游请求。启用发布eac7f042完整ID见台账，配置审计/data/tushare/validation/cross-sentiment-enable-20260909T042558Z-274e6062.json。热榜市场语义未知仍保留，不借启用宣称PIT。
+- 99fb562源码/Git双端已核对，4727文件，source_digest86fcb7892291a4064a4bd7ed9a2cf686f6a43ddb96693c69f94311c0363b8042。采集04:19:54Z暂停接新任务、04:20:54Z自然排空，只重启tushare-worker，04:23:54Z恢复；文档/US消费者保持，4服务健康检查通过。新真实d7ac29bf批SUCCESS，184请求/137.67秒，规划28.01/发现23.23秒。较前成功批发现少17.6%，但整批131.18→137.67秒，尚无整体吞吐提升证据。
+- RRG40优先事务真实commit（04:25:48Z）：operation rrg-diffusion40-20260909-b0b0f1b914894a928565212be8f0fd28，40已有pending任务priority45→24，0新增，config/planning/scheduler提交时保持。后置只读40身份/优先级一致，04:27:42Z仍pending/无attempt，不把排队当已下载。prepared SHA71bcb2332d83eff05b8841d74274d7766ac47913e2f43f8c52d19d230f759a7c；收据在validation/rrg-priority-adjustments。完整日历骨架、历史成分PIT和ETF缺口仍待办。
+- 下一bond8纯合同91d5e7d已在独立分支推送：70完整字段/22默认隐藏列，7隔离测试通过，runtime继续并行准备，尚未生产或探测。各原文报告/两个verifier/镜像/部署/提权helper证据已归档validation/intake-batch-20260909T035512Z。完整263基线+13发现范围不缩减，继续历史/修订/权限/附件接入。
+
+
+## 2026-09-09 12:41 Bond8联合候选与成员合法分片
+
+- 上轮为实质进展；本轮父0661c3b上合pure91d5e7d→b4faca3、runtime70af978→b2bfb14，新增8债券接口70全字段/22默认N，200采集API/206读取dataset候选。镜像安装copylist补齐；572全套隔离tests26.687秒/Ruff/diff通过。生产仍192，新family默认关闭，真实权限尚未探测；YC独立权限未知且真实type/code过滤需验证。
+- 候选沿用旧records投影、旧SQL/游标/任务身份；新CB发现独立bond_extra_convertibles，报告end_date与评级ann_date分开，YC0/1请求身份不合并，不把101↔1001.CB当已验证别名，不省掉报价22隐藏字段。
+- 正在准备最大23真实请求的probe与全列固定verifier；逐API启用helper由原审核版缩为单family，8个隔离负例通过，含隐藏字段缺失、YC类型未验、饱和、过滤、缺对照、重复请求和权限阻断。所有脚本齐备才部署，不为等脚本暂停生产。
+- RRG40于04:34:08Z只读核查2done/38pending；20250930 daily5423与adj_factor5437，共10860来源行、6raw/obs/Parquet文件SHA/全列通过，无空或失败。所查云固定8f9d1c65与Mac41d91a尚未包含新6文件，不能宣称完整窗口离线。报告/tmp/tushare-rrg40-current-evidence.json SHA f91fa69e73a363542cbfdd7628df2ff133c12755e1f85ad2c4976a830c252ac9。
+- TDX/KP成员先准备6个实际已存板块的合法code分区探测，父3000行仅下界；保留未知板块/成员全集、第二维、PIT缺口。将2API加入已运行market_sentiment会改变旧交织历史policy，需单独追加scope迁移；本轮不重置旧游标来放行。完整目录/历史/修订/附件范围继续。
+
+
+## 2026-09-09 13:12 六个债券接口启用与并行验收
+
+- 092dedf已部署master/GitHub/cloud，200采集API/206读取dataset；4745文件、source_digest36ff07ee8b5780454240fde6cebbc080a74badc1456a807c99ee1ba55267c048。仅采集消费者04:46:07Z暂停接新任务，04:47:42Z自然排空，04:51:06Z恢复；文档和US消费者保留。四服务健康检查通过。
+- bond8初次11 HTTP/12结果遗漏了可用CB种子；有限发现修复优先已验cross6原文，同epoch补9请求/382行，旧12观察/对象均未重抓，累计20调用/21结果。19项隔离测试通过。云/Mac固定0a5af2a6全部原文、70已知字段、61相关文件及reader对账通过，共同证据一致；YC独立权限拒绝；bc_otcqt bulk2000保护阈值，精确09/04范围却含09/07—09/09三行，保持饱和和过滤阻断。
+- top10_cb_holders、cb_rating、repo_daily、bond_blk、bond_blk_detail、bc_bestotcqt六接口已按验收启用；新增500近期+500历史任务，旧无关配置/规划/请求门控保持。启用无上游调用，审计validation/bond8-enable-20260909T050941Z-b53f05c7.json，发布data-6ef5044ed2d8d677129d4d96d2d751709e1fd9c97c9763a038998ba055268039。有限样本和启用不代表完整历史。
+- TDX/KP六个合法成员分片真实985行，11字段/27相关文件云/Mac固定验收相同（完整报告同SHA17f5dafdb03172fede12f6a914e68940040beeefc9b6c3bd8660e69ccfd9785c）。父已见子集不缺，未知全集、第二维、PIT及追加scope迁移8项缺口保留；两个成员API仍不启用，不重置旧历史策略。
+- 标准Mac mirror固定data-0a5af2a613b00f3c8cf088662215614fb1d56ba38c162f480a270634370103a1已校验267257文件，新增6798；bond Mac报告SHA78a547f9a16783e5ecae4b82d54b080328b5564b074143b8eab269fb7a9e19a0。此验收不声称Mac已追平后续启用版。证据归档validation/intake-batch-20260909T044559Z。
+- RRG40于05:01:54Z为14 done/26 pending，75992行、空/失败0；当时e79fc1f4云/Mac已含8项，另外6已落盘。未重复扫描后续当前数，完整日历/成员PIT/ETF映射仍待验收。RRG优先窗口、其他接口开发、固定验收和镜像并行，不等全目录历史结束。
+- 下一calendar/factor5纯候选5aa26e1（26字段）及目录解析候选f024021（12相关测试）已独立推送，未合入或部署。后者只修复schema表头并定点486输出13→真实4，保留数字起首字段和全部源HTML证据。263基线+13发现及完整历史、修订、附件范围不缩减。
+
+
+## 2026-09-09 13:33 Calendar/factor5与成员追加scope候选
+
+- 父基线79f4498整合纯5aa26e1→1983599、parser f024021→d8ed13b、运行dcb2c3e→115e4af及member alias06acf3a→dd7279d。候选205采集API/211读取dataset，新两family与market_members scope均默认关闭；生产仍200，未把候选记成接入完成。
+- 全263官方页面重新只读获取，HTML SHA全部与目录存档一致。共享parser除校验名称表头，还排除hm_list同名示例表；新增四页目录修正删除28个伪输入参数、7个伪输出字段，全部为原文枚举说明值；原文/枚举证据保留。完整证据/tmp/tushare-full-schema-audit-20260909/final-report.json SHA db6ffbb0e6c8588d017ab4b9f43338d4344206221f2e78bdf8706df231163ab2，版本化摘要tushare-catalog-schema-full-audit.evidence.json。既有因子486九类别误列修复保留。
+- 7份旧测试19处YYYYMMDD日期解析改为等价strptime，保持覆盖断言；194纯合同测试先通过，联合后实际Python3.10完整603 tests/31.687秒通过。17项calendar/factor helper父基线测试1.617秒通过；第一次以unittest绝对模块路径启动失败未执行测试，改为直接脚本后通过，日志独立保存。
+- 日历18列与因子8列完整请求，允许源前值/预测等非标识空值但不豁免缺列。factor_list无源日期，factor_value只从真实列表资产/名称规划；合法code-only样本读取支持，列表缺失时名称/资产映射仍阻断自动启用。有限probe正常16/fallback13、硬18请求/120秒，仍待生产权限。
+- market_members使用独立APPEND_PLANNERS进入自动规划，合同/消费group仍market_sentiment，旧PLANNERS消费组与份额不变；依赖原组启用并禁止旧scope同时含成员API。新scope保留bulk发现与已观察板块逐码历史，来源新增通过原冻结快照/refresh追赶，默认关闭、历史起点须显式，全集/第二维/PIT仍缺口。启用helper准备中，未修改旧游标。
+- 只读云端检查采集与文档worker healthy，SSD492G/已用220G/可用248G；本轮无扩容或消费者暂停。下一历史分钟7纯合同并行准备，非本批生产范围。

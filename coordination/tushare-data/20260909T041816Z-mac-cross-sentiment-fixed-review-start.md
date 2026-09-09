@@ -1,0 +1,1 @@
+text_contracts仅执行父指定固定版data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435的cross6/sentiment7只读verifier；SHA与handoff一致。现有cloud-compose quantmind python -S入口，顺序执行；cloud仅/tmp脚本/报告写入，0上游、0数据库修改、0发布/enable。sentiment可loopback认证查询，认证头不输出。完成后原报告逐字节回Mac/tmp核SHA。

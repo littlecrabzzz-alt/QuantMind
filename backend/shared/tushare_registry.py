@@ -164,6 +164,141 @@ MARKET_SENTIMENT_RUNTIME_CONTRACTS = {
     for api, spec in MARKET_SENTIMENT_CONTRACTS.items()
 }
 
+from backend.shared.tushare_calendar_extra_contracts import (
+    CALENDAR_EXTRA_CONTRACTS,
+    iter_calendar_extra_jobs,
+    calendar_extra_prerequisites,
+)
+from backend.shared.tushare_factor_library_contracts import (
+    FACTOR_LIBRARY_CONTRACTS,
+    iter_factor_library_jobs,
+    factor_library_prerequisites,
+)
+
+CALENDAR_EXTRA_RUNTIME_CONTRACTS = {
+    api: {**spec, "group": "calendar_extra"}
+    for api, spec in CALENDAR_EXTRA_CONTRACTS.items()
+}
+FACTOR_LIBRARY_RUNTIME_CONTRACTS = {
+    api: {
+        **spec, "group": "factor_library",
+        **({"saturation_fallback": "factor_library_stocks",
+            "saturation_dependencies": ["factor_library_stocks"]}
+           if api == "factor_value" else {}),
+    }
+    for api, spec in FACTOR_LIBRARY_CONTRACTS.items()
+}
+
+# Independent planning scope, deliberately absent from PLANNERS consumption
+# groups. Contracts, job identities, permissions and fair group remain unchanged.
+MARKET_MEMBER_APIS = ("tdx_member", "kpl_concept_cons")
+MARKET_MEMBER_DEPENDENCIES = {
+    "tdx_member": "tdx_indices", "kpl_concept_cons": "kpl_concepts"
+}
+
+
+def _market_member_config(config):
+    if not config.get("enable_market_sentiment"):
+        raise ValueError("market_members requires enabled market_sentiment group")
+    old = config.get("market_sentiment_apis", tuple(MARKET_SENTIMENT_CONTRACTS))
+    if (
+        not isinstance(old, (list, tuple))
+        or any(not isinstance(api, str) or api not in MARKET_SENTIMENT_CONTRACTS for api in old)
+        or set(old).intersection(MARKET_MEMBER_APIS)
+    ):
+        raise ValueError("market_sentiment_apis must exclude both member APIs")
+    selected = config.get("market_members_apis", MARKET_MEMBER_APIS)
+    if not isinstance(selected, (list, tuple)) or not selected or any(
+        api not in MARKET_MEMBER_APIS for api in selected
+    ):
+        raise ValueError("market_members_apis must select reviewed member APIs")
+    start = config.get("market_members_history_start")
+    if isinstance(start, dict) and set(start) - set(MARKET_MEMBER_APIS):
+        raise ValueError("Unknown market_members history API")
+    # The old family's start is not evidence for this new scope's history.
+    return {
+        "market_sentiment_apis": list(dict.fromkeys(selected)),
+        "market_sentiment_history_start": start,
+        **({"planning_epoch": config["planning_epoch"]} if "planning_epoch" in config else {}),
+    }
+
+
+def _market_member_codes(identifiers, selected):
+    import re
+
+    result = {}
+    for api in selected:
+        codes = identifiers.get(MARKET_MEMBER_DEPENDENCIES[api], [])
+        suffix = "TDX" if api == "tdx_member" else "KP"
+        if not isinstance(codes, (list, tuple, set)) or any(
+            not isinstance(code, str) or not re.fullmatch(r"[0-9]{6}\." + suffix, code)
+            for code in codes
+        ):
+            raise ValueError("Invalid observed member board namespace: " + api)
+        result[api] = sorted(set(codes))
+    return result
+
+
+def market_member_prerequisites(identifiers=None, config=None):
+    projected = _market_member_config(config or {})
+    selected = projected["market_sentiment_apis"]
+    codes = _market_member_codes(identifiers or {}, selected)
+    gaps = market_sentiment_prerequisites(identifiers, config=projected)
+    for api in selected:
+        gaps.append({
+            "api_name": api, "dependencies": [MARKET_MEMBER_DEPENDENCIES[api]],
+            "reason": "observed_board_scope_not_universe",
+            "observed_boards": len(codes[api]), "universe_complete": False,
+            "detail": "Bulk discovery plus observed boards; second member axis, historical universe and PIT remain unverified.",
+        })
+    return gaps
+
+
+def iter_market_member_jobs(config, today, identifiers=None):
+    projected = _market_member_config(config)
+    codes = _market_member_codes(identifiers or {}, projected["market_sentiment_apis"])
+    for job in iter_market_sentiment_jobs(projected, today, identifiers):
+        # Retain the bulk request: known boards must not hide future discoveries.
+        yield job
+        for code in codes[job["api_name"]]:
+            yield {**job, "params": {**job["params"], "ts_code": code}}
+
+
+APPEND_PLANNERS = {"market_members": iter_market_member_jobs}
+
+
+from backend.shared.tushare_bond_extra_contracts import (
+    BOND_EXTRA_CONTRACTS,
+    iter_bond_extra_jobs,
+    bond_extra_prerequisites,
+)
+
+BOND_EXTRA_RUNTIME_CONTRACTS = {
+    api: {
+        **spec,
+        "group": "bond_extra",
+        "dependencies": ["bond_extra_convertibles"] if spec["dependencies"] else [],
+        "source_namespace": spec["source_namespace"].split("<", 1)[0],
+        "namespace_note": spec["namespace_note"].replace(
+            "Namespace conversion belongs to future runtime integration, not this pure planner.", ""
+        )
+        + " Runtime prefixes the unchanged source string with this asset namespace and preserves source_ts_code. Non-string source codes require schema review; no inferred curve-code alias or A-share conversion.",
+    }
+    for api, spec in BOND_EXTRA_CONTRACTS.items()
+}
+
+
+def _bond_extra_identifiers(identifiers):
+    return {"bonds": identifiers.get("bond_extra_convertibles", [])}
+
+
+def bond_extra_runtime_prerequisites(identifiers, config=None):
+    return [
+        {**gap, "dependencies": ["bond_extra_convertibles" if name == "bonds" else name for name in gap.get("dependencies", [])]}
+        for gap in bond_extra_prerequisites(_bond_extra_identifiers(identifiers), config=config)
+    ]
+
+
 FOREIGN_FINANCIAL_RUNTIME_CONTRACTS = {
     api: {
         **spec,
@@ -340,6 +475,9 @@ CONNECT_RUNTIME_CONTRACTS = {
 }
 
 EXTENDED_CONTRACTS = {
+    **CALENDAR_EXTRA_RUNTIME_CONTRACTS,
+    **FACTOR_LIBRARY_RUNTIME_CONTRACTS,
+    **BOND_EXTRA_RUNTIME_CONTRACTS,
     **CROSS_ASSET_RUNTIME_CONTRACTS,
     **MARKET_SENTIMENT_RUNTIME_CONTRACTS,
     **FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
@@ -386,6 +524,9 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "calendar_extra": iter_calendar_extra_jobs,
+    "factor_library": iter_factor_library_jobs,
+    "bond_extra": lambda config, today, ids: iter_bond_extra_jobs(config, today, _bond_extra_identifiers(ids)),
     "cross_asset_extra": iter_cross_asset_extra_jobs,
     "market_sentiment": iter_market_sentiment_jobs,
     "foreign_financial": lambda config, today, ids: iter_foreign_financial_jobs(

@@ -115,12 +115,12 @@ class TechnicalExtraContracts(unittest.TestCase):
                     if job["api_name"] != api or job["params"].get("ts_code") != code:
                         continue
                     params = job["params"]
-                    first = date.fromisoformat(
-                        params.get("start_date", params.get("trade_date"))
-                    )
-                    last = date.fromisoformat(
-                        params.get("end_date", params.get("trade_date"))
-                    )
+                    first = datetime.strptime(
+                        params.get("start_date", params.get("trade_date")), "%Y%m%d"
+                    ).date()
+                    last = datetime.strptime(
+                        params.get("end_date", params.get("trade_date")), "%Y%m%d"
+                    ).date()
                     if "start_date" in params:
                         self.assertEqual(
                             (first.year, first.month), (last.year, last.month)
