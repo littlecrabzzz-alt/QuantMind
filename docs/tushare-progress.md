@@ -237,4 +237,7 @@
 - 固定e1386fc1全5803行原文/Parquet/独立查询及30HTTP对账通过（匿名401、上游0）；Mac新增4058/共159836文件校验、24样本证据SHA及禁网禁凭据查询通过。详情与完整release ID/报告路径见docs/tushare-concept-extra-intake.md。
 - 两专属队列恢复，真实采集1f84450c-2506-4d74-90bb-b9768b49878d、文档768c6e8e-d036-415a-9a75-a164eaa33ddd活跃，US88fe98db保持。00:33:56Z正常批265请求/120.401秒、failed_stage=null，较少请求不直接等同退化（成员响应更大且共享负载变化）。自动DC done18/empty3、THS daily done4/empty3、index done1、member done11/blocked4/pending1956；四阻塞为返回5099—5549行超过本地未知cap保护值，原始全行保留且不推断真实截断。history目前仍在跳过成员近期项，未称历史完成。空间259.74GiB可用。
 - 并行耗时复核：部署前两正常批335请求、118.729/119.694秒，发布约15.1秒；coverage/closure约4.48、attempt+stat2.43—2.68、retain_previous2.22秒。固定120秒节拍下，单缩短publish不能承诺提高请求数，暂不为这点增加迁移。物理元数据占用审计另由structured整理，未删数据或改schema。
-- 下一dc_member/dc_daily纯候选523d32b已push codex/tushare-dc-extra（17字段、7tests），runtime在独立worktree继续，未上线/未probe/未enable。补每日历史成分与OHLCV，官方历史下界/PIT/分类映射/单板块饱和仍待验。旧互联互通过滤探测、全目录剩余接口、全部历史/修订/PDF/RRG准入继续推进。
+- 下一dc_member/dc_daily纯候选523d32b已push codex/tushare-dc-extra（17字段、7tests），runtime94d66a1已在独立worktree完成并push codex/tushare-dc-runtime，417项测试通过，未上线/未probe/未enable。补每日历史成分与OHLCV，官方历史下界/PIT/分类映射/单板块饱和仍待验。旧互联互通过滤探测、全目录剩余接口、全部历史/修订/PDF/RRG准入继续推进。
+
+- 空间专项只读核算：/data/tushare所选文件按device+inode去重后28.16GiB，其中元数据17.68GiB（62.8%）；release/archive10.45GiB、历史文档索引7.03GiB、原始响应6.35GiB、Parquet1.99GiB、附件0.86GiB。此数不含目录、未列子目录、数据库及外部备份，不是整盘总量。164对旧release/archive同大小不同inode，潜在去重3.628GiB，尚未逐对SHA验证或实际回收；当前新别名已安全硬链接。最新不同版本manifest约66.7MB，若大小不变且每120秒产生新版，静态估算44.72GiB/日；不是实测日增长。证据/tmp/tushare-storage-review-20260909.json及003856Z主题记录。
+- 优先并行准备常规tick发布间隔候选（默认0兼容，后续可设900秒最小间隔）：API采集、原文、observations/attempts、文档尝试继续每批持久化，手动publish立即，减少重复全量清单；保留审查确认后续固定版仍包含全部原文/观察/尝试，减少的是中间状态索引快照。尚未实现上线或修改生产频率，实际新鲜度还受120秒tick和Mac15分钟轮询影响，不能承诺严格15分钟。旧副本去重另留方案，不删除历史、不改manifest schema。
