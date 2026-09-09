@@ -21,6 +21,7 @@ from backend.shared.tushare_registry import (
     LIMIT_EXTRA_RUNTIME_CONTRACTS,
     CONCEPT_EXTRA_RUNTIME_CONTRACTS,
     DC_EXTRA_RUNTIME_CONTRACTS,
+    RISK_EVENT_RUNTIME_CONTRACTS,
 )
 from backend.shared.tushare_credit_extra_contracts import CREDIT_EXTRA_CONTRACTS
 from backend.shared.tushare_etf_basket_contracts import ETF_BASKET_CONTRACTS
@@ -45,6 +46,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **RISK_EVENT_RUNTIME_CONTRACTS,
     **DC_EXTRA_RUNTIME_CONTRACTS,
     **CONCEPT_EXTRA_RUNTIME_CONTRACTS,
     **LIMIT_EXTRA_RUNTIME_CONTRACTS,
@@ -473,11 +475,15 @@ def _dataset(root, release_id, api_name):
             api_name in LISTING_EXTRA_RUNTIME_CONTRACTS
             or api_name in CONCEPT_EXTRA_RUNTIME_CONTRACTS
             or api_name in DC_EXTRA_RUNTIME_CONTRACTS
+            or api_name in RISK_EVENT_RUNTIME_CONTRACTS
         ):
             for note in ("date_axis_note", "namespace_note", "history_gap", "cap_note"):
                 if spec.get(note):
                     metadata[note] = spec[note]
-        if api_name in DC_EXTRA_RUNTIME_CONTRACTS:
+        if (
+            api_name in DC_EXTRA_RUNTIME_CONTRACTS
+            or api_name in RISK_EVENT_RUNTIME_CONTRACTS
+        ):
             for note in (
                 "history_note",
                 "pit_gap",
@@ -485,6 +491,8 @@ def _dataset(root, release_id, api_name):
                 "category_gap",
                 "member_namespace_note",
                 "unit_note",
+                "source_consistency_gap",
+                "future_gap",
             ):
                 if spec.get(note):
                     metadata[note] = spec[note]
@@ -563,6 +571,12 @@ def _date_expression(field, columns):
     )
 
 
+def _default_date_field(api_name, columns):
+    if api_name in RISK_EVENT_RUNTIME_CONTRACTS:
+        return RISK_EVENT_RUNTIME_CONTRACTS[api_name]["date_field"]
+    return next((field for field in DATE_FIELDS if field in columns), None)
+
+
 def _query(
     db,
     columns,
@@ -596,7 +610,7 @@ def _query(
         )
         params.append(cutoff)
     if start_date is not None or end_date is not None:
-        date_field = date_field or next((f for f in DATE_FIELDS if f in columns), None)
+        date_field = date_field or _default_date_field(api_name, columns)
         expression = _date_expression(date_field, columns)
         start = _date(start_date) if start_date is not None else None
         end = _date(end_date) if end_date is not None else None
@@ -694,7 +708,7 @@ def dataset_schema(root, release_id, api_name):
                 for f in table.schema
             ],
             "keys": keys,
-            "default_date_field": next((f for f in DATE_FIELDS if f in columns), None),
+            "default_date_field": _default_date_field(api_name, columns),
             "period_date_semantics": "month and quarter filters use the period's first calendar day",
         }
 

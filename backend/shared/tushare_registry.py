@@ -70,6 +70,43 @@ from backend.shared.tushare_dc_extra_contracts import (
     iter_dc_extra_jobs,
 )
 
+from backend.shared.tushare_risk_event_contracts import (
+    RISK_EVENT_CONTRACTS,
+    iter_risk_event_jobs,
+    risk_event_prerequisites,
+)
+
+RISK_EVENT_RUNTIME_CONTRACTS = {
+    api: {
+        **spec,
+        "group": "risk_event",
+        "dependencies": ["risk_stocks"] if api == "st" else [],
+        "saturation_fallback": "risk_securities"
+        if api == "stk_alert"
+        else "risk_stocks",
+        "saturation_dependencies": [
+            "risk_securities" if api == "stk_alert" else "risk_stocks"
+        ],
+    }
+    for api, spec in RISK_EVENT_CONTRACTS.items()
+}
+
+
+def _risk_identifiers(identifiers):
+    # The pure planner's logical stocks dependency uses a wider, isolated
+    # historical-risk discovery family; never mutate other planners' stocks.
+    return {"stocks": identifiers.get("risk_stocks", [])}
+
+
+def risk_event_runtime_prerequisites(identifiers, config=None):
+    return [
+        {**gap, "dependencies": ["risk_stocks"] if gap.get("dependencies") else []}
+        for gap in risk_event_prerequisites(
+            _risk_identifiers(identifiers), config=config
+        )
+    ]
+
+
 DC_EXTRA_RUNTIME_CONTRACTS = {
     api: {**spec, "group": "dc_extra"} for api, spec in DC_EXTRA_CONTRACTS.items()
 }
@@ -128,6 +165,7 @@ CONNECT_RUNTIME_CONTRACTS = {
 }
 
 EXTENDED_CONTRACTS = {
+    **RISK_EVENT_RUNTIME_CONTRACTS,
     **DC_EXTRA_RUNTIME_CONTRACTS,
     **CONCEPT_EXTRA_RUNTIME_CONTRACTS,
     **LIMIT_EXTRA_RUNTIME_CONTRACTS,
@@ -168,6 +206,9 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "risk_event": lambda config, today, ids: iter_risk_event_jobs(
+        config, today, _risk_identifiers(ids)
+    ),
     "dc_extra": iter_dc_extra_jobs,
     "concept_extra": iter_concept_extra_jobs,
     "limit_extra": iter_limit_extra_jobs,
