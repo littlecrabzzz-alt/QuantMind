@@ -243,7 +243,20 @@ class FixedStore(unittest.TestCase):
             }
             <= {api for api, _ in fixtures}
         )
-        self.assertEqual(len(fixtures), 164)
+        self.assertTrue(
+            {
+                "hk_income",
+                "hk_balancesheet",
+                "hk_cashflow",
+                "hk_fina_indicator",
+                "us_income",
+                "us_balancesheet",
+                "us_cashflow",
+                "us_fina_indicator",
+            }
+            <= {api for api, _ in fixtures}
+        )
+        self.assertEqual(len(fixtures), 172)
 
     def test_dates_codes_and_macro_periods(self):
         pinned = release(

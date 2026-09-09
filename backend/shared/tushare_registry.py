@@ -82,6 +82,33 @@ from backend.shared.tushare_technical_extra_contracts import (
     technical_extra_prerequisites,
 )
 
+from backend.shared.tushare_foreign_financial_contracts import (
+    FOREIGN_FINANCIAL_CONTRACTS,
+    iter_foreign_financial_jobs,
+    foreign_financial_prerequisites,
+)
+
+FOREIGN_FINANCIAL_RUNTIME_CONTRACTS = {
+    api: {
+        **spec,
+        "group": "foreign_financial",
+        "date_field": "end_date",
+        "requested_fields": list(spec["extra_fields"]),
+    }
+    for api, spec in FOREIGN_FINANCIAL_CONTRACTS.items()
+}
+
+
+def _foreign_financial_identifiers(identifiers):
+    return {name: identifiers.get(name, []) for name in ("hk_stocks", "us_stocks")}
+
+
+def foreign_financial_runtime_prerequisites(identifiers, config=None):
+    return foreign_financial_prerequisites(
+        _foreign_financial_identifiers(identifiers), config=config
+    )
+
+
 TECHNICAL_EXTRA_RUNTIME_CONTRACTS = {
     api: {
         **spec,
@@ -196,6 +223,7 @@ CONNECT_RUNTIME_CONTRACTS = {
 }
 
 EXTENDED_CONTRACTS = {
+    **FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
     **TECHNICAL_EXTRA_RUNTIME_CONTRACTS,
     **RISK_EVENT_RUNTIME_CONTRACTS,
     **DC_EXTRA_RUNTIME_CONTRACTS,
@@ -238,6 +266,9 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "foreign_financial": lambda config, today, ids: iter_foreign_financial_jobs(
+        config, today, _foreign_financial_identifiers(ids)
+    ),
     "technical_extra": lambda config, today, ids: iter_technical_extra_jobs(
         config, today, _technical_identifiers(ids)
     ),
