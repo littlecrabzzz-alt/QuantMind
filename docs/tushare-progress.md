@@ -367,3 +367,13 @@
 - 标准Mac mirror固定data-0a5af2a613b00f3c8cf088662215614fb1d56ba38c162f480a270634370103a1已校验267257文件，新增6798；bond Mac报告SHA78a547f9a16783e5ecae4b82d54b080328b5564b074143b8eab269fb7a9e19a0。此验收不声称Mac已追平后续启用版。证据归档validation/intake-batch-20260909T044559Z。
 - RRG40于05:01:54Z为14 done/26 pending，75992行、空/失败0；当时e79fc1f4云/Mac已含8项，另外6已落盘。未重复扫描后续当前数，完整日历/成员PIT/ETF映射仍待验收。RRG优先窗口、其他接口开发、固定验收和镜像并行，不等全目录历史结束。
 - 下一calendar/factor5纯候选5aa26e1（26字段）及目录解析候选f024021（12相关测试）已独立推送，未合入或部署。后者只修复schema表头并定点486输出13→真实4，保留数字起首字段和全部源HTML证据。263基线+13发现及完整历史、修订、附件范围不缩减。
+
+
+## 2026-09-09 13:33 Calendar/factor5与成员追加scope候选
+
+- 父基线79f4498整合纯5aa26e1→1983599、parser f024021→d8ed13b、运行dcb2c3e→115e4af及member alias06acf3a→dd7279d。候选205采集API/211读取dataset，新两family与market_members scope均默认关闭；生产仍200，未把候选记成接入完成。
+- 全263官方页面重新只读获取，HTML SHA全部与目录存档一致。共享parser除校验名称表头，还排除hm_list同名示例表；新增四页目录修正删除28个伪输入参数、7个伪输出字段，全部为原文枚举说明值；原文/枚举证据保留。完整证据/tmp/tushare-full-schema-audit-20260909/final-report.json SHA db6ffbb0e6c8588d017ab4b9f43338d4344206221f2e78bdf8706df231163ab2，版本化摘要tushare-catalog-schema-full-audit.evidence.json。既有因子486九类别误列修复保留。
+- 7份旧测试19处YYYYMMDD日期解析改为等价strptime，保持覆盖断言；194纯合同测试先通过，联合后实际Python3.10完整603 tests/31.687秒通过。17项calendar/factor helper父基线测试1.617秒通过；第一次以unittest绝对模块路径启动失败未执行测试，改为直接脚本后通过，日志独立保存。
+- 日历18列与因子8列完整请求，允许源前值/预测等非标识空值但不豁免缺列。factor_list无源日期，factor_value只从真实列表资产/名称规划；合法code-only样本读取支持，列表缺失时名称/资产映射仍阻断自动启用。有限probe正常16/fallback13、硬18请求/120秒，仍待生产权限。
+- market_members使用独立APPEND_PLANNERS进入自动规划，合同/消费group仍market_sentiment，旧PLANNERS消费组与份额不变；依赖原组启用并禁止旧scope同时含成员API。新scope保留bulk发现与已观察板块逐码历史，来源新增通过原冻结快照/refresh追赶，默认关闭、历史起点须显式，全集/第二维/PIT仍缺口。启用helper准备中，未修改旧游标。
+- 只读云端检查采集与文档worker healthy，SSD492G/已用220G/可用248G；本轮无扩容或消费者暂停。下一历史分钟7纯合同并行准备，非本批生产范围。

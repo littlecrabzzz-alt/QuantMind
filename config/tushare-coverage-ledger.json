@@ -2,7 +2,7 @@
   "schema_version": 1,
   "catalog_fetched_at": "2026-09-08T15:22:12.131618+00:00",
   "catalog_index_sha256": "182240e4826c7e65a6b63ef83efdc4e14b7b3589a6249ed54cd36ac66c937dce",
-  "reviewed_at": "2026-09-09T05:12:05.905981+00:00",
+  "reviewed_at": "2026-09-09T05:33:30.165161+00:00",
   "entry_count": 263,
   "scope": "Every entry in pinned official catalogue plus independently discovered linked entries. entry_count remains the immutable baseline count, not a scope ceiling. Runtime evidence controls entitlement and coverage.",
   "entries": [
@@ -3214,6 +3214,15 @@
           "historical_pit_unverified",
           "migration_needed"
         ]
+      },
+      "append_scope_candidate": {
+        "commit": "dd7279d",
+        "document": "docs/tushare-member-append-scope.md",
+        "status": "default_disabled_not_deployed",
+        "old_history_policy_preserved": true,
+        "automatic_recent_and_history": true,
+        "universe_complete": false,
+        "pit_verified": false
       }
     },
     {
@@ -3426,6 +3435,15 @@
           "historical_pit_unverified",
           "migration_needed"
         ]
+      },
+      "append_scope_candidate": {
+        "commit": "dd7279d",
+        "document": "docs/tushare-member-append-scope.md",
+        "status": "default_disabled_not_deployed",
+        "old_history_policy_preserved": true,
+        "automatic_recent_and_history": true,
+        "universe_complete": false,
+        "pit_verified": false
       }
     },
     {
@@ -3685,7 +3703,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-calendar-factor-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "dd7279d",
+        "runtime_document": "docs/tushare-calendar-factor-intake.md",
+        "reviewed_field_count": 5,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "93",
@@ -5565,7 +5596,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-calendar-factor-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "dd7279d",
+        "runtime_document": "docs/tushare-calendar-factor-intake.md",
+        "reviewed_field_count": 8,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "177",
@@ -6314,7 +6358,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-calendar-factor-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "dd7279d",
+        "runtime_document": "docs/tushare-calendar-factor-intake.md",
+        "reviewed_field_count": 5,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "148",
@@ -7048,7 +7105,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-calendar-factor-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "dd7279d",
+        "runtime_document": "docs/tushare-calendar-factor-intake.md",
+        "reviewed_field_count": 4,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "490",
@@ -7062,7 +7132,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-calendar-factor-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "dd7279d",
+        "runtime_document": "docs/tushare-calendar-factor-intake.md",
+        "reviewed_field_count": 4,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "474",
