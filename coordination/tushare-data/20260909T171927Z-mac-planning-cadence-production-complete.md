@@ -8,4 +8,6 @@
 
 真实验收：首次planning-only `bf536d45…`总86.034秒、planning78.542/identifiers71.271、0请求并落检查点；publish-only `56ae4767…`总69.274秒并发布`data-0e961a88…`；两个成功acquire-only `4d3f9585…`/`3215f989…`分别44/95请求，run约89.94/89.98秒、任务总121.63/106.16秒，initialize/plan均未执行。启用后日志确认0个429/明确频率事件。验收文件`/data/tushare/validation/planning-cadence/900.acceptance.json` SHA `2ca27f7f8de77c98e383c43a68f4c8bad93cc18736892272930df734797242ad`。
 
+Mac镜像已把`CURRENT`原子切换到`data-0e961a88…`；本地禁网上下文读取固定清单共397173文件，覆盖done53411/empty46698/pending2365922/permission_blocked1165/quality174/blocked436/split_pending1450/resolved490/deferred_legacy_period_plan9802，`rrg_status=blocked_data`。旧完整版本继续保留。随后云端实时库已推进到done53756/empty46997/attempts104831，并因新规划扩展到pending2453446；采集与附件任务均active。固定版与实时库属于不同时间点，不应混作同一快照。
+
 限制：另一个acquire-only仍在acquire157.201秒后触发160秒soft limit，API冷却/响应/末次处理仍需继续拆解；本轮没有提高超时或资源。磁盘缓存普通cold/warm无收益且cgroup仍触1GiB，生产hold，安全候选`35bb612`留独立分支。900秒内新发现会延后，当前约235万pending可持续消费；短TTL实时范围启用前重审cadence。全量历史、修订、附件、PIT、9个未登记接口及RRG缺口仍继续，不能把本次吞吐验收当完整数据完成。
