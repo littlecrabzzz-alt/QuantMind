@@ -506,7 +506,25 @@ CONNECT_RUNTIME_CONTRACTS = {
     for api, spec in CONNECT_CONTRACTS.items()
 }
 
+from backend.shared.tushare_securities_lending_history_contracts import (
+    SECURITIES_LENDING_HISTORY_CONTRACTS,
+    iter_securities_lending_history_jobs,
+    securities_lending_history_prerequisites,
+)
+
+SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS = {
+    api: {
+        **spec,
+        "group": "securities_lending_history",
+        "requested_fields": list(spec["extra_fields"]),
+        "date_field": "trade_date",
+        "namespace_note": "Supplier stock codes retain source_ts_code; internal SH/SZ/BJ prefixes preserve distinct historical T identities.",
+    }
+    for api, spec in SECURITIES_LENDING_HISTORY_CONTRACTS.items()
+}
+
 EXTENDED_CONTRACTS = {
+    **SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS,
     **HISTORY_MINUTES_RUNTIME_CONTRACTS,
     **CALENDAR_EXTRA_RUNTIME_CONTRACTS,
     **FACTOR_LIBRARY_RUNTIME_CONTRACTS,
@@ -557,6 +575,7 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "securities_lending_history": iter_securities_lending_history_jobs,
     "history_minutes": iter_history_minutes_jobs,
     "calendar_extra": iter_calendar_extra_jobs,
     "factor_library": iter_factor_library_jobs,

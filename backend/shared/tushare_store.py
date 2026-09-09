@@ -15,6 +15,7 @@ import re
 import tempfile
 
 from backend.shared.tushare_registry import (
+    SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS,
     HISTORY_MINUTES_RUNTIME_CONTRACTS,
     CALENDAR_EXTRA_RUNTIME_CONTRACTS,
     FACTOR_LIBRARY_RUNTIME_CONTRACTS,
@@ -55,6 +56,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS,
     **HISTORY_MINUTES_RUNTIME_CONTRACTS,
     **CALENDAR_EXTRA_RUNTIME_CONTRACTS,
     **FACTOR_LIBRARY_RUNTIME_CONTRACTS,
@@ -533,6 +535,14 @@ def _dataset(root, release_id, api_name):
             ):
                 if spec.get(note):
                     metadata[note] = spec[note]
+        if api_name in SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS:
+            for name, value in spec.items():
+                if name.endswith(("_gap", "_note")) or name in (
+                    "field_metadata", "hidden_fields", "permission_status", "date_field",
+                    "stop_date", "update_status", "history_start", "history_bound_verified",
+                    "row_cap", "row_cap_verified", "minimum_points", "independent_permission",
+                ):
+                    metadata[name] = value
         if api_name in BOND_EXTRA_RUNTIME_CONTRACTS or api_name in CALENDAR_EXTRA_RUNTIME_CONTRACTS or api_name in FACTOR_LIBRARY_RUNTIME_CONTRACTS or api_name in HISTORY_MINUTES_RUNTIME_CONTRACTS:
             for note, value in spec.items():
                 if note.endswith(("_gap", "_note")) or note in (
