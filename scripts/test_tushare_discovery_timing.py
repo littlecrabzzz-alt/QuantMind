@@ -92,7 +92,7 @@ class DiscoveryTiming(unittest.TestCase):
         self.result("stock_basic", sha, request_market="SH")
         self.result("stock_basic", sha, request_market="SZ")
 
-        def records(saved):
+        def records(saved, *, fields=None):
             return [{"ts_code": "000001." + saved["request_market"]}]
 
         with (
@@ -127,8 +127,8 @@ class DiscoveryTiming(unittest.TestCase):
         self.result("stock_basic", sha)
         original = self.p.records
 
-        def disappearing(saved):
-            rows = original(saved)
+        def disappearing(saved, *, fields=None):
+            rows = original(saved, fields=fields)
             (self.root / "objects" / (sha + ".json")).unlink()
             return rows
 
