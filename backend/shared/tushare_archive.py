@@ -396,19 +396,38 @@ def _copy_manifest(root, raw, release=None):
     return "archives/" + destination.name, sha
 
 
-def _record_release(root, db, release, raw):
-    sha = _hash(raw)
+def _record_release(root, db, release, raw, *, source_metadata=None):
+    # The publisher already decoded this SHA-pinned predecessor. Reuse that
+    # document, but reverify actual source/archive bytes with the existing safe
+    # streaming alias implementation instead of allocating another raw body.
+    if source_metadata is None:
+        sha, size = _hash(raw), len(raw)
+    else:
+        if not re.fullmatch(r"data-[a-f0-9]{64}", release):
+            raise ArchiveError("invalid_predecessor_identity")
+        sha, size = source_metadata["sha256"], source_metadata["bytes"]
+        if sha != release[5:]:
+            raise ArchiveError("manifest_checksum_mismatch")
     old = db.execute(
         "SELECT sha256 FROM archived_releases WHERE release_id=?", (release,)
     ).fetchone()
     if old and old[0] != sha:
         raise ArchiveError("immutable_release_conflict")
-    path, sha = _copy_manifest(root, raw, release)
-    _register(db, path, sha, len(raw))
+    if source_metadata is None:
+        path, sha = _copy_manifest(root, raw, release)
+    else:
+        path = "archives/" + sha + ".json"
+        if (root / path).is_symlink():
+            raise ArchiveError("archive_copy_conflict")
+        if not link_manifest_alias(
+            root, f"releases/{release}/manifest.json", path, source_metadata
+        ):
+            raise ArchiveError("missing_predecessor_manifest")
+    _register(db, path, sha, size)
     db.execute(
         "INSERT OR IGNORE INTO archived_releases VALUES(?,?,?)", (release, path, sha)
     )
-    return path, {"sha256": sha, "bytes": len(raw)}
+    return path, {"sha256": sha, "bytes": size}
 
 
 def _manifest_document(root, release):
@@ -423,7 +442,7 @@ def _manifest_document(root, release):
     return raw, document
 
 
-def _expected_files(root, release, document):
+def _expected_files(root, release, document, *, collect=True):
     """Supplier manifest expectations, NOT a fresh referenced-object validation."""
     files = document.get("files")
     if release.startswith("data-"):
@@ -454,7 +473,11 @@ def _expected_files(root, release, document):
             )
     else:
         raise ArchiveError("invalid_probe_results")
-    output = {}
+    # Data inventories are dicts (unique keys). The publisher already owns
+    # their closure, so validate every entry without cloning the entire map.
+    if not collect and not release.startswith("data-"):
+        raise ArchiveError("legacy_inventory_requires_collection")
+    output = {} if collect else None
     for name, metadata in entries:
         if not isinstance(name, str) or not FILE_PATTERN.fullmatch(name):
             raise ArchiveError("invalid_immutable_path")
@@ -478,53 +501,99 @@ def _expected_files(root, release, document):
         if not name.startswith("observations/") and Path(name).stem != sha:
             raise ArchiveError("referenced_file_mismatch")
         expected = {"sha256": sha, "bytes": size}
-        if name in output and output[name] != expected:
-            raise ArchiveError("conflicting_file_metadata")
-        output[name] = expected
+        if output is not None:
+            if name in output and output[name] != expected:
+                raise ArchiveError("conflicting_file_metadata")
+            output[name] = expected
     return output
 
 
-def retain_release(root, release_id):
-    """Retain one predecessor; caller merges ``files`` before publishing CURRENT.
+def retain_release(root, release_id, *, _verified_predecessor=None, timing=None):
+    """Retain one predecessor; default callers receive its complete expectations.
 
-    Copies only the exact manifest bytes. Referenced file metadata is inherited,
-    not rehashed or inserted into the verified-files table. Publisher/mirror must
-    verify actual referenced bytes before claiming closure. Legacy probe IDs are
-    mapped to observed SHA256; their IDs never prove original content authenticity.
-    Missing legacy metadata is measured locally and is only observed evidence.
-    No initial tree scan occurs here. Repeating after interruption is idempotent.
+    The private publisher fast path accepts ONLY its unchanged manifest_at result
+    for this SHA-pinned data release. It already inherited that document's files,
+    so returns archive additions only. Every inherited metadata entry is still
+    validated; the safe alias rechecks source/archive SHA and stat under the lock.
+    General and legacy-probe callers retain their original read/parse/return path.
+    Referenced objects are expectations, never freshly verified by retention.
     """
-    root = Path(root).resolve()
-    raw, document = _manifest_document(root, release_id)
-    files = _expected_files(root, release_id, document)
-    with (root / ".archive.lock").open("a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        db = _db(root)
+    started = time.monotonic()
+    timing = {} if timing is None else timing
+    timing.update(stage_seconds={}, completed_stages=[], failed_stage=None)
+
+    @contextmanager
+    def measure(name):
+        begin = time.monotonic()
         try:
-            path, metadata = _record_release(root, db, release_id, raw)
-            files[path] = metadata
-            db.commit()
-            releases = [
-                dict(row)
-                for row in db.execute(
-                    "SELECT * FROM archived_releases ORDER BY release_id"
-                )
-            ]
-            # Include every known manifest file, even when the predecessor
-            # predates legacy catch-up. Data-object closure still comes from its
-            # expectations and the caller's bounded archive recovery inventory.
-            for saved in db.execute(
-                "SELECT f.path,f.sha256,f.bytes FROM files f JOIN archived_releases r ON r.path=f.path"
-            ):
-                metadata = {"sha256": saved["sha256"], "bytes": saved["bytes"]}
-                if saved["path"] in files and files[saved["path"]] != metadata:
-                    raise ArchiveError("conflicting_file_metadata")
-                files[saved["path"]] = metadata
-            return {
-                "files": files,
-                "archived_releases": releases,
-                "verification": "manifest_verified_references_expected",
-            }
+            yield
+        except BaseException:
+            timing["failed_stage"] = name
+            raise
+        else:
+            timing["completed_stages"].append(name)
+        finally:
+            now = time.monotonic()
+            timing["stage_seconds"][name] = max(0.0, now - begin)
+            timing["total_elapsed_seconds"] = max(0.0, now - started)
+
+    root = Path(root).resolve()
+    reuse = _verified_predecessor is not None and isinstance(release_id, str) and bool(
+        re.fullmatch(r"data-[a-f0-9]{64}", release_id)
+    )
+    timing["reused_predecessor"] = reuse
+    source_metadata = None
+    with measure("reuse_stat" if reuse else "manifest_read_parse"):
+        if reuse:
+            document, raw = _verified_predecessor, None
+            source = _safe(root, f"releases/{release_id}/manifest.json")
+            source_metadata = {"sha256": release_id[5:], "bytes": source.stat().st_size}
+            if not isinstance(document, dict):
+                raise ArchiveError("invalid_manifest")
+        else:
+            raw, document = _manifest_document(root, release_id)
+    with measure("expected_files"):
+        inherited = document.get("files") if reuse else None
+        files = _expected_files(root, release_id, document, collect=not reuse)
+        if reuse:
+            files = {}
+    with (root / ".archive.lock").open("a") as lock:
+        with measure("lock_wait"):
+            fcntl.flock(lock, fcntl.LOCK_EX)
+        with measure("archive_open"):
+            db = _db(root)
+        try:
+            with measure("archive_record"):
+                if reuse:
+                    path, metadata = _record_release(
+                        root, db, release_id, raw, source_metadata=source_metadata
+                    )
+                else:
+                    path, metadata = _record_release(root, db, release_id, raw)
+                files[path] = metadata
+                db.commit()
+            with measure("known_archives"):
+                releases = [
+                    dict(row)
+                    for row in db.execute(
+                        "SELECT * FROM archived_releases ORDER BY release_id"
+                    )
+                ]
+                # The delta includes all known archive mappings, including older
+                # legacy catch-up. The publisher still carries all original files.
+                for saved in db.execute(
+                    "SELECT f.path,f.sha256,f.bytes FROM files f JOIN archived_releases r ON r.path=f.path"
+                ):
+                    metadata = {"sha256": saved["sha256"], "bytes": saved["bytes"]}
+                    for inventory in (files, inherited or {}):
+                        if saved["path"] in inventory and inventory[saved["path"]] != metadata:
+                            raise ArchiveError("conflicting_file_metadata")
+                    files[saved["path"]] = metadata
+                return {
+                    "files": files,
+                    "archived_releases": releases,
+                    "verification": "manifest_verified_references_expected",
+                }
         finally:
             db.close()
 

@@ -2934,11 +2934,17 @@ class Pipeline:
             from backend.shared.tushare_archive import archive_inventory, retain_release
 
             with measure("retain_previous"):
-                retained = retain_release(self.root, previous_id)
+                retention_timing = timing["retention"] = {}
+                retained = retain_release(
+                    self.root, previous_id,
+                    _verified_predecessor=previous,
+                    timing=retention_timing,
+                )
                 for name, metadata in retained["files"].items():
                     if name in files and files[name] != metadata:
                         raise ValueError("Conflicting inherited file metadata")
                     files[name] = metadata
+                del retained  # Do not overlap an inherited map with JSON encoding.
             with measure("archive_inventory_after"):
                 archived = archive_inventory(self.root)
                 files.update(archived["files"])
