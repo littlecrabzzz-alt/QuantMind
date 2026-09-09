@@ -39,3 +39,9 @@
 公共冲突接点仅registry新块/PLANNERS、pipeline import/_planning_inputs新族/normalize/identifiers/prereq/validation/run发送前约束、store新族字典/可选身份/日期、mirror复制名单。父可与其他候选串行合并；无publish/tick配置区改动。
 
 Python3.10全套 `python -m unittest discover -s scripts -p 'test_tushare*.py'`：705 tests / 35.993s / OK，日志 `/tmp/tushare-realtime-runtime-full310.log`；专项9tests与Ruff通过。微基准输出是既有测试证据，不推断生产提速。
+
+## Mandatory review delta: 当前配置 slot 精确匹配
+
+发送前在原日界/未来检查之后，必须验证该 family 当前配置的 snapshot_epoch 格式、真实日期、非未来及当前沪时同日，再与任务 epoch 解析后的 UTC时间精确一致。缺失/非法配置为 snapshot_invalid_config_epoch；同日旧slot为 snapshot_superseded。没有靠同日条件放行旧队列。新配置slot对应的新ID可正常执行；旧slot0HTTP、不增加tries/attempts且不改原文。竞价和旧family继续排除。新增所有9接口同日08:00→09:00的实际run对照及无效配置边界测试。
+
+该delta验证：Python3.10全706tests/43.404s/OK（`/tmp/tushare-realtime-runtime-slot-full310.log`）；最新专项10tests/1.040s，包含9API缺配置实际run0HTTP，Ruff/diffcheck通过。

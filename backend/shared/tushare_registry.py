@@ -686,6 +686,17 @@ def realtime_dispatch_status(api, epoch, config, now):
         return "snapshot_future_epoch"
     if planned.astimezone(ZoneInfo("Asia/Shanghai")).date() != actual.astimezone(ZoneInfo("Asia/Shanghai")).date():
         return "snapshot_expired"
+    configured = config.get(family + "_snapshot_epoch")
+    if not isinstance(configured, str) or not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z", configured):
+        return "snapshot_invalid_config_epoch"
+    try:
+        current_slot = datetime.strptime(configured, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return "snapshot_invalid_config_epoch"
+    if current_slot > actual or current_slot.astimezone(ZoneInfo("Asia/Shanghai")).date() != actual.astimezone(ZoneInfo("Asia/Shanghai")).date():
+        return "snapshot_invalid_config_epoch"
+    if planned != current_slot:
+        return "snapshot_superseded"
     return None
 
 
