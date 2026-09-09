@@ -103,6 +103,30 @@ class Rates(unittest.TestCase):
             50,
         )
 
+    def test_explicit_category_allowlist_and_post_expiry_special_review(self):
+        self.assertEqual(len(policy.REGULAR_APIS), 147)
+        expired = datetime(2026, 12, 5, tzinfo=NOW.tzinfo)
+        for api in policy.REGULAR_APIS:
+            self.assertEqual(self.rate(api, now=expired), 500)
+        for api, cap in [
+            ("stk_nineturn", 30),
+            ("stk_ah_comparison", 30),
+            ("stk_surv", 50),
+        ]:
+            spec = {"requests_per_minute": cap}
+            self.assertEqual(self.rate(api, spec), 300)
+            resolved = policy.resolved_api_rate(api, spec, CONFIG, expired)
+            self.assertEqual(resolved["rpm"], cap)
+            self.assertTrue(resolved["review_required"])
+        resolved = policy.resolved_api_rate(
+            "hm_detail",
+            {"requests_per_minute": 50, "minimum_points": 10000},
+            CONFIG,
+            expired,
+        )
+        self.assertTrue(resolved["review_required"])
+        self.assertEqual(resolved["review_reason"], "points_below_documented_minimum")
+
     def test_legacy_exact_compatibility_and_invalid(self):
         self.assertEqual(
             self.rate("daily", {"requests_per_minute": 30}, {"rate_policy": "legacy"}),

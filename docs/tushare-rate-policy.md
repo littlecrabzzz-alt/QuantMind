@@ -4,7 +4,9 @@
 
 ## 配额依据和保守边界
 
-[官方总表290](https://tushare.pro/document/1?doc_id=290)区分积分和独立权限，5000以上常规500次/分钟、10000以上特色300次/分钟。本地没有明确单页依据的积分接口先限300，积分不足10000降到200保守复核档；不能因合同原先是本地30次就证明供应商只允许30，也不能据此把未知接口升500。`fut_weekly_monthly/hsgt_top10/namechange`明确保持旧合同上限；factor_value及未验证独立权益也保持合同保守档（最多200）。
+[官方总表290](https://tushare.pro/document/1?doc_id=290)区分积分和独立权限，5000以上常规500次/分钟、10000以上特色300次/分钟。官方类别逐项核对后147个明确常规API使用静态allowlist，可至500；`stk_nineturn/stk_ah_comparison/stk_surv`归特色300，在8100回原合同30/30/50并要求复核。`hk_basic/hk_tradecal/us_basic/us_tradecal/hm_detail`归不确定、保持合同保守；hm_detail在8100还会报告10000门槛未满足。其余没有明确单页或分类依据的积分接口先限300，积分不足10000降到200保守复核档；不能因合同原先是本地30次就证明供应商只允许30，也不能据此把未知接口升500。`fut_weekly_monthly/hsgt_top10/namechange`明确保持旧合同上限；factor_value及未验证独立权益也保持合同保守档（最多200）。
+
+分类审计来源为官方290类别层次，静态清单输入SHA `f0e1b6adca065edf6a77eecd9f72029308872fe9f7055603e83b45584af53bbe`，不能从其他API的补集自动生成。复核标记不会重置任务或伪造权限已失效的供应商响应。
 
 单页/合同明确阶梯优先：[daily27](https://tushare.pro/document/1?doc_id=27)500、[stock_basic25](https://tushare.pro/document/2?doc_id=25)50、[cyq_chips294](https://tushare.pro/document/2?doc_id=294)200、[limit_step356](https://tushare.pro/document/2?doc_id=356)及[kpl_list347](https://tushare.pro/document/2?doc_id=347)8000以上500；合同更低单页频次与显式`api_requests_per_minute`仍取更严值。已观察到的1次/60秒等quota和`api_min_interval_seconds`始终覆盖这些名义档位。
 
