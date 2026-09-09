@@ -19,54 +19,60 @@ def digest(value):
 
 
 class Store:
-    async def create(self, owner, node, key, payload, contract, parent=None):
+    async def create(self, owner, node, key, payload, contract, parent=None, session=None):
+        if session is not None:
+            return await self._create(session, owner, node, key, payload, contract, parent)
+        async with get_session() as db:
+            return await self._create(db, owner, node, key, payload, contract, parent)
+
+    async def _create(self, db, owner, node, key, payload, contract, parent):
         tenant, user = owner
         request_hash = digest(payload)
-        async with get_session() as db:
-            # Serializes a user's submits/resumes; the unique index is the final guard.
-            await db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
-                             {"key": f"research:{tenant}:{user}:{node}"})
-            old = (await db.execute(text("""SELECT * FROM research_windows WHERE
-                tenant_id=:tenant AND user_id=:user AND node_id=:node AND idempotency_key=:key"""),
-                {"tenant": tenant, "user": user, "node": node, "key": key})).mappings().first()
-            if old:
-                if old["request_hash"] != request_hash:
-                    raise ValueError("同一提交标识的研究设置发生变化，请重新提交")
-                return old["run_id"]
-            checkpoint = {"stage": "baseline", "experiments": [], "events": [], "candidate_count": 0}
-            case_id = uuid4().hex
-            if parent:
-                previous = (await db.execute(text("""SELECT * FROM research_windows WHERE
-                    run_id=:run AND tenant_id=:tenant AND user_id=:user AND node_id=:node FOR UPDATE"""),
-                    {"run": parent, "tenant": tenant, "user": user, "node": node})).mappings().first()
-                if not previous or previous["status"] not in ("paused", "expired", "cancelled", "failed", "blocked"):
-                    raise ValueError("该任务不能继续，或已在运行")
-                case_id = previous["case_id"]
-                latest = (await db.execute(text("SELECT run_id FROM research_windows WHERE case_id=:case ORDER BY started_at DESC LIMIT 1"),
-                                          {"case": case_id})).scalar()
-                if latest != parent:
-                    raise ValueError("请从课题的最新运行窗口继续")
-                checkpoint = dict(previous["checkpoint"])
-                checkpoint.pop("error", None)
-                checkpoint["resumed_from"] = parent
-                # A stopped experiment may be retried only after this explicit action.
-                if checkpoint.get("active") and checkpoint["active"].get("status") in ("failed", "cancelled"):
-                    checkpoint["retry_proposal"] = checkpoint["active"]["proposal"]
-                    checkpoint["experiments"].append(checkpoint["active"])
-                    checkpoint.pop("active")
-            else:
-                await db.execute(text("""INSERT INTO research_cases(case_id,tenant_id,user_id,node_id,kind,goal,contract)
-                    VALUES(:case,:tenant,:user,:node,:kind,:goal,CAST(:contract AS jsonb))"""),
-                    {"case": case_id, "tenant": tenant, "user": user, "node": node,
-                     "kind": payload["kind"], "goal": payload["goal"], "contract": json.dumps(contract)})
-            run_id = uuid4().hex
-            await db.execute(text("""INSERT INTO research_windows
-                (run_id,case_id,tenant_id,user_id,node_id,idempotency_key,request_hash,checkpoint,deadline_epoch)
-                VALUES(:run,:case,:tenant,:user,:node,:key,:hash,CAST(:checkpoint AS jsonb),:deadline)"""),
-                {"run": run_id, "case": case_id, "tenant": tenant, "user": user, "node": node,
-                 "key": key, "hash": request_hash, "checkpoint": json.dumps(checkpoint),
-                 "deadline": time.time()+payload["hours"]*3600})
-            return run_id
+        # Serializes a user's submits/resumes; the unique index is the final guard.
+        await db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+                         {"key": f"research:{tenant}:{user}:{node}"})
+        old = (await db.execute(text("""SELECT * FROM research_windows WHERE
+            tenant_id=:tenant AND user_id=:user AND node_id=:node AND idempotency_key=:key"""),
+            {"tenant": tenant, "user": user, "node": node, "key": key})).mappings().first()
+        if old:
+            if old["request_hash"] != request_hash:
+                raise ValueError("同一提交标识的研究设置发生变化，请重新提交")
+            return old["run_id"]
+        checkpoint = {"stage": "baseline", "experiments": [], "events": [], "candidate_count": 0}
+        case_id = uuid4().hex
+        if parent:
+            previous = (await db.execute(text("""SELECT * FROM research_windows WHERE
+                run_id=:run AND tenant_id=:tenant AND user_id=:user AND node_id=:node FOR UPDATE"""),
+                {"run": parent, "tenant": tenant, "user": user, "node": node})).mappings().first()
+            if not previous or previous["status"] not in ("paused", "expired", "cancelled", "failed", "blocked"):
+                raise ValueError("该任务不能继续，或已在运行")
+            case_id = previous["case_id"]
+            latest = (await db.execute(text("SELECT run_id FROM research_windows WHERE case_id=:case ORDER BY started_at DESC LIMIT 1"),
+                                      {"case": case_id})).scalar()
+            if latest != parent:
+                raise ValueError("请从课题的最新运行窗口继续")
+            checkpoint = dict(previous["checkpoint"])
+            checkpoint.pop("error", None)
+            checkpoint["resumed_from"] = parent
+            # A stopped experiment may be retried only after this explicit action.
+            if checkpoint.get("active") and checkpoint["active"].get("status") in ("failed", "cancelled"):
+                checkpoint["retry_proposal"] = checkpoint["active"]["proposal"]
+                checkpoint["experiments"].append(checkpoint["active"])
+                checkpoint.pop("active")
+        else:
+            await db.execute(text("""INSERT INTO research_cases(case_id,tenant_id,user_id,node_id,kind,goal,contract)
+                VALUES(:case,:tenant,:user,:node,:kind,:goal,CAST(:contract AS jsonb))"""),
+                {"case": case_id, "tenant": tenant, "user": user, "node": node,
+                 "kind": payload["kind"], "goal": payload["goal"], "contract": json.dumps(contract)})
+        run_id = uuid4().hex
+        await db.execute(text("""INSERT INTO research_windows
+            (run_id,case_id,tenant_id,user_id,node_id,idempotency_key,request_hash,checkpoint,deadline_epoch)
+            VALUES(:run,:case,:tenant,:user,:node,:key,:hash,CAST(:checkpoint AS jsonb),:deadline)"""),
+            {"run": run_id, "case": case_id, "tenant": tenant, "user": user, "node": node,
+             "key": key, "hash": request_hash, "checkpoint": json.dumps(checkpoint),
+             "deadline": time.time()+payload["hours"]*3600})
+        return run_id
+
 
     async def get(self, owner, node, run_id=None):
         query = """SELECT w.*, c.kind, c.goal, c.contract FROM research_windows w

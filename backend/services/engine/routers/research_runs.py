@@ -77,10 +77,12 @@ def public(row, details=False):
                    "completed_experiments": sum(e["status"] == "completed" for e in s.get("experiments", [])),
                    "usage": s.get("usage"), "selection": s.get("selection"),
                    "research_status": s.get("research_status", "development_comparison"),
-                   "active": {k: s["active"].get(k) for k in ("id", "status", "proposal")} if s.get("active") else None})
+                   "active": {**{k: s["active"].get(k) for k in ("id", "status", "proposal")}, "submitted": bool(s["active"].get("container_id"))} if s.get("active") else None})
     if details:
         result["events"] = s.get("events", [])
         result["base_config"] = c["base_config"]
+        result["draft_id"] = c.get("draft_id")
+        result["plan_version"] = c.get("plan_version")
         result["lineage"] = c.get("lineage")
         result["experiments"] = [{k: e.get(k) for k in ("id", "status", "proposal", "gates", "result")} for e in s.get("experiments", [])]
         curves = []
@@ -121,8 +123,17 @@ async def capabilities(request: Request):
         return {"ready": False, "reason": "研究数据模板、模型配置或执行服务尚未就绪", "node_id": None, "models": []}
 
 
+from backend.services.engine.routers.research_drafts import router as draft_router
+router.include_router(draft_router)
+
+
 @router.post("")
 async def create(req: NewResearch, request: Request):
+    owner(request)
+    raise HTTPException(409, "请先建立研究草稿、查看计划并确认执行；旧的直接启动入口已关闭")
+
+
+async def prepare_research(req: NewResearch, request: Request):
     cfg = configured(request)
     who = owner(request)
     if req.node_id != cfg["node_id"]:
@@ -158,10 +169,9 @@ async def create(req: NewResearch, request: Request):
             contract["seed_factor"] = runtime.frozen.read(artifact)
             contract["lineage"] = {"case_id": parent["case_id"], "run_id": parent["run_id"], "experiment_id": exp["id"],
                                    "factor_sha256": exp["result"]["artifacts"][artifact.name]}
-        run_id = await store.create(who, cfg["node_id"], req.idempotency_key, payload, contract)
+        return payload, contract
     except (ValueError, SyntaxError) as exc:
         raise HTTPException(400, str(exc)) from exc
-    return public((await store.get(who, cfg["node_id"], run_id))[0])
 
 
 @router.get("")
@@ -184,15 +194,8 @@ async def control(run_id: str, action: Literal["pause", "cancel"], request: Requ
 
 @router.post("/{run_id}/continue-window")
 async def resume(run_id: str, req: ContinueResearch, request: Request):
-    row = await owned(request, run_id)
-    if req.node_id != row["node_id"]:
-        raise HTTPException(409, "运行节点已改变")
-    try:
-        new_id = await store.create(owner(request), row["node_id"], req.idempotency_key,
-            {**req.model_dump(), "parent": run_id}, row["contract"], parent=run_id)
-    except ValueError as exc:
-        raise HTTPException(409, str(exc)) from exc
-    return public((await store.get(owner(request), row["node_id"], new_id))[0])
+    await owned(request, run_id)
+    raise HTTPException(409, "请在课题的计划确认页继续；旧的直接继续入口已关闭")
 
 
 @router.get("/{run_id}/report/download")

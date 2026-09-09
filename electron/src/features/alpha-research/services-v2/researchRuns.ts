@@ -32,7 +32,8 @@ export interface ResearchRun {
   status: string; stage: string; environment: string; snapshot_id: string; model: string;
   started_at: string; updated_at: string; deadline_epoch: number; candidate_limit: number;
   completed_experiments: number; error?: string; report_available?: boolean;
-  active?: { id: string; status: string; proposal: ResearchExperiment['proposal'] };
+  draft_id?: string; plan_version?: number;
+  active?: { id: string; status: string; submitted?: boolean; proposal: ResearchExperiment['proposal'] };
   selection?: { selected: string; reason: string; next_question: string };
   events?: Array<{ at: number; message: string }>;
   experiments?: ResearchExperiment[];
@@ -58,12 +59,8 @@ export const researchRuns = {
   capabilities: async (): Promise<ResearchCapabilities> => (await request('/capabilities')).data,
   list: async (node: string): Promise<ResearchRun[]> => (await request('', node)).data.runs,
   detail: async (id: string, node: string): Promise<ResearchRun> => (await request(`/${id}`, node)).data,
-  create: async (data: ResearchRequest): Promise<ResearchRun> =>
-    (await request('', data.node_id, { method: 'POST', data })).data,
   control: async (id: string, node: string, action: 'pause' | 'cancel') =>
     request(`/${id}/controls/${action}`, node, { method: 'POST' }),
-  resume: async (id: string, node: string, hours: number, key: string): Promise<ResearchRun> =>
-    (await request(`/${id}/continue-window`, node, { method: 'POST', data: { node_id: node, hours, idempotency_key: key } })).data,
   download: async (id: string, node: string, suffix = 'report/download', filename = `research-${id}.md`) => {
     const response = await request(`/${id}/${suffix}`, node, { responseType: 'blob' });
     const url = URL.createObjectURL(response.data);
@@ -72,4 +69,38 @@ export const researchRuns = {
     document.body.appendChild(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
+};
+
+export interface PlanVersion {
+  version: number; at: number; run_id: string | null;
+  execution?: { hours: number; model: string; candidate_limit: number };
+  plan: { title: string; question: string; subject: string; method: string; baselines: string[];
+    steps: string[]; outputs: string[]; criteria: string[]; limitations: string[]; questions: string[];
+    candidate_limit: number; expression: string; requirements: { dataset: string; executor: string; features: string[]; missing: string[] } };
+  admission: { ready: boolean; checks: Array<{ name: string; ready: boolean; detail: string }> };
+}
+export interface ResearchDraft {
+  draft_id: string; node_id: string; revision: number; run_id: string | null; needs_plan: boolean;
+  input: { question: string; subject: string; material: string; source_run_id?: string };
+  plan: PlanVersion | null; plans?: PlanVersion[]; run?: ResearchRun;
+  job: { id: string; mode: string; status: string; error: string | null; deadline: number } | null;
+  messages?: Array<{ role: string; content: string; mode?: string; at: number; job_id: string }>;
+  inventory?: { snapshot_id: string; market: string; universe: { size: number }; dates: Record<string, string[]>;
+    features: string[]; portfolio: { initial_capital: number }; unavailable: string[] };
+  discussion_usage?: ResearchRun['usage'];
+}
+export interface DiscussionMessage { key: string; revision: number; mode: 'ask' | 'plan' | 'revise'; content: string; model: string }
+export interface Approval { version: number; action: 'start' | 'resume'; reviewed: true; key: string;
+  hours: number; model: string; candidate_limit: number; parent_run_id?: string }
+export const researchDrafts = {
+  list: async (node: string): Promise<ResearchDraft[]> => (await request('/drafts', node)).data.drafts,
+  create: async (node: string, data: ResearchDraft['input']): Promise<ResearchDraft> =>
+    (await request('/drafts', node, { method: 'POST', data })).data,
+  detail: async (node: string, id: string): Promise<ResearchDraft> => (await request(`/drafts/${id}`, node)).data,
+  message: async (node: string, id: string, data: DiscussionMessage): Promise<ResearchDraft> =>
+    (await request(`/drafts/${id}/messages`, node, { method: 'POST', data })).data,
+  cancelMessage: async (node: string, id: string): Promise<ResearchDraft> =>
+    (await request(`/drafts/${id}/messages/cancel`, node, { method: 'POST' })).data,
+  execute: async (node: string, id: string, data: Approval): Promise<{ run_id: string; reused: boolean }> =>
+    (await request(`/drafts/${id}/execute`, node, { method: 'POST', data })).data,
 };

@@ -1,6 +1,6 @@
 # 研究工作台运行说明
 
-实现范围与设计见 [持续研究 Plan](continuous-research-and-strategy-plan.md)。当前版本为冻结八因子模板上的受控研究：策略更改特征子集或模型参数；方法研究计算受限因果公式并与原模型作增量比较。任意论文算法、外部数据下载和模拟交易不在本版本自动执行范围内。
+实现范围与设计见 [持续研究 Plan](continuous-research-and-strategy-plan.md)。当前入口为“课题 → 讨论 → 计划版本 → 明确确认 → 执行”。新问题、材料或已有结果都可建立课题，不要求已有策略。**可执行工具**目前仍为冻结八因子模板上的受控研究：策略更改特征子集或模型参数；方法研究计算受限因果公式并与原模型作增量比较。任意论文算法、外部数据下载和模拟交易不在本版本自动执行范围内。
 
 ## 当前实现索引
 
@@ -8,11 +8,14 @@
 
 | 职责 | 代码入口 | 实际行为 |
 | --- | --- | --- |
-| 研究页面 | [ResearchWorkbench.tsx](../electron/src/features/alpha-research/pages-v2/ResearchWorkbench.tsx) | 两种启动、设置、记录/详情/净值、控制与下载；显式打开记录后加载并滚动/聚焦，后台轮询不抢位置 |
+| 研究页面 | [ResearchWorkbench.tsx](../electron/src/features/alpha-research/pages-v2/ResearchWorkbench.tsx) | 讨论与计划入口、执行记录/详情/净值、控制与下载；显式打开记录后加载并滚动/聚焦，后台轮询不抢位置 |
+| 讨论与计划页面 | [ResearchDiscussion.tsx](../electron/src/features/alpha-research/pages-v2/ResearchDiscussion.tsx) | 原始问题/对象/材料、聊天、准备检查、历史计划版本、确认执行与继续 |
+| 草稿与计划 | [drafts.py](../backend/services/engine/research/drafts.py)、[planning.py](../backend/services/engine/research/planning.py)、[v2 SQL](../scripts/research_workbench_v2.sql) | 持久化消息/计划/模型任务、租约、版本冲突和资源准入 |
+| 计划 API | [research_drafts.py](../backend/services/engine/routers/research_drafts.py) | 归属检查、修改先暂停、计划确认与执行在同一事务内写入 |
 | 页面请求 | [researchRuns.ts](../electron/src/features/alpha-research/services-v2/researchRuns.ts) | 固定请求节点与认证连接，拒绝切换后迟到结果 |
 | 认证 API | [research_runs.py](../backend/services/engine/routers/research_runs.py) | 合同校验、归属、因子引用、曲线/下载完整性核验 |
 | 持久化 | [store.py](../backend/services/engine/research/store.py)、[迁移 SQL](../scripts/research_workbench_v1.sql) | 课题/窗口、幂等与排他租约、最新窗口继续及累计检查点 |
-| 专用调度 | [tasks.py](../backend/services/engine/research/tasks.py) | 独立 research 队列，Beat 每 5 秒触发，任务软/硬期限 220/240 秒；不是实验总时长 |
+| 专用调度 | [tasks.py](../backend/services/engine/research/tasks.py) | 独立 research 队列，执行 Beat 每 5 秒、讨论每 10 秒触发，任务软/硬期限 220/240 秒；不是实验总时长 |
 | 阶段协调 | [coordinator.py](../backend/services/engine/research/coordinator.py) | baseline → propose → select → finish；模型提案/修正、候选门槛、压力与核验 |
 | 隔离运行 | [runtime.py](../backend/services/engine/research/runtime.py) | 宿主角色、私有凭据、冻结输入/代码、Docker 运行与截止控制 |
 | 因子与计算 | [research_expression.py](../scripts/research_expression.py)、[frozen_research_worker.py](../scripts/frozen_research_worker.py) | 受限 AST 因果公式、实际因子值、训练/逐日推理与回测 |
@@ -30,16 +33,29 @@
 | 方法 / 相对路径 | 用途 |
 | --- | --- |
 | GET `/capabilities` | 节点身份、模板、模型和执行服务可用性；不可用显示原因 |
-| POST 空路径 | 幂等创建策略或方法研究，提交后由队列推进 |
+| POST 空路径 | 旧直接启动入口，返回 409，防止旧页面绕过计划确认 |
+| GET/POST `/drafts`、GET `/drafts/{id}` | 列出、建立、读取课题；创建和阅读不启动模型或实验 |
+| POST `/drafts/{id}/messages` | ask 仅回答；plan/revise 生成新计划并申请暂停旧执行；消息 key 与 revision 防重复/冲突 |
+| POST `/drafts/{id}/messages/cancel` | 停止本次讨论，迟到响应不改变课题 |
+| POST `/drafts/{id}/execute` | reviewed=true、当前 version、资源检查通过后原子创建一次执行；action=resume 明确开新窗口 |
 | GET 空路径、GET `/{run_id}` | 当前账户/节点的窗口列表和详情 |
 | POST `/{run_id}/controls/pause`、`/controls/cancel` | 请求暂停后续或取消当前研究 |
-| POST `/{run_id}/continue-window` | 沿用课题合同创建一个新的受限窗口 |
+| POST `/{run_id}/continue-window` | 旧直接继续入口，返回 409；改用计划确认页 |
 | GET `/{run_id}/report/download` | 已完成且哈希匹配的 Markdown 报告 |
 | GET `/{run_id}/artifacts/{experiment_id}/{name}` | 清单内已完成/失败实验的已核验产物或日志 |
 
-页面目标可留空使用默认课题；首次配置好后直接点击启动卡片。创建固定 `kind`、`model`、`hours`（0.1–8）、`candidate_limit`（1–2）、可选 `expression/source_text` 与幂等键；关联策略还引用 `source_run_id/source_experiment_id`。不上传主机任意路径或密钥。继续只提交节点、时长及幂等键。
+先核对页面的本地/云端标签，再填写想弄清的问题。对象可以暂不确定；材料只能粘贴已有正文或公式，目前不自动打开网址。
 
-使用时先确认页面“本地沙盒研究/云端研究”与可运行状态。点击列表课题名查看其详情；窄屏会自动定位，标题可换行。暂停和取消语义见下文；发布新前端后旧页面需刷新。报告下载失败时保留任务并显示错误，不重新提交研究。
+1. **保存课题，进入讨论**仅写草稿。相同账户、节点和原始输入重复保存会打开原课题。
+2. **发送讨论**请求模型回答，既不执行实验也不修改计划。**整理第一版计划 / 暂停并提出修改**生成完整新版本；缺数据、工具或待决定事项会列出来，不能启动。
+3. 计划展示问题、对象、方法、对照、步骤、产物、判断标准、限制和资源检查。当前模板与代码不是任意课题的替代品：例如黄金ETF历史研究应停在对应数据/工具准备，不能悄悄变成A股八因子实验。
+4. **审阅并确认执行**打开确认页，核对节点、版本、候选上限与最长时限；勾选审阅后才提交。每版本只启动一次，即使不同请求键并发提交也不会多开。候选上限写入计划，更改要产生新版本。
+5. 已执行计划可提问、暂停或取消；计划修改先申请暂停，当前实验允许收尾，旧计划不再获准启动。新版本确认时若旧窗口仍活动会被拒绝。已完成的计划和结果保留，不覆盖；新版本重新跑基线，没有隐含缓存复用。
+6. **审阅并继续此计划**仅继续该计划最新的可恢复窗口，沿用原合同及累计尝试；不会把新修改套进旧结果。旧记录可“基于此结果建立课题”，先讨论再决定。记录名称只打开详情。
+
+草稿消息、版本和待处理调用都在 PostgreSQL。每次讨论请求期限 15 分钟；HTTP/429 使用既有适配器退避，格式最多修正 3 次；租约到期后恢复。取消不保证中止供应商已经收到的请求，但迟到内容不会重新写成有效计划；用量无法确认时保留未知。单课题最多 40 轮消息，列表最多最近 100 个课题/窗口；跨节点同步、任意代码开发和自动接数据未实现。
+
+讨论和执行复用一个研究 worker，模型调用期间推进任务可能等待当前调用结束（单调用至多约 180 秒，任务软/硬期限 220/240 秒）。控制意图先写数据库；计算绝对截止由原执行器约束。页面分别显示讨论排队/处理/退避/失败与实际执行状态，不显示编造的进度百分比。
 
 ## 准备与启动
 
@@ -81,6 +97,7 @@ PYTHONPATH=.:scripts python3 -m unittest scripts/test_research_workbench.py scri
 npm run typecheck --workspace=electron
 # 单独创建名为 research_test 的临时 PostgreSQL，应用新增表 SQL 后：
 DATABASE_URL=postgresql://.../research_test PYTHONPATH=.:scripts python3 scripts/test_research_persistence.py
+DATABASE_URL=postgresql://.../research_test PYTHONPATH=.:scripts python3 scripts/test_research_drafts.py
 ```
 
 第三项包含真实数据库并发幂等/归属/租约/恢复和真实 Docker 取消，拒绝使用其他数据库名。它不调用模型或正式数据。产品页面与真实模型的双端验收见 [2026-09-09 验收记录](research-workbench-validation-20260909.md)，以上检查不能替代端到端完成证据。

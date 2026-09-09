@@ -70,7 +70,7 @@ def main():
         raise ValueError("Existing research settings differ; finish active research before switching templates")
     frozen.write(root / "settings.json", cfg)
     if args.apply_migration:
-        sql = Path(__file__).with_name("research_workbench_v1.sql").read_bytes()
+        sql = b"\n".join(Path(__file__).with_name(name).read_bytes() for name in ("research_workbench_v1.sql", "research_workbench_v2.sql"))
         subprocess.run(["docker", "exec", "-i", database, "sh", "-c",
             'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'], input=sql, check=True)
     print(json.dumps({"prepared": True, "node_id": node_id, "role": role, "snapshot": args.frozen,
