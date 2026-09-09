@@ -2938,6 +2938,7 @@ class Pipeline:
                 retained = retain_release(
                     self.root, previous_id,
                     _verified_predecessor=previous,
+                    _inherited_files=files,
                     timing=retention_timing,
                 )
                 for name, metadata in retained["files"].items():

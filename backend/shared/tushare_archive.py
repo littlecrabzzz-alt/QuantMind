@@ -442,7 +442,7 @@ def _manifest_document(root, release):
     return raw, document
 
 
-def _expected_files(root, release, document, *, collect=True):
+def _expected_files(root, release, document, *, collect=True, inherited=None):
     """Supplier manifest expectations, NOT a fresh referenced-object validation."""
     files = document.get("files")
     if release.startswith("data-"):
@@ -501,6 +501,10 @@ def _expected_files(root, release, document, *, collect=True):
         if not name.startswith("observations/") and Path(name).stem != sha:
             raise ArchiveError("referenced_file_mismatch")
         expected = {"sha256": sha, "bytes": size}
+        if inherited is not None and (
+            name not in inherited or inherited[name] != expected
+        ):
+            raise ArchiveError("Conflicting inherited file metadata")
         if output is not None:
             if name in output and output[name] != expected:
                 raise ArchiveError("conflicting_file_metadata")
@@ -508,7 +512,9 @@ def _expected_files(root, release, document, *, collect=True):
     return output
 
 
-def retain_release(root, release_id, *, _verified_predecessor=None, timing=None):
+def retain_release(
+    root, release_id, *, _verified_predecessor=None, _inherited_files=None, timing=None
+):
     """Retain one predecessor; default callers receive its complete expectations.
 
     The private publisher fast path accepts ONLY its unchanged manifest_at result
@@ -553,8 +559,14 @@ def retain_release(root, release_id, *, _verified_predecessor=None, timing=None)
         else:
             raw, document = _manifest_document(root, release_id)
     with measure("expected_files"):
-        inherited = document.get("files") if reuse else None
-        files = _expected_files(root, release_id, document, collect=not reuse)
+        inherited = None
+        if reuse:
+            inherited = document.get("files") if _inherited_files is None else _inherited_files
+            if not isinstance(inherited, dict):
+                raise ArchiveError("invalid_inherited_inventory")
+        files = _expected_files(
+            root, release_id, document, collect=not reuse, inherited=inherited
+        )
         if reuse:
             files = {}
     with (root / ".archive.lock").open("a") as lock:

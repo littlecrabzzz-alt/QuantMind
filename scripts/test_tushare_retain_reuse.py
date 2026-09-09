@@ -74,6 +74,33 @@ class RetainReuse(unittest.TestCase):
                 self.assertEqual(timing['failed_stage'], 'expected_files')
                 self.assertFalse((self.root / 'archives').exists())
 
+    def test_inherited_missing_or_changed_metadata_rejected(self):
+        key = next(iter(self.previous['files']))
+        for inherited in ({}, {key: {**self.previous['files'][key], 'bytes': 999}},
+                          {key: {**self.previous['files'][key], 'extra': 'must not silently survive'}}):
+            with self.subTest(inherited=inherited):
+                with self.assertRaisesRegex(archive.ArchiveError, 'Conflicting inherited'):
+                    self.fast(_inherited_files=inherited)
+
+    def test_publish_changed_object_length_does_not_advance_current(self):
+        p = m.Pipeline(self.root, {'entries': []})
+        self.addCleanup(p.close)
+        pointer = m.json_bytes({'release_id': self.release, 'manifest_sha256': self.release[5:]})
+        (self.root / 'CURRENT.json').write_bytes(pointer)
+        name, metadata = next(iter(self.previous['files'].items()))
+        observation = 'a' * 32 + '.json'
+        (self.root / 'observations').mkdir(exist_ok=True)
+        (self.root / 'observations' / observation).write_bytes(b'{}')
+        result = {'api_name': 'daily', 'observation': observation,
+                  'observation_sha256': m.digest(b'{}'), 'object_sha256': metadata['sha256']}
+        p.db.execute('INSERT INTO attempts VALUES(?,?,?)', ('fixture', 1, json.dumps(result)))
+        p.db.commit()
+        (self.root / name).write_bytes(b'changed length must not be published')
+        with self.assertRaisesRegex(ValueError, 'Conflicting inherited'):
+            p.publish()
+        self.assertEqual((self.root / 'CURRENT.json').read_bytes(), pointer)
+        self.assertEqual(p.publish_timing['retention']['failed_stage'], 'expected_files')
+
     def test_source_changed_after_previous_read_fails_closed(self):
         source = self.root / 'releases' / self.release / 'manifest.json'
         source.write_bytes(self.raw.replace(b'datasets', b'changed!'))

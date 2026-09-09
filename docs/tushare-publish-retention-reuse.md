@@ -10,7 +10,10 @@ to merge again.
 a private `retain_release(..., _verified_predecessor=...)` path. This parameter is
 not an external ingestion interface: callers must never provide arbitrary or
 mutated documents. Only `data-*` uses the path. Every inherited file's path,
-SHA/filename and size metadata is still validated. The existing safe
+SHA/filename and size metadata is still validated and compared against the
+publisher's current inherited inventory. Missing entries, metadata changes or a
+changed stat-derived object length retain the old conflict failure rather than
+silently publishing a changed expectation. The existing safe
 `link_manifest_alias` independently streams and verifies the actual predecessor
 and archive bytes with the expected release SHA, pinned directories, O_NOFOLLOW,
 stat checks, and the original hardlink/copy behavior. The archive lock and durable
