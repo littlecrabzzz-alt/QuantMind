@@ -1,0 +1,150 @@
+{
+  "fixed_releases": {
+    "data-ca7c1fcb7305d3248b3d820714c4b868087e0fbf66facf2bd17e00cded0c2001": {
+      "output": "/tmp/rrg-stock-point-candidate-ca7c-20260910",
+      "report_sha256": "4e54d985f3cb9d4908d70b5f6e79b732f822f60ab3f65fe18fce3350dc21a328",
+      "manifest_sha256": "e81ce1158ca3be56339aa6cc4dacbc3a80e5bedf70c7a8ca983882620d763066",
+      "stock_input": {
+        "valid_comparisons": 107862,
+        "last_day_valid": 5394,
+        "all20_valid_codes": 5337,
+        "observed_price_codes": 5576,
+        "invalid_price_factor_pairs": 0,
+        "capitalization_fields_present_comparisons": 110806,
+        "industry_aggregation_performed": false,
+        "membership_known_at_verified": false
+      },
+      "physical_observation_partitions": {
+        "fund_daily": 1626,
+        "fund_portfolio": 11539,
+        "etf_sz_cons": 763,
+        "fund_adj": 2920,
+        "etf_sh_cons": 970,
+        "ci_daily": 211,
+        "ci_index_member": 59,
+        "etf_basic": 3,
+        "etf_index": 2
+      },
+      "members": {
+        "rows": 6740,
+        "known_at_column_present": false,
+        "known_at_verified": false,
+        "missing_price_l1_codes": [],
+        "price_codes_without_l1": []
+      }
+    },
+    "data-0e961a886dafaefd91941dd113039652c294c1ccf0a60d4bb36aae15236b7c82": {
+      "output": "/tmp/rrg-stock-point-candidate-0e961a-20260910",
+      "report_sha256": "2f37acbc608e7b869958921682aba8c863762ae4de75b1cd1e2615fffc9f283f",
+      "manifest_sha256": "102fda9cd43ba59fcacb23ffafa170b51fc9ec401014298d182593a7821db78c",
+      "stock_input": {
+        "valid_comparisons": 107862,
+        "last_day_valid": 5394,
+        "all20_valid_codes": 5337,
+        "observed_price_codes": 5576,
+        "invalid_price_factor_pairs": 0,
+        "capitalization_fields_present_comparisons": 110806,
+        "industry_aggregation_performed": false,
+        "membership_known_at_verified": false
+      },
+      "physical_observation_partitions": {
+        "fund_daily": 1630,
+        "etf_sz_cons": 776,
+        "fund_portfolio": 13299,
+        "fund_adj": 2923,
+        "etf_sh_cons": 981,
+        "ci_daily": 241,
+        "ci_index_member": 118,
+        "etf_basic": 6,
+        "etf_index": 3
+      },
+      "members": {
+        "rows": 6740,
+        "known_at_column_present": false,
+        "known_at_verified": false,
+        "missing_price_l1_codes": [],
+        "price_codes_without_l1": []
+      }
+    }
+  },
+  "comparison_business_fields": [
+    "trade_date",
+    "lag220_date",
+    "ts_code",
+    "up_flag",
+    "close",
+    "free_share",
+    "float_share",
+    "circ_mv",
+    "capitalization_fields_present"
+  ],
+  "business_rows_equal": true,
+  "comparison_rows": 111520,
+  "status": "blocked_data",
+  "new_source_calls": 0,
+  "next_probe_plan": {
+    "source_path": "/tmp/rrg-ca7c-suspension-review-20260909/remaining-endpoints.json",
+    "source_sha256": "88f5986f8c912f2a121669f6a1541f3d7cf2675d1a2a345c60498280162d7a46",
+    "requests": [
+      {
+        "api_name": "daily",
+        "params": {
+          "ts_code": "920680.BJ",
+          "trade_date": "20260831"
+        },
+        "max_new_calls": 1,
+        "reason": "diagnosis_only_missing_price_not_confirmed_collection_failure"
+      },
+      {
+        "api_name": "suspend_d",
+        "params": {
+          "ts_code": "920680.BJ",
+          "trade_date": "20260831"
+        },
+        "max_new_calls": 1,
+        "reason": "diagnosis_only_missing_price_not_confirmed_collection_failure"
+      },
+      {
+        "api_name": "daily",
+        "params": {
+          "ts_code": "000851.SZ",
+          "trade_date": "20260831"
+        },
+        "max_new_calls": 1,
+        "reason": "diagnosis_only_missing_price_not_confirmed_collection_failure"
+      },
+      {
+        "api_name": "suspend_d",
+        "params": {
+          "ts_code": "000851.SZ",
+          "trade_date": "20260831"
+        },
+        "max_new_calls": 1,
+        "reason": "diagnosis_only_missing_price_not_confirmed_collection_failure"
+      }
+    ],
+    "max_calls": 4,
+    "execute": false,
+    "required_execution": "Parent existing Pipeline/shared gates/pipeline.lock, immutable raw/observation and same epoch no terminal retry. Total time <=120s; no enable/publish by this artifact.",
+    "acceptance": "No broader RRG promotion. Preserve empty/permission/saturation/field gaps; verify exact date/code/full raw->Parquet->fixed reader equality using new fixed release. Missing source response cannot prove PIT."
+  },
+  "final_candidate_run": {
+    "output": "/tmp/rrg-stock-point-final-0e961a-20260910",
+    "release_id": "data-0e961a886dafaefd91941dd113039652c294c1ccf0a60d4bb36aae15236b7c82",
+    "report_sha256": "2c8b4cc1d4def52c1de54e7d2af9b598f0559ad7ba3216fd43478992c8256eb3",
+    "manifest_sha256": "4c1c5a55a592fb8337aee9ceb4a464508d2b30ecb4af8c69bf1fcadb2496065e",
+    "script_sha256": "175fad3d8267df5bb284f3a94e7bf12c4f20e485611d3db1dced58f4cde64c72",
+    "stock_input": {
+      "valid_comparisons": 107862,
+      "last_day_valid": 5394,
+      "all20_valid_codes": 5337,
+      "observed_price_codes": 5576,
+      "invalid_price_factor_pairs": 0,
+      "capitalization_fields_present_comparisons": 110806,
+      "industry_aggregation_performed": false,
+      "membership_known_at_verified": false
+    },
+    "source_calls": 0,
+    "status": "blocked_data"
+  }
+}
