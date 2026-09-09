@@ -2,6 +2,7 @@
 """Pull a pinned cloud release over SSH; publish locally only after verification."""
 
 import argparse
+from contextlib import contextmanager
 import fcntl
 import hashlib
 import json
@@ -12,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -237,6 +239,85 @@ def install_schedule(root):
     return {"status": "installed", "interval_seconds": 900, "root": str(destination)}
 
 
+@contextmanager
+def mirror_stage(name):
+    started = time.monotonic()
+    try:
+        yield
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        if not hasattr(exc, "mirror_stage"):
+            exc.mirror_stage = name
+            exc.mirror_elapsed = round(time.monotonic() - started, 3)
+        raise
+
+
+def failure_report(exc):
+    # Never log subprocess commands, output, remote error text or credentials.
+    result = {"status": "failed", "error_type": type(exc).__name__}
+    if hasattr(exc, "mirror_stage"):
+        result.update(stage=exc.mirror_stage, elapsed_seconds=exc.mirror_elapsed)
+    if isinstance(exc, subprocess.TimeoutExpired):
+        result["timeout_seconds"] = exc.timeout
+    elif isinstance(exc, subprocess.CalledProcessError):
+        result["returncode"] = exc.returncode
+    return result
+
+
+def fetch_manifest(root, host, source, release, sha):
+    """Pin a complete compressed transfer before publishing any local pointer."""
+    relative = "releases/" + release + "/manifest.json"
+    destination = root / relative
+    archive = root / "archives" / (sha + ".json")
+    for path in (destination, archive):
+        if path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
+            raise ValueError("Refusing mirrored manifest symlink")
+        if path.exists():
+            expected = {"sha256": sha, "bytes": path.stat().st_size}
+            if checked_file(path, expected) is None:
+                raise ValueError("Existing manifest checksum mismatch")
+            if path == archive:
+                link_manifest_alias(
+                    root, "archives/" + sha + ".json", relative, expected
+                )
+            return
+    # A private directory prevents partially transferred bytes from becoming a
+    # releases/*/manifest.json. Every retry pins CURRENT anew and starts safely.
+    with tempfile.TemporaryDirectory(prefix=".manifest-", dir=root) as folder:
+        staging = Path(folder)
+        listing = staging / "files"
+        listing.write_text(relative + "\n")
+        with mirror_stage("manifest_transfer"):
+            subprocess.run(
+                [
+                    "rsync",
+                    "-az",
+                    "--compress-level=3",
+                    "--checksum",
+                    "--timeout=45",
+                    "--rsync-path=sudo -n rsync",
+                    "--files-from=" + str(listing),
+                    "-e",
+                    "ssh -o BatchMode=yes -o ConnectTimeout=15",
+                    host + ":" + source,
+                    str(staging) + "/",
+                ],
+                check=True,
+                timeout=180,
+                capture_output=True,
+            )
+        incoming = staging / relative
+        with mirror_stage("manifest_verify"):
+            if incoming.is_symlink() or any(
+                parent.is_symlink() for parent in incoming.parents
+            ):
+                raise ValueError("Refusing transferred manifest symlink")
+            expected = {"sha256": sha, "bytes": incoming.stat().st_size}
+            if checked_file(incoming, expected) is None:
+                raise ValueError("Remote manifest mismatch")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(incoming, destination)
+
+
 def mirror(root):
     topology = dict(
         line.split("=", 1)
@@ -253,48 +334,31 @@ def mirror(root):
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return {"status": "already_running"}
-        pointer = json.loads(
-            subprocess.check_output(
-                ssh + ["sudo -n cat " + shlex.quote(source + "CURRENT.json")],
-                timeout=30,
+        with mirror_stage("pointer_fetch"):
+            pointer = json.loads(
+                subprocess.check_output(
+                    ssh + ["sudo -n cat " + shlex.quote(source + "CURRENT.json")],
+                    timeout=30,
+                    stderr=subprocess.PIPE,
+                )
             )
-        )
+            if not isinstance(pointer, dict) or not all(
+                isinstance(pointer.get(key), str)
+                for key in ("release_id", "manifest_sha256")
+            ):
+                raise ValueError("Invalid remote pointer")
         release = pointer["release_id"]
         # Validate before constructing any remote path.
         import re
 
         if not re.fullmatch(r"data-[a-f0-9]{64}", release):
             raise ValueError("Invalid remote release")
-        raw = subprocess.check_output(
-            ssh
-            + [
-                "sudo -n cat "
-                + shlex.quote(source + "releases/" + release + "/manifest.json")
-            ],
-            timeout=30,
-        )
-        if digest(raw) != pointer["manifest_sha256"] or digest(
-            raw
-        ) != release.removeprefix("data-"):
-            raise ValueError("Remote manifest mismatch")
-        # Storing the pinned manifest is safe before CURRENT is updated.
-        manifest_path = root / "releases" / release / "manifest.json"
-        if manifest_path.is_symlink() or any(
-            parent.is_symlink() for parent in manifest_path.parents
-        ):
-            raise ValueError("Refusing mirrored manifest symlink")
-        manifest_expected = {"sha256": digest(raw), "bytes": len(raw)}
-        if manifest_path.exists():
-            manifest_at(root, release)  # Verify existing bytes; preserve its inode.
-
-        elif not link_manifest_alias(
-            root,
-            "archives/" + release[5:] + ".json",
-            "releases/" + release + "/manifest.json",
-            manifest_expected,
-        ):
-            atomic_bytes(manifest_path, raw)
-        manifest = manifest_at(root, release)
+        if pointer["manifest_sha256"] != release.removeprefix("data-"):
+            raise ValueError("Remote pointer identity mismatch")
+        with mirror_stage("manifest_prepare"):
+            fetch_manifest(root, host, source, release, pointer["manifest_sha256"])
+        with mirror_stage("manifest_validate"):
+            manifest = manifest_at(root, release)
         missing, verified = [], {}
         for name, expected in manifest["files"].items():
             path = root / name
@@ -318,30 +382,32 @@ def mirror(root):
             ) as listing:
                 listing.write("\n".join(missing) + "\n")
                 listing.flush()
-                subprocess.run(
-                    [
-                        "rsync",
-                        "-az",
-                        "--compress-level=3",
-                        "--checksum",
-                        "--timeout=45",
-                        "--partial-dir=.rsync-partial",
-                        "--rsync-path=sudo -n rsync",
-                        "--files-from=" + listing.name,
-                        "-e",
-                        "ssh -o BatchMode=yes -o ConnectTimeout=15",
-                        host + ":" + source,
-                        str(root) + "/",
-                    ],
-                    check=True,
-                )
+                with mirror_stage("objects_transfer"):
+                    subprocess.run(
+                        [
+                            "rsync",
+                            "-az",
+                            "--compress-level=3",
+                            "--checksum",
+                            "--timeout=45",
+                            "--partial-dir=.rsync-partial",
+                            "--rsync-path=sudo -n rsync",
+                            "--files-from=" + listing.name,
+                            "-e",
+                            "ssh -o BatchMode=yes -o ConnectTimeout=15",
+                            host + ":" + source,
+                            str(root) + "/",
+                        ],
+                        check=True,
+                    )
         # Existing immutable files were already hashed above. Recheck their
         # identity after transfer; hash new, repaired or externally changed files.
-        for name, expected in manifest["files"].items():
-            path = root / name
-            if verified.get(name) != fingerprint(path):
-                if checked_file(path, expected) is None:
-                    raise ValueError("Dataset object checksum mismatch")
+        with mirror_stage("objects_verify"):
+            for name, expected in manifest["files"].items():
+                path = root / name
+                if verified.get(name) != fingerprint(path):
+                    if checked_file(path, expected) is None:
+                        raise ValueError("Dataset object checksum mismatch")
         atomic_json(root / "CURRENT.json", pointer)
         result = {
             "status": "verified",
@@ -372,5 +438,5 @@ if __name__ == "__main__":
             )
         )
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
-        print(json.dumps({"status": "failed", "error_type": type(exc).__name__}))
+        print(json.dumps(failure_report(exc)))
         raise SystemExit(2) from None
