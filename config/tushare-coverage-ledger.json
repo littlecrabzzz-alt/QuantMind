@@ -1876,9 +1876,68 @@
       "acquisition_api_names": [
         "limit_list_ths"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue every pool/category through monthly history, saturation splits and revisions; retain unknown historical and market coverage gaps.",
+      "contract_evidence": "docs/tushare-limit-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/limit-audit.json",
+        "release_id": "data-d976b04aee8b055ce929a4893b7d8e4f77e8126105da9142fb8016f176ea7c36",
+        "checked_at": "2026-09-09T00:05:00.077813+00:00",
+        "sample_rows": 629,
+        "sample_requests": [
+          {
+            "limit_type": "涨停池",
+            "trade_date": "20260904"
+          },
+          {
+            "limit_type": "连扳池",
+            "trade_date": "20260904"
+          },
+          {
+            "limit_type": "冲刺涨停",
+            "trade_date": "20260904"
+          },
+          {
+            "limit_type": "炸板池",
+            "trade_date": "20260904"
+          },
+          {
+            "limit_type": "跌停池",
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "limit_type": "涨停池",
+            "start_date": "20260901"
+          },
+          {
+            "end_date": "20260904",
+            "limit_type": "连扳池",
+            "start_date": "20260901"
+          },
+          {
+            "end_date": "20260904",
+            "limit_type": "冲刺涨停",
+            "start_date": "20260901"
+          },
+          {
+            "end_date": "20260904",
+            "limit_type": "炸板池",
+            "start_date": "20260901"
+          },
+          {
+            "end_date": "20260904",
+            "limit_type": "跌停池",
+            "start_date": "20260901"
+          }
+        ],
+        "requested_fields": 24,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-d976b04aee8b055ce929a4893b7d8e4f77e8126105da9142fb8016f176ea7c36",
+        "offline_evidence": "/tmp/tushare-limit4-mac-verified-20260909.json",
+        "scope": "20 requests and 1233 source rows across four APIs; 975 distinct query rows. Raw, Parquet, pool/date identity, cloud API and offline Mac verified; not complete history."
+      }
     },
     {
       "doc_id": "298",
@@ -1890,9 +1949,50 @@
       "acquisition_api_names": [
         "limit_list_d"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue every pool/category through monthly history, saturation splits and revisions; retain unknown historical and market coverage gaps.",
+      "contract_evidence": "docs/tushare-limit-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/limit-audit.json",
+        "release_id": "data-d976b04aee8b055ce929a4893b7d8e4f77e8126105da9142fb8016f176ea7c36",
+        "checked_at": "2026-09-09T00:05:00.077813+00:00",
+        "sample_rows": 449,
+        "sample_requests": [
+          {
+            "limit_type": "U",
+            "trade_date": "20260904"
+          },
+          {
+            "limit_type": "D",
+            "trade_date": "20260904"
+          },
+          {
+            "limit_type": "Z",
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "limit_type": "U",
+            "start_date": "20260901"
+          },
+          {
+            "end_date": "20260904",
+            "limit_type": "D",
+            "start_date": "20260901"
+          },
+          {
+            "end_date": "20260904",
+            "limit_type": "Z",
+            "start_date": "20260901"
+          }
+        ],
+        "requested_fields": 18,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-d976b04aee8b055ce929a4893b7d8e4f77e8126105da9142fb8016f176ea7c36",
+        "offline_evidence": "/tmp/tushare-limit4-mac-verified-20260909.json",
+        "scope": "20 requests and 1233 source rows across four APIs; 975 distinct query rows. Raw, Parquet, pool/date identity, cloud API and offline Mac verified; not complete history."
+      }
     },
     {
       "doc_id": "356",
@@ -1904,9 +2004,30 @@
       "acquisition_api_names": [
         "limit_step"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue every pool/category through monthly history, saturation splits and revisions; retain unknown historical and market coverage gaps.",
+      "contract_evidence": "docs/tushare-limit-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/limit-audit.json",
+        "release_id": "data-d976b04aee8b055ce929a4893b7d8e4f77e8126105da9142fb8016f176ea7c36",
+        "checked_at": "2026-09-09T00:05:00.077813+00:00",
+        "sample_rows": 55,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260901"
+          }
+        ],
+        "requested_fields": 4,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-d976b04aee8b055ce929a4893b7d8e4f77e8126105da9142fb8016f176ea7c36",
+        "offline_evidence": "/tmp/tushare-limit4-mac-verified-20260909.json",
+        "scope": "20 requests and 1233 source rows across four APIs; 975 distinct query rows. Raw, Parquet, pool/date identity, cloud API and offline Mac verified; not complete history."
+      }
     },
     {
       "doc_id": "357",
@@ -1918,9 +2039,30 @@
       "acquisition_api_names": [
         "limit_cpt_list"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue every pool/category through monthly history, saturation splits and revisions; retain unknown historical and market coverage gaps.",
+      "contract_evidence": "docs/tushare-limit-extra-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/limit-audit.json",
+        "release_id": "data-d976b04aee8b055ce929a4893b7d8e4f77e8126105da9142fb8016f176ea7c36",
+        "checked_at": "2026-09-09T00:05:00.077813+00:00",
+        "sample_rows": 100,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260901"
+          }
+        ],
+        "requested_fields": 9,
+        "field_coverage": "complete_for_explicit_request",
+        "offline_release_id": "data-d976b04aee8b055ce929a4893b7d8e4f77e8126105da9142fb8016f176ea7c36",
+        "offline_evidence": "/tmp/tushare-limit4-mac-verified-20260909.json",
+        "scope": "20 requests and 1233 source rows across four APIs; 975 distinct query rows. Raw, Parquet, pool/date identity, cloud API and offline Mac verified; not complete history."
+      }
     },
     {
       "doc_id": "259",
@@ -4726,6 +4868,18 @@
           "row_count": 1000,
           "field_coverage": "gap",
           "reason": "Explicitly requested output column absent from this actual response; documentation/source discrepancy under review. Raw data retained; no assertion of complete field coverage."
+        },
+        {
+          "field": "file_name",
+          "observation": "14ecc013ed9a4db7a9186226a9824c22.json",
+          "object_sha256": "f1e57ae4e9e29fff736107c5b45f65f1f4575a48cab4dbc322f80a99732a7466",
+          "status": "schema_gap",
+          "row_count": 85,
+          "sample_request": {
+            "trade_date": "20260121"
+          },
+          "field_coverage": "gap",
+          "reason": "Exact official-example date with normal explicit 11-field request still returned 10 columns without file_name. Not solely a range-request or 1000-row saturation artifact; keep raw data and field obligation."
         }
       ]
     },

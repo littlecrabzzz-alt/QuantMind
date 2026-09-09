@@ -218,3 +218,13 @@
 - 仅重启quantmind和两Tushare worker，恢复后采集7b68c095-ba31-48d5-80b8-88d31446b6ac、附件f85881ce-c050-44b2-9009-d6910b2d2dd1实测活动；普通US任务88fe98db-f897-42a9-932c-cc1a84860e10保持。23:36:37Z正常325请求/115.710秒、publish12.562秒，failed_stage=null；不能由单批或noop索引耗时推断持续提速。空间262.29GiB可用。
 - 自动非probe已推进trading done13/empty24、listing done14/empty21。IPO无筛选2000行实际饱和blocked，日期分区仍继续；research_report已捕获真实file_name缺列且原1000行保留，文档矛盾待复核。全部8条台账改ingested_partial/available_observed，基线263+发现13不变。
 - 并行下一候选：limit_extra纯cd1da8a+runtime91fc460，43 tests通过；附件脚本挑战分类5246705，43文档测试通过。两989B原文实际是JS挑战页，未执行或绕过，cninfo超时归因仍未知。候选未部署，下一轮审查集成。全部历史、修订、附件、PIT/RRG准入仍未完成，goal持续active。
+
+
+## 2026-09-09 08:14 并行推进、limit4与月窗上线
+
+- 用户要求减少等待：历史采集持续，新接口在独立worktree准备；固定版API/Mac验收与采集并行。本轮暂停窗口约16分钟，后续先完成开发/离线测试，再短时排空/部署。RRG已有较高调度权重，按所需数据范围逐项验收，无需等全部附件和其他市场历史。
+- runtime bbe2f9e已合入master/GitHub/cloud；handoff passed，4562文件、8cb42112c2ac6e4bf789c8fe2ef871e89d0417434343fbd50da19fc885b79f3f。148采集API及6财务查询别名；limit4的20请求/1233来源行、55显式字段与10种类别对账，固定版云端API及Mac禁网查询全部通过，去重975行；详见涨跌停接入文档。其他13未完成历史游标保留，近期70+历史430初始任务不代表历史总量。
+- 月窗减少未饱和历史区间初始请求，满额继续二分，不承诺固定倍数提速。391项隔离回归11.946秒、Ruff/diff通过；计时另Python3.10独立62测试/AST等价复核。source_challenge已产生真实尝试3786/3795（988/984字节），原始bin SHA通过、parse not_attempted，不执行挑战；validation/source-challenge-runtime.json。
+- 重启quantmind和两专属worker后，采集4c3447b8-ea3f-49d2-9ca8-c154a5e3a094、附件ba365ffd-bdc6-4b78-b098-9378578a65e1及两队列实测恢复；US88fe98db-f897-42a9-932c-cc1a84860e10保持。00:11:51Z正常批329请求/118.014秒、failed_stage=null；发布14.069秒，其中coverage/closure4.065、attempts/stat2.432、retain_previous2.178秒。单批定位不等于持续收益，账户本地预算240次/分，不能靠多worker线性加速。云盘可用260.67GiB。
+- research_report精确trade_date=20260121、正常11列请求仍回85行/10列，file_name缺失，不是仅范围请求或1000行满额所致。原文/schema_gap保留，known_field_gaps增加证据；不删字段、不推断永久无权限。此前10个近期/历史固定样本只读比较见本主题记录。
+- 下一concept4已并行准备：e1041f2→03d8d74→55848e1，40相关测试；未合入生产、未probe、未启用。先独立整合测试再安排发布，保留THS成员历史/PIT/未知cap。旧互联互通精确过滤探测仍未执行；263基线+13发现、全历史/修订/附件及RRG准入仍未完成。
