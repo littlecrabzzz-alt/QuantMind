@@ -145,6 +145,25 @@ def cross_asset_runtime_prerequisites(identifiers, config=None):
     ]
 
 
+from backend.shared.tushare_market_sentiment_contracts import (
+    MARKET_SENTIMENT_CONTRACTS,
+    iter_market_sentiment_jobs,
+    market_sentiment_prerequisites,
+)
+
+MARKET_SENTIMENT_RUNTIME_CONTRACTS = {
+    api: {
+        **spec,
+        "group": "market_sentiment",
+        "namespace_note": spec["namespace_note"].replace(
+            "Runtime normalization is not implemented by this pure module.",
+            "Runtime projection uses immutable request market; unknown market remains UNVERIFIED_MARKET and missing request identity blocks fixed reads.",
+        ),
+        "canonical_namespace_note": "TDX:/KP: board codes; THS:I:/THS:N: ranking boards; FUND: ETF/funds; CB: convertibles; FUT: futures; validated CN suffix identities become exchange prefix including T, validated HK suffix identities become HK prefix including historical !, US symbols retain opaque source spelling after US prefix. Unknown source spellings retain explicit asset namespace; source_ts_code/source_con_code remain unchanged. Cross-dataset source joins still require verified market and date semantics.",
+    }
+    for api, spec in MARKET_SENTIMENT_CONTRACTS.items()
+}
+
 FOREIGN_FINANCIAL_RUNTIME_CONTRACTS = {
     api: {
         **spec,
@@ -322,6 +341,7 @@ CONNECT_RUNTIME_CONTRACTS = {
 
 EXTENDED_CONTRACTS = {
     **CROSS_ASSET_RUNTIME_CONTRACTS,
+    **MARKET_SENTIMENT_RUNTIME_CONTRACTS,
     **FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
     **STOCK_CONTEXT_RUNTIME_CONTRACTS,
     **TECHNICAL_EXTRA_RUNTIME_CONTRACTS,
@@ -367,6 +387,7 @@ EXTENDED_CONTRACTS = {
 }
 PLANNERS = {
     "cross_asset_extra": iter_cross_asset_extra_jobs,
+    "market_sentiment": iter_market_sentiment_jobs,
     "foreign_financial": lambda config, today, ids: iter_foreign_financial_jobs(
         config, today, _foreign_financial_identifiers(ids)
     ),
