@@ -10,9 +10,11 @@ import time
 import zlib
 from pathlib import Path
 
-VERSION = "discovery-projection-v1"
+VERSION = "discovery-projection-v2"
 MAX_BYTES = 128 * 1024**2
 MAX_PAYLOAD = 2 * 1024**2
+MAX_ROWS = 8192
+MAX_COMPRESSED = MAX_PAYLOAD + 65536
 
 
 def encoded(value):
@@ -24,8 +26,8 @@ class DiscoveryCache:
         self.path = Path(root) / "discovery-cache.sqlite"
         self.db = None
         self.admission_seconds = admission_seconds
-        self.stats = dict(hits=0, misses=0, admitted=0, rejected=0, errors=0,
-                          admission_seconds=0.0, bytes=0)
+        self.stats = {"hits": 0, "misses": 0, "admitted": 0, "rejected": 0,
+                      "errors": 0, "admission_seconds": 0.0, "bytes": 0}
         if not enabled:
             return
         try:
@@ -78,12 +80,22 @@ class DiscoveryCache:
             return loader()
         key = hashlib.sha256(encoded((VERSION, str(source.absolute()), source_key, sorted(fields)))).hexdigest()
         try:
-            saved = self.db.execute("SELECT payload,sha FROM projections WHERE key=?", (key,)).fetchone()
+            saved = self.db.execute(
+                "SELECT CASE WHEN length(payload)<=? THEN payload END, "
+                "CASE WHEN length(sha)=64 THEN sha END FROM projections WHERE key=?",
+                (MAX_COMPRESSED, key),
+            ).fetchone()
             if saved:
+                if not isinstance(saved[0], bytes) or not isinstance(saved[1], str):
+                    raise ValueError("oversized or invalid stored projection")
                 obj = zlib.decompressobj()
                 raw = obj.decompress(saved[0], MAX_PAYLOAD + 1)
                 if len(raw) > MAX_PAYLOAD or not obj.eof or obj.unused_data or hashlib.sha256(raw).hexdigest() != saved[1]:
                     raise ValueError("invalid cache payload")
+                # Conservative lexical bound before allocating decoded row objects.
+                # Braces inside strings may reject caching; raw semantics are unchanged.
+                if raw.count(b"{") > MAX_ROWS:
+                    raise ValueError("too many cached row objects")
                 rows = json.loads(raw)
                 if not isinstance(rows, list) or any(not isinstance(row, dict) or not set(row).issubset(fields) for row in rows):
                     raise ValueError("invalid cache projection")
@@ -92,7 +104,7 @@ class DiscoveryCache:
                     raise ValueError("source changed during lookup")
                 self.stats["hits"] += 1
                 return rows
-        except (OSError, sqlite3.Error, ValueError, zlib.error, UnicodeError, TypeError):
+        except (OSError, sqlite3.Error, ValueError, zlib.error, UnicodeError, TypeError, RecursionError):
             self.stats["errors"] += 1
             # Never trust a damaged cache again during this invocation.
             self.close()
@@ -105,14 +117,29 @@ class DiscoveryCache:
         try:
             seen, unique, length = set(), [], 2
             for row in rows:
-                # Scalar source columns dominate discovery. Avoid JSON encoding
-                # every duplicate row, while keeping bool/int/float distinct.
+                # Reject costly cache admission before encoding. Never truncate or
+                # reject the authoritative rows returned to discovery. Six bytes per
+                # Unicode character bounds JSON escapes and UTF-8; large integers and
+                # nested values retain the original raw path instead of extra copies.
+                bound = 2
+                for name, value in row.items():
+                    bound += 6 * len(name) + 6
+                    if isinstance(value, str):
+                        bound += 6 * len(value) + 2
+                    elif value is None or type(value) in (bool, float):
+                        bound += 32
+                    elif type(value) is int and value.bit_length() <= 64:
+                        bound += 32
+                    else:
+                        bound = MAX_PAYLOAD + 1
+                    if bound > MAX_PAYLOAD:
+                        self.stats["rejected"] += 1
+                        return rows
                 identity = tuple((name, type(value), value) for name, value in row.items())
-                try:
-                    hash(identity)
-                except TypeError:
-                    identity = encoded(row)
                 if identity not in seen:
+                    if len(unique) >= MAX_ROWS:
+                        self.stats["rejected"] += 1
+                        return rows
                     length += len(encoded(row)) + 1
                     if length > MAX_PAYLOAD:
                         self.stats["rejected"] += 1

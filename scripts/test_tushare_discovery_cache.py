@@ -222,6 +222,58 @@ class DiscoveryDiskCache(unittest.TestCase):
             self.assertEqual(cache.read(path, key, {'ts_code'}, changed_loader), [{'ts_code': '000001.SZ'}])
             self.assertEqual(cache.stats['admitted'], 0)
 
+    def test_large_or_nested_row_rejected_before_encoding_without_losing_raw(self):
+        _, result, path = self.save('000001.SZ')
+        stat = path.stat()
+        key = (result['api_name'], result['object_sha256'], 'sample_ok', None,
+               stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+        original = cache_module.encoded
+        for value in ('x' * cache_module.MAX_PAYLOAD, ['nested'], 1 << 100):
+            with self.subTest(kind=type(value).__name__):
+                rows = [{'ts_code': value}]
+                def encode_guard(value):
+                    if isinstance(value, dict):
+                        raise AssertionError('oversized/nested row encoded before admission bound')
+                    return original(value)
+                with cache_module.DiscoveryCache(self.root, enabled=True) as cache, patch.object(
+                    cache_module, 'encoded', side_effect=encode_guard
+                ):
+                    self.assertIs(cache.read(path, key, {'ts_code'}, lambda rows=rows: rows), rows)
+                    self.assertEqual(cache.stats['admitted'], 0)
+                    self.assertEqual(cache.stats['rejected'], 1)
+
+    def test_large_cached_blob_not_materialized_or_decompressed(self):
+        self.save('000001.SZ')
+        self.compare()
+        with sqlite3.connect(self.root / 'discovery-cache.sqlite') as db:
+            db.execute('UPDATE projections SET payload=zeroblob(?)',
+                       (cache_module.MAX_COMPRESSED + 1,))
+        with patch.object(cache_module.zlib, 'decompressobj') as decompressor:
+            self.assertEqual(self.compare()[0]['stocks'], ['000001.SZ'])
+            decompressor.assert_not_called()
+
+    def test_deep_or_many_cached_objects_fall_back_before_large_decode(self):
+        import zlib
+        self.save('000001.SZ')
+        self.compare()
+        for raw in (b'[' * 2000 + b'0' + b']' * 2000,
+                    b'[' + b'{},' * cache_module.MAX_ROWS + b'{}]'):
+            with self.subTest(size=len(raw)):
+                with sqlite3.connect(self.root / 'discovery-cache.sqlite') as db:
+                    db.execute('UPDATE projections SET payload=?,sha=?',
+                               (zlib.compress(raw), m.digest(raw)))
+                actual, stats = self.compare()
+                self.assertEqual(actual['stocks'], ['000001.SZ'])
+                self.assertGreater(stats['disk_cache']['errors'], 0)
+
+    def test_many_projected_rows_bypass_cache_without_dropping_membership(self):
+        codes = [[f'{i:06d}.SZ', 1] for i in range(cache_module.MAX_ROWS + 1)]
+        self.save(None, items=codes)
+        actual, stats = self.compare()
+        self.assertEqual(len(actual['stocks']), cache_module.MAX_ROWS + 1)
+        self.assertEqual(stats['disk_cache']['admitted'], 0)
+        self.assertEqual(self.compare()[1]['disk_cache']['hits'], 0)
+
     def test_foreign_db_and_symlink_untouched(self):
         self.save('000001.SZ')
         target = self.root / 'other.sqlite'
