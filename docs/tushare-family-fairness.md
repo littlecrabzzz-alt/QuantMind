@@ -15,3 +15,6 @@ structured_api_turn:*、structured_phase:* 键完全不变。新组使用 family
 ```sh
 PYTHONPATH=scripts UV_OFFLINE=1 uv run --python 3.10 --no-project --with httpx --with pyarrow --with duckdb python -m unittest scripts.test_tushare_family_fairness scripts.test_tushare_structured_fairness scripts.test_tushare_queue_indexes scripts.test_tushare_extended_pipeline scripts.test_tushare_technical_extra_pipeline scripts.test_tushare_history_budget
 ```
+
+
+2026-09-09生产后置验收：4115b14已部署，03:19:13Z恢复采集。五API合计14次真实历史HTTP200，CYQ两接口分别返回22/3586行，其余12次为空并保留empty_unverified。14份observation SHA通过；原冻结signature和抽查100个旧job身份不变，history offset91237。新增历史是否进入后续发布/Mac尚未验收，不能据此称历史全量完成。报告/data/tushare/validation/intake-batch-20260909T025328Z/tushare-family-fairness-after4-20260909.json。

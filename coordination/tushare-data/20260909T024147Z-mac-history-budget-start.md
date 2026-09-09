@@ -1,0 +1,1 @@
+父授权history预算最小候选，codex/tushare-text在575e3e1基础独立增量。仅plan_extended预算验证及stream/islice后的循环；新test/doc。remaining stock_context仅开头family validate插入，已确认无重叠。保持原generator/绝对offset/signature，不重置任何已存cursor；源scan/time界协作检查，无生产/config/DB写入。

@@ -54,7 +54,10 @@ class IntakeAcceptance(unittest.TestCase):
         <p><strong>输入参数</strong></p><table><tr><th>名称</th></tr>
         <tr><td>date</td></tr></table><p>输出参数</p><table>
         <tr><th>名称</th><th>默认显示</th></tr><tr><td>title</td><td>Y</td></tr>
-        <tr><td>content</td><td>N</td></tr></table></div>
+        <tr><td>content</td><td>N</td></tr>
+        <tr><td>1w</td><td>Y</td></tr><tr><td>3day</td><td>N</td></tr>
+        <tr><td>1w</td><td>Y</td></tr>
+        <tr><td>bad;column</td><td>Y</td></tr></table></div>
         <div class="content">接口：footer</div>"""
         parser = DocParser()
         parser.feed(html)
@@ -62,7 +65,7 @@ class IntakeAcceptance(unittest.TestCase):
         result = parse_document(html, 9, "A")
         self.assertEqual(result["api_names"], ["example"])
         self.assertEqual(result["input_fields"], ["date"])
-        self.assertEqual(result["output_fields"], ["title", "content"])
+        self.assertEqual(result["output_fields"], ["title", "content", "1w", "3day"])
 
     def test_schema_cap_empty_and_permission_are_distinct(self):
         price_check = assess_response(

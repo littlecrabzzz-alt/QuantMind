@@ -41,3 +41,6 @@
 ## 2026-09-09 生产探测
 
 十个实际请求中盘前和开收盘竞价拒绝；管理层、薪酬、九转、AH共1801来源行、去重1775、43字段非空样本完整。管理层/九转/AH已启用；薪酬1428行保留且单期22行过滤通过，未知cap保护与完整性缺口未解除。固定ed2f8b46…3faf原文/Parquet/reader及8HTTP（含401、7筛选scope）通过；Mac清单同步正在补修。完整版本与耐久证据见tushare-progress 11:15记录。
+
+
+2026-09-09后置Mac验收已完成：固定ed2f8b46的release、probe SHA、全部probe_samples、dataset_checks和gaps与云端逐项相等，原文/Parquet/实际reader固定1775行完整对账；仍为3启用、3拒绝、薪酬自动禁用。完整历史与PIT未通过，不能将固定样本验收扩展到未采数据。报告validation/intake-batch-20260909T025328Z/stock7-mac-verified.json。

@@ -3787,8 +3787,14 @@
         "limit_up_num",
         "limit_down_num",
         "lu_days",
+        "3day",
+        "5day",
+        "10day",
+        "20day",
+        "60day",
         "mtd",
         "ytd",
+        "1year",
         "pe",
         "pb",
         "float_mv",
@@ -7524,7 +7530,14 @@
       ],
       "output_fields": [
         "date",
-        "on"
+        "on",
+        "1w",
+        "2w",
+        "1m",
+        "3m",
+        "6m",
+        "9m",
+        "1y"
       ],
       "audit_status": "schema_extracted",
       "permission_status": "unprobed",
@@ -7548,7 +7561,21 @@
         "date",
         "bank",
         "on_b",
-        "on_a"
+        "on_a",
+        "1w_b",
+        "1w_a",
+        "2w_b",
+        "2w_a",
+        "1m_b",
+        "1m_a",
+        "3m_b",
+        "3m_a",
+        "6m_b",
+        "6m_a",
+        "9m_b",
+        "9m_a",
+        "1y_b",
+        "1y_a"
       ],
       "audit_status": "schema_extracted",
       "permission_status": "unprobed",
@@ -7568,7 +7595,9 @@
         "end_date"
       ],
       "output_fields": [
-        "date"
+        "date",
+        "1y",
+        "5y"
       ],
       "audit_status": "schema_extracted",
       "permission_status": "unprobed",
@@ -7591,7 +7620,13 @@
       "output_fields": [
         "date",
         "curr_type",
-        "on"
+        "on",
+        "1w",
+        "1m",
+        "2m",
+        "3m",
+        "6m",
+        "12m"
       ],
       "audit_status": "schema_extracted",
       "permission_status": "unprobed",
@@ -7612,7 +7647,14 @@
       ],
       "output_fields": [
         "date",
-        "on"
+        "on",
+        "1w",
+        "2w",
+        "1m",
+        "2m",
+        "3m",
+        "6m",
+        "12m"
       ],
       "audit_status": "schema_extracted",
       "permission_status": "unprobed",
