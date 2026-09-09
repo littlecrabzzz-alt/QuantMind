@@ -1,0 +1,1 @@
+父授权 structured 消费公平候选；Mac codex/tushare-text，基线8c2e938。仅 pipeline __init__ 迁移/next_job/相邻helper、新公平测试/短文档，既有schema断言必要调整。轮转不改job/规划/其他family，schema6索引迁移及gate同事务checkpoint。remaining负责同文件imports/identifiers/plan_extended，范围已协调。本轮仅临时目录验证与候选commit/push，不生产操作。
