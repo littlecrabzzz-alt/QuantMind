@@ -25,6 +25,9 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from backend.shared.tushare_registry import (
+    HISTORY_MINUTES_RUNTIME_CONTRACTS,
+    MINUTE_SOURCE_FAMILIES,
+    history_minutes_runtime_prerequisites,
     CALENDAR_EXTRA_RUNTIME_CONTRACTS,
     FACTOR_LIBRARY_RUNTIME_CONTRACTS,
     calendar_extra_prerequisites,
@@ -110,7 +113,14 @@ def _planning_inputs(family, config, identifiers):
         raise ValueError("Unknown " + family + " API")
     contracts = {api: contracts[api] for api in selected}
     dependencies = {
-        dep for spec in contracts.values() for dep in spec.get("dependencies", ())
+        dep
+        for api, spec in contracts.items()
+        for dep in (
+            spec["planning_dependencies_by_value_mode"].get(
+                config.get("factor_library_value_mode", "factor_name"), spec.get("dependencies", ())
+            ) if family == "factor_library" and api == "factor_value"
+            and "planning_dependencies_by_value_mode" in spec else spec.get("dependencies", ())
+        )
     }
     for api, dependency in (("namechange", "stocks"), ("index_daily", "indexes")):
         if api in contracts:
@@ -122,6 +132,10 @@ def _planning_inputs(family, config, identifiers):
         keys.remove("history_start")
     if family not in ("structured", "market"):
         keys.add(family + "_history_start")
+    if family == "history_minutes":
+        keys.add("history_minutes_frequencies")
+    if family == "factor_library":
+        keys.add("factor_library_value_mode")
     if family == "foreign_financial":
         keys.add("foreign_financial_recent_days")
     if family == "text":
@@ -713,7 +727,16 @@ class Pipeline:
                 value = row.get(key)
                 if isinstance(value, str):
                     row["source_" + key] = value
-                    if (
+                    if key == "ts_code" and result["api_name"] in HISTORY_MINUTES_RUNTIME_CONTRACTS:
+                        kind = HISTORY_MINUTES_RUNTIME_CONTRACTS[result["api_name"]]["source_namespace"]
+                        if kind == "CN" and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", value):
+                            symbol, exchange = value.rsplit(".", 1)
+                            row[key] = exchange + symbol
+                        elif kind == "HK" and re.fullmatch(r"[0-9]{5}(?:![A-Z]{0,8})?\.HK", value):
+                            row[key] = "HK" + value.removesuffix(".HK")
+                        else:
+                            row[key] = kind + ":" + value
+                    elif (
                         key == "ts_code"
                         and result["api_name"] in CROSS_ASSET_RUNTIME_CONTRACTS
                     ):
@@ -972,7 +995,11 @@ class Pipeline:
             "fx_obasic": "fx_instruments",
             "fx_daily": "fx_instruments",
         }
+        # Additional sources enter only the minute projection, never an old universe.
+        families = {**dict.fromkeys(MINUTE_SOURCE_FAMILIES, "minute_source_only"), **families}
         result = {name: set() for name in families.values()}
+        result.update({name: set() for name in MINUTE_SOURCE_FAMILIES.values()})
+        result["minute_futures_unmapped"] = set()
         result.update(
             sw_indexes=set(),
             futures_continuous=set(),
@@ -986,7 +1013,7 @@ class Pipeline:
             (
                 "ts_code", "index_code", "level", "fut_code", "o_code", "n_code",
                 "name", "hm_name", "l1_code", "l2_code", "l3_code", "con_code",
-                "factor_name", "asset_type",
+                "factor_name", "asset_type", "mapping_ts_code",
             )
         )
         placeholders = ",".join("?" for _ in families)
@@ -1041,6 +1068,17 @@ class Pipeline:
             discovery["bypassed"] += int(bypass)
             discovery["body_reads"] += int(bool(eligible))
             for record in self.records(saved, fields=discovery_fields):
+                minute_family = MINUTE_SOURCE_FAMILIES.get(api)
+                if minute_family:
+                    field = "mapping_ts_code" if api == "fut_mapping" else "index_code" if api == "index_classify" else "ts_code"
+                    code = record.get(field)
+                    if isinstance(code, str) and code:
+                        if minute_family == "minute_futures" and code.split(".")[0].endswith(("L", "L1", "L2", "L3", "8888", "9999")):
+                            result["minute_futures_unmapped"].add(code)
+                        else:
+                            result[minute_family].add(code)
+                if families[api] == "minute_source_only":
+                    continue
                 if saved["api_name"] == "factor_list":
                     # Actual list identity only, not descriptions/demo IDs or
                     # factor_value outputs that cannot establish asset_type.
@@ -1057,6 +1095,7 @@ class Pipeline:
                         value = record.get(field)
                         if isinstance(value, str) and value:
                             result["cross_asset_indexes"].add(value)
+                            result["minute_indexes"].add(value)
                     continue  # Constituent ts_code is not an index identifier.
                 if saved["api_name"] == "index_classify" and record.get("index_code"):
                     result["sw_indexes"].add(record["index_code"])
@@ -1315,6 +1354,7 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "history_minutes": history_minutes_runtime_prerequisites,
             "calendar_extra": calendar_extra_prerequisites,
             "factor_library": factor_library_prerequisites,
             "cross_asset_extra": cross_asset_runtime_prerequisites,
@@ -1386,6 +1426,7 @@ class Pipeline:
         self.planning_timing["active_stage"] = "validation_and_snapshots"
         blocked_families = set()
         for family, validate in (
+            ("history_minutes", lambda cfg, ids: self.record_extra_planning_gaps("history_minutes", cfg, ids)),
             (
                 "calendar_extra",
                 lambda cfg, ids: self.record_extra_planning_gaps("calendar_extra", cfg, ids),

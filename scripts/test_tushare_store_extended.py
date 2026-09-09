@@ -189,6 +189,7 @@ class FixedStore(unittest.TestCase):
             "hsgt_top10": {"trade_date": "20260904", "market_type": "1"},
             "moneyflow_ind_dc": {"trade_date": "20260904", "content_type": "行业"},
         }
+        identity_params.update({api: {"freq": "1min"} for api in store.HISTORY_MINUTES_RUNTIME_CONTRACTS})
         for api, keys in store.KEYS.items():
             if api not in store.CONTRACTS and api not in (
                 "trade_cal",
@@ -262,7 +263,7 @@ class FixedStore(unittest.TestCase):
             }
             <= {api for api, _ in fixtures}
         )
-        self.assertEqual(len(fixtures), 205)
+        self.assertEqual(len(fixtures), 212)
 
     def test_dates_codes_and_macro_periods(self):
         pinned = release(

@@ -164,6 +164,38 @@ MARKET_SENTIMENT_RUNTIME_CONTRACTS = {
     for api, spec in MARKET_SENTIMENT_CONTRACTS.items()
 }
 
+from backend.shared.tushare_history_minutes_contracts import (
+    HISTORY_MINUTES_CONTRACTS, iter_history_minutes_jobs, history_minutes_prerequisites,
+)
+
+HISTORY_MINUTES_RUNTIME_CONTRACTS = {
+    api: {**spec, "group": "history_minutes"}
+    for api, spec in HISTORY_MINUTES_CONTRACTS.items()
+}
+# Source endpoint, not code shape, determines asset family. Keep old family
+# discovery unchanged and use observations (including expired/delisted rows).
+MINUTE_SOURCE_FAMILIES = {
+    **{api: spec["dependencies"][0] for api, spec in HISTORY_MINUTES_CONTRACTS.items()},
+    **dict.fromkeys(("stock_basic", "daily", "daily_basic", "adj_factor", "weekly", "monthly", "bak_basic"), "minute_stocks"),
+    **dict.fromkeys(("etf_basic", "etf_share_size", "etf_limit"), "minute_etfs"),
+    **dict.fromkeys(("index_basic", "index_daily", "idx_factor_pro", "ci_daily"), "minute_indexes"),
+    **dict.fromkeys(("index_classify", "sw_daily"), "minute_sw_indexes"),
+    **dict.fromkeys(("fut_basic", "fut_daily", "fut_mapping"), "minute_futures"),
+    **dict.fromkeys(("opt_basic", "opt_daily"), "minute_options"),
+    **dict.fromkeys(("hk_basic", "hk_daily", "hk_daily_adj"), "minute_hk_stocks"),
+}
+
+
+def history_minutes_runtime_prerequisites(identifiers=None, config=None):
+    gaps = history_minutes_prerequisites(identifiers, config=config)
+    if (identifiers or {}).get("minute_futures_unmapped") and "ft_mins" in (config or {}).get("history_minutes_apis", HISTORY_MINUTES_CONTRACTS):
+        gaps.append({"api_name": "ft_mins", "dependencies": ["minute_futures_unmapped"],
+                     "reason": "continuous_symbols_require_dated_actual_contract_mapping",
+                     "observed_unmapped": len(identifiers["minute_futures_unmapped"]),
+                     "universe_complete": False})
+    return gaps
+
+
 from backend.shared.tushare_calendar_extra_contracts import (
     CALENDAR_EXTRA_CONTRACTS,
     iter_calendar_extra_jobs,
@@ -475,6 +507,7 @@ CONNECT_RUNTIME_CONTRACTS = {
 }
 
 EXTENDED_CONTRACTS = {
+    **HISTORY_MINUTES_RUNTIME_CONTRACTS,
     **CALENDAR_EXTRA_RUNTIME_CONTRACTS,
     **FACTOR_LIBRARY_RUNTIME_CONTRACTS,
     **BOND_EXTRA_RUNTIME_CONTRACTS,
@@ -524,6 +557,7 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "history_minutes": iter_history_minutes_jobs,
     "calendar_extra": iter_calendar_extra_jobs,
     "factor_library": iter_factor_library_jobs,
     "bond_extra": lambda config, today, ids: iter_bond_extra_jobs(config, today, _bond_extra_identifiers(ids)),
