@@ -266,3 +266,12 @@
 
 
 09:37后置只读核查通过：全部111目标的job/logical_key/epoch/请求/group/priority与提交后证据一致；配置SHA仍一致，已完成/空结果未被重置。16个目标已有新尝试：daily done5/empty2、adj_factor done5/empty2、daily_basic done2，其余目标继续pending。该计数来自云端当前队列，新增响应尚不能算已进入Mac当前6a固定版。证据validation/rrg-priority-adjustments/rrg-window-20260909-de9677e3c154482bb4432954c6cbd998.verified.json及Mac/tmp/tushare-rrg-priority-postcheck.json。
+
+
+## 2026-09-09 09:58 RRG优先窗口落盘与联合候选
+
+- 111个RRG目标已全部产生新尝试：81非空、445887源行；30空响应均由同固定版SSE交易日历证实休市。303个原文/观测/Parquet文件SHA、35个已知请求字段、全部源列/原始代码/行身份逐行通过。原始daily ah_vol/ah_amount存在null并完整保留，不填零。证据`/tmp/tushare-rrg-priority-readonly-report.json`，SHA4050a55f101c85e4ecb06be6aa317c70ec766a43baa9a53e84eb3b374d5332d2。
+- 固定自动版data-ea8b819290385b2d630d940e2e3bd041f0c51ae59fe62c1256ba7ea4c9ff5af3包含49个新尝试，其余62在该版之后采集。包含旧probe/修订的全部对应API分区独立去重后，与实际reader的49个API/日期全列比较194099行，差异0；HTTP/上游0。此处未验证后续版或Mac，不把有限窗口当完整2021—2026/RRG PIT验收。
+- 父候选6e28dae整合风险5、技术5及structured独立API轮转/3近期:1历史机会；468项Tushare隔离回归24.736秒、Ruff及diff通过。曾用模块路径运行技术专项因scripts测试导入路径失败；改用仓库原discover入口后14项通过，不是代码故障。风险29字段、技术342字段均显式请求并保留来源语义；真实权限/过滤/字段仍待probe，不计入已生产154接口。
+- schema6仅增pending表达式索引，不改历史生成器、旧游标和任务内容；40万模拟任务索引约10.7MiB/239ms、全任务SHA不变。生产需停两专属消费者并自然排空、先一致备份再迁移；旧代码拒绝6，禁止用旧DB覆盖升级后新增进度。候选未发布，采集继续。
+- 五个/tmp迁移/风险技术probe/云Mac共用verifier已准备并检查Python3.10语法；启用helper继续独立准备。统一发布前先把测试和脚本做完，恢复采集后再做固定API/Mac验收。额外并行启动HK/US八财务接口纯契约研究，独立权限未知按缺口记录，全263基线+13发现的范围不缩减。
