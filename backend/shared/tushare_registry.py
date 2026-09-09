@@ -88,6 +88,63 @@ from backend.shared.tushare_foreign_financial_contracts import (
     foreign_financial_prerequisites,
 )
 
+from backend.shared.tushare_cross_asset_extra_contracts import (
+    CROSS_ASSET_EXTRA_CONTRACTS,
+    cross_asset_extra_prerequisites,
+    cross_asset_identifiers,
+    iter_cross_asset_extra_jobs,
+)
+
+CROSS_ASSET_NAMESPACES = {
+    "idx_factor_pro": "IDX:",
+    "fund_factor_pro": "FUND:",
+    "cb_factor_pro": "CB:",
+    "index_global": "GIDX:",
+    "sz_daily_info": "SZBOARD:",
+    "etf_limit": "FUND:",
+}
+CROSS_ASSET_RUNTIME_CONTRACTS = {
+    api: {
+        **spec,
+        "group": "cross_asset_extra",
+        "dependencies": [],
+        "saturation_fallback": spec["saturation_fallback"]
+        if spec["saturation_fallback"].startswith("cross_asset_")
+        else "cross_asset_" + spec["saturation_fallback"],
+        "source_namespace": CROSS_ASSET_NAMESPACES[api],
+        "namespace_note": spec["namespace_note"]
+        + " Canonical ts_code is "
+        + CROSS_ASSET_NAMESPACES[api]
+        + " plus the unchanged supplier code; source_ts_code preserves the original. Other datasets are not implicitly joined.",
+    }
+    for api, spec in CROSS_ASSET_EXTRA_CONTRACTS.items()
+}
+
+
+def cross_asset_runtime_prerequisites(identifiers, config=None):
+    projected = {
+        spec["saturation_fallback"]: identifiers.get(
+            CROSS_ASSET_RUNTIME_CONTRACTS[api]["saturation_fallback"], []
+        )
+        for api, spec in CROSS_ASSET_EXTRA_CONTRACTS.items()
+    }
+    names = {
+        spec["saturation_fallback"]: CROSS_ASSET_RUNTIME_CONTRACTS[api][
+            "saturation_fallback"
+        ]
+        for api, spec in CROSS_ASSET_EXTRA_CONTRACTS.items()
+    }
+    return [
+        {
+            **gap,
+            "dependencies": [
+                names.get(name, name) for name in gap.get("dependencies", [])
+            ],
+        }
+        for gap in cross_asset_extra_prerequisites(projected, config=config)
+    ]
+
+
 FOREIGN_FINANCIAL_RUNTIME_CONTRACTS = {
     api: {
         **spec,
@@ -107,6 +164,7 @@ def foreign_financial_runtime_prerequisites(identifiers, config=None):
     return foreign_financial_prerequisites(
         _foreign_financial_identifiers(identifiers), config=config
     )
+
 
 from backend.shared.tushare_stock_context_contracts import (
     STOCK_CONTEXT_CONTRACTS,
@@ -263,6 +321,7 @@ CONNECT_RUNTIME_CONTRACTS = {
 }
 
 EXTENDED_CONTRACTS = {
+    **CROSS_ASSET_RUNTIME_CONTRACTS,
     **FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
     **STOCK_CONTEXT_RUNTIME_CONTRACTS,
     **TECHNICAL_EXTRA_RUNTIME_CONTRACTS,
@@ -307,6 +366,7 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "cross_asset_extra": iter_cross_asset_extra_jobs,
     "foreign_financial": lambda config, today, ids: iter_foreign_financial_jobs(
         config, today, _foreign_financial_identifiers(ids)
     ),

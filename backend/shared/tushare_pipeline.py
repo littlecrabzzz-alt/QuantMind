@@ -25,6 +25,9 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from backend.shared.tushare_registry import (
+    CROSS_ASSET_RUNTIME_CONTRACTS,
+    cross_asset_runtime_prerequisites,
+    cross_asset_identifiers,
     EXTENDED_CONTRACTS,
     PLANNERS,
     contract_for,
@@ -623,7 +626,19 @@ class Pipeline:
                 value = row.get(key)
                 if isinstance(value, str):
                     row["source_" + key] = value
-                    if key == "ts_code" and (
+                    if (
+                        key == "ts_code"
+                        and result["api_name"] in CROSS_ASSET_RUNTIME_CONTRACTS
+                    ):
+                        # This asset family uses opaque, explicit namespaces before
+                        # any generic stock-shaped code handling; raw code is retained.
+                        row[key] = (
+                            CROSS_ASSET_RUNTIME_CONTRACTS[result["api_name"]][
+                                "source_namespace"
+                            ]
+                            + value
+                        )
+                    elif key == "ts_code" and (
                         result["api_name"] == "limit_cpt_list"
                         or contract_for(result["api_name"]).get("group")
                         in ("concept_extra", "dc_extra")
@@ -801,6 +816,12 @@ class Pipeline:
     def identifiers(self):
         families = {
             **{
+                api: spec["saturation_fallback"]
+                for api, spec in CROSS_ASSET_RUNTIME_CONTRACTS.items()
+            },
+            "ci_daily": "cross_asset_indexes",
+            "ci_index_member": "cross_asset_indexes",
+            **{
                 api: spec["dependencies"][0]
                 for api, spec in FOREIGN_FINANCIAL_RUNTIME_CONTRACTS.items()
             },
@@ -872,6 +893,12 @@ class Pipeline:
         ):
             saved = json.loads(row[0])
             for record in self.records(saved):
+                if saved["api_name"] == "ci_index_member":
+                    for field in ("l1_code", "l2_code", "l3_code"):
+                        value = record.get(field)
+                        if isinstance(value, str) and value:
+                            result["cross_asset_indexes"].add(value)
+                    continue  # Constituent ts_code is not an index identifier.
                 if saved["api_name"] == "index_classify" and record.get("index_code"):
                     result["sw_indexes"].add(record["index_code"])
                 if saved["api_name"] == "fut_basic":
@@ -938,7 +965,22 @@ class Pipeline:
         result["risk_securities"].update(
             result["risk_stocks"] | result["funds"] | result["etfs"]
         )
+        # Isolated discovery unions: never widen old-family stocks/funds/bonds.
+        result["cross_asset_indexes"].update(result["indexes"] | result["sw_indexes"])
+        result["cross_asset_funds"].update(result["funds"] | result["etfs"])
+        result["cross_asset_bonds"].update(result["bonds"])
+        result["cross_asset_etfs"].update(result["etfs"])
         result = {key: sorted(values) for key, values in result.items()}
+        for api, spec in CROSS_ASSET_RUNTIME_CONTRACTS.items():
+            family = spec["saturation_fallback"]
+            logical = EXTENDED_CONTRACTS[api].get("discovery_dependencies", [family])[0]
+            try:
+                result[family] = cross_asset_identifiers(
+                    {logical: result[family]}, [api]
+                )[logical]
+            except ValueError:
+                # Preserve malformed source evidence for family-local validation.
+                pass
         try:
             result.update(credit_identifiers(result))
         except ValueError:
@@ -1102,6 +1144,7 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "cross_asset_extra": cross_asset_runtime_prerequisites,
             "foreign_financial": foreign_financial_runtime_prerequisites,
             "stock_context": stock_context_runtime_prerequisites,
             "technical_extra": technical_extra_runtime_prerequisites,
@@ -1139,6 +1182,12 @@ class Pipeline:
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
+            (
+                "cross_asset_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "cross_asset_extra", cfg, ids
+                ),
+            ),
             (
                 "foreign_financial",
                 lambda cfg, ids: self.record_extra_planning_gaps(
