@@ -2505,24 +2505,111 @@ class Pipeline:
             self.db.execute("UPDATE jobs SET expanded=1 WHERE id=?", (row["id"],))
         self.db.commit()
 
+    def identifier_split_needs_discovery(self, job):
+        spec = contract_for(job["api_name"])
+        return bool(
+            spec.get("saturation_fallback")
+            and spec.get("saturation_param", "ts_code") not in job["params"]
+            and job["api_name"] not in ("fut_holding", "fut_weekly_detail")
+            and not (spec.get("group") == "global" and spec.get("pagination"))
+            and not self.date_children(job)
+        )
+
+    def resume_identifier_split(self, deadline):
+        # Existing state index limits this read to unresolved parents, not the
+        # millions of pending acquisition jobs. The result is already durable.
+        row = self.db.execute(
+            "SELECT * FROM jobs WHERE state='split_pending' "
+            "AND json_type(result,'$.partition_deferred') IS NOT NULL "
+            "ORDER BY priority,rowid LIMIT 1"
+        ).fetchone()
+        if row is None:
+            return None
+        if time.monotonic() >= deadline:
+            return {"status": "deadline_deferred", "job_id": row["id"], "upstream_calls": 0}
+        job, result = json.loads(row["job"]), json.loads(row["result"])
+        if (
+            result.get("partition_deferred") != {"version": 1, "kind": "identifier_fanout"}
+            or result.get("status") != "possibly_truncated"
+            or not self.identifier_split_needs_discovery(job)
+        ):
+            raise ValueError(
+                "Unsupported deferred identifier partition; evidence preserved"
+            )
+        try:
+            split = self.split_request(row, job, result)
+            result.pop("partition_deferred")
+            if split:
+                result["split"] = split
+            else:
+                result["partition_error"] = "no_legal_identifier_children"
+            self.db.execute(
+                "UPDATE jobs SET state=?,result=? WHERE id=?",
+                (
+                    "split_pending"
+                    if split and not result.get("normalization_error")
+                    else "blocked",
+                    json.dumps(result),
+                    row["id"],
+                ),
+            )
+            # Reconcile the exact parent before commit: unknown-universe evidence
+            # remains a gap. The original capture attempt is never overwritten.
+            self.reconcile_partitions(child_id=row["id"])
+            self.db.commit()
+        except BaseException:
+            self.db.rollback()
+            raise
+        return {
+            "status": "partitioned" if split else "blocked",
+            "job_id": row["id"],
+            "split": split,
+            "upstream_calls": 0,
+        }
+
     def run(self, client, token, config, max_requests=100, max_seconds=100, pause=0.6):
         started = time.monotonic()
+        partition_work = self.resume_identifier_split(started + max_seconds)
+        if partition_work is not None:
+            # One expensive local fanout is the entire run. Never combine a full
+            # discovery scan with another acquisition batch in the same task.
+            return {
+                "requests": 0,
+                "elapsed_seconds": round(time.monotonic() - started, 3),
+                "partition_work": partition_work,
+                **self.status(),
+            }
         self.reconcile_partitions()
         completed = 0
         while completed < max_requests and time.monotonic() - started < max_seconds:
             self.expand(config)
+            if time.monotonic() - started >= max_seconds:
+                break
             row = self.next_job(config, started + max_seconds)
-            if row is None:
+            if row is None or time.monotonic() - started >= max_seconds:
                 break
             job = json.loads(row["job"])
-            rejected = realtime_dispatch_status(job["api_name"], row["epoch"], config, time.time())
+            rejected = realtime_dispatch_status(
+                job["api_name"], row["epoch"], config, time.time()
+            )
             if rejected:
                 self.db.execute("UPDATE jobs SET state=? WHERE id=?", (rejected, row["id"]))
                 self.db.execute(
                     "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
                     "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
-                    ("dispatch:" + row["id"], rejected, utc_now(),
-                     json.dumps({"api_name": job["api_name"], "epoch": row["epoch"], "reason": rejected, "upstream_calls": 0})),
+                    (
+                        "dispatch:" + row["id"],
+                        rejected,
+                        utc_now(),
+                        json.dumps(
+                            {
+                                "api_name": job["api_name"],
+                                "epoch": row["epoch"],
+                                "reason": rejected,
+                                "upstream_calls": 0,
+                            }
+                        ),
+                    ),
                 )
                 self.db.commit()
                 continue
@@ -2607,10 +2694,19 @@ class Pipeline:
                 )
             if status == "possibly_truncated":
                 state = "blocked"
-                split = self.split_request(row, job, result)
-                if split:
-                    result["split"] = split
+                if self.identifier_split_needs_discovery(job):
+                    # Commit capture/normalization/attempt below before any full
+                    # discovery scan. A resumed parent never repeats its HTTP call.
+                    result["partition_deferred"] = {
+                        "version": 1,
+                        "kind": "identifier_fanout",
+                    }
                     state = "split_pending"
+                else:
+                    split = self.split_request(row, job, result)
+                    if split:
+                        result["split"] = split
+                        state = "split_pending"
             pagination = contract_for(job["api_name"]).get("pagination")
             if job["api_name"] == "fund_adj":
                 pagination = {"offset_param": "offset", "limit_param": "limit"}
@@ -2667,7 +2763,12 @@ class Pipeline:
                 try:
                     result = self.normalize(result)
                 except Exception as exc:
-                    state = "blocked"
+                    # The old path had already enqueued split children before a
+                    # normalization failure. Keep that obligation pending too;
+                    # resume restores blocked parent state after creating children.
+                    state = (
+                        "split_pending" if result.get("partition_deferred") else "blocked"
+                    )
                     result["normalization_error"] = type(exc).__name__
             self.db.execute(
                 "INSERT OR IGNORE INTO attempts(job_id,attempt,result) VALUES(?,?,?)",

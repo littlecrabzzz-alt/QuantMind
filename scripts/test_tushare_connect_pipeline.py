@@ -236,7 +236,16 @@ class ConnectRuntimeTest(unittest.TestCase):
             result = self.p.run(
                 client, "fixture", {}, max_requests=5, max_seconds=10, pause=0
             )
-        self.assertEqual(result["requests"], 5)
+            self.assertEqual(result["requests"], 3)
+            for _ in range(2):
+                resumed = self.p.run(
+                    client, "fixture", {}, max_requests=5, max_seconds=10, pause=0
+                )
+                self.assertEqual(resumed["requests"], 0)
+            remaining = self.p.run(
+                client, "fixture", {}, max_requests=2, max_seconds=10, pause=0
+            )
+        self.assertEqual(result["requests"] + remaining["requests"], 5)
         self.assertEqual(len(calls), 5)
         parent_split = self.p.db.execute(
             "SELECT * FROM partition_splits WHERE parent_id=?", (parent,)
