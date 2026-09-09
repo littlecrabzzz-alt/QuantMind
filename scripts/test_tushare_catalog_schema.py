@@ -103,6 +103,17 @@ class CatalogSchema(unittest.TestCase):
         result = parse_document(html + "</div>", 1, "示例")
         self.assertEqual(result["input_fields"], ["ts_code"])
 
+    def test_named_example_table_is_not_a_field_schema(self):
+        html = '<div class="col-md-9"><p>接口：hm_list</p><p>输出参数</p>'
+        html += table(
+            [["名称", "类型", "默认显示", "描述"], ["name", "str", "Y", "名称"]]
+        )
+        html += table(
+            [["名称", "说明", "关联机构"], ["Asking", "示例名称", "示例机构"]]
+        )
+        result = parse_document(html + "</div>", 311, "游资名录")
+        self.assertEqual(result["output_fields"], ["name"])
+
     def test_catalog_target_sha_and_exact_nine_field_difference(self):
         catalog = json.loads((ROOT / "config/tushare-catalog.json").read_text())
         evidence = self.evidence

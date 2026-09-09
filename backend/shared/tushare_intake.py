@@ -121,7 +121,12 @@ def parse_document(html, doc_id, title):
         rows = table["rows"]
         # Section labels persist through examples/category tables. Only the
         # documented field-name header identifies a schema (also compact ones).
-        if not rows or not rows[0] or rows[0][0] != "名称":
+        if (
+            not rows
+            or not rows[0]
+            or rows[0][0] != "名称"
+            or (len(rows[0]) > 1 and rows[0][1] not in {"类型", "默认显示", "默认输出"})
+        ):
             continue
         for row in rows[1:]:
             # Supplier fields include rate tenors (1w) and returns (3day).

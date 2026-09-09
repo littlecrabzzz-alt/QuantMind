@@ -1,0 +1,379 @@
+{
+  "public_pages": 263,
+  "all_original_html_sha_unchanged": true,
+  "provider_api_calls": 0,
+  "changes": [
+    {
+      "doc_id": "398",
+      "api_names": [
+        "stock_hsgt"
+      ],
+      "html_sha256": "b2c42ccbf8d9fec459cdbcf0d812db217773a7496a8e3b34e0a1c64d77ad80a4",
+      "delta": {
+        "input_fields": {
+          "removed": [
+            "HK_SZ",
+            "SZ_HK",
+            "HK_SH",
+            "SH_HK"
+          ],
+          "added": []
+        },
+        "output_fields": {
+          "removed": [],
+          "added": []
+        }
+      },
+      "excluded_tables": [
+        {
+          "section": "input",
+          "rows": [
+            [
+              "类型",
+              "类型名称"
+            ],
+            [
+              "HK_SZ",
+              "深股通(港>深)"
+            ],
+            [
+              "SZ_HK",
+              "港股通(深>港)"
+            ],
+            [
+              "HK_SH",
+              "沪股通(港>沪)"
+            ],
+            [
+              "SH_HK",
+              "港股通(沪>港)"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "doc_id": "94",
+      "api_names": [
+        "index_basic"
+      ],
+      "html_sha256": "be4ef1df3df824ca39bdfc13537503f7eee1e1541fa5854d921aee66112267b0",
+      "delta": {
+        "input_fields": {
+          "removed": [],
+          "added": []
+        },
+        "output_fields": {
+          "removed": [
+            "MSCI",
+            "CSI",
+            "SSE",
+            "SZSE",
+            "CICC",
+            "SW",
+            "OTH"
+          ],
+          "added": []
+        }
+      },
+      "excluded_tables": [
+        {
+          "section": "output",
+          "rows": [
+            [
+              "市场代码",
+              "说明"
+            ],
+            [
+              "MSCI",
+              "MSCI指数"
+            ],
+            [
+              "CSI",
+              "中证指数"
+            ],
+            [
+              "SSE",
+              "上交所指数"
+            ],
+            [
+              "SZSE",
+              "深交所指数"
+            ],
+            [
+              "CICC",
+              "中金指数"
+            ],
+            [
+              "SW",
+              "申万指数"
+            ],
+            [
+              "OTH",
+              "其他指数"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "doc_id": "211",
+      "api_names": [
+        "index_global"
+      ],
+      "html_sha256": "d609b225c655a55bde5a0d6cdbfe3dc12fd0b36eab07003adaff4d375145387c",
+      "delta": {
+        "input_fields": {
+          "removed": [
+            "XIN9",
+            "HSI",
+            "HKTECH",
+            "HKAH",
+            "DJI",
+            "SPX",
+            "IXIC",
+            "FTSE",
+            "FCHI",
+            "GDAXI",
+            "N225",
+            "KS11",
+            "AS51",
+            "SENSEX",
+            "IBOVESPA",
+            "RTS",
+            "TWII",
+            "CKLSE",
+            "SPTSX",
+            "CSX5P",
+            "RUT"
+          ],
+          "added": []
+        },
+        "output_fields": {
+          "removed": [],
+          "added": []
+        }
+      },
+      "excluded_tables": [
+        {
+          "section": "input",
+          "rows": [
+            [
+              "TS指数代码",
+              "指数名称"
+            ],
+            [
+              "XIN9",
+              "富时中国A50指数  (富时A50)"
+            ],
+            [
+              "HSI",
+              "恒生指数"
+            ],
+            [
+              "HKTECH",
+              "恒生科技指数"
+            ],
+            [
+              "HKAH",
+              "恒生AH股H指数"
+            ],
+            [
+              "DJI",
+              "道琼斯工业指数"
+            ],
+            [
+              "SPX",
+              "标普500指数"
+            ],
+            [
+              "IXIC",
+              "纳斯达克指数"
+            ],
+            [
+              "FTSE",
+              "富时100指数"
+            ],
+            [
+              "FCHI",
+              "法国CAC40指数"
+            ],
+            [
+              "GDAXI",
+              "德国DAX指数"
+            ],
+            [
+              "N225",
+              "日经225指数"
+            ],
+            [
+              "KS11",
+              "韩国综合指数"
+            ],
+            [
+              "AS51",
+              "澳大利亚标普200指数"
+            ],
+            [
+              "SENSEX",
+              "印度孟买SENSEX指数"
+            ],
+            [
+              "IBOVESPA",
+              "巴西IBOVESPA指数"
+            ],
+            [
+              "RTS",
+              "俄罗斯RTS指数"
+            ],
+            [
+              "TWII",
+              "台湾加权指数"
+            ],
+            [
+              "CKLSE",
+              "马来西亚指数"
+            ],
+            [
+              "SPTSX",
+              "加拿大S&P/TSX指数"
+            ],
+            [
+              "CSX5P",
+              "STOXX欧洲50指数"
+            ],
+            [
+              "RUT",
+              "罗素2000指数"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "doc_id": "268",
+      "api_names": [
+        "sz_daily_info"
+      ],
+      "html_sha256": "801db76a7d3a0f8331ddd57492771c9e18670d3f8d0649876d702aaf14e74604",
+      "delta": {
+        "input_fields": {
+          "removed": [
+            "ETF",
+            "LOF",
+            "ABS"
+          ],
+          "added": []
+        },
+        "output_fields": {
+          "removed": [],
+          "added": []
+        }
+      },
+      "excluded_tables": [
+        {
+          "section": "input",
+          "rows": [
+            [
+              "板块代码（TS_CODE）",
+              "板块说明",
+              "数据开始日期"
+            ],
+            [
+              "股票",
+              "深圳市场股票总和",
+              "20080102"
+            ],
+            [
+              "主板A股",
+              "深圳主板A股情况",
+              "20080102"
+            ],
+            [
+              "主板B股",
+              "深圳主板B股情况",
+              "20080102"
+            ],
+            [
+              "创业板A股",
+              "深圳创业板情况",
+              "20080102"
+            ],
+            [
+              "基金",
+              "深圳市场基金总和",
+              "20080102"
+            ],
+            [
+              "ETF",
+              "深圳ETF交易情况",
+              "20080102"
+            ],
+            [
+              "LOF",
+              "深圳LOF交易情况",
+              "20080102"
+            ],
+            [
+              "封闭式基金",
+              "深圳封闭式基金交易情况",
+              "20080102"
+            ],
+            [
+              "基础设施基金",
+              "深圳RETIS基金交易情况",
+              "20210621"
+            ],
+            [
+              "债券",
+              "深圳债券市场总和",
+              "20080102"
+            ],
+            [
+              "债券现券",
+              "深圳现券交易情况",
+              "20080102"
+            ],
+            [
+              "债券回购",
+              "深圳债券回购交易情况",
+              "20080102"
+            ],
+            [
+              "ABS",
+              "深圳ABS交易情况",
+              "20080102"
+            ],
+            [
+              "期权",
+              "深圳期权总和",
+              "20080102"
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "named_example_table_regression": {
+    "doc_id": "311",
+    "header": [
+      "名称",
+      "说明",
+      "关联机构"
+    ],
+    "discarded_example_names": [
+      "zhouyu1933",
+      "bike770",
+      "Asking"
+    ],
+    "actual_output_fields": [
+      "name",
+      "desc",
+      "orgs"
+    ]
+  },
+  "full_evidence_path": "/tmp/tushare-full-schema-audit-20260909/final-report.json",
+  "full_evidence_sha256": "db6ffbb0e6c8588d017ab4b9f43338d4344206221f2e78bdf8706df231163ab2",
+  "source_index_sha256": "182240e4826c7e65a6b63ef83efdc4e14b7b3589a6249ed54cd36ac66c937dce",
+  "note": "Only schema lists changed. Enumeration values stay in original HTML and excluded-table evidence; they are not API parameter/field names. Existing hm_list catalog was already corrected and remains unchanged."
+}
