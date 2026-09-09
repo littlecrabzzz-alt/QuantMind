@@ -1,6 +1,6 @@
-# 技术指标、筹码与备用行情纯候选
+# 技术指标、筹码与备用行情接入候选
 
-基线 `8c2e938`，2026-09-09 官方复核。五个不同 API 均属于现有 263 基线，未注册；`stk_factor_pro` 不是 `stk_factor` 或 `pro_bar` 的别名。仅新增纯合同/惰性规划和隔离测试，未修改完整目录义务、运行注册、数据或配置，权限全部 `unprobed`。
+基线 `8c2e938`，2026-09-09 官方复核。五个不同 API 均属于现有 263 基线，未注册；`stk_factor_pro` 不是 `stk_factor` 或 `pro_bar` 的别名。已在隔离候选注册纯合同、规划与固定版本存储，未修改完整目录义务、生产数据或配置，权限全部 `unprobed`；尚未 probe、启用或部署。
 
 | 官方接口 | 全输出列 | 公开单次上限 | 公开权限/频率 | 历史范围 |
 |---|---:|---:|---|---|
@@ -16,7 +16,7 @@
 
 ## 规划与后续接线
 
-导出 `TECHNICAL_EXTRA_CONTRACTS`、`iter_technical_extra_jobs(config,today,identifiers=None)`、`technical_extra_prerequisites(...)`。建议 group/开关为 `technical_extra` / `enable_technical_extra`；配置 `technical_extra_apis` 与 `technical_extra_history_start`（字符串或 API 映射，回退 `history_start`）。本候选不注册这些运行入口。
+导出 `TECHNICAL_EXTRA_CONTRACTS`、`iter_technical_extra_jobs(config,today,identifiers=None)`、`technical_extra_prerequisites(...)`。group/开关为 `technical_extra` / `enable_technical_extra`；配置 `technical_extra_apis` 与 `technical_extra_history_start`（字符串或 API 映射，回退 `history_start`）。运行 registry 适配逻辑 `stocks` 至独立 `technical_stocks`，不会改变其他 family 的标识集合。
 
 五接口输入均为字符串 `ts_code/trade_date/start_date/end_date`；仅 `bak_daily` 另公开字符串 `offset/limit`。筹码两接口 **必须 `ts_code`**；专业版必须 `ts_code/trade_date` 至少一项，其余两接口没有已公开的必选项。不能把筹码请求变成无代码全市场请求，也不能以专业版裸日期范围替代合法请求。
 
@@ -33,3 +33,10 @@
 - 数据日与观察时刻分开。估值/行业归属/动态因子未证明当时可知，七日重刷不能证明旧修订或删除已覆盖。筹码/备用价格复权、币种等不明处逐列保留源值，不能直接当作 RRG 或完整 PIT 研究准入。
 
 离线验证：`python3 -B scripts/test_tushare_technical_extra_contracts.py`，8 项通过；完整官方字段与保存目录一致、合法参数/所有列、闰月首尾无重叠遗漏、历史 T 代码、缺失依赖隔离、懒序列公平性；提取现有纯 `assess_response/date_children` 验证上限状态和筹码月窗 29 日叶分片。Ruff 通过。未调用 Tushare 数据 API、未执行生产或完整回测。
+
+
+运行候选在 `07a7fde` 纯提交之后接入 registry、pipeline 发现/规划验证、store 与 mirror 安装名单。`technical_stocks` 合并已存 stock_basic、历史挂牌/退市/BSE旧新代码、龙虎榜/涨跌停/ST 股票，以及 daily/daily_basic/adj_factor 和本组 API 来源观察（含 saturated attempts）；不加入 ETF/fund 或概念指数目录，也不按当前上市状态裁剪。真正全历史主数据完整性仍是 gap，坏代码只阻塞本组。
+
+读取默认日期均为 `trade_date`；`read_dataset`、`dataset_schema`、`export_jsonl` 使用实际返回全字段和现有自然键/`_row_identity`。原始负值、PE 空值、新增未知列、T 与复用普通代码、筹码同日多个价格档位/不同源行均保留；units/adjustment/formula/PIT/逐字段 gap 随读取元数据返回。此增量不改 SQLite/Parquet/manifest schema 或既有 release 含义，不迁移或重写旧文件；旧固定版没有本组分区时继续明确 unavailable，不能回源。`pipeline.__init__`、`next_job`、publish/interval 与其他 planner 均保持原实现。
+
+运行验证：`UV_OFFLINE=1 uv run --no-project --with httpx --with pyarrow --with duckdb --with fastapi --with pyyaml --with reportlab --with pypdf python -B -m unittest discover -s scripts -p 'test_tushare*.py'`，**456 项通过，21.199 秒**，包含新增 6 项采集→normalize→publish→固定版读取测试，完整 342 列/未知列、历史身份与隔离、日期过滤/JSONL、旧版缺口、分片/满 cap 终端 blocked，以及全部 store 164 数据集夹具。日志仅 Mac `/tmp/tushare-technical-runtime-tests.log`；Ruff/diff 与 Pipeline 方法 AST 范围检查通过。未实测权限、月窗上游过滤或全历史完整性。

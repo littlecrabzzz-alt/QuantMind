@@ -22,6 +22,7 @@ from backend.shared.tushare_registry import (
     CONCEPT_EXTRA_RUNTIME_CONTRACTS,
     DC_EXTRA_RUNTIME_CONTRACTS,
     RISK_EVENT_RUNTIME_CONTRACTS,
+    TECHNICAL_EXTRA_RUNTIME_CONTRACTS,
 )
 from backend.shared.tushare_credit_extra_contracts import CREDIT_EXTRA_CONTRACTS
 from backend.shared.tushare_etf_basket_contracts import ETF_BASKET_CONTRACTS
@@ -47,6 +48,7 @@ KEYS = {
 }
 CONTRACTS = {
     **RISK_EVENT_RUNTIME_CONTRACTS,
+    **TECHNICAL_EXTRA_RUNTIME_CONTRACTS,
     **DC_EXTRA_RUNTIME_CONTRACTS,
     **CONCEPT_EXTRA_RUNTIME_CONTRACTS,
     **LIMIT_EXTRA_RUNTIME_CONTRACTS,
@@ -493,6 +495,22 @@ def _dataset(root, release_id, api_name):
                 "unit_note",
                 "source_consistency_gap",
                 "future_gap",
+            ):
+                if spec.get(note):
+                    metadata[note] = spec[note]
+        if api_name in TECHNICAL_EXTRA_RUNTIME_CONTRACTS:
+            for note in (
+                "namespace_note",
+                "history_gap",
+                "pit_gap",
+                "unit_note",
+                "adjustment_note",
+                "formula_gap",
+                "pre_close_gap",
+                "pagination_gap",
+                "saturation_gap",
+                "refresh_gap",
+                "field_gaps",
             ):
                 if spec.get(note):
                     metadata[note] = spec[note]
