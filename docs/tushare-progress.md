@@ -288,3 +288,10 @@
 
 
 10:39补充：真实自动publish_only任务e7b0e64f完成SUCCESS、零请求、performed=true，整轮49.245秒、发布47.438秒，CURRENT推进2e1585a2…；后续两正常采集186/217请求均成功，发布与采集分轮的恢复链已验证。详见tushare-publish-first.md与/tmp/tushare-publish-first-chain-evidence.json。性能agent查明技术近期前缀86737项；500/轮预算会到第174轮才进入history，现offset4000未重置。已并行准备“预算只扣history、绝对源offset保持且有扫描时限”的最小候选，未部署、不承诺吞吐倍增。
+
+
+## 2026-09-09 10:47 下一批候选准备
+
+父独立分支0056b55已合并foreign_financial8、stock_context7和单次coverage聚合/提前释放旧manifest优化；498项联合Tushare测试22.608秒通过，Ruff/diff通过。实际注册计数179采集API、185读取数据集（含6查询别名），这是候选计数，生产仍164采集API。两组运行接线冲突已保留全部family/标识/日期轴与179扩展fixture，没有取消任何断言。foreign8完整192字段、stock7完整68字段（含managers.resume非默认列），默认均关闭。
+
+两个agent分别准备有界真实probe及固定云/Mac验收，root复用逐接口启用helper，全部已知字段不豁免；第三agent修复历史预算跳过近期前缀，维持绝对源offset/signature，并增加scan/time界。候选全部备齐前不暂停生产。02:43:37Z生产正常269请求、126.717秒，pending991107，云盘可用253.46GiB；队列增长与完整历史待办保留，不把pending计数当已下载数据量。
