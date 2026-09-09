@@ -410,3 +410,13 @@
 - RRG40 ca7c完整云/Mac120文件217026行、40全列+40as_of零差异。另已证240日历骨架及必要股价/复权/当前权重字段齐备；5394当日与5337完整20日个股输入存在。67缺价端点按已存官方停牌语义解释，剩208端点/48股精确清单，20260831仅2端点优先补证。历史成员known_at、权重口径、ETF及研究case仍blocked_data。
 - 全范围差集重新按命名接口核对：234命名并集减212注册=22，含19只读、1 SDK pro_bar、2 excluded_mutation；无名/失效/分类页及3 unresolved mentions继续保留。融资历史slb_sec/slb_sec_detail/slb_len_mm与开户历史stk_account/stk_account_old共34字段在独立worktree并行实现，尚未生产采样/部署。
 - 本批不可变证据目录/data/tushare/validation/intake-batch-20260909T065700Z；清单/tmp/minute-factor-preparation-archive.json与/tmp/minute-calendar-closure-archive.json，双端核对/tmp/minute-calendar-dual-fixed-compare.json。263基线+13发现、全部历史/修订/正文附件与消费端/RRG准入仍未完成。
+
+## 2026-09-09 22:06 月窗口、指数公告与历史接口候选
+
+- 股票分钟额外一次窄窗真实返回40203、2次/天，已持久记录；与原1次/分钟观察分开保留，不再追加当天探测。原241行不重抓。固定1d96532云/Mac核查完全同SHA93ed0fe3a8a13a511d0624dbdd8dd7224c0be76e1a179cd76bb553608e514af7，状态unavailable_no_success_claim；本次没有新分钟数据。
+- factor_value真实两次调用：000001.SZ/20260801–31返回4340行、21个交易日期；只从实际返回日期选0817独立控制，212行。均4列齐全、未触6000上限。固定4d55e6bd月/日默认及显式日期轴四次读取与原始响应逐列相等，云/Mac报告完全同SHA948fd93e2fe674f4d462fb867b5438efaa0dcba5d871551a254a9b4d12f28b98。只证明这一个股票/月窗口，不证明全部因子、日历、历史或PIT；月规划迁移尚未实现，原每日回填继续。
+- idx_anns已实际追加启用，只有calendar_extra_apis从[cn_schedule]改为[cn_schedule,idx_anns]。新近期7、历史250，共257请求，事后全部身份核验一致、当时pending；历史游标仍未完成，原任务/其他配置保留。receipt idx-anns-append-enable-20260909.json SHAdea99b503a92fd51e4df0277803ad8e2566783b6c153c906b1e55f529ad9eb73；启用0上游请求，发布4d55e6bd。既有eco两项语义/饱和缺口不豁免、不启用。
+- 标准Mac镜像4d55e6bd已完成378780文件校验、2040新增。第一次pointer_fetch SSH退出255，终止已确认；SSH只读复查成功后重试通过，旧固定CURRENT未被失败覆盖。分钟前一轮1d96532镜像376739文件、5894新增也完成。
+- 父候选融资3运行时845efcd及实际起点签名修复745e0a6，父45相关测试通过。开户2纯0d251f1、运行时62aa0e9，父60相关测试3.577秒通过，旧周期原文保留且本地支持闭区间相交/端点过滤，未知周期明确gap不丢数据。合计候选217采集API/223读取dataset，尚未主树发布，生产仍212/218。融资3有限真实探测及开户控制探测在准备，默认off不能报生产采样完成。
+- 云端13:50:37Z一轮SoftTimeLimitExceeded：160秒预算中planning66.556秒、identifiers60.030秒、acquire78.976秒，下一轮继续。诊断发现每tick重解析历史body且每tick新Pipeline；只加SQL索引不能解决。独立派生磁盘缓存候选正在实施，不改正式schema/原始对象/来源集合，尚未启用；不把合成基准外推为生产加速。
+- 本批证据归档/data/tushare/validation/intake-batch-20260909T133800Z，父测试、真实报告、固定核查、追加收据及postcheck均有不可变SHA。实时剩余8接口纯合同接续；发现stk_auction官方已支持历史，按原文保留历史义务，新增邻接API另列，范围不以原目录数量封顶。完整目标未完成。
