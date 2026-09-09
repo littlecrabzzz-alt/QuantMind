@@ -15,6 +15,7 @@ import re
 import tempfile
 
 from backend.shared.tushare_registry import (
+    REALTIME_RUNTIME_CONTRACTS,
     ACCOUNT_HISTORY_RUNTIME_CONTRACTS,
     SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS,
     HISTORY_MINUTES_RUNTIME_CONTRACTS,
@@ -57,7 +58,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
-    **ACCOUNT_HISTORY_RUNTIME_CONTRACTS,
+    **REALTIME_RUNTIME_CONTRACTS,    **ACCOUNT_HISTORY_RUNTIME_CONTRACTS,
     **SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS,
     **HISTORY_MINUTES_RUNTIME_CONTRACTS,
     **CALENDAR_EXTRA_RUNTIME_CONTRACTS,
@@ -282,7 +283,8 @@ def _dataset(root, release_id, api_name):
                 missing = [
                     field
                     for field in identity_fields
-                    if params.get(field) is None or params.get(field) == ""
+                    if (params.get(field) is None or params.get(field) == "")
+                    and field not in spec.get("optional_request_identity_fields", [])
                 ]
                 if missing:
                     raise ValueError(
@@ -290,7 +292,7 @@ def _dataset(root, release_id, api_name):
                         + ",".join(missing)
                     )
                 identity_json = json.dumps(
-                    {field: params[field] for field in identity_fields},
+                    {field: params.get(field) for field in identity_fields},
                     ensure_ascii=False,
                     sort_keys=True,
                 )
@@ -561,7 +563,7 @@ def _dataset(root, release_id, api_name):
                     "row_cap", "row_cap_verified", "minimum_points", "independent_permission",
                 ):
                     metadata[name] = value
-        if api_name in BOND_EXTRA_RUNTIME_CONTRACTS or api_name in CALENDAR_EXTRA_RUNTIME_CONTRACTS or api_name in FACTOR_LIBRARY_RUNTIME_CONTRACTS or api_name in HISTORY_MINUTES_RUNTIME_CONTRACTS:
+        if api_name in REALTIME_RUNTIME_CONTRACTS or api_name in BOND_EXTRA_RUNTIME_CONTRACTS or api_name in CALENDAR_EXTRA_RUNTIME_CONTRACTS or api_name in FACTOR_LIBRARY_RUNTIME_CONTRACTS or api_name in HISTORY_MINUTES_RUNTIME_CONTRACTS:
             for note, value in spec.items():
                 if note.endswith(("_gap", "_note")) or note in (
                     "field_gaps", "field_metadata", "hidden_fields", "permission_status",
@@ -695,6 +697,8 @@ def _date_expression(field, columns):
 
 
 def _default_date_field(api_name, columns):
+    if api_name in REALTIME_RUNTIME_CONTRACTS:
+        return REALTIME_RUNTIME_CONTRACTS[api_name]["date_field"]
     if api_name in ACCOUNT_HISTORY_RUNTIME_CONTRACTS:
         return "date"
     if api_name in HISTORY_MINUTES_RUNTIME_CONTRACTS:
@@ -763,10 +767,12 @@ def _query(
                 check_params.append(cutoff)
             if db.execute("SELECT 1 FROM stored WHERE " + invalid + " LIMIT 1", check_params).fetchone():
                 raise ValueError("period_projection_unverified: date filtering could omit unrecognized source periods; raw unfiltered read remains available")
-        minute = api_name in HISTORY_MINUTES_RUNTIME_CONTRACTS and date_field == "trade_time"
+        minute = (api_name in HISTORY_MINUTES_RUNTIME_CONTRACTS and date_field == "trade_time") or (api_name in REALTIME_RUNTIME_CONTRACTS and date_field in ("time", "trade_time"))
         if minute:
             column = "CAST(" + _identifier(date_field, columns) + " AS VARCHAR)"
             expression = "TRY_STRPTIME(replace(" + column + ", 'T', ' '), '%Y-%m-%d %H:%M:%S')"
+            if api_name in REALTIME_RUNTIME_CONTRACTS and db.execute("SELECT 1 FROM stored WHERE " + expression + " IS NULL LIMIT 1").fetchone():
+                raise ValueError("realtime_timestamp_unverified: cannot filter unknown source timestamp without inventing date/timezone")
         else:
             expression = _date_expression(
                 "_period_end" if old_period and date_field == "date" else date_field, columns
