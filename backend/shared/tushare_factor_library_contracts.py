@@ -3,6 +3,7 @@
 from datetime import date, datetime, timedelta
 import re
 
+from backend.shared.tushare_market_contracts import _months
 from backend.shared.tushare_structured_contracts import _contract, _parse
 from backend.shared.tushare_technical_extra_contracts import _days
 
@@ -217,6 +218,15 @@ def _value_mode(config):
     return mode
 
 
+def _history_window(config):
+    window = config.get("factor_library_history_window", "daily")
+    if window not in ("daily", "month"):
+        raise ValueError("factor_library_history_window must be daily or month")
+    if window == "month" and _value_mode(config) != "code_only":
+        raise ValueError("Monthly factor history requires explicit code_only mode")
+    return window
+
+
 def _stock_codes(identifiers):
     """Caller supplies observed source stocks; preserve historical T identities."""
     codes = (identifiers or {}).get("factor_library_stocks", ())
@@ -237,6 +247,7 @@ def factor_library_prerequisites(identifiers=None, enabled_apis=None, config=Non
     enabled = _enabled(config)
     starts = _starts(config, enabled)
     mode = _value_mode(config)
+    _history_window(config)
     names, assets = (
         _factor_names(identifiers)
         if "factor_value" in enabled and mode == "factor_name"
@@ -306,7 +317,7 @@ def factor_library_prerequisites(identifiers=None, enabled_apis=None, config=Non
 
 
 def iter_factor_library_jobs(config, today, identifiers=None):
-    """Full optional list snapshot; recent7/history daily requests by actual name or code."""
+    """Recent7 stays daily; explicit code_only history may use clipped calendar months."""
     if isinstance(today, datetime):
         today = today.date()
     if not isinstance(today, date):
@@ -316,6 +327,7 @@ def iter_factor_library_jobs(config, today, identifiers=None):
     if any(v and v > today for v in starts.values()):
         raise ValueError("History start cannot be after today")
     mode = _value_mode(config)
+    window = _history_window(config)
     selectors = []
     if "factor_value" in enabled:
         selectors = (
@@ -344,7 +356,15 @@ def iter_factor_library_jobs(config, today, identifiers=None):
             begin, end = start, recent - timedelta(days=1)
         else:
             begin, end = max(start or recent, recent), today
-        for params in _days(begin, end):
+        windows = (
+            (
+                {"start_date": a.strftime("%Y%m%d"), "end_date": b.strftime("%Y%m%d")}
+                for a, b in _months(begin, end)
+            )
+            if history and window == "month"
+            else _days(begin, end)
+        )
+        for params in windows:
             for selector in selectors:
                 yield {
                     "api_name": "factor_value",

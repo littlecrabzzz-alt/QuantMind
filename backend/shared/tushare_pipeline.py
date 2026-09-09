@@ -147,6 +147,10 @@ def _planning_inputs(family, config, identifiers):
         keys.add("history_minutes_frequencies")
     if family == "factor_library":
         keys.add("factor_library_value_mode")
+        # Omitted/explicit daily preserve existing policy hashes and cursors.
+        # Switching to month is an explicit policy migration, never offset reuse.
+        if config.get("factor_library_history_window", "daily") != "daily":
+            keys.add("factor_library_history_window")
     if family == "foreign_financial":
         keys.add("foreign_financial_recent_days")
     if family == "text":
