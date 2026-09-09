@@ -1,6 +1,6 @@
 """Offline checks for futures fields, distinct clocks and lazy complete scopes."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from itertools import islice
 import json
 from pathlib import Path
@@ -132,8 +132,8 @@ class FuturesExtra(unittest.TestCase):
                 if api == "fut_trade_cal":
                     dates.extend(
                         days(
-                            date.fromisoformat(p["start_date"]),
-                            date.fromisoformat(p["end_date"]),
+                            datetime.strptime(p["start_date"], "%Y%m%d").date(),
+                            datetime.strptime(p["end_date"], "%Y%m%d").date(),
                         )
                     )
                     self.assertNotIn("is_open", p)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Offline global contracts/planning verification; no API calls or data writes."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from itertools import islice
 import json
 from pathlib import Path
@@ -347,8 +347,8 @@ class GlobalContracts(unittest.TestCase):
                 "2026"
             ):
                 continue
-            start = date.fromisoformat(job["params"]["start_date"])
-            end = date.fromisoformat(job["params"]["end_date"])
+            start = datetime.strptime(job["params"]["start_date"], "%Y%m%d").date()
+            end = datetime.strptime(job["params"]["end_date"], "%Y%m%d").date()
             self.assertLessEqual((end - start).days, 365)
         # Re-enumerating after a long outage still covers every fully ended period.
         for api, closed in (
@@ -359,8 +359,8 @@ class GlobalContracts(unittest.TestCase):
             for job in later:
                 if job["api_name"] != api:
                     continue
-                start = date.fromisoformat(job["params"]["start_date"])
-                end = date.fromisoformat(job["params"]["end_date"])
+                start = datetime.strptime(job["params"]["start_date"], "%Y%m%d").date()
+                end = datetime.strptime(job["params"]["end_date"], "%Y%m%d").date()
                 covered.update(
                     start + timedelta(days=n) for n in range((end - start).days + 1)
                 )
@@ -393,8 +393,8 @@ class GlobalContracts(unittest.TestCase):
             )
             for job in rows:
                 params = job["params"]
-                left = date.fromisoformat(params["start_date"])
-                right = date.fromisoformat(params["end_date"])
+                left = datetime.strptime(params["start_date"], "%Y%m%d").date()
+                right = datetime.strptime(params["end_date"], "%Y%m%d").date()
                 self.assertLessEqual(right.year - left.year, 9)
                 # Even a range straddling partial weekly labels stays below guard.
                 self.assertLess(
@@ -418,8 +418,8 @@ class GlobalContracts(unittest.TestCase):
                 self.assertTrue(all(p in history for p in old))
                 ranges = sorted(
                     (
-                        date.fromisoformat(j["params"]["start_date"]),
-                        date.fromisoformat(j["params"]["end_date"]),
+                        datetime.strptime(j["params"]["start_date"], "%Y%m%d").date(),
+                        datetime.strptime(j["params"]["end_date"], "%Y%m%d").date(),
                     )
                     for j in later
                     if j["api_name"] == api

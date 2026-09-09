@@ -1,7 +1,7 @@
 """Pure, offline Connect/board-flow plans; never registers or probes endpoints."""
 
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from itertools import islice
 import json
 from pathlib import Path
@@ -98,8 +98,8 @@ class ConnectContractsTest(unittest.TestCase):
             if "trade_date" in p:
                 days = {p["trade_date"]}
             else:
-                begin = date.fromisoformat(p["start_date"])
-                end = date.fromisoformat(p["end_date"])
+                begin = datetime.strptime(p["start_date"], "%Y%m%d").date()
+                end = datetime.strptime(p["end_date"], "%Y%m%d").date()
                 days = span(begin, end)
             variant = tuple(
                 (key, p[key])

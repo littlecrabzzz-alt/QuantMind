@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pure six-API contracts/plans: source-date semantics, preservation and bounds."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from itertools import islice
 import json
 from pathlib import Path
@@ -210,8 +210,8 @@ class ResearchExtraContracts(unittest.TestCase):
         )
         ranges = sorted(
             (
-                date.fromisoformat(j["params"]["start_date"]),
-                date.fromisoformat(j["params"]["end_date"]),
+                datetime.strptime(j["params"]["start_date"], "%Y%m%d").date(),
+                datetime.strptime(j["params"]["end_date"], "%Y%m%d").date(),
             )
             for j in first
             if j["params"]["type"] == "P"

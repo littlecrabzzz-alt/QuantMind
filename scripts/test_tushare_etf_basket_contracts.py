@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pure PCF source fields, date coverage, identity and no guessed history."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from itertools import islice
 import json
 from pathlib import Path
@@ -84,7 +84,8 @@ class EtfBasketContracts(unittest.TestCase):
                 params = job["params"]
                 self.assertTrue(set(params) <= set(INPUT_FIELDS[api]))
                 left, right = (
-                    date.fromisoformat(params[k]) for k in ("start_date", "end_date")
+                    datetime.strptime(params[k], "%Y%m%d").date()
+                    for k in ("start_date", "end_date")
                 )
                 observed += [
                     left + timedelta(days=i) for i in range((right - left).days + 1)
