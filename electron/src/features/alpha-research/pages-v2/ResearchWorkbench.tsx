@@ -25,7 +25,7 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
   const selectedId = useRef<string | null>(null);
   const detailPanel = useRef<HTMLDivElement>(null);
   const [openingRun, setOpeningRun] = useState<string | null>(null);
-  const [detailNavigation, setDetailNavigation] = useState(0);
+  const [detailNavigation, setDetailNavigation] = useState<ResearchRun | null>(null);
   const node = useRef<string | null>(null);
   const scope = useRef<string | null>(null);
   const endpoint = useRef(String(SERVICE_ENDPOINTS.AI_STRATEGY));
@@ -109,9 +109,9 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
       const detail = await researchRuns.detail(row.run_id, row.node_id);
       if (node.current !== row.node_id || selectedId.current !== row.run_id) return;
       setSelected(detail);
-      setDetailNavigation(value => value + 1);
+      setDetailNavigation(detail);
     } catch (err) { setError(errorText(err)); }
-    finally { setOpeningRun(current => current === row.run_id ? null : current); }
+    finally { if (selectedId.current === row.run_id) setOpeningRun(null); }
   };
 
   const create = async (request: ResearchRequest) => {
