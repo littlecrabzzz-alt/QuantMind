@@ -1,0 +1,8 @@
+# Fixed-mirror discovery cache capacity ready
+- remaining_markets only/tmp and uniquecoord, no runtime/queue/config/prod changes.
+- Fixed33a0 SHA; all80517 mirror observations scanned,18026 selected current-extractor sources/99API/663486181rawbytes. Mirror-derived set is NOT live jobs union attempts equivalence.
+- 64MiB charge53449418B/14099entries/all cacheable fit;3927 bypass. Baseline6.519s warm3.809s. 32MiB charge33552812B/5256entries; remaining8843 still source-read. Closing admission once full avoids repeated compression: baseline6.534s warm4.788s. All exact ID SHA equal ae816b45731f77ff954038a1893dfdbadc8eadd0f5051fd8f877e37247301c4e.
+- Three valid runs + first memory-stop total106.42s; each <180s/512MiB RSS watchdog. Full manifest json.loads first hit cap, bounded files parser retained source SHA then completed. Effective peak valid<=371572736B.
+- One cloud06:11:59Z snapshot: cgroup current497917952/max1073741824/peak1073745920, max-events11433,oom0. ChildRSS214072kB,HWM813256kB. No named max-task env or CLI override; source-default10 inference, not runtime-control proof. Single snapshot does not establish recycle cause/count/Docker RestartCount.
+- 32MiB admission-stop merits disabled candidate; direct rollout NOT justified because production high-water reached1GiB. Need isolated actual worker lifecycle/normalize+publish peak and cache release validation before enable.
+- Full handoff /tmp/tushare-compact-full/handoff.md; original reports/cloud snapshot/replication scripts+sha256.json. Final compact.pySHA b9d8e7f1fed2811c0907180c8b4dacd345ab5fe751d744ad24522d285967f54c; handoffSHA 63efbd5516b14eaa472e980c619b8bb742c2a111795f35a7ff8dcef3907e9983. Original9oracle+additionalpair/budget/restore tests and Ruff pass. No runtime commit.

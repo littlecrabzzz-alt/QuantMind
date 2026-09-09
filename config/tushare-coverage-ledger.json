@@ -2,7 +2,7 @@
   "schema_version": 1,
   "catalog_fetched_at": "2026-09-08T15:22:12.131618+00:00",
   "catalog_index_sha256": "182240e4826c7e65a6b63ef83efdc4e14b7b3589a6249ed54cd36ac66c937dce",
-  "reviewed_at": "2026-09-09T06:13:02.762822+00:00",
+  "reviewed_at": "2026-09-09T07:10:07.674823+00:00",
   "entry_count": 263,
   "scope": "Every entry in pinned official catalogue plus independently discovered linked entries. entry_count remains the immutable baseline count, not a scope ceiling. Runtime evidence controls entitlement and coverage.",
   "entries": [
@@ -463,9 +463,9 @@
       "acquisition_api_names": [
         "stk_mins"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Runtime candidate and fixed second-precision reader passed parent Python3.10 full623 tests. Deploy only after batch review; then bounded actual minute entitlements/time/frequency/source checks. No minute production requests or auto activation yet.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Stock 1min source241 rows and exact-second local reader verified; narrow supplier control hit observed1request/60s. Separate bounded follow-up only after shared cooldown; permission product/history/frequency/time semantics remain unverified.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
@@ -480,12 +480,52 @@
           "60min"
         ],
         "contract_only": false,
-        "production_registered": false,
-        "actual_permission_probed": false,
+        "production_registered": true,
+        "actual_permission_probed": true,
         "automatically_enabled": false,
         "history_complete": false,
         "pit_verified": false,
-        "runtime_document": "docs/tushare-history-minutes-runtime.md"
+        "runtime_document": "docs/tushare-history-minutes-runtime.md",
+        "production_commit": "5d442d3ae4d083530ff492fa7cfbd07d7ae19fd1"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/history-minutes7-probe.json",
+        "release_id": "data-1f3dfb00ef633aa0a8bd408101dd7303c36d9bd8b03c3eb13da0226e6d2c6ea6",
+        "checked_at": "2026-09-09T07:00:17.531438+00:00",
+        "sample_rows": 241,
+        "sample_requests": [
+          {
+            "end_date": "2026-09-02 00:00:00",
+            "freq": "1min",
+            "start_date": "2026-09-01 00:00:00",
+            "ts_code": "000001.SZ"
+          },
+          {
+            "end_date": "2026-09-01 11:30:01",
+            "freq": "1min",
+            "start_date": "2026-09-01 11:29:59",
+            "ts_code": "000001.SZ"
+          }
+        ],
+        "source_statuses": [
+          "rate_limited",
+          "sample_ok"
+        ],
+        "probe_report_sha256": "76d726f18013619e671a997e1f8de65d8e626a9d1ebdfe2013310a2a2c6c7b98",
+        "fixed_rows_after_dedupe": 241,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-mac-verified.json",
+        "offline_evidence_sha256": "ad64f3dd593cf33e2fcc4468d77d33616ed0846808a76cfb39d0c1ae7652c18b",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "gap_counts": {
+          "response_unavailable_or_non_json": 1,
+          "permission_scope_history_time_semantics_unverified": 1,
+          "date_axis_overlap_unverified_or_changed": 1
+        },
+        "gap_details_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json"
       }
     },
     {
@@ -3554,9 +3594,9 @@
       "acquisition_api_names": [
         "etf_mins"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Runtime candidate and fixed second-precision reader passed parent Python3.10 full623 tests. Deploy only after batch review; then bounded actual minute entitlements/time/frequency/source checks. No minute production requests or auto activation yet.",
+      "status": "permission_blocked",
+      "permission_status": "denied_observed",
+      "next_action": "Observed independent permission denial; retain source response and proceed with other APIs. No periodic minute activation or blind retries.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
@@ -3571,12 +3611,46 @@
           "60min"
         ],
         "contract_only": false,
-        "production_registered": false,
-        "actual_permission_probed": false,
+        "production_registered": true,
+        "actual_permission_probed": true,
         "automatically_enabled": false,
         "history_complete": false,
         "pit_verified": false,
-        "runtime_document": "docs/tushare-history-minutes-runtime.md"
+        "runtime_document": "docs/tushare-history-minutes-runtime.md",
+        "production_commit": "5d442d3ae4d083530ff492fa7cfbd07d7ae19fd1"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/history-minutes7-probe.json",
+        "release_id": "data-1f3dfb00ef633aa0a8bd408101dd7303c36d9bd8b03c3eb13da0226e6d2c6ea6",
+        "checked_at": "2026-09-09T07:00:17.531438+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "end_date": "2026-09-09 00:00:00",
+            "freq": "1min",
+            "start_date": "2026-09-08 00:00:00",
+            "ts_code": "158000.SZ"
+          }
+        ],
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "probe_report_sha256": "76d726f18013619e671a997e1f8de65d8e626a9d1ebdfe2013310a2a2c6c7b98",
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-mac-verified.json",
+        "offline_evidence_sha256": "ad64f3dd593cf33e2fcc4468d77d33616ed0846808a76cfb39d0c1ae7652c18b",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "gap_counts": {
+          "response_unavailable_or_non_json": 1,
+          "permission_scope_history_time_semantics_unverified": 1,
+          "no_fixed_rows_to_verify": 1,
+          "comparison_request_not_completed": 2
+        },
+        "gap_details_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json"
       }
     },
     {
@@ -3773,9 +3847,9 @@
       "acquisition_api_names": [
         "idx_anns"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "One empty dated sample does not establish absent history or permission. Probe a bounded broader legal announcement window and nonempty source/date filters; original attachments remain required.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Nonempty range259 plus actual-day1 announcement source and cloud/Mac all-column control verified. Prepare append enablement preserving existing calendar/factor checkpoints; original attachments/full history/PIT remain unfinished.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-calendar-factor-intake.md",
       "implementation_evidence": {
@@ -3788,41 +3862,72 @@
         "automatically_enabled": false,
         "history_complete": false,
         "pit_verified": false,
-        "production_commit": "f627b896f63e96c109ad098503a1dfebcbf0b4be"
+        "production_commit": "5d442d3ae4d083530ff492fa7cfbd07d7ae19fd1"
       },
       "runtime_evidence": {
-        "path": "/data/tushare/validation/calendar-factor5-probe.json",
-        "release_id": "data-cf01c59247127378fed86d0f5c26d2d9dbe4b5cbe77906e145d540dfaef9f2fb",
-        "checked_at": "2026-09-09T06:13:02.762822+00:00",
-        "sample_rows": 0,
+        "path": "/data/tushare/validation/calendar-gap-probe.json",
+        "release_id": "data-1f3dfb00ef633aa0a8bd408101dd7303c36d9bd8b03c3eb13da0226e6d2c6ea6",
+        "checked_at": "2026-09-09T07:01:34.604309+00:00",
+        "sample_rows": 260,
         "sample_requests": [
           {
-            "ann_date": "20260904"
+            "end_date": "20260904",
+            "start_date": "20260101"
+          },
+          {
+            "ann_date": "20260102"
           }
         ],
-        "probe_report_sha256": "96bf1487aa2110919534163037a93a87e6751f1ca09ff0cf260a10330a5d9f82",
-        "enabled": false,
         "source_statuses": [
-          "empty_unverified"
+          "sample_ok"
         ],
-        "fixed_rows_after_dedupe": 0,
-        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-cloud-preenable.json",
-        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-mac-verified.json",
-        "offline_evidence_sha256": "65bad9525cf0b0df587bcadc564e6d009e1bd4f7549f2abfac86fb71a7f1d44d",
+        "probe_report_sha256": "eaeee1d6218e020f540c083aab7e18efca009e8912cd677abb5de5e2cd58832b",
+        "fixed_rows_after_dedupe": 259,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/calendar-gap-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/calendar-gap-mac-verified.json",
+        "offline_evidence_sha256": "ae6dfffa31cbf1ccfbff0178c6d3f942a46c4d1e948b855fb515fedbc36a3b16",
         "offline_status": "fixed_release_verified_with_gaps",
-        "enable_evidence": "/data/tushare/validation/calendar-factor5-enable-20260909T060700Z-a6859bfd.json",
-        "enabled_release_id": null,
-        "blocked_reasons": [
-          "all_samples_empty_or_unavailable",
-          "audit_gap:comparison_request_not_completed",
-          "audit_gap:empty_or_non_success_not_completeness",
-          "audit_gap:no_fixed_rows_to_verify",
-          "missing_nonempty_all_column_comparison",
-          "no_fixed_dataset"
-        ],
+        "enabled": false,
         "history_complete": false,
-        "pit_verified": false
-      }
+        "pit_verified": false,
+        "gap_counts": {},
+        "gap_details_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/calendar-gap-cloud-preenable.json"
+      },
+      "prior_runtime_evidence": [
+        {
+          "path": "/data/tushare/validation/calendar-factor5-probe.json",
+          "release_id": "data-cf01c59247127378fed86d0f5c26d2d9dbe4b5cbe77906e145d540dfaef9f2fb",
+          "checked_at": "2026-09-09T06:13:02.762822+00:00",
+          "sample_rows": 0,
+          "sample_requests": [
+            {
+              "ann_date": "20260904"
+            }
+          ],
+          "probe_report_sha256": "96bf1487aa2110919534163037a93a87e6751f1ca09ff0cf260a10330a5d9f82",
+          "enabled": false,
+          "source_statuses": [
+            "empty_unverified"
+          ],
+          "fixed_rows_after_dedupe": 0,
+          "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-cloud-preenable.json",
+          "offline_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-mac-verified.json",
+          "offline_evidence_sha256": "65bad9525cf0b0df587bcadc564e6d009e1bd4f7549f2abfac86fb71a7f1d44d",
+          "offline_status": "fixed_release_verified_with_gaps",
+          "enable_evidence": "/data/tushare/validation/calendar-factor5-enable-20260909T060700Z-a6859bfd.json",
+          "enabled_release_id": null,
+          "blocked_reasons": [
+            "all_samples_empty_or_unavailable",
+            "audit_gap:comparison_request_not_completed",
+            "audit_gap:empty_or_non_success_not_completeness",
+            "audit_gap:no_fixed_rows_to_verify",
+            "missing_nonempty_all_column_comparison",
+            "no_fixed_dataset"
+          ],
+          "history_complete": false,
+          "pit_verified": false
+        }
+      ]
     },
     {
       "doc_id": "93",
@@ -3937,9 +4042,9 @@
       "acquisition_api_names": [
         "idx_mins"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Runtime candidate and fixed second-precision reader passed parent Python3.10 full623 tests. Deploy only after batch review; then bounded actual minute entitlements/time/frequency/source checks. No minute production requests or auto activation yet.",
+      "status": "permission_blocked",
+      "permission_status": "denied_observed",
+      "next_action": "Observed independent permission denial; retain source response and proceed with other APIs. No periodic minute activation or blind retries.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
@@ -3954,12 +4059,46 @@
           "60min"
         ],
         "contract_only": false,
-        "production_registered": false,
-        "actual_permission_probed": false,
+        "production_registered": true,
+        "actual_permission_probed": true,
         "automatically_enabled": false,
         "history_complete": false,
         "pit_verified": false,
-        "runtime_document": "docs/tushare-history-minutes-runtime.md"
+        "runtime_document": "docs/tushare-history-minutes-runtime.md",
+        "production_commit": "5d442d3ae4d083530ff492fa7cfbd07d7ae19fd1"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/history-minutes7-probe.json",
+        "release_id": "data-1f3dfb00ef633aa0a8bd408101dd7303c36d9bd8b03c3eb13da0226e6d2c6ea6",
+        "checked_at": "2026-09-09T07:00:17.531438+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "end_date": "2026-09-09 00:00:00",
+            "freq": "1min",
+            "start_date": "2026-09-08 00:00:00",
+            "ts_code": "000007.SH"
+          }
+        ],
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "probe_report_sha256": "76d726f18013619e671a997e1f8de65d8e626a9d1ebdfe2013310a2a2c6c7b98",
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-mac-verified.json",
+        "offline_evidence_sha256": "ad64f3dd593cf33e2fcc4468d77d33616ed0846808a76cfb39d0c1ae7652c18b",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "gap_counts": {
+          "response_unavailable_or_non_json": 1,
+          "permission_scope_history_time_semantics_unverified": 1,
+          "no_fixed_rows_to_verify": 1,
+          "comparison_request_not_completed": 2
+        },
+        "gap_details_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json"
       }
     },
     {
@@ -4094,9 +4233,9 @@
       "acquisition_api_names": [
         "sw_mins"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Runtime candidate and fixed second-precision reader passed parent Python3.10 full623 tests. Deploy only after batch review; then bounded actual minute entitlements/time/frequency/source checks. No minute production requests or auto activation yet.",
+      "status": "permission_blocked",
+      "permission_status": "denied_observed",
+      "next_action": "Observed independent permission denial; retain source response and proceed with other APIs. No periodic minute activation or blind retries.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
@@ -4111,12 +4250,46 @@
           "60min"
         ],
         "contract_only": false,
-        "production_registered": false,
-        "actual_permission_probed": false,
+        "production_registered": true,
+        "actual_permission_probed": true,
         "automatically_enabled": false,
         "history_complete": false,
         "pit_verified": false,
-        "runtime_document": "docs/tushare-history-minutes-runtime.md"
+        "runtime_document": "docs/tushare-history-minutes-runtime.md",
+        "production_commit": "5d442d3ae4d083530ff492fa7cfbd07d7ae19fd1"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/history-minutes7-probe.json",
+        "release_id": "data-1f3dfb00ef633aa0a8bd408101dd7303c36d9bd8b03c3eb13da0226e6d2c6ea6",
+        "checked_at": "2026-09-09T07:00:17.531438+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "end_date": "2026-09-09 00:00:00",
+            "freq": "1min",
+            "start_date": "2026-09-08 00:00:00",
+            "ts_code": "801001.SI"
+          }
+        ],
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "probe_report_sha256": "76d726f18013619e671a997e1f8de65d8e626a9d1ebdfe2013310a2a2c6c7b98",
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-mac-verified.json",
+        "offline_evidence_sha256": "ad64f3dd593cf33e2fcc4468d77d33616ed0846808a76cfb39d0c1ae7652c18b",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "gap_counts": {
+          "response_unavailable_or_non_json": 1,
+          "permission_scope_history_time_semantics_unverified": 1,
+          "no_fixed_rows_to_verify": 1,
+          "comparison_request_not_completed": 2
+        },
+        "gap_details_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json"
       }
     },
     {
@@ -4730,9 +4903,9 @@
       "acquisition_api_names": [
         "ft_mins"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Runtime candidate and fixed second-precision reader passed parent Python3.10 full623 tests. Deploy only after batch review; then bounded actual minute entitlements/time/frequency/source checks. No minute production requests or auto activation yet.",
+      "status": "permission_blocked",
+      "permission_status": "denied_observed",
+      "next_action": "Observed independent permission denial; retain source response and proceed with other APIs. No periodic minute activation or blind retries.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
@@ -4747,12 +4920,46 @@
           "60min"
         ],
         "contract_only": false,
-        "production_registered": false,
-        "actual_permission_probed": false,
+        "production_registered": true,
+        "actual_permission_probed": true,
         "automatically_enabled": false,
         "history_complete": false,
         "pit_verified": false,
-        "runtime_document": "docs/tushare-history-minutes-runtime.md"
+        "runtime_document": "docs/tushare-history-minutes-runtime.md",
+        "production_commit": "5d442d3ae4d083530ff492fa7cfbd07d7ae19fd1"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/history-minutes7-probe.json",
+        "release_id": "data-1f3dfb00ef633aa0a8bd408101dd7303c36d9bd8b03c3eb13da0226e6d2c6ea6",
+        "checked_at": "2026-09-09T07:00:17.531438+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "end_date": "2026-09-09 00:00:00",
+            "freq": "1min",
+            "start_date": "2026-09-08 00:00:00",
+            "ts_code": "IC2609.CFX"
+          }
+        ],
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "probe_report_sha256": "76d726f18013619e671a997e1f8de65d8e626a9d1ebdfe2013310a2a2c6c7b98",
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-mac-verified.json",
+        "offline_evidence_sha256": "ad64f3dd593cf33e2fcc4468d77d33616ed0846808a76cfb39d0c1ae7652c18b",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "gap_counts": {
+          "response_unavailable_or_non_json": 1,
+          "permission_scope_history_time_semantics_unverified": 1,
+          "no_fixed_rows_to_verify": 1,
+          "comparison_request_not_completed": 2
+        },
+        "gap_details_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json"
       }
     },
     {
@@ -5030,9 +5237,9 @@
       "acquisition_api_names": [
         "opt_mins"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Runtime candidate and fixed second-precision reader passed parent Python3.10 full623 tests. Deploy only after batch review; then bounded actual minute entitlements/time/frequency/source checks. No minute production requests or auto activation yet.",
+      "status": "permission_blocked",
+      "permission_status": "denied_observed",
+      "next_action": "Observed independent permission denial; retain source response and proceed with other APIs. No periodic minute activation or blind retries.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
@@ -5047,12 +5254,46 @@
           "60min"
         ],
         "contract_only": false,
-        "production_registered": false,
-        "actual_permission_probed": false,
+        "production_registered": true,
+        "actual_permission_probed": true,
         "automatically_enabled": false,
         "history_complete": false,
         "pit_verified": false,
-        "runtime_document": "docs/tushare-history-minutes-runtime.md"
+        "runtime_document": "docs/tushare-history-minutes-runtime.md",
+        "production_commit": "5d442d3ae4d083530ff492fa7cfbd07d7ae19fd1"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/history-minutes7-probe.json",
+        "release_id": "data-1f3dfb00ef633aa0a8bd408101dd7303c36d9bd8b03c3eb13da0226e6d2c6ea6",
+        "checked_at": "2026-09-09T07:00:17.531438+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "end_date": "2026-09-09 00:00:00",
+            "freq": "1min",
+            "start_date": "2026-09-08 00:00:00",
+            "ts_code": "A2611-C-3700.DCE"
+          }
+        ],
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "probe_report_sha256": "76d726f18013619e671a997e1f8de65d8e626a9d1ebdfe2013310a2a2c6c7b98",
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-mac-verified.json",
+        "offline_evidence_sha256": "ad64f3dd593cf33e2fcc4468d77d33616ed0846808a76cfb39d0c1ae7652c18b",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "gap_counts": {
+          "response_unavailable_or_non_json": 1,
+          "permission_scope_history_time_semantics_unverified": 1,
+          "no_fixed_rows_to_verify": 1,
+          "comparison_request_not_completed": 2
+        },
+        "gap_details_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json"
       }
     },
     {
@@ -5786,7 +6027,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Preserve saturated future-day originals; implement and verify legal country/currency/event partitions before automatic scope activation. Full country/event universe remains unverified.",
+      "next_action": "Three observed country/date/range pairs verified; full-market cap and country/category semantics remain gaps. Preserve global obligations and prepare explicit partial-date acquisition without inventing country universe.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-calendar-factor-intake.md",
       "implementation_evidence": {
@@ -5799,50 +6040,104 @@
         "automatically_enabled": false,
         "history_complete": false,
         "pit_verified": false,
-        "production_commit": "f627b896f63e96c109ad098503a1dfebcbf0b4be"
+        "production_commit": "5d442d3ae4d083530ff492fa7cfbd07d7ae19fd1"
       },
       "runtime_evidence": {
-        "path": "/data/tushare/validation/calendar-factor5-probe.json",
-        "release_id": "data-cf01c59247127378fed86d0f5c26d2d9dbe4b5cbe77906e145d540dfaef9f2fb",
-        "checked_at": "2026-09-09T06:13:02.762822+00:00",
-        "sample_rows": 300,
+        "path": "/data/tushare/validation/calendar-gap-probe.json",
+        "release_id": "data-1f3dfb00ef633aa0a8bd408101dd7303c36d9bd8b03c3eb13da0226e6d2c6ea6",
+        "checked_at": "2026-09-09T07:01:34.604309+00:00",
+        "sample_rows": 62,
         "sample_requests": [
           {
-            "date": "20260904"
-          },
-          {
+            "country": "美国",
             "date": "20260910"
           },
           {
-            "end_date": "20260904",
-            "start_date": "20260904"
+            "country": "美国",
+            "end_date": "20260910",
+            "start_date": "20260910"
           },
           {
+            "country": "欧元区",
+            "date": "20260910"
+          },
+          {
+            "country": "欧元区",
+            "end_date": "20260910",
+            "start_date": "20260910"
+          },
+          {
+            "country": "德国",
+            "date": "20260910"
+          },
+          {
+            "country": "德国",
             "end_date": "20260910",
             "start_date": "20260910"
           }
         ],
-        "probe_report_sha256": "96bf1487aa2110919534163037a93a87e6751f1ca09ff0cf260a10330a5d9f82",
-        "enabled": false,
         "source_statuses": [
-          "possibly_truncated",
           "sample_ok"
         ],
-        "fixed_rows_after_dedupe": 150,
-        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-cloud-preenable.json",
-        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-mac-verified.json",
-        "offline_evidence_sha256": "65bad9525cf0b0df587bcadc564e6d009e1bd4f7549f2abfac86fb71a7f1d44d",
+        "probe_report_sha256": "eaeee1d6218e020f540c083aab7e18efca009e8912cd677abb5de5e2cd58832b",
+        "fixed_rows_after_dedupe": 151,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/calendar-gap-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/calendar-gap-mac-verified.json",
+        "offline_evidence_sha256": "ae6dfffa31cbf1ccfbff0178c6d3f942a46c4d1e948b855fb515fedbc36a3b16",
         "offline_status": "fixed_release_verified_with_gaps",
-        "enable_evidence": "/data/tushare/validation/calendar-factor5-enable-20260909T060700Z-a6859bfd.json",
-        "enabled_release_id": null,
-        "blocked_reasons": [
-          "audit_gap:empty_or_non_success_not_completeness",
-          "audit_gap:saturation_unresolved",
-          "saturation_unresolved_status"
-        ],
+        "enabled": false,
         "history_complete": false,
-        "pit_verified": false
-      }
+        "pit_verified": false,
+        "gap_counts": {
+          "bulk_saturation_and_country_universe_unknown": 1,
+          "country_semantics_unverified": 1
+        },
+        "gap_details_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/calendar-gap-cloud-preenable.json"
+      },
+      "prior_runtime_evidence": [
+        {
+          "path": "/data/tushare/validation/calendar-factor5-probe.json",
+          "release_id": "data-cf01c59247127378fed86d0f5c26d2d9dbe4b5cbe77906e145d540dfaef9f2fb",
+          "checked_at": "2026-09-09T06:13:02.762822+00:00",
+          "sample_rows": 300,
+          "sample_requests": [
+            {
+              "date": "20260904"
+            },
+            {
+              "date": "20260910"
+            },
+            {
+              "end_date": "20260904",
+              "start_date": "20260904"
+            },
+            {
+              "end_date": "20260910",
+              "start_date": "20260910"
+            }
+          ],
+          "probe_report_sha256": "96bf1487aa2110919534163037a93a87e6751f1ca09ff0cf260a10330a5d9f82",
+          "enabled": false,
+          "source_statuses": [
+            "possibly_truncated",
+            "sample_ok"
+          ],
+          "fixed_rows_after_dedupe": 150,
+          "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-cloud-preenable.json",
+          "offline_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-mac-verified.json",
+          "offline_evidence_sha256": "65bad9525cf0b0df587bcadc564e6d009e1bd4f7549f2abfac86fb71a7f1d44d",
+          "offline_status": "fixed_release_verified_with_gaps",
+          "enable_evidence": "/data/tushare/validation/calendar-factor5-enable-20260909T060700Z-a6859bfd.json",
+          "enabled_release_id": null,
+          "blocked_reasons": [
+            "audit_gap:empty_or_non_success_not_completeness",
+            "audit_gap:saturation_unresolved",
+            "saturation_unresolved_status"
+          ],
+          "history_complete": false,
+          "pit_verified": false
+        }
+      ]
     },
     {
       "doc_id": "177",
@@ -6070,9 +6365,9 @@
       "acquisition_api_names": [
         "hk_mins"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Runtime candidate and fixed second-precision reader passed parent Python3.10 full623 tests. Deploy only after batch review; then bounded actual minute entitlements/time/frequency/source checks. No minute production requests or auto activation yet.",
+      "status": "permission_blocked",
+      "permission_status": "denied_observed",
+      "next_action": "Observed independent permission denial; retain source response and proceed with other APIs. No periodic minute activation or blind retries.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
@@ -6087,12 +6382,46 @@
           "60min"
         ],
         "contract_only": false,
-        "production_registered": false,
-        "actual_permission_probed": false,
+        "production_registered": true,
+        "actual_permission_probed": true,
         "automatically_enabled": false,
         "history_complete": false,
         "pit_verified": false,
-        "runtime_document": "docs/tushare-history-minutes-runtime.md"
+        "runtime_document": "docs/tushare-history-minutes-runtime.md",
+        "production_commit": "5d442d3ae4d083530ff492fa7cfbd07d7ae19fd1"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/history-minutes7-probe.json",
+        "release_id": "data-1f3dfb00ef633aa0a8bd408101dd7303c36d9bd8b03c3eb13da0226e6d2c6ea6",
+        "checked_at": "2026-09-09T07:00:17.531438+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "end_date": "2026-09-05 00:00:00",
+            "freq": "1min",
+            "start_date": "2026-09-04 00:00:00",
+            "ts_code": "00001.HK"
+          }
+        ],
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "probe_report_sha256": "76d726f18013619e671a997e1f8de65d8e626a9d1ebdfe2013310a2a2c6c7b98",
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-mac-verified.json",
+        "offline_evidence_sha256": "ad64f3dd593cf33e2fcc4468d77d33616ed0846808a76cfb39d0c1ae7652c18b",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "gap_counts": {
+          "response_unavailable_or_non_json": 1,
+          "permission_scope_history_time_semantics_unverified": 1,
+          "no_fixed_rows_to_verify": 1,
+          "comparison_request_not_completed": 2
+        },
+        "gap_details_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json"
       }
     },
     {
@@ -7458,8 +7787,8 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "195 code-only rows and same-day range match all columns on cloud/Mac. Implement explicit source-code planning without requiring unavailable factor catalog; preserve unknown names/assets/formulas and full-history gaps.",
-      "auto_acquisition": false,
+      "next_action": "Continue automatic source-code daily acquisition from requested1990 scope with6225 frozen observed codes; 1000 initial queued jobs are not historical completion. Four-day780-row range/all-column/date reads verified. Evaluate bounded month-window proof and checkpoint-preserving range planning to avoid excessive per-code daily requests; catalogue/formula/unit/PIT remain unverified.",
+      "auto_acquisition": true,
       "contract_evidence": "docs/tushare-calendar-factor-intake.md",
       "implementation_evidence": {
         "candidate_commit": "dd7279d",
@@ -7468,10 +7797,10 @@
         "hidden_fields": [],
         "actual_permission_probed": true,
         "production_registered": true,
-        "automatically_enabled": false,
+        "automatically_enabled": true,
         "history_complete": false,
         "pit_verified": false,
-        "production_commit": "f627b896f63e96c109ad098503a1dfebcbf0b4be"
+        "production_commit": "5d442d3ae4d083530ff492fa7cfbd07d7ae19fd1"
       },
       "runtime_evidence": {
         "path": "/data/tushare/validation/calendar-factor5-probe.json",
@@ -7490,7 +7819,7 @@
           }
         ],
         "probe_report_sha256": "96bf1487aa2110919534163037a93a87e6751f1ca09ff0cf260a10330a5d9f82",
-        "enabled": false,
+        "enabled": true,
         "source_statuses": [
           "sample_ok"
         ],
@@ -7499,13 +7828,17 @@
         "offline_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-mac-verified.json",
         "offline_evidence_sha256": "65bad9525cf0b0df587bcadc564e6d009e1bd4f7549f2abfac86fb71a7f1d44d",
         "offline_status": "fixed_release_verified_with_gaps",
-        "enable_evidence": "/data/tushare/validation/calendar-factor5-enable-20260909T060700Z-a6859bfd.json",
-        "enabled_release_id": null,
-        "blocked_reasons": [
-          "audit_gap:factor_catalog_asset_mapping_unverified"
-        ],
+        "enable_evidence": "/data/tushare/validation/factor-value-code-enable-20260909T065854Z-b78e5541.json",
+        "enabled_release_id": "data-c71d0dab88d72f385824254bc7923e7ef77bbc6df56ebb96e9e89625dba3fb26",
+        "blocked_reasons": [],
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "retained_nonblocking_gaps": [
+          "factor_catalog_asset_mapping_unverified"
+        ],
+        "enable_postcheck": "/data/tushare/validation/intake-batch-20260909T065700Z/factor-enable-postcheck-20260909.json",
+        "initial_new_jobs": 1000,
+        "initial_jobs_status": "pending_not_downloaded"
       },
       "code_only_candidate": {
         "pure_commit": "792db04",
@@ -7514,14 +7847,15 @@
         "dependencies": [
           "factor_library_stocks"
         ],
-        "status": "isolated_verified_not_deployed_or_enabled",
+        "status": "deployed_enabled_first1000_queued",
         "source_range_probe": "/data/tushare/validation/factor-value-range-probe.json",
         "actual_additional_upstream_calls": 1,
         "source_range_rows": 780,
         "last_day_rows_equal_to_original": 195,
-        "fixed_range_read_verified": false,
+        "fixed_range_read_verified": true,
         "monthly_window_verified": false,
-        "history_complete": false
+        "history_complete": false,
+        "range_reader_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/factor-value-range-ca7c-mac-verified.json"
       }
     },
     {
