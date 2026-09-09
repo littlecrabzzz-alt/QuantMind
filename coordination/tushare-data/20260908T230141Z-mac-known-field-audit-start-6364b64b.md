@@ -1,0 +1,1 @@
+Owner text_contracts: read-only audit registered text/financial hidden and extra fields through enqueue/capture/normalization. No runtime edits, production API/token or ownership overlap. Concrete known-field differences only, not full-data completeness proof.

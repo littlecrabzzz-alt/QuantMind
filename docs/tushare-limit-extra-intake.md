@@ -1,0 +1,54 @@
+# 涨跌停专题 4 接口纯候选
+
+对照 263 项目录基线、13 项额外发现与 144 个已注册 API，选取下列尚无运行合同的 4 项；保留全范围缺口，未改目录、台账或生产。权限均为 `unprobed`，门槛不是账户实际授权证明。
+
+| 官方接口 | 页面门槛 / 单次上限 | 本批必须保留的差异 |
+|---|---|---|
+| [limit_list_ths / 355](https://tushare.pro/document/2?doc_id=355) | 8000 分以上 / 4000 行 | 从 20231101 起，约 16 点更新。默认涨停池；必须显式覆盖全部 5 池，6 个字段默认隐藏。页面注明个人学习研究用途。 |
+| [limit_list_d / 298](https://tushare.pro/document/2?doc_id=298) | 5000 / 2500 | 从 2020 年起，明确不提供 ST 统计；分别请求 U/D/Z。输入 `limit_type` 和输出 `limit` 不同名。 |
+| [limit_step / 356](https://tushare.pro/document/2?doc_id=356) | 8000 分以上 / 2000 | 历史下界未公布；`nums` 是字符串且可多值筛选。官方样例含 ST，不能沿用另一接口的排除规则。 |
+| [limit_cpt_list / 357](https://tushare.pro/document/2?doc_id=357) | 8000 分以上 / 2000 | 历史下界未公布。`ts_code` 如 `885728.TI` 是概念板块，`rank` 是字符串，不是股票或资金流净额。 |
+
+已核对完整输入与 55 个输出字段，和固定目录一致。THS 的 `first_lu_time/last_lu_time/first_ld_time/last_ld_time/rise_rate/sum_float` 全部默认 N；合同将其列入显式 requested/extra/required 字段并允许空值。`fields=''` 不等于已经获取这些列；运行集成必须验收真实请求与返回 schema，同时保留未来发现的未知列。
+
+THS 五个参数原文为 `涨停池/连扳池/冲刺涨停/炸板池/跌停池`；保留官方“连扳池”的拼写，实测接受性与返回类别前不自动替换成“连板池”。部分字段只对特定池有值，例如最大封单；合法 null 不应触发数值错误。D 接口跌停首次封板时间、涨停板上金额同样允许空。
+
+## 接入契约
+
+新增纯模块 `tushare_limit_extra_contracts.py`、专属测试与本文。导出 `LIMIT_EXTRA_CONTRACTS`、`iter_limit_extra_jobs(config,today,identifiers=None)`、`limit_extra_prerequisites(...)`；建议未来组 `limit_extra`，配置 `limit_extra_apis`、`limit_extra_history_start`（字符串或每 API 字典），回退 `history_start`。
+
+最近 7 个自然日按接口/日/全部类别规划，然后按接口轮转惰性历史分区。近期每日合计 10 个请求（THS 5、D 3、step 1、cpt 1），无当前上市/开市过滤；step 的 `nums` 不筛选，也不猜连板最大高度。THS 市场参数不筛选，默认是否覆盖全部市场仍待实证；合法值仅按官方记录 HS/GEM/STAR，不虚构 BJ 筛选。step/cpt 未配置历史起点时仅规划近期，样例日期不能作为全历史下界。
+
+所有输出日期轴均 `trade_date`，合法起止范围按此拆分；THS 的 20231101 是页面日期下界，D 的 20200101 是年份范围的规划边界，均未验证实际首条/全历史完整性。保留所有源时间字符串，不拼装没有时区证据的盘中时间戳。
+
+键候选分别为：THS `(trade_date,ts_code,limit_type,market_type)`，D `(trade_date,ts_code,limit)`，step `(trade_date,ts_code,nums)`，cpt `(trade_date,ts_code)`。均保留不同原始行；THS/D 还要求 `request_identity_fields=["limit_type"]`，避免供应商返回相同行时丢失不同池请求的证据。父运行接入必须在注册与读取合同中保留这个参数身份，并补全全合同 store fixture 的两组请求身份，不能只添加 API 数量断言。
+
+## 饱和、权限与研究边界
+
+- 4 页都没有 offset/limit 参数。只可保留池/市场/交易所/nums 过滤条件后拆日期或 `ts_code`；单日单代码达到上限仍应 blocked。
+- 股票接口使用独立 `limit_securities` 发现集合，接入时并入历史/T/退市股票、历史列表和已观察榜单代码，不能只看当前股票。cpt 使用独立 `limit_concepts`；已观察排名板块或未来 THS 主表也不能单独证明完整历史概念集合。纯候选尚未实现这些运行发现/分区。
+- 页面给出 8000 分以上每分钟 500 次、每日不限；D 另给 5000 分每分钟 200 次、每日 10000 次。合同保守运行上限 50 rpm 与供应商额度分开，真实权限、字段返回和共享频控由后续业务探测验证。
+- 全部是供应商日终/事后榜单口径，不构成盘中因果信号、PIT 历史成员或 RRG 准入。涨停原因/连续标签、旧修订和相同值多条事件仍需独立证据；7 日重叠不证明修订完全。
+
+复验命令：`python3 -S -B scripts/test_tushare_limit_extra_contracts.py`。11 个测试涵盖完整字段与隐藏列、5/3 类别无遗漏、跨闰日/跨年及首尾窗口唯一覆盖、源 namespace、未知下界、惰性轮转和非法配置，并隔离执行既有日期二分、满额判定和家族指纹纯函数；不导入或实例化 Pipeline，不联网、不访问生产数据。
+
+父集成补充：概念标识在固定查询和JSONL导出中均按该数据集原值筛选，即使外形像股票后缀也不转换；普通股票查询仍要求内部前缀。此为离线读写一致性保证，不是证明某个未来概念代码可用于供应商请求。
+
+
+## 历史月窗口（2026-09-09 已通过样本验收并上线）
+
+历史改用同一自然月内的 `start_date/end_date` 闭区间，首月裁到合同/配置起点，尾月裁到最近 7 日之前；近期仍逐日显式 `trade_date`。每个历史窗口保留 THS 全部 5 池、D 全部 U/D/Z，step/cpt 不增加过滤。未知历史起点仍只规划近期并留 gap；月窗口不改变日期轴、ST 排除范围、字段要求或权限状态。
+
+现有实际代码路径已经支持：`assess_response` 遇到行数达到上限或 `has_more` 时标记 `possibly_truncated`，`run` 调用 `split_request`，优先由 `date_children` 将范围二分成无重叠的两个闭区间，保留类别和代码等输入；直到单日后再使用已有代码分片或维持 blocked。专属测试直接抽取执行这些既有纯函数，覆盖 29 日闰月、全部请求身份及满额响应；未改变运行分片实现。
+
+只有供应商真实遵守范围过滤、返回字段和类别正确、且窗口未饱和时，月窗口才会减少初始请求。密集窗口会多付出父范围探测请求；若最终拆到 D 个单日叶子，二分树最多需要 `2D-1` 个范围/单日节点（尚未计代码分片），可能多于直接 D 次逐日请求。计划窗口数不能证明真实吞吐提升；启用前应将同范围的逐日样本与范围样本按池/类别、日期、来源行和隐藏字段对账，检查越界或忽略参数。
+
+每份合同增加 `history_partition=calendar_month_v1`，由现有家族合同指纹触发 limit 家族历史游标重规划，避免把旧日序列 offset 用于新月序列；测试确认不会重置无关家族。没有 schema 迁移，也不删除或改写旧任务。若此前已经生成日历史任务，两种参数身份可并存并产生重复采集；本次父任务确认尚未首次启用 limit4，可在真实范围验收通过后先集成本候选，再首次规划。此候选不代表权限、全历史或研究准入已通过。
+
+
+## 2026-09-09 08:14 生产与离线验收
+
+- master/GitHub/cloud runtime bbe2f9e；月窗 e83a0dc、发布分阶段计时 bbe2f9e，391 项隔离测试及 Ruff 通过。首次启用前完成10类精确日和10类范围探测（各约8.15秒），55个显式字段全部返回；258+975来源行无越界，范围末日与精确日10/10全列一致。原始响应、观察与Parquet哈希/全列/类别身份通过。
+- 四接口已启用，近期70个新任务、历史首批430个同月范围；其他13个未完成history签名/offset保留。历史继续生成，不把初始任务数当完整分母。月窗饱和仍走原有二分，长期吞吐收益待测。
+- 固定版 data-d976b04aee8b055ce929a4893b7d8e4f77e8126105da9142fb8016f176ea7c36：云端16次日期/代码查询全列一致、匿名401、upstream_calls=0；Mac153348文件校验（新增36），禁网禁凭据独立重建去重，1233来源行保留、查询975行（THS494/D353/step48/cpt80），60个样本证据文件SHA通过，概念原码未转换。
+- 云端证据validation/limit-extra-probe.json、limit-range-probe.json、limit-audit.json、limit-acceptance.json、limit4-api-acceptance.json；Mac /tmp/tushare-limit4-mac-verified-20260909.json。未知历史起点、修订、市场全集和RRG PIT义务仍保留。

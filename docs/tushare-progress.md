@@ -208,3 +208,36 @@
 - 07:00全量快照PID422770先完成在线预复制/扫描，07:19:53因`Celery work active`以75/TEMPFAIL退出；未发布新快照，现有服务仍running。期间父未暂停任何消费者，也未执行schema3迁移或新接口probe。备份失败独立记录，不阻止离线开发，不自动重试或停止其他活动任务。
 - 本机已准备但未执行 `/tmp/tushare-schema3-migrate.py`、`/tmp/tushare-trading-event-probe.py`、`/tmp/tushare-listing-extra-probe.py`及旧互联互通过滤探测。下一步发布前重查活动任务/双端一致性，自然排空两专属消费者；新API读取器先兼容旧/新索引，正式DB备份、meta1→3迁移、全核心表与全部便携行SHA比对，再做账号样本、固定API和Mac禁网验收，恢复并核验两队列。不能直接回退旧DB覆盖新增进度。
 - 全263基线+13额外发现义务不缩减；RRG固定坐标技术验收已通过，但历史成分可知性/ETF等仍blocked_data。无需等待所有PDF下载才继续RRG数据消费验证。
+
+## 2026-09-09 07:41 schema3与八接口生产闭环
+
+- f2cd52e已合入master/GitHub及云端，handoff passed（4535文件、88249b3e80c50872bb9ad0ecf89a5179594506a9582b61f610ca8dc810455d30）。正式144采集合同及6财务查询别名（KEYS150；扩展CONTRACTS137+基础7），不可将某个子注册表长度冒充全注册数。完整364隔离测试及Ruff通过，本次台账/目录修正另15定向测试通过。
+- 两专属队列自然排空后，先升级quantmind读取器，四子服务health200，再备份documents.sqlite并迁移document_index_meta1→3。420331520字节备份、352512文档/412528引用/3465尝试全内容摘要前后一致；全部便携行与DB比对一致。首次构建9.928秒、noop0.578秒，4096叶/16描述块。旧新API各9页通过，匿名401；完整证据见文档存储页。
+- 八次真实请求分别2.789/1.717秒，8API全部非空、6928原始行和91输出列通过raw/观察SHA、Parquet及过滤语义对账。hm_detail.tag246行皆null但列存在；IPO按ipo_date；BSE原码不合并生效区间；daily_info新增SH_FUND_REITs标签保留。8接口已启用，近期39新任务、历史初始961新任务，原12历史组签名/游标没有回退。
+- 固定data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668：19次真实API全字段6928行一致、upstream_calls=0、匿名401。Mac新增4141文件、总130814全校验；8接口禁网/禁凭据原文、Parquet、查询全部一致。另固定schema3迁移版350k文档等全部便携行在Mac与云端DB摘要一致，旧schema2可读。
+- 仅重启quantmind和两Tushare worker，恢复后采集7b68c095-ba31-48d5-80b8-88d31446b6ac、附件f85881ce-c050-44b2-9009-d6910b2d2dd1实测活动；普通US任务88fe98db-f897-42a9-932c-cc1a84860e10保持。23:36:37Z正常325请求/115.710秒、publish12.562秒，failed_stage=null；不能由单批或noop索引耗时推断持续提速。空间262.29GiB可用。
+- 自动非probe已推进trading done13/empty24、listing done14/empty21。IPO无筛选2000行实际饱和blocked，日期分区仍继续；research_report已捕获真实file_name缺列且原1000行保留，文档矛盾待复核。全部8条台账改ingested_partial/available_observed，基线263+发现13不变。
+- 并行下一候选：limit_extra纯cd1da8a+runtime91fc460，43 tests通过；附件脚本挑战分类5246705，43文档测试通过。两989B原文实际是JS挑战页，未执行或绕过，cninfo超时归因仍未知。候选未部署，下一轮审查集成。全部历史、修订、附件、PIT/RRG准入仍未完成，goal持续active。
+
+
+## 2026-09-09 08:14 并行推进、limit4与月窗上线
+
+- 用户要求减少等待：历史采集持续，新接口在独立worktree准备；固定版API/Mac验收与采集并行。本轮暂停窗口约16分钟，后续先完成开发/离线测试，再短时排空/部署。RRG已有较高调度权重，按所需数据范围逐项验收，无需等全部附件和其他市场历史。
+- runtime bbe2f9e已合入master/GitHub/cloud；handoff passed，4562文件、8cb42112c2ac6e4bf789c8fe2ef871e89d0417434343fbd50da19fc885b79f3f。148采集API及6财务查询别名；limit4的20请求/1233来源行、55显式字段与10种类别对账，固定版云端API及Mac禁网查询全部通过，去重975行；详见涨跌停接入文档。其他13未完成历史游标保留，近期70+历史430初始任务不代表历史总量。
+- 月窗减少未饱和历史区间初始请求，满额继续二分，不承诺固定倍数提速。391项隔离回归11.946秒、Ruff/diff通过；计时另Python3.10独立62测试/AST等价复核。source_challenge已产生真实尝试3786/3795（988/984字节），原始bin SHA通过、parse not_attempted，不执行挑战；validation/source-challenge-runtime.json。
+- 重启quantmind和两专属worker后，采集4c3447b8-ea3f-49d2-9ca8-c154a5e3a094、附件ba365ffd-bdc6-4b78-b098-9378578a65e1及两队列实测恢复；US88fe98db-f897-42a9-932c-cc1a84860e10保持。00:11:51Z正常批329请求/118.014秒、failed_stage=null；发布14.069秒，其中coverage/closure4.065、attempts/stat2.432、retain_previous2.178秒。单批定位不等于持续收益，账户本地预算240次/分，不能靠多worker线性加速。云盘可用260.67GiB。
+- research_report精确trade_date=20260121、正常11列请求仍回85行/10列，file_name缺失，不是仅范围请求或1000行满额所致。原文/schema_gap保留，known_field_gaps增加证据；不删字段、不推断永久无权限。此前10个近期/历史固定样本只读比较见本主题记录。
+- 下一concept4已并行准备：e1041f2→03d8d74→55848e1，40相关测试；未合入生产、未probe、未启用。先独立整合测试再安排发布，保留THS成员历史/PIT/未知cap。旧互联互通精确过滤探测仍未执行；263基线+13发现、全历史/修订/附件及RRG准入仍未完成。
+
+
+## 2026-09-09 08:36 concept4生产闭环与下一批并行
+
+- 上一turn为实质进展，本轮继续全目标：e1041f2→03d8d74→55848e1已集成为100e4df并发布master/GitHub/cloud，404隔离tests+Ruff通过。152采集API+6财务查询别名，未缩减263基线+13发现范围。期间采集仅在备齐候选/脚本后自然排空，恢复后再做固定版验收。
+- THS目录/日线/最新成员、DC三类别已启用。8请求6.139秒、5803行、40已知输出字段全部返回；目录A/HK/US及七类type保留，隐藏市值非空，成员三个历史/权重字段均null。目录A/typeBB样本实际全.HK成员，目录count306/成员309不一致，全部保留、不按目录exchange/count过滤，历史PIT限制仍在。
+- 固定e1386fc1全5803行原文/Parquet/独立查询及30HTTP对账通过（匿名401、上游0）；Mac新增4058/共159836文件校验、24样本证据SHA及禁网禁凭据查询通过。详情与完整release ID/报告路径见docs/tushare-concept-extra-intake.md。
+- 两专属队列恢复，真实采集1f84450c-2506-4d74-90bb-b9768b49878d、文档768c6e8e-d036-415a-9a75-a164eaa33ddd活跃，US88fe98db保持。00:33:56Z正常批265请求/120.401秒、failed_stage=null，较少请求不直接等同退化（成员响应更大且共享负载变化）。自动DC done18/empty3、THS daily done4/empty3、index done1、member done11/blocked4/pending1956；四阻塞为返回5099—5549行超过本地未知cap保护值，原始全行保留且不推断真实截断。history目前仍在跳过成员近期项，未称历史完成。空间259.74GiB可用。
+- 并行耗时复核：部署前两正常批335请求、118.729/119.694秒，发布约15.1秒；coverage/closure约4.48、attempt+stat2.43—2.68、retain_previous2.22秒。固定120秒节拍下，单缩短publish不能承诺提高请求数，暂不为这点增加迁移。物理元数据占用审计另由structured整理，未删数据或改schema。
+- 下一dc_member/dc_daily纯候选523d32b已push codex/tushare-dc-extra（17字段、7tests），runtime94d66a1已在独立worktree完成并push codex/tushare-dc-runtime，417项测试通过，未上线/未probe/未enable。补每日历史成分与OHLCV，官方历史下界/PIT/分类映射/单板块饱和仍待验。旧互联互通过滤探测、全目录剩余接口、全部历史/修订/PDF/RRG准入继续推进。
+
+- 空间专项只读核算：/data/tushare所选文件按device+inode去重后28.16GiB，其中元数据17.68GiB（62.8%）；release/archive10.45GiB、历史文档索引7.03GiB、原始响应6.35GiB、Parquet1.99GiB、附件0.86GiB。此数不含目录、未列子目录、数据库及外部备份，不是整盘总量。164对旧release/archive同大小不同inode，潜在去重3.628GiB，尚未逐对SHA验证或实际回收；当前新别名已安全硬链接。最新不同版本manifest约66.7MB，若大小不变且每120秒产生新版，静态估算44.72GiB/日；不是实测日增长。证据/tmp/tushare-storage-review-20260909.json及003856Z主题记录。
+- 优先并行准备常规tick发布间隔候选（默认0兼容，后续可设900秒最小间隔）：API采集、原文、observations/attempts、文档尝试继续每批持久化，手动publish立即，减少重复全量清单；保留审查确认后续固定版仍包含全部原文/观察/尝试，减少的是中间状态索引快照。尚未实现上线或修改生产频率，实际新鲜度还受120秒tick和Mac15分钟轮询影响，不能承诺严格15分钟。旧副本去重另留方案，不删除历史、不改manifest schema。

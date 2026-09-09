@@ -55,6 +55,34 @@ from backend.shared.tushare_listing_extra_contracts import (
     iter_listing_extra_jobs,
 )
 
+from backend.shared.tushare_limit_extra_contracts import (
+    LIMIT_EXTRA_CONTRACTS,
+    iter_limit_extra_jobs,
+)
+
+from backend.shared.tushare_concept_extra_contracts import (
+    CONCEPT_EXTRA_CONTRACTS,
+    iter_concept_extra_jobs,
+)
+
+from backend.shared.tushare_dc_extra_contracts import (
+    DC_EXTRA_CONTRACTS,
+    iter_dc_extra_jobs,
+)
+
+DC_EXTRA_RUNTIME_CONTRACTS = {
+    api: {**spec, "group": "dc_extra"} for api, spec in DC_EXTRA_CONTRACTS.items()
+}
+
+CONCEPT_EXTRA_RUNTIME_CONTRACTS = {
+    api: {**spec, "group": "concept_extra"}
+    for api, spec in CONCEPT_EXTRA_CONTRACTS.items()
+}
+
+LIMIT_EXTRA_RUNTIME_CONTRACTS = {
+    api: {**spec, "group": "limit_extra"} for api, spec in LIMIT_EXTRA_CONTRACTS.items()
+}
+
 LISTING_EXTRA_RUNTIME_CONTRACTS = {
     api: {
         **spec,
@@ -100,6 +128,9 @@ CONNECT_RUNTIME_CONTRACTS = {
 }
 
 EXTENDED_CONTRACTS = {
+    **DC_EXTRA_RUNTIME_CONTRACTS,
+    **CONCEPT_EXTRA_RUNTIME_CONTRACTS,
+    **LIMIT_EXTRA_RUNTIME_CONTRACTS,
     **LISTING_EXTRA_RUNTIME_CONTRACTS,
     **TRADING_EVENT_RUNTIME_CONTRACTS,
     **CONNECT_RUNTIME_CONTRACTS,
@@ -137,6 +168,9 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "dc_extra": iter_dc_extra_jobs,
+    "concept_extra": iter_concept_extra_jobs,
+    "limit_extra": iter_limit_extra_jobs,
     "listing_extra": iter_listing_extra_jobs,
     "trading_event": iter_trading_event_jobs,
     "connect": iter_connect_jobs,

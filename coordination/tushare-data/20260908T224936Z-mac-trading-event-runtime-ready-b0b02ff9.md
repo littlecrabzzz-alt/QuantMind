@@ -1,0 +1,8 @@
+# 龙虎榜/游资4接口运行候选交接
+- remaining_markets，Mac独立 codex/tushare-trading-event-runtime；基线父93b6343+纯4d2f953；仅交增量 b5b6a80e1077ae82fb63f3d779afec6d0608b536，不重复交merge。无生产访问。
+- 7文件：registry/store/pipeline仅imports、identifiers、record_extra_planning_gaps/初始validate tuple，mirror模块名单、hm_list catalog精确纠错、新test_tushare_trading_event_pipeline.py、store数量136→140。未动plan_extended循环/helpers、split_request、archive/文档索引/生产配置。
+- 注册 trading_event(enable_trading_event/trading_event_apis/trading_event_history_start)，实际enqueue→capture→normalize→publish→fixed-release store读闭环；保留同日不同reason/side/tag、相同事件重复观察去重、未知源字段和source_ts_code。hm_detail显式tag且缺列schema_gap；合法null可通过。
+- hm_list catalog仅移除示例用户名zhouyu1933/bike770/Asking，原HTML sha/元数据/基线条目数全保留，避免enqueue字段并集带错列。
+- 饱和统一trading_event_securities：历史stocks(保留T与退市)并集top_list/top_inst/hm_detail全部存储观察及当前饱和父观察；hot_money_names单独从hm_list/hm_detail发现。固定trade_date及已有hm_name等请求参数不丢失；父分区仍universe_unverified。
+- 必需后续：hm_name二级分区未实现，ts_code终端饱和保持blocked；hm_list1000cap无法以已观测名单证明完整。planning保留secondary_partition_gap，实际run测试证明无伪fanout/伪完成。权限仍unprobed、top_inst历史下界未知、标签PIT/旧修订/同值multiplicity不能宣告闭合。需父review后生产probe/部署，不能以候选测试宣布真实数据就绪。
+- 40 tests passed：纯10、新运行6、store6、Connect4、planning14；新运行final复验6过；Ruff/diff-check过。只在TemporaryDirectory使用MockTransport，socket/secret访问受测试guard拒绝。

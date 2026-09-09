@@ -48,6 +48,9 @@ from backend.shared.tushare_listing_extra_contracts import (
     DAILY_INFO_STARTS,
     listing_extra_prerequisites,
 )
+from backend.shared.tushare_limit_extra_contracts import limit_extra_prerequisites
+from backend.shared.tushare_concept_extra_contracts import concept_extra_prerequisites
+from backend.shared.tushare_dc_extra_contracts import dc_extra_prerequisites
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
@@ -466,6 +469,13 @@ class Pipeline:
                 for field, value in numeric.items():
                     if value is not None and not isinstance(value, str):
                         row[field] = json_bytes(value).decode("utf-8")
+            if contract_for(result["api_name"]).get("group") in (
+                "concept_extra",
+                "dc_extra",
+            ):
+                for field in ("con_code", "leading_code"):
+                    if isinstance(row.get(field), str):
+                        row["source_" + field] = row[field]
             for key in (
                 "ts_code",
                 "symbol",
@@ -477,7 +487,15 @@ class Pipeline:
                 value = row.get(key)
                 if isinstance(value, str):
                     row["source_" + key] = value
-                    if result["api_name"] in OTHER_CONTRACTS and result[
+                    if key == "ts_code" and (
+                        result["api_name"] == "limit_cpt_list"
+                        or contract_for(result["api_name"]).get("group")
+                        in ("concept_extra", "dc_extra")
+                    ):
+                        # Supplier concept codes are opaque within this dataset;
+                        # even stock-shaped future labels are not equity identities.
+                        row[key] = value
+                    elif result["api_name"] in OTHER_CONTRACTS and result[
                         "api_name"
                     ].startswith(("opt_", "sge_", "fx_")):
                         # Asset namespace precedes any stock-shaped symbol. Supplier
@@ -640,7 +658,17 @@ class Pipeline:
 
     def identifiers(self):
         families = {
+            "ths_index": "ths_indices",
+            "ths_daily": "ths_indices",
+            "ths_member": "ths_indices",
+            "dc_index": "dc_indices",
+            "dc_member": "dc_indices",
+            "dc_daily": "dc_indices",
             **{api: "connect_" + api for api in CONNECT_CONTRACTS},
+            "limit_list_ths": "limit_securities",
+            "limit_list_d": "limit_securities",
+            "limit_step": "limit_securities",
+            "limit_cpt_list": "limit_concepts",
             "bak_basic": "historical_listing_securities",
             "new_share": "historical_listing_securities",
             "daily_info": "market_stat_categories",
@@ -735,6 +763,11 @@ class Pipeline:
             result["stocks"] | result["bse_old_codes"] | result["bse_new_codes"]
         )
         result["market_stat_categories"].update(DAILY_INFO_STARTS)
+        result["limit_securities"].update(
+            result["stocks"]
+            | result["historical_listing_securities"]
+            | result["trading_event_securities"]
+        )
         result = {key: sorted(values) for key, values in result.items()}
         try:
             result.update(credit_identifiers(result))
@@ -899,6 +932,9 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "dc_extra": dc_extra_prerequisites,
+            "concept_extra": concept_extra_prerequisites,
+            "limit_extra": limit_extra_prerequisites,
             "listing_extra": listing_extra_prerequisites,
             "trading_event": trading_event_prerequisites,
             "connect": connect_prerequisites,
@@ -929,6 +965,22 @@ class Pipeline:
         identifiers = self.identifiers()
         blocked_families = set()
         for family, validate in (
+            (
+                "dc_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps("dc_extra", cfg, ids),
+            ),
+            (
+                "concept_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "concept_extra", cfg, ids
+                ),
+            ),
+            (
+                "limit_extra",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "limit_extra", cfg, ids
+                ),
+            ),
             (
                 "listing_extra",
                 lambda cfg, ids: self.record_extra_planning_gaps(
@@ -1984,12 +2036,37 @@ class Pipeline:
         }
 
     def publish(self):
-        previous_id, previous = None, None
-        pointer = self.root / "CURRENT.json"
-        if pointer.exists():
-            previous_id = json.loads(pointer.read_bytes())["release_id"]
-            if previous_id.startswith("data-"):
-                previous = manifest_at(self.root, previous_id)
+        from contextlib import contextmanager
+
+        publish_started = time.monotonic()
+        timing = self.publish_timing = {
+            "stage_seconds": {},
+            "completed_stages": [],
+            "failed_stage": None,
+        }
+
+        @contextmanager
+        def measure(name):
+            started = time.monotonic()
+            try:
+                yield
+            except BaseException:
+                timing["failed_stage"] = name
+                raise
+            else:
+                timing["completed_stages"].append(name)
+            finally:
+                finished = time.monotonic()
+                timing["stage_seconds"][name] = max(0.0, finished - started)
+                timing["total_elapsed_seconds"] = max(0.0, finished - publish_started)
+
+        with measure("read_current"):
+            previous_id, previous = None, None
+            pointer = self.root / "CURRENT.json"
+            if pointer.exists():
+                previous_id = json.loads(pointer.read_bytes())["release_id"]
+                if previous_id.startswith("data-"):
+                    previous = manifest_at(self.root, previous_id)
 
         def preserve_release_mapping(archive):
             known = (
@@ -2013,229 +2090,241 @@ class Pipeline:
             recovery["archived_releases"] = [mappings[key] for key in sorted(mappings)]
             return {**archive, "recovery": recovery}
 
-        files = dict(previous["files"]) if previous else {}
-        active, gaps = {}, []
-        for row in self.db.execute(
-            "SELECT * FROM jobs WHERE state NOT IN ('done','pending') ORDER BY rowid"
-        ):
-            result = json.loads(row["result"]) if row["result"] else {}
-            if row["state"] not in ("done", "pending", "resolved"):
-                gaps.append(
-                    {
-                        "id": row["id"],
-                        "state": row["state"],
-                        "api_name": json.loads(row["job"])["api_name"],
-                        "params": json.loads(row["job"])["params"],
-                        "assessment": result.get("status"),
-                    }
-                )
-        # Repeated attempts and prior revisions remain queryable in the latest
-        # release; migration can recover only the attempts v1 had retained.
-        for row in self.db.execute(
-            "SELECT result FROM attempts ORDER BY job_id,attempt"
-        ):
-            result = json.loads(row[0])
-            if "observation" in result:
-                paths = [
-                    (
-                        "observations/" + result["observation"],
-                        result["observation_sha256"],
-                    ),
-                    (
-                        "objects/" + result["object_sha256"] + ".json",
-                        result["object_sha256"],
-                    ),
-                ]
-                if "parquet" in result:
-                    paths.append(
-                        (result["parquet"]["path"], result["parquet"]["sha256"])
+        with measure("scan_gaps"):
+            files = dict(previous["files"]) if previous else {}
+            active, gaps = {}, []
+            for row in self.db.execute(
+                "SELECT * FROM jobs WHERE state NOT IN ('done','pending') ORDER BY rowid"
+            ):
+                result = json.loads(row["result"]) if row["result"] else {}
+                if row["state"] not in ("done", "pending", "resolved"):
+                    gaps.append(
+                        {
+                            "id": row["id"],
+                            "state": row["state"],
+                            "api_name": json.loads(row["job"])["api_name"],
+                            "params": json.loads(row["job"])["params"],
+                            "assessment": result.get("status"),
+                        }
                     )
-                for name, sha in paths:
-                    files[name] = {
-                        "sha256": sha,
-                        "bytes": (self.root / name).stat().st_size,
+        with measure("scan_attempts_and_stat"):
+            # Repeated attempts and prior revisions remain queryable in the latest
+            # release; migration can recover only the attempts v1 had retained.
+            for row in self.db.execute(
+                "SELECT result FROM attempts ORDER BY job_id,attempt"
+            ):
+                result = json.loads(row[0])
+                if "observation" in result:
+                    paths = [
+                        (
+                            "observations/" + result["observation"],
+                            result["observation_sha256"],
+                        ),
+                        (
+                            "objects/" + result["object_sha256"] + ".json",
+                            result["object_sha256"],
+                        ),
+                    ]
+                    if "parquet" in result:
+                        paths.append(
+                            (result["parquet"]["path"], result["parquet"]["sha256"])
+                        )
+                    for name, sha in paths:
+                        files[name] = {
+                            "sha256": sha,
+                            "bytes": (self.root / name).stat().st_size,
+                        }
+                if "parquet" in result:
+                    active[result["parquet"]["path"]] = {
+                        "api_name": result["api_name"],
+                        "quality_state": result["status"],
+                        **result["parquet"],
                     }
-            if "parquet" in result:
-                active[result["parquet"]["path"]] = {
-                    "api_name": result["api_name"],
-                    "quality_state": result["status"],
-                    **result["parquet"],
+        with measure("schema_metadata"):
+            # Ship the reviewed catalog/contract field definitions with every pinned
+            # release; code availability must not substitute for offline metadata.
+            metadata = {"catalog": self.catalog, "contracts": EXTENDED_CONTRACTS}
+            raw = json_bytes(metadata)
+            schema_name = "schemas/" + digest(raw) + ".json"
+            if not (self.root / schema_name).exists():
+                atomic_bytes(self.root / schema_name, raw)
+            files[schema_name] = {"sha256": digest(raw), "bytes": len(raw)}
+        with measure("archive_inventory_before"):
+            archive = None
+            self_archive_verified = False
+            if (self.root / "archive.sqlite").exists():
+                from backend.shared.tushare_archive import archive_inventory
+
+                archived = archive_inventory(self.root)
+                self_archive_verified = bool(
+                    previous_id
+                    and "archives/" + previous_id.removeprefix("data-") + ".json"
+                    in archived["files"]
+                )
+                files.update(archived["files"])
+                for dataset in archived["datasets"]:
+                    active.setdefault(dataset["path"], dataset)
+                archive = {"recovery": archived["recovery"], "gaps": archived["gaps"]}
+        with measure("document_index"):
+            documents = None
+            if (self.root / "documents.sqlite").exists():
+                from backend.shared.tushare_documents import document_index
+
+                inventory = document_index(self.root)
+                for item in inventory["files"]:
+                    files[item["path"]] = {"sha256": item["sha256"], "bytes": item["bytes"]}
+                documents = {
+                    "path": inventory["path"],
+                    "schema_version": inventory["schema_version"],
+                    "counts": inventory["counts"],
+                    "reference_counts": inventory["reference_counts"],
+                    "totals": inventory["totals"],
                 }
-        # Ship the reviewed catalog/contract field definitions with every pinned
-        # release; code availability must not substitute for offline metadata.
-        metadata = {"catalog": self.catalog, "contracts": EXTENDED_CONTRACTS}
-        raw = json_bytes(metadata)
-        schema_name = "schemas/" + digest(raw) + ".json"
-        if not (self.root / schema_name).exists():
-            atomic_bytes(self.root / schema_name, raw)
-        files[schema_name] = {"sha256": digest(raw), "bytes": len(raw)}
-        archive = None
-        self_archive_verified = False
-        if (self.root / "archive.sqlite").exists():
-            from backend.shared.tushare_archive import archive_inventory
-
-            archived = archive_inventory(self.root)
-            self_archive_verified = bool(
-                previous_id
-                and "archives/" + previous_id.removeprefix("data-") + ".json"
-                in archived["files"]
-            )
-            files.update(archived["files"])
-            for dataset in archived["datasets"]:
-                active.setdefault(dataset["path"], dataset)
-            archive = {"recovery": archived["recovery"], "gaps": archived["gaps"]}
-        documents = None
-        if (self.root / "documents.sqlite").exists():
-            from backend.shared.tushare_documents import document_index
-
-            inventory = document_index(self.root)
-            for item in inventory["files"]:
-                files[item["path"]] = {"sha256": item["sha256"], "bytes": item["bytes"]}
-            documents = {
-                "path": inventory["path"],
-                "schema_version": inventory["schema_version"],
-                "counts": inventory["counts"],
-                "reference_counts": inventory["reference_counts"],
-                "totals": inventory["totals"],
+                del inventory
+        with measure("metadata_inventory"):
+            # Retain prior immutable metadata versions as well as the current index.
+            # A fresh Mac must not depend on having mirrored every earlier release.
+            for family in ("documents", "schemas", "archives"):
+                if (self.root / family).is_symlink():
+                    raise ValueError("Unsafe immutable metadata directory")
+                for path in (self.root / family).glob("*.json"):
+                    if not re.fullmatch(r"[a-f0-9]{64}", path.stem):
+                        continue
+                    if path.is_symlink():
+                        raise ValueError("Unsafe immutable metadata symlink")
+                    files[path.relative_to(self.root).as_posix()] = {
+                        "sha256": path.stem,
+                        "bytes": path.stat().st_size,
+                    }
+        with measure("coverage_and_closure"):
+            content = {
+                "schema_version": 1,
+                "files": files,
+                "datasets": list(active.values()),
+                "coverage": self.status(),
+                "coverage_by_api": [
+                    dict(r)
+                    for r in self.db.execute(
+                        "SELECT json_extract(job, '$.api_name') AS api_name,state,count(*) AS partitions FROM jobs GROUP BY api_name,state"
+                    )
+                ],
+                "gaps": gaps,
+                "history_complete": False,
+                "partition_closure": self.partition_inventory(),
+                "rrg_status": "blocked_data",
+                "scope": [
+                    r[0]
+                    for r in self.db.execute(
+                        "SELECT DISTINCT json_extract(job,'$.api_name') AS api FROM jobs ORDER BY api"
+                    )
+                ],
+                "implemented_contracts": sorted(set(CONTRACTS) | set(EXTENDED_CONTRACTS)),
+                "schema_path": schema_name,
+                "documents": documents,
+                "archive": preserve_release_mapping(archive),
+                "historical_versions_complete": False,
+                "retained_observations_included": True,
+                "capabilities": [
+                    dict(r)
+                    for r in self.db.execute("SELECT * FROM capability ORDER BY scope")
+                ],
+                "planning": [
+                    dict(r)
+                    for r in self.db.execute("SELECT * FROM planning_state ORDER BY name")
+                ],
+                "catalogued_interfaces": len(self.catalog["entries"]),
+                "unimplemented_catalog_scope": True,
             }
-            del inventory
-        # Retain prior immutable metadata versions as well as the current index.
-        # A fresh Mac must not depend on having mirrored every earlier release.
-        for family in ("documents", "schemas", "archives"):
-            if (self.root / family).is_symlink():
-                raise ValueError("Unsafe immutable metadata directory")
-            for path in (self.root / family).glob("*.json"):
-                if not re.fullmatch(r"[a-f0-9]{64}", path.stem):
-                    continue
-                if path.is_symlink():
-                    raise ValueError("Unsafe immutable metadata symlink")
-                files[path.relative_to(self.root).as_posix()] = {
-                    "sha256": path.stem,
-                    "bytes": path.stat().st_size,
-                }
-        content = {
-            "schema_version": 1,
-            "files": files,
-            "datasets": list(active.values()),
-            "coverage": self.status(),
-            "coverage_by_api": [
-                dict(r)
-                for r in self.db.execute(
-                    "SELECT json_extract(job, '$.api_name') AS api_name,state,count(*) AS partitions FROM jobs GROUP BY api_name,state"
-                )
-            ],
-            "gaps": gaps,
-            "history_complete": False,
-            "partition_closure": self.partition_inventory(),
-            "rrg_status": "blocked_data",
-            "scope": [
-                r[0]
-                for r in self.db.execute(
-                    "SELECT DISTINCT json_extract(job,'$.api_name') AS api FROM jobs ORDER BY api"
-                )
-            ],
-            "implemented_contracts": sorted(set(CONTRACTS) | set(EXTENDED_CONTRACTS)),
-            "schema_path": schema_name,
-            "documents": documents,
-            "archive": preserve_release_mapping(archive),
-            "historical_versions_complete": False,
-            "retained_observations_included": True,
-            "capabilities": [
-                dict(r)
-                for r in self.db.execute("SELECT * FROM capability ORDER BY scope")
-            ],
-            "planning": [
-                dict(r)
-                for r in self.db.execute("SELECT * FROM planning_state ORDER BY name")
-            ],
-            "catalogued_interfaces": len(self.catalog["entries"]),
-            "unimplemented_catalog_scope": True,
-        }
-        if previous:
-            # A crash after retaining CURRENT must not manufacture a new release
-            # solely because CURRENT's own archived manifest now exists.
-            def comparable(document):
-                value = dict(document)
-                own_path = "archives/" + previous_id[5:] + ".json"
-                if own_path in document["files"]:
-                    own = self.root / own_path
-                    expected = document["files"][own_path]
-                    if (
-                        expected
-                        != {"sha256": previous_id[5:], "bytes": own.stat().st_size}
-                        or digest(own.read_bytes()) != previous_id[5:]
-                    ):
-                        raise ValueError("Invalid archived CURRENT manifest")
-                value["files"] = {
-                    name: metadata
-                    for name, metadata in document["files"].items()
-                    if name != own_path
-                }
-                archive = document.get("archive")
-                if archive:
-                    archive = {**archive, "recovery": dict(archive["recovery"])}
-                    recovery = archive["recovery"]
-                    releases = recovery.get("archived_releases", [])
-                    retained = [r for r in releases if r["release_id"] != previous_id]
-                    if len(retained) != len(releases):
-                        recovery["archived_releases"] = retained
-                        if any(
-                            r
-                            != {
-                                "release_id": previous_id,
-                                "path": own_path,
-                                "sha256": previous_id[5:],
-                            }
-                            for r in releases
-                            if r["release_id"] == previous_id
+        with measure("compare_previous"):
+            if previous:
+                # A crash after retaining CURRENT must not manufacture a new release
+                # solely because CURRENT's own archived manifest now exists.
+                def comparable(document):
+                    value = dict(document)
+                    own_path = "archives/" + previous_id[5:] + ".json"
+                    if own_path in document["files"]:
+                        own = self.root / own_path
+                        expected = document["files"][own_path]
+                        if (
+                            expected
+                            != {"sha256": previous_id[5:], "bytes": own.stat().st_size}
+                            or digest(own.read_bytes()) != previous_id[5:]
                         ):
-                            raise ValueError("Invalid archived CURRENT mapping")
-                    if self_archive_verified and own_path in document["files"]:
-                        recovery["files"] -= 1
-                    if archive == {
-                        "gaps": [],
-                        "recovery": {
-                            "status": "not_started",
-                            "remaining": 0,
-                            "tasks": 0,
-                            "files": 0,
-                            "open_gaps": 0,
-                            "scan_count": 0,
-                            "historical_complete": False,
-                            "archived_releases": [],
-                        },
-                    }:
-                        archive = None
-                    value["archive"] = archive
-                return value
+                            raise ValueError("Invalid archived CURRENT manifest")
+                    value["files"] = {
+                        name: metadata
+                        for name, metadata in document["files"].items()
+                        if name != own_path
+                    }
+                    archive = document.get("archive")
+                    if archive:
+                        archive = {**archive, "recovery": dict(archive["recovery"])}
+                        recovery = archive["recovery"]
+                        releases = recovery.get("archived_releases", [])
+                        retained = [r for r in releases if r["release_id"] != previous_id]
+                        if len(retained) != len(releases):
+                            recovery["archived_releases"] = retained
+                            if any(
+                                r
+                                != {
+                                    "release_id": previous_id,
+                                    "path": own_path,
+                                    "sha256": previous_id[5:],
+                                }
+                                for r in releases
+                                if r["release_id"] == previous_id
+                            ):
+                                raise ValueError("Invalid archived CURRENT mapping")
+                        if self_archive_verified and own_path in document["files"]:
+                            recovery["files"] -= 1
+                        if archive == {
+                            "gaps": [],
+                            "recovery": {
+                                "status": "not_started",
+                                "remaining": 0,
+                                "tasks": 0,
+                                "files": 0,
+                                "open_gaps": 0,
+                                "scan_count": 0,
+                                "historical_complete": False,
+                                "archived_releases": [],
+                            },
+                        }:
+                            archive = None
+                        value["archive"] = archive
+                    return value
 
-            if comparable(content) == comparable(previous):
-                return previous_id
+                if comparable(content) == comparable(previous):
+                    return previous_id
         if previous_id:
             from backend.shared.tushare_archive import archive_inventory, retain_release
 
-            retained = retain_release(self.root, previous_id)
-            for name, metadata in retained["files"].items():
-                if name in files and files[name] != metadata:
-                    raise ValueError("Conflicting inherited file metadata")
-                files[name] = metadata
-            archived = archive_inventory(self.root)
-            files.update(archived["files"])
-            content["archive"] = preserve_release_mapping(
-                {
-                    "recovery": archived["recovery"],
-                    "gaps": archived["gaps"],
-                }
+            with measure("retain_previous"):
+                retained = retain_release(self.root, previous_id)
+                for name, metadata in retained["files"].items():
+                    if name in files and files[name] != metadata:
+                        raise ValueError("Conflicting inherited file metadata")
+                    files[name] = metadata
+            with measure("archive_inventory_after"):
+                archived = archive_inventory(self.root)
+                files.update(archived["files"])
+                content["archive"] = preserve_release_mapping(
+                    {
+                        "recovery": archived["recovery"],
+                        "gaps": archived["gaps"],
+                    }
+                )
+        with measure("serialize_manifest"):
+            raw = json_bytes(content)
+            sha = digest(raw)
+            release = "data-" + sha
+            destination = self.root / "releases" / release / "manifest.json"
+        with measure("write_manifest"):
+            if not destination.exists():
+                atomic_bytes(destination, raw)
+            atomic_json(
+                self.root / "CURRENT.json", {"release_id": release, "manifest_sha256": sha}
             )
-        raw = json_bytes(content)
-        sha = digest(raw)
-        release = "data-" + sha
-        destination = self.root / "releases" / release / "manifest.json"
-        if not destination.exists():
-            atomic_bytes(destination, raw)
-        atomic_json(
-            self.root / "CURRENT.json", {"release_id": release, "manifest_sha256": sha}
-        )
         return release
 
 
@@ -2256,6 +2345,9 @@ def tick(max_requests=None, max_seconds=None):
     )
     if not 1 <= int(max_requests) <= 1000 or not 1 <= float(max_seconds) <= 100:
         raise ValueError("Invalid bounded batch limits")
+    publish_interval = config.get("publish_interval_seconds", 0)
+    if type(publish_interval) is not int or publish_interval < 0:
+        raise ValueError("Invalid publication interval")
     catalog = json.loads(
         (
             Path(__file__).resolve().parents[2] / "config/tushare-catalog.json"
@@ -2271,7 +2363,15 @@ def tick(max_requests=None, max_seconds=None):
         token = get_secret("TUSHARE_TOKEN")
         if not token:
             return {"status": "blocked_missing_token"}
-        report = {}
+        publication = {
+            "interval_seconds": publish_interval,
+            "status": "not_attempted",
+            "performed": False,
+            "pending": True,
+            "current_release_id": None,
+            "mirror_status": "not_checked",
+        }
+        report = {"publication": publication}
         stage_seconds = {}
         completed_stages = []
         failed_stage = None
@@ -2338,7 +2438,57 @@ def tick(max_requests=None, max_seconds=None):
                                 ),
                             )
                 with measure("publish"):
-                    report["release_id"] = pipeline.publish()
+                    due = True
+                    if publish_interval:
+                        pointer = ROOT / "CURRENT.json"
+                        if pointer.exists() or pointer.is_symlink():
+                            if pointer.is_symlink():
+                                raise ValueError("Unsafe current pointer")
+                            current = json.loads(pointer.read_bytes())
+                            release_id = current["release_id"]
+                            if current.get("manifest_sha256") != release_id[5:]:
+                                raise ValueError("Current manifest identity mismatch")
+                            manifest_at(ROOT, release_id)
+                            publication["current_release_id"] = release_id
+                            saved = pipeline.db.execute(
+                                "SELECT value FROM scheduler_state WHERE name='publish_success_at'"
+                            ).fetchone()
+                            if saved:
+                                last_success = saved[0]
+                                if type(last_success) is not int or last_success < 0:
+                                    raise ValueError("Invalid publication checkpoint")
+                                publication["last_success_at"] = last_success
+                                publication["next_due_at"] = (
+                                    last_success + publish_interval
+                                )
+                                # Clock rollback forces a real publication check, never
+                                # an unbounded postponement based on a future timestamp.
+                                elapsed = time.time() - last_success
+                                due = not 0 <= elapsed < publish_interval
+                    if due:
+                        publication["status"] = "publishing"
+                        release_id = pipeline.publish()
+                        report["release_id"] = release_id
+                        publication.update(
+                            status="published",
+                            performed=True,
+                            pending=False,
+                            current_release_id=release_id,
+                        )
+                        if publish_interval:
+                            successful_at = int(time.time())
+                            pipeline.db.execute(
+                                "INSERT INTO scheduler_state(name,value) VALUES('publish_success_at',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                                (successful_at,),
+                            )
+                            pipeline.db.commit()
+                            publication.update(
+                                last_success_at=successful_at,
+                                next_due_at=successful_at + publish_interval,
+                            )
+                    else:
+                        report["release_id"] = publication["current_release_id"]
+                        publication["status"] = "deferred"
             finally:
                 if pipeline is not None:
                     with measure("close"):
@@ -2346,6 +2496,8 @@ def tick(max_requests=None, max_seconds=None):
             return report
         except BaseException as exc:
             failed = True
+            if publication["status"] == "publishing":
+                publication["status"] = "failed"
             report.update(status="error", error_type=type(exc).__name__)
             raise
         finally:
@@ -2360,6 +2512,9 @@ def tick(max_requests=None, max_seconds=None):
                     "total_elapsed_seconds": max(0.0, time.monotonic() - tick_started),
                 },
             )
+            publish_timing = getattr(pipeline, "publish_timing", None)
+            if isinstance(publish_timing, dict):
+                report["timing"]["publish"] = publish_timing
             if failed:
                 try:
                     atomic_json(ROOT / "pipeline-status.json", report)

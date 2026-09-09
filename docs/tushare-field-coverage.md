@@ -56,5 +56,8 @@ therefore remains mock-confirmed only.
 Full local audit schemas, official HTML hashes, seven pre-fix reproductions and
 fixed-sample comparison are under `/tmp/quantmind-known-fields-audit-20260909/`.
 Offline regression: new field-coverage tests, intake tests, HTTP evidence tests,
-and pipeline acceptance (38 tests total). Production activation belongs to the
-parent integration task; this change is a candidate only.
+and pipeline acceptance (38 tests total). Production activation completed in f2cd52e; the integrated 364-test suite passed before release.
+
+## Production observation
+
+The enabled guard observed research_report response b0750473814b4996bca4a7572f591e43.json: 1000 rows, possibly_truncated and field_coverage=gap with file_name absent. The raw response SHA256 is 44652b0754efb081055d85a3d3e6ee5d13a31e14f18b13919f3fee37ae1c0ecc. Saturation and field coverage remain separate findings. The raw response is retained; official output-table/example inconsistency remains under review and no field is silently removed. New trading/listing samples returned all 91 requested columns, including nullable hm_detail.tag.

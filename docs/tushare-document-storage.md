@@ -1,5 +1,7 @@
 # Tushare 原文保存与 PDF 逐页提取
 
+> 下文保留组件初始设计与当时验证记录；生产进展以[tushare-progress.md](tushare-progress.md)及本页末节为准。
+
 2026-09-09。`backend/shared/tushare_documents.py` 是无数据库、无队列的下载/提取组件，接入目标沿用 [总计划](tushare-integration-plan.md)。此子任务只做模拟网络与临时目录验证，未读取生产凭据、访问真实原文、调整依赖或部署；主任务负责云端调用、持续补齐和发布。
 
 ```python
@@ -50,3 +52,11 @@ PDF 提取在独立 Python 进程中完成，生产路径尝试限制 1 GiB 地�
 需要继续推进：真实公告和研报各一份下载/提取及原文页码核对；HTML 内的 PDF/其他附件发现；扫描件 OCR；超过当前单文件/解析资源上限的专用批次；加密文档、坏链、过期链接、非标准端口和上游不可达分别留缺口。这些未完成项不改变可获取原文尽量全历史保存的目标，也不阻塞其他来源。
 
 本次验证命令为 `python3 scripts/test_tushare_documents.py`，7 项模拟网络测试覆盖 URL、混合 DNS、逐跳校验、重定向上限、IP 固定/TLS 主机名、流式大小限制、截断、HTML 伪装 PDF、解析失败保留、幂等与损坏/符号链接拒绝。自行生成两页 PDF 提取后核对文本/页码，第一页面经 Poppler 渲染查看。该结果不证明供应商真实 PDF 可获取或云端解析依赖已经就绪。
+
+## 2026-09-09 schema3生产迁移
+
+便携索引使用16个一级描述块与4096个三位十六进制状态桶。追加映射、文件、尝试索引仍沿用现有分块，数据库user_version保持2，仅document_index_meta从1迁移到3；旧不可变schema1/2数据保留，读取器同时支持。
+
+云端迁移前SQLite备份420331520字节，SHA256 a7dd76fec405d1add279c89d1a07764b3959b3b1a7928880319a540bba1452c2。352512条文档、412528条引用、3465条尝试在迁移前后逐行摘要一致，全部便携行与数据库再次比对一致。首次构建9.928秒、无变更0.578秒，旧新API各9个分页对账通过。Mac固定schema3版全部行摘要与云端DB一致，旧schema2也仍存在且可读；禁网禁凭据验证通过。
+
+固定迁移版data-1d8dfc1ba3ec2560ab6c34bc6a88c429325f303592d35261ecee96467f5505ec。云端validation/schema3-migration-acceptance.json与schema3-api-acceptance.json；Mac/tmp/tushare-schema3-mac-verified.json。旧meta1-only writer不可直接复用；回退不得恢复旧DB覆盖新增记录。此次没有修改源下载/解析并发，不能把索引优化等同附件成功率改善。

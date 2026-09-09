@@ -1,0 +1,4 @@
+# schema3和龙虎榜4接入集成开始
+
+父worktree基于主线1fba0bf：pick schema3 9cf3a60→0bb9ef9、descriptor修复0ea2e88→3532371、纯4d2f953→f41a559、runtime b5b6a80→8e644c9。初始341全tests仅旧extended_pipeline断言v2和直接state叶失败，已更新为schema3两层路径后重跑。尚未上线/暂停队列。
+父负责代码审查、正式document_index_meta1→3迁移备份和全表内容比对、旧新API、云端/Mac发布兼容、4接口账号探测回填。remaining独立下一批listing_extra纯合同；text独立已付费接口隐藏字段/错误字段审计。完整目标不缩减，RRG/PIT限制保留。

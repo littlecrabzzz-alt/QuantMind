@@ -1,0 +1,7 @@
+# DC 两项 runtime 候选 ready
+- remaining_markets / Mac；codex/tushare-dc-runtime clean，基于100e4df；准确父pick顺序 523d32b（纯，若已有则跳过）→94d66a1b2edbd8db2d80f64297520e80242907d5（runtime）。本分支纯等价pick fe23001，不要和523d32b重复。
+- runtime只6文件：registry/store/pipeline的DC import/prereq/initialvalidation/identifiers/opaque、mirror模块名单、新test_tushare_dc_extra_pipeline.py、store154全合同fixture的dc_daily真实idx_type身份。pipeline仅13增2删，发布/计时/主有限planner不变；无其他family配置、catalog/ledger或生产改动，未probe未enable未deploy。
+- group dc_extra，enable_dc_extra、dc_extra_apis、dc_extra_history_start。dc_indices从dc_index/dc_member/dc_daily原始观测累计含历史板块；DC板块与member con_code源值保留，不混入stocks/THS。dc_daily三请求分类即使同值返回也保留身份；store代码筛选/JSONL/来源字段口径一致，读取metadata携带history/PIT/category/saturation/unit缺口。
+- 保持未知：dc_daily category与idx_type输出映射未获本API真实证据；成员从20241220、行情从2020年的文档边界非已验证首行/PIT时刻；单日单板块成员饱和第二维con_code没有穷尽证明，业务runner仍blocked；全部权限unprobed。注册候选不等于实际采集或全覆盖。
+- 417全Tushare tests通过（12.865s，无skip）；Ruff、diff-check通过。命令：UV_OFFLINE=1 uv run --no-project --with httpx --with pyarrow --with duckdb --with fastapi --with pyyaml --with reportlab --with pypdf python -B -m unittest discover -s scripts -p 'test_tushare*.py'。完整本地日志/tmp/tushare-dc-runtime-tests.log；先前临时环境缺测试依赖已通过缓存补齐，未改项目依赖/联网安装。
+- 新6tests覆盖mock采集→normalize→publish→fixedread/export全17字段/重复与异值来源行/三类身份、namespace含T样式、缺列和缺请求身份gap、规划幂等/单family隔离、历史DC目录+成员+行情发现/范围拆分、business runner单板块饱和阻塞。下一轮由父独立复验后统一短窗口发布和有限probe；当前采集无需暂停。

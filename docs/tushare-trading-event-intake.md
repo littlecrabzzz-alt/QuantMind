@@ -1,6 +1,6 @@
-# 龙虎榜与游资 4 接口候选
+# 龙虎榜与游资 4 接口接入
 
-基于 `eb3bf64`（131 个已注册接口），本增量只提供纯合同和离线惰性规划。仍以既有 263 项目录基线 + 11 项额外发现为审计范围；这 4 项已在基线，不增加目录分母，也没有获得运行接入、权限或全历史完成证明。
+以下为纯合同阶段记录；2026-09-09 已完成生产接入，验收见末节。原设计基于 `eb3bf64`（131 个已注册接口），本增量只提供纯合同和离线惰性规划。仍以既有 263 项目录基线 + 11 项额外发现为审计范围；这 4 项已在基线，不增加目录分母，也没有获得运行接入、权限或全历史完成证明。
 
 | API / 官方依据 | 门槛 / 单次上限 | 合法分区与历史范围 | 关键语义 |
 |---|---|---|---|
@@ -9,7 +9,7 @@
 | [hm_list / 311](https://tushare.pro/document/2?doc_id=311) | 5000 / 1000 | 可选 `name`；无日期输入，仅快照 | `orgs` 类型未指定；名称、组织列表是供应商标签，不是已核实账户归属或历史 PIT 映射 |
 | [hm_detail / 312](https://tushare.pro/document/2?doc_id=312) | 10000 / 2000 | 可选 `trade_date/ts_code/hm_name/start_date/end_date`；2022 年 8 月起 | `tag` 默认隐藏；`hm_name/hm_orgs/tag` 与源行区分标签，不以股票日线键覆盖 |
 
-账户权限全部 `unprobed`。10100 积分只超过这些页面写明的数值门槛，独立权益、实际频率和可返回历史仍须真实能力探测；合同中的 50 rpm 是保守运行上限，不是官方频率承诺。4 页均未提供 offset/limit 输入。
+纯合同阶段账户权限全部 `unprobed`，后续真实样本权限已记录到覆盖台账。10100 积分只超过这些页面写明的数值门槛，独立权益、实际频率和可返回历史仍须真实能力探测；合同中的 50 rpm 是保守运行上限，不是官方频率承诺。4 页均未提供 offset/limit 输入。
 
 ## 父任务接入边界
 
@@ -52,3 +52,9 @@ hm_detail: trade_date,ts_code,ts_name,buy_amount,sell_amount,net_amount,hm_name,
 | 312 | `64e42c09934c74aea5bd28fe1f0f439ae64fed68a372fdfbac045217a42adc7b` |
 
 可独立复验：`python3 -S -B scripts/test_tushare_trading_event_contracts.py`。测试不实例化 Pipeline、不连接网络、不读写权威数据，覆盖完整字段、隐藏列、合法参数、历史边界、闰日/周末连续性、惰性轮转和未知范围保留。
+
+## 2026-09-09 生产验收
+
+f2cd52e 经双端校验部署，4次真实请求2.789秒：top_list57、top_inst660、hm_list117、hm_detail246，共1080行、37输出列全部返回。hm_list.orgs为原始字符串；hm_detail.tag列存在且246行全部null，未把空值当缺列或自行补标签。原文、观察与Parquet逐字段/日期匹配，固定API及Mac禁网读取全部一致。
+
+已启用trading_event组，首次近期22项、历史478项新任务；旧12组历史签名与游标保持。源证券发现5910、游资名称117，均不是历史全集证明。固定版本data-1a593ee58c333ebb02b025b1529f342c914a82cf389ac7878eeb34c73f45d668，证据validation/eight-acceptance.json、eight-api-acceptance.json及/tmp/tushare-eight-mac-verified.json。历史成员/PIT和饱和末端仍保留缺口。

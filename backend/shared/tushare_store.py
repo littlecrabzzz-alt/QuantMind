@@ -18,6 +18,9 @@ from backend.shared.tushare_registry import (
     CONNECT_RUNTIME_CONTRACTS,
     TRADING_EVENT_RUNTIME_CONTRACTS,
     LISTING_EXTRA_RUNTIME_CONTRACTS,
+    LIMIT_EXTRA_RUNTIME_CONTRACTS,
+    CONCEPT_EXTRA_RUNTIME_CONTRACTS,
+    DC_EXTRA_RUNTIME_CONTRACTS,
 )
 from backend.shared.tushare_credit_extra_contracts import CREDIT_EXTRA_CONTRACTS
 from backend.shared.tushare_etf_basket_contracts import ETF_BASKET_CONTRACTS
@@ -42,6 +45,9 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **DC_EXTRA_RUNTIME_CONTRACTS,
+    **CONCEPT_EXTRA_RUNTIME_CONTRACTS,
+    **LIMIT_EXTRA_RUNTIME_CONTRACTS,
     **LISTING_EXTRA_RUNTIME_CONTRACTS,
     **TRADING_EVENT_RUNTIME_CONTRACTS,
     **CONNECT_RUNTIME_CONTRACTS,
@@ -404,8 +410,11 @@ def _dataset(root, release_id, api_name):
                 for f in ("_row_identity",) + TEXT_FIELDS
                 if f in columns and f not in keys
             ]
-        if "ts_code" in columns and not api_name.startswith(
-            ("opt_", "sge_", "fx_", "us_")
+        if (
+            "ts_code" in columns
+            and api_name not in CONCEPT_EXTRA_RUNTIME_CONTRACTS
+            and api_name not in DC_EXTRA_RUNTIME_CONTRACTS
+            and not api_name.startswith(("opt_", "sge_", "fx_", "us_"))
         ):
             # Canonicalize the old stored supplier spelling without rewriting
             # immutable partitions or merging its distinct historical identity.
@@ -460,8 +469,23 @@ def _dataset(root, release_id, api_name):
                 metadata["source_scalar_note"] = (
                     "Legacy PCF numeric encoding unknown; never assume strings are encoded JSON."
                 )
-        if api_name in LISTING_EXTRA_RUNTIME_CONTRACTS:
-            for note in ("date_axis_note", "namespace_note", "history_gap"):
+        if (
+            api_name in LISTING_EXTRA_RUNTIME_CONTRACTS
+            or api_name in CONCEPT_EXTRA_RUNTIME_CONTRACTS
+            or api_name in DC_EXTRA_RUNTIME_CONTRACTS
+        ):
+            for note in ("date_axis_note", "namespace_note", "history_gap", "cap_note"):
+                if spec.get(note):
+                    metadata[note] = spec[note]
+        if api_name in DC_EXTRA_RUNTIME_CONTRACTS:
+            for note in (
+                "history_note",
+                "pit_gap",
+                "saturation_gap",
+                "category_gap",
+                "member_namespace_note",
+                "unit_note",
+            ):
                 if spec.get(note):
                     metadata[note] = spec[note]
         if identity_fields:
@@ -543,6 +567,7 @@ def _query(
     db,
     columns,
     keys,
+    api_name,
     *,
     fields=None,
     date_field=None,
@@ -593,7 +618,14 @@ def _query(
             "o_code",
             "n_code",
         }.issubset(columns)
-        if not mapping_source and any(
+        concept_source = (api_name == "limit_cpt_list" and code_field == "ts_code") or (
+            (
+                api_name in CONCEPT_EXTRA_RUNTIME_CONTRACTS
+                or api_name in DC_EXTRA_RUNTIME_CONTRACTS
+            )
+            and code_field in ("ts_code", "con_code", "leading_code")
+        )
+        if not (mapping_source or concept_source) and any(
             re.fullmatch(r"[0-9]{6}\.(SH|SZ|BJ)", c) for c in codes
         ):
             raise ValueError("Use internal prefix stock codes, for example SH600036")
@@ -676,7 +708,7 @@ def read_dataset(root, release_id, api_name, **filters):
     observation-time caveat. Legacy releases mark observation history incomplete.
     """
     with _dataset(root, release_id, api_name) as (db, columns, keys, metadata):
-        table = _query(db, columns, keys, **filters).fetch_arrow_table()
+        table = _query(db, columns, keys, api_name, **filters).fetch_arrow_table()
         metadata["as_of"] = _as_of(filters.get("as_of"))
         return table.replace_schema_metadata(
             {b"tushare": json.dumps(metadata, ensure_ascii=False).encode("utf-8")}
@@ -706,7 +738,7 @@ def export_jsonl(root, release_id, api_name, destination, **filters):
             "Export must not overwrite immutable dataset storage or symlinks"
         )
     with _dataset(root, release_id, api_name) as (db, columns, keys, metadata):
-        batches = _query(db, columns, keys, **filters).fetch_record_batch(65536)
+        batches = _query(db, columns, keys, api_name, **filters).fetch_record_batch(65536)
         destination.parent.mkdir(parents=True, exist_ok=True)
         fd, temporary = tempfile.mkstemp(
             prefix=".tushare-export-", dir=destination.parent
