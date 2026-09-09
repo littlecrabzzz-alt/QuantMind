@@ -347,3 +347,12 @@
 - 99fb562源码/Git双端已核对，4727文件，source_digest86fcb7892291a4064a4bd7ed9a2cf686f6a43ddb96693c69f94311c0363b8042。采集04:19:54Z暂停接新任务、04:20:54Z自然排空，只重启tushare-worker，04:23:54Z恢复；文档/US消费者保持，4服务健康检查通过。新真实d7ac29bf批SUCCESS，184请求/137.67秒，规划28.01/发现23.23秒。较前成功批发现少17.6%，但整批131.18→137.67秒，尚无整体吞吐提升证据。
 - RRG40优先事务真实commit（04:25:48Z）：operation rrg-diffusion40-20260909-b0b0f1b914894a928565212be8f0fd28，40已有pending任务priority45→24，0新增，config/planning/scheduler提交时保持。后置只读40身份/优先级一致，04:27:42Z仍pending/无attempt，不把排队当已下载。prepared SHA71bcb2332d83eff05b8841d74274d7766ac47913e2f43f8c52d19d230f759a7c；收据在validation/rrg-priority-adjustments。完整日历骨架、历史成分PIT和ETF缺口仍待办。
 - 下一bond8纯合同91d5e7d已在独立分支推送：70完整字段/22默认隐藏列，7隔离测试通过，runtime继续并行准备，尚未生产或探测。各原文报告/两个verifier/镜像/部署/提权helper证据已归档validation/intake-batch-20260909T035512Z。完整263基线+13发现范围不缩减，继续历史/修订/权限/附件接入。
+
+
+## 2026-09-09 12:41 Bond8联合候选与成员合法分片
+
+- 上轮为实质进展；本轮父0661c3b上合pure91d5e7d→b4faca3、runtime70af978→b2bfb14，新增8债券接口70全字段/22默认N，200采集API/206读取dataset候选。镜像安装copylist补齐；572全套隔离tests26.687秒/Ruff/diff通过。生产仍192，新family默认关闭，真实权限尚未探测；YC独立权限未知且真实type/code过滤需验证。
+- 候选沿用旧records投影、旧SQL/游标/任务身份；新CB发现独立bond_extra_convertibles，报告end_date与评级ann_date分开，YC0/1请求身份不合并，不把101↔1001.CB当已验证别名，不省掉报价22隐藏字段。
+- 正在准备最大23真实请求的probe与全列固定verifier；逐API启用helper由原审核版缩为单family，8个隔离负例通过，含隐藏字段缺失、YC类型未验、饱和、过滤、缺对照、重复请求和权限阻断。所有脚本齐备才部署，不为等脚本暂停生产。
+- RRG40于04:34:08Z只读核查2done/38pending；20250930 daily5423与adj_factor5437，共10860来源行、6raw/obs/Parquet文件SHA/全列通过，无空或失败。所查云固定8f9d1c65与Mac41d91a尚未包含新6文件，不能宣称完整窗口离线。报告/tmp/tushare-rrg40-current-evidence.json SHA f91fa69e73a363542cbfdd7628df2ff133c12755e1f85ad2c4976a830c252ac9。
+- TDX/KP成员先准备6个实际已存板块的合法code分区探测，父3000行仅下界；保留未知板块/成员全集、第二维、PIT缺口。将2API加入已运行market_sentiment会改变旧交织历史policy，需单独追加scope迁移；本轮不重置旧游标来放行。完整目录/历史/修订/附件范围继续。

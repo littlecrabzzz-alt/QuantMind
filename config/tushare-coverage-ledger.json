@@ -4903,7 +4903,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual source/field/filter probes and fixed cloud/Mac verification before per-API enablement. Preserve all historical, revision, pagination and PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 6,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "392",
@@ -5005,7 +5018,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual source/field/filter probes and fixed cloud/Mac verification before per-API enablement. Preserve all historical, revision, pagination and PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 8,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "256",
@@ -5019,7 +5045,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual source/field/filter probes and fixed cloud/Mac verification before per-API enablement. Preserve all historical, revision, pagination and PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 12,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "322",
@@ -5033,7 +5072,34 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual source/field/filter probes and fixed cloud/Mac verification before per-API enablement. Preserve all historical, revision, pagination and PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 13,
+        "hidden_fields": [
+          "trade_date",
+          "qt_time",
+          "bank",
+          "ts_code",
+          "name",
+          "maturity",
+          "remain_maturity",
+          "bond_type",
+          "coupon_rate",
+          "buy_price",
+          "sell_price",
+          "buy_yield",
+          "sell_yield"
+        ],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "323",
@@ -5047,7 +5113,30 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual source/field/filter probes and fixed cloud/Mac verification before per-API enablement. Preserve all historical, revision, pagination and PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 11,
+        "hidden_fields": [
+          "trade_date",
+          "ts_code",
+          "name",
+          "remain_maturity",
+          "bond_type",
+          "best_buy_bank",
+          "best_buy_yield",
+          "best_sell_bank",
+          "best_sell_yield"
+        ],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "271",
@@ -5061,7 +5150,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual source/field/filter probes and fixed cloud/Mac verification before per-API enablement. Preserve all historical, revision, pagination and PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 6,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "272",
@@ -5075,7 +5177,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual source/field/filter probes and fixed cloud/Mac verification before per-API enablement. Preserve all historical, revision, pagination and PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 8,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "201",
@@ -5089,7 +5204,20 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Deploy reviewed runtime, then bounded actual source/field/filter probes and fixed cloud/Mac verification before per-API enablement. Preserve all historical, revision, pagination and PIT gaps.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-bond-extra-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "b2bfb14",
+        "runtime_document": "docs/tushare-bond-extra-intake.md",
+        "reviewed_field_count": 6,
+        "hidden_fields": [],
+        "actual_permission_probed": false,
+        "production_registered": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "233",
