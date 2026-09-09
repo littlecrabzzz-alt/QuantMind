@@ -45,3 +45,27 @@ probe SHA `0f08f3f950accdf373de33102df6f7ea0bf172e82371b749ace0631af6548fab`。
 5. 回滚不能恢复旧整库覆盖新增进度。按迁移审计精确撤回仍符合前像的配置/状态；保留新月已经取得的原文/尝试。恢复旧冻结日游标继续枚举，已存在 logical key 由现有 enqueue 幂等复用。迁移清单随完成状态登记，不能把归档旧游标或 deferred 数量当作数据完成。
 
 需要的迁移验收：旧非零 offset、在近期前缀内/历史中、不同冻结发现、部分月份饱和嵌套、失败/空/月成功后故障、审计中断重跑、回滚后旧任务新增进度不丢，以及所有原 job/attempt/raw SHA 不变。必须先证明义务和恢复，再做生产切换。
+
+## 可复跑的只读迁移预检
+
+新增 `scripts/tushare_factor_month_migration.py`，当前**只有 plan-only，没有 execute/apply/rollback 开关**。源码确认有两个阻碍：`pipeline-config.json` 的文件 replace 与 SQLite 不共用事务；`tick()` 还在取得 `pipeline.lock` 前读取配置。仅在 helper 内加共享锁，并不能阻止已拿到旧配置的 worker 对新状态再次按日 policy 重建。这个提交不越过该边界，不把“先写一份、再写另一份”称作原子迁移。
+
+预检使用现有非阻塞 `pipeline.lock` 和 `mode=ro/query_only`，仅按主键读取两个因子检查点，无 jobs/attempts 扫描。不构造 Pipeline、不读取凭据或网络、不改配置/状态/数据。整个 CLI 硬限30秒；状态不是schema6、旧签名未知、配置与冻结 policy 不同、发现不足、offset超出旧流或月规划未安装时拒绝。应在已经安装本月规划候选的代码路径下运行：
+
+```sh
+python3 -S scripts/tushare_factor_month_migration.py \
+  --root /data/tushare --output /tmp/factor-month-migration-preflight.json
+```
+
+输出在权威数据目录外，包含完整 config 字节SHA（不复制配置内容/凭据）、两个检查点精确前像及SHA、源代码SHA、冻结代码和月区间覆盖证明、旧流绝对offset位置及尚未枚举日尾部数量。用一只实际冻结代码调用当前纯月 planner 核对全部窗口，余下代码遵循同一笛卡尔积。候选状态只写进审计文件：历史新流建议从0开始；近期流不变、只建议更新policy，不直接迁移其offset。证明覆盖全部旧历史请求义务，不认证已取得数据。
+
+审计文件原子、不可覆盖；同一前像重复生成内容相同。已有审计的复验必须同时提供文件SHA：
+
+```sh
+python3 -S scripts/tushare_factor_month_migration.py \
+  --root /data/tushare --output /tmp/factor-month-migration-preflight.json \
+  --revalidate /tmp/factor-month-migration-preflight.json \
+  --expected-audit-sha256 REVIEWED_AUDIT_SHA256
+```
+
+配置、任一规划游标/冻结发现或候选源码变化均拒绝复验，不恢复旧值。普通旧日任务在此期间完成、增加原文/attempt时不会被回滚；本 helper 从来不改这些行，也不批量 deferred。审计写入前/原子安装后崩溃不影响权威数据，重跑复用完整审计。`apply_allowed=false` 和两个阻塞原因始终保留。真正切换需要后续单独审查运行时协议（至少锁内读取配置，以及worker可识别、可恢复的配置/游标切换提交点），不能仅凭这份预检直接操作。
