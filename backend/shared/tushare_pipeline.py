@@ -25,6 +25,8 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from backend.shared.tushare_registry import (
+    REALTIME_RUNTIME_CONTRACTS, REALTIME_SOURCE_FAMILIES,
+    realtime_runtime_prerequisites, realtime_dispatch_status, project_realtime_row,
     ACCOUNT_HISTORY_RUNTIME_CONTRACTS,
     account_history_prerequisites,
     project_account_period,
@@ -143,6 +145,10 @@ def _planning_inputs(family, config, identifiers):
             if family == "securities_lending_history"
             else family + "_history_start"
         )
+    if family in ("realtime_extra", "realtime_replay"):
+        keys.update((family + "_frequencies", family + "_snapshot_epoch"))
+        if family == "realtime_replay":
+            keys.add("realtime_replay_futures_scope")
     if family == "history_minutes":
         keys.add("history_minutes_frequencies")
     if family == "factor_library":
@@ -524,6 +530,8 @@ class Pipeline:
             | set(spec.get("extra_fields", []))
             | set(required)
         )
+        if api in REALTIME_RUNTIME_CONTRACTS:
+            fields = sorted(set(spec["extra_fields"]) | set(required))
         if not fields:
             raise ValueError("Missing reviewed schema")
         job = {
@@ -634,7 +642,8 @@ class Pipeline:
         missing = [
             field
             for field in identity_fields
-            if params.get(field) is None or params.get(field) == ""
+            if (params.get(field) is None or params.get(field) == "")
+            and field not in contract_for(result["api_name"]).get("optional_request_identity_fields", [])
         ]
         request_json = json_bytes(request_identity).decode("utf-8")
         for row in rows:
@@ -673,6 +682,8 @@ class Pipeline:
                 for field in ("con_code", "leading_code"):
                     if isinstance(row.get(field), str):
                         row["source_" + field] = row[field]
+            if result["api_name"] in REALTIME_RUNTIME_CONTRACTS:
+                project_realtime_row(result["api_name"], row, params)
             if result["api_name"] == "stk_account_old":
                 try:
                     begin, end = project_account_period(row.get("date"))
@@ -747,6 +758,8 @@ class Pipeline:
                 "l3_code",
                 "index_code",
             ):
+                if result["api_name"] in REALTIME_RUNTIME_CONTRACTS:
+                    continue  # Already projected using source API/request asset identity.
                 if result["api_name"] in CALENDAR_EXTRA_RUNTIME_CONTRACTS or result["api_name"] in ACCOUNT_HISTORY_RUNTIME_CONTRACTS or result["api_name"] == "factor_list":
                     continue  # Calendar/factor taxonomy labels are not securities.
                 if result["api_name"] == "factor_value" and key != "ts_code":
@@ -964,6 +977,7 @@ class Pipeline:
         bond_source_apis = ("cb_daily", "cb_issue", "cb_call", "cb_rate", "cb_price_chg", "cb_share")
         factor_records = {}
         families = {
+            **dict.fromkeys(REALTIME_RUNTIME_CONTRACTS, "realtime_source_only"),
             **dict.fromkeys(SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS, "stocks"),
             "factor_list": "factor_library_factors",
             "factor_value": "factor_library_stocks",
@@ -1037,6 +1051,7 @@ class Pipeline:
         families = {**dict.fromkeys(MINUTE_SOURCE_FAMILIES, "minute_source_only"), **families}
         result = {name: set() for name in families.values()}
         result.update({name: set() for name in MINUTE_SOURCE_FAMILIES.values()})
+        result.update({name: set() for name in REALTIME_SOURCE_FAMILIES.values()})
         result["minute_futures_unmapped"] = set()
         result.update(
             sw_indexes=set(),
@@ -1051,7 +1066,7 @@ class Pipeline:
             (
                 "ts_code", "index_code", "level", "fut_code", "o_code", "n_code",
                 "name", "hm_name", "l1_code", "l2_code", "l3_code", "con_code",
-                "factor_name", "asset_type", "mapping_ts_code",
+                "factor_name", "asset_type", "mapping_ts_code", "code",
             )
         )
         placeholders = ",".join("?" for _ in families)
@@ -1105,7 +1120,20 @@ class Pipeline:
                 seen.add(key)
             discovery["bypassed"] += int(bypass)
             discovery["body_reads"] += int(bool(eligible))
+            realtime_params = {}
+            if api == "stk_auction":
+                observed = json.loads((self.root / "observations" / saved["observation"]).read_bytes())
+                realtime_params = observed.get("request", {}).get("params", {})
             for record in self.records(saved, fields=discovery_fields):
+                if api in REALTIME_RUNTIME_CONTRACTS:
+                    code = record.get(REALTIME_RUNTIME_CONTRACTS[api]["source_code_field"])
+                    family = REALTIME_SOURCE_FAMILIES[api]
+                    if api == "stk_auction":
+                        family = {"STK": "realtime_stocks", "ETF": "realtime_etfs"}.get(realtime_params.get("ts_type"), family)
+                    if isinstance(code, str) and code:
+                        result[family].add(code)
+                    continue
+
                 minute_family = MINUTE_SOURCE_FAMILIES.get(api)
                 if minute_family:
                     field = "mapping_ts_code" if api == "fut_mapping" else "index_code" if api == "index_classify" else "ts_code"
@@ -1397,6 +1425,9 @@ class Pipeline:
 
     def record_extra_planning_gaps(self, family, config, identifiers):
         prerequisites = {
+            "realtime_auction": lambda ids, config: realtime_runtime_prerequisites(ids, config, family="realtime_auction"),
+            "realtime_extra": realtime_runtime_prerequisites,
+            "realtime_replay": lambda ids, config: realtime_runtime_prerequisites(ids, config, family="realtime_replay"),
             "account_history": account_history_prerequisites,
             "securities_lending_history": securities_lending_history_prerequisites,
             "history_minutes": history_minutes_runtime_prerequisites,
@@ -1471,6 +1502,9 @@ class Pipeline:
         self.planning_timing["active_stage"] = "validation_and_snapshots"
         blocked_families = set()
         for family, validate in (
+            ("realtime_auction", lambda cfg, ids: self.record_extra_planning_gaps("realtime_auction", cfg, ids)),
+            ("realtime_extra", lambda cfg, ids: self.record_extra_planning_gaps("realtime_extra", cfg, ids)),
+            ("realtime_replay", lambda cfg, ids: self.record_extra_planning_gaps("realtime_replay", cfg, ids)),
             (
                 "account_history",
                 lambda cfg, ids: self.record_extra_planning_gaps("account_history", cfg, ids),
@@ -2461,6 +2495,17 @@ class Pipeline:
             if row is None:
                 break
             job = json.loads(row["job"])
+            rejected = realtime_dispatch_status(job["api_name"], row["epoch"], config, time.time())
+            if rejected:
+                self.db.execute("UPDATE jobs SET state=? WHERE id=?", (rejected, row["id"]))
+                self.db.execute(
+                    "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
+                    "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
+                    ("dispatch:" + row["id"], rejected, utc_now(),
+                     json.dumps({"api_name": job["api_name"], "epoch": row["epoch"], "reason": rejected, "upstream_calls": 0})),
+                )
+                self.db.commit()
+                continue
             result = capture_sample(client, token, job, self.root)
             status = result["status"]
             state = "done" if status == "sample_ok" else "quality"
@@ -2934,11 +2979,18 @@ class Pipeline:
             from backend.shared.tushare_archive import archive_inventory, retain_release
 
             with measure("retain_previous"):
-                retained = retain_release(self.root, previous_id)
+                retention_timing = timing["retention"] = {}
+                retained = retain_release(
+                    self.root, previous_id,
+                    _verified_predecessor=previous,
+                    _inherited_files=files,
+                    timing=retention_timing,
+                )
                 for name, metadata in retained["files"].items():
                     if name in files and files[name] != metadata:
                         raise ValueError("Conflicting inherited file metadata")
                     files[name] = metadata
+                del retained  # Do not overlap an inherited map with JSON encoding.
             with measure("archive_inventory_after"):
                 archived = archive_inventory(self.root)
                 files.update(archived["files"])

@@ -552,7 +552,184 @@ ACCOUNT_HISTORY_RUNTIME_CONTRACTS["stk_account_old"].update(
     saturation_gap="Unverified local1000-row guard. Automatic range subdivision is disabled while supplier period-range coverage is unknown; retain raw/Parquet and the unresolved cap, with no invented offset or date parameter.",
 )
 
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+import re
+
+from backend.shared.tushare_realtime_extra_contracts import (
+    REALTIME_EXTRA_CONTRACTS, iter_realtime_extra_jobs, realtime_extra_prerequisites,
+)
+from backend.shared.tushare_realtime_replay_contracts import (
+    REALTIME_REPLAY_CONTRACTS, iter_realtime_replay_jobs, realtime_replay_prerequisites,
+)
+from backend.shared.tushare_discovered_contracts import _epoch as _realtime_epoch
+
+REALTIME_SOURCE_FAMILIES = {
+    "stk_auction": "realtime_auction_untyped", "rt_k": "realtime_stocks",
+    "rt_etf_k": "realtime_etfs", "rt_etf_sz_iopv": "realtime_etfs",
+    "rt_idx_k": "realtime_indexes", "rt_idx_min": "realtime_indexes",
+    "rt_idx_min_daily": "realtime_indexes", "rt_sw_k": "realtime_sw_indexes",
+    "rt_fut_min": "realtime_futures", "rt_fut_min_daily": "realtime_futures",
+}
+REALTIME_DISCOVERY_INPUTS = {
+    "stocks": ("stocks", "minute_stocks", "realtime_stocks"),
+    "etfs": ("etfs", "minute_etfs", "realtime_etfs"),
+    "indexes": ("indexes", "minute_indexes", "realtime_indexes"),
+    "sw_indexes": ("sw_indexes", "minute_sw_indexes", "realtime_sw_indexes"),
+    "minute_futures": ("minute_futures", "realtime_futures"),
+}
+REALTIME_RUNTIME_CONTRACTS = {}
+for _api, _spec in {**REALTIME_EXTRA_CONTRACTS, **REALTIME_REPLAY_CONTRACTS}.items():
+    _optional = {
+        "stk_auction": ["ts_type"], "rt_etf_k": ["topic"],
+        "rt_fut_min_daily": ["date_str"],
+    }.get(_api, [])
+    REALTIME_RUNTIME_CONTRACTS[_api] = {
+        **_spec,
+        "optional_request_identity_fields": _optional,
+        "dependencies": sorted({name for dep in _spec.get("dependencies", [])
+                                for name in REALTIME_DISCOVERY_INPUTS.get(dep, (dep,))}),
+        "realtime_dispatch_guard": _api != "stk_auction",
+        "request_identity_note": "Documented omitted optional dimensions are stored as explicit null request identity, distinct from supplied values; required frequency/source dimensions remain mandatory.",
+    }
+REALTIME_RUNTIME_CONTRACTS["stk_auction"]["group"] = "realtime_auction"
+REALTIME_RUNTIME_CONTRACTS["stk_auction"]["namespace_gap"] += (
+    " Untyped rows use AUCTION_UNTYPED: plus original code until independently classified; they are not added to stock discovery. Explicit STK/ETF request variants remain distinct."
+)
+REALTIME_RUNTIME_CONTRACTS["rt_fut_min"].update(
+    allowed_params=["ts_code", "freq"],
+    catalog_gap="Catalog340 includes date_str from the separate daily table. Runtime enqueue uses this API's reviewed output fields only, never the contaminated input name as an output field.",
+)
+
+
+def realtime_identifiers(identifiers):
+    ids = identifiers or {}
+    projected = {
+        target: sorted({value for source in sources for value in ids.get(source, [])})
+        for target, sources in REALTIME_DISCOVERY_INPUTS.items()
+    }
+    # No automatic producer for eligibility evidence yet; current replay remains
+    # usable while prior-day scope stays explicitly blocked, never config-guessed.
+    projected["realtime_replay_futures_windows"] = {}
+    return projected
+
+
+def _realtime_config(config, today, family):
+    adjusted = dict(config)
+    key = family + "_snapshot_epoch"
+    try:
+        _realtime_epoch({"discovered_snapshot_epoch": config.get(key)}, today)
+    except ValueError:
+        adjusted[key] = None  # Does not mutate persisted config or auction history.
+    return adjusted
+
+
+def _auction_config(config):
+    selected = config.get("realtime_auction_apis", ["stk_auction"])
+    if not isinstance(selected, (list, tuple)) or any(api != "stk_auction" for api in selected):
+        raise ValueError("realtime_auction_apis only accepts stk_auction")
+    return {**config, "enable_realtime_extra": config.get("enable_realtime_auction", False),
+            "realtime_extra_apis": list(dict.fromkeys(selected)),
+            "realtime_extra_history_start": config.get("realtime_auction_history_start", config.get("history_start", "20250101")),
+            "realtime_extra_snapshot_epoch": None}
+
+
+def realtime_runtime_prerequisites(identifiers=None, config=None, *, family="realtime_extra"):
+    config = config or {}
+    if family == "realtime_auction":
+        return realtime_extra_prerequisites(realtime_identifiers(identifiers), config=_auction_config(config))
+    if family == "realtime_extra":
+        config = {**config, "realtime_extra_apis": config.get("realtime_extra_apis", [a for a in REALTIME_EXTRA_CONTRACTS if a != "stk_auction"])}
+        if "stk_auction" in config["realtime_extra_apis"]:
+            raise ValueError("stk_auction uses the separate realtime_auction history scope")
+    today = datetime.now(ZoneInfo("Asia/Shanghai")).date()
+    adjusted = _realtime_config(config, today, family)
+    pure = realtime_extra_prerequisites if family == "realtime_extra" else realtime_replay_prerequisites
+    gaps = pure(realtime_identifiers(identifiers), config=adjusted)
+    if adjusted.get(family + "_snapshot_epoch") != config.get(family + "_snapshot_epoch"):
+        for api in config.get(family + "_apis", (
+            REALTIME_EXTRA_CONTRACTS if family == "realtime_extra" else REALTIME_REPLAY_CONTRACTS
+        )):
+            if api != "stk_auction":
+                gaps.append({"api_name": api, "reason": "stale_or_invalid_config_snapshot_epoch", "detail": "No stale epoch is replayed; set a new explicit current slot after authorization."})
+    return gaps
+
+
+def iter_realtime_runtime_jobs(config, today, identifiers, *, family="realtime_extra"):
+    if family == "realtime_auction":
+        yield from iter_realtime_extra_jobs(_auction_config(config), today, realtime_identifiers(identifiers))
+        return
+    if family == "realtime_extra":
+        config = {**config, "realtime_extra_apis": config.get("realtime_extra_apis", [a for a in REALTIME_EXTRA_CONTRACTS if a != "stk_auction"])}
+        if "stk_auction" in config["realtime_extra_apis"]:
+            raise ValueError("stk_auction uses the separate realtime_auction history scope")
+    pure = iter_realtime_extra_jobs if family == "realtime_extra" else iter_realtime_replay_jobs
+    yield from pure(_realtime_config(config, today, family), today, realtime_identifiers(identifiers))
+
+
+def realtime_dispatch_status(api, epoch, config, now):
+    """Return durable rejection state, or None; never changes another family."""
+    spec = REALTIME_RUNTIME_CONTRACTS.get(api)
+    if not spec or not spec["realtime_dispatch_guard"]:
+        return None
+    family = spec["group"]
+    if not config.get("enable_" + family) or api not in config.get(family + "_apis", REALTIME_RUNTIME_CONTRACTS):
+        return "snapshot_disabled"
+    if not isinstance(epoch, str) or not re.fullmatch(r"snapshot-[0-9]{8}T[0-9]{6}Z", epoch):
+        return "snapshot_invalid_epoch"
+    try:
+        planned = datetime.strptime(epoch, "snapshot-%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return "snapshot_invalid_epoch"
+    actual = datetime.fromtimestamp(now, timezone.utc)
+    if planned > actual:
+        return "snapshot_future_epoch"
+    if planned.astimezone(ZoneInfo("Asia/Shanghai")).date() != actual.astimezone(ZoneInfo("Asia/Shanghai")).date():
+        return "snapshot_expired"
+    configured = config.get(family + "_snapshot_epoch")
+    if not isinstance(configured, str) or not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z", configured):
+        return "snapshot_invalid_config_epoch"
+    try:
+        current_slot = datetime.strptime(configured, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return "snapshot_invalid_config_epoch"
+    if current_slot > actual or current_slot.astimezone(ZoneInfo("Asia/Shanghai")).date() != actual.astimezone(ZoneInfo("Asia/Shanghai")).date():
+        return "snapshot_invalid_config_epoch"
+    if planned != current_slot:
+        return "snapshot_superseded"
+    return None
+
+
+def project_realtime_row(api, row, params):
+    spec = REALTIME_RUNTIME_CONTRACTS[api]
+    field = spec["source_code_field"]
+    value = row.get(field)
+    if not isinstance(value, str) or not value:
+        raise ValueError("Realtime source code requires schema review")
+    if api in ("rt_idx_min", "rt_idx_min_daily", "rt_fut_min", "rt_fut_min_daily"):
+        requested = params.get("ts_code")
+        codes = requested.split(",") if isinstance(requested, str) and api in ("rt_idx_min", "rt_fut_min") else [requested]
+        if value not in codes or ("freq" in row and row["freq"] != params.get("freq")):
+            raise ValueError("Realtime source code/frequency does not match immutable request")
+    row["source_" + field] = value
+    kind = (params.get("ts_type") or "AUCTION_UNTYPED") if api == "stk_auction" else (
+        "STK" if api == "rt_k" else "ETF" if api in ("rt_etf_k", "rt_etf_sz_iopv")
+        else "FUT" if api in ("rt_fut_min", "rt_fut_min_daily") else "IDX"
+    )
+    if kind == "STK" and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", value):
+        symbol, exchange = value.rsplit(".", 1)
+        canonical = exchange + symbol
+    else:
+        canonical = {"ETF": "FUND", "STK": "STK_UNVERIFIED"}.get(kind, kind) + ":" + value
+    row[field] = canonical
+    if field == "code":
+        row["source_ts_code"] = value
+        row["ts_code"] = canonical
+    return row
+
+
 EXTENDED_CONTRACTS = {
+    **REALTIME_RUNTIME_CONTRACTS,
     **ACCOUNT_HISTORY_RUNTIME_CONTRACTS,
     **SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS,
     **HISTORY_MINUTES_RUNTIME_CONTRACTS,
@@ -605,6 +782,9 @@ EXTENDED_CONTRACTS = {
     },
 }
 PLANNERS = {
+    "realtime_auction": lambda config, today, ids: iter_realtime_runtime_jobs(config, today, ids, family="realtime_auction"),
+    "realtime_extra": iter_realtime_runtime_jobs,
+    "realtime_replay": lambda config, today, ids: iter_realtime_runtime_jobs(config, today, ids, family="realtime_replay"),
     "account_history": iter_account_history_jobs,
     "securities_lending_history": iter_securities_lending_history_jobs,
     "history_minutes": iter_history_minutes_jobs,
