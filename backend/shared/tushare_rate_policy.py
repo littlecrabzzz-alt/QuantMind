@@ -24,7 +24,8 @@ PAGE_RPM = {
     "kpl_list": 500,
 }
 # Explicit category audit, never the complement of the registered API set.
-# /tmp/tushare-rate-refined.json SHA256 f0e1b6adca065edf6a77eecd9f72029308872fe9f7055603e83b45584af53bbe
+# docs/tushare-general-rate-refinement.json SHA256
+# f0e1b6adca065edf6a77eecd9f72029308872fe9f7055603e83b45584af53bbe
 REGULAR_APIS = frozenset(
     [
         "adj_factor",

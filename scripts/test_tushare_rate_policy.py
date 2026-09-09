@@ -104,7 +104,21 @@ class Rates(unittest.TestCase):
         )
 
     def test_explicit_category_allowlist_and_post_expiry_special_review(self):
-        self.assertEqual(len(policy.REGULAR_APIS), 147)
+        evidence = json.loads(
+            (
+                Path(__file__).resolve().parents[1]
+                / "docs/tushare-general-rate-refinement.json"
+            ).read_bytes()
+        )["api_sets"]
+        self.assertEqual(policy.REGULAR_APIS, frozenset(evidence["regular_500"]))
+        self.assertEqual(
+            policy.SPECIAL - {"broker_recommend", "cyq_chips", "report_rc", "cyq_perf"},
+            set(evidence["special_300"]),
+        )
+        self.assertEqual(
+            policy.UNKNOWN_APIS - {"fut_weekly_monthly", "hsgt_top10", "namechange"},
+            set(evidence["uncertain"]),
+        )
         expired = datetime(2026, 12, 5, tzinfo=NOW.tzinfo)
         for api in policy.REGULAR_APIS:
             self.assertEqual(self.rate(api, now=expired), 500)
