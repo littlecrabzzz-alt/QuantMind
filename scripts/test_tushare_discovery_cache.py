@@ -69,6 +69,25 @@ class DiscoveryDiskCache(unittest.TestCase):
         self.assertEqual(self.p.identifier_timing['body_reads'], 0)
         self.assertEqual(self.p.identifier_timing['disk_cache']['hits'], 1)
 
+    def test_previous_projection_released_before_next_body_decode(self):
+        import weakref
+        self.save('000001.SZ')
+        self.save('000002.SZ')
+        class Rows(list):
+            pass
+        previous = None
+        original = self.p.records
+        def read(*args, **kwargs):
+            nonlocal previous
+            if previous is not None:
+                self.assertIsNone(previous(), 'previous body retained during next decode')
+            rows = Rows(original(*args, **kwargs))
+            previous = weakref.ref(rows)
+            return rows
+        with patch.dict(os.environ, {'TUSHARE_DISCOVERY_CACHE': '1'}), patch.object(self.p, 'records', side_effect=read):
+            self.p.identifiers()
+        self.assertIsNone(previous())
+
     def test_full_membership_add_delete_revision_restore(self):
         key, _, _ = self.save('000001.SZ')
         self.compare()
