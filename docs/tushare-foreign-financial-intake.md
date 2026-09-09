@@ -56,3 +56,8 @@ uv run --no-project --python 3.10 --with httpx python scripts/test_tushare_forei
 foreign_financial通过registry/固定版store/mirror接入，8接口完整192字段显式请求，默认读取end_date；显式公告日筛选仍可用。来源标识回到独立HK/US历史发现，保留退市!和美股标点，不污染A股发现。科目长表保留ind_name与报告类型/不同源行，不压成单公司单期一行；未公开币种或修订标识继续gap。
 
 与stock_context7、发布聚合优化联合498项Tushare测试通过；仅说明候选功能和隔离存取，不能提升账户权限。下一步按接口有限probe，只有非空字段/过滤/原文到固定版验证通过才启用，权限拒绝或空响应分别记录，继续其他组。
+
+
+## 2026-09-09 生产探测
+
+八个实际请求均为permission_denied。8份拒绝原文及8份观测已进入ed2f8b46…3faf固定版并校验SHA，均保持禁用；不由10100积分推断独立财报权限。权限缺口不阻其他组，Mac归档闭包待镜像超时修复。

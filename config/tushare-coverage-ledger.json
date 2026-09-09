@@ -73,9 +73,31 @@
       "acquisition_api_names": [
         "stk_premarket"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "contract_evidence": "docs/tushare-stock-context-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/stock-context-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          }
+        ],
+        "probe_report_sha256": "a5b11de89cc67233281e2881a763b9947cddb81cf4d2f767a02545860d652dd2",
+        "enabled": false,
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "26",
@@ -231,9 +253,34 @@
       "acquisition_api_names": [
         "stk_managers"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical acquisition, source universe, revisions and PIT validation; finish Mac fixed-release acceptance after mirror transfer repair.",
+      "contract_evidence": "docs/tushare-stock-context-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/stock-context-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 146,
+        "sample_requests": [
+          {
+            "ann_date": "20260904"
+          },
+          {
+            "ts_code": "002634.SZ"
+          }
+        ],
+        "probe_report_sha256": "a5b11de89cc67233281e2881a763b9947cddb81cf4d2f767a02545860d652dd2",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "fixed_rows_after_dedupe": 143,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "194",
@@ -245,9 +292,36 @@
       "acquisition_api_names": [
         "stk_rewards"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "All 1428 observed rows retained; local unknown-cap guard fired. Explicit end_date matches 22 rows. Plan observed periods with rediscovery and unresolved parent coverage; not yet enabled.",
+      "contract_evidence": "docs/tushare-stock-context-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/stock-context-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 1450,
+        "sample_requests": [
+          {
+            "ts_code": "000001.SZ"
+          },
+          {
+            "end_date": "20251231",
+            "ts_code": "000001.SZ"
+          }
+        ],
+        "probe_report_sha256": "a5b11de89cc67233281e2881a763b9947cddb81cf4d2f767a02545860d652dd2",
+        "enabled": false,
+        "source_statuses": [
+          "possibly_truncated",
+          "sample_ok"
+        ],
+        "fixed_rows_after_dedupe": 1428,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "375",
@@ -1552,9 +1626,31 @@
       "acquisition_api_names": [
         "stk_auction_o"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "contract_evidence": "docs/tushare-stock-context-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/stock-context-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          }
+        ],
+        "probe_report_sha256": "a5b11de89cc67233281e2881a763b9947cddb81cf4d2f767a02545860d652dd2",
+        "enabled": false,
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "354",
@@ -1566,9 +1662,31 @@
       "acquisition_api_names": [
         "stk_auction_c"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "contract_evidence": "docs/tushare-stock-context-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/stock-context-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          }
+        ],
+        "probe_report_sha256": "a5b11de89cc67233281e2881a763b9947cddb81cf4d2f767a02545860d652dd2",
+        "enabled": false,
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "364",
@@ -1580,9 +1698,33 @@
       "acquisition_api_names": [
         "stk_nineturn"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical acquisition, source universe, revisions and PIT validation; finish Mac fixed-release acceptance after mirror transfer repair.",
+      "contract_evidence": "docs/tushare-stock-context-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/stock-context-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 1,
+        "sample_requests": [
+          {
+            "freq": "daily",
+            "trade_date": "2026-09-04 00:00:00",
+            "ts_code": "000001.SZ"
+          }
+        ],
+        "probe_report_sha256": "a5b11de89cc67233281e2881a763b9947cddb81cf4d2f767a02545860d652dd2",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "fixed_rows_after_dedupe": 1,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "399",
@@ -1594,9 +1736,36 @@
       "acquisition_api_names": [
         "stk_ah_comparison"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue historical acquisition, source universe, revisions and PIT validation; finish Mac fixed-release acceptance after mirror transfer repair.",
+      "contract_evidence": "docs/tushare-stock-context-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/stock-context-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 204,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "hk_code": "02475.HK",
+            "trade_date": "20260904",
+            "ts_code": "002475.SZ"
+          }
+        ],
+        "probe_report_sha256": "a5b11de89cc67233281e2881a763b9947cddb81cf4d2f767a02545860d652dd2",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "fixed_rows_after_dedupe": 203,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "275",
@@ -4352,9 +4521,32 @@
       "acquisition_api_names": [
         "hk_income"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "contract_evidence": "docs/tushare-foreign-financial-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/foreign-financial-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "period": "20241231",
+            "ts_code": "00700.HK"
+          }
+        ],
+        "probe_report_sha256": "5a0696284c21e54806ce237fac93c94450ca0f15887b7a2fc9b7d51d0ff99fdd",
+        "enabled": false,
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "390",
@@ -4366,9 +4558,32 @@
       "acquisition_api_names": [
         "hk_balancesheet"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "contract_evidence": "docs/tushare-foreign-financial-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/foreign-financial-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "period": "20241231",
+            "ts_code": "00700.HK"
+          }
+        ],
+        "probe_report_sha256": "5a0696284c21e54806ce237fac93c94450ca0f15887b7a2fc9b7d51d0ff99fdd",
+        "enabled": false,
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "391",
@@ -4380,9 +4595,32 @@
       "acquisition_api_names": [
         "hk_cashflow"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "contract_evidence": "docs/tushare-foreign-financial-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/foreign-financial-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "period": "20241231",
+            "ts_code": "00700.HK"
+          }
+        ],
+        "probe_report_sha256": "5a0696284c21e54806ce237fac93c94450ca0f15887b7a2fc9b7d51d0ff99fdd",
+        "enabled": false,
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "388",
@@ -4394,9 +4632,32 @@
       "acquisition_api_names": [
         "hk_fina_indicator"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "contract_evidence": "docs/tushare-foreign-financial-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/foreign-financial-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "period": "20241231",
+            "ts_code": "00700.HK"
+          }
+        ],
+        "probe_report_sha256": "5a0696284c21e54806ce237fac93c94450ca0f15887b7a2fc9b7d51d0ff99fdd",
+        "enabled": false,
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "251",
@@ -4551,9 +4812,33 @@
       "acquisition_api_names": [
         "us_income"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "contract_evidence": "docs/tushare-foreign-financial-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/foreign-financial-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "end_date": "20250430",
+            "start_date": "20250401",
+            "ts_code": "NVDA"
+          }
+        ],
+        "probe_report_sha256": "5a0696284c21e54806ce237fac93c94450ca0f15887b7a2fc9b7d51d0ff99fdd",
+        "enabled": false,
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "395",
@@ -4565,9 +4850,33 @@
       "acquisition_api_names": [
         "us_balancesheet"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "contract_evidence": "docs/tushare-foreign-financial-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/foreign-financial-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "end_date": "20250430",
+            "start_date": "20250401",
+            "ts_code": "NVDA"
+          }
+        ],
+        "probe_report_sha256": "5a0696284c21e54806ce237fac93c94450ca0f15887b7a2fc9b7d51d0ff99fdd",
+        "enabled": false,
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "396",
@@ -4579,9 +4888,33 @@
       "acquisition_api_names": [
         "us_cashflow"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "contract_evidence": "docs/tushare-foreign-financial-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/foreign-financial-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "end_date": "20250430",
+            "start_date": "20250401",
+            "ts_code": "NVDA"
+          }
+        ],
+        "probe_report_sha256": "5a0696284c21e54806ce237fac93c94450ca0f15887b7a2fc9b7d51d0ff99fdd",
+        "enabled": false,
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "393",
@@ -4593,9 +4926,33 @@
       "acquisition_api_names": [
         "us_fina_indicator"
       ],
-      "status": "planned",
+      "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "contract_evidence": "docs/tushare-foreign-financial-intake.md",
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/foreign-financial-probe.json",
+        "release_id": "data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf",
+        "checked_at": "2026-09-09T03:14:07.507946+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "end_date": "20250430",
+            "start_date": "20250401",
+            "ts_code": "NVDA"
+          }
+        ],
+        "probe_report_sha256": "5a0696284c21e54806ce237fac93c94450ca0f15887b7a2fc9b7d51d0ff99fdd",
+        "enabled": false,
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
+        "offline_status": "pending_mirror_timeout_fix",
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "147",

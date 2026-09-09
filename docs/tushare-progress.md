@@ -298,3 +298,13 @@
 
 
 10:53联合候选f2d8ec3已加入历史预算修复，最终507项回归23.321秒/Ruff通过；Python3.10规划相关63项通过。当前准备进入单次部署窗口，schema保持6，无游标重置迁移。foreign8/stock7有界probe和固定版verifier、逐API启用helper已准备并经隔离夹具验证；实际权限/字段与云Mac闭包仍待本批执行。
+
+
+## 2026-09-09 11:15 十五接口上线与两个等待瓶颈
+
+- 8b4553c生产发布通过handoff：4677文件，source_digest f0d9cf7e2d6719f20331ff1b7d04279b279112727816f587b22c019d93686ad3；两次Syncthing未追平时拒绝，实际逐文件一致后重试通过，没有覆盖冲突。两Tushare队列02:53:28Z取消消费并自然排空，03:00:22Z确认恢复；采集64f63c4a-b79c-42ac-859e-ec4d2cf24981、文档46292b6a-3b80-4893-86e5-d7aa1281852b，普通US88fe98db保持。schema仍6，注册179采集API+6读取别名，不代表全部可用或历史完成。
+- foreign8八请求全部permission_denied，8原文+8观测文件进入固定版并SHA验证，全部禁用。stock7十请求：盘前/开收盘竞价拒绝；管理层/薪酬/九转/AH共1801来源行、去重1775、43字段非空样本完整，68字段中其余25未验证。仅管理层/九转/AH启用（固定347行、36字段）；薪酬1428行完整保存，超过本地未验证1000行保护阈值，自动启用暂缓，不把它说成已证明上游截断。
+- 固定data-ed2f8b460437e0fdbd025565a2e2d20105c7a770d629c341a83e76de10aa3faf原文/Parquet/reader全列通过；管理层公告/任期、薪酬报告期、AH双代码与九转精确日期/freq保留。三组动态非空全列对照相同。stock云端8HTTP（含401、7筛选scope）通过，不声称全1775行全部经HTTP；foreign无非空数据，不伪造可用证明。耐久证据和helper副本保存在/data/tushare/validation/intake-batch-20260909T025328Z/共13文件。
+- Mac本批标准mirror明确exit2 TimeoutExpired，前两自动轮也同错，旧CURRENT保留。只读取证86,253,968字节固定manifest压缩rsync11.941秒且SHA一致；旧日志无法确定具体超时stage。镜像修复e89b→8a098de已部署master/cloud，handoff4685文件通过，parent13专项通过、agent513全tests通过。只更新Mac运行client、不重启采集；有界压缩清单传输、已有manifest/alias校验复用和安全stage诊断保留全部对象/历史。本次正式mirror正在运行，结果待验。
+- 历史规划修复保留旧technical signature逐字节不变，offset7500→87237→87737，5接口各200个history共1000真实入队，但全部pending/tries0/无attempt。进一步确认technical组仍按priority20近期优先，8384近期压住priority55历史；只有structured原先享有3近期:1历史。最小消费修复e0b→4115b14已通过联合520 tests23.167秒/Ruff，复用schema6索引、保留RRG/权重/gates/旧structured键，对其他已启用family独立API轮转。本轮只排空/重启采集worker，真实history请求仍待恢复后验证。
+- 薪酬54个观察期每期1—60行，含非季末20070625；20251231单期22行与全期对应全列一致。后续按已观察期分片必须保留未知期间、code-only再发现及父覆盖缺口，不能把54期当全集或只枚举季度末。15项台账已更新真实权限/存储/启用状态，Mac闭包暂标pending。全目录、完整历史/修订/附件/PIT目标继续。
