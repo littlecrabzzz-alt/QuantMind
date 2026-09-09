@@ -2,7 +2,7 @@
   "schema_version": 1,
   "catalog_fetched_at": "2026-09-08T15:22:12.131618+00:00",
   "catalog_index_sha256": "182240e4826c7e65a6b63ef83efdc4e14b7b3589a6249ed54cd36ac66c937dce",
-  "reviewed_at": "2026-09-09T05:33:30.165161+00:00",
+  "reviewed_at": "2026-09-09T06:13:02.762822+00:00",
   "entry_count": 263,
   "scope": "Every entry in pinned official catalogue plus independently discovered linked entries. entry_count remains the immutable baseline count, not a scope ceiling. Runtime evidence controls entitlement and coverage.",
   "entries": [
@@ -465,7 +465,27 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Pure historical-minute contracts prepared; integrate runtime with full timestamp/frequency identity and real asset-family discovery, then bounded actual entitlement and endpoint-semantic probes. No production minute requests yet.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-history-minutes-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "de8e8eb",
+        "reviewed_field_count": 8,
+        "hidden_fields": [],
+        "frequencies": [
+          "1min",
+          "5min",
+          "15min",
+          "30min",
+          "60min"
+        ],
+        "contract_only": true,
+        "production_registered": false,
+        "actual_permission_probed": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "144",
@@ -3153,7 +3173,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finite legal code partitions verified on cloud and Mac. Preserve unknown supplier/member universe and PIT; additive scope migration required before enabling without resetting old history policy.",
+      "next_action": "Additive market_members scope enabled and resumed automatically without changing old history policy; continue observed-board/date partitions and bulk discovery. Unknown board/member universe, second-axis saturation and historical PIT remain open.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -3162,12 +3182,12 @@
         "hidden_fields": [],
         "actual_permission_probed": true,
         "production_registered": true,
-        "automatically_enabled": false,
+        "automatically_enabled": true,
         "history_complete": false,
         "pit_verified": false,
-        "production_commit": "30b3194"
+        "production_commit": "f627b896f63e96c109ad098503a1dfebcbf0b4be"
       },
-      "auto_acquisition": false,
+      "auto_acquisition": true,
       "runtime_evidence": {
         "path": "/data/tushare/validation/sentiment7-probe.json",
         "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
@@ -3218,10 +3238,25 @@
       "append_scope_candidate": {
         "commit": "dd7279d",
         "document": "docs/tushare-member-append-scope.md",
-        "status": "default_disabled_not_deployed",
+        "status": "deployed_enabled_verified",
         "old_history_policy_preserved": true,
         "automatic_recent_and_history": true,
         "universe_complete": false,
+        "pit_verified": false,
+        "production_commit": "f627b896f63e96c109ad098503a1dfebcbf0b4be"
+      },
+      "append_scope_evidence": {
+        "scope": "market_members",
+        "history_start": "19900101",
+        "receipt_path": "/data/tushare/validation/member-scope-enable-20260909T055627Z-7242ccfa.json",
+        "receipt_sha256": "7a2f5c5964ac37bf14c19107fca0dd67e38b87fc49c54bbb03d7b45530378062",
+        "release_id": "data-cf01c59247127378fed86d0f5c26d2d9dbe4b5cbe77906e145d540dfaef9f2fb",
+        "postcheck": "/data/tushare/validation/intake-batch-20260909T053533Z/member-scope-enable-postcheck-summary.json",
+        "old_planning_rows_preserved": 46,
+        "new_jobs_identity_verified": 1000,
+        "automatic_queue_observed_at": "2026-09-09T06:04:32.171440+00:00",
+        "source_universe_complete": false,
+        "history_complete": false,
         "pit_verified": false
       }
     },
@@ -3368,7 +3403,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Finite legal code partitions verified on cloud and Mac. Preserve unknown supplier/member universe and PIT; additive scope migration required before enabling without resetting old history policy.",
+      "next_action": "Additive market_members scope enabled and resumed automatically without changing old history policy; continue observed-board/date partitions and bulk discovery. Unknown board/member universe, second-axis saturation and historical PIT remain open.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -3377,12 +3412,12 @@
         "hidden_fields": [],
         "actual_permission_probed": true,
         "production_registered": true,
-        "automatically_enabled": false,
+        "automatically_enabled": true,
         "history_complete": false,
         "pit_verified": false,
-        "production_commit": "30b3194"
+        "production_commit": "f627b896f63e96c109ad098503a1dfebcbf0b4be"
       },
-      "auto_acquisition": false,
+      "auto_acquisition": true,
       "runtime_evidence": {
         "path": "/data/tushare/validation/sentiment7-probe.json",
         "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
@@ -3439,10 +3474,25 @@
       "append_scope_candidate": {
         "commit": "dd7279d",
         "document": "docs/tushare-member-append-scope.md",
-        "status": "default_disabled_not_deployed",
+        "status": "deployed_enabled_verified",
         "old_history_policy_preserved": true,
         "automatic_recent_and_history": true,
         "universe_complete": false,
+        "pit_verified": false,
+        "production_commit": "f627b896f63e96c109ad098503a1dfebcbf0b4be"
+      },
+      "append_scope_evidence": {
+        "scope": "market_members",
+        "history_start": "19900101",
+        "receipt_path": "/data/tushare/validation/member-scope-enable-20260909T055627Z-7242ccfa.json",
+        "receipt_sha256": "7a2f5c5964ac37bf14c19107fca0dd67e38b87fc49c54bbb03d7b45530378062",
+        "release_id": "data-cf01c59247127378fed86d0f5c26d2d9dbe4b5cbe77906e145d540dfaef9f2fb",
+        "postcheck": "/data/tushare/validation/intake-batch-20260909T053533Z/member-scope-enable-postcheck-summary.json",
+        "old_planning_rows_preserved": 46,
+        "new_jobs_identity_verified": 1000,
+        "automatic_queue_observed_at": "2026-09-09T06:04:32.171440+00:00",
+        "source_universe_complete": false,
+        "history_complete": false,
         "pit_verified": false
       }
     },
@@ -3505,7 +3555,27 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Pure historical-minute contracts prepared; integrate runtime with full timestamp/frequency identity and real asset-family discovery, then bounded actual entitlement and endpoint-semantic probes. No production minute requests yet.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-history-minutes-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "de8e8eb",
+        "reviewed_field_count": 8,
+        "hidden_fields": [],
+        "frequencies": [
+          "1min",
+          "5min",
+          "15min",
+          "30min",
+          "60min"
+        ],
+        "contract_only": true,
+        "production_registered": false,
+        "actual_permission_probed": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "127",
@@ -3701,9 +3771,9 @@
       "acquisition_api_names": [
         "idx_anns"
       ],
-      "status": "planned",
+      "status": "implementing",
       "permission_status": "unverified",
-      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
+      "next_action": "One empty dated sample does not establish absent history or permission. Probe a bounded broader legal announcement window and nonempty source/date filters; original attachments remain required.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-calendar-factor-intake.md",
       "implementation_evidence": {
@@ -3711,9 +3781,43 @@
         "runtime_document": "docs/tushare-calendar-factor-intake.md",
         "reviewed_field_count": 5,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "f627b896f63e96c109ad098503a1dfebcbf0b4be"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/calendar-factor5-probe.json",
+        "release_id": "data-cf01c59247127378fed86d0f5c26d2d9dbe4b5cbe77906e145d540dfaef9f2fb",
+        "checked_at": "2026-09-09T06:13:02.762822+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {
+            "ann_date": "20260904"
+          }
+        ],
+        "probe_report_sha256": "96bf1487aa2110919534163037a93a87e6751f1ca09ff0cf260a10330a5d9f82",
+        "enabled": false,
+        "source_statuses": [
+          "empty_unverified"
+        ],
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-mac-verified.json",
+        "offline_evidence_sha256": "65bad9525cf0b0df587bcadc564e6d009e1bd4f7549f2abfac86fb71a7f1d44d",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "enable_evidence": "/data/tushare/validation/calendar-factor5-enable-20260909T060700Z-a6859bfd.json",
+        "enabled_release_id": null,
+        "blocked_reasons": [
+          "all_samples_empty_or_unavailable",
+          "audit_gap:comparison_request_not_completed",
+          "audit_gap:empty_or_non_success_not_completeness",
+          "audit_gap:no_fixed_rows_to_verify",
+          "missing_nonempty_all_column_comparison",
+          "no_fixed_dataset"
+        ],
         "history_complete": false,
         "pit_verified": false
       }
@@ -3833,7 +3937,27 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Pure historical-minute contracts prepared; integrate runtime with full timestamp/frequency identity and real asset-family discovery, then bounded actual entitlement and endpoint-semantic probes. No production minute requests yet.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-history-minutes-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "de8e8eb",
+        "reviewed_field_count": 8,
+        "hidden_fields": [],
+        "frequencies": [
+          "1min",
+          "5min",
+          "15min",
+          "30min",
+          "60min"
+        ],
+        "contract_only": true,
+        "production_registered": false,
+        "actual_permission_probed": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "172",
@@ -3969,7 +4093,27 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Pure historical-minute contracts prepared; integrate runtime with full timestamp/frequency identity and real asset-family discovery, then bounded actual entitlement and endpoint-semantic probes. No production minute requests yet.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-history-minutes-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "de8e8eb",
+        "reviewed_field_count": 8,
+        "hidden_fields": [],
+        "frequencies": [
+          "1min",
+          "5min",
+          "15min",
+          "30min",
+          "60min"
+        ],
+        "contract_only": true,
+        "production_registered": false,
+        "actual_permission_probed": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "373",
@@ -4584,7 +4728,27 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Pure historical-minute contracts prepared; integrate runtime with full timestamp/frequency identity and real asset-family discovery, then bounded actual entitlement and endpoint-semantic probes. No production minute requests yet.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-history-minutes-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "de8e8eb",
+        "reviewed_field_count": 9,
+        "hidden_fields": [],
+        "frequencies": [
+          "1min",
+          "5min",
+          "15min",
+          "30min",
+          "60min"
+        ],
+        "contract_only": true,
+        "production_registered": false,
+        "actual_permission_probed": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "314",
@@ -4863,7 +5027,27 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Pure historical-minute contracts prepared; integrate runtime with full timestamp/frequency identity and real asset-family discovery, then bounded actual entitlement and endpoint-semantic probes. No production minute requests yet.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-history-minutes-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "de8e8eb",
+        "reviewed_field_count": 9,
+        "hidden_fields": [],
+        "frequencies": [
+          "1min",
+          "5min",
+          "15min",
+          "30min",
+          "60min"
+        ],
+        "contract_only": true,
+        "production_registered": false,
+        "actual_permission_probed": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "184",
@@ -5594,9 +5778,9 @@
       "acquisition_api_names": [
         "eco_cal"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Preserve saturated future-day originals; implement and verify legal country/currency/event partitions before automatic scope activation. Full country/event universe remains unverified.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-calendar-factor-intake.md",
       "implementation_evidence": {
@@ -5604,9 +5788,52 @@
         "runtime_document": "docs/tushare-calendar-factor-intake.md",
         "reviewed_field_count": 8,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "f627b896f63e96c109ad098503a1dfebcbf0b4be"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/calendar-factor5-probe.json",
+        "release_id": "data-cf01c59247127378fed86d0f5c26d2d9dbe4b5cbe77906e145d540dfaef9f2fb",
+        "checked_at": "2026-09-09T06:13:02.762822+00:00",
+        "sample_rows": 300,
+        "sample_requests": [
+          {
+            "date": "20260904"
+          },
+          {
+            "date": "20260910"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904"
+          },
+          {
+            "end_date": "20260910",
+            "start_date": "20260910"
+          }
+        ],
+        "probe_report_sha256": "96bf1487aa2110919534163037a93a87e6751f1ca09ff0cf260a10330a5d9f82",
+        "enabled": false,
+        "source_statuses": [
+          "possibly_truncated",
+          "sample_ok"
+        ],
+        "fixed_rows_after_dedupe": 150,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-mac-verified.json",
+        "offline_evidence_sha256": "65bad9525cf0b0df587bcadc564e6d009e1bd4f7549f2abfac86fb71a7f1d44d",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "enable_evidence": "/data/tushare/validation/calendar-factor5-enable-20260909T060700Z-a6859bfd.json",
+        "enabled_release_id": null,
+        "blocked_reasons": [
+          "audit_gap:empty_or_non_success_not_completeness",
+          "audit_gap:saturation_unresolved",
+          "saturation_unresolved_status"
+        ],
         "history_complete": false,
         "pit_verified": false
       }
@@ -5839,7 +6066,27 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Review official parameters, history, fields, permissions and partitioning; then implement and probe."
+      "next_action": "Pure historical-minute contracts prepared; integrate runtime with full timestamp/frequency identity and real asset-family discovery, then bounded actual entitlement and endpoint-semantic probes. No production minute requests yet.",
+      "auto_acquisition": false,
+      "contract_evidence": "docs/tushare-history-minutes-intake.md",
+      "implementation_evidence": {
+        "candidate_commit": "de8e8eb",
+        "reviewed_field_count": 8,
+        "hidden_fields": [],
+        "frequencies": [
+          "1min",
+          "5min",
+          "15min",
+          "30min",
+          "60min"
+        ],
+        "contract_only": true,
+        "production_registered": false,
+        "actual_permission_probed": false,
+        "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false
+      }
     },
     {
       "doc_id": "389",
@@ -6356,19 +6603,57 @@
       "acquisition_api_names": [
         "cn_schedule"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
-      "auto_acquisition": false,
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Automatic month-based recent/history acquisition enabled after fixed cloud/Mac comparison; verify all historical months and revisions as they arrive. Planner exhaustion is not download completion.",
+      "auto_acquisition": true,
       "contract_evidence": "docs/tushare-calendar-factor-intake.md",
       "implementation_evidence": {
         "candidate_commit": "dd7279d",
         "runtime_document": "docs/tushare-calendar-factor-intake.md",
         "reviewed_field_count": 5,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
-        "automatically_enabled": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
+        "automatically_enabled": true,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "f627b896f63e96c109ad098503a1dfebcbf0b4be"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/calendar-factor5-probe.json",
+        "release_id": "data-cf01c59247127378fed86d0f5c26d2d9dbe4b5cbe77906e145d540dfaef9f2fb",
+        "checked_at": "2026-09-09T06:13:02.762822+00:00",
+        "sample_rows": 33,
+        "sample_requests": [
+          {
+            "m": "202609"
+          },
+          {
+            "m": "202610"
+          },
+          {
+            "m": "202609",
+            "title": "商品住宅销售价格指数月度报告"
+          },
+          {
+            "m": "202610",
+            "title": "全国居民收支情况季度报告"
+          }
+        ],
+        "probe_report_sha256": "96bf1487aa2110919534163037a93a87e6751f1ca09ff0cf260a10330a5d9f82",
+        "enabled": true,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "fixed_rows_after_dedupe": 31,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-mac-verified.json",
+        "offline_evidence_sha256": "65bad9525cf0b0df587bcadc564e6d009e1bd4f7549f2abfac86fb71a7f1d44d",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "enable_evidence": "/data/tushare/validation/calendar-factor5-enable-20260909T060700Z-a6859bfd.json",
+        "enabled_release_id": "data-cb0151985a41194618a490fbd50a544b171a268432685d5547bcf2df31e795c6",
+        "blocked_reasons": [],
         "history_complete": false,
         "pit_verified": false
       }
@@ -7103,9 +7388,9 @@
       "acquisition_api_names": [
         "factor_list"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
+      "status": "permission_blocked",
+      "permission_status": "denied_observed",
+      "next_action": "Actual permission_denied; preserve evidence and retry after entitlement change. Continue independently accessible factor_value work.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-calendar-factor-intake.md",
       "implementation_evidence": {
@@ -7113,9 +7398,43 @@
         "runtime_document": "docs/tushare-calendar-factor-intake.md",
         "reviewed_field_count": 4,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "f627b896f63e96c109ad098503a1dfebcbf0b4be"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/calendar-factor5-probe.json",
+        "release_id": "data-cf01c59247127378fed86d0f5c26d2d9dbe4b5cbe77906e145d540dfaef9f2fb",
+        "checked_at": "2026-09-09T06:13:02.762822+00:00",
+        "sample_rows": 0,
+        "sample_requests": [
+          {}
+        ],
+        "probe_report_sha256": "96bf1487aa2110919534163037a93a87e6751f1ca09ff0cf260a10330a5d9f82",
+        "enabled": false,
+        "source_statuses": [
+          "permission_denied"
+        ],
+        "fixed_rows_after_dedupe": 0,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-mac-verified.json",
+        "offline_evidence_sha256": "65bad9525cf0b0df587bcadc564e6d009e1bd4f7549f2abfac86fb71a7f1d44d",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "enable_evidence": "/data/tushare/validation/calendar-factor5-enable-20260909T060700Z-a6859bfd.json",
+        "enabled_release_id": null,
+        "blocked_reasons": [
+          "all_samples_empty_or_unavailable",
+          "audit_gap:comparison_request_not_completed",
+          "audit_gap:no_fixed_rows_to_verify",
+          "audit_gap:response_unavailable_or_non_json",
+          "missing_nonempty_all_column_comparison",
+          "no_fixed_dataset",
+          "upstream_status:permission_denied",
+          "current_capability_permission_denied"
+        ],
         "history_complete": false,
         "pit_verified": false
       }
@@ -7130,9 +7449,9 @@
       "acquisition_api_names": [
         "factor_value"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Deploy reviewed runtime, then bounded actual permission/source/filter probes and fixed cloud/Mac checks; preserve all historical, future-window, factor-asset and attachment/PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "195 code-only rows and same-day range match all columns on cloud/Mac. Implement explicit source-code planning without requiring unavailable factor catalog; preserve unknown names/assets/formulas and full-history gaps.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-calendar-factor-intake.md",
       "implementation_evidence": {
@@ -7140,9 +7459,44 @@
         "runtime_document": "docs/tushare-calendar-factor-intake.md",
         "reviewed_field_count": 4,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "f627b896f63e96c109ad098503a1dfebcbf0b4be"
+      },
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/calendar-factor5-probe.json",
+        "release_id": "data-cf01c59247127378fed86d0f5c26d2d9dbe4b5cbe77906e145d540dfaef9f2fb",
+        "checked_at": "2026-09-09T06:13:02.762822+00:00",
+        "sample_rows": 390,
+        "sample_requests": [
+          {
+            "trade_date": "20260904",
+            "ts_code": "000001.SZ"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "000001.SZ"
+          }
+        ],
+        "probe_report_sha256": "96bf1487aa2110919534163037a93a87e6751f1ca09ff0cf260a10330a5d9f82",
+        "enabled": false,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "fixed_rows_after_dedupe": 195,
+        "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-cloud-preenable.json",
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T053533Z/calendar-factor5-mac-verified.json",
+        "offline_evidence_sha256": "65bad9525cf0b0df587bcadc564e6d009e1bd4f7549f2abfac86fb71a7f1d44d",
+        "offline_status": "fixed_release_verified_with_gaps",
+        "enable_evidence": "/data/tushare/validation/calendar-factor5-enable-20260909T060700Z-a6859bfd.json",
+        "enabled_release_id": null,
+        "blocked_reasons": [
+          "audit_gap:factor_catalog_asset_mapping_unverified"
+        ],
         "history_complete": false,
         "pit_verified": false
       }
