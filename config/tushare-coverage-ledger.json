@@ -2787,18 +2787,132 @@
       "acquisition_api_names": [
         "ths_hot"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-market-sentiment-intake.md",
         "reviewed_field_count": 11,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/sentiment7-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:15:57.600957+00:00",
+        "sample_rows": 9715,
+        "sample_requests": [
+          {
+            "is_new": "Y",
+            "market": "热股",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "热股",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "ETF",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "ETF",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "可转债",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "可转债",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "行业板块",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "行业板块",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "概念板块",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "概念板块",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "期货",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "期货",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "港股",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "港股",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "热基",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "热基",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "美股",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "N",
+            "market": "美股",
+            "trade_date": "20260904"
+          },
+          {
+            "is_new": "Y",
+            "market": "热股",
+            "trade_date": "20260904",
+            "ts_code": "003040.SZ"
+          }
+        ],
+        "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
+        "enabled": false,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "pending_fixed_verification",
         "history_complete": false,
         "pit_verified": false
       }
@@ -2813,18 +2927,132 @@
       "acquisition_api_names": [
         "dc_hot"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-market-sentiment-intake.md",
         "reviewed_field_count": 8,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/sentiment7-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:15:57.600957+00:00",
+        "sample_rows": 14011,
+        "sample_requests": [
+          {
+            "hot_type": "人气榜",
+            "is_new": "Y",
+            "market": "A股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "人气榜",
+            "is_new": "N",
+            "market": "A股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "Y",
+            "market": "A股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "N",
+            "market": "A股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "人气榜",
+            "is_new": "Y",
+            "market": "ETF基金",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "人气榜",
+            "is_new": "N",
+            "market": "ETF基金",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "Y",
+            "market": "ETF基金",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "N",
+            "market": "ETF基金",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "人气榜",
+            "is_new": "Y",
+            "market": "港股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "人气榜",
+            "is_new": "N",
+            "market": "港股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "Y",
+            "market": "港股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "N",
+            "market": "港股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "人气榜",
+            "is_new": "Y",
+            "market": "美股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "人气榜",
+            "is_new": "N",
+            "market": "美股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "Y",
+            "market": "美股市场",
+            "trade_date": "20260904"
+          },
+          {
+            "hot_type": "飙升榜",
+            "is_new": "N",
+            "market": "美股市场",
+            "trade_date": "20260904"
+          }
+        ],
+        "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
+        "enabled": false,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "pending_fixed_verification",
         "history_complete": false,
         "pit_verified": false
       }
@@ -2839,18 +3067,52 @@
       "acquisition_api_names": [
         "tdx_index"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-market-sentiment-intake.md",
         "reviewed_field_count": 9,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/sentiment7-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:15:57.600957+00:00",
+        "sample_rows": 613,
+        "sample_requests": [
+          {
+            "idx_type": "概念板块",
+            "trade_date": "20260904"
+          },
+          {
+            "idx_type": "行业板块",
+            "trade_date": "20260904"
+          },
+          {
+            "idx_type": "风格板块",
+            "trade_date": "20260904"
+          },
+          {
+            "idx_type": "地区板块",
+            "trade_date": "20260904"
+          }
+        ],
+        "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
+        "enabled": false,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "pending_fixed_verification",
         "history_complete": false,
         "pit_verified": false
       }
@@ -2865,18 +3127,39 @@
       "acquisition_api_names": [
         "tdx_member"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-market-sentiment-intake.md",
         "reviewed_field_count": 4,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/sentiment7-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:15:57.600957+00:00",
+        "sample_rows": 3000,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          }
+        ],
+        "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
+        "enabled": false,
+        "source_statuses": [
+          "possibly_truncated"
+        ],
+        "offline_status": "pending_fixed_verification",
         "history_complete": false,
         "pit_verified": false
       }
@@ -2891,18 +3174,43 @@
       "acquisition_api_names": [
         "tdx_daily"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-market-sentiment-intake.md",
         "reviewed_field_count": 38,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/sentiment7-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:15:57.600957+00:00",
+        "sample_rows": 617,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "trade_date": "20260904",
+            "ts_code": "881115.TDX"
+          }
+        ],
+        "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
+        "enabled": false,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "pending_fixed_verification",
         "history_complete": false,
         "pit_verified": false
       }
@@ -2917,18 +3225,56 @@
       "acquisition_api_names": [
         "kpl_list"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-market-sentiment-intake.md",
         "reviewed_field_count": 24,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/sentiment7-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:15:57.600957+00:00",
+        "sample_rows": 293,
+        "sample_requests": [
+          {
+            "tag": "涨停",
+            "trade_date": "20260904"
+          },
+          {
+            "tag": "炸板",
+            "trade_date": "20260904"
+          },
+          {
+            "tag": "跌停",
+            "trade_date": "20260904"
+          },
+          {
+            "tag": "自然涨停",
+            "trade_date": "20260904"
+          },
+          {
+            "tag": "竞价",
+            "trade_date": "20260904"
+          }
+        ],
+        "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
+        "enabled": false,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "pending_fixed_verification",
         "history_complete": false,
         "pit_verified": false
       }
@@ -2943,18 +3289,45 @@
       "acquisition_api_names": [
         "kpl_concept_cons"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
       "contract_evidence": "docs/tushare-market-sentiment-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-market-sentiment-intake.md",
         "reviewed_field_count": 7,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/sentiment7-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:15:57.600957+00:00",
+        "sample_rows": 3001,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "con_code": "688316.SH",
+            "trade_date": "20260904",
+            "ts_code": "000386.KP"
+          }
+        ],
+        "probe_report_sha256": "56eb20129adc1a67659932dfbe38a1b08b9084b602cb4ac9d6165ece5b5df4f1",
+        "enabled": false,
+        "source_statuses": [
+          "possibly_truncated",
+          "sample_ok"
+        ],
+        "offline_status": "pending_fixed_verification",
         "history_complete": false,
         "pit_verified": false
       }
@@ -3058,9 +3431,9 @@
       "acquisition_api_names": [
         "etf_limit"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -3071,9 +3444,35 @@
           "asset_type",
           "exchange"
         ],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/cross6-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:14:21.065591+00:00",
+        "sample_rows": 2147,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "158000.SZ"
+          }
+        ],
+        "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
+        "enabled": false,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "pending_fixed_verification",
         "history_complete": false,
         "pit_verified": false
       }
@@ -3475,9 +3874,9 @@
       "acquisition_api_names": [
         "index_global"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
@@ -3486,9 +3885,35 @@
         "hidden_fields": [
           "amount"
         ],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/cross6-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:14:21.065591+00:00",
+        "sample_rows": 23,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "AS51"
+          }
+        ],
+        "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
+        "enabled": false,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "pending_fixed_verification",
         "history_complete": false,
         "pit_verified": false
       }
@@ -3503,18 +3928,44 @@
       "acquisition_api_names": [
         "idx_factor_pro"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-cross-asset-extra-runtime.md",
         "reviewed_field_count": 89,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/cross6-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:14:21.065591+00:00",
+        "sample_rows": 3393,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "000001.SH"
+          }
+        ],
+        "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
+        "enabled": false,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "pending_fixed_verification",
         "history_complete": false,
         "pit_verified": false
       }
@@ -3558,18 +4009,44 @@
       "acquisition_api_names": [
         "sz_daily_info"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-cross-asset-extra-runtime.md",
         "reviewed_field_count": 9,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/cross6-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:14:21.065591+00:00",
+        "sample_rows": 15,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "ABS"
+          }
+        ],
+        "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
+        "enabled": false,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "pending_fixed_verification",
         "history_complete": false,
         "pit_verified": false
       }
@@ -3729,18 +4206,44 @@
       "acquisition_api_names": [
         "fund_factor_pro"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-cross-asset-extra-runtime.md",
         "reviewed_field_count": 90,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/cross6-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:14:21.065591+00:00",
+        "sample_rows": 2115,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "158000.SZ"
+          }
+        ],
+        "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
+        "enabled": false,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "pending_fixed_verification",
         "history_complete": false,
         "pit_verified": false
       }
@@ -4308,18 +4811,44 @@
       "acquisition_api_names": [
         "cb_factor_pro"
       ],
-      "status": "planned",
-      "permission_status": "unverified",
-      "next_action": "Run bounded actual permission and field/filter probes after candidate deployment; verify immutable cloud/Mac reads before automatic enablement. Keep full history, revisions and PIT gaps.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Finish fixed cloud/Mac field, identity and filter verification before selective enablement. Retain saturation, unknown history, revisions and PIT gaps.",
       "contract_evidence": "docs/tushare-cross-asset-extra-intake.md",
       "implementation_evidence": {
         "candidate_commit": "8a1c259",
         "runtime_document": "docs/tushare-cross-asset-extra-runtime.md",
         "reviewed_field_count": 89,
         "hidden_fields": [],
-        "actual_permission_probed": false,
-        "production_registered": false,
+        "actual_permission_probed": true,
+        "production_registered": true,
         "automatically_enabled": false,
+        "history_complete": false,
+        "pit_verified": false,
+        "production_commit": "30b3194"
+      },
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "/data/tushare/validation/cross6-probe.json",
+        "release_id": "data-41d91a26636bde7c6c83020e36671e012aa845af1c2ea8e07f6772aae9f80435",
+        "checked_at": "2026-09-09T04:14:21.065591+00:00",
+        "sample_rows": 316,
+        "sample_requests": [
+          {
+            "trade_date": "20260904"
+          },
+          {
+            "end_date": "20260904",
+            "start_date": "20260904",
+            "ts_code": "110075.SH"
+          }
+        ],
+        "probe_report_sha256": "6484d2fad354c689450cb12ba8787ea59e5525b2600bfe3116a47f76d8a1f733",
+        "enabled": false,
+        "source_statuses": [
+          "sample_ok"
+        ],
+        "offline_status": "pending_fixed_verification",
         "history_complete": false,
         "pit_verified": false
       }
