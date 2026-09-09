@@ -275,3 +275,16 @@
 - 父候选6e28dae整合风险5、技术5及structured独立API轮转/3近期:1历史机会；468项Tushare隔离回归24.736秒、Ruff及diff通过。曾用模块路径运行技术专项因scripts测试导入路径失败；改用仓库原discover入口后14项通过，不是代码故障。风险29字段、技术342字段均显式请求并保留来源语义；真实权限/过滤/字段仍待probe，不计入已生产154接口。
 - schema6仅增pending表达式索引，不改历史生成器、旧游标和任务内容；40万模拟任务索引约10.7MiB/239ms、全任务SHA不变。生产需停两专属消费者并自然排空、先一致备份再迁移；旧代码拒绝6，禁止用旧DB覆盖升级后新增进度。候选未发布，采集继续。
 - 五个/tmp迁移/风险技术probe/云Mac共用verifier已准备并检查Python3.10语法；启用helper继续独立准备。统一发布前先把测试和脚本做完，恢复采集后再做固定API/Mac验收。额外并行启动HK/US八财务接口纯契约研究，独立权限未知按缺口记录，全263基线+13发现的范围不缩减。
+
+
+## 2026-09-09 10:36 并行接入、风险技术上线与Mac闭包
+
+- a68c6d9已发布风险5、技术5、schema6公平轮转和到期单独发布；随后其他任务完成Qlib发布，主树已到510dd57，未打断两Tushare worker。联合隔离470 tests/Ruff通过；schema5一致备份1056563200字节，迁移2.01秒、8表行数/内容SHA与rowid不变、integrity_check通过。备份和部署证据见云端validation/pre-v6-prepared.json与Mac/tmp/tushare-v6-deployment.json。两专属消费者仅在02:10—02:23Z部署验证窗口自然排空/恢复，未撤销普通US任务。
+- 风险9请求223来源行，stock_st/st/stk_shock去重221行、18已知字段通过非空样本；stk_high_shock和stk_alert共4次仅空返回，不能据此判无权限或字段已验证，注册但不启用。技术8请求17338来源行、去重17202行，5接口342字段全部返回；单日/范围或代码过滤的3组非空全列比较通过。已启用风险3+技术5，台账10项同步真实状态；全263基线+13发现范围保留。
+- 固定data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55完成云端原文/Parquet/reader与认证HTTP验证，再经标准Mac mirror校验209734文件；风险与技术Mac禁网/禁凭据读取结果相同。技术HTTP大表明确仅单股scope，不称全17202行经HTTP；完整行对账在实际store路径完成。报告/tmp/risk5-mac-verified.json、/tmp/technical5-mac-verified.json及对应cloud报告。
+- 同一固定版已包含RRG111全部303文件，本地SHA全通过；此前未发布62目标的实际reader全列对账251788行、缺/多/列差0，16休市空查询。完整报告/tmp/tushare-rrg-mac-cc8-closure-report.json及023118Z主题记录。有限研究切片已可离线消费，不代表完整2021—2026或成员/ETF/PIT通过。
+- 不等全历史结束：remaining并行补stock_context7运行候选；foreign_financial8与publish优化已准备待审；text只读分析历史前缀/规划耗时，structured验收自动发布恢复。生产仍共用账户限流，部署集中批次，接口开发/固定版验收与采集并行。技术history首批500全部跳过近期前缀，实际新增历史0；不能把配置启用称作历史已拉取。
+- 02:33:31Z实际自动acquire_only批217请求、121.664秒，planning25.018秒、acquire90.237秒、无failed_stage；CURRENT已推进2e1585a2…，checkpoint1788920958。手工发布14.6秒发生在quantmind容器，不能作为0.75CPU专属worker性能证明。前序publish_only具体结果另核验。剩余历史/修订/文本附件/独立权限/PIT缺口继续记录，不缩减范围。
+
+
+10:39补充：真实自动publish_only任务e7b0e64f完成SUCCESS、零请求、performed=true，整轮49.245秒、发布47.438秒，CURRENT推进2e1585a2…；后续两正常采集186/217请求均成功，发布与采集分轮的恢复链已验证。详见tushare-publish-first.md与/tmp/tushare-publish-first-chain-evidence.json。性能agent查明技术近期前缀86737项；500/轮预算会到第174轮才进入history，现offset4000未重置。已并行准备“预算只扣history、绝对源offset保持且有扫描时限”的最小候选，未部署、不承诺吞吐倍增。

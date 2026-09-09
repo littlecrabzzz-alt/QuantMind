@@ -40,3 +40,10 @@
 读取默认日期均为 `trade_date`；`read_dataset`、`dataset_schema`、`export_jsonl` 使用实际返回全字段和现有自然键/`_row_identity`。原始负值、PE 空值、新增未知列、T 与复用普通代码、筹码同日多个价格档位/不同源行均保留；units/adjustment/formula/PIT/逐字段 gap 随读取元数据返回。此增量不改 SQLite/Parquet/manifest schema 或既有 release 含义，不迁移或重写旧文件；旧固定版没有本组分区时继续明确 unavailable，不能回源。`pipeline.__init__`、`next_job`、publish/interval 与其他 planner 均保持原实现。
 
 运行验证：`UV_OFFLINE=1 uv run --no-project --with httpx --with pyarrow --with duckdb --with fastapi --with pyyaml --with reportlab --with pypdf python -B -m unittest discover -s scripts -p 'test_tushare*.py'`，**456 项通过，21.199 秒**，包含新增 6 项采集→normalize→publish→固定版读取测试，完整 342 列/未知列、历史身份与隔离、日期过滤/JSONL、旧版缺口、分片/满 cap 终端 blocked，以及全部 store 164 数据集夹具。日志仅 Mac `/tmp/tushare-technical-runtime-tests.log`；Ruff/diff 与 Pipeline 方法 AST 范围检查通过。未实测权限、月窗上游过滤或全历史完整性。
+
+
+## 2026-09-09 生产与固定版样本验收
+
+上述未probe状态为开发阶段记录，当前a68c6d9已部署并启用五接口。8次真实请求17338来源行、去重17202行，342显式字段全部返回；筹码单日与9月1—4日窗口、专业因子单股与全市场日请求三组全列比较通过。
+
+固定cc8ed219…db55的全部相关来源/Parquet/实际reader行通过云端与Mac禁网验证。云端HTTP超过2000行的factor/pro/bak明确取SH600000单股范围，筹码全样本可覆盖；不宣称HTTP覆盖17202行全数据。Mac报告/tmp/technical5-mac-verified.json，原probe SHA8837a1ebabb9d36e3af49b7df9addc1f780637c7790066674234dda80a003b35。完整release与部署见tushare-progress 10:36记录。报告gap0仅指本次字段/过滤核验无差异，不取消上文单位、公式、来源全集、修订和PIT限制。history首批500项均跳过近期任务、新增历史0，长近期前缀仍待优化。

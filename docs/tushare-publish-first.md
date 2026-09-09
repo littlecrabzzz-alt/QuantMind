@@ -11,3 +11,10 @@
 隔离测试包含60秒publish与90秒acquire分轮计时、采集中跨期、发布轮零上游/零token读取、默认0、坏指针、时钟回退、缺pointer、失败checkpoint保留，以及四批未发布原文/Parquet/文档版本经下一自动轮进入同一固定版并可复制到新mirror。真实部署与CURRENT推进仍须父任务验收。
 
 局限：这只解决采集与发布时间预算叠加。如果元数据继续增长导致单独publish也超过160秒，仍会失败；本改动未解决manifest规模、单轮序列化或全历史容量上限，不承诺无限扩展。
+
+
+## 2026-09-09 10:29 真实自动恢复验收
+
+生产专属worker celery@bb73f18d769b 的真实任务e7b0e64f-16ee-400b-b807-17ebcbfbd0af完成SUCCESS：status=publish_only、requests=0、performed=true、pending=false，整轮49.245秒，publish外层47.438秒，CURRENT推进data-2e1585a2c28036ec7f0474a591d1424e863c17f81d3543135182d5317c2804aa，成功checkpoint1788920958。不是quantmind手工publish性能，也没有调时钟或临时任务派发。
+
+同worker后续c65a2a9d-864f-43d0-8ddf-9b87d7b08feb及12f5c7ad-67ee-4c6d-80b6-82e66d17e050均SUCCESS，正常acquire_only分别186/217请求、116.651/121.664秒；当前版保持，新采集pending待下一周期发布。由backend结果与有限worker日志联合核对；/tmp/tushare-publish-first-chain-evidence.json。该自动release的Mac追平需另验，不能用已验cc8版替代。单轮恢复已证实，长时间稳定性和单独publish继续增长风险仍保留。
