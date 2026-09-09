@@ -115,6 +115,11 @@ for _api, _doc, _cap, _points, _axis, _keys in (
         _cap,
         _keys,
         required=FIELDS[_api],
+        nullable=[
+            f
+            for f in FIELDS[_api]
+            if f != ("month" if _api == "cn_schedule" else _axis)
+        ],
         extra=FIELDS[_api],
         split=_api != "cn_schedule",
         rpm=30,
