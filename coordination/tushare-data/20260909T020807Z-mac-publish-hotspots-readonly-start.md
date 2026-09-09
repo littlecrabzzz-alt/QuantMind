@@ -1,0 +1,1 @@
+父授权10分钟有界只读publish热点分析。仅读取父b849e87 publish与通过现有cloud business entry mode=ro/query_only SQLite统计、EXPLAIN、3000-gap样本；单SQL3-4秒预算，不生产写入/建索引/调用publish/暂停/请求上游。只传计数/耗时/摘要，不将原始数据复制到Mac。remaining独占tick分离，不触碰该段。本轮先性能证据/建议，若小补丁另协调。

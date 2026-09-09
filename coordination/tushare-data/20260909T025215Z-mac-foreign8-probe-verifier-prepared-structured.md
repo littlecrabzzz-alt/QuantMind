@@ -1,0 +1,7 @@
+# Foreign8 probe/verifier prepared — structured
+
+Owned scope: /tmp helper files and this unique coordination record only. No repository runtime/config/ledger edits, upstream/network probe, production access, token lookup or enable. Ownership released.
+
+Handoff: /tmp/tushare-foreign8-handoff.md (exact cloud/Mac commands and bounds). Probe: /tmp/tushare-foreign8-probe.py SHA256 9d52deb4e115487dd781040879b58ff2dc1c8f76034f899b9b6fa98d71b947e1. Verifier: /tmp/foreign8-fixed-verify.py SHA256 50b7322d2d29a5ce3cbee30833a1358b6a52bf0d7dc3f5bf6f559b74a25e98b4. Test: /tmp/test_foreign8_helpers.py SHA256 aafaae47ced345b50a6fb2b46a2cca05676f718982d6433c9047fbcdf25b7b05; test output /tmp/foreign8-helpers-test-result.txt SHA256 a57a47392ac68e548b12e9668cf65184a28eb82a650c88a5a4d2f22e31fd75aa. 12 isolated Python3.10 tests pass plus plan-only CLI; production verification pending explicit parent authorization.
+
+8 finite scopes: HK 00700.HK/20241231; US NVDA/20250401..20250430, real fiscal dates retained. Shared gates and denial cache respected. No guessed paging. All known contract fields plus source unknown/null preserved. Full immutable related parts compared independently, long-form source row identity retained, no mutable DB/network/secret access in verifier. Parent assessor needs added BLOCK_GAPS kind probe_not_in_fixed_release. Zero real calls; permission/current returned schema/full history/PIT remain unverified.

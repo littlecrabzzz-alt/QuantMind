@@ -1,0 +1,1 @@
+父授权 publish 最小候选，独立codex/tushare-text已合a68c6d9。仅publish coverage_and_closure共用一次GROUP及serialize前释放previous、新等价测试/短doc。gap索引无收益不纳入；无schema/tick/格式改动。remaining/父本轮发布不受影响，无生产访问/写入，本轮用固定时间临时fixture比较旧a68c6d9方法与候选的清单字节/NOOP/历史闭包。

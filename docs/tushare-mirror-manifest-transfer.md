@@ -11,3 +11,6 @@ All manifest-listed objects, observations, archives and attachments still follow
 Failure JSON now includes a safe stage, elapsed seconds and timeout/return code when available. It never includes subprocess command text, stdout/stderr payload or credentials. Stages distinguish pointer_fetch, manifest_prepare/transfer/verify/validate, objects_transfer and objects_verify. Existing schedule/venv installation is unchanged; the parent must deploy/reinstall the client copy through the established path before its LaunchAgent can use the fix. This candidate does not restart that agent or launch a mirror.
 
 Offline temporary fixtures cover compressed command bounds, exactly pinned manifest paths, partial timeout cleanup/retry, SHA and symlink rejection, archive/local reuse and inode preservation, object-transfer failure retaining old CURRENT, full object/attachment verification, and pointer timeout classification. Existing mirror acceptance fixtures retain their recovery/corruption assertions with only transport mock updates and the extra local manifest SHA-check count.
+
+
+2026-09-09正式标准mirror已exit0，data-630dbb0ca721022e19d02337cc578d3cd5b4f61f797fa31f900ed192be36f278共218864文件通过，新增9129；固定ed2的foreign8/stock7随后离线验证与云端相等。此为真实手工调用标准mirror结果，未另将下一次LaunchAgent自动运行宣称已成功。

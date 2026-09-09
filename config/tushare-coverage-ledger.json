@@ -75,7 +75,7 @@
       ],
       "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "next_action": "Permission denied in bounded actual probe; retain archived evidence and retry only when entitlement changes. Full-history and PIT obligations remain open.",
       "contract_evidence": "docs/tushare-stock-context-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/stock-context-probe.json",
@@ -94,9 +94,12 @@
         ],
         "fixed_rows_after_dedupe": 0,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-mac-verified.json",
+        "offline_evidence_sha256": "5c5fffdd4de647a3c7ef08bab8fb109a69d0a10ea3ff9927108d83aec7ce1f21",
+        "offline_scope": "Archived permission response only; no nonempty dataset."
       }
     },
     {
@@ -255,7 +258,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Continue historical acquisition, source universe, revisions and PIT validation; finish Mac fixed-release acceptance after mirror transfer repair.",
+      "next_action": "Continue historical acquisition, source universe, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-stock-context-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/stock-context-probe.json",
@@ -277,9 +280,12 @@
         ],
         "fixed_rows_after_dedupe": 143,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-mac-verified.json",
+        "offline_evidence_sha256": "5c5fffdd4de647a3c7ef08bab8fb109a69d0a10ea3ff9927108d83aec7ce1f21",
+        "offline_scope": "Fixed observed rows and all source columns; not full history or PIT."
       }
     },
     {
@@ -294,7 +300,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "All 1428 observed rows retained; local unknown-cap guard fired. Explicit end_date matches 22 rows. Plan observed periods with rediscovery and unresolved parent coverage; not yet enabled.",
+      "next_action": "Retain observed-period shards, unknown-period coverage gap and code-only rediscovery; resolve saturation protection before automatic enablement. Fixed Mac acceptance passed.",
       "contract_evidence": "docs/tushare-stock-context-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/stock-context-probe.json",
@@ -318,9 +324,12 @@
         ],
         "fixed_rows_after_dedupe": 1428,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-mac-verified.json",
+        "offline_evidence_sha256": "5c5fffdd4de647a3c7ef08bab8fb109a69d0a10ea3ff9927108d83aec7ce1f21",
+        "offline_scope": "Fixed observed rows and all source columns; not full history or PIT."
       }
     },
     {
@@ -1628,7 +1637,7 @@
       ],
       "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "next_action": "Permission denied in bounded actual probe; retain archived evidence and retry only when entitlement changes. Full-history and PIT obligations remain open.",
       "contract_evidence": "docs/tushare-stock-context-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/stock-context-probe.json",
@@ -1647,9 +1656,12 @@
         ],
         "fixed_rows_after_dedupe": 0,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-mac-verified.json",
+        "offline_evidence_sha256": "5c5fffdd4de647a3c7ef08bab8fb109a69d0a10ea3ff9927108d83aec7ce1f21",
+        "offline_scope": "Archived permission response only; no nonempty dataset."
       }
     },
     {
@@ -1664,7 +1676,7 @@
       ],
       "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "next_action": "Permission denied in bounded actual probe; retain archived evidence and retry only when entitlement changes. Full-history and PIT obligations remain open.",
       "contract_evidence": "docs/tushare-stock-context-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/stock-context-probe.json",
@@ -1683,9 +1695,12 @@
         ],
         "fixed_rows_after_dedupe": 0,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-mac-verified.json",
+        "offline_evidence_sha256": "5c5fffdd4de647a3c7ef08bab8fb109a69d0a10ea3ff9927108d83aec7ce1f21",
+        "offline_scope": "Archived permission response only; no nonempty dataset."
       }
     },
     {
@@ -1700,7 +1715,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Continue historical acquisition, source universe, revisions and PIT validation; finish Mac fixed-release acceptance after mirror transfer repair.",
+      "next_action": "Continue historical acquisition, source universe, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-stock-context-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/stock-context-probe.json",
@@ -1721,9 +1736,12 @@
         ],
         "fixed_rows_after_dedupe": 1,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-mac-verified.json",
+        "offline_evidence_sha256": "5c5fffdd4de647a3c7ef08bab8fb109a69d0a10ea3ff9927108d83aec7ce1f21",
+        "offline_scope": "Fixed observed rows and all source columns; not full history or PIT."
       }
     },
     {
@@ -1738,7 +1756,7 @@
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
-      "next_action": "Continue historical acquisition, source universe, revisions and PIT validation; finish Mac fixed-release acceptance after mirror transfer repair.",
+      "next_action": "Continue historical acquisition, source universe, revisions and PIT validation.",
       "contract_evidence": "docs/tushare-stock-context-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/stock-context-probe.json",
@@ -1762,9 +1780,12 @@
         ],
         "fixed_rows_after_dedupe": 203,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/stock7-mac-verified.json",
+        "offline_evidence_sha256": "5c5fffdd4de647a3c7ef08bab8fb109a69d0a10ea3ff9927108d83aec7ce1f21",
+        "offline_scope": "Fixed observed rows and all source columns; not full history or PIT."
       }
     },
     {
@@ -4523,7 +4544,7 @@
       ],
       "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "next_action": "Permission denied in bounded actual probe; retain archived evidence and retry only when entitlement changes. Full-history and PIT obligations remain open.",
       "contract_evidence": "docs/tushare-foreign-financial-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/foreign-financial-probe.json",
@@ -4543,9 +4564,12 @@
         ],
         "fixed_rows_after_dedupe": 0,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-mac-verified.json",
+        "offline_evidence_sha256": "f896b0bd598d533c9afa3e89b69ed25ec3f16ba9600b78d3fa9bb9792d2dbec1",
+        "offline_scope": "Archived permission response only; no nonempty dataset."
       }
     },
     {
@@ -4560,7 +4584,7 @@
       ],
       "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "next_action": "Permission denied in bounded actual probe; retain archived evidence and retry only when entitlement changes. Full-history and PIT obligations remain open.",
       "contract_evidence": "docs/tushare-foreign-financial-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/foreign-financial-probe.json",
@@ -4580,9 +4604,12 @@
         ],
         "fixed_rows_after_dedupe": 0,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-mac-verified.json",
+        "offline_evidence_sha256": "f896b0bd598d533c9afa3e89b69ed25ec3f16ba9600b78d3fa9bb9792d2dbec1",
+        "offline_scope": "Archived permission response only; no nonempty dataset."
       }
     },
     {
@@ -4597,7 +4624,7 @@
       ],
       "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "next_action": "Permission denied in bounded actual probe; retain archived evidence and retry only when entitlement changes. Full-history and PIT obligations remain open.",
       "contract_evidence": "docs/tushare-foreign-financial-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/foreign-financial-probe.json",
@@ -4617,9 +4644,12 @@
         ],
         "fixed_rows_after_dedupe": 0,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-mac-verified.json",
+        "offline_evidence_sha256": "f896b0bd598d533c9afa3e89b69ed25ec3f16ba9600b78d3fa9bb9792d2dbec1",
+        "offline_scope": "Archived permission response only; no nonempty dataset."
       }
     },
     {
@@ -4634,7 +4664,7 @@
       ],
       "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "next_action": "Permission denied in bounded actual probe; retain archived evidence and retry only when entitlement changes. Full-history and PIT obligations remain open.",
       "contract_evidence": "docs/tushare-foreign-financial-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/foreign-financial-probe.json",
@@ -4654,9 +4684,12 @@
         ],
         "fixed_rows_after_dedupe": 0,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-mac-verified.json",
+        "offline_evidence_sha256": "f896b0bd598d533c9afa3e89b69ed25ec3f16ba9600b78d3fa9bb9792d2dbec1",
+        "offline_scope": "Archived permission response only; no nonempty dataset."
       }
     },
     {
@@ -4814,7 +4847,7 @@
       ],
       "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "next_action": "Permission denied in bounded actual probe; retain archived evidence and retry only when entitlement changes. Full-history and PIT obligations remain open.",
       "contract_evidence": "docs/tushare-foreign-financial-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/foreign-financial-probe.json",
@@ -4835,9 +4868,12 @@
         ],
         "fixed_rows_after_dedupe": 0,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-mac-verified.json",
+        "offline_evidence_sha256": "f896b0bd598d533c9afa3e89b69ed25ec3f16ba9600b78d3fa9bb9792d2dbec1",
+        "offline_scope": "Archived permission response only; no nonempty dataset."
       }
     },
     {
@@ -4852,7 +4888,7 @@
       ],
       "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "next_action": "Permission denied in bounded actual probe; retain archived evidence and retry only when entitlement changes. Full-history and PIT obligations remain open.",
       "contract_evidence": "docs/tushare-foreign-financial-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/foreign-financial-probe.json",
@@ -4873,9 +4909,12 @@
         ],
         "fixed_rows_after_dedupe": 0,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-mac-verified.json",
+        "offline_evidence_sha256": "f896b0bd598d533c9afa3e89b69ed25ec3f16ba9600b78d3fa9bb9792d2dbec1",
+        "offline_scope": "Archived permission response only; no nonempty dataset."
       }
     },
     {
@@ -4890,7 +4929,7 @@
       ],
       "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "next_action": "Permission denied in bounded actual probe; retain archived evidence and retry only when entitlement changes. Full-history and PIT obligations remain open.",
       "contract_evidence": "docs/tushare-foreign-financial-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/foreign-financial-probe.json",
@@ -4911,9 +4950,12 @@
         ],
         "fixed_rows_after_dedupe": 0,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-mac-verified.json",
+        "offline_evidence_sha256": "f896b0bd598d533c9afa3e89b69ed25ec3f16ba9600b78d3fa9bb9792d2dbec1",
+        "offline_scope": "Archived permission response only; no nonempty dataset."
       }
     },
     {
@@ -4928,7 +4970,7 @@
       ],
       "status": "permission_blocked",
       "permission_status": "unverified",
-      "next_action": "Account probes returned permission_denied; keep registered and disabled, retain rejection responses and recheck on entitlement change.",
+      "next_action": "Permission denied in bounded actual probe; retain archived evidence and retry only when entitlement changes. Full-history and PIT obligations remain open.",
       "contract_evidence": "docs/tushare-foreign-financial-intake.md",
       "runtime_evidence": {
         "path": "/data/tushare/validation/foreign-financial-probe.json",
@@ -4949,9 +4991,12 @@
         ],
         "fixed_rows_after_dedupe": 0,
         "cloud_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-cloud-verified.json",
-        "offline_status": "pending_mirror_timeout_fix",
+        "offline_status": "fixed_release_verified_with_gaps",
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "offline_evidence": "/data/tushare/validation/intake-batch-20260909T025328Z/foreign8-mac-verified.json",
+        "offline_evidence_sha256": "f896b0bd598d533c9afa3e89b69ed25ec3f16ba9600b78d3fa9bb9792d2dbec1",
+        "offline_scope": "Archived permission response only; no nonempty dataset."
       }
     },
     {

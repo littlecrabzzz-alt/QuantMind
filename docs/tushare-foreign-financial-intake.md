@@ -61,3 +61,6 @@ foreign_financial通过registry/固定版store/mirror接入，8接口完整192�
 ## 2026-09-09 生产探测
 
 八个实际请求均为permission_denied。8份拒绝原文及8份观测已进入ed2f8b46…3faf固定版并校验SHA，均保持禁用；不由10100积分推断独立财报权限。权限缺口不阻其他组，Mac归档闭包待镜像超时修复。
+
+
+2026-09-09后置Mac验收已完成：固定ed2f8b46的release、probe SHA、probe_samples、dataset_checks、gaps与云端逐项相等；16份拒绝原文/观测已离线可读。8接口仍permission_denied且禁用，无非空数据可用性证明。报告validation/intake-batch-20260909T025328Z/foreign8-mac-verified.json。

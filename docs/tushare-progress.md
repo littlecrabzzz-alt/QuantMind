@@ -308,3 +308,13 @@
 - Mac本批标准mirror明确exit2 TimeoutExpired，前两自动轮也同错，旧CURRENT保留。只读取证86,253,968字节固定manifest压缩rsync11.941秒且SHA一致；旧日志无法确定具体超时stage。镜像修复e89b→8a098de已部署master/cloud，handoff4685文件通过，parent13专项通过、agent513全tests通过。只更新Mac运行client、不重启采集；有界压缩清单传输、已有manifest/alias校验复用和安全stage诊断保留全部对象/历史。本次正式mirror正在运行，结果待验。
 - 历史规划修复保留旧technical signature逐字节不变，offset7500→87237→87737，5接口各200个history共1000真实入队，但全部pending/tries0/无attempt。进一步确认technical组仍按priority20近期优先，8384近期压住priority55历史；只有structured原先享有3近期:1历史。最小消费修复e0b→4115b14已通过联合520 tests23.167秒/Ruff，复用schema6索引、保留RRG/权重/gates/旧structured键，对其他已启用family独立API轮转。本轮只排空/重启采集worker，真实history请求仍待恢复后验证。
 - 薪酬54个观察期每期1—60行，含非季末20070625；20251231单期22行与全期对应全列一致。后续按已观察期分片必须保留未知期间、code-only再发现及父覆盖缺口，不能把54期当全集或只枚举季度末。15项台账已更新真实权限/存储/启用状态，Mac闭包暂标pending。全目录、完整历史/修订/附件/PIT目标继续。
+
+
+## 2026-09-09 11:29 Mac闭包与真实历史消费验收
+
+- 标准Mac mirror修复后实际exit0，固定data-630dbb0ca721022e19d02337cc578d3cd5b4f61f797fa31f900ed192be36f278共218864文件通过校验，新增9129。随后对固定ed2f8b46的foreign8/stock7分别离线验收，云Mac的release、probe SHA、全部probe_samples、dataset_checks和gaps逐项相等。15项台账更新离线状态；11拒绝权限项仅证明拒绝响应已归档，并未变成可用数据。
+- 公平消费4115b14随master044f373云端核对通过，4688文件/source_digest 8a21aef32b41ab313e5d1860991b53b3da9f171f821b3000830c55e7beaf1dd3。只采集队列03:13:21Z自然排空，03:19:13Z已恢复；文档和普通US任务保持。最终联合520项隔离测试/Ruff通过。
+- 只读实测五技术API累计14次真实history HTTP200；cyq_perf22行、cyq_chips3586行，均000001.SZ的20180101—20180131；其余12次为空，保留empty_unverified。14份观测SHA一致，旧signature及100个原任务身份不变，history offset推进91237。此后新增历史响应是否发布并到Mac尚未验证，不混同前述固定版。证据tushare-family-fairness-after4-20260909.json SHA5afb30e9ff7ad365c13e753ded5a8fadd0cd8075fa8f0541886bd26549005683。
+- 不等待历史全量结束：market_sentiment7与cross_asset_extra6独立纯合同并行；后者候选24dfca5已推送，6 API/296字段/4隐藏字段、6项Python3.10测试/Ruff通过，尚未运行接入。前者识别tdx_daily目录漏6数字起首字段，必须完整保留，后续定点修正目录。生产仍共用账户限流，不因开发并行叠加无控制采集。完整历史、修订、权限、附件、RRG成员/ETF/PIT继续未完成。
+
+11:30补充：market_sentiment纯7也已完成并推送cc0de16，101完整字段、7项离线测试/Ruff通过；与cross_asset_extra6合计13 API/397字段，均仅候选，尚未运行接线或真实权限验证。后续从两分支独立review集成，不扩大生产已启用计数。
