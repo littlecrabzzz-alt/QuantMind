@@ -191,7 +191,7 @@ class StockContextRuntime(unittest.TestCase):
         self.assertEqual({j["api_name"] for j in jobs}, set(FIELDS))
         self.assertEqual(
             set(module._planning_inputs("stock_context", cfg, ids)[1]),
-            {"stock_context_stocks"},
+            {"stock_context_stocks", "stock_context_reward_periods"},
         )
         self.assertIn(
             "backend/shared/tushare_stock_context_contracts.py",

@@ -989,6 +989,7 @@ class Pipeline:
     def identifiers(self):
         bond_source_apis = ("cb_daily", "cb_issue", "cb_call", "cb_rate", "cb_price_chg", "cb_share")
         factor_records = {}
+        reward_period_records = {}
         families = {
             **dict.fromkeys(REALTIME_RUNTIME_CONTRACTS, "realtime_source_only"),
             **dict.fromkeys(SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS, "stocks"),
@@ -1079,7 +1080,7 @@ class Pipeline:
             (
                 "ts_code", "index_code", "level", "fut_code", "o_code", "n_code",
                 "name", "hm_name", "l1_code", "l2_code", "l3_code", "con_code",
-                "factor_name", "asset_type", "mapping_ts_code", "code",
+                "factor_name", "asset_type", "mapping_ts_code", "code", "end_date",
             )
         )
         placeholders = ",".join("?" for _ in families)
@@ -1138,6 +1139,11 @@ class Pipeline:
                 observed = json.loads((self.root / "observations" / saved["observation"]).read_bytes())
                 realtime_params = observed.get("request", {}).get("params", {})
             for record in self.records(saved, fields=discovery_fields):
+                if api == "stk_rewards":
+                    # Body-only actual pairs, including capped historical attempts.
+                    # Invalid/missing dates remain evidence for a prerequisite gap.
+                    identity = {field: record.get(field) for field in ("ts_code", "end_date")}
+                    reward_period_records[json_bytes(identity)] = identity
                 if api in REALTIME_RUNTIME_CONTRACTS:
                     code = record.get(REALTIME_RUNTIME_CONTRACTS[api]["source_code_field"])
                     family = REALTIME_SOURCE_FAMILIES[api]
@@ -1265,6 +1271,7 @@ class Pipeline:
         result["cross_asset_etfs"].update(result["etfs"])
         result = {key: sorted(values) for key, values in result.items()}
         result["factor_library_factors"] = [factor_records[key] for key in sorted(factor_records)]
+        result["stock_context_reward_periods"] = [reward_period_records[key] for key in sorted(reward_period_records)]
         for api, spec in CROSS_ASSET_RUNTIME_CONTRACTS.items():
             family = spec["saturation_fallback"]
             logical = EXTENDED_CONTRACTS[api].get("discovery_dependencies", [family])[0]
