@@ -15,6 +15,7 @@ import re
 import tempfile
 
 from backend.shared.tushare_registry import (
+    BOND_EXTRA_RUNTIME_CONTRACTS,
     CROSS_ASSET_RUNTIME_CONTRACTS,
     MARKET_SENTIMENT_RUNTIME_CONTRACTS,
     FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
@@ -51,6 +52,7 @@ KEYS = {
     "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
 }
 CONTRACTS = {
+    **BOND_EXTRA_RUNTIME_CONTRACTS,
     **CROSS_ASSET_RUNTIME_CONTRACTS,
     **MARKET_SENTIMENT_RUNTIME_CONTRACTS,
     **FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
@@ -525,6 +527,13 @@ def _dataset(root, release_id, api_name):
             ):
                 if spec.get(note):
                     metadata[note] = spec[note]
+        if api_name in BOND_EXTRA_RUNTIME_CONTRACTS:
+            for note, value in spec.items():
+                if note.endswith(("_gap", "_note")) or note in (
+                    "field_gaps", "field_metadata", "hidden_fields", "permission_status",
+                    "date_field", "source_namespace", "independent_permission",
+                ):
+                    metadata[note] = value
         if api_name in CROSS_ASSET_RUNTIME_CONTRACTS or api_name in MARKET_SENTIMENT_RUNTIME_CONTRACTS:
             for note, value in spec.items():
                 if note.endswith(("_gap", "_note")) or note in (
@@ -641,6 +650,8 @@ def _date_expression(field, columns):
 
 
 def _default_date_field(api_name, columns):
+    if api_name in BOND_EXTRA_RUNTIME_CONTRACTS:
+        return BOND_EXTRA_RUNTIME_CONTRACTS[api_name]["date_field"]
     if api_name in CROSS_ASSET_RUNTIME_CONTRACTS or api_name in MARKET_SENTIMENT_RUNTIME_CONTRACTS:
         return "trade_date"
     if api_name in FOREIGN_FINANCIAL_RUNTIME_CONTRACTS:
@@ -714,10 +725,11 @@ def _query(
             )
             and code_field in ("ts_code", "con_code", "leading_code")
         )
-        cross_asset_source = (
-            api_name in CROSS_ASSET_RUNTIME_CONTRACTS and code_field == "source_ts_code"
+        asset_source = (
+            (api_name in CROSS_ASSET_RUNTIME_CONTRACTS or api_name in BOND_EXTRA_RUNTIME_CONTRACTS)
+            and code_field == "source_ts_code"
         )
-        if not (mapping_source or concept_source or cross_asset_source) and any(
+        if not (mapping_source or concept_source or asset_source) and any(
             re.fullmatch(r"[0-9]{6}\.(SH|SZ|BJ)", c) for c in codes
         ):
             raise ValueError("Use internal prefix stock codes, for example SH600036")
