@@ -39,6 +39,10 @@ async def main():
              requirements={'dataset': 'current_frozen_template', 'executor': 'factor_expression', 'features': base['features'], 'missing': []},
              expression='rank(mom_ret_20d) * rank(amt_ratio_5_20)')
     assert admission(p, available)['ready']
+    derived = deepcopy(p); derived['requirements']['features'] += [p['expression'], 'research_signal']
+    assert admission(derived, available)['ready'], 'Derived output misclassified as unavailable raw input'
+    derived['expression'] = 'rank(missing_field)'; derived['requirements']['features'] = [derived['expression']]
+    assert not admission(derived, available)['ready'], 'Derived output bypassed raw input validation'
     for changes in ({'dataset': 'other'}, {'executor': 'unavailable'}, {'features': ['missing_field']}, {'missing': ['新数据']}):
         blocked = deepcopy(p); blocked['requirements'].update(changes)
         assert not admission(blocked, available)['ready']
