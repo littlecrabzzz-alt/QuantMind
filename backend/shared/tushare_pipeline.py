@@ -924,6 +924,9 @@ class Pipeline:
             bse_new_codes=set(),
         )
         placeholders = ",".join("?" for _ in families)
+        seen = set()
+        discovery = {"results": 0, "duplicate_bodies": 0, "bypassed": 0, "body_reads": 0}
+        self.identifier_timing = discovery
         for row in self.db.execute(
             "SELECT result FROM jobs WHERE result IS NOT NULL AND json_extract(job,'$.api_name') IN ("
             + placeholders
@@ -933,6 +936,44 @@ class Pipeline:
             tuple(families) + tuple(families),
         ):
             saved = json.loads(row[0])
+            discovery["results"] += 1
+            api, sha = saved.get("api_name"), saved.get("object_sha256")
+            # Request-aware discovery must opt in separately. Current hot-list
+            # market labels live in immutable requests, not necessarily the body.
+            bypass = api in ("ths_hot", "dc_hot") or bool(
+                contract_for(api).get("request_identity_fields")
+            )
+            eligible = (
+                sha
+                and saved.get("status")
+                not in (
+                    "transport_error",
+                    "rate_limited",
+                    "permission_denied",
+                    "api_error",
+                    "invalid_response",
+                )
+                and saved.get("response_format") != "non_json"
+            )
+            if eligible and not bypass:
+                stat = (self.root / "objects" / (sha + ".json")).stat()
+                key = (
+                    api,
+                    sha,
+                    saved.get("status"),
+                    saved.get("response_format"),
+                    stat.st_dev,
+                    stat.st_ino,
+                    stat.st_size,
+                    stat.st_mtime_ns,
+                    stat.st_ctime_ns,
+                )
+                if key in seen:
+                    discovery["duplicate_bodies"] += 1
+                    continue
+                seen.add(key)
+            discovery["bypassed"] += int(bypass)
+            discovery["body_reads"] += int(bool(eligible))
             for record in self.records(saved):
                 if saved["api_name"] == "ci_index_member":
                     for field in ("l1_code", "l2_code", "l3_code"):
@@ -951,10 +992,7 @@ class Pipeline:
                         .endswith(("L", "L1", "L2", "L3"))
                     ):
                         result["futures_continuous"].add(record["ts_code"])
-                if (
-                    saved["api_name"] == "index_classify"
-                    and record.get("level") != "L3"
-                ):
+                if saved["api_name"] == "index_classify" and record.get("level") != "L3":
                     continue
                 if saved["api_name"] == "bse_mapping":
                     for field, family in (
@@ -1226,7 +1264,35 @@ class Pipeline:
             )
 
     def plan_extended(self, config, today):
-        identifiers = self.identifiers()
+        started = time.monotonic()
+        self.planning_timing = {
+            "stage_seconds": {},
+            "families": {},
+            "active_stage": "identifiers",
+            "failed_stage": None,
+        }
+        try:
+            return self._plan_extended(config, today)
+        except BaseException:
+            self.planning_timing["failed_stage"] = self.planning_timing["active_stage"]
+            raise
+        finally:
+            self.planning_timing["total_elapsed_seconds"] = max(
+                0.0, time.monotonic() - started
+            )
+
+    def _plan_extended(self, config, today):
+        started = time.monotonic()
+        self.identifier_timing = None
+        try:
+            identifiers = self.identifiers()
+        finally:
+            if isinstance(self.identifier_timing, dict):
+                self.planning_timing["discovery"] = self.identifier_timing
+            self.planning_timing["stage_seconds"]["identifiers"] = max(
+                0.0, time.monotonic() - started
+            )
+        self.planning_timing["active_stage"] = "validation_and_snapshots"
         blocked_families = set()
         for family, validate in (
             (
@@ -1369,11 +1435,13 @@ class Pipeline:
             raise ValueError("Invalid historical planner time limit")
         stats = {}
         for family, planner in PLANNERS.items():
+            self.planning_timing["active_stage"] = family + ":policy"
             if family in blocked_families or not config.get("enable_" + family, False):
                 continue
             policy, current_ids = _planning_inputs(family, config, identifiers)
             for mode in ("recent", "history"):
                 name = mode + ":" + family
+                self.planning_timing["active_stage"] = name + ":snapshot"
                 epoch = (
                     datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y%m%d%H")
                     if family == "text"
@@ -1451,6 +1519,16 @@ class Pipeline:
                     else state["anchor"],
                 }
                 started = time.monotonic()
+                timing = {
+                    "initial_next_seconds": 0.0,
+                    "source_next_seconds": 0.0,
+                    "enqueue_seconds": 0.0,
+                    "checkpoint_seconds": 0.0,
+                    "initial_offset": state["offset"],
+                    "source_items": 0,
+                }
+                self.planning_timing["families"][name] = timing
+                self.planning_timing["active_stage"] = name + ":source_setup"
                 stream = iter(planner(plan_config, anchor, snapshot["identifiers"]))
                 stream = itertools.islice(stream, state["offset"], None)
                 count, done = 0, False
@@ -1468,7 +1546,15 @@ class Pipeline:
                     # existing islice replay) must return before time is checked.
                     # Count every consumed item, even intentionally skipped recent
                     # entries, so persisted offsets retain their absolute meaning.
-                    job = next(stream, None)
+                    self.planning_timing["active_stage"] = name + ":source_next"
+                    next_started = time.monotonic()
+                    try:
+                        job = next(stream, None)
+                    finally:
+                        elapsed = max(0.0, time.monotonic() - next_started)
+                        timing["source_next_seconds"] += elapsed
+                        if count == 0:
+                            timing["initial_next_seconds"] += elapsed
                     if job is None or (mode == "recent" and job["epoch"] == "history"):
                         done = True
                         stop_reason = "stream_end"
@@ -1476,19 +1562,35 @@ class Pipeline:
                     if mode != "history" or job["epoch"] == "history":
                         attempted += 1
                         before = self.db.total_changes
-                        self.enqueue(
-                            job["api_name"],
-                            job["params"],
-                            job["priority"],
-                            job["epoch"],
-                        )
+                        self.planning_timing["active_stage"] = name + ":enqueue"
+                        enqueue_started = time.monotonic()
+                        try:
+                            self.enqueue(
+                                job["api_name"],
+                                job["params"],
+                                job["priority"],
+                                job["epoch"],
+                            )
+                        finally:
+                            timing["enqueue_seconds"] += max(
+                                0.0, time.monotonic() - enqueue_started
+                            )
                         inserted += self.db.total_changes - before
                     count += 1
-                self.db.execute(
-                    "UPDATE planning_state SET offset=offset+?,done=? WHERE name=?",
-                    (count, int(done), name),
-                )
-                self.db.commit()
+                    timing["source_items"] = count
+                self.planning_timing["active_stage"] = name + ":checkpoint"
+                checkpoint_started = time.monotonic()
+                try:
+                    self.db.execute(
+                        "UPDATE planning_state SET offset=offset+?,done=? WHERE name=?",
+                        (count, int(done), name),
+                    )
+                    self.db.commit()
+                finally:
+                    timing["checkpoint_seconds"] = max(
+                        0.0, time.monotonic() - checkpoint_started
+                    )
+                    timing["total_elapsed_seconds"] = max(0.0, time.monotonic() - started)
                 stats[name] = {
                     "planned": count,
                     "new_jobs": inserted,
@@ -1500,7 +1602,9 @@ class Pipeline:
                     "discovery_refresh_pending": snapshot["identifiers"] != current_ids,
                     "stop_reason": stop_reason,
                 }
+        self.planning_timing["active_stage"] = "final_commit"
         self.db.commit()  # Persist validation gaps even when every family is blocked.
+        self.planning_timing["active_stage"] = "complete"
         return stats
 
     def date_children(self, job):
@@ -2865,6 +2969,9 @@ def tick(max_requests=None, max_seconds=None):
                     "total_elapsed_seconds": max(0.0, time.monotonic() - tick_started),
                 },
             )
+            planning_timing = getattr(pipeline, "planning_timing", None)
+            if isinstance(planning_timing, dict):
+                report["timing"]["planning"] = planning_timing
             publish_timing = getattr(pipeline, "publish_timing", None)
             if isinstance(publish_timing, dict):
                 report["timing"]["publish"] = publish_timing
