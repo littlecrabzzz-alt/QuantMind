@@ -174,6 +174,7 @@ class FixedStore(unittest.TestCase):
         fixtures = []
         observations = {}
         identity_params = {
+            "dc_index": {"trade_date": "20260904", "idx_type": "行业板块"},
             "limit_list_ths": {"trade_date": "20260904", "limit_type": "涨停池"},
             "limit_list_d": {"trade_date": "20260904", "limit_type": "D"},
             "fina_mainbz": {"ts_code": "600036.SH", "type": "P"},
@@ -241,7 +242,7 @@ class FixedStore(unittest.TestCase):
             }
             <= {api for api, _ in fixtures}
         )
-        self.assertEqual(len(fixtures), 148)
+        self.assertEqual(len(fixtures), 152)
 
     def test_dates_codes_and_macro_periods(self):
         pinned = release(
