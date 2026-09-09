@@ -159,6 +159,7 @@ def install_schedule(root):
         "scripts/tushare_pipeline.py",
         "backend/shared/tushare_store.py",
         "backend/shared/tushare_pipeline.py",
+        "backend/shared/tushare_discovery_cache.py",
         "backend/shared/tushare_intake.py",
         "backend/shared/tushare_rate_policy.py",
         "backend/shared/tushare_daily_quota.py",
