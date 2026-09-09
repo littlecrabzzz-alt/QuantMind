@@ -256,6 +256,13 @@ def capture_sample(client, token, job, root: Path):
     """
     if not token:
         raise ValueError("Missing token")
+    # All callers, including finite probes, share this pre-HTTP reservation.
+    from backend.shared.tushare_daily_quota import reserve
+
+    daily = reserve(root, job["api_name"])
+    if daily is not None and not daily["reserved"]:
+        return {"api_name": job["api_name"], "status": "rate_limited",
+                "local_daily_quota": daily, "upstream_calls": 0}
     request = {k: job[k] for k in ("api_name", "params", "fields")}
     started = utc_now()
     field_coverage = {

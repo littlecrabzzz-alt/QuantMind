@@ -18,5 +18,37 @@
     "text": 1,
     "structured": 1,
     "market": 1
+  },
+  "rate_policy": "legacy",
+  "rollout_account_rpm": 300,
+  "account_entitlement": {
+    "reported_points": 10100,
+    "reported_as_of": "2026-09-08",
+    "point_tranches": [
+      {
+        "points": 8000,
+        "expires": "2027-09-08"
+      },
+      {
+        "points": 2000,
+        "expires": "2026-12-05"
+      },
+      {
+        "points": 100,
+        "expires": null
+      }
+    ],
+    "independent_permissions_expiry": "2027-09-08",
+    "independent_api_rpm": {
+      "news": 400,
+      "major_news": 400,
+      "cctv_news": 400,
+      "anns_d": 500,
+      "irm_qa_sh": 500,
+      "irm_qa_sz": 500,
+      "npr": 500,
+      "research_report": 500,
+      "monetary_policy": 200
+    }
   }
 }

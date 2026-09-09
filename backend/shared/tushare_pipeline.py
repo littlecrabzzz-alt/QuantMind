@@ -397,7 +397,16 @@ class Pipeline:
         fair_families = {"structured"} | {
             name for name in PLANNERS if name != "rrg" and config.get("enable_" + name)
         }
+        from backend.shared.tushare_rate_policy import enabled, positive_int, resolved_api_rate
+
         rpm = config.get("requests_per_minute")
+        if enabled(config) and rpm is None:
+            raise ValueError("Tiered rate policy requires an account ceiling")
+        if enabled(config) and config.get("rollout_account_rpm") is not None:
+            rollout = positive_int(config["rollout_account_rpm"], "rollout account rate")
+            if rpm is None:
+                raise ValueError("Tiered rate policy requires an account ceiling")
+            rpm = min(positive_int(rpm, "account request rate"), rollout)
         if rpm is None:
             now = time.time()
             row = self.db.execute(
@@ -463,10 +472,8 @@ class Pipeline:
                     row, checkpoints = self._next_family_job(row["group_name"], now)
             if row:
                 api = json.loads(row["job"])["api_name"]
-                api_rpm = min(
-                    int(config.get("api_requests_per_minute", {}).get(api, 200)),
-                    int(contract_for(api).get("requests_per_minute", 500)),
-                )
+                resolved = resolved_api_rate(api, contract_for(api), config)
+                api_rpm = resolved["rpm"]
                 if not 1 <= api_rpm <= 500:
                     raise ValueError("Invalid API request rate")
                 interval = config.get("api_min_interval_seconds", {}).get(api, 0)
@@ -482,6 +489,12 @@ class Pipeline:
                 ).fetchone()
                 if quota:
                     interval = max(interval, json.loads(quota[0])["interval_seconds"])
+                self.rate_gate_status = {
+                    "last_api": api, "resolved_api_cap": resolved,
+                    "effective_min_interval_seconds": max(60 / api_rpm, interval),
+                    "effective_account_rpm": int(rpm),
+                    "observed_quota_preserved": quota is not None,
+                }
                 try:
                     self.db.executemany(
                         "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=excluded.next_at",
@@ -2507,6 +2520,16 @@ class Pipeline:
                 self.db.commit()
                 continue
             result = capture_sample(client, token, job, self.root)
+            if result.get("local_daily_quota"):
+                daily = result["local_daily_quota"]
+                self.daily_quota_status = daily
+                self.db.execute(
+                    "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=MAX(next_at,excluded.next_at)",
+                    ("api:" + job["api_name"], daily["retry_at"]),
+                )
+                self.db.commit()
+                # No HTTP, result/tries/attempt rows or inferred supplier quota.
+                continue
             status = result["status"]
             state = "done" if status == "sample_ok" else "quality"
             if status == "empty_unverified":
@@ -3066,7 +3089,9 @@ def tick(max_requests=None, max_seconds=None):
             "current_release_id": None,
             "mirror_status": "not_checked",
         }
-        report = {"publication": publication}
+        from backend.shared.tushare_rate_policy import policy_report
+
+        report = {"publication": publication, "rate_policy": policy_report(config)}
         stage_seconds = {}
         completed_stages = []
         failed_stage = None
@@ -3225,6 +3250,17 @@ def tick(max_requests=None, max_seconds=None):
                     "total_elapsed_seconds": max(0.0, time.monotonic() - tick_started),
                 },
             )
+            from backend.shared.tushare_daily_quota import status as daily_quota_report
+
+            daily_status = daily_quota_report(ROOT, config)
+            if daily_status is not None:
+                report["rate_policy"]["daily_quota_ledger"] = daily_status
+            daily_quota_status = getattr(pipeline, "daily_quota_status", None)
+            if isinstance(daily_quota_status, dict):
+                report["rate_policy"]["daily_quota"] = daily_quota_status
+            rate_gate_status = getattr(pipeline, "rate_gate_status", None)
+            if isinstance(rate_gate_status, dict):
+                report["rate_policy"]["last_gate"] = rate_gate_status
             planning_timing = getattr(pipeline, "planning_timing", None)
             if isinstance(planning_timing, dict):
                 report["timing"]["planning"] = planning_timing
