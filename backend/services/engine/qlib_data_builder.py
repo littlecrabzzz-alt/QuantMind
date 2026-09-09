@@ -12,8 +12,14 @@ Qlib binary 格式要求：
 
 from __future__ import annotations
 
+import ctypes
+import fcntl
 import logging
+import os
 import struct
+import sys
+import tempfile
+from contextlib import closing
 from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
@@ -72,6 +78,47 @@ def _register_market_hub(market: str, builder_cls: type):
     _MARKET_HUB_FACTORY[market.upper()] = builder_cls
 
 
+def _duckdb_config() -> dict:
+    # Leave room for Python, Arrow/Pandas and Celery within a 1.5 GiB worker.
+    return {"memory_limit": "256MB", "threads": "1", "preserve_insertion_order": "false"}
+
+
+def _publish_directory(staged: Path, live: Path) -> None:
+    """Replace the whole generation atomically, including an existing directory."""
+    if not live.exists():
+        staged.rename(live)
+        return
+    libc = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "linux":
+        result = libc.renameat2(-100, os.fsencode(staged), -100, os.fsencode(live), 2)
+    elif sys.platform == "darwin":
+        result = libc.renamex_np(os.fsencode(staged), os.fsencode(live), 2)
+    else:
+        raise RuntimeError("Atomic cache publication requires Linux or macOS")
+    if result != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error), str(live))
+
+
+def _symbol_frames(cursor, max_symbol_rows=None):
+    """Sorted query, bounded fetch: keep only the final unfinished symbol."""
+    pending = None
+    while True:
+        frame = cursor.fetch_df_chunk(4)
+        if frame.empty:
+            break
+        if pending is not None:
+            frame = pd.concat([pending, frame], ignore_index=True)
+        last = frame["symbol"].iloc[-1]
+        tail = frame["symbol"] == last
+        pending = frame.loc[tail].copy()
+        if max_symbol_rows is not None and len(pending) > max_symbol_rows:
+            raise RuntimeError("Symbol history exceeds calendar; check duplicate source rows")
+        yield from frame.loc[~tail].groupby("symbol", sort=False)
+    if pending is not None:
+        yield pending["symbol"].iloc[0], pending
+
+
 class QlibDataBuilder:
     """从各市场 parquet 构建 Qlib binary 缓存。
 
@@ -111,7 +158,7 @@ class QlibDataBuilder:
         if market_upper == "CN":
             if data_dir is None:
                 data_dir = _resolve_cn_data_dir()
-            hub = QuantDBDataHub(data_dir)
+            hub = QuantDBDataHub(data_dir, duckdb_config=_duckdb_config())
             default_qlib = Path("/data/qlib/cn_data")
         elif market_upper == "US":
             if data_dir is None:
@@ -146,7 +193,57 @@ class QlibDataBuilder:
     def hub(self) -> QuantDBDataHub:
         return self._hub
 
-    def build_all(
+    def build_all(self, *, incremental=True, symbols=None, progress_cb=None) -> dict:
+        live = self._qlib_dir.absolute()
+        live.parent.mkdir(parents=True, exist_ok=True)
+        if symbols is not None and live.exists():
+            raise ValueError("Partial builds require a separate output directory")
+        with (live.parent / ("." + live.name + ".build.lock")).open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with tempfile.TemporaryDirectory(prefix="." + live.name + "-build-", dir=live.parent) as directory:
+                staged = Path(directory) / "cache"
+                self._qlib_dir = staged
+                try:
+                    result = self._build_all(incremental=incremental, symbols=symbols, progress_cb=progress_cb)
+                    self._validate_generation()
+                    _publish_directory(staged, live)
+                    return result
+                finally:
+                    self._qlib_dir = live
+
+    def _validate_generation(self) -> None:
+        dates = self._load_calendar()
+        if not dates or not self.is_built():
+            raise RuntimeError("Incomplete Qlib generation")
+        newest = -1
+        count = 0
+        for directory in (self._qlib_dir / "features").iterdir():
+            if not directory.is_dir():
+                continue
+            expected = None
+            fields = QLIB_FIELDS + (["change"] if self._market == "CN" else [])
+            for field in fields:
+                path = directory / (field + ".day.bin")
+                size = path.stat().st_size
+                with path.open("rb") as stream:
+                    header = struct.unpack("<f", stream.read(4))[0]
+                if not np.isfinite(header) or header != int(header) or size < 8 or size % 4:
+                    raise RuntimeError(f"Invalid Qlib binary: {path}")
+                shape = (int(header), size // 4 - 1)
+                if shape[0] < 0 or sum(shape) > len(dates) or (expected is not None and expected != shape):
+                    raise RuntimeError(f"Qlib field/calendar mismatch: {path}")
+                expected = shape
+            # A fresh benchmark index must not hide stale stock binaries.
+            is_index = self._market == "CN" and directory.name in {
+                self._to_qlib_symbol(symbol) for symbol in CN_QLIB_INDEX_SYMBOLS
+            }
+            if not is_index:
+                newest = max(newest, sum(expected) - 1)
+            count += 1
+        if not count or newest != len(dates) - 1:
+            raise RuntimeError("Qlib features do not reach the published calendar")
+
+    def _build_all(
         self,
         *,
         incremental: bool = True,
@@ -259,7 +356,7 @@ class QlibDataBuilder:
             return []
         files = ",".join(f"'{fwd / p / 'data.parquet'}'" for p in partitions)
         try:
-            con = duckdb.connect(config={"memory_limit": "4GB", "threads": "2"})
+            con = duckdb.connect(config=_duckdb_config())
             try:
                 df = con.execute(
                     f"SELECT DISTINCT CAST(time AS DATE) d FROM read_parquet([{files}])"
@@ -281,7 +378,7 @@ class QlibDataBuilder:
         import duckdb
 
         try:
-            con = duckdb.connect(config={"memory_limit": "4GB", "threads": "2"})
+            con = duckdb.connect(config=_duckdb_config())
             try:
                 df = con.execute(
                     f"SELECT DISTINCT CAST(time AS DATE) d FROM read_parquet('{fwd / 'dt=*' / 'data.parquet'}', hive_partitioning=1)"
@@ -358,7 +455,7 @@ class QlibDataBuilder:
                 import duckdb
 
                 try:
-                    con = duckdb.connect(config={"memory_limit": "4GB", "threads": "2"})
+                    con = duckdb.connect(config=_duckdb_config())
                     try:
                         df = con.execute(
                             f"SELECT DISTINCT symbol FROM read_parquet('{fwd / 'dt=*' / 'data.parquet'}', hive_partitioning=1)"
@@ -426,9 +523,9 @@ class QlibDataBuilder:
     ) -> dict:
         """从 parquet 后复权 K 线生成 features/*.day.bin。
 
-        CN 与非 CN 一律走批量构建（一次读入全市场再按标的分组写 bin），
-        比逐标的串行快 1~2 个量级。`incremental` 参数保留以兼容调用方，
-        批量构建是整库重写，天然与上游 FULL_REWRITE（分红复权）保持一致。
+        CN 与非 CN 都只扫描一次，流式按标的写入 bin。
+        `incremental` 保留以兼容调用方；仍重算历史，保持上游复权修订语义，
+        但不将全市场历史物化到 Python 内存。
         """
         if symbols is None:
             symbols = self._get_all_symbols()
@@ -450,10 +547,10 @@ class QlibDataBuilder:
                         if self._build_index_features(qlib_sym, self._to_qdb_symbol(qlib_sym), feat_dir, cal_dates, cal_index):
                             result["updated"] += 1
                         else:
+                            feat_dir.rmdir()  # No source data: omit the empty directory.
                             result["skipped"] += 1
                     except Exception as exc:  # noqa: BLE001
-                        logger.warning("构建指数 %s features 失败: %s", qlib_sym, exc)
-                        result["skipped"] += 1
+                        raise RuntimeError(f"Failed to build index {qlib_sym}") from exc
 
         return result
 
@@ -519,7 +616,7 @@ class QlibDataBuilder:
           提供 volume/amount 与事件表缺失时的回退因子。
         - 非 CN（US/HK/CRYPTO/FUTURES）: 只有 daily_forward，factor 恒为 1.0。
 
-        整体读入再 groupby，避免逐标的全库扫描导致 OOM / 数小时耗时。
+        SQL 在受限内存下排序/落临时盘，Python 流式读取，只保留当前标的。
 
         symbols: 可选子集（qlib 格式）；None 则覆盖 parquet 中全部标的。
         """
@@ -535,123 +632,114 @@ class QlibDataBuilder:
         kline_sub = "daily_backward" if is_cn else "daily_forward"
         kline_glob = str(self._hub.data_dir / f"1_kline_data/{kline_sub}/dt=*/data.parquet")
 
-        con = duckdb.connect(config={"memory_limit": "8GB", "threads": "4"})
-        try:
-            if is_cn:
-                # 未复权价单独取回：close_bin 要写成 raw x 乘法因子，不能再拿 hfq 当价格
-                unadj_glob = str(self._hub.data_dir / "1_kline_data/daily_unadjusted/dt=*/data.parquet")
-                df = con.execute(
-                    f"""
-                    SELECT k.symbol,
-                           CAST(k.time AS DATE) AS d,
-                           k.open, k.high, k.low, k.close, k.volume, k.amount,
-                           u.open AS raw_open, u.high AS raw_high, u.low AS raw_low,
-                           u.close AS raw_close,
-                           k.close / NULLIF(u.close, 0.0) AS factor
-                    FROM read_parquet('{kline_glob}', hive_partitioning=1) k
-                    LEFT JOIN read_parquet('{unadj_glob}', hive_partitioning=1) u
-                      ON u.symbol = k.symbol AND CAST(u.time AS DATE) = CAST(k.time AS DATE)
-                    WHERE k.close > 0 AND u.close > 0
-                    ORDER BY k.symbol, d
-                    """
-                ).fetchdf()
-            else:
-                df = con.execute(
-                    f"""
-                    SELECT symbol, CAST(time AS DATE) d,
-                           open, high, low, close, volume, amount
-                    FROM read_parquet('{kline_glob}', hive_partitioning=1)
-                    ORDER BY symbol, d
-                    """
-                ).fetchdf()
-                if not df.empty:
-                    df["factor"] = np.ones(len(df), dtype=np.float64)
-        finally:
-            con.close()
-
-        if df.empty:
-            return {"updated": 0, "skipped": 0}
-
-        df["ci"] = df["d"].astype(str).map(cal_index)
-        df = df[df["ci"].notna()]
-        df["ci"] = df["ci"].astype(np.int64)
-
-        if symbols is not None:
-            # all.txt 中的 symbol 已小写（_feat_dir_name 规则），而 parquet 原生
-            # symbol 保留大小写，非 CN 市场过滤需两侧都小写比较
-            if not is_cn:
-                qlib_wanted = {s.lower() for s in symbols}
-                df = df[df["symbol"].map(self._to_qlib_symbol).str.lower().isin(qlib_wanted)]
-            else:
-                qlib_wanted = set(symbols)
-                df = df[df["symbol"].map(self._to_qlib_symbol).isin(qlib_wanted)]
-
-        updated = skipped = 0
-        factor_fallback = 0
-        total_syms = int(df["symbol"].nunique()) if not df.empty else 0
-        processed = 0
-        for qdb_sym, group in df.groupby("symbol", sort=False):
-            processed += 1
-            # 特征阶段占据总耗时主体（8~95%）：按批次上报进度，让上层看到"在动"并续心跳
-            if callable(progress_cb) and total_syms and (processed % 20 == 0 or processed == total_syms):
-                try:
-                    progress_cb(int(8 + 87 * processed / total_syms))
-                except Exception:  # noqa: BLE001 - 进度回调非关键路径
-                    pass
-            qlib_sym = self._to_qlib_symbol(qdb_sym)
-            positions = group["ci"].values
-            start_idx = int(positions.min())
-            span = int(positions.max()) - start_idx + 1
-            offsets = positions - start_idx
-
-            # qlib 的 FileFeatureStorage 强制 instrument.lower() 拼路径，
-            # 目录必须小写否则读取静默为空
-            feat_dir = self._qlib_dir / "features" / self._feat_dir_name(qlib_sym)
-            feat_dir.mkdir(parents=True, exist_ok=True)
-
-            try:
-                cols = {
-                    field: group[field].values
-                    for field in ("open", "high", "low", "close", "volume", "amount")
-                }
-                factor = group["factor"].values if is_cn else np.ones(len(group))
+        wanted = None if symbols is None else {s.lower() for s in symbols}
+        self._qlib_dir.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix=".qlib-spill-", dir=self._qlib_dir.parent) as spill:
+            config = dict(_duckdb_config(), temp_directory=spill)
+            with closing(duckdb.connect(config=config)) as con:
                 if is_cn:
-                    f_mult = self._multiplicative_factor(
-                        qlib_sym, group["d"].values, group["raw_close"].values,
-                        group["close"].values,
+                    # 未复权价单独取回：close_bin 要写成 raw x 乘法因子，不能再拿 hfq 当价格
+                    unadj_glob = str(self._hub.data_dir / "1_kline_data/daily_unadjusted/dt=*/data.parquet")
+                    con.execute(
+                        f"""
+                        SELECT k.symbol,
+                               CAST(k.time AS DATE) AS d,
+                               k.open, k.high, k.low, k.close, k.volume, k.amount,
+                               u.open AS raw_open, u.high AS raw_high, u.low AS raw_low,
+                               u.close AS raw_close,
+                               k.close / NULLIF(u.close, 0.0) AS factor
+                        FROM read_parquet('{kline_glob}', hive_partitioning=1) k
+                        LEFT JOIN read_parquet('{unadj_glob}', hive_partitioning=1) u
+                          ON u.symbol = k.symbol AND CAST(u.time AS DATE) = CAST(k.time AS DATE)
+                        WHERE k.close > 0 AND u.close > 0
+                        ORDER BY k.symbol, d
+                        """
                     )
-                    if f_mult is not None:
-                        # 价格序列整体换成 未复权价 x 乘法因子，保证 close/factor == raw
-                        for field in ("open", "high", "low", "close"):
-                            raw = group[f"raw_{field}"].values.astype(np.float64)
-                            cols[field] = np.where(
-                                np.isfinite(raw) & (raw > 0), raw * f_mult, np.nan
+                else:
+                    con.execute(
+                        f"""
+                        SELECT symbol, CAST(time AS DATE) d,
+                               open, high, low, close, volume, amount
+                        FROM read_parquet('{kline_glob}', hive_partitioning=1)
+                        ORDER BY symbol, d
+                        """
+                    )
+                updated = skipped = 0
+                factor_fallback = 0
+                total_syms = len(wanted) if wanted is not None else 0
+                processed = 0
+                for qdb_sym, group in _symbol_frames(con, max_symbol_rows=len(cal_dates)):
+                    qlib_sym = self._to_qlib_symbol(qdb_sym)
+                    if wanted is not None and qlib_sym.lower() not in wanted:
+                        continue
+                    group = group.copy()
+                    group["ci"] = group["d"].astype(str).map(cal_index)
+                    if group["ci"].isna().any() or group["ci"].duplicated().any():
+                        raise RuntimeError(f"Duplicate or unaligned source dates: {qdb_sym}")
+                    group["ci"] = group["ci"].astype(np.int64)
+                    processed += 1
+                    # 特征阶段占据总耗时主体（8~95%）：按批次上报进度，让上层看到"在动"并续心跳
+                    if callable(progress_cb) and total_syms and (processed % 20 == 0 or processed == total_syms):
+                        try:
+                            progress_cb(int(8 + 87 * processed / total_syms))
+                        except Exception:  # noqa: BLE001 - 进度回调非关键路径
+                            pass
+                    qlib_sym = self._to_qlib_symbol(qdb_sym)
+                    positions = group["ci"].values
+                    start_idx = int(positions.min())
+                    span = int(positions.max()) - start_idx + 1
+                    offsets = positions - start_idx
+
+                    # qlib 的 FileFeatureStorage 强制 instrument.lower() 拼路径，
+                    # 目录必须小写否则读取静默为空
+                    feat_dir = self._qlib_dir / "features" / self._feat_dir_name(qlib_sym)
+                    feat_dir.mkdir(parents=True, exist_ok=True)
+
+                    try:
+                        cols = {
+                            field: group[field].values
+                            for field in ("open", "high", "low", "close", "volume", "amount")
+                        }
+                        factor = group["factor"].values if is_cn else np.ones(len(group))
+                        if is_cn:
+                            f_mult = self._multiplicative_factor(
+                                qlib_sym, group["d"].values, group["raw_close"].values,
+                                group["close"].values,
                             )
-                        factor = f_mult
-                    else:
-                        factor_fallback += 1
-                aligned: dict[str, np.ndarray] = {}
-                for field, values in cols.items():
-                    arr = np.full(span, np.nan, dtype=np.float32)
-                    arr[offsets] = np.asarray(values, dtype=np.float32)
-                    aligned[field] = arr
-                f_aligned = np.full(span, 1.0, dtype=np.float32)
-                f_aligned[offsets] = np.asarray(factor, dtype=np.float32)
-                aligned["factor"] = f_aligned
-                for field, arr in aligned.items():
-                    self._write_bin_file(feat_dir / f"{field}.day.bin", start_idx, arr)
-                if is_cn:
-                    # $change = pct_change(close)：除权日分母自然换成参考价，
-                    # CnExchange.check_stock_limit 读的就是这一列
-                    close_arr = aligned["close"]
-                    chg = np.full(span, np.nan, dtype=np.float32)
-                    with np.errstate(invalid="ignore", divide="ignore"):
-                        chg[1:] = close_arr[1:] / close_arr[:-1] - 1.0
-                    self._write_bin_file(feat_dir / "change.day.bin", start_idx, chg)
-                updated += 1
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("构建 %s features 失败: %s", qlib_sym, exc)
-                skipped += 1
+                            if f_mult is not None:
+                                # 价格序列整体换成 未复权价 x 乘法因子，保证 close/factor == raw
+                                for field in ("open", "high", "low", "close"):
+                                    raw = group[f"raw_{field}"].values.astype(np.float64)
+                                    cols[field] = np.where(
+                                        np.isfinite(raw) & (raw > 0), raw * f_mult, np.nan
+                                    )
+                                factor = f_mult
+                            else:
+                                factor_fallback += 1
+                        aligned: dict[str, np.ndarray] = {}
+                        for field, values in cols.items():
+                            arr = np.full(span, np.nan, dtype=np.float32)
+                            arr[offsets] = np.asarray(values, dtype=np.float32)
+                            aligned[field] = arr
+                        f_aligned = np.full(span, 1.0, dtype=np.float32)
+                        f_aligned[offsets] = np.asarray(factor, dtype=np.float32)
+                        aligned["factor"] = f_aligned
+                        for field, arr in aligned.items():
+                            self._write_bin_file(feat_dir / f"{field}.day.bin", start_idx, arr)
+                        if is_cn:
+                            # $change = pct_change(close)：除权日分母自然换成参考价，
+                            # CnExchange.check_stock_limit 读的就是这一列
+                            close_arr = aligned["close"]
+                            chg = np.full(span, np.nan, dtype=np.float32)
+                            with np.errstate(invalid="ignore", divide="ignore"):
+                                chg[1:] = close_arr[1:] / close_arr[:-1] - 1.0
+                            self._write_bin_file(feat_dir / "change.day.bin", start_idx, chg)
+                        updated += 1
+                    except Exception as exc:  # noqa: BLE001
+                        raise RuntimeError(f"Failed to build features for {qlib_sym}") from exc
+                    finally:
+                        # Each symbol is processed once; do not retain the whole event book.
+                        self._events = None
 
         if is_cn and factor_fallback:
             logger.warning(
@@ -696,8 +784,12 @@ class QlibDataBuilder:
         if df.empty:
             return False
 
-        first_date = str(df.iloc[0].get("trade_date", ""))[:10]
-        start_idx = cal_index.get(first_date, 0)
+        positions = pd.to_datetime(df["trade_date"]).dt.strftime("%Y-%m-%d").map(cal_index)
+        if positions.isna().any() or positions.duplicated().any():
+            raise RuntimeError(f"Duplicate or unaligned index dates: {qdb_sym}")
+        start_idx = int(positions.min())
+        offsets = positions.to_numpy(dtype=np.int64) - start_idx
+        span = int(positions.max()) - start_idx + 1
 
         field_data = {
             "open": df["open"].values if "open" in df.columns else None,
@@ -711,10 +803,17 @@ class QlibDataBuilder:
 
         for field_name, values in field_data.items():
             if values is None:
-                continue
+                raise RuntimeError(f"Missing index field: {qdb_sym}/{field_name}")
+            aligned = np.full(span, np.nan, dtype=np.float32)
+            aligned[offsets] = np.asarray(values, dtype=np.float32)
             bin_path = feat_dir / f"{field_name}.day.bin"
-            self._write_bin_file(bin_path, start_idx, values.astype(np.float32))
-
+            self._write_bin_file(bin_path, start_idx, aligned)
+        close = np.full(span, np.nan, dtype=np.float32)
+        close[offsets] = df["close"].to_numpy(dtype=np.float32)
+        change = np.full(span, np.nan, dtype=np.float32)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            change[1:] = close[1:] / close[:-1] - 1.0
+        self._write_bin_file(feat_dir / "change.day.bin", start_idx, change)
         return True
 
     # ------------------------------------------------------------------
@@ -886,13 +985,6 @@ def ensure_qlib_cache(
 
     builder = QlibDataBuilder.for_market(market, data_dir=quantdb_dir, qlib_dir=qlib_dir)
 
-    if not builder.is_built():
-        logger.info("Qlib[%s] 缓存不存在，开始构建...", market)
-        builder.build_all(incremental=False)
-    else:
-        # 增量更新：先重建日历（数据可能已更新），再增量更新 instruments 和 features
-        builder.build_calendar()
-        builder.build_instruments()
-        builder.build_features(incremental=True)
+    builder.build_all(incremental=True)
 
     return str(builder.qlib_dir)
