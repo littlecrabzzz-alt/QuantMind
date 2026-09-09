@@ -224,11 +224,12 @@ STOCK_CONTEXT_CONTRACTS["stk_managers"].update(
 )
 STOCK_CONTEXT_CONTRACTS["stk_rewards"].update(
     date_axis_note="Only ts_code (required) and optional end_date REPORT PERIOD are legal inputs. Output ann_date is publication date; end_date is the financial period, never a request interval end. Store default ann_date for availability-oriented filtering, explicit end_date for report cohorts.",
-    history_request="unbounded_single_stock",
-    recent_request="unbounded_single_stock_each_epoch",
+    dependencies=["stocks", "reward_periods"],
+    history_request="observed_single_stock_report_periods",
+    recent_request="unbounded_single_stock_and_latest_observed_period_each_epoch",
     history_gap="No start or announcement-range input and no oldest date is documented. One code-only request returns supplier-available periods without invented quarterly coverage or local date clipping; configuration scopes cannot trim it.",
     unit_note="reward is CNY yuan, hold_vol shares. Unknown/unreported reward is nullable; zero holdings is a valid value, not missing. Annualization, currencies for unusual entities and retrospective revisions need evidence.",
-    saturation_gap="Code-only request has no legal start_date/offset partition. end_date can filter a KNOWN report period, but a complete period inventory and legal period fanout are not implemented; capped responses must remain blocked.",
+    saturation_gap="Code-only request has no legal start_date/offset partition. end_date can filter an actually observed stock/report-period pair. Supplemental period jobs do not partition or complete the code-only parent: the period inventory is incomplete, and capped parents or individual periods remain blocked.",
     identity_gap="Same name/title across periods or revisions is not a globally unique manager; preserve distinct source rows and avoid inferring individual identity or an exhaustive payroll census.",
 )
 for _api in ("stk_auction_o", "stk_auction_c"):
@@ -294,6 +295,37 @@ def _starts(config, enabled):
     return starts
 
 
+def observed_reward_periods(identifiers):
+    """Return only valid observed code/period pairs; malformed evidence stays a gap."""
+    values = identifiers.get("reward_periods", ())
+    if not isinstance(values, (list, tuple)):
+        raise ValueError("reward_periods must contain source observation records")
+    pairs, invalid = set(), 0
+    for row in values:
+        try:
+            if not isinstance(row, dict) or set(row) != {"ts_code", "end_date"}:
+                raise ValueError("Expected source stock/report-period identity")
+            code = _stocks({"stocks": [row["ts_code"]]})[0]
+            period = row["end_date"]
+            _parse(period)  # Exact valid YYYYMMDD; never substitute ann_date.
+        except (ValueError, TypeError, KeyError):
+            invalid += 1
+            continue
+        pairs.add((code, period))
+    return sorted(pairs), invalid
+
+
+def _reward_recent_requests(stocks, periods):
+    latest = {}
+    for code, period in periods:
+        latest[code] = max(period, latest.get(code, period))
+    for code in sorted(set(stocks) | set(latest)):
+        # Preserve unrestricted discovery even when its local cap is reached.
+        yield {"ts_code": code}
+        if code in latest:
+            yield {"ts_code": code, "end_date": latest[code]}
+
+
 def stock_context_prerequisites(identifiers=None, enabled_apis=None, config=None):
     config = dict(config or {})
     if enabled_apis is not None:
@@ -355,6 +387,20 @@ def stock_context_prerequisites(identifiers=None, enabled_apis=None, config=None
                     "universe_complete": False,
                 }
             )
+    if "stk_rewards" in enabled:
+        periods, invalid = observed_reward_periods(identifiers or {})
+        gaps.append(
+            {
+                "api_name": "stk_rewards",
+                "dependencies": [],
+                "reason": "observed_period_inventory_unverified",
+                "observed_pairs": len(periods),
+                "invalid_period_identities": invalid,
+                "period_inventory_complete": False,
+                "parent_saturation_resolved": False,
+                "detail": "Only actual stk_rewards code/end_date pairs supplement discovery; neither returned periods nor successful single-period requests certify the unbounded parent or revisions to older periods.",
+            }
+        )
     return gaps
 
 
@@ -370,7 +416,7 @@ def _params(api, begin, end):
 
 
 def iter_stock_context_jobs(config, today, identifiers=None):
-    """Fair exact source dates; rewards refresh unbounded code history once/epoch."""
+    """Fair source dates; rewards preserve discovery plus observed-period supplements."""
     if isinstance(today, datetime):
         today = today.date()
     if not isinstance(today, date):
@@ -384,6 +430,11 @@ def iter_stock_context_jobs(config, today, identifiers=None):
         if "stk_rewards" in enabled
         else []
     )
+    reward_periods = (
+        observed_reward_periods(identifiers or {})[0]
+        if "stk_rewards" in enabled
+        else []
+    )
     recent = today - timedelta(days=6)
     epoch = str(config.get("planning_epoch", today.strftime("%Y%m%d")))
     for history in (False, True):
@@ -391,8 +442,13 @@ def iter_stock_context_jobs(config, today, identifiers=None):
         for api in enabled:
             start = starts[api]
             if api == "stk_rewards":
-                if not history:
-                    streams[api] = ({"ts_code": code} for code in stocks)
+                if history:
+                    streams[api] = (
+                        {"ts_code": code, "end_date": period}
+                        for code, period in reward_periods
+                    )
+                else:
+                    streams[api] = iter(_reward_recent_requests(stocks, reward_periods))
             elif not history:
                 streams[api] = iter(_params(api, max(start or recent, recent), today))
             elif start and start < recent:

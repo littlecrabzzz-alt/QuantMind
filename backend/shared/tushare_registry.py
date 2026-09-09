@@ -362,7 +362,7 @@ STOCK_CONTEXT_RUNTIME_CONTRACTS = {
     api: {
         **spec,
         "group": "stock_context",
-        "dependencies": ["stock_context_stocks"] if spec.get("dependencies") else [],
+        "dependencies": [{"stocks": "stock_context_stocks", "reward_periods": "stock_context_reward_periods"}[dep] for dep in spec.get("dependencies", [])],
         "saturation_fallback": "stock_context_stocks",
         "saturation_dependencies": ["stock_context_stocks"],
     }
@@ -378,7 +378,10 @@ STOCK_CONTEXT_RUNTIME_CONTRACTS["stk_ah_comparison"]["namespace_note"] = (
 
 
 def _stock_context_identifiers(identifiers):
-    return {"stocks": identifiers.get("stock_context_stocks", [])}
+    return {
+        "stocks": identifiers.get("stock_context_stocks", []),
+        "reward_periods": identifiers.get("stock_context_reward_periods", []),
+    }
 
 
 def stock_context_runtime_prerequisites(identifiers, config=None):
