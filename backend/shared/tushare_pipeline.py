@@ -521,7 +521,7 @@ class Pipeline:
         )
         return key
 
-    def records(self, result):
+    def records(self, result, *, fields=None):
         if not result or "object_sha256" not in result:
             return []
         # Complete HTTP error bodies are immutable evidence, never market rows.
@@ -541,10 +541,27 @@ class Pipeline:
             (self.root / "objects" / (result["object_sha256"] + ".json")).read_bytes()
         )
         data = payload.get("data") or {}
-        return [
-            dict(zip(data.get("fields", []), row, strict=True))
-            for row in data.get("items", [])
-        ]
+        if fields is None:
+            return [
+                dict(zip(data.get("fields", []), row, strict=True))
+                for row in data.get("items", [])
+            ]
+        source_fields = data.get("fields", [])
+        # Last duplicate wins, exactly as dict(zip(...)). Validate every field's
+        # hashability even when it is not requested by discovery.
+        positions = {name: index for index, name in enumerate(source_fields)}
+        selected = [(name, index) for name, index in positions.items() if name in fields]
+        rows = []
+        for row in data.get("items", []):
+            if not isinstance(row, list) or len(row) != len(source_fields):
+                # Preserve strict row-length errors and legacy non-array behavior.
+                complete = dict(zip(source_fields, row, strict=True))
+                rows.append(
+                    {name: value for name, value in complete.items() if name in fields}
+                )
+            else:
+                rows.append({name: row[index] for name, index in selected})
+        return rows
 
     def normalize(self, result):
         import pyarrow as pa
@@ -923,6 +940,14 @@ class Pipeline:
             etfs=set(),
             bse_new_codes=set(),
         )
+        # All columns used below, including cross-market/member discovery. Raw
+        # JSON is still fully decoded; only temporary row dictionaries narrow.
+        discovery_fields = frozenset(
+            (
+                "ts_code", "index_code", "level", "fut_code", "o_code", "n_code",
+                "name", "hm_name", "l1_code", "l2_code", "l3_code", "con_code",
+            )
+        )
         placeholders = ",".join("?" for _ in families)
         seen = set()
         discovery = {"results": 0, "duplicate_bodies": 0, "bypassed": 0, "body_reads": 0}
@@ -974,7 +999,7 @@ class Pipeline:
                 seen.add(key)
             discovery["bypassed"] += int(bypass)
             discovery["body_reads"] += int(bool(eligible))
-            for record in self.records(saved):
+            for record in self.records(saved, fields=discovery_fields):
                 if saved["api_name"] == "ci_index_member":
                     for field in ("l1_code", "l2_code", "l3_code"):
                         value = record.get(field)
