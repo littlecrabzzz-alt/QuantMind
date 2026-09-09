@@ -388,3 +388,13 @@
 - 标准Mac镜像已验证33a0版289769文件，本轮新增6652。随后同cf01历史固定版离线查询通过，不能把较新云cb015198启用版误称已镜像。RRG40于06:04附近为36done/4pending、195339来源行，40任务身份与优先级0异常；本轮该检查不冒充完整raw/Parquet/全窗口验收。
 - 下一步并行：分钟7纯合同bd197c8已合入父候选de8e8eb，58字段/5频率，父Python3.10八测试0.007秒通过，runtime准备中，未部署/请求；因子值转向显式code-only规划，复用已验证195行证据，不为缺factor_list而放弃可用值，也不伪造STK目录/公式；发现缓存完成固定小实验但尚未上线，继续测完整本地工作集和实际workerRSS。
 - 全263基线+13发现、全部历史/修订/原文附件与RRG/PIT准入仍未完成。协调记录和实际receipt是接续依据，未完成工作不因单批通过而删除。
+
+
+## 2026-09-09 14:29 下一分钟/因子候选与RRG40采集完成
+
+- 本批已验收台账与21条接续记录合入master/GitHub876386e；双端handoff首轮仅因源同步尚未追平拒绝，随后4793文件逐项diff为空才重试成功，digest96141b0cbc2bf08cd14646ce42b6158be660c44b9a36669e78936970cbb5c4cf，云Git同876386e；未重启服务。证据/tmp/calendar-member-closure-handoff-retry.json。
+- 父候选792db04（text def23cb）+17b6c88（structured96ec42e）：factor_value显式code_only、实际stock依赖与mode签名；分钟7登记及秒级reader/namespace/freq/来源发现接线。候选212采集接口/218读取dataset，生产仍205/211、分钟默认关闭。父实际Python3.10完整623 tests/32.462秒通过（/tmp/tushare-minute-factor-parent-full310.log），尚未同步新运行代码或启用。
+- 一次实际factor_value范围请求000001.SZ/20260901–04返回780行，前3日期真实存在，末日195行与原12样本中0904逐列多重集相等、缺列/过滤错误0。原12报告SHA保持，独立报告validation/factor-value-range-probe.json；本次未发布，固定reader和月窗仍未验证。helper dcd9f77f…026a851，父17tests通过，原共享锁等135.953秒后执行1调用，未暂停消费者或改变频控。
+- RRG40只读postcheck现已40done/0pending、40sample_ok、217026来源行、40身份/优先级0issue；当前指针c9736769…4a266。完整40原文/Parquet/同版reader/as_of及Mac闭包已转structured优先验收，未把队列完成当成完整RRG输入/策略准入。
+- 缓存扩展实验在固定Mac33a0全部80517观察范围选18026发现来源：64MiB缓存贡献50.97MiB、热6.519→3.809秒；32MiB有界热6.534→4.788秒，两者ID SHA一致。镜像观察集合不是liveDB来源全集，云worker历史峰接近1GiB；仍不部署缓存。/tmp/tushare-compact-full/handoff.md保留边界与失败测量。
+- 并行待交：分钟7实际来源+有限helper；仅factor_value的code_only启用helper；eco/idx有限分片/宽窗探测helper。eco旧raw.country混有economic_activity等类别字符串，语义待核、不改原文。263+13和全部历史/修订/附件/PIT目标不变。

@@ -465,11 +465,11 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Pure historical-minute contracts prepared; integrate runtime with full timestamp/frequency identity and real asset-family discovery, then bounded actual entitlement and endpoint-semantic probes. No production minute requests yet.",
+      "next_action": "Runtime candidate and fixed second-precision reader passed parent Python3.10 full623 tests. Deploy only after batch review; then bounded actual minute entitlements/time/frequency/source checks. No minute production requests or auto activation yet.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
-        "candidate_commit": "de8e8eb",
+        "candidate_commit": "17b6c88",
         "reviewed_field_count": 8,
         "hidden_fields": [],
         "frequencies": [
@@ -479,12 +479,13 @@
           "30min",
           "60min"
         ],
-        "contract_only": true,
+        "contract_only": false,
         "production_registered": false,
         "actual_permission_probed": false,
         "automatically_enabled": false,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "runtime_document": "docs/tushare-history-minutes-runtime.md"
       }
     },
     {
@@ -3555,11 +3556,11 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Pure historical-minute contracts prepared; integrate runtime with full timestamp/frequency identity and real asset-family discovery, then bounded actual entitlement and endpoint-semantic probes. No production minute requests yet.",
+      "next_action": "Runtime candidate and fixed second-precision reader passed parent Python3.10 full623 tests. Deploy only after batch review; then bounded actual minute entitlements/time/frequency/source checks. No minute production requests or auto activation yet.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
-        "candidate_commit": "de8e8eb",
+        "candidate_commit": "17b6c88",
         "reviewed_field_count": 8,
         "hidden_fields": [],
         "frequencies": [
@@ -3569,12 +3570,13 @@
           "30min",
           "60min"
         ],
-        "contract_only": true,
+        "contract_only": false,
         "production_registered": false,
         "actual_permission_probed": false,
         "automatically_enabled": false,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "runtime_document": "docs/tushare-history-minutes-runtime.md"
       }
     },
     {
@@ -3937,11 +3939,11 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Pure historical-minute contracts prepared; integrate runtime with full timestamp/frequency identity and real asset-family discovery, then bounded actual entitlement and endpoint-semantic probes. No production minute requests yet.",
+      "next_action": "Runtime candidate and fixed second-precision reader passed parent Python3.10 full623 tests. Deploy only after batch review; then bounded actual minute entitlements/time/frequency/source checks. No minute production requests or auto activation yet.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
-        "candidate_commit": "de8e8eb",
+        "candidate_commit": "17b6c88",
         "reviewed_field_count": 8,
         "hidden_fields": [],
         "frequencies": [
@@ -3951,12 +3953,13 @@
           "30min",
           "60min"
         ],
-        "contract_only": true,
+        "contract_only": false,
         "production_registered": false,
         "actual_permission_probed": false,
         "automatically_enabled": false,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "runtime_document": "docs/tushare-history-minutes-runtime.md"
       }
     },
     {
@@ -4093,11 +4096,11 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Pure historical-minute contracts prepared; integrate runtime with full timestamp/frequency identity and real asset-family discovery, then bounded actual entitlement and endpoint-semantic probes. No production minute requests yet.",
+      "next_action": "Runtime candidate and fixed second-precision reader passed parent Python3.10 full623 tests. Deploy only after batch review; then bounded actual minute entitlements/time/frequency/source checks. No minute production requests or auto activation yet.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
-        "candidate_commit": "de8e8eb",
+        "candidate_commit": "17b6c88",
         "reviewed_field_count": 8,
         "hidden_fields": [],
         "frequencies": [
@@ -4107,12 +4110,13 @@
           "30min",
           "60min"
         ],
-        "contract_only": true,
+        "contract_only": false,
         "production_registered": false,
         "actual_permission_probed": false,
         "automatically_enabled": false,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "runtime_document": "docs/tushare-history-minutes-runtime.md"
       }
     },
     {
@@ -4728,11 +4732,11 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Pure historical-minute contracts prepared; integrate runtime with full timestamp/frequency identity and real asset-family discovery, then bounded actual entitlement and endpoint-semantic probes. No production minute requests yet.",
+      "next_action": "Runtime candidate and fixed second-precision reader passed parent Python3.10 full623 tests. Deploy only after batch review; then bounded actual minute entitlements/time/frequency/source checks. No minute production requests or auto activation yet.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
-        "candidate_commit": "de8e8eb",
+        "candidate_commit": "17b6c88",
         "reviewed_field_count": 9,
         "hidden_fields": [],
         "frequencies": [
@@ -4742,12 +4746,13 @@
           "30min",
           "60min"
         ],
-        "contract_only": true,
+        "contract_only": false,
         "production_registered": false,
         "actual_permission_probed": false,
         "automatically_enabled": false,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "runtime_document": "docs/tushare-history-minutes-runtime.md"
       }
     },
     {
@@ -5027,11 +5032,11 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Pure historical-minute contracts prepared; integrate runtime with full timestamp/frequency identity and real asset-family discovery, then bounded actual entitlement and endpoint-semantic probes. No production minute requests yet.",
+      "next_action": "Runtime candidate and fixed second-precision reader passed parent Python3.10 full623 tests. Deploy only after batch review; then bounded actual minute entitlements/time/frequency/source checks. No minute production requests or auto activation yet.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
-        "candidate_commit": "de8e8eb",
+        "candidate_commit": "17b6c88",
         "reviewed_field_count": 9,
         "hidden_fields": [],
         "frequencies": [
@@ -5041,12 +5046,13 @@
           "30min",
           "60min"
         ],
-        "contract_only": true,
+        "contract_only": false,
         "production_registered": false,
         "actual_permission_probed": false,
         "automatically_enabled": false,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "runtime_document": "docs/tushare-history-minutes-runtime.md"
       }
     },
     {
@@ -6066,11 +6072,11 @@
       ],
       "status": "planned",
       "permission_status": "unverified",
-      "next_action": "Pure historical-minute contracts prepared; integrate runtime with full timestamp/frequency identity and real asset-family discovery, then bounded actual entitlement and endpoint-semantic probes. No production minute requests yet.",
+      "next_action": "Runtime candidate and fixed second-precision reader passed parent Python3.10 full623 tests. Deploy only after batch review; then bounded actual minute entitlements/time/frequency/source checks. No minute production requests or auto activation yet.",
       "auto_acquisition": false,
       "contract_evidence": "docs/tushare-history-minutes-intake.md",
       "implementation_evidence": {
-        "candidate_commit": "de8e8eb",
+        "candidate_commit": "17b6c88",
         "reviewed_field_count": 8,
         "hidden_fields": [],
         "frequencies": [
@@ -6080,12 +6086,13 @@
           "30min",
           "60min"
         ],
-        "contract_only": true,
+        "contract_only": false,
         "production_registered": false,
         "actual_permission_probed": false,
         "automatically_enabled": false,
         "history_complete": false,
-        "pit_verified": false
+        "pit_verified": false,
+        "runtime_document": "docs/tushare-history-minutes-runtime.md"
       }
     },
     {
@@ -7499,6 +7506,22 @@
         ],
         "history_complete": false,
         "pit_verified": false
+      },
+      "code_only_candidate": {
+        "pure_commit": "792db04",
+        "runtime_commit": "17b6c88",
+        "mode": "code_only",
+        "dependencies": [
+          "factor_library_stocks"
+        ],
+        "status": "isolated_verified_not_deployed_or_enabled",
+        "source_range_probe": "/data/tushare/validation/factor-value-range-probe.json",
+        "actual_additional_upstream_calls": 1,
+        "source_range_rows": 780,
+        "last_day_rows_equal_to_original": 195,
+        "fixed_range_read_verified": false,
+        "monthly_window_verified": false,
+        "history_complete": false
       }
     },
     {
