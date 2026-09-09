@@ -320,7 +320,7 @@
 11:30补充：market_sentiment纯7也已完成并推送cc0de16，101完整字段、7项离线测试/Ruff通过；与cross_asset_extra6合计13 API/397字段，均仅候选，尚未运行接线或真实权限验证。后续从两分支独立review集成，不扩大生产已启用计数。
 
 
-## 2026-09-09 11:56 下一13接口联合与目录/规划修复候选
+## 2026-09-09 11:52 下一13接口联合与目录/规划修复候选
 
 - 父独立候选合入cross6运行96515d8→bf88123、market_sentiment7运行62c1956→ff8fb26，公共注册/规范化/标的发现/固定reader/镜像接点冲突保留两组。候选192采集API、198读取数据集；仍未生产或启用。完整397字段、4隐藏列，热榜全46变体及market/is_new/hot_type/tag/idx_type身份保持，跨资产namespace隔离并保留全部source列。
 - 修复官方目录parse_document字母起首正则导致的42遗漏列：TDX6、五利率API36。六页重新读取的HTML SHA与旧目录完全相同，确认是本地提取遗漏；利率enqueue实际字段集合改前后相同，因原extra_fields已补足。目录现在完整，TDX已有gap改成已复核note；未来实际响应、历史不因目录成功而判完整。详见tushare-catalog-numeric-fields.md。
