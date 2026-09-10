@@ -3,6 +3,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import sysconfig
 import tempfile
 import unittest
 
@@ -10,13 +11,21 @@ import unittest
 REPO = Path(__file__).resolve().parents[1]
 
 
+def _sitecustomize_source():
+    repo_source = REPO / "docker/litellm_sitecustomize.py"
+    if repo_source.is_file():
+        return repo_source
+    installed_source = Path(sysconfig.get_paths()["purelib"]) / "sitecustomize.py"
+    if installed_source.is_file():
+        return installed_source
+    raise FileNotFoundError("litellm sitecustomize source is unavailable")
+
+
 class LiteLLMSiteCustomizeTests(unittest.TestCase):
     def _startup_value(self, configured=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            shutil.copyfile(
-                REPO / "docker/litellm_sitecustomize.py", root / "sitecustomize.py"
-            )
+            shutil.copyfile(_sitecustomize_source(), root / "sitecustomize.py")
             capture = root / "captured.txt"
             package = root / "litellm/types/llms"
             package.mkdir(parents=True)
