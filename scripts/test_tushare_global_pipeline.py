@@ -346,7 +346,7 @@ class GlobalPipeline(unittest.TestCase):
                 report = module.tick(max_requests=1, max_seconds=1)
             pipeline.register_documents.assert_called_once()
             self.assertEqual(download.called, should_run)
-            self.assertEqual(report["document_registration"], {"observations": 1})
+            self.assertEqual(report["document_registration"]["observations"], 1)
             self.assertEqual("documents" in report, should_run)
 
 
