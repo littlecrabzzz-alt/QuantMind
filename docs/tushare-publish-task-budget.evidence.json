@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "scope": "Tushare acquisition worker publication envelope",
+  "trigger": {
+    "observed_at": "2026-09-10T08:32:44Z",
+    "task_id": "0156e079-290d-4d22-b51a-81f0587e7c87",
+    "failure": "SoftTimeLimitExceeded",
+    "old_soft_time_limit_seconds": 160,
+    "last_measured_publish_stage_seconds": 155.323
+  },
+  "change": {
+    "soft_time_limit_seconds": 300,
+    "hard_time_limit_seconds": 330,
+    "acquisition_budget_unchanged": true,
+    "publication_interval_seconds": 900
+  },
+  "safety": [
+    "The larger Celery envelope covers local fixed-release publication work; tick() retains configured request and wall-clock acquisition bounds.",
+    "The hard limit remains below the publication interval, so a wedged task cannot overlap an unlimited number of scheduled publication attempts.",
+    "The document publication lock remains non-blocking and unchanged."
+  ],
+  "validation": {
+    "status": "candidate_tests_passed",
+    "targeted_tests": 30,
+    "full_python_3_10_tests": 958,
+    "full_python_3_10_skipped": 5,
+    "full_test_log_sha256": "ed515eca35ab04cbae1186fc331f1368920a6d0529f24f37840e52e831b30094",
+    "ruff": "passed",
+    "diff_check": "passed",
+    "production_required": "Cloud worker reload and one successful real fixed publication under 300 seconds"
+  }
+}
