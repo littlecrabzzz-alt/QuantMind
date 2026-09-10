@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "executed_at": "2026-09-10T14:12:50+08:00",
+  "authority": "lzy-vm:/root/data/disk/quantmind/project/data/tushare",
+  "helper_sha256": "dab51cef35f4cd2cb69b995a197ea96ebe023da5002760ef73d5b4057aed09dc",
+  "contract_evidence_sha256": "175ee44d95ef21b2e7f7c424ac594a44a610aee21f09fd3dd9ce5de40666576a",
+  "report_path": "/data/tushare/validation/offcatalog-probe-20260910/probe.json",
+  "report_sha256": "745925821b4f928cb9baac0c7ae4ee2c34fc16ae2066ded4c02a019941d7c7a2",
+  "planned_max_upstream_calls": 11,
+  "actual_upstream_calls": 8,
+  "deadline_seconds": 120,
+  "stop_reason": null,
+  "configuration_changed": false,
+  "automatic_activation_permitted": false,
+  "shared_raw_object_sha256": "f8f00c12283dbb2123ccee6f5afb59063d2fed51e47acfc2a1812e933c6b164b",
+  "supplier_response_code": 40101,
+  "classification": "supplier_rejected_api_name",
+  "results": [
+    {"api_name": "film_record", "status": "api_error", "observation_sha256": "16d851d0df54ab6ef244b8017054f7bd7b837c9c27f893564a1628d937f12fc1"},
+    {"api_name": "teleplay_record", "status": "api_error", "observation_sha256": "fd4180943818df0f1c4b8d0e92b7f8a21226c424115ba24d7ad1cef30075a292"},
+    {"api_name": "bo_monthly", "status": "api_error", "observation_sha256": "93663586eca858a5b55c16878ed491145fab476f50bea73559667762ff722394"},
+    {"api_name": "bo_weekly", "status": "api_error", "observation_sha256": "d0535c4503e3b06690cfde92a49bb209f9697afc1647d9307e9a70bec0e429fb"},
+    {"api_name": "bo_daily", "status": "api_error", "observation_sha256": "28561899da89efd4b0be7f19d6e7c5495c69b381c8b407a63afcd2cb63de3f41"},
+    {"api_name": "bo_cinema", "status": "api_error", "observation_sha256": "7fa666c9a4d91ce82e43a1bd6abf63f6b2512d4526aaf8bd1cb7d119fac14f5c"},
+    {"api_name": "fund_sales_ratio", "status": "api_error", "observation_sha256": "5034ded3e814d107848704eba6d90b660a35515d38c46ebb920b39d7a07e8761"},
+    {"api_name": "fund_sales_vol", "status": "api_error", "observation_sha256": "e57b2944bac901485925898ce2d1c3d889de7186125251da27717b670c2ffa13"}
+  ],
+  "decision": "Keep all eight contracts registered and disabled. The sampled provider endpoint rejected every reviewed API name; this is neither a permission denial nor evidence that historical data never existed.",
+  "sensitive_data_included": false
+}
