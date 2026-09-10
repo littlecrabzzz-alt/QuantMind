@@ -1,0 +1,130 @@
+{
+  "benchmark_timeout_ms": 200,
+  "claim_schema_migration_seconds": 0.2933165831491351,
+  "connection_defaults": {
+    "busy_timeout": 10000,
+    "journal_mode": "delete",
+    "locking_mode": "normal",
+    "read_uncommitted": 0,
+    "synchronous": 2
+  },
+  "database_bytes": 319303680,
+  "python": "3.10.19",
+  "rows": 1000000,
+  "scenarios": {
+    "after_long_writer_release": {
+      "claims": 1,
+      "seconds": 0.0017819579225033522,
+      "status": "ok",
+      "timing": {
+        "claim_db_calls": 1,
+        "claim_db_total_seconds": 0.0017692078836262226,
+        "claim_db_wait_seconds": 1.4292076230049133e-05
+      },
+      "value": [
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ]
+    },
+    "finish_after_reader_release": {
+      "attempts": 1,
+      "claims": 0,
+      "seconds": 0.0016763750463724136,
+      "state": [
+        "downloaded",
+        1
+      ],
+      "status": "ok",
+      "timing": {
+        "finish_db_calls": 1,
+        "finish_db_total_seconds": 0.0016504998784512281,
+        "finish_db_wait_seconds": 2.7792062610387802e-05
+      },
+      "value": null
+    },
+    "finish_long_reader": {
+      "attempts_after_error": 0,
+      "claim_preserved": 1,
+      "error": "database is locked",
+      "error_type": "OperationalError",
+      "seconds": 0.23156554182060063,
+      "state_after_error": [
+        "pending",
+        0
+      ],
+      "status": "error",
+      "timing": {
+        "finish_db_calls": 1,
+        "finish_db_total_seconds": 0.23153937491588295,
+        "finish_db_wait_seconds": 3.195810131728649e-05
+      }
+    },
+    "long_audit_reader": {
+      "claims_after_error": 0,
+      "error": "database is locked",
+      "error_type": "OperationalError",
+      "in_transaction_after_error": false,
+      "seconds": 0.24962566699832678,
+      "status": "error",
+      "timing": {
+        "claim_db_calls": 1,
+        "claim_db_total_seconds": 0.24961220799013972,
+        "claim_db_wait_seconds": 5.083158612251282e-06
+      }
+    },
+    "long_writer": {
+      "claims_after_error": 0,
+      "error": "database is locked",
+      "error_type": "OperationalError",
+      "seconds": 0.2543045000638813,
+      "status": "error",
+      "timing": {
+        "claim_db_calls": 1,
+        "claim_db_total_seconds": 0.2542928750626743,
+        "claim_db_wait_seconds": 0.25427966588176787
+      }
+    },
+    "short_audit_reader": {
+      "claims": 1,
+      "seconds": 0.06753629189915955,
+      "status": "ok",
+      "timing": {
+        "claim_db_calls": 1,
+        "claim_db_total_seconds": 0.06752908299677074,
+        "claim_db_wait_seconds": 1.0832911357283592e-05
+      },
+      "value": [
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ]
+    },
+    "short_writer": {
+      "claims": 1,
+      "seconds": 0.07576037500984967,
+      "status": "ok",
+      "timing": {
+        "claim_db_calls": 1,
+        "claim_db_total_seconds": 0.07574195903725922,
+        "claim_db_wait_seconds": 0.07336966693401337
+      },
+      "value": [
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ]
+    },
+    "wal_long_reader": {
+      "claims": 1,
+      "journal_mode": "wal",
+      "seconds": 0.00048325001262128353,
+      "status": "ok",
+      "timing": {
+        "claim_db_calls": 1,
+        "claim_db_total_seconds": 0.0004782499745488167,
+        "claim_db_wait_seconds": 5.624955520033836e-06
+      },
+      "value": [
+        "0000000000000000000000000000000000000000000000000000000000000001"
+      ],
+      "wal_bytes": 12392
+    }
+  },
+  "setup_seconds": 1.4886454578954726,
+  "sqlite": "3.50.4"
+}
