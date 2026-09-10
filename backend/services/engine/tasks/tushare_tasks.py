@@ -2,8 +2,84 @@
 
 import json
 import shutil
+from datetime import datetime
 
 from backend.services.engine.qlib_app.celery_config import celery_app
+
+
+DISK_RESERVE_BYTES = 100 * 2**30
+DISK_WARNING_HEADROOM_BYTES = 40 * 2**30
+DISK_TREND_MIN_SECONDS = 30 * 60
+DISK_TREND_WARNING_HOURS = 72
+
+
+def _disk_capacity_report(*, free_bytes, observed_at, previous=None):
+    """Summarize the document volume without exposing paths or credentials."""
+    baseline_at = observed_at
+    baseline_free = free_bytes
+    if isinstance(previous, dict):
+        baseline_at = previous.get("baseline_observed_at", observed_at)
+        baseline_free = previous.get("baseline_free_bytes", free_bytes)
+    try:
+        elapsed = (
+            datetime.fromisoformat(observed_at) - datetime.fromisoformat(baseline_at)
+        ).total_seconds()
+        if elapsed < 0 or isinstance(baseline_free, bool):
+            raise ValueError
+        baseline_free = int(baseline_free)
+    except (TypeError, ValueError):
+        baseline_at, baseline_free, elapsed = observed_at, free_bytes, 0.0
+
+    headroom = free_bytes - DISK_RESERVE_BYTES
+    consumed_per_hour = (
+        max(0.0, (baseline_free - free_bytes) * 3600 / elapsed)
+        if elapsed >= DISK_TREND_MIN_SECONDS
+        else None
+    )
+    hours_to_reserve = (
+        max(0.0, headroom) / consumed_per_hour if consumed_per_hour else None
+    )
+    reasons = []
+    if free_bytes < DISK_RESERVE_BYTES:
+        status = "blocked"
+        reasons.append("below_reserve")
+    else:
+        status = "healthy"
+        if headroom < DISK_WARNING_HEADROOM_BYTES:
+            status = "warning"
+            reasons.append("low_headroom")
+        if hours_to_reserve is not None and hours_to_reserve < DISK_TREND_WARNING_HOURS:
+            status = "warning"
+            reasons.append("reserve_within_72h_at_observed_trend")
+    return {
+        "status": status,
+        "free_bytes": free_bytes,
+        "reserve_bytes": DISK_RESERVE_BYTES,
+        "headroom_bytes": headroom,
+        "warning_headroom_bytes": DISK_WARNING_HEADROOM_BYTES,
+        "observed_at": observed_at,
+        "baseline_observed_at": baseline_at,
+        "baseline_free_bytes": baseline_free,
+        "trend_window_seconds": round(elapsed, 3),
+        "consumption_bytes_per_hour": (
+            round(consumed_per_hour, 3) if consumed_per_hour is not None else None
+        ),
+        "projected_hours_to_reserve": (
+            round(hours_to_reserve, 3) if hours_to_reserve is not None else None
+        ),
+        "warning_reasons": reasons,
+    }
+
+
+def _previous_disk_capacity(status_path):
+    try:
+        status = json.loads(status_path.read_bytes())
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(status, dict):
+        return None
+    capacity = status.get("disk_capacity")
+    return capacity if isinstance(capacity, dict) else None
 
 
 def _document_config():
@@ -78,9 +154,19 @@ def tushare_documents():
     from backend.shared.tushare_pipeline import ROOT, atomic_json, utc_now
 
     config = _document_config()  # Authority check precedes every read/write.
+    capacity = None
+    free_bytes = None
+    if config is not None:
+        observed_at = utc_now()
+        free_bytes = shutil.disk_usage(ROOT).free
+        capacity = _disk_capacity_report(
+            free_bytes=free_bytes,
+            observed_at=observed_at,
+            previous=_previous_disk_capacity(ROOT / "document-worker-status.json"),
+        )
     if config is None:
         report = {"status": "disabled", "processed": 0}
-    elif shutil.disk_usage(ROOT).free < 100 * 2**30:
+    elif free_bytes < DISK_RESERVE_BYTES:
         report = {"status": "blocked_disk_reserve", "processed": 0}
     else:
         count = config.get("document_worker_max_documents", 100)
@@ -110,10 +196,13 @@ def tushare_documents():
                 {
                     "status": "worker_failed",
                     "error_type": type(exc).__name__,
+                    "disk_capacity": capacity,
                     "updated_at": utc_now(),
                 },
             )
             raise
+    if capacity is not None:
+        report["disk_capacity"] = capacity
     report = {**report, "updated_at": utc_now()}
     if ROOT.is_dir():
         atomic_json(ROOT / "document-worker-status.json", report)

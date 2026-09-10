@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-10T11:02:51Z",
+  "authority": "lzy-vm:/root/data/disk/quantmind/project/data/tushare",
+  "deployed_revision": "3615bebae57d7e5fa9d6ae2a789433b267304d7b",
+  "read_only_window": {
+    "started_at": "2026-09-10T09:01:11Z",
+    "completed_document_tasks": 34,
+    "successful_document_tasks": 34,
+    "database_locked": 0,
+    "task_failures": 0,
+    "soft_timeouts": 0,
+    "hard_timeouts": 0,
+    "processed_stages": 1956,
+    "download_stages": 1059,
+    "parse_stages": 897,
+    "active_stages_per_hour": 2291.025,
+    "wall_stages_per_hour": 986.427,
+    "tasks_hitting_100_before_80_seconds": 2,
+    "successful_publications": 5,
+    "publication_seconds": [
+      188.692,
+      193.257,
+      203.495,
+      220.482,
+      243.842
+    ]
+  },
+  "queue_delta": {
+    "baseline_documents": 1103148,
+    "observed_documents": 1111054,
+    "registered": 7906,
+    "parsed": 841,
+    "pending": 6891,
+    "observed_pending": 1087353
+  },
+  "capacity": {
+    "volume_total_bytes": 528239599616,
+    "free_bytes": 154367193088,
+    "reserve_bytes": 107374182400,
+    "headroom_bytes": 46993010688,
+    "headroom_gib": 43.766,
+    "free_change_from_window_start_bytes": -2931281920,
+    "existing_pipeline_status_exposes_capacity": false,
+    "existing_document_status_exposes_capacity": false,
+    "generic_engine_health_exposes_tushare_capacity": false
+  },
+  "decision": {
+    "increase_document_stage_cap": false,
+    "reason": "Only 2 of 34 tasks hit the 100-stage cap before 80 seconds, below the predeclared 20 percent gate.",
+    "candidate_scope": "Add non-secret capacity headroom and long-window trend warning fields to the existing document worker status; do not change scheduling, concurrency, upstream access or production state."
+  },
+  "sensitive_content": {
+    "token": false,
+    "payment_or_order": false,
+    "upstream_response_body": false,
+    "document_url_or_text": false
+  }
+}
