@@ -283,7 +283,9 @@ class RewardAppend(unittest.TestCase):
             row = observer.execute(
                 "SELECT offset,done FROM planning_state WHERE name=?", (SCOPE,)
             ).fetchone()
-            self.assertEqual(row, (2, 0))  # Budget boundary; next round can mark done.
+            self.assertEqual(
+                row, (2, 1)
+            )  # One existing ID does not consume new-job budget.
             pairs = {
                 json.loads(r[0])["params"]["end_date"]
                 for r in observer.execute(
@@ -293,6 +295,108 @@ class RewardAppend(unittest.TestCase):
             self.assertEqual(pairs, {"20201231", "20251231"})
         for name, state in old_states.items():
             self.assertEqual(self.state(name), state)
+
+    def seed_period_jobs(self, total, existing):
+        # Distinct synthetic observed codes share a valid completed report period.
+        pairs = [
+            {"ts_code": f"{n:06d}.SZ", "end_date": "20251231"}
+            for n in range(1, total + 1)
+        ]
+        for params in pairs[:existing]:
+            self.p.enqueue("stk_rewards", params, 55, "history")
+        self.p.db.commit()
+        ids = identifiers([])
+        ids["stock_context_reward_periods"] = pairs
+        return ids
+
+    def test_624_pairs_skip_524_existing_and_append_last_100_in_one_round(self):
+        ids = self.seed_period_jobs(624, 524)
+        original = [
+            tuple(r) for r in self.p.db.execute("SELECT * FROM jobs ORDER BY id")
+        ]
+        with patch.dict(module.PLANNERS, {}, clear=True):
+            result = self.plan(ids, {**CONFIG, "plan_jobs_per_tick": 500})[SCOPE]
+        self.assertEqual(
+            (result["new_jobs"], result["existing_jobs"], result["planned"]),
+            (100, 524, 624),
+        )
+        self.assertTrue(result["done"])
+        self.assertEqual(result["stop_reason"], "stream_end")
+        self.assertEqual(self.state(SCOPE)["offset"], 624)
+        self.assertEqual(len(self.pairs()), 624)
+        for row in original:
+            self.assertEqual(
+                tuple(
+                    self.p.db.execute(
+                        "SELECT * FROM jobs WHERE id=?", (row[0],)
+                    ).fetchone()
+                ),
+                row,
+            )
+
+    def test_all_existing_reaches_stream_end_without_spending_new_job_budget(self):
+        ids = self.seed_period_jobs(624, 624)
+        with patch.dict(module.PLANNERS, {}, clear=True):
+            result = self.plan(ids, {**CONFIG, "plan_jobs_per_tick": 500})[SCOPE]
+        self.assertEqual((result["new_jobs"], result["existing_jobs"]), (0, 624))
+        self.assertEqual(result["stop_reason"], "stream_end")
+        self.assertTrue(result["done"])
+        with patch.dict(module.PLANNERS, {}, clear=True):
+            self.assertNotIn(
+                SCOPE, self.plan(ids, {**CONFIG, "plan_jobs_per_tick": 500})
+            )
+
+    def test_existing_prefix_then_more_than_500_new_resumes_at_exact_offset(self):
+        ids = self.seed_period_jobs(1125, 524)
+        config = {**CONFIG, "plan_jobs_per_tick": 2000}
+        with patch.dict(module.PLANNERS, {}, clear=True):
+            first = self.plan(ids, config)[SCOPE]
+        self.assertEqual((first["new_jobs"], first["existing_jobs"]), (500, 524))
+        self.assertEqual(self.state(SCOPE)["offset"], 1024)
+        self.assertFalse(first["done"])
+        self.p.close()
+        self.p = module.Pipeline(self.root, self.p.catalog)
+        self.addCleanup(self.p.close)
+        with patch.dict(module.PLANNERS, {}, clear=True):
+            second = self.plan(ids, config)[SCOPE]
+        self.assertEqual(second["new_jobs"], 101)
+        self.assertEqual(self.state(SCOPE)["offset"], 1125)
+        self.assertTrue(second["done"])
+        self.assertEqual(len(self.pairs()), 1125)
+
+    def test_existing_ids_still_stop_at_scan_and_elapsed_time_bounds(self):
+        ids = self.seed_period_jobs(624, 624)
+        config = {**CONFIG, "plan_jobs_per_tick": 500}
+        with patch.dict(module.PLANNERS, {}, clear=True):
+            result = self.plan(ids, {**config, "history_plan_scan_limit": 200})[SCOPE]
+        self.assertEqual((result["new_jobs"], result["existing_jobs"]), (0, 200))
+        self.assertEqual(result["stop_reason"], "scan_limit")
+        self.assertEqual(self.state(SCOPE)["offset"], 200)
+        self.assertFalse(result["done"])
+        clock = {"seconds": 0.0}
+        original_enqueue = self.p.enqueue
+
+        def timed_enqueue(*args, **kwargs):
+            result = original_enqueue(*args, **kwargs)
+            clock["seconds"] += 0.6
+            return result
+
+        with (
+            patch.dict(module.PLANNERS, {}, clear=True),
+            patch.object(self.p, "enqueue", side_effect=timed_enqueue),
+            patch.object(
+                module.time, "monotonic", side_effect=lambda: clock["seconds"]
+            ),
+        ):
+            result = self.plan(ids, {**config, "history_plan_seconds": 1.0})[SCOPE]
+        self.assertEqual((result["new_jobs"], result["existing_jobs"]), (0, 2))
+        self.assertEqual(result["stop_reason"], "time_limit")
+        self.assertEqual(self.state(SCOPE)["offset"], 202)
+        self.assertFalse(result["done"])
+        with patch.dict(module.PLANNERS, {}, clear=True):
+            result = self.plan(ids, config)[SCOPE]
+        self.assertTrue(result["done"])
+        self.assertEqual(result["existing_jobs"], 422)
 
 
 if __name__ == "__main__":

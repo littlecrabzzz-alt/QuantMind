@@ -85,7 +85,7 @@ PYTHONPATH=scripts:. python -m unittest test_tushare_stock_context_invalid_ident
 
 候选基线8193d14，复用既有 `APPEND_PLANNERS` 和版本JSON快照，新增内部规划行 `history:stock_rewards_periods`。它只含实际已观察合法 code/end_date，不复制股票全集；只在stock_context启用、明确选择stk_rewards且家族校验通过时执行，不引入新的配置开关或采集family。复用原纯planner及字段契约，只保留其history补采，任务仍属stock_context、priority55、epoch=history，与原规划路径生成完全相同的ID。
 
-每轮最多 `min(plan_jobs_per_tick,500)` 次幂等入队尝试，沿用history扫描/时间预算。新发现不会打断未完成的有限快照；完成后再按最新发现刷新。已有期间任务不改，重启从SQLite offset继续，时间预算耗尽保留未完成状态。原stock_context recent/history照常推进、签名和游标不重置；code-only发现、原quality父与未知期间全集缺口保留。仅新增一个紧凑pair快照，未来大规模发现仍有有限轮次延迟和单次迭代的协作式时间边界，不能承诺秒级追平。
+每轮最多 `min(plan_jobs_per_tick,500)` 个新增任务；已存在ID不占新增预算，但继续计入history扫描/时间预算。新发现不会打断未完成的有限快照；完成后再按最新发现刷新。已有期间任务不改，重启从SQLite offset继续，时间预算耗尽保留未完成状态。原stock_context recent/history照常推进、签名和游标不重置；code-only发现、原quality父与未知期间全集缺口保留。仅新增一个紧凑pair快照，未来大规模发现仍有有限轮次延迟和单次迭代的协作式时间边界，不能承诺秒级追平。
 
 专项命令：`PYTHONPATH=scripts:. python -m unittest test_tushare_rewards_period_append test_tushare_stock_context_invalid_identifiers test_tushare_rewards_observed_periods test_tushare_stock_context_pipeline test_tushare_planning_progress test_tushare_history_budget test_tushare_member_append_scope`。Python3.10共53项/1.846秒通过；隔离临时SQLite、MockTransport，socket/DNS/secret getter禁用。覆盖原快照未完即可追加、持续新增不饥饿、进程重开、稳定身份与父任务保持、关闭/未选/校验失败0追加、500上限及时间预算恢复。候选未部署、未改生产配置或队列，没有上游请求。
 
@@ -98,3 +98,10 @@ PYTHONPATH=scripts:. python -m unittest test_tushare_stock_context_invalid_ident
 新增两项回退对照：恢复旧末尾顺序时两项均失败；新顺序验证其余家族顺序保持，以及后续普通家族模拟耗时161秒并抛错后，通过独立SQLite只读连接确认追加任务和offset已经提交，原recent/history游标逐字段不变。专项55项/1.626秒通过，日志 `/tmp/rewards-append-first-target310.log`；旧顺序复现 `/tmp/rewards-append-first-before310.log`。全部隔离，不操作生产。
 
 优先级修复完整Python3.10回归865项/43.108秒通过，`OK (skipped=5)`，日志 `/tmp/rewards-append-first-full310.log`；Ruff与diff检查通过。
+
+
+### 已存在期间不占新增预算
+
+生产观察624合法组合中524已计划，旧实现按attempted收500，前500全部existing时错过新尾部。基线a22f1079的最小修复仅stock_rewards_periods按inserted计预算；其他family仍按原attempted/count。624/524existing夹具在扫描/时间预算允许时一轮新增100并stream_end；624全existing一轮done，不空转；524existing+601new第一轮只500new、offset1024，进程重开后补101。已有任务逐行不变，scan200与模拟1秒预算均按原机制停止并可恢复。任何单次同步next/enqueue仍是既有协作式时间边界，不保证总墙钟硬截止；不放宽数据完整性或原父饱和缺口。
+
+专项Python3.10共59项/1.732秒通过，日志 `/tmp/rewards-new-budget-target310.log`；未发上游或改生产。本轮只改预算条件和必要测试/说明。
