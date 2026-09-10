@@ -735,3 +735,11 @@
 - 公告第1批90.674秒完成221次调用：219项返回2000行上限并进入`split_pending`，1项empty，140项保持pending；共1313650行。220次HTTP 200，另1次`ReadTimeout`按可重试pending保存且没有写入部分payload。第一次操作员验收脚本把这类pending误当成必须0尝试，原失败闭包保留；语义修正后的不可覆盖v2闭包逐文件核验220个object、220个observation和219个Parquet，验证错误0。
 - 本轮三批合计941次上游调用、940次HTTP 200、0次429、1次可重试传输超时，runner时间合计178.626秒、返回1574777行；941个调用对应的940个完整object/observation和931个Parquet物理SHA均通过。专用worker和Beat已恢复healthy，worker 2GiB、restart0、OOM false，`tushare_acquire`消费恢复并接收新任务。
 - 当前authority为106420995288字节，云盘可用141094637568字节，高于107374182400字节硬停线；Mac镜像93203988480字节。本轮三批尚未进入下一小时固定版或Mac镜像，保留`history_complete=false`、历史修订/PIT未完成和`rrg_status=blocked_data`。机器证据为`docs/tushare-publication-announcement-wave2-20260911.evidence.json`。
+
+## 2026-09-11 06:51 第三次精确波次与容器启动隔离
+
+- 再次排空专用队列后冻结三份互不重叠的不可变清单。基金行情第4批覆盖20171018—20180711的180个共同SSE交易日，`fund_daily`、`fund_adj`各180项，44.548秒内360项全部done，返回243322行；分红第3批按SH 124、SZ 124、BJ 112固定360只股票，44.541秒内360项全部done，返回17487行。
+- 公告第2批从585个未尝试叶中固定360项，90.303秒完成242次调用：239 `split_pending`、2 `done`、118项尚未开始、1项`blocked`，共1442455行。blocked项HTTP 200返回6000行，原始object/observation和两个日期二分子任务均已保存，只在90秒边界的规范化阶段超时，因此没有声称Parquet成功，也不作为上游权限、频率或数据丢失故障。
+- 三批合计962次调用全部HTTP 200、0次429、1703264行；逐实体验证962个object、962个observation和961个Parquet SHA，错误0。三份权威闭包SHA分别为`d0a2cedfa212e346bddc6ac38bf0dd79b05fd4d7ae326e9ac652f658cb8b4cf8`、`39e8cc1b4276b8a1ee4856efdd00ffda46d7d43f9602a0d7da946f3662ccea7c`、`373495ee992a9fe3f89c6dcc08844e406e58fd21103d809555772ccf8d23076a`。
+- 运行时检查发现所有Python进程在用户代码前导入LiteLLM，并默认尝试下载模型费用表，给断网plan-only带来无关的约10秒等待。`ffe883a6`在导入前默认设置`LITELLM_LOCAL_MODEL_COST_MAP=True`并允许显式覆盖；`1fe6ee08`让同一测试兼容仓库与容器安装路径。Mac主机、Mac容器、云端生产容器各2项通过，真实云端公告plan-only约5.01秒且不再出现远程费用表警告。
+- Mac、GitHub和云端源码已对齐`1fe6ee08`，专用worker与Beat恢复healthy，restart0、OOM false。authority当前约106924476093字节，云盘可用140415729664字节，高于100GiB硬停线。`CURRENT.json`仍为`data-051d825b…`，第二、第三波次都等待正常小时发布和Mac单向镜像；`history_complete=false`、修订/PIT未验证、RRG继续`blocked_data`。机器证据为`docs/tushare-exact-history-wave3-20260911.evidence.json`。

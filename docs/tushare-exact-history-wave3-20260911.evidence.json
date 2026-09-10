@@ -1,0 +1,186 @@
+{
+  "authority": {
+    "apparent_bytes": 106924476093,
+    "current_release": "data-051d825b3220a2419e8291fcf15d7917eee9547ccb90c67ed8344b925f36c813",
+    "free_bytes_after_wave": 140415729664,
+    "hard_reserve_bytes": 107374182400,
+    "role": "cloud_formal_writer",
+    "worker_health": {
+      "beat": {
+        "health": "healthy",
+        "memory_limit_bytes": 402653184,
+        "oom_killed": false,
+        "restart_count": 0
+      },
+      "tushare_worker": {
+        "health": "healthy",
+        "memory_limit_bytes": 2147483648,
+        "oom_killed": false,
+        "restart_count": 0
+      }
+    }
+  },
+  "boundaries": {
+    "historical_versions_complete": false,
+    "history_complete": false,
+    "next_action": "wait for the normal hourly fixed publication, verify wave 2 and wave 3 inclusion, then run the standard one-way Mac mirror",
+    "pit_verified": false,
+    "rrg_status": "blocked_data",
+    "wave2_in_current_fixed_release": false,
+    "wave3_in_current_fixed_release": false,
+    "wave3_mac_mirror_available": false
+  },
+  "exact_wave3": {
+    "aggregate": {
+      "effective_calls_per_minute_over_runner_time": 321.753,
+      "elapsed_seconds_sum": 179.392,
+      "http_200": 962,
+      "http_429": 0,
+      "objects_verified": 962,
+      "observations_verified": 962,
+      "parquet_verified": 961,
+      "retryable_transport_errors": 0,
+      "rows": 1703264,
+      "tasks_planned": 1080,
+      "upstream_calls": 962
+    },
+    "batches": {
+      "anns_d_batch_2": {
+        "blocked_events": [
+          {
+            "children_created": 2,
+            "http_status": 200,
+            "normalization_error": "TimeoutError",
+            "raw_object_and_observation_preserved": true,
+            "row_count": 6000,
+            "status": "possibly_truncated",
+            "task_id": "8be3e259b2658fed9d52a64d4371945886ef5203e8f50f0610d254e6621b3d28"
+          }
+        ],
+        "closure_sha256": "373495ee992a9fe3f89c6dcc08844e406e58fd21103d809555772ccf8d23076a",
+        "effective_calls_per_minute": 160.792,
+        "elapsed_seconds": 90.303,
+        "eligible_pristine_tasks_before_freeze": 585,
+        "http_429": 0,
+        "manifest_sha256": "b9ccdf34c714a9988755c09c82bac6208525eb32705ca81e4bcd3e4ae542c370",
+        "reference_occurrences": {
+          "object": 242,
+          "observation": 242,
+          "parquet": 241
+        },
+        "result_statuses": {
+          "possibly_truncated": 240,
+          "sample_ok": 2
+        },
+        "rows": 1442455,
+        "rows_by_api": {
+          "anns_d": 1442455
+        },
+        "states": {
+          "blocked": 1,
+          "done": 2,
+          "pending": 118,
+          "split_pending": 239
+        },
+        "status": "verified_partial_time_budget",
+        "task_inventory_sha256": "ea7a336c0b719f108c3d4b8843d33f00e76dc80b327e30e0035af0e73e4fd48e",
+        "tasks": 360,
+        "upstream_calls": 242,
+        "validation_errors": []
+      },
+      "dividend_batch_3": {
+        "closure_sha256": "39e8cc1b4276b8a1ee4856efdd00ffda46d7d43f9602a0d7da946f3662ccea7c",
+        "effective_calls_per_minute": 484.946,
+        "elapsed_seconds": 44.541,
+        "http_429": 0,
+        "manifest_sha256": "2f0d8c5c6812abc1b30fcf1f985df456ca249fcf380ddd8aa57e1dac7d10240f",
+        "market_counts": {
+          "BJ": 112,
+          "SH": 124,
+          "SZ": 124
+        },
+        "reference_occurrences": {
+          "object": 360,
+          "observation": 360,
+          "parquet": 360
+        },
+        "rows": 17487,
+        "rows_by_api": {
+          "dividend": 17487
+        },
+        "states": {
+          "done": 360
+        },
+        "status": "verified",
+        "task_inventory_sha256": "b07d5bc4c00f4b0d9517e89e6606b63a88b3edd41cd7c5af771889b86023c580",
+        "tasks": 360,
+        "upstream_calls": 360,
+        "validation_errors": []
+      },
+      "fund_price_batch_4": {
+        "closure_sha256": "d0a2cedfa212e346bddc6ac38bf0dd79b05fd4d7ae326e9ac652f658cb8b4cf8",
+        "effective_calls_per_minute": 484.87,
+        "elapsed_seconds": 44.548,
+        "http_429": 0,
+        "manifest_sha256": "3ae3be9016a58e5d36bdfdde90fe48b874191121a0ff8098d30adfd6aa1bd46e",
+        "reference_occurrences": {
+          "object": 360,
+          "observation": 360,
+          "parquet": 360
+        },
+        "rows": 243322,
+        "rows_by_api": {
+          "fund_adj": 133423,
+          "fund_daily": 109899
+        },
+        "selected_trade_date_range": [
+          "20171018",
+          "20180711"
+        ],
+        "states": {
+          "done": 360
+        },
+        "status": "verified",
+        "task_inventory_sha256": "6d8f1ffc9f6d4704f6fb530d2797aa30ef45e297e7d16bdf95a4a66aed1658bc",
+        "tasks": 360,
+        "upstream_calls": 360,
+        "validation_errors": []
+      }
+    },
+    "current_release_switched": false,
+    "fixed_input_release": "data-051d825b3220a2419e8291fcf15d7917eee9547ccb90c67ed8344b925f36c813",
+    "release_published": false
+  },
+  "git": {
+    "branch": "master",
+    "cloud_aligned": true,
+    "github_pushed": true,
+    "head_before_evidence_commit": "1fe6ee08fd1b7bfa3f3607e5f876a6bd9d95e856",
+    "local_cost_map_commit": "ffe883a6158729a95d5737ac8c9d858cd89a67b5",
+    "portable_test_commit": "1fe6ee08fd1b7bfa3f3607e5f876a6bd9d95e856"
+  },
+  "next_exact_candidates": {
+    "anns_d_pristine_split_leaves_before_batch": 585,
+    "dividend_pristine_after_batch": 4147,
+    "fund_price_remaining_trade_dates_before_batch": 6465,
+    "npr_new_historical_leaves": 6,
+    "npr_note": "use a dedicated six-task exact batch; the existing paid-policy preparer also selects previously attempted refresh work"
+  },
+  "observed_at": "2026-09-10T22:50:49Z",
+  "runtime_network_isolation": {
+    "cloud_actual_plan_only_elapsed_seconds": 5.01,
+    "cloud_actual_plan_only_remote_cost_map_warning": false,
+    "cloud_container_tests_passed": 2,
+    "default": "LITELLM_LOCAL_MODEL_COST_MAP=True",
+    "explicit_override_preserved": true,
+    "mac_container_tests_passed": 2,
+    "mac_host_tests_passed": 2,
+    "purpose": "prevent unrelated LiteLLM model-cost network access before Tushare code starts"
+  },
+  "schema_version": 1,
+  "secrets": {
+    "included": false,
+    "token_values": "redacted and excluded"
+  },
+  "status": "verified_unpublished_wave"
+}
