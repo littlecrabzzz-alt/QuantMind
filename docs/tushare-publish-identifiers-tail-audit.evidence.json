@@ -1,0 +1,160 @@
+{
+  "identifiers": {
+    "current_implementation": "complete jobs/attempts UNION, exact result filtering, immutable object stat, request-sensitive bypass, same-call body identity dedup, selected-column projection, final sorted families",
+    "decision": "reject SQL rewrite and persistent cache activation: current UNION was faster and lower-memory in the 200000-row metadata fixture; the only measured fully warm cache benefit requires costly priming and lacks production memory proof. A resumable authoritative scan needs a mutation/snapshot contract and is not a safe local edit.",
+    "held_cache_full_replay": {
+      "current_baseline_seconds": 34.398,
+      "default_cold_seconds": 35.798,
+      "fully_primed_seconds": 23.065,
+      "identifier_sha_equal_all_rounds": true,
+      "limitation": "default admission did not improve cold/early warm; full warm required an unauthorized long priming pass and production memory headroom was not established",
+      "offline_priming_seconds": 70.911,
+      "source": "coordination/tushare-data/20260909T173000Z-mac-discovery-cache-current-replay-ready-structured.md",
+      "verified_raw_bytes": 1151118880,
+      "verified_raw_objects": 30909
+    },
+    "raw_evidence": {
+      "/tmp/identifier-union-20260910.json": "89ad9f322db7238cb8b32bb391f0acaeaa6890c55c3933926b81405dad214425",
+      "/tmp/identifiers-current-projection-20260910.json": "004f2a4f46b33f728f13ebd3c04f203f724d2b276cfb5b95592ab053a4f0c4d5"
+    },
+    "sequential_query_peak_change_percent": 38.44052313513253,
+    "sequential_query_wall_change_percent": 5.206865519333381,
+    "sql_metadata_benchmark": {
+      "rows": 200000,
+      "runs": {
+        "sequential": {
+          "median_seconds": 0.23693204205483198,
+          "peak_traced_bytes": 51307254,
+          "seconds": [
+            0.23615770787000656,
+            0.2380187911912799,
+            0.23693204205483198
+          ]
+        },
+        "union": {
+          "median_seconds": 0.22520587500184774,
+          "peak_traced_bytes": 37060864,
+          "seconds": [
+            0.22520587500184774,
+            0.2280981249641627,
+            0.22397554200142622
+          ]
+        }
+      },
+      "selected": 66667
+    },
+    "wide_body_projection_benchmark": {
+      "fixture": {
+        "columns": 342,
+        "raw_bytes": 68543176,
+        "responses": 4,
+        "rows_each": 6000
+      },
+      "full": {
+        "discovery": {
+          "body_reads": 4,
+          "bypassed": 0,
+          "duplicate_bodies": 0,
+          "results": 4
+        },
+        "elapsed_seconds": 0.5023903329856694,
+        "output_sha256": "7b61e788d9617cd016df51cec4e5286cfc6b5f05caaad22769fb6992535d68c4",
+        "peak_traced_bytes": 178922457
+      },
+      "projected": {
+        "discovery": {
+          "body_reads": 4,
+          "bypassed": 0,
+          "duplicate_bodies": 0,
+          "results": 4
+        },
+        "elapsed_seconds": 0.3388515829574317,
+        "output_sha256": "7b61e788d9617cd016df51cec4e5286cfc6b5f05caaad22769fb6992535d68c4",
+        "peak_traced_bytes": 101952090
+      }
+    }
+  },
+  "mode": "offline_no_network_no_credentials_no_production",
+  "observed_at": "2026-09-10T06:55:00Z",
+  "production_evidence_supplied": {
+    "manifest_bytes": 206530431,
+    "planning_tail": "two planning-only attempts reached 160 seconds; next planning-only task completed in 155.375 seconds",
+    "publish_tail": "two publisher tasks reached the existing 160 second soft limit around final serialization; publication intent recovery kept CURRENT and publish_success_at consistent",
+    "source": "coordination/tushare-data/20260910T053000Z-mac-legacy-rrg-offcatalog-production.md"
+  },
+  "publish": {
+    "bytes_and_sha_equal": true,
+    "candidate_max_rss_change_percent": -5.809402007518505,
+    "candidate_wall_change_percent": -0.7384609759317651,
+    "current": {
+      "bytes": [
+        204389128
+      ],
+      "elapsed_seconds": [
+        0.7565059170592576,
+        0.7404579590074718,
+        0.7734140420798212
+      ],
+      "encoder_chunks": [
+        123,
+        123,
+        123
+      ],
+      "max_peak_rss_bytes": 845512704,
+      "median_elapsed_seconds": 0.7565059170592576,
+      "peak_rss_bytes": [
+        845512704,
+        835076096,
+        836763648
+      ],
+      "sha256": [
+        "af20524c76be231e0bf5689815e80fc3a97de8d1ee3e0ecdcd9afd4369271c69"
+      ]
+    },
+    "current_implementation": "CPython JSONEncoder sort_keys/ensure_ascii=False C one-shot chunks; UTF-8 hash/write/fsync to private temporary; verified immutable rename; release directory fsync; publication intent then atomic CURRENT",
+    "decision": "reject: time change is below 1 percent and within run noise; modest RSS reduction does not prove a 160 second benefit or production headroom, while changing encoder diagnostics and adding a second serialization path",
+    "fixture": {
+      "closure_children": 1500000,
+      "files": 500000,
+      "gaps": 125000,
+      "runs": 3,
+      "unicode": "BMP"
+    },
+    "raw_evidence": {
+      "/tmp/manifest-206mb-baseline-v2.jsonl": "7c23131ed2645d85b135a4e24186ae37a6d45a92ddc1fe23844603739b0f583a",
+      "/tmp/manifest-206mb-segmented.jsonl": "ff71d0de0218c1816d4d303c865a27d8a9c1682d18e1bbe687ada2dfafaa8701"
+    },
+    "rejected_top_level_segment_prototype": {
+      "bytes": [
+        204389128
+      ],
+      "elapsed_seconds": [
+        0.7452132089529186,
+        0.7735591668169945,
+        0.7509194160811603
+      ],
+      "encoder_chunks": [
+        139,
+        139,
+        139
+      ],
+      "max_peak_rss_bytes": 796393472,
+      "median_elapsed_seconds": 0.7509194160811603,
+      "peak_rss_bytes": [
+        796393472,
+        796065792,
+        795836416
+      ],
+      "sha256": [
+        "af20524c76be231e0bf5689815e80fc3a97de8d1ee3e0ecdcd9afd4369271c69"
+      ]
+    }
+  },
+  "recommended_next_measurement": [
+    "Use existing publish_timing.serialization fields on the next naturally due publish to separate C chunk generation, file write/fsync and preceding retain/closure stages; do not infer serialization cost from the last Python frame alone.",
+    "Use existing planning_timing.discovery counters and process/cgroup memory on one planning-only task. If identifiers again approaches the limit, capture SQL time versus stat/raw-decode/merge without a live long SQLite read transaction.",
+    "Only design resumable identifier materialization after defining an exact source-generation or SQLite snapshot contract that detects job update/delete/restore and object replacement; partial aggregates must never enter planning."
+  ],
+  "schema_version": 1,
+  "source_commit": "957d060b9e19a14125854239a7dc5a90c04980a3"
+}
