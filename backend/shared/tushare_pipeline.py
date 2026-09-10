@@ -199,6 +199,46 @@ def atomic_bytes(path, raw):
     tmp.replace(path)
 
 
+def serialize_manifest_file(directory, content, timing=None):
+    """Write the same CPython JSON chunks without joining the whole manifest.
+
+    _one_shot=True keeps the C encoder used by json.dumps. It still builds a
+    list of chunks: this reduces peak copies, not O(manifest) memory itself.
+    """
+    directory = Path(directory)
+    if directory.is_symlink():
+        raise ValueError("Unsafe release directory")
+    directory.mkdir(parents=True, exist_ok=True)
+    temporary = directory / (".manifest-" + uuid4().hex + ".tmp")
+    stream = temporary.open("xb")
+    timing = {} if timing is None else timing
+    started = time.monotonic()
+    try:
+        with stream:
+            chunks = json.JSONEncoder(ensure_ascii=False, sort_keys=True).iterencode(
+                content, _one_shot=True
+            )
+            timing["chunk_generation_seconds"] = time.monotonic() - started
+            timing["eager_chunks"] = isinstance(chunks, list)
+            sha = hashlib.sha256()
+            size, count, maximum = 0, 0, 0
+            for chunk in chunks:
+                raw = chunk.encode("utf-8")
+                stream.write(raw)
+                sha.update(raw)
+                size += len(raw)
+                count += 1
+                maximum = max(maximum, len(raw))
+            stream.flush()
+            os.fsync(stream.fileno())
+            timing.update(bytes=size, chunks=count, largest_chunk_bytes=maximum)
+            timing["total_seconds"] = time.monotonic() - started
+        return temporary, sha.hexdigest()
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
 def authority():
     if (
         os.getenv("QM_NODE_ROLE") != "authority"
@@ -3279,18 +3319,42 @@ class Pipeline:
         with measure("serialize_manifest"):
             # Comparison and the final inherited archive mapping are finished.
             # Keep needed shared file/mapping entries through content, but release
-            # the old manifest's other containers before allocating JSON bytes.
+            # the old manifest's other containers before building JSON chunks.
             previous = None
-            raw = json_bytes(content)
-            sha = digest(raw)
+            temporary, sha = serialize_manifest_file(
+                self.root / "releases", content, timing.setdefault("serialization", {})
+            )
             release = "data-" + sha
             destination = self.root / "releases" / release / "manifest.json"
-        with measure("write_manifest"):
-            if not destination.exists():
-                atomic_bytes(destination, raw)
-            atomic_json(
-                self.root / "CURRENT.json", {"release_id": release, "manifest_sha256": sha}
-            )
+        try:
+            with measure("write_manifest"):
+                if destination.is_symlink() or destination.parent.is_symlink():
+                    raise ValueError("Unsafe manifest destination")
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                if destination.exists():
+                    # A retry may find its sealed manifest. Never hide a damaged
+                    # existing file just because its filename has the right SHA.
+                    existing = hashlib.sha256()
+                    with destination.open("rb") as stream:
+                        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                            existing.update(chunk)
+                    if existing.hexdigest() != sha:
+                        raise ValueError("Existing manifest checksum mismatch")
+                else:
+                    temporary.replace(destination)
+                # Persist the immutable file and new release directory before
+                # the atomic pointer can make it visible to readers.
+                for parent in (destination.parent, destination.parent.parent):
+                    fd = os.open(parent, os.O_RDONLY)
+                    try:
+                        os.fsync(fd)
+                    finally:
+                        os.close(fd)
+                atomic_json(
+                    self.root / "CURRENT.json", {"release_id": release, "manifest_sha256": sha}
+                )
+        finally:
+            temporary.unlink(missing_ok=True)
         return release
 
 
