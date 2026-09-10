@@ -1,0 +1,9 @@
+# RRG acquisition shard importer ready
+
+- Candidate: `1c3fa6da` on `codex/rrg-acquisition-importer`, rebased onto `ffebbf33`.
+- Scope: default `plan_only`; execute requires the configured cloud authority, exclusive `pipeline.lock`, existing schema 6, explicit manifest/shard hashes and an explicit maximum job count. Full source, shard and current `Pipeline.enqueue` identity validation occurs while the lock is held, before one bounded SQLite transaction.
+- Identity checked: `task_id`, `logical_key`, complete `job`, `group_name`, `priority`, `epoch`, source-plan line and approved preparation policy. Re-entry inserts no duplicate; an identity conflict rolls the whole shard back.
+- Boundaries: no Token or secret read, network, upstream request, worker run, publication or `CURRENT` switch. Empty responses remain request evidence only and cannot become no-dividend, suspension, filled-price or PIT-membership claims.
+- Validation: 9 importer/preparation tests passed; Ruff check and format check passed; `git diff --check` passed. Tests cover plan-only isolation, lock-held verification, atomic enqueue, idempotent re-entry, busy lock, schema-5 refusal without migration, rollback, redacted receipt, full hash/source-policy tampering, explicit bounds and unlisted shards.
+- Real plan-only evidence: pinned batch `3ceaa518...927d81` verified 8 shards / 1767 jobs; selected `shards/0001-fund_div.jsonl` verified 250 jobs; all task IDs hash `62caad35...7fb283`; 0 credentials, 0 upstream calls, `would_enqueue=false`. Structured evidence is `20260910T061500Z-mac-rrg-acquisition-importer.evidence.json`.
+- Remaining authority gate: merge this candidate, make the pinned batch plus its pinned audit source available to the verified authority container, then run one explicit shard import at a time and retain each redacted stdout receipt. This candidate has not imported any authority job or run a worker.
