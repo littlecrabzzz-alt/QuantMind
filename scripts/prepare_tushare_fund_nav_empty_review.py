@@ -277,7 +277,7 @@ def _controls(root, manifest, code_end_dates):
     controls = {}
     for code, rows in candidates.items():
         if not rows:
-            raise ValueError(f"No sample_ok fixed-release control for {code}")
+            continue
         nav_date, ann_date, observation_name, parquet_name = min(rows)
         observation_expected = manifest["files"].get("observations/" + observation_name)
         observation_path = _stored(
@@ -433,17 +433,20 @@ def prepare(root, release_root, release_id, output=None, *, now=None, jobs=MAX_T
     finally:
         db.close()
     candidates.sort(key=lambda item: item[:3])
-    selected = candidates[:jobs]
     code_end_dates = {}
-    for _, code, _, record in selected:
+    for _, code, _, record in candidates:
         code_end_dates[code] = max(
             code_end_dates.get(code, ""), record["target"]["job"]["params"]["end_date"]
         )
     controls = _controls(release_root, fixed, code_end_dates)
     records = []
-    for _, code, _, record in selected:
+    for _, code, _, record in candidates:
+        if code not in controls:
+            continue
         record["control"] = controls[code]
         records.append(record)
+        if len(records) == jobs:
+            break
     task_ids = sorted(record["target"]["task_id"] for record in records)
     manifest = {
         "schema_version": 1,

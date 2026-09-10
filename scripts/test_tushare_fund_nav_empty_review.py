@@ -324,6 +324,19 @@ class FundNavEmptyReviewTests(unittest.TestCase):
             self._prepare(self.first_fetched + timedelta(days=2))
         parquet.write_bytes(parquet_raw)
 
+    def test_missing_positive_control_skips_only_that_code(self):
+        manifest = json.loads(
+            (
+                self.release_root / "releases" / self.release_id / "manifest.json"
+            ).read_bytes()
+        )
+        controls = review._controls(
+            self.release_root.resolve(),
+            manifest,
+            {"000022.OF": "20080502", "000113.OF": "20080502"},
+        )
+        self.assertEqual(set(controls), {"000022.OF"})
+
     def test_output_must_be_new_and_outside_both_input_roots(self):
         now = self.first_fetched + timedelta(days=2)
         for output in (
