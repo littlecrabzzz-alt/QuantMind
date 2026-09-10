@@ -1,0 +1,11 @@
+# Tushare wave 2/3 fixed release, NPR residual and snapshot capacity
+
+- `data-bdb8d5c7…` published in 226.548 seconds. Its 286,136,683-byte manifest has 738,613 file entries and 95,006 datasets.
+- The authority closure verifies all wave 2/3 outputs in the immutable release: 1,902 objects, 1,902 observations and 1,892 Parquet files. The 131 duplicate task occurrences are untouched `anns_d` tasks deliberately re-frozen from batch 1 into batch 2; the unique task count is 2,029.
+- Mac LaunchAgent run 152 downloaded 13,006 files, verified all 738,613 entries and switched atomically. A network-none, empty-token, read-only query returned five `fund_daily@20171018` rows with zero upstream calls.
+- Of the six previously audited `npr` history leaves, one was completed by the normal worker before freeze. The original exact-six preparer failed closed with zero upstream calls. The deployed refreeze selects up to six currently pristine history leaves and pins the actual task hash; the exclusive runner still rejects any cross-epoch attempt drift.
+- The five residual `npr` tasks completed in 2.3 seconds with five HTTP 200 responses, 1,223 rows, zero 429, two done, one empty and two split_pending. All five object/observation and four Parquet references passed physical SHA checks. They are authority-only until the next normal fixed publication.
+- The 07:00 whole-project snapshot resumed an incomplete `.building` tree, reduced free space to 94,011,957,248 bytes and correctly triggered the 100 GiB Tushare stop-line. The staging tree had no COMPLETE marker and was not `latest`; after stopping the snapshot service it was removed, restoring about 232.9 GB free. Published snapshots and Tushare authority were preserved.
+- The whole-project snapshot timer is disabled until the cloud disk is expanded and snapshot headroom is revalidated. Tushare hourly publication and the 15-minute Mac fixed-release mirror remain active.
+- The API was recreated with the required cloud compose override and is healthy on `127.0.0.1:18000`; Web, Tushare worker and Beat are healthy. Python startup now reports the local LiteLLM cost-map default without a remote fetch warning.
+- Git is aligned on Mac, GitHub and cloud at `206e6c5d` before this evidence commit. Full history, historical revisions and PIT remain incomplete; RRG remains `blocked_data`.
