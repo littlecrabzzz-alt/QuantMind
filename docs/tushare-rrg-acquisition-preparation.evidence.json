@@ -1,0 +1,92 @@
+{
+  "checked_at": "2026-09-10T05:40:00Z",
+  "status": "prepared_not_enqueued",
+  "source": {
+    "release_id": "data-03885aef45ce7be5ce812f4305734a7c8852646a09cfa567383215d10e5f6d22",
+    "audit_report_sha256": "74d6798cab10c1ead48eca23927a511bd7192c882c8855c20b1df8f4737e1fe6",
+    "collection_plan_sha256": "e03f273adc3c6448de8deff835f214a36d7e04a1ff8bcea1a37a1b2c84f10030"
+  },
+  "output": "/tmp/quantmind-rrg-acquisition-prep-20260910T0540Z",
+  "batch_manifest": {
+    "bytes": 9886,
+    "sha256": "3ceaa518a73af92df4c824a9fa2c4fc7a65343a75569396643b749b091927d81"
+  },
+  "selection": {
+    "prepared": {
+      "fund_div": 1718,
+      "etf_limit": 49,
+      "total": 1767
+    },
+    "excluded_by_default": {
+      "fund_daily_diagnostic_ranges": 1888
+    },
+    "blocked": {
+      "etf_sh_cons": 3376,
+      "etf_sz_cons": 2398,
+      "reason": "authoritative historical ETF industry mapping unavailable"
+    },
+    "epoch": "history",
+    "shard_size": 250
+  },
+  "shards": [
+    {
+      "path": "shards/0001-fund_div.jsonl",
+      "rows": 250,
+      "sha256": "b1c8db1a63377f69aa4ee582996670235a5198db0250c94c979415d6c8097cf7"
+    },
+    {
+      "path": "shards/0002-fund_div.jsonl",
+      "rows": 250,
+      "sha256": "39e50d6492e2044613ec1a13032b27cf2000fb64475d69483cdaf967eb5bc99c"
+    },
+    {
+      "path": "shards/0003-fund_div.jsonl",
+      "rows": 250,
+      "sha256": "3993adadc8a0ef5abc535cfded1b527f43ceff05002d110ab37ba46212413d20"
+    },
+    {
+      "path": "shards/0004-fund_div.jsonl",
+      "rows": 250,
+      "sha256": "a695eba3a38a24b11cba5cbb17ab520e60eb5f6fe777a48d56e41f46f86dd313"
+    },
+    {
+      "path": "shards/0005-fund_div.jsonl",
+      "rows": 250,
+      "sha256": "8221206ac555d1ec287fcc1ebe0d295e922208ed77e48ec1c8775fa137feac40"
+    },
+    {
+      "path": "shards/0006-fund_div.jsonl",
+      "rows": 250,
+      "sha256": "c639a88fdf37148dbdb74dfde8d5a9fd22537f77e2a4750d4f8b5ea51116cb19"
+    },
+    {
+      "path": "shards/0007-fund_div.jsonl",
+      "rows": 218,
+      "sha256": "b5bf8891d170d3b54fbbad0cbf9a517ad7d196cf0f89abd2aa461b095c694d48"
+    },
+    {
+      "path": "shards/0008-etf_limit.jsonl",
+      "rows": 49,
+      "sha256": "38adbc260da6d2f819da42ddf22d61195affbd76749a68e872c41e4c80d6b435"
+    }
+  ],
+  "idempotency": {
+    "implementation": "backend.shared.tushare_pipeline.Pipeline.enqueue",
+    "independent_rerun_identical": true,
+    "second_batch_manifest_sha256": "3ceaa518a73af92df4c824a9fa2c4fc7a65343a75569396643b749b091927d81"
+  },
+  "guards": {
+    "automatically_enqueued": false,
+    "authority_apply_implemented": false,
+    "production_accessed": false,
+    "credentials_accessed": false,
+    "upstream_calls": 0,
+    "fixed_release_published": false,
+    "price_fill": false,
+    "suspension_or_pit_inferred": false
+  },
+  "source_sha256": {
+    "scripts/prepare_tushare_rrg_acquisition_batch.py": "0dddd027bbe3fde5751fc9599a78bef33e305ab7f1fbbed3c6fdc3c945e2647b",
+    "scripts/test_tushare_rrg_acquisition_batch.py": "bfd06f4e9f15ee91cc5949e154a8fadd342b07584b0bb0bb7ba61f68cfc63d8f"
+  }
+}
