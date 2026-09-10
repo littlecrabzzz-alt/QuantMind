@@ -1,0 +1,243 @@
+{
+  "aggregate": {
+    "effective_calls_per_minute": 470.172,
+    "elapsed_seconds": 127.23,
+    "http_200": 997,
+    "http_429": 0,
+    "objects_verified": 997,
+    "observations_verified": 997,
+    "parquet_verified": 907,
+    "rows": 280060,
+    "tasks": 997,
+    "upstream_calls": 997
+  },
+  "batches": {
+    "dividend": {
+      "attempts_by_api": {
+        "dividend": 360
+      },
+      "authority_free_bytes": 142162980864,
+      "batch_manifest": "validation/dividend-batch-20260911/batch-1-manifest.json",
+      "batch_manifest_sha256": "7befe4db5c8bc42f3e2a8a03db25ec440f6e7e7ea26204d2264556c69d1345ef",
+      "current_release_switched": false,
+      "current_unchanged": true,
+      "effective_calls_per_minute": 485.885,
+      "elapsed_seconds": 44.455,
+      "execution_receipt": "validation/dividend-batch-20260911/acceptance-batch-1.json",
+      "execution_receipt_sha256": "35246d4afb84054ac81ce4206b9dfb3311f574ef38a0268c8a1b215644a8f9dd",
+      "history_complete": false,
+      "http_429": 0,
+      "http_status_counts": {
+        "200": 360
+      },
+      "pit_verified": false,
+      "receipt_id": "e6df0f4dc3937cb4822210b26b2b0a2d542860b9c9bd9dffa3944e247071e459",
+      "receipt_id_verified": true,
+      "reference_occurrences": {
+        "object": 360,
+        "observation": 360,
+        "parquet": 355
+      },
+      "release_id": "data-7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+      "release_manifest_sha256": "7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+      "release_published": false,
+      "rows": 17200,
+      "rows_by_api": {
+        "dividend": 17200
+      },
+      "schema_version": 1,
+      "states": {
+        "done": 355,
+        "empty": 5
+      },
+      "states_by_api": {
+        "dividend": {
+          "done": 355,
+          "empty": 5
+        }
+      },
+      "status": "verified",
+      "tasks": 360,
+      "unique_reference_bytes": {
+        "object": 2197149,
+        "observation": 322536,
+        "parquet": 3408317
+      },
+      "unique_references_verified": {
+        "object": 360,
+        "observation": 360,
+        "parquet": 355
+      },
+      "upstream_calls": 360,
+      "validation_errors": []
+    },
+    "fund_price": {
+      "attempts_by_api": {
+        "fund_adj": 180,
+        "fund_daily": 180
+      },
+      "authority_free_bytes": 142163001344,
+      "batch_manifest": "validation/fund-price-batch-20260911/batch-2-manifest.json",
+      "batch_manifest_sha256": "e3576c8336af3d9c0eeb7f2de3b4c56645b9a7b4af2874fd0314afb127f515aa",
+      "current_release_switched": false,
+      "current_unchanged": true,
+      "effective_calls_per_minute": 483.081,
+      "elapsed_seconds": 44.713,
+      "execution_receipt": "validation/fund-price-batch-20260911/acceptance-batch-2.json",
+      "execution_receipt_sha256": "a99d952cf0af320ec1a57105e994b7abec4f5e67cc6ac0a79aa0a68ae6624dda",
+      "history_complete": false,
+      "http_429": 0,
+      "http_status_counts": {
+        "200": 360
+      },
+      "pit_verified": false,
+      "receipt_id": "24663d14e2d8767ecda6a96158afde8d60044051d35a147f91c30509fdaf3faf",
+      "receipt_id_verified": true,
+      "reference_occurrences": {
+        "object": 360,
+        "observation": 360,
+        "parquet": 360
+      },
+      "release_id": "data-7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+      "release_manifest_sha256": "7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+      "release_published": false,
+      "rows": 259149,
+      "rows_by_api": {
+        "fund_adj": 142968,
+        "fund_daily": 116181
+      },
+      "schema_version": 1,
+      "states": {
+        "done": 360
+      },
+      "states_by_api": {
+        "fund_adj": {
+          "done": 180
+        },
+        "fund_daily": {
+          "done": 180
+        }
+      },
+      "status": "verified",
+      "tasks": 360,
+      "unique_reference_bytes": {
+        "object": 14041467,
+        "observation": 317600,
+        "parquet": 18140572
+      },
+      "unique_references_verified": {
+        "object": 360,
+        "observation": 360,
+        "parquet": 360
+      },
+      "upstream_calls": 360,
+      "validation_errors": []
+    },
+    "paid_policy": {
+      "attempts_by_api": {
+        "monetary_policy": 7,
+        "npr": 270
+      },
+      "authority_free_bytes": 142162989056,
+      "batch_manifest": "validation/paid-policy-batch-20260911/batch-1-manifest.json",
+      "batch_manifest_sha256": "4c45508ecda90f401285f47257fb19810d5f3fa6def5b40c467e5eb3627bd16a",
+      "current_release_switched": false,
+      "current_unchanged": true,
+      "effective_calls_per_minute": 436.656,
+      "elapsed_seconds": 38.062,
+      "execution_receipt": "validation/paid-policy-batch-20260911/acceptance-batch-1.json",
+      "execution_receipt_sha256": "64e3fd2b45c70cbe5b5a69f913ac0dbc54734c42ad34e6d2b076bd5c7187dbda",
+      "history_complete": false,
+      "http_429": 0,
+      "http_status_counts": {
+        "200": 277
+      },
+      "pit_verified": false,
+      "receipt_id": "30d1a521ce7cdfda643126c41c4237cb60c38a2b43bb104a37abc438ca1630a6",
+      "receipt_id_verified": true,
+      "reference_occurrences": {
+        "object": 277,
+        "observation": 277,
+        "parquet": 192
+      },
+      "release_id": "data-7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+      "release_manifest_sha256": "7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+      "release_published": false,
+      "rows": 3711,
+      "rows_by_api": {
+        "monetary_policy": 0,
+        "npr": 3711
+      },
+      "schema_version": 1,
+      "states": {
+        "done": 189,
+        "empty": 85,
+        "split_pending": 3
+      },
+      "states_by_api": {
+        "monetary_policy": {
+          "empty": 7
+        },
+        "npr": {
+          "done": 189,
+          "empty": 78,
+          "split_pending": 3
+        }
+      },
+      "status": "verified",
+      "tasks": 277,
+      "unique_reference_bytes": {
+        "object": 51909102,
+        "observation": 249996,
+        "parquet": 12495225
+      },
+      "unique_references_verified": {
+        "object": 277,
+        "observation": 277,
+        "parquet": 192
+      },
+      "upstream_calls": 277,
+      "validation_errors": []
+    }
+  },
+  "boundaries": {
+    "history_complete": false,
+    "mac_mirror_contains_new_data": false,
+    "new_data_in_fixed_release": false,
+    "pit_verified": false,
+    "rrg_status": "blocked_data"
+  },
+  "failed_closed_attempt": {
+    "authority_evidence": "validation/fund-price-batch-20260911/failed-attempt-batch-1.json",
+    "batch": "fund_price_1",
+    "cause": "operator read-only audit process retained SQLite file descriptor",
+    "phase": "reserve_before_upstream",
+    "upstream_calls": 0
+  },
+  "fixed_release": {
+    "manifest_sha256": "7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+    "release_id": "data-7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+    "unchanged": true
+  },
+  "limits": {
+    "account_rpm": 500,
+    "disk_reserve_bytes": 107374182400,
+    "fund_price_api_rpm": 500,
+    "max_requests_per_batch": 360,
+    "max_seconds_per_batch": 90,
+    "monetary_policy_api_rpm": 200,
+    "npr_api_rpm": 500
+  },
+  "production_git_head": "907ad7b50d379eb0e4e0e42e2a8320d71edc647d",
+  "schema_version": 1,
+  "service_restore": {
+    "beat_healthy": true,
+    "beat_oom_killed": false,
+    "beat_restart_count": 0,
+    "tushare_worker_healthy": true,
+    "tushare_worker_memory_bytes": 2147483648,
+    "tushare_worker_oom_killed": false,
+    "tushare_worker_restart_count": 0
+  },
+  "status": "verified_production_batches"
+}

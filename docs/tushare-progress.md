@@ -716,3 +716,12 @@
 - 真实执行受90秒硬窗约束，90.103秒完成340次请求，339 done、20项尚未开始、1项blocked，返回1529654行；按API为`adj_factor`310797、`daily`304489、`daily_basic`304489、`moneyflow`293838、`stk_limit`315191、`suspend_d`850。持续等效吞吐226.408次/分钟，低于500rpm账户门，主因是大结果本地转换与落盘；没有429或供应商限频证据，不能用请求上限冒充实际端到端吞吐。
 - blocked项是`stk_limit@20251009`：HTTP 200且5516行raw object/observation已保存，硬截止在normalize阶段触发`TimeoutError`，未生成Parquet；其余20项保持pending/tries0，由常规队列继续。闭包重算340个object、340个observation和339个Parquet实体SHA，`CURRENT`保持上述固定版；receipt SHA256为`5cb56861e295be7818598f6bc57e205ffd8b9a54856447dc52955f18190ca15f`，闭包SHA256为`ecba9e2f29da9b5b3e43ba4504697673e990d3eda9485bf49563588e658cbdca`，机器证据为`docs/tushare-core-market-batch-20260911.evidence.json`。
 - 全局`history_complete=false`、修订/PIT未验证，RRG仍为`blocked_data`。云盘可用约142.39GB，高于100GiB停采线；本批只扩充权威存量，后续固定发布和Mac自动镜像仍按单向协议完成。
+
+## 2026-09-11 05:44 基金行情、已购政策与分红历史精确批次
+
+- `907ad7b5`新增三套默认plan-only的精确批次入口。Mac与生产镜像各23项组合测试通过；已购政策准备器把47个跨epoch重复任务折叠为277个不同逻辑请求，保留源任务统计但不浪费上游预算。代码已推送master并通过双节点内容摘要和Git快进检查部署到云端。
+- 基金行情批次固定20190410—20191231的180个共同SSE开市日，`fund_daily`、`fund_adj`各180项。44.713秒完成360次请求，全部done，返回259149行，等效483.081次/分钟。第一次执行在上游调用前被操作员遗留的只读审计进程占锁拒绝，0次调用、CURRENT未变；关闭该进程并重新冻结相同清单后成功。
+- 已购政策批次完成277次请求：`monetary_policy` 7项均empty；`npr` 189 done、78 empty、3 split_pending，返回3711行，38.062秒。清单锁定单接口限速为央行货币政策执行报告200rpm、政策法规500rpm，账户总闸门500rpm。
+- 分红历史批次按沪深北各120只股票固定360项，44.455秒完成360次请求，355 done、5 empty，返回17200行，等效485.885次/分钟。三个批次合计997次HTTP 200、0次429、280060行；逐文件验证997个object、997个observation和907个Parquet哈希，错误0。
+- 三批均固定release、任务集、配置、准备器和执行器SHA，使用authority/schema6/ENABLED/排他锁/100GiB余量门，且不发布、不切换CURRENT。权威闭包SHA分别为`0161dc75c71940750bafbb35fe10493480beeb9db1071aa452df062d81e4adab`、`c9b1a46c8db8918d36a1c6feb6d1176fb66d603927dd0b4d811afd926ecbb42a`、`8608a6b5c5b220efe33b9522c6c01a264dba4918bf040e74324dd9ad9f2fab87`；仓库机器证据为`docs/tushare-exact-history-batches-20260911.evidence.json`。
+- Tushare worker与Beat已恢复healthy；worker实际内存2147483648字节、restart0、OOM false。新增活动数据等待正常一小时固定发布和Mac LaunchAgent单向镜像，因此当前固定版仍为`data-7be20672…`。完整历史、修订/PIT和RRG准入仍未闭合，继续`blocked_data`。
