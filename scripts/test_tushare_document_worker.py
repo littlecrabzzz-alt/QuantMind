@@ -135,6 +135,12 @@ class DocumentWorkerTest(unittest.TestCase):
             self.tasks.tushare_acquire()
         self.app.send_task.assert_not_called()
 
+    def test_deferred_publish_does_not_start_competing_document_task(self):
+        self.tick.return_value = {"status": "publish_deferred_documents_active"}
+        result = self.tasks.tushare_acquire()
+        self.assertEqual(result["status"], "publish_deferred_documents_active")
+        self.app.send_task.assert_not_called()
+
     def test_dispatch_failure_preserves_api_continuation(self):
         self.app.send_task.side_effect = RuntimeError("mock unavailable broker")
         result = self.tasks.tushare_acquire()

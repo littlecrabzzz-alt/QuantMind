@@ -3662,23 +3662,50 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                 stage_seconds[name] = max(0.0, time.monotonic() - started)
 
         def publish_existing():
-            with measure("publish"):
-                publication["status"] = "publishing"
-                release_id = pipeline.publish()
-                report["release_id"] = release_id
-                publication.update(
-                    status="published",
-                    performed=True,
-                    pending=False,
-                    current_release_id=release_id,
+            document_lock = None
+            with measure("publish_lock"):
+                lock_path = ROOT / "documents.lock"
+                if lock_path.is_symlink():
+                    raise ValueError("Unsafe document lock")
+                descriptor = os.open(
+                    lock_path,
+                    os.O_RDWR
+                    | os.O_CREAT
+                    | getattr(os, "O_NOFOLLOW", 0),
+                    0o600,
                 )
-                if publish_interval:
-                    successful_at = int(time.time())
-                    pipeline._publication_success(release_id, successful_at)
-                    publication.update(
-                        last_success_at=successful_at,
-                        next_due_at=successful_at + publish_interval,
+                document_lock = os.fdopen(descriptor, "a+")
+                try:
+                    fcntl.flock(
+                        document_lock, fcntl.LOCK_EX | fcntl.LOCK_NB
                     )
+                except BlockingIOError:
+                    document_lock.close()
+                    publication["status"] = "deferred_documents_active"
+                    publication["performed"] = False
+                    publication["pending"] = True
+                    return False
+            with measure("publish"):
+                try:
+                    publication["status"] = "publishing"
+                    release_id = pipeline.publish()
+                    report["release_id"] = release_id
+                    publication.update(
+                        status="published",
+                        performed=True,
+                        pending=False,
+                        current_release_id=release_id,
+                    )
+                    if publish_interval:
+                        successful_at = int(time.time())
+                        pipeline._publication_success(release_id, successful_at)
+                        publication.update(
+                            last_success_at=successful_at,
+                            next_due_at=successful_at + publish_interval,
+                        )
+                finally:
+                    document_lock.close()
+            return True
 
         pipeline = None
         failed = False
@@ -3743,13 +3770,12 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                     if due:
                         report.update(status="publish_only", requests=0)
                         publication["mode"] = "publish_only"
-                        publish_existing()
+                        if not publish_existing():
+                            report["status"] = "publish_deferred_documents_active"
                         return report
                     report["release_id"] = publication["current_release_id"]
                     publication["status"] = "deferred"
                     publication["mode"] = "acquire_only"
-                    start_nonpublication_work()
-                else:
                     start_nonpublication_work()
                 planning_due = not planning_interval
                 if planning_interval:
@@ -3874,7 +3900,8 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                                 ),
                             )
                 if not publish_interval:
-                    publish_existing()
+                    if not publish_existing():
+                        report["status"] = "publish_deferred_documents_active"
             finally:
                 if pipeline is not None:
                     with measure("close"):
