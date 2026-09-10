@@ -1,0 +1,38 @@
+# A 股三大财务表精确补采批次
+
+本批选择 `income_vip`、`balancesheet_vip`、`cashflow_vip`。三项保留报告期、公告日、实际公告日、报表类型、公司类型和供应商修订字段，适合后续按公告时点构建基本面研究输入。它们不会自动证明源端首次发布时间、迟到修订全集或回测 PIT 合规；缺公告日期的原始记录继续保留并在使用时阻断。
+
+2026-09-10T11:15Z 对云端 schema 6 权威队列做索引化短查询时，三项均为 `available`。当前 epoch 状态如下：
+
+| API | done | empty | pending | split_pending | pending 股票叶任务 |
+|---|---:|---:|---:|---:|---:|
+| `income_vip` | 15 | 19 | 5,992 | 1 | 5,931 |
+| `balancesheet_vip` | 9 | 23 | 18,009 | 3 | 17,948 |
+| `cashflow_vip` | 13 | 19 | 18,163 | 3 | 18,102 |
+
+合计有 42,164 个 pending，其中 41,981 个是已经由饱和父请求按股票拆出的叶任务；另有 183 个尚未请求的全市场父任务，未来仍可能产生更多叶任务，所以这个数字是当前下界，不是最终历史分母。生产配置请求边界为 1990-01-01，历史 planner 仍在推进，注册和队列存在不能证明 1990 年以来已完整。
+
+## 有界执行
+
+`prepare_tushare_financial_pit_batch.py` 只读现有 `pipeline.sqlite`，从三项 API 的共同 pending 叶任务中选择相同的最新报告期、报表类型和股票集合。每项最多 120 个，整个批次最多 360 个；它不生成新任务、不读取凭据、不调用上游。
+
+```bash
+python3 scripts/prepare_tushare_financial_pit_batch.py \
+  --root /data/tushare \
+  --output /tmp/tushare-financial-pit-batch.json \
+  --epoch 20260910 \
+  --jobs-per-api 120
+```
+
+`run_tushare_financial_pit_batch.py` 的默认模式只校验清单。生产执行还要求显式固定任务集合、当前配置和运行器 SHA256；执行前核对 authority、schema 6、`ENABLED`、共享锁和 100 GiB 磁盘余量。它安装临时 exact scope，最多运行 360 次或 90 秒，不扩展全局队列、不发布、不切换 `CURRENT`。
+
+本次从真实权威队列生成的清单为 811,554 字节，包含 120 个共同股票在 2026-06-30、report type 1 的三表任务，共 360 项。清单 SHA256 为 `07a7eb666e9302e8eb4fbce956113f0059621b04e87126bb18d488732ed63390`，任务集合 SHA256 为 `1ef0e80551582d911d778e6943bd1ad113f32b9b5a3cb284af9d993887b88810`；离线 plan-only 复核为 0 authority、0 凭据、0 网络。
+
+按 500 次/分钟上限，360 次理论下限为 43.2 秒；参考近期精确批次约 454 次/分钟，预计约 48 秒。考虑财务接口响应差异，首次生产验收保留完整 90 秒硬边界。单股票单季度财务叶任务通常只有少量行，但字段较宽；首批按 10–30 MB 预留。若当前 41,981 个叶任务均按相似形态执行，调用下限约 84–93 分钟、磁盘约 1–4 GiB，尚未包括 183 个父任务后续可能产生的叶任务或固定版发布与镜像时间。
+
+## 暂不并入本批
+
+- `index_member_all` 当前 692 pending，但生效区间没有可验证的历史 `known_at`；重复拉取不能补成修订发布时间。
+- `index_weight` history 有 87,493 pending、88 split_pending，具备指数研究价值，但完整指数发现、单指数单月饱和和发布时点仍需单独有界方案。
+- `fund_nav` history 有 22,205 pending、49 split_pending，当前 epoch 另有 7,057 pending；适合后续基金研究批次，本轮先完成能形成同股票三表闭环的数据。
+- `fund_basic` 当前 4 done、2 empty、2 blocked；阻塞项来自大响应/完整性问题，不能通过重复相同请求宣称基金基础全集闭包。
