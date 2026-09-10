@@ -18,6 +18,7 @@ from backend.shared.tushare_supplement_contracts import (
 )
 
 from backend.shared.tushare_equity_event_contracts import (
+    ANNOUNCEMENTS,
     EQUITY_EVENT_CONTRACTS,
     iter_equity_event_jobs,
 )
@@ -414,6 +415,39 @@ def iter_reward_period_append_jobs(config, today, identifiers=None):
 
 
 APPEND_PLANNERS["stock_rewards_periods"] = iter_reward_period_append_jobs
+
+
+def iter_equity_announcement_jobs(config, today, identifiers=None):
+    """History-only all-market announcements, independent of stock fanout."""
+    selected = [
+        api
+        for api in config.get("equity_event_apis", EQUITY_EVENT_CONTRACTS)
+        if api in ANNOUNCEMENTS
+    ]
+    projected = {
+        "equity_event_apis": selected,
+        **(
+            {"history_start": config["history_start"]}
+            if "history_start" in config
+            else {}
+        ),
+        **(
+            {"equity_event_history_start": config["equity_event_history_start"]}
+            if "equity_event_history_start" in config
+            else {}
+        ),
+        **(
+            {"planning_epoch": config["planning_epoch"]}
+            if "planning_epoch" in config
+            else {}
+        ),
+    }
+    for job in iter_equity_event_jobs(projected, today, identifiers):
+        if job["epoch"] == "history":
+            yield job
+
+
+APPEND_PLANNERS["equity_announcements"] = iter_equity_announcement_jobs
 
 
 TECHNICAL_EXTRA_RUNTIME_CONTRACTS = {

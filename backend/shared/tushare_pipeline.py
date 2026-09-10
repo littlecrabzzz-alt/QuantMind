@@ -49,6 +49,7 @@ from backend.shared.tushare_registry import (
     EXTENDED_CONTRACTS,
     PLANNERS,
     APPEND_PLANNERS,
+    ANNOUNCEMENTS,
     MARKET_MEMBER_APIS,
     MARKET_MEMBER_DEPENDENCIES,
     market_member_prerequisites,
@@ -67,7 +68,10 @@ from backend.shared.tushare_global_contracts import (
 )
 from backend.shared.tushare_other_contracts import OTHER_CONTRACTS, other_prerequisites
 from backend.shared.tushare_supplement_contracts import supplement_prerequisites
-from backend.shared.tushare_equity_event_contracts import equity_event_prerequisites
+from backend.shared.tushare_equity_event_contracts import (
+    EQUITY_EVENT_CONTRACTS,
+    equity_event_prerequisites,
+)
 from backend.shared.tushare_futures_extra_contracts import futures_extra_prerequisites
 from backend.shared.tushare_research_extra_contracts import research_extra_prerequisites
 from backend.shared.tushare_etf_basket_contracts import etf_basket_prerequisites
@@ -113,7 +117,19 @@ def _planning_inputs(family, config, identifiers):
         contracts = {api: EXTENDED_CONTRACTS[api] for api in MARKET_MEMBER_APIS}
     if family == "stock_rewards_periods":
         contracts = {"stk_rewards": EXTENDED_CONTRACTS["stk_rewards"]}
-    selected = ("stk_rewards",) if family == "stock_rewards_periods" else config.get(family + "_apis", tuple(contracts))
+    if family == "equity_announcements":
+        contracts = {api: EXTENDED_CONTRACTS[api] for api in ANNOUNCEMENTS}
+    selected = (
+        ("stk_rewards",)
+        if family == "stock_rewards_periods"
+        else tuple(
+            api
+            for api in config.get("equity_event_apis", EQUITY_EVENT_CONTRACTS)
+            if api in ANNOUNCEMENTS
+        )
+        if family == "equity_announcements"
+        else config.get(family + "_apis", tuple(contracts))
+    )
     if any(api not in contracts for api in selected):
         raise ValueError("Unknown " + family + " API")
     contracts = {api: contracts[api] for api in selected}
@@ -164,6 +180,11 @@ def _planning_inputs(family, config, identifiers):
         # Parent stock_context validation/selection gates it; no new config keys.
         dependencies = {"stock_context_reward_periods"}
         keys = set()
+    if family == "equity_announcements":
+        # Reuse the parent contracts and source request identities while keeping
+        # its large per-stock cursor immutable.
+        dependencies = set()
+        keys = {"history_start", "equity_event_apis", "equity_event_history_start"}
     policy = digest(
         json_bytes(
             {
@@ -1826,7 +1847,16 @@ class Pipeline:
         stats = {}
         # Commit observed-period supplements before expensive ordinary families.
         # Repeated dictionary keys keep their first insertion position.
-        planners = {"stock_rewards_periods": APPEND_PLANNERS["stock_rewards_periods"], **PLANNERS, **APPEND_PLANNERS}
+        priority_append = {
+            name: APPEND_PLANNERS[name]
+            for name in ("stock_rewards_periods", "equity_announcements")
+            if name in APPEND_PLANNERS
+        }
+        planners = {
+            **priority_append,
+            **PLANNERS,
+            **APPEND_PLANNERS,
+        }
         for family, planner in planners.items():
             self.planning_timing["active_stage"] = family + ":policy"
             if family == "stock_rewards_periods":
@@ -1836,11 +1866,20 @@ class Pipeline:
                     or "stk_rewards" not in config.get("stock_context_apis", STOCK_CONTEXT_RUNTIME_CONTRACTS)
                 ):
                     continue
+            elif family == "equity_announcements":
+                selected = config.get("equity_event_apis", EQUITY_EVENT_CONTRACTS)
+                if (
+                    "equity_event" in blocked_families
+                    or not config.get("enable_equity_event", False)
+                    or not set(selected).intersection(ANNOUNCEMENTS)
+                ):
+                    continue
             elif family in blocked_families or not config.get("enable_" + family, False):
                 continue
             policy, current_ids = _planning_inputs(family, config, identifiers)
-            modes = ("history",) if family == "stock_rewards_periods" else ("recent", "history")
-            family_budget = min(budget, 500) if family == "stock_rewards_periods" else budget
+            append_only = family in ("stock_rewards_periods", "equity_announcements")
+            modes = ("history",) if append_only else ("recent", "history")
+            family_budget = min(budget, 500) if append_only else budget
             for mode in modes:
                 name = mode + ":" + family
                 self.planning_timing["active_stage"] = name + ":snapshot"
@@ -1939,7 +1978,7 @@ class Pipeline:
                 # Only this append scope budgets new jobs; existing history IDs
                 # still consume the shared scan/time bounds and advance offset.
                 while (
-                    inserted if family == "stock_rewards_periods"
+                    inserted if append_only
                     else attempted if mode == "history" else count
                 ) < family_budget:
                     if mode == "history":
