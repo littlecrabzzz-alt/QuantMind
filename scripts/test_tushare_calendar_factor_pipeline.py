@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from backend.shared import tushare_pipeline as module
 from backend.shared.tushare_calendar_extra_contracts import FIELD_METADATA as CAL_FIELDS
+from backend.shared.tushare_calendar_extra_contracts import ECO_CAL_OBSERVED_FANOUT
 from backend.shared.tushare_factor_library_contracts import (
     FIELD_METADATA as FACTOR_FIELDS,
 )
@@ -21,6 +22,7 @@ from backend.shared.tushare_store import read_dataset, dataset_schema
 import test_tushare_technical_extra_pipeline as fixtures
 
 FIELDS = {**CAL_FIELDS, **FACTOR_FIELDS}
+CATALOG = json.loads((ROOT / "config/tushare-catalog.json").read_bytes())
 
 
 def source(api, **updates):
@@ -338,7 +340,179 @@ class CalendarFactorRuntime(unittest.TestCase):
         jobs = list(module.PLANNERS["factor_library"]({}, date(2026, 9, 4), ids))
         self.assertEqual({j["api_name"] for j in jobs}, {"factor_list"})
 
-    def test_actual_run_terminal_caps_keep_raw_and_block(self):
+    def test_eco_cal_countries_come_only_from_retained_source_rows(self):
+        self.capture(
+            "eco_cal",
+            {"date": "20260904"},
+            [
+                source("eco_cal", country="中国"),
+                source("eco_cal", country="美国"),
+                source("eco_cal", country="New Zealand"),
+                source("eco_cal", country="中国", event="修订事件"),
+            ],
+        )
+        self.assertEqual(
+            self.p.identifiers()["eco_cal_countries"],
+            ["New Zealand", "中国", "美国"],
+        )
+        spec = contract_for("eco_cal")
+        self.assertEqual(ECO_CAL_OBSERVED_FANOUT["family"], "eco_cal_countries")
+        self.assertEqual(ECO_CAL_OBSERVED_FANOUT["param"], "country")
+        self.assertEqual(ECO_CAL_OBSERVED_FANOUT["jobs_per_run"], 100)
+        self.assertEqual(spec["requests_per_minute"], 30)
+
+    def test_eco_cal_saturation_is_budgeted_stable_and_keeps_raw_parent(self):
+        spec = module.EXTENDED_CONTRACTS["eco_cal"]
+        seen = []
+
+        def respond(request):
+            payload = json.loads(request.content)
+            seen.append(payload["params"])
+            rows = [
+                source("eco_cal", country="中国"),
+                source("eco_cal", country="美国"),
+            ]
+            fields = list(rows[0])
+            return httpx.Response(
+                200,
+                json={
+                    "code": 0,
+                    "data": {
+                        "fields": fields,
+                        "items": [[row.get(field) for field in fields] for row in rows],
+                        "has_more": True,
+                    },
+                },
+            )
+
+        with (
+            patch.dict(spec, {"row_cap": 2}),
+            httpx.Client(
+                transport=httpx.MockTransport(respond), trust_env=False
+            ) as client,
+        ):
+            parent_id = self.p.enqueue(
+                "eco_cal", {"date": "20260904"}, 10, "saturation"
+            )
+            config = {"plan_jobs_per_tick": 1}
+            first = self.p.run(
+                client, "fixture", config, max_requests=1, max_seconds=10, pause=0
+            )
+            parent = self.p.db.execute(
+                "SELECT result FROM jobs WHERE id=?", (parent_id,)
+            ).fetchone()
+            original = json.loads(parent["result"])
+            legacy = dict(original)
+            legacy.pop("partition_deferred")
+            self.p.db.execute(
+                "UPDATE jobs SET state='blocked',result=? WHERE id=?",
+                (json.dumps(legacy), parent_id),
+            )
+            self.p.db.commit()
+            second = self.p.run(
+                client, "fixture", config, max_requests=1, max_seconds=10, pause=0
+            )
+            self.assertEqual(second["partition_work"]["status"], "partition_progress")
+            self.assertTrue(second["partition_work"]["legacy_parent_recovered"])
+            self.assertEqual(
+                self.p.db.execute(
+                    "SELECT count(*) FROM partition_children WHERE parent_id=?",
+                    (parent_id,),
+                ).fetchone()[0],
+                1,
+            )
+            self.p.close()
+            self.p = module.Pipeline(self.root, CATALOG)
+            self.addCleanup(self.p.close)
+            third = self.p.run(
+                client, "fixture", config, max_requests=1, max_seconds=10, pause=0
+            )
+
+        self.assertEqual(first["requests"], 1)
+        self.assertEqual(third["partition_work"]["status"], "partitioned")
+        self.assertEqual(seen, [{"date": "20260904"}])
+        children = [
+            (row["id"], json.loads(row["job"]), row["group_name"])
+            for row in self.p.db.execute(
+                "SELECT j.id,j.job,j.group_name FROM partition_children c "
+                "JOIN jobs j ON j.id=c.child_id WHERE c.parent_id=? ORDER BY j.id",
+                (parent_id,),
+            )
+        ]
+        self.assertEqual(
+            {json.dumps(job["params"], ensure_ascii=False, sort_keys=True) for _, job, _ in children},
+            {
+                '{"country": "中国", "date": "20260904"}',
+                '{"country": "美国", "date": "20260904"}',
+            },
+        )
+        self.assertTrue(all(group == "calendar_extra" for _, _, group in children))
+        partition = self.p.db.execute(
+            "SELECT * FROM partition_splits WHERE parent_id=?", (parent_id,)
+        ).fetchone()
+        evidence = json.loads(partition["evidence"])
+        self.assertEqual((partition["coverage_proven"], partition["gap"]), (0, "universe_unverified"))
+        self.assertEqual(evidence["new_job_budget"], 1)
+        self.assertEqual(evidence["observed_values_remaining"], 0)
+        saved = json.loads(
+            self.p.db.execute(
+                "SELECT result FROM jobs WHERE id=?", (parent_id,)
+            ).fetchone()[0]
+        )
+        self.assertEqual(
+            (saved["object_sha256"], saved["observation"]),
+            (original["object_sha256"], original["observation"]),
+        )
+        self.assertNotIn("partition_deferred", saved)
+        self.assertEqual(
+            saved["partition_recovery"],
+            {"version": 1, "source_state": "blocked", "upstream_calls": 0},
+        )
+        count = self.p.db.execute("SELECT count(*) FROM jobs").fetchone()[0]
+        with patch.dict(spec, {"row_cap": 2}):
+            for child_id, job, _ in children:
+                self.assertEqual(
+                    self.p.enqueue("eco_cal", job["params"], 99, "saturation"),
+                    child_id,
+                )
+        self.assertEqual(self.p.db.execute("SELECT count(*) FROM jobs").fetchone()[0], count)
+
+    def test_eco_cal_discovery_does_not_reset_parent_planning_cursor(self):
+        config = {
+            "enable_calendar_extra": True,
+            "calendar_extra_apis": ["eco_cal"],
+            "calendar_extra_history_start": "20260901",
+            "plan_jobs_per_tick": 1,
+            "history_plan_seconds": 5,
+        }
+        self.p.plan_extended(config, date(2026, 9, 4))
+        before = self.p.db.execute(
+            "SELECT signature,offset,done FROM planning_state "
+            "WHERE name='recent:calendar_extra'"
+        ).fetchone()
+        self.capture(
+            "eco_cal",
+            {"date": "20260801"},
+            [source("eco_cal", country="新加坡")],
+        )
+        stats = self.p.plan_extended(config, date(2026, 9, 4))
+        after = self.p.db.execute(
+            "SELECT signature,offset,done FROM planning_state "
+            "WHERE name='recent:calendar_extra'"
+        ).fetchone()
+        self.assertEqual(after["signature"], before["signature"])
+        self.assertEqual(after["offset"], before["offset"] + 1)
+        self.assertEqual(stats["recent:calendar_extra"]["new_jobs"], 1)
+        self.assertLessEqual(
+            stats["recent:calendar_extra"]["new_jobs"], config["plan_jobs_per_tick"]
+        )
+        gap = self.p.db.execute(
+            "SELECT status FROM capability "
+            "WHERE scope='planning:calendar_extra:eco_cal:saturation_gap'"
+        ).fetchone()
+        self.assertEqual(gap["status"], "coverage_unverified")
+
+    def test_actual_run_terminal_caps_keep_raw_and_supported_fanout_defers(self):
         keys = []
         for api in FIELDS:
             request_params = params(api)
@@ -375,8 +549,11 @@ class CalendarFactorRuntime(unittest.TestCase):
             row = self.p.db.execute(
                 "SELECT state,result FROM jobs WHERE id=?", (key,)
             ).fetchone()
-            self.assertEqual(row["state"], "blocked")
             result = json.loads(row["result"])
+            expected = (
+                "split_pending" if result["api_name"] == "eco_cal" else "blocked"
+            )
+            self.assertEqual(row["state"], expected)
             self.assertEqual(result["status"], "possibly_truncated")
             self.assertTrue(
                 (self.root / "observations" / result["observation"]).is_file()

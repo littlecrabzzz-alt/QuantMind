@@ -181,6 +181,14 @@ CALENDAR_EXTRA_CONTRACTS["idx_anns"].update(
     saturation_gap="Initial unfiltered all-source dates preserve newly appearing sources. Legal src can narrow a saturated date, but source-universe completeness is unverified; source/day cap has no title/type/page filter.",
 )
 
+# Runtime-only saturation discovery is intentionally outside the planner contract.
+# Adding observed countries must not change/reset the parent calendar cursor.
+ECO_CAL_OBSERVED_FANOUT = {
+    "family": "eco_cal_countries",
+    "param": "country",
+    "jobs_per_run": 100,
+}
+
 
 def _enabled(config):
     selected = config.get("calendar_extra_apis", tuple(CALENDAR_EXTRA_CONTRACTS))
