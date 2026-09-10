@@ -29,8 +29,14 @@
     "receipt_id": "e8cc0b85a19257fed58e27d48f584f544a8fb3aeb861bb105b680177cb73a860",
     "elapsed_seconds": 49.349,
     "upstream_calls": 360,
-    "before": {"pending": 360},
-    "after": {"done": 165, "empty": 53, "split_pending": 142},
+    "before": {
+      "pending": 360
+    },
+    "after": {
+      "done": 165,
+      "empty": 53,
+      "split_pending": 142
+    },
     "release_published_by_runner": false,
     "current_switched_by_runner": false,
     "published_release": "data-3eee75afb22ae4bea72b9ac5826e6bea6b7d98f0f2e600adfd1b04f11677c2e1",
@@ -59,5 +65,49 @@
   "sensitive_content": {
     "token": false,
     "upstream_response_body": false
+  },
+  "second_batch": {
+    "executed_at": "2026-09-10T15:34:00Z",
+    "deployed_revision": "215ffb0a334154b74c3aa5285ab752bbb24c94dc",
+    "manifest_path": "/data/tushare/validation/fund-nav-batch-20260910/batch-2-manifest.json",
+    "manifest_sha256": "2e82be986b08365bef13a698824c17d977eccdda3e16f32aa75149e5dcd19eed",
+    "task_set_sha256": "3e565c4481ae643f449bab7cbe75bcbb8b5b496d032896ecc1381fd78d342858",
+    "authority_config_sha256": "da45afae322463eacd54a97203f2ede46a9ff86aafbb58e6bec26b57ea009853",
+    "prepare_helper_sha256": "a4a4320a361cb710fb8fe6d91b0d4f6075d1a01e8c3dd8df2adbebccc27ba26e",
+    "runner_helper_sha256": "5fa32b52871722d8ab6c74e999f442d201a4cbef2b7f081228697148c7f7fe89",
+    "verified_jobs": 360,
+    "selection": {
+      "pending_split_leaf": 290,
+      "pending_history_root": 70,
+      "funds": 215
+    },
+    "upstream_calls": 360,
+    "elapsed_seconds": 48.565,
+    "before": {
+      "pending": 360
+    },
+    "after": {
+      "done": 133,
+      "empty": 93,
+      "split_pending": 134
+    },
+    "release_published_by_runner": false,
+    "current_switched_by_runner": false,
+    "release_before_batch": "data-1ed56821ebf8f42ca999dc754829b80fa0ee27cbae3a0501ec399001ee62e10f",
+    "receipt_path": "/data/tushare/validation/fund-nav-batch-20260910/acceptance-batch-2.json",
+    "receipt_sha256": "e4277d3b3537dd65a31982ba03db072bf0bae5a9488bbfd431f4cb48c8b70b35",
+    "receipt_id": "782d1e2350fe23fb78d8116acd186b7ade8908e28f1a1a160910887593f93a15",
+    "published_by_scheduled_pipeline_after_batch": false,
+    "release_before_batch_mac_mirror": {
+      "status": "verified",
+      "release_id": "data-1ed56821ebf8f42ca999dc754829b80fa0ee27cbae3a0501ec399001ee62e10f",
+      "downloaded_files": 10090,
+      "verified_files": 656514,
+      "last_exit_code": 0,
+      "contains_second_batch": false,
+      "completed_at": "2026-09-10T15:41:08Z",
+      "manifest_sha256_verified": true,
+      "error_log_bytes": 0
+    }
   }
 }

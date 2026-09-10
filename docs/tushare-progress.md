@@ -598,3 +598,12 @@
 - `66df93ba`上线`eco_cal`饱和后的来源观察值拆分。两个各100行的旧封顶父任务均从已保存object/observation原地恢复，父请求重发0次、原始引用和尝试保持；每个父任务连接24个后代并保留`coverage_proven=0 / universe_unverified`。Tushare原始`country`字段同时含国家名与分类标识，均按来源原样处理，不凭名称删值。
 - 阶段快照后继续由`calendar_extra`常规队列自然消费，48个唯一后代最终为24 done/24 empty，全部48次请求HTTP200、每个后代只尝试一次；空结果保留`empty_unverified`。最终闭包收据`/data/tushare/validation/eco-cal-saturation-20260910/closure-20260910T150820Z.json`，SHA256 `31499010eb699b440b69f48831c383197c092da710138db7e68d4d110bf3ade4`。
 - 完整回归989项、生产镜像断网专项29项及Ruff通过。结构化worker和Beat保持运行，文档worker继续按容量缓解方案停用；发布周期3600秒、账户灰度500rpm、单接口既有限速、100GiB硬停线均未改。扩盘仍是外部云控制面动作，不缩减已登记数据范围。 23:12复核worker/Beat均healthy、OOM false、restart0，部署后16个任务成功、HTTP429/错误/任务失败均为0；云盘可用148709466112字节，距100GiB停线41335283712字节（38.496GiB）。`fund_share`独立历史游标仍为offset26788/done1。
+
+## 2026-09-10 23:36 第七批财务三表与第二批基金净值
+
+- 23:16一次只读审计与生产SQLite写事务重叠，任务 `f08cc911…` 在响应检查点提交时触发一次 `database is locked`。审计连接全部关闭后，自动重试任务 `d4549374…` 在155.511秒内成功；未重启服务、没有遗留读连接。由于失败发生在响应提交边界，该次网络响应可能被后续任务重新请求，本轮不宣称这一故障窗口上游调用严格去重。后续审计只使用离线backup或短自动提交查询。
+- 下一小时自动任务 `50d567d4…` 在258.323秒内完成0请求固定发布，原子切换到 `data-1ed56821ebf8f42ca999dc754829b80fa0ee27cbae3a0501ec399001ee62e10f`。固定清单对比确认 `eco_cal` 新增的48个终态后代已进入该版：24 `done`、24 `empty`；两个来源父任务仍保留 `split_pending / universe_unverified`，不外推来源国家全集。
+- 发布后排空并暂停专用Tushare worker和Beat。第七批财务三表清单与两次审计重算一致，360项均为首次尝试；85.137秒内三接口各完成120次，分别118 `done`、2 `empty`，批内0 `pending`。清单SHA `421403ebe023809072473eedf44015376e6c24d9f240afe3f34407e838d7ee9d`，收据SHA `a3b5dd26a914c1d1ceae78d7ac4aac623e4d871fdbf1ce33385f519e46fa6bf0`。
+- 同一独占窗口按只读价值审计执行第二批 `fund_nav`：固定290个拆分叶和70个历史根、共215只基金，全部 `pending/tries=0` 且与首批无重叠。48.565秒完成360次请求，结果133 `done`、93 `empty`、134 `split_pending`；后者继续由标准日期二分处理。清单SHA `2e82be986b08365bef13a698824c17d977eccdda3e16f32aa75149e5dcd19eed`，收据SHA `e4277d3b3537dd65a31982ba03db072bf0bae5a9488bbfd431f4cb48c8b70b35`。
+- 两个精确批次均通过manifest、任务集合、生产配置、prepare/runner哈希、authority、schema6、共享锁和100GiB余量校验；合计720次请求，不发布、不切换CURRENT。结束后worker和Beat恢复healthy；先后成功完成一次153.294秒规划和一次62.446秒采集，继续收到后续正常任务，未出现新锁错或HTTP429。文档worker继续按容量缓解方案停用。23:41云盘可用147862343680字节，距100GiB停线40488161280字节（37.708GiB）。这两个批次等待2026-09-11 00:26:31到期的下一次固定版周期统一发布。
+- 标准Mac LaunchAgent按900秒周期自动启动镜像，没有手工触发；23:41:08新增下载10090个文件、完整校验656514个文件后退出0并原子追平 `data-1ed568…`，本地manifest SHA一致、错误日志0字节。该版包含本轮发布前的 `eco_cal` 及既有终态；刚执行的财务第七批和 `fund_nav` 第二批仍需下一次固定版发布后才会进入Mac。

@@ -185,5 +185,49 @@
       "verified_files": 646423,
       "last_exit_code": 0
     }
+  },
+  "seventh_batch": {
+    "executed_at": "2026-09-10T15:31:00Z",
+    "deployed_revision": "215ffb0a334154b74c3aa5285ab752bbb24c94dc",
+    "manifest_path": "/data/tushare/validation/financial-pit-batch-20260910/batch-7-manifest.json",
+    "manifest_sha256": "421403ebe023809072473eedf44015376e6c24d9f240afe3f34407e838d7ee9d",
+    "all_task_ids_sha256": "24a6f2b6af84a92c47e93bb30438846bebc381f95c01e912d5bddc3e9a8bd60a",
+    "authority_config_sha256": "da45afae322463eacd54a97203f2ede46a9ff86aafbb58e6bec26b57ea009853",
+    "helper_sha256": "7b2e40d3a4e7b4feda1ff50e1e3c8f07eb9c34931cd12e3122e3f7c104aa2658",
+    "verified_jobs": 360,
+    "upstream_calls": 360,
+    "elapsed_seconds": 85.137,
+    "api_results": {
+      "income_vip": {
+        "done": 118,
+        "empty": 2
+      },
+      "balancesheet_vip": {
+        "done": 118,
+        "empty": 2
+      },
+      "cashflow_vip": {
+        "done": 118,
+        "empty": 2
+      }
+    },
+    "release_published": false,
+    "current_release_switched": false,
+    "release_before_batch": "data-1ed56821ebf8f42ca999dc754829b80fa0ee27cbae3a0501ec399001ee62e10f",
+    "receipt_path": "/data/tushare/validation/financial-pit-batch-20260910/acceptance-batch-7.json",
+    "receipt_sha256": "a3b5dd26a914c1d1ceae78d7ac4aac623e4d871fdbf1ce33385f519e46fa6bf0",
+    "receipt_id": "d953a4e31f3dfaccb8649cb54110a9b1fc36427ed6f561aa1b072b9f67cb5069",
+    "published_by_scheduled_pipeline_after_batch": false,
+    "release_before_batch_mac_mirror": {
+      "status": "verified",
+      "release_id": "data-1ed56821ebf8f42ca999dc754829b80fa0ee27cbae3a0501ec399001ee62e10f",
+      "downloaded_files": 10090,
+      "verified_files": 656514,
+      "last_exit_code": 0,
+      "contains_seventh_batch": false,
+      "completed_at": "2026-09-10T15:41:08Z",
+      "manifest_sha256_verified": true,
+      "error_log_bytes": 0
+    }
   }
 }
