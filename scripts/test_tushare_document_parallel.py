@@ -184,6 +184,39 @@ class ParallelDocuments(unittest.TestCase):
             1,
         )
 
+    def test_download_wave_timing_exposes_idle_slot(self):
+        self.seed(2)
+        barrier = threading.Barrier(2)
+
+        def fetch(url, root, timeout, *, download_only=False):
+            barrier.wait(timeout=2)
+            time.sleep(0.01 if url.endswith("/0") else 0.08)
+            return {
+                "status": "download_timeout",
+                "parse_status": "not_attempted",
+                "files": [],
+            }
+
+        with patch.object(docs, "_download_job", side_effect=fetch):
+            report = docs.run_documents(
+                self.root, max_documents=2, max_seconds=2, download_workers=2
+            )
+        timing = report["timing"]
+        self.assertEqual(timing["download_waves"], 1)
+        self.assertGreaterEqual(timing["download_wave_seconds"], 0.07)
+        self.assertGreaterEqual(timing["download_slot_idle_seconds"], 0.04)
+        self.assertAlmostEqual(
+            timing["download_slot_capacity_seconds"],
+            2 * timing["download_wave_seconds"],
+            places=5,
+        )
+        self.assertAlmostEqual(
+            timing["download_slot_idle_seconds"],
+            timing["download_slot_capacity_seconds"]
+            - timing["download_job_seconds"],
+            places=5,
+        )
+
     def test_defaults_rollback_mode_can_parse_saved_pending_without_download(self):
         self.seed(1)
         with patch.object(docs, "_download_job", return_value=self.download()) as fetch:

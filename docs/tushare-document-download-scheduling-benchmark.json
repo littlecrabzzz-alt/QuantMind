@@ -1,0 +1,261 @@
+{
+  "baseline_commit": "b3d482b805534f426672c182b563e8cd2bfdc877",
+  "cases": {
+    "equal_100ms_100ms": {
+      "baseline": {
+        "download_seconds_alternating": [
+          0.1,
+          0.1
+        ],
+        "elapsed_seconds": [
+          1.116266,
+          1.101886,
+          1.127672,
+          1.106819,
+          1.128995
+        ],
+        "median_elapsed_seconds": 1.116266,
+        "peak_downloads": [
+          2
+        ],
+        "processed": [
+          24
+        ],
+        "refill_jobs": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "candidate": {
+        "download_seconds_alternating": [
+          0.1,
+          0.1
+        ],
+        "elapsed_seconds": [
+          1.13129,
+          1.111609,
+          1.113999,
+          1.139055,
+          1.086389
+        ],
+        "median_elapsed_seconds": 1.113999,
+        "peak_downloads": [
+          2
+        ],
+        "processed": [
+          24
+        ],
+        "refill_jobs": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "candidate_wall_change_percent": -0.203
+    },
+    "moderate_40ms_120ms": {
+      "baseline": {
+        "download_seconds_alternating": [
+          0.04,
+          0.12
+        ],
+        "elapsed_seconds": [
+          1.236833,
+          1.187308,
+          1.218204,
+          1.241891,
+          1.188905
+        ],
+        "median_elapsed_seconds": 1.218204,
+        "peak_downloads": [
+          2
+        ],
+        "processed": [
+          24
+        ],
+        "refill_jobs": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "candidate": {
+        "download_seconds_alternating": [
+          0.04,
+          0.12
+        ],
+        "elapsed_seconds": [
+          1.225395,
+          1.180645,
+          1.212429,
+          1.223773,
+          1.19071
+        ],
+        "median_elapsed_seconds": 1.212429,
+        "peak_downloads": [
+          2
+        ],
+        "processed": [
+          24
+        ],
+        "refill_jobs": [
+          4,
+          4,
+          4,
+          4,
+          4
+        ]
+      },
+      "candidate_wall_change_percent": -0.474
+    },
+    "slight_100ms_160ms": {
+      "baseline": {
+        "download_seconds_alternating": [
+          0.1,
+          0.16
+        ],
+        "elapsed_seconds": [
+          1.478374,
+          1.48582,
+          1.472271,
+          1.485401,
+          1.479905
+        ],
+        "median_elapsed_seconds": 1.479905,
+        "peak_downloads": [
+          2
+        ],
+        "processed": [
+          24
+        ],
+        "refill_jobs": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "candidate": {
+        "download_seconds_alternating": [
+          0.1,
+          0.16
+        ],
+        "elapsed_seconds": [
+          1.5701,
+          1.643394,
+          1.656127,
+          1.663258,
+          1.680237
+        ],
+        "median_elapsed_seconds": 1.656127,
+        "peak_downloads": [
+          2
+        ],
+        "processed": [
+          24
+        ],
+        "refill_jobs": [
+          2,
+          3,
+          3,
+          4,
+          3
+        ]
+      },
+      "candidate_wall_change_percent": 11.908
+    },
+    "strong_40ms_200ms": {
+      "baseline": {
+        "download_seconds_alternating": [
+          0.04,
+          0.2
+        ],
+        "elapsed_seconds": [
+          1.717999,
+          1.708323,
+          1.698329,
+          1.709053,
+          1.714055
+        ],
+        "median_elapsed_seconds": 1.709053,
+        "peak_downloads": [
+          2
+        ],
+        "processed": [
+          24
+        ],
+        "refill_jobs": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "candidate": {
+        "download_seconds_alternating": [
+          0.04,
+          0.2
+        ],
+        "elapsed_seconds": [
+          1.511317,
+          1.515734,
+          1.511914,
+          1.504865,
+          1.508577
+        ],
+        "median_elapsed_seconds": 1.511317,
+        "peak_downloads": [
+          2
+        ],
+        "processed": [
+          24
+        ],
+        "refill_jobs": [
+          4,
+          4,
+          4,
+          4,
+          4
+        ]
+      },
+      "candidate_wall_change_percent": -11.57
+    }
+  },
+  "conclusion": {
+    "default_scheduler_change": "rejected",
+    "next_experiment": "Collect at least 20 normal production task receipts after deployment, with no live SQLite audit transaction. Compute idle_ratio=download_slot_idle_seconds/download_slot_capacity_seconds, parse share, phase counts, parsed/hour, timeouts and OOM. Only test refill if idle_ratio is material and stable; compare fixed task counts and roll back on lower parsed/hour, any OOM, more unfinished claims, or evidence/retry mismatch.",
+    "safe_candidate": "report-only download wave wall and idle-slot timing"
+  },
+  "fixture": {
+    "documents": 12,
+    "max_download_subprocesses": 2,
+    "max_parser_subprocesses": 1,
+    "network": "disabled; download jobs are deterministic sleeps",
+    "parse": "deterministic sleep; asserts zero active downloads",
+    "parse_seconds_each": 0.03,
+    "phases": {
+      "download": 12,
+      "parse": 12
+    },
+    "runs_per_case": 5,
+    "sqlite_queue": "temporary real documents.sqlite with real claim and finish paths"
+  },
+  "mode": "offline_no_network_synthetic_scheduler_benchmark",
+  "observed_at": "2026-09-10T05:45:00Z",
+  "rejected_prototype": {
+    "description": "After the first job in a two-download wave finishes, wait 50ms and, only when its peer is still running and phase budget reserves matching parse turns, claim one replacement. At most two transfers remain active and parsing waits for the wave to drain.",
+    "focused_state_tests": "14 passed before prototype was reverted",
+    "maximum_claimed_downloads_per_wave": 3,
+    "reason_rejected": "A legal mild-skew ordering can admit a slower replacement and increase wall time; production has no per-wave distribution evidence to rule this out."
+  },
+  "schema_version": 1
+}

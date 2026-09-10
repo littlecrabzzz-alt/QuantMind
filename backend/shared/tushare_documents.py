@@ -1114,6 +1114,10 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
         "finish_db_total_seconds": 0.0,
         "download_jobs": 0,
         "download_job_seconds": 0.0,
+        "download_waves": 0,
+        "download_wave_seconds": 0.0,
+        "download_slot_capacity_seconds": 0.0,
+        "download_slot_idle_seconds": 0.0,
         "parse_jobs": 0,
         "parse_job_seconds": 0.0,
     }
@@ -1148,6 +1152,8 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                 if not jobs:
                     break
                 if phase == "download":
+                    wave_started = time.monotonic()
+                    wave_job_seconds = 0.0
 
                     def transfer(job):
                         budget = min(20, max(0.001, deadline - time.monotonic()))
@@ -1172,11 +1178,20 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                             result, job_error, job_seconds = future.result()
                             timing["download_jobs"] += 1
                             timing["download_job_seconds"] += job_seconds
+                            wave_job_seconds += job_seconds
                             if job_error is not None:
                                 result = _document_failure(job, "download", job_error)
                             _finish_document(db, owner, job, result, "download", timing)
                             phase_counts["download"] += 1
                             processed += 1
+                    wave_seconds = time.monotonic() - wave_started
+                    slot_capacity = len(jobs) * wave_seconds
+                    timing["download_waves"] += 1
+                    timing["download_wave_seconds"] += wave_seconds
+                    timing["download_slot_capacity_seconds"] += slot_capacity
+                    timing["download_slot_idle_seconds"] += max(
+                        0.0, slot_capacity - wave_job_seconds
+                    )
                     parse_turns = 2
                 else:
                     job = jobs[0]
