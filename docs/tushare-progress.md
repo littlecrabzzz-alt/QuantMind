@@ -700,3 +700,19 @@
 - 生产Python 3.10镜像中store/CLI/API/Agent联合21项通过；Mac宿主Python 3.13因未安装`duckdb`无法运行数据测试，不是代码回归。云端对固定版`data-f9c557…`屏蔽socket/DNS并置空Token，FastAPI与QuantBot都在未指定`code_field`时查到5行`SH000300`指数权重，首行一致，`upstream_calls=0`。
 - 代码已推送GitHub并在云端快进到同一提交；只重启`quantmind` API、健康检查HTTP 200。`tushare-worker`、Beat和DB未因这次代码发布重启，采集任务继续成功接续。
 - 保留数据缺口：旧固定版`index_weight.con_code`仍为`000001.SZ`这类供应商格式，没有`source_con_code`，不应与内部`SH/SZ/BJ`前缀代码直接联接。研究适配层暂时需显式转换；后续固定版再保留来源字段并发布内部规范列。证据为`docs/tushare-reader-default-20260911.evidence.json`。
+
+## 2026-09-11 05:02 第二次精确波次发布与指数成分代码兼容
+
+- 正常发布首次在采集后进入约275MB清单序列化时触发300秒软上限；两个恢复子进程随后碰到`tushare-worker`的1GiB cgroup上限并被内核OOM终止。Beat停止、精确consumer取消后，最后一个已在途的恢复任务在288.135秒内完成原子发布，`CURRENT`切到`data-7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09`。这不是上游、磁盘或数据损坏；发布intent和不可变目录使重试没有重复抓取或暴露半成品。
+- 新固定版逐项包含04:06波次的1440个唯一任务：1120 done、172 empty、148 split_pending；重算1440个object、1440个observation和1268个Parquet实体SHA均通过，manifest gap匹配320项，验证错误0。闭包报告SHA256为`55ca1d341ea1c6a44ec3ee26ed67f132a410c1ba9092f60045301d99225137dc`，机器证据为`docs/tushare-exact-wave-fixed-release-20260911.evidence.json`。
+- `cb7fffa7`使未来`index_weight`写入同时保存内部前缀`con_code`和供应商原值`source_con_code`，store在查询旧版或混合分区时做兼容投影并按规范自然键去重，不回写不可变Parquet。生产固定版禁socket/DNS、空Token读取中，FastAPI与QuantBot均自动按`index_code=SH000300`返回5行；首行`con_code=SH600000`、`source_con_code=600000.SH`，上游调用0。机器证据`docs/tushare-index-constituent-normalization-20260911.evidence.json` SHA256为`cec13affe749d76b350c44f1e499c67b1f7653653304c14916d701f0db1cb125`。
+- `f71e407a`只把云端专用`tushare-worker`内存额度从1GiB增至2GiB。排空后重建的worker实际限制2147483648字节、healthy、restart0、OOM false，并加载上述代码；Beat单独重建为healthy。DB、主API、文档及其他市场worker未因容量修复重建。
+- Mac标准LaunchAgent第144轮新增下载11459个文件并完整校验716614个文件，exit 0、错误日志0字节，原子追平同一固定版；本地manifest实算SHA与release ID一致。Mac生产镜像容器在`--network none`、空Token和只读镜像挂载下得到与云端相同的5行指数成分结果，上游调用0。单向镜像证据`docs/tushare-fixed-release-mirror-20260911.evidence.json` SHA256为`eb96be4d3efa23a4d628e01788e0e84a2f094a946d238b6c16d8e72653813b0f`。
+
+## 2026-09-11 05:08 核心行情第一批真实补采
+
+- `056ad757`新增复用既有exact helper的核心行情冻结/执行入口；首次生产prepare因真实job还含字段和质量合同元数据而安全失败，0上游调用、未生成manifest。`5a196944`修正为允许这些已纳入task identity的标准元数据，同时继续严格限制六个API和唯一`trade_date`参数。生产镜像9项核心及helper回归通过。
+- 停写authority以新固定版和全部`trade_cal`实体SHA冻结60个共同SSE开市日，范围20250829—20251226；`daily`、`adj_factor`、`daily_basic`、`stk_limit`、`suspend_d`、`moneyflow`各60项，共360项，全部pending/tries0。manifest SHA为`cf7ee55cfd0288af9ac91f69f6f6c5f487c0547d169f94effea72249512402a9`；plan-only确认authority、凭据、网络、写入和发布均未访问。
+- 真实执行受90秒硬窗约束，90.103秒完成340次请求，339 done、20项尚未开始、1项blocked，返回1529654行；按API为`adj_factor`310797、`daily`304489、`daily_basic`304489、`moneyflow`293838、`stk_limit`315191、`suspend_d`850。持续等效吞吐226.408次/分钟，低于500rpm账户门，主因是大结果本地转换与落盘；没有429或供应商限频证据，不能用请求上限冒充实际端到端吞吐。
+- blocked项是`stk_limit@20251009`：HTTP 200且5516行raw object/observation已保存，硬截止在normalize阶段触发`TimeoutError`，未生成Parquet；其余20项保持pending/tries0，由常规队列继续。闭包重算340个object、340个observation和339个Parquet实体SHA，`CURRENT`保持上述固定版；receipt SHA256为`5cb56861e295be7818598f6bc57e205ffd8b9a54856447dc52955f18190ca15f`，闭包SHA256为`ecba9e2f29da9b5b3e43ba4504697673e990d3eda9485bf49563588e658cbdca`，机器证据为`docs/tushare-core-market-batch-20260911.evidence.json`。
+- 全局`history_complete=false`、修订/PIT未验证，RRG仍为`blocked_data`。云盘可用约142.39GB，高于100GiB停采线；本批只扩充权威存量，后续固定发布和Mac自动镜像仍按单向协议完成。

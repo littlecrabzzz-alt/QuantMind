@@ -1,0 +1,57 @@
+{
+  "authority_free_bytes": 142683267072,
+  "batch_task_counts": {
+    "financial": 360,
+    "fund_nav": 360,
+    "fund_share": 360,
+    "index_weight": 360
+  },
+  "current_json_sha256": "69f7a1a461e9700c5b3a077bf2fcb5cad59d0139326f48cc392c7ad5f1635588",
+  "dataset_matches": 1268,
+  "fixed_release_includes_exact_wave": true,
+  "gap_matches": 320,
+  "generated_at": "2026-09-10T21:02:40.525674+00:00",
+  "historical_versions_complete": false,
+  "history_complete": false,
+  "reference_occurrences": {
+    "object": 1440,
+    "observation": 1440,
+    "parquet": 1268
+  },
+  "release_coverage": {
+    "blocked": 758,
+    "deferred_legacy_period_plan": 9802,
+    "done": 85404,
+    "empty": 78628,
+    "pending": 3783988,
+    "permission_blocked": 2329,
+    "quality": 344,
+    "resolved": 1559,
+    "split_pending": 3092
+  },
+  "release_id": "data-7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+  "release_manifest_sha256": "7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+  "rrg_status": "blocked_data",
+  "schema_version": 1,
+  "source_window_summary": "validation/exact-wave-20260911T0406/window-summary.json",
+  "source_window_summary_sha256": "e88c8f8638bcc22d1f8d5495c7bea98c7ebef89895efce94ea1db9f53ae4203a",
+  "status": "verified",
+  "task_states": {
+    "done": 1120,
+    "empty": 172,
+    "split_pending": 148
+  },
+  "tasks": 1440,
+  "unique_reference_bytes": {
+    "object": 28835561,
+    "observation": 1838970,
+    "parquet": 39608105
+  },
+  "unique_references_verified": {
+    "object": 1440,
+    "observation": 1440,
+    "parquet": 1268
+  },
+  "unique_tasks": 1440,
+  "validation_errors": []
+}

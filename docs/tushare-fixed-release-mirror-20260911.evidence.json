@@ -1,0 +1,55 @@
+{
+  "current": {
+    "manifest_sha256": "7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+    "release_id": "data-7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09"
+  },
+  "error_log_bytes": 0,
+  "launchagent_last_exit_code": 0,
+  "launchagent_runs": 144,
+  "mac_writes_back_to_cloud": false,
+  "manifest_sha256": "7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+  "mirror": {
+    "coverage": {
+      "blocked": 758,
+      "deferred_legacy_period_plan": 9802,
+      "done": 85404,
+      "empty": 78628,
+      "pending": 3783988,
+      "permission_blocked": 2329,
+      "quality": 344,
+      "resolved": 1559,
+      "split_pending": 3092
+    },
+    "downloaded_files": 11459,
+    "files": 716614,
+    "release_id": "data-7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+    "status": "verified"
+  },
+  "network_mode": "none",
+  "offline_reader": {
+    "agent_first": {
+      "con_code": "SH600000",
+      "index_code": "SH000300",
+      "source_con_code": "600000.SH",
+      "trade_date": "20260630",
+      "weight": 0.406
+    },
+    "agent_rows": 5,
+    "api_first": {
+      "con_code": "SH600000",
+      "index_code": "SH000300",
+      "source_con_code": "600000.SH",
+      "trade_date": "20260630",
+      "weight": 0.406
+    },
+    "api_rows": 5,
+    "default_code_field": "index_code",
+    "release_id": "data-7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+    "upstream_calls": 0
+  },
+  "release_id": "data-7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+  "schema_version": 1,
+  "status": "verified",
+  "sync_direction": "cloud_fixed_release_to_mac_read_only",
+  "token_present": false
+}

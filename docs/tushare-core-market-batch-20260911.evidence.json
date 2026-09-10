@@ -1,0 +1,222 @@
+{
+  "attempts_by_api": {
+    "adj_factor": 57,
+    "daily": 56,
+    "daily_basic": 56,
+    "moneyflow": 57,
+    "stk_limit": 57,
+    "suspend_d": 57
+  },
+  "authority_free_bytes": 142389047296,
+  "batch_manifest": "validation/core-market-batch-20260911/batch-1-manifest.json",
+  "batch_manifest_sha256": "cf7ee55cfd0288af9ac91f69f6f6c5f487c0547d169f94effea72249512402a9",
+  "blocked_tasks": [
+    {
+      "api_name": "stk_limit",
+      "error": null,
+      "http_status": 200,
+      "status": "sample_ok",
+      "task_id": "2a6b977688ea4ab1046839b5acf6aac0fdd4c5c9aa4949a633e5659854d5d203",
+      "trade_date": "20251009",
+      "tries": 1
+    }
+  ],
+  "current_json_sha256": "69f7a1a461e9700c5b3a077bf2fcb5cad59d0139326f48cc392c7ad5f1635588",
+  "current_unchanged": true,
+  "effective_calls_per_minute": 226.408,
+  "elapsed_seconds": 90.103,
+  "execution_receipt": "validation/core-market-batch-20260911/acceptance-batch-1.json",
+  "execution_receipt_sha256": "5cb56861e295be7818598f6bc57e205ffd8b9a54856447dc52955f18190ca15f",
+  "generated_at": "2026-09-10T21:08:10.866748+00:00",
+  "history_complete": false,
+  "pending_tasks": [
+    {
+      "api_name": "daily",
+      "task_id": "31f7b37c4135f9fe42e9ac601096907ba4d54abd8dc6dd0c01459173b9ce34eb",
+      "trade_date": "20251009",
+      "tries": 0
+    },
+    {
+      "api_name": "daily_basic",
+      "task_id": "22bbbca4b15094d77dc1b8e5487fecd961ea2863bfc6c1d44975b2f6fc266b4d",
+      "trade_date": "20251009",
+      "tries": 0
+    },
+    {
+      "api_name": "daily",
+      "task_id": "64454f068e8ade93a0fe270e3e19786d1783f1f83d98e142a9213ee23c927804",
+      "trade_date": "20250902",
+      "tries": 0
+    },
+    {
+      "api_name": "adj_factor",
+      "task_id": "86d4bfe1ef0dc5409363ceb0b314e6041488c47fc3dcfc3f181413e3c4dc4b55",
+      "trade_date": "20250902",
+      "tries": 0
+    },
+    {
+      "api_name": "daily_basic",
+      "task_id": "697ea199894dc4f00c577a6fe935f3786fe367c45a2a1aba02cfdca652c186f9",
+      "trade_date": "20250902",
+      "tries": 0
+    },
+    {
+      "api_name": "stk_limit",
+      "task_id": "823fe3bdc39c7457305d76cc0853f74e242374497e38c142b4e1ac2f0651fccf",
+      "trade_date": "20250902",
+      "tries": 0
+    },
+    {
+      "api_name": "suspend_d",
+      "task_id": "d3700770a9e4dfab4851ef0381ab1be9271b827bccc2173987d1696ae000ba1a",
+      "trade_date": "20250902",
+      "tries": 0
+    },
+    {
+      "api_name": "moneyflow",
+      "task_id": "538d8f540d5187dcf8795de8c799f3a8f5345c9dd98de8b780fcca154a9492df",
+      "trade_date": "20250902",
+      "tries": 0
+    },
+    {
+      "api_name": "daily",
+      "task_id": "8594a971be85612c418b7e75f000b01f2b47e6669c7f85bf7ab28916eb736443",
+      "trade_date": "20250901",
+      "tries": 0
+    },
+    {
+      "api_name": "adj_factor",
+      "task_id": "f0de8f6ea99fcb84b9ef9001811e8f698c15941ac11c9dd8909fd658cdea88ee",
+      "trade_date": "20250901",
+      "tries": 0
+    },
+    {
+      "api_name": "daily_basic",
+      "task_id": "638d668610262c34a3e7feeeaea252a20b083915dc850865fc73eedb285af7c5",
+      "trade_date": "20250901",
+      "tries": 0
+    },
+    {
+      "api_name": "stk_limit",
+      "task_id": "1d50aaf98b1764f97ccbe3cb0aab071eaa08b36dbeb774c61ccda8aac4689239",
+      "trade_date": "20250901",
+      "tries": 0
+    },
+    {
+      "api_name": "suspend_d",
+      "task_id": "12af950044f8d906e084c7619da33ff9602809b9e251bf0780dd7e29b6bac214",
+      "trade_date": "20250901",
+      "tries": 0
+    },
+    {
+      "api_name": "moneyflow",
+      "task_id": "e3bede172444872f2437610411fff52a7cc715134322c1f36ef05815153e4844",
+      "trade_date": "20250901",
+      "tries": 0
+    },
+    {
+      "api_name": "daily",
+      "task_id": "44d92cee86869478864d4c66428f44aa8a0791109870644aa1f4cc9a8a11a100",
+      "trade_date": "20250829",
+      "tries": 0
+    },
+    {
+      "api_name": "adj_factor",
+      "task_id": "12430e47224e2dc6745874b0eb6018b2d97ad1c7818ecc58fa1d6500d057408a",
+      "trade_date": "20250829",
+      "tries": 0
+    },
+    {
+      "api_name": "daily_basic",
+      "task_id": "31674e1a2c4b550f4af92f3222dcf35549107ca270cd77147dfdc3c29ad38878",
+      "trade_date": "20250829",
+      "tries": 0
+    },
+    {
+      "api_name": "stk_limit",
+      "task_id": "c32a0e4884605179fcce2586bef3010db4a9951a3990c2f589e124ee53f89772",
+      "trade_date": "20250829",
+      "tries": 0
+    },
+    {
+      "api_name": "suspend_d",
+      "task_id": "60d04e5c46536e41520855a63bc473e695adaecb5336920712819a57b514c7de",
+      "trade_date": "20250829",
+      "tries": 0
+    },
+    {
+      "api_name": "moneyflow",
+      "task_id": "f3a4d19346a03d0cf9f2bb7b53ecfcfbb667c36ebb86aadb1cff1b234d2df511",
+      "trade_date": "20250829",
+      "tries": 0
+    }
+  ],
+  "pit_verified": false,
+  "receipt_id": "ddaa75336a7cf9e8cf20655e071c2a9e3db3e1bd758ffc87154b7552b993c062",
+  "receipt_id_verified": true,
+  "reference_occurrences": {
+    "object": 340,
+    "observation": 340,
+    "parquet": 339
+  },
+  "release_id": "data-7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+  "release_manifest_sha256": "7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+  "release_published": false,
+  "rows": 1529654,
+  "rows_by_api": {
+    "adj_factor": 310797,
+    "daily": 304489,
+    "daily_basic": 304489,
+    "moneyflow": 293838,
+    "stk_limit": 315191,
+    "suspend_d": 850
+  },
+  "rrg_status": "blocked_data",
+  "schema_version": 1,
+  "states": {
+    "blocked": 1,
+    "done": 339,
+    "pending": 20
+  },
+  "states_by_api": {
+    "adj_factor": {
+      "done": 57,
+      "pending": 3
+    },
+    "daily": {
+      "done": 56,
+      "pending": 4
+    },
+    "daily_basic": {
+      "done": 56,
+      "pending": 4
+    },
+    "moneyflow": {
+      "done": 57,
+      "pending": 3
+    },
+    "stk_limit": {
+      "blocked": 1,
+      "done": 56,
+      "pending": 3
+    },
+    "suspend_d": {
+      "done": 57,
+      "pending": 3
+    }
+  },
+  "status": "verified_partial_time_budget",
+  "tasks": 360,
+  "unique_reference_bytes": {
+    "object": 146031898,
+    "observation": 297685,
+    "parquet": 143382273
+  },
+  "unique_references_verified": {
+    "object": 340,
+    "observation": 340,
+    "parquet": 339
+  },
+  "upstream_calls": 340,
+  "validation_errors": []
+}
