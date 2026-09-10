@@ -150,8 +150,19 @@ class StockContext(unittest.TestCase):
         )
         self.assertTrue(any(g["reason"] == "frequency_gap" for g in gaps()))
         self.assertTrue(any(g["reason"] == "intraday_gap" for g in gaps()))
-        with self.assertRaises(ValueError):
-            list(jobs({}, date(2026, 9, 9), {"stocks": ["SH600000"]}))
+        invalid_ids = {"stocks": ["SH600000"]}
+        self.assertTrue(
+            any(
+                g["reason"] == "malformed_stock_supplier_identifiers"
+                for g in gaps(invalid_ids)
+            )
+        )
+        self.assertFalse(
+            any(
+                j["api_name"] == "stk_rewards"
+                for j in jobs({}, date(2026, 9, 9), invalid_ids)
+            )
+        )
         self.assertEqual(
             len(
                 list(

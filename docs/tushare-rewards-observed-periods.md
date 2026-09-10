@@ -39,7 +39,7 @@
 
 1. `identifiers()` 从已有 **jobs ∪ attempts** 的 `stk_rewards` 原文抽取 code/end_date 对，包含被后续 job 结果替代的老观察和饱和观察。只按来源对去重，不从其他财报的 end_date 推断薪酬期间，也不把公告日期替换进去。
 2. code-only 发现保持，每个股票的**最大已见报告期**与其轮流刷新；所有合法已见 code/period 产生 `epoch=history` 的稳定补采任务。没有已见期间时仍只发现，不猜季度、年份或股票×期间笛卡尔积。
-3. 严格接受原始合法股票源标识（含 T/历史股票）和合法 YYYYMMDD；不剥离 T，不改成季度末，不修补坏日期。无效/缺失的期间身份保留原文及 prerequisite 计数，合法期间继续规划。股票源命名空间本身失配仍遵循既有家族校验，不通过过滤坏股票来伪造有效全集。有效但不常见的日期也不擅自丢弃；它必须来自实际来源。
+3. 严格接受原始合法股票源标识（含 T/历史股票）和合法 YYYYMMDD；不剥离 T，不改成季度末，不修补坏日期。无效/缺失的期间身份保留原文及 prerequisite 计数，合法期间继续规划。初版股票源命名空间失配会阻断整个家族；下述 2026-09-10 修复将此收窄为有记录的叶级缺口，不宣称过滤后的股票为完整全集。有效但不常见的日期也不擅自丢弃；它必须来自实际来源。
 4. 新发现只影响选择了 `stk_rewards` 的 stock_context 依赖。已启用的管理层/九转/AH三项以及其他 family 的政策/发现指纹不变；历史推进继续使用现有冻结快照，新增较早期间在后续生成轮补入，不重排正在扫描的历史尾部。
 
 运行标识依赖新增 `stock_context_reward_periods`，映射纯 planner 的 `reward_periods`；不改配置键、表结构、镜像格式或 store 自然键。模块原本已在安装名单中，无需新镜像模块。默认关闭规则不变，只有实际选择 `stock_context_apis` 中的 `stk_rewards` 才会规划。
@@ -59,3 +59,22 @@
 新增7项覆盖合法实际配对/T/闰日/非常规期间、坏期间gap、缺发现保留code-only、其他family指纹不变、老attempts不丢、完整原文→Parquet→固定reader及ann_date/end_date区别、父饱和状态不变、有限历史扫描中新较早期间最终补入与稳定任务幂等。全部使用临时数据和 MockTransport，禁止socket/DNS/secret getter；没有生产读取或真实请求。旧运行测试只更新新增显式依赖集合的一处断言，业务检查保持。
 
 本候选最终验证：Python3.10全 `test_tushare*.py` 共817项/41.853秒通过，Ruff和diff check通过；日志 `/tmp/rewards-observed-full310.log`。这些隔离结果不代表生产权限或下载已经完成。
+
+
+## 2026-09-10：不让异常来源标识阻断合法薪酬补采
+
+修复基线 `0c18fb2`。经现有云端业务入口只读 SQLite（`mode=ro`、schema 6）与来源对象 SHA 校验，839 个不同来源、2.323 秒内找到首个异常：`stk_managers` 原文的 `X20720.SZ`，对象 SHA `729eed0e7a6b5dae2e9a723d23c6a3a9f9ceffd9e3fd4b8050f50d77d67ff378`，观察 `6b6ea82158db46638a866fe8614da3b7.json`。它不符合既有 `T?[0-9]{6}\.(SH|SZ|BJ)` 股票源标识规则；不猜其实际证券类型或修成数字代码。调查在首个发现后停止，不能用它推全库只有一个异常。只读报告 `/tmp/stock-context-source-readonly-result.json`，没有初始化生产 Pipeline、访问 Token 或发上游请求。
+
+最小修复只在 stock_context 的薪酬规划入口逐叶复用原校验器。合法股票继续 code-only 发现，合法已观察代码／报告期继续近期与历史规划；原始 discovery 和来源对象不变。异常产生独立能力记录 `planning:stock_context:stk_rewards:malformed_stock_supplier_identifiers`，包含非法数量、合法股票数及最多五个类型／SHA 摘要，仅短代码形状允许显示源值；任意非代码文本不会写入摘要。该记录为 `coverage_unverified`，即使父级恢复为 `validation_passed`，股票全集和异常标识仍未解决。
+
+容器／配置错误仍阻断该家族；共享 `_stocks` 和其他家族的严格校验不变。没有更改合同元数据、发现依赖、规划签名、表结构或游标，已有冻结发现仍可继续使用。没有清除旧任务、创建虚假父子完成关系或解除原饱和缺口。
+
+专项离线回归以等价的 **54 个合成来源配对**复现混合异常列表，验证实际 `identifiers()` → `plan_extended()` 有界推进、全部配对入队、旧阻断恢复、异常能力记录、原对象 SHA／父任务保持及重复规划幂等。这不是对生产 54 对的逐项重新执行，也不是上游全集证明。另验证 T 代码、非法摘要数量上限、其他家族及容器仍严格；仅更新两个旧“坏叶阻断”断言以匹配新规则，保留容器失败隔离覆盖。
+
+```sh
+PYTHONPATH=scripts:. python -m unittest test_tushare_stock_context_invalid_identifiers test_tushare_stock_context_contracts test_tushare_stock_context_pipeline test_tushare_rewards_observed_periods
+```
+
+候选仅在隔离 worktree 测试；未部署或修改正式任务／配置，RRG 准入不变。
+
+该修复候选 Python3.10 专项 25 项/0.687 秒通过；完整 `test_tushare*.py` 840 项/46.199 秒通过（既有 5 项跳过），日志 `/tmp/stock-context-invalid-full310.log`。Ruff 与 `git diff --check` 通过；这里只确认隔离回归。
