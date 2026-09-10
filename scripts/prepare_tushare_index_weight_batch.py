@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pin a small, recent and index-fair batch of queued index-weight history."""
+"""Pin a small, high-margin and index-fair batch of queued index-weight history."""
 
 from __future__ import annotations
 
@@ -21,6 +21,8 @@ API = "index_weight"
 GROUP = "market"
 EPOCH = "history"
 MAX_BATCH_JOBS = 360
+LEGACY_SELECTION = "latest_history_rounds_interleaved_by_supplier_suffix"
+SELECTION = "full_month_first_history_rounds_interleaved_by_supplier_suffix"
 BOUNDARIES = {
     "history_start_is_request_scope_not_verified_availability": True,
     "index_universe_complete": False,
@@ -99,7 +101,8 @@ def _selected_stats(records):
         "index_count": len(per_index),
         "suffix_counts": dict(sorted(suffixes.items())),
         "requests_per_index_counts": {
-            str(requests): indexes for requests, indexes in sorted(request_counts.items())
+            str(requests): indexes
+            for requests, indexes in sorted(request_counts.items())
         },
         "request_start_min": min(
             record["job"]["params"]["start_date"] for record in records
@@ -112,7 +115,10 @@ def _selected_stats(records):
 
 def verify_manifest(path, manifest_sha256):
     path = _regular(path, "Batch manifest")
-    if not re.fullmatch(r"[a-f0-9]{64}", manifest_sha256) or sha(path) != manifest_sha256:
+    if (
+        not re.fullmatch(r"[a-f0-9]{64}", manifest_sha256)
+        or sha(path) != manifest_sha256
+    ):
         raise ValueError("Batch manifest hash mismatch")
     manifest = json.loads(path.read_bytes())
     records = manifest.get("records") if isinstance(manifest, dict) else None
@@ -133,8 +139,7 @@ def verify_manifest(path, manifest_sha256):
         or source.get("api_name") != API
         or source.get("epoch") != EPOCH
         or source.get("state") != "pending"
-        or source.get("selection")
-        != "latest_history_rounds_interleaved_by_supplier_suffix"
+        or source.get("selection") not in (LEGACY_SELECTION, SELECTION)
         or type(source.get("pending_jobs")) is not int
         or type(source.get("pending_indexes")) is not int
         or manifest.get("boundaries") != BOUNDARIES
@@ -149,9 +154,10 @@ def verify_manifest(path, manifest_sha256):
         raise ValueError("Task inventory hash mismatch")
     if manifest.get("selected") != _selected_stats(records):
         raise ValueError("Selected inventory mismatch")
-    if source["pending_jobs"] < len(records) or source["pending_indexes"] < manifest[
-        "selected"
-    ]["index_count"]:
+    if (
+        source["pending_jobs"] < len(records)
+        or source["pending_indexes"] < manifest["selected"]["index_count"]
+    ):
         raise ValueError("Source inventory is smaller than selected inventory")
     return manifest
 
@@ -161,7 +167,12 @@ def prepare(root, output, batch_jobs=MAX_BATCH_JOBS):
         raise ValueError("batch_jobs must be between 1 and 360")
     root, output = Path(root).resolve(), Path(output).resolve()
     database = _regular(root / "pipeline.sqlite", "Pipeline database")
-    if output.exists() or output.is_symlink() or output == root or root in output.parents:
+    if (
+        output.exists()
+        or output.is_symlink()
+        or output == root
+        or root in output.parents
+    ):
         raise ValueError("Output must not exist or be inside authority")
     db = sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=60)
     db.row_factory = sqlite3.Row
@@ -176,17 +187,27 @@ def prepare(root, output, batch_jobs=MAX_BATCH_JOBS):
             "AND group_name=? AND epoch=? AND json_extract(job,'$.api_name')=?",
             (GROUP, EPOCH, API),
         ).fetchone()
+        # Keep one round per index fair; within an index, use parentless full
+        # months before falling back to split descendants or partial windows.
         rows = db.execute(
-            "WITH per_index AS ("
+            "WITH candidates AS ("
             "SELECT id,logical_key,epoch,job,priority,group_name,"
             "json_extract(job,'$.params.index_code') AS index_code,"
             "substr(json_extract(job,'$.params.index_code'),"
             "instr(json_extract(job,'$.params.index_code'),'.')+1) AS suffix,"
-            "ROW_NUMBER() OVER (PARTITION BY json_extract(job,'$.params.index_code') "
-            "ORDER BY json_extract(job,'$.params.end_date') DESC,"
-            "json_extract(job,'$.params.start_date') DESC,id) AS request_round "
+            "CASE WHEN substr(json_extract(job,'$.params.start_date'),7,2)='01' "
+            "AND json_extract(job,'$.params.end_date')=strftime('%Y%m%d',"
+            "substr(json_extract(job,'$.params.start_date'),1,4)||'-'||"
+            "substr(json_extract(job,'$.params.start_date'),5,2)||'-01',"
+            "'+1 month','-1 day') AND NOT EXISTS (SELECT 1 FROM partition_children "
+            "WHERE child_id=jobs.id) THEN 0 ELSE 1 END AS selection_tier "
             "FROM jobs INDEXED BY jobs_ready_api_history WHERE state='pending' "
             "AND group_name=? AND epoch=? AND json_extract(job,'$.api_name')=?),"
+            "per_index AS (SELECT *,"
+            "ROW_NUMBER() OVER (PARTITION BY json_extract(job,'$.params.index_code') "
+            "ORDER BY selection_tier,json_extract(job,'$.params.end_date') DESC,"
+            "json_extract(job,'$.params.start_date') DESC,id) AS request_round "
+            "FROM candidates),"
             "suffix_ranked AS (SELECT *,ROW_NUMBER() OVER ("
             "PARTITION BY request_round,suffix ORDER BY index_code,id) AS suffix_rank "
             "FROM per_index) SELECT id,logical_key,epoch,job,priority,group_name "
@@ -219,7 +240,7 @@ def prepare(root, output, batch_jobs=MAX_BATCH_JOBS):
             "state": "pending",
             "pending_jobs": source[0],
             "pending_indexes": source[1],
-            "selection": "latest_history_rounds_interleaved_by_supplier_suffix",
+            "selection": SELECTION,
         },
         "boundaries": BOUNDARIES,
         "selected": stats,

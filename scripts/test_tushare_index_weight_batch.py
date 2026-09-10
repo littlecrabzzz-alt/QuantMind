@@ -22,7 +22,9 @@ class IndexWeightBatchTests(unittest.TestCase):
         self.base = Path(temporary.name)
         self.root = self.base / "authority"
         catalog = json.loads(
-            (Path(__file__).resolve().parents[1] / "config/tushare-catalog.json").read_bytes()
+            (
+                Path(__file__).resolve().parents[1] / "config/tushare-catalog.json"
+            ).read_bytes()
         )
         pipeline = runner.pipeline_module.Pipeline(self.root, catalog)
         self.history = []
@@ -40,6 +42,20 @@ class IndexWeightBatchTests(unittest.TestCase):
                         epoch=preparation.EPOCH,
                     )
                 )
+        parent = pipeline.db.execute(
+            "SELECT * FROM jobs WHERE id=?", (self.history[2],)
+        ).fetchone()
+        pipeline.split_request(parent, json.loads(parent["job"]))
+        pipeline.db.execute(
+            "UPDATE jobs SET state='split_pending' WHERE id=?", (self.history[2],)
+        )
+        self.split_children = {
+            child[0]
+            for child in pipeline.db.execute(
+                "SELECT child_id FROM partition_children WHERE parent_id=?",
+                (self.history[2],),
+            )
+        }
         self.recent = pipeline.enqueue(
             preparation.API,
             {
@@ -83,16 +99,26 @@ class IndexWeightBatchTests(unittest.TestCase):
             params = record["job"]["params"]
             per_code.setdefault(params["index_code"], []).append(params["end_date"])
             self.assertEqual(record["epoch"], preparation.EPOCH)
-        self.assertEqual(set(per_code), {"000001.SH", "000300.SH", "000905.SH", "000985.CSI"})
+        self.assertEqual(
+            set(per_code), {"000001.SH", "000300.SH", "000905.SH", "000985.CSI"}
+        )
         self.assertEqual(sorted(map(len, per_code.values())), [1, 1, 2, 2])
-        self.assertTrue(all(max(days) == "20260831" for days in per_code.values()))
+        self.assertTrue(
+            self.split_children.isdisjoint(record["task_id"] for record in records)
+        )
+        self.assertEqual(max(per_code["000001.SH"]), "20260731")
+        self.assertEqual(self.verified["source"]["selection"], preparation.SELECTION)
         self.assertEqual(self.verified["boundaries"], preparation.BOUNDARIES)
         self.assertFalse(self.verified["boundaries"]["known_at_verified"])
         db = sqlite3.connect(self.root / "pipeline.sqlite")
         try:
-            self.assertEqual(db.execute("SELECT COUNT(*) FROM attempts").fetchone()[0], 0)
             self.assertEqual(
-                db.execute("SELECT state FROM jobs WHERE id=?", (self.recent,)).fetchone()[0],
+                db.execute("SELECT COUNT(*) FROM attempts").fetchone()[0], 0
+            )
+            self.assertEqual(
+                db.execute(
+                    "SELECT state FROM jobs WHERE id=?", (self.recent,)
+                ).fetchone()[0],
                 "pending",
             )
         finally:
@@ -114,6 +140,32 @@ class IndexWeightBatchTests(unittest.TestCase):
         self.manifest.write_bytes(runner.json_bytes(value))
         with self.assertRaisesRegex(ValueError, "Invalid batch manifest"):
             preparation.verify_manifest(self.manifest, preparation.sha(self.manifest))
+
+    def test_manifest_keeps_legacy_selection_compatible(self):
+        value = json.loads(self.manifest.read_bytes())
+        value["source"]["selection"] = preparation.LEGACY_SELECTION
+        self.manifest.write_bytes(runner.json_bytes(value))
+        preparation.verify_manifest(self.manifest, preparation.sha(self.manifest))
+
+    def test_prepare_falls_back_to_split_descendants_when_full_months_are_exhausted(
+        self,
+    ):
+        db = sqlite3.connect(self.root / "pipeline.sqlite")
+        try:
+            db.execute(
+                "UPDATE jobs SET state='done' WHERE epoch=? "
+                "AND json_extract(job,'$.api_name')=? "
+                "AND id NOT IN (SELECT child_id FROM partition_children)",
+                (preparation.EPOCH, preparation.API),
+            )
+            db.commit()
+        finally:
+            db.close()
+        fallback = self.base / "fallback.json"
+        result = preparation.prepare(self.root, fallback, batch_jobs=2)
+        self.assertEqual(
+            {record["task_id"] for record in result["records"]}, self.split_children
+        )
 
     def test_execute_is_exact_bounded_and_does_not_publish(self):
         calls = []
@@ -153,7 +205,9 @@ class IndexWeightBatchTests(unittest.TestCase):
         db = sqlite3.connect(self.root / "pipeline.sqlite")
         try:
             self.assertEqual(
-                db.execute("SELECT state FROM jobs WHERE id=?", (self.unrelated,)).fetchone()[0],
+                db.execute(
+                    "SELECT state FROM jobs WHERE id=?", (self.unrelated,)
+                ).fetchone()[0],
                 "pending",
             )
             self.assertEqual(
