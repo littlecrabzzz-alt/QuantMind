@@ -69,6 +69,15 @@ class ParallelDocuments(unittest.TestCase):
         with sqlite3.connect(self.root / "documents.sqlite") as db:
             return db.execute(sql).fetchall()
 
+    def release_later(self, db, delay=0.03):
+        def release():
+            time.sleep(delay)
+            db.rollback()
+
+        thread = threading.Thread(target=release)
+        thread.start()
+        return thread
+
     def test_two_transfers_overlap_but_parsing_waits_for_durable_raw(self):
         self.seed(2)
         active, peak = 0, 0
@@ -345,6 +354,125 @@ class ParallelDocuments(unittest.TestCase):
         self.assertEqual(timing["setup_db_calls"], 1)
         self.assertGreaterEqual(
             timing["setup_db_total_seconds"], timing["setup_db_wait_seconds"]
+        )
+        db.close()
+
+    def test_short_audit_reader_uses_existing_busy_timeout(self):
+        self.seed(1)
+        db = docs._document_db(self.root, timeout=0.2)
+        docs._claims_setup(db)
+        reader = sqlite3.connect(
+            self.root / "documents.sqlite", check_same_thread=False
+        )
+        reader.execute("BEGIN")
+        reader.execute("SELECT count(*) FROM documents").fetchone()
+        release = self.release_later(reader)
+        timing = {}
+        jobs = docs._claim_documents(db, "owner", "download", 1, 20, timing)
+        release.join()
+        self.assertEqual(len(jobs), 1)
+        self.assertGreaterEqual(timing["claim_db_total_seconds"], 0.01)
+        self.assertLess(
+            timing["claim_db_wait_seconds"], timing["claim_db_total_seconds"]
+        )
+        self.assertEqual(
+            db.execute(
+                "SELECT count(*) FROM document_claims WHERE owner='owner'"
+            ).fetchone()[0],
+            1,
+        )
+        db.close()
+        reader.close()
+
+    def test_claim_commit_lock_rolls_back_and_next_run_recovers(self):
+        self.seed(1)
+        db = docs._document_db(self.root, timeout=0.02)
+        docs._claims_setup(db)
+        reader = sqlite3.connect(self.root / "documents.sqlite")
+        reader.execute("BEGIN")
+        reader.execute("SELECT count(*) FROM documents").fetchone()
+        timing = {}
+        with self.assertRaisesRegex(sqlite3.OperationalError, "database is locked"):
+            docs._claim_documents(db, "owner", "download", 1, 20, timing)
+        self.assertFalse(db.in_transaction)
+        self.assertEqual(
+            db.execute(
+                "SELECT count(*) FROM document_claims WHERE owner='owner'"
+            ).fetchone()[0],
+            0,
+        )
+        self.assertGreaterEqual(timing["claim_db_total_seconds"], 0.01)
+        reader.rollback()
+        reader.close()
+        self.assertEqual(
+            len(docs._claim_documents(db, "recovered", "download", 1, 20)), 1
+        )
+        db.close()
+
+    def test_short_writer_collision_waits_at_claim_begin(self):
+        self.seed(1)
+        db = docs._document_db(self.root, timeout=0.2)
+        docs._claims_setup(db)
+        holder = sqlite3.connect(
+            self.root / "documents.sqlite", check_same_thread=False
+        )
+        holder.execute("BEGIN IMMEDIATE")
+        release = self.release_later(holder)
+        timing = {}
+        jobs = docs._claim_documents(db, "owner", "download", 1, 20, timing)
+        release.join()
+        self.assertEqual(len(jobs), 1)
+        self.assertGreaterEqual(timing["claim_db_wait_seconds"], 0.01)
+        db.close()
+        holder.close()
+
+    def test_finish_commit_lock_rolls_back_attempt_state_and_claim(self):
+        self.seed(1)
+        db = docs._document_db(self.root, timeout=0.02)
+        docs._claims_setup(db)
+        job = docs._claim_documents(db, "owner", "download", 1, 20)[0]
+        reader = sqlite3.connect(self.root / "documents.sqlite")
+        reader.execute("BEGIN")
+        reader.execute("SELECT count(*) FROM documents").fetchone()
+        result = {
+            "status": "downloaded",
+            "mime": "application/pdf",
+            "parse_status": "parse_pending",
+            "files": [self.original],
+        }
+        with self.assertRaisesRegex(sqlite3.OperationalError, "database is locked"):
+            docs._finish_document(db, "owner", job, result.copy(), "download")
+        self.assertFalse(db.in_transaction)
+        self.assertEqual(
+            tuple(
+                db.execute(
+                    "SELECT download_status,download_tries FROM documents"
+                ).fetchone()
+            ),
+            ("pending", 0),
+        )
+        self.assertEqual(
+            db.execute("SELECT count(*) FROM document_attempts").fetchone()[0], 0
+        )
+        self.assertEqual(
+            db.execute("SELECT count(*) FROM document_claims").fetchone()[0], 1
+        )
+        reader.rollback()
+        reader.close()
+        docs._finish_document(db, "owner", job, result.copy(), "download")
+        self.assertEqual(
+            tuple(
+                db.execute(
+                    "SELECT download_status,download_tries FROM documents"
+                ).fetchone()
+            ),
+            ("downloaded", 1),
+        )
+        self.assertEqual(
+            db.execute("SELECT count(*) FROM document_attempts").fetchone()[0], 1
+        )
+        self.assertEqual(
+            db.execute("SELECT count(*) FROM document_claims").fetchone()[0], 0
         )
         db.close()
 
