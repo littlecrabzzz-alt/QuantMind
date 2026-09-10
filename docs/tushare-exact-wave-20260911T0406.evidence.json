@@ -1,0 +1,131 @@
+{
+  "authority_free_bytes": 143531327488,
+  "batches": {
+    "financial": {
+      "acceptance": "validation/financial-pit-batch-20260909/acceptance-batch-12.json",
+      "acceptance_sha256": "80159ed181dddb46ef781e57e333bb4897ed62ff84626e9f8e3a2a94531f600d",
+      "elapsed_seconds": 45.634,
+      "manifest": "validation/financial-pit-batch-20260909/batch-12-manifest.json",
+      "manifest_sha256": "d05ad00e1170c799ea345b6847fbc4009b7ab6a5d63601ac6e70a62d5102cfde",
+      "missing_tasks": 0,
+      "receipt_id": "7fe53d6969b3269d1cf3239ce233eaa148f9a6e8c51f5b88b9944eb1b39deaf9",
+      "references": {
+        "object": 360,
+        "observation": 360,
+        "parquet": 357
+      },
+      "rows_by_api": {
+        "balancesheet_vip": 251,
+        "cashflow_vip": 245,
+        "income_vip": 237
+      },
+      "states": {
+        "done": 357,
+        "empty": 3
+      },
+      "tasks": 360,
+      "upstream_calls": 360
+    },
+    "fund_nav": {
+      "acceptance": "validation/fund-nav-batch-20260911/acceptance-batch-8.json",
+      "acceptance_sha256": "be04fc5a3283fb9b74299613a07a51a975ed40e895deb4aa151f8fa77351477e",
+      "elapsed_seconds": 44.587,
+      "manifest": "validation/fund-nav-batch-20260911/batch-8-manifest.json",
+      "manifest_sha256": "24351e391b57a4720afde46eb2d3f10c11f9d7bd4ae7f8ac3e654ce74bd6d908",
+      "missing_tasks": 0,
+      "receipt_id": "6e1a7f6f132f0b22b72d7608f2f2ad1b250249c839891008d3609cb3139093af",
+      "references": {
+        "object": 360,
+        "observation": 360,
+        "parquet": 321
+      },
+      "rows_by_api": {
+        "fund_nav": 241163
+      },
+      "states": {
+        "done": 208,
+        "empty": 39,
+        "split_pending": 113
+      },
+      "tasks": 360,
+      "upstream_calls": 360
+    },
+    "fund_share": {
+      "acceptance": "validation/fund-share-batch-20260911/acceptance-batch-7.json",
+      "acceptance_sha256": "8def58dc0fe85ed18a782b935ad3800cad2c125bddfb34c078004659c67ea07a",
+      "elapsed_seconds": 44.31,
+      "manifest": "validation/fund-share-batch-20260911/batch-7-manifest.json",
+      "manifest_sha256": "7284782b7f63fcf07fa8f1047108bbc04ca82aaac17188654614c5abc0f13db9",
+      "missing_tasks": 0,
+      "receipt_id": "7cd7b9104e03842f4981d9d3f48c30c4436894959967efe677cd0b510db915a8",
+      "references": {
+        "object": 360,
+        "observation": 360,
+        "parquet": 239
+      },
+      "rows_by_api": {
+        "fund_share": 106834
+      },
+      "states": {
+        "done": 239,
+        "empty": 121
+      },
+      "tasks": 360,
+      "upstream_calls": 360
+    },
+    "index_weight": {
+      "acceptance": "validation/index-weight-batch-20260911/acceptance-batch-4.json",
+      "acceptance_sha256": "517fba49b28a1a283999195c678c26f32331afd6d272aba59e787079687a051a",
+      "elapsed_seconds": 45.31,
+      "manifest": "validation/index-weight-batch-20260911/batch-4-manifest.json",
+      "manifest_sha256": "c4370e887e006f1a2e5ca06c75b210e728ff00abb0dcc49ee4365afbfc7d98e6",
+      "missing_tasks": 0,
+      "receipt_id": "75b4ce6837d21e420a13f41132d3b8ee20ece00fe3c2f18233b54444aa4416ce",
+      "references": {
+        "object": 360,
+        "observation": 360,
+        "parquet": 351
+      },
+      "rows_by_api": {
+        "index_weight": 132005
+      },
+      "states": {
+        "done": 316,
+        "empty": 9,
+        "split_pending": 35
+      },
+      "tasks": 360,
+      "upstream_calls": 360
+    }
+  },
+  "current_after_sha256": "96fad1dd7c619a8e0b8f45cf4c4706afcfda1220c598ef35f130887e054d872f",
+  "current_before_sha256": "96fad1dd7c619a8e0b8f45cf4c4706afcfda1220c598ef35f130887e054d872f",
+  "current_unchanged": true,
+  "elapsed_seconds": 179.841,
+  "fixed_release": {
+    "manifest_sha256": "f9c557872d2b7793779791dded640acce597cf5ceb07e35dacf81d9d5af74ee9",
+    "release_id": "data-f9c557872d2b7793779791dded640acce597cf5ceb07e35dacf81d9d5af74ee9"
+  },
+  "generated_at": "2026-09-10T20:17:21.399592+00:00",
+  "history_complete": false,
+  "pipeline_sqlite_bytes": 5399355392,
+  "pit_verified": false,
+  "release_published": false,
+  "rrg_status": "blocked_data",
+  "schema_version": 1,
+  "status": "verified",
+  "tasks": 1440,
+  "unique_reference_bytes": {
+    "object": 28835561,
+    "observation": 1838970,
+    "parquet": 39608105
+  },
+  "unique_references_verified": {
+    "object": 1440,
+    "observation": 1440,
+    "parquet": 1268
+  },
+  "unique_tasks": 1440,
+  "upstream_calls": 1440,
+  "validation_errors": []
+}

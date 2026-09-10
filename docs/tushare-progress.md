@@ -685,3 +685,11 @@
 - 任务级闭包逐一核对1440个task：1103 done、181 empty、156 split_pending；关闭SQLite读取后，对4139个唯一observation/raw object/Parquet引用重算物理SHA与字节，empty/split_pending同时存在于manifest gaps。返回行数为财务三表665、`index_weight`132350、`fund_nav`244214、`fund_share`122450；不可覆盖闭包报告SHA为`073eb220fe6a2ad3599b946610fd296139eae36a5d812743719148d9599ada21`。
 - Mac第140次标准LaunchAgent新增下载12426文件、完整校验705154文件，退出码0且错误日志0，原子追平同一固定版。云端`--network none`和Mac禁socket/DNS、无Token复核结果一致：`income_vip`4行、`index_weight`内部/来源码各1369行、`fund_share`1015行、`fund_nav`523行，全部0上游调用。
 - 最终云端authority约98.581GiB、Mac固定镜像约84.952GiB，云盘可用143650902016字节（133.785GiB），高于100GiB停采线。机器证据为`docs/tushare-exact-wave-reader-20260911.evidence.json`。全局历史、修订/PIT和RRG成员/ETF映射缺口仍开放，RRG继续`blocked_data`。
+
+## 2026-09-11 04:20 第二次精确波次补采
+
+- 在固定版 `data-f9c557872d2b7793779791dded640acce597cf5ceb07e35dacf81d9d5af74ee9` 的停写窗口内，重新冻结并串行执行四个360请求精确批次。财务三表第12批45.634秒，357 done/3 empty，返回733行；`index_weight`第4批45.310秒，316 done/9 empty/35 split_pending，返回132005行；`fund_share`第7批44.310秒，239 done/121 empty，返回106834行；`fund_nav`第8批44.587秒，208 done/39 empty/113 split_pending，返回241163行。合计1440次上游请求、179.841秒、480735行。
+- 四份manifest和receipt按批次号以0444归档到authority `validation/`，每份receipt的内容摘要均与runner输出的`receipt_id`一致。合并验收重算1440个唯一task及1440个object、1440个observation、1268个Parquet的物理SHA，0缺失、0哈希错误；权威摘要SHA256为`e88c8f8638bcc22d1f8d5495c7bea98c7ebef89895efce94ea1db9f53ae4203a`。
+- `CURRENT.json`窗口前后SHA256均为`96fad1dd7c619a8e0b8f45cf4c4706afcfda1220c598ef35f130887e054d872f`，未发布、未切换固定版。窗口后云盘可用143531327488字节，高于100GiB停采线。
+- 恢复`tushare-worker`时Compose同时重建postgres容器，数据卷保留；DB、API、专用worker和Beat均恢复healthy，restart0、OOM false。停写窗口前保留在Redis的两个普通采集消息因自带`expires=110`已过期，worker恢复后按Celery语义标记`REVOKED(expired)`，未形成部分任务。04:19:57 Beat按120秒周期投递新任务`aee5532f…`并由专用worker接收，后续幂等继续。
+- 机器证据为`docs/tushare-exact-wave-20260911T0406.evidence.json`。当前固定版尚未包含本次新增结果，等下一次正常publish-only后再做Mac单向镜像和双端断网读取验收。全局仍为`history_complete=false`、`pit_verified=false`，RRG继续`blocked_data`。
