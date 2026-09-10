@@ -1,0 +1,96 @@
+{
+  "checked_at": "2026-09-10T04:45:00Z",
+  "status": "blocked_data",
+  "release_id": "data-03885aef45ce7be5ce812f4305734a7c8852646a09cfa567383215d10e5f6d22",
+  "window": {
+    "start_date": "20220901",
+    "end_date": "20260901",
+    "sse_sessions": 969,
+    "monthly_signal_execution_pairs": 48
+  },
+  "output": "/tmp/quantmind-rrg-etf-window-audit-20260910T0445Z",
+  "files": {
+    "report.json": {
+      "bytes": 34169,
+      "sha256": "74d6798cab10c1ead48eca23927a511bd7192c882c8855c20b1df8f4737e1fe6"
+    },
+    "missing-observations.jsonl": {
+      "bytes": 115763,
+      "rows": 232,
+      "sha256": "c5e20724ad1fb4b61df011f2c8b637408492f73da1450317ccd9d60522432ce0"
+    },
+    "collection-plan.jsonl": {
+      "bytes": 1943724,
+      "rows": 9429,
+      "sha256": "e03f273adc3c6448de8deff835f214a36d7e04a1ff8bcea1a37a1b2c84f10030"
+    },
+    "manifest.json": {
+      "bytes": 564,
+      "sha256": "12942b3bd96a5d07c3a6b778255fc7e82c7eb1b97c4ab2ced69debbbfda556ef"
+    }
+  },
+  "membership": {
+    "rows": 6740,
+    "effective_interval_candidates_on_window_end": 5504,
+    "known_at_rows": 0,
+    "known_at_verified": false,
+    "revision_publication_evidence_verified": false
+  },
+  "universe": {
+    "observed_etf_rows": 1829,
+    "supported_observed_codes": 1826,
+    "known_lifecycle_codes": 1786,
+    "window_lifecycle_codes": 1718,
+    "unknown_list_date_codes": 40,
+    "unsupported_exchange_codes": [
+      "158008.OF"
+    ],
+    "historical_universe_verified": false,
+    "industry_mapping_verified": false
+  },
+  "coverage": {
+    "expected_lifecycle_session_pairs": 1027679,
+    "fund_daily_valid_pairs": 1022792,
+    "fund_daily_missing_pairs": 4887,
+    "fund_daily_invalid_pairs": 0,
+    "fund_adj_valid_pairs": 1027562,
+    "fund_adj_lifecycle_missing_pairs": 117,
+    "fund_adj_missing_for_price_pairs": 0,
+    "fund_adj_invalid_pairs": 0,
+    "joined_valid_price_factor_pairs": 1022792,
+    "monthly_execution_expected_pairs": 51278,
+    "monthly_execution_valid_price_factor_pairs": 51055,
+    "fund_div_event_rows": 10,
+    "fund_div_codes_with_events": 4,
+    "fund_div_empty_receipts_available_in_fixed_release": false,
+    "etf_limit_code_day_pairs": 0,
+    "pcf_code_day_pairs": 2,
+    "pcf_monthly_execution_pairs": 0
+  },
+  "collection_plan": {
+    "active_candidate_jobs": {
+      "fund_daily_diagnostic_ranges": 1888,
+      "fund_div_terminal_receipts": 1718,
+      "etf_limit_month_windows": 49,
+      "total": 3655
+    },
+    "blocked_until_authoritative_etf_mapping": {
+      "etf_sh_cons_year_windows": 3376,
+      "etf_sz_cons_year_windows": 2398,
+      "total": 5774
+    },
+    "automatically_enqueued": false
+  },
+  "guards": {
+    "upstream_calls": 0,
+    "credentials_accessed": false,
+    "price_fill": false,
+    "strategy_or_returns_calculated": false,
+    "production_written": false
+  },
+  "source_sha256": {
+    "scripts/audit_tushare_rrg_etf_window.py": "cb4858b5305395f75f9b5b6c107d30380d43f67ec3f4bc3d3207b006dec37afc",
+    "scripts/test_tushare_rrg_etf_window_audit.py": "76bf6a7e33687d282cdbabe87e3b2b2fcf0452180d4040585e5226151fe034c8"
+  },
+  "claim": "The pinned Tushare release now has a deterministic full-window ETF coverage audit and exact inactive/diagnostic collection parameters. PIT membership, historical ETF industry mapping, dividend empty receipts, tradability and exact-day PCF remain blocked_data."
+}
