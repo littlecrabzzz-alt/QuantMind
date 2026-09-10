@@ -21,7 +21,9 @@ ALLOWED_APIS = ("income_vip", "balancesheet_vip", "cashflow_vip")
 MARKETS = ("SH", "SZ", "BJ")
 MAX_JOBS_PER_API = 120
 MAX_BATCH_JOBS = len(ALLOWED_APIS) * MAX_JOBS_PER_API
-CANDIDATE_MULTIPLIER = 10
+# One recent epoch can already contain the latest report for the whole exchange.
+# Read deeply enough to reach the next cohort while keeping the query bounded.
+CANDIDATE_MULTIPLIER = 100
 SQLITE_PARAMETER_BATCH = 500
 
 
