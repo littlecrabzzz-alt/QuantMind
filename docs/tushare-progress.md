@@ -643,3 +643,10 @@
 - 正常publish-only任务在253.219秒内完成，0上游请求，原子发布固定版 `data-469f77386a446840774a5d78b7384d0bedcc4c6b1f89035b3512b52fe09703c1`。Mac标准镜像新增下载9447个文件、完整校验679991个文件后追平同版；固定版断网读取实际返回153122条目标日期范围内的 `fund_share`、654968条latest `fund_nav`，以及三个深市样例的70条 `income_vip`，过程0上游调用。
 - 为冻结下一批精确任务，Beat已停止；先取消专用worker的 `tushare_acquire` 消费，再等待当前任务自然成功并确认active为0，随后停止worker。这个顺序避免新增撤销任务，后续精确批次结束后恢复worker和Beat。
 - 财务第10批首次准备安全失败，未生成manifest也未调用上游。20260910 epoch中三表共同pending候选有1172组，SH/SZ/BJ分别400/400/372，均为20260630/report type 1；跨epoch排重后当前候选窗口内为0，因为3600个logical key已在其他epoch终态。准备器将每市场的有界候选读取深度由目标量的10倍扩大为100倍，以到达更早报告期；仍保持只读、有限查询、三表共同叶、跨epoch排重和360项硬上限。若更深扫描仍不足，则记录为非阻塞数据状态并继续执行 `index_weight` 第2批。
+
+## 2026-09-11 02:00 财务与指数权重精确批次完成
+
+- 扩大候选扫描后，20260910 epoch仍全部属于跨epoch终态重复；准备器改从仍有5873组三表共同pending叶的20260909 epoch冻结第10批。固定20260630/report type 1的120只股票，沪、深、京各40只，三API各120；360项全部pending且attempt为0。45.880秒完成360次调用，各API均113 done/7 empty，批内0 pending。manifest SHA `249dc0c4080b1431c166fa7d24d26d67f20a713ec72d5d95457c961f1606c55a`，任务集SHA `a708b170bf1b0f579212685cd5b15e46a34f2a3ba83001f493024472377f9edb`，receipt SHA `669359b8ab0c970632daa2a49c7ab9e8a6b1b9c54cbe0ba3056be578bf156c28`。
+- `index_weight` 第2批固定203个指数的360个完整自然月窗口，时间范围20171101—20260831，SH后缀246项、CSI后缀114项；无拆分后代或部分月回退，全部pending且attempt为0。44.706秒完成360次调用，316 done/9 empty/35 split_pending。manifest SHA `132c2479dd229531a0931d462a403d9368aee036e7a356f1a333afa03f1c5f28`，任务集SHA `850db14860259a8634600e5edb104af4f7ea06a1c85d5161653f8b725ada15ac`，receipt SHA `38f8fb58f9292242521e74426a04da349e1ce95108b920eef91bcec641181ae7`。
+- 两批共720次请求、90.586秒，均通过不可变manifest、任务集、配置、runner哈希、schema6、authority、共享锁、90秒和100GiB门控；不发布、不切换CURRENT。结束后专用worker和Beat恢复healthy、restart0、OOM false，重新订阅 `tushare_acquire` 并开始正常任务。云盘可用145720508416字节，距100GiB线38346326016字节；Tushare权威目录约103747731456字节。
+- `fund_nav` 空结果复核第一阶段prepare已实现：显式固定release，只读选择满24小时的一次有效空观察及同基金单日正向控制，固定原始observation/object和控制observation/parquet哈希，不追随CURRENT、不读取凭据、不调用上游、不改任务状态。显式d5固定版临时schema6夹具离线重建得到77个目标；生产runner、A/B执行、7天第二轮和收据仍未实现，未在生产执行。
