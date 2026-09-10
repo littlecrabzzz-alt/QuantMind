@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pin an oldest-first, market-fair batch of queued fund_share history."""
+"""Pin a recent-first, market-fair batch of queued fund_share history."""
 
 from __future__ import annotations
 
@@ -22,6 +22,11 @@ GROUP = "market"
 EPOCH = "history"
 MARKETS = ("SH", "SZ")
 MAX_BATCH_JOBS = 360
+SELECTION = "newest_pending_rounds_interleaved_by_market"
+SUPPORTED_SELECTIONS = {
+    SELECTION,
+    "oldest_pending_rounds_interleaved_by_market",
+}
 BOUNDARIES = {
     "history_start_is_request_scope_not_verified_availability": True,
     "non_trading_day_empty_is_verified_absence": False,
@@ -140,7 +145,7 @@ def verify_manifest(path, manifest_sha256):
         or source.get("group_name") != GROUP
         or source.get("epoch") != EPOCH
         or source.get("state") != "pending"
-        or source.get("selection") != "oldest_pending_rounds_interleaved_by_market"
+        or source.get("selection") not in SUPPORTED_SELECTIONS
         or type(source.get("pending_jobs")) is not int
         or source["pending_jobs"] < 1
         or manifest.get("boundaries") != BOUNDARIES
@@ -191,11 +196,11 @@ def prepare(root, output, jobs=MAX_BATCH_JOBS):
             "json_extract(job,'$.params.market') AS market,"
             "json_extract(job,'$.params.trade_date') AS trade_date,"
             "ROW_NUMBER() OVER (PARTITION BY json_extract(job,'$.params.market') "
-            "ORDER BY json_extract(job,'$.params.trade_date'),id) AS request_round "
+            "ORDER BY json_extract(job,'$.params.trade_date') DESC,id) AS request_round "
             "FROM jobs INDEXED BY jobs_ready_api_history WHERE state='pending' "
             "AND group_name=? AND epoch=? AND json_extract(job,'$.api_name')=?) "
             "SELECT id,logical_key,epoch,job,priority,group_name FROM per_market "
-            "ORDER BY request_round,trade_date,market,id LIMIT ?",
+            "ORDER BY request_round,trade_date DESC,market,id LIMIT ?",
             (GROUP, EPOCH, API, jobs),
         ).fetchall()
     finally:
@@ -222,7 +227,7 @@ def prepare(root, output, jobs=MAX_BATCH_JOBS):
             "group_name": GROUP,
             "epoch": EPOCH,
             "state": "pending",
-            "selection": "oldest_pending_rounds_interleaved_by_market",
+            "selection": SELECTION,
             "pending_jobs": pending_jobs,
         },
         "api_counts": {API: len(records)},

@@ -72,13 +72,13 @@ class FundShareBatchTests(unittest.TestCase):
         self.manifest_sha = preparation.sha(self.manifest)
         self.verified = preparation.verify_manifest(self.manifest, self.manifest_sha)
 
-    def test_prepare_is_read_only_oldest_first_market_fair_and_history_only(self):
+    def test_prepare_is_read_only_recent_first_market_fair_and_history_only(self):
         before = (self.root / "pipeline.sqlite").read_bytes()
         records = self.verified["records"]
         params = [record["job"]["params"] for record in records]
         self.assertEqual(
             {item["trade_date"] for item in params},
-            {"20260901", "20260902", "20260903"},
+            {"20260902", "20260903", "20260904"},
         )
         self.assertEqual(self.verified["source"]["pending_jobs"], 8)
         self.assertEqual(self.verified["selected"]["market_counts"], {"SH": 3, "SZ": 3})
@@ -112,6 +112,12 @@ class FundShareBatchTests(unittest.TestCase):
         self.manifest.write_bytes(runner.json_bytes(value))
         with self.assertRaisesRegex(ValueError, "Invalid batch manifest"):
             preparation.verify_manifest(self.manifest, preparation.sha(self.manifest))
+
+    def test_previous_oldest_first_manifest_remains_verifiable(self):
+        value = json.loads(self.manifest.read_bytes())
+        value["source"]["selection"] = "oldest_pending_rounds_interleaved_by_market"
+        self.manifest.write_bytes(runner.json_bytes(value))
+        preparation.verify_manifest(self.manifest, preparation.sha(self.manifest))
 
     def test_execute_is_exact_bounded_hash_pinned_and_does_not_publish(self):
         calls = []
