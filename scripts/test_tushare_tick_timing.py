@@ -123,9 +123,11 @@ class TickTimingTest(unittest.TestCase):
         self.assertEqual(report["archive"], {"remaining": 4})
         self.assertEqual(report["release_id"], self.stage_values["publish"])
         timing = report["timing"]
-        self.assertEqual(timing["completed_stages"], expected)
+        expected_timing = [*expected[:-2], "publish_lock", *expected[-2:]]
+        self.assertEqual(timing["completed_stages"], expected_timing)
         self.assertEqual(
-            timing["stage_seconds"], {key: self.durations[key] for key in expected}
+            timing["stage_seconds"],
+            {**{key: self.durations[key] for key in expected}, "publish_lock": 0},
         )
         self.assertEqual(timing["total_elapsed_seconds"], 121)
         self.assertIsNone(timing["failed_stage"])

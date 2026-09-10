@@ -54,7 +54,8 @@ def tushare_acquire():
     # hook, so the document task starts only after its long SQLite index
     # transaction and manifest write have finished.
     report = tick(before_nonpublication_work=dispatch_documents)
-    dispatch_documents()
+    if report.get("status") != "publish_deferred_documents_active":
+        dispatch_documents()
     if dispatch is not None:
         report["document_dispatch"] = dispatch
     return report

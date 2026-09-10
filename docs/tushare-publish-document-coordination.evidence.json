@@ -34,10 +34,12 @@
   "candidate": {
     "branch": "codex/tushare-publish-document-coordination",
     "behavior": {
-      "publish_only": "Do not dispatch documents before publication. Dispatch once after a successful publication returns.",
-      "failed_publish": "Do not start a competing document task; leave the existing publication checkpoint pending for the next retry.",
+      "publish_only": "Do not dispatch documents before publication. Acquire documents.lock without waiting before any publication scan and hold it through the complete publish. Dispatch once after a successful publication returns.",
+      "documents_active": "Return publish_deferred_documents_active without changing CURRENT or the publication checkpoint, do not dispatch another document task, and retry on the next tick.",
+      "failed_publish": "Release documents.lock, do not start a competing document task, and leave the existing publication checkpoint pending for the next retry.",
       "planning_or_acquisition": "Invoke the document dispatch hook before planning or acquisition so the two dedicated workers retain their existing parallelism.",
-      "disabled_or_blocked_tick": "After a normal tick return, perform the same bounded document dispatch and let the document worker enforce its existing authority, enable and disk gates."
+      "legacy_every_tick": "Because every legacy tick publishes, dispatch documents only after acquisition and publication complete.",
+      "disabled_or_blocked_tick": "After a normal non-deferred tick return, perform the same bounded document dispatch and let the document worker enforce its existing authority, enable and disk gates."
     },
     "limits_unchanged": [
       "160 second acquisition soft limit",
@@ -49,21 +51,23 @@
       "500 rpm rollout account ceiling"
     ],
     "files": {
-      "backend/shared/tushare_pipeline.py": "b0836e183edf01d9bbbc2303913906fd5fd27c7b23a0d759108abefcea711c16",
-      "backend/services/engine/tasks/tushare_tasks.py": "b9b302ea06e6d13c059a7bcf49d416740e03a319d703b2dcc4de08cb8fc80e1e",
-      "scripts/test_tushare_document_worker.py": "916e2f7b7431926986f1dd286d3da9f7b368b46ef288bc15df303b081b7c1f95",
-      "scripts/test_tushare_publish_interval.py": "7e94699cad2cfbc509d010b52d1d6ec9a6b1e8baadad0f292f25f959c16992ab"
+      "backend/shared/tushare_pipeline.py": "c5010cefe0155f20041de58b8e94e1bb3cfe2d78ad2c44f950f51048fee2f56c",
+      "backend/services/engine/tasks/tushare_tasks.py": "a48444b3c07cf4e924c8c1e3d4de7f6d79a7afa240f04904a079c61f477fc19f",
+      "scripts/test_tushare_document_worker.py": "27fe34e17dbc30e5525f4acddb2e9f4ddc477e3ce9bc25aad5fecee3a76011ed",
+      "scripts/test_tushare_publish_interval.py": "dd4448fec28d693e52afeae36b12dbec5c98fdcf1ea93f9b764484b00a8e1618",
+      "scripts/test_tushare_tick_timing.py": "65282eeb0a98bb455d9d8c86acda7d0ad8425502a26129b778b78f6dbe3b0194"
     }
   },
   "validation": {
     "python": "3.10.19",
     "full_tushare_suite": {
-      "passed": 955,
+      "ran": 958,
+      "status": "passed",
       "skipped": 5,
-      "elapsed_seconds": 47.432
+      "elapsed_seconds": 48.876
     },
-    "document_worker_tests": 10,
-    "publication_interval_tests": 12,
+    "document_worker_tests": 11,
+    "publication_interval_tests": 14,
     "document_family_tests": 72,
     "publish_family_tests": 20,
     "planning_interval_tests": 9,
@@ -76,7 +80,8 @@
   },
   "production_acceptance_required": [
     "Deploy only after both dedicated queues are drained and source/Git are aligned.",
-    "Observe a due automatic publish below the 160 second soft limit without a simultaneous document task.",
+    "Observe an active document task causing one fast publish_deferred_documents_active result without changing CURRENT or the checkpoint.",
+    "Observe the following due automatic publish below the 160 second soft limit while it holds documents.lock.",
     "Verify the successful publish dispatches exactly one subsequent document task.",
     "Observe later non-publication acquisition and document work running in parallel.",
     "Verify no new database-is-locked document failure in the acceptance window and both workers remain healthy."

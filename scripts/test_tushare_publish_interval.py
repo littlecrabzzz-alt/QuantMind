@@ -1,6 +1,7 @@
 """Bounded publication cadence with real immutable retention; fixtures only."""
 
 from contextlib import ExitStack
+import fcntl
 import json
 from pathlib import Path
 import shutil
@@ -224,7 +225,7 @@ class PublicationInterval(unittest.TestCase):
         self.assertEqual(report["publication"]["mode"], "publish_only")
         self.assertEqual(
             report["timing"]["completed_stages"],
-            ["open", "publication_check", "publish", "close"],
+            ["open", "publication_check", "publish_lock", "publish", "close"],
         )
         initialize.assert_not_called()
         plan.assert_not_called()
@@ -264,6 +265,53 @@ class PublicationInterval(unittest.TestCase):
                 before_nonpublication_work=lambda: events.append("documents")
             )
         self.assertEqual(events, [])
+
+    def test_active_document_worker_defers_publish_without_state_change(self):
+        self.tick()
+        pointer = (self.root / "CURRENT.json").read_bytes()
+        checkpoint = self.checkpoint()
+        events = []
+        with (self.root / "documents.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            deferred = self.tick(
+                900, before_nonpublication_work=lambda: events.append("documents")
+            )
+        self.assertEqual(deferred["status"], "publish_deferred_documents_active")
+        self.assertEqual(
+            deferred["publication"]["status"], "deferred_documents_active"
+        )
+        self.assertEqual(events, [])
+        self.assertEqual((self.root / "CURRENT.json").read_bytes(), pointer)
+        self.assertEqual(self.checkpoint(), checkpoint)
+        published = self.tick(
+            before_nonpublication_work=lambda: events.append("documents")
+        )
+        self.assertEqual(published["status"], "publish_only")
+        self.assertTrue(published["publication"]["performed"])
+        self.assertEqual(events, [])
+
+    def test_publish_lock_rejects_document_consumer_and_releases_on_error(self):
+        observed = []
+        original = module.Pipeline.publish
+
+        def publish_while_checking_lock(pipeline):
+            observed.append(docs.run_documents(self.root))
+            return original(pipeline)
+
+        with patch.object(module.Pipeline, "publish", publish_while_checking_lock):
+            self.tick()
+        self.assertEqual(observed, [{"status": "already_running", "processed": 0}])
+        with (
+            patch.object(
+                module.Pipeline,
+                "publish",
+                side_effect=RuntimeError("fixture publish failure"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "fixture publish failure"),
+        ):
+            self.tick(900)
+        with (self.root / "documents.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
     def test_60_second_publish_and_90_second_acquire_never_share_interval_tick(self):
         elapsed = [0.0]
