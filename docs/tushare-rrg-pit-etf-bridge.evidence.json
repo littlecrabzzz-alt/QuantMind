@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "status": "blocked_data",
+  "fixed_release_id": "data-2c8715f9920400555ccab3f739c982938cb127f72db1a1c6c0bb18378b6f1662",
+  "signal_date": "20260831",
+  "execution_date": "20260901",
+  "output": "/tmp/quantmind-rrg-pit-etf-final-20260910T0335Z",
+  "script_sha256": "099c9c9daf3857238bf29ead8d9d323d073c58c9d5a054f646656c6ad5a464de",
+  "input_report_sha256": "897f3720f6c9530c6788c046c6d7a8033af13bdad42b26a24fc8f9aa95457b8c",
+  "artifact_manifest_sha256": "db2993de97236fa71f9ac10f8dbde543062466caa7edda26a081bff2645f9f04",
+  "upstream_calls": 0,
+  "credentials_accessed": false,
+  "membership": {
+    "rows": 6740,
+    "candidate_on_signal_rows": 5497,
+    "known_at_rows": 0,
+    "pit_ready": false
+  },
+  "etf": {
+    "observed_codes": 1829,
+    "date_eligible_candidate_codes": 1648,
+    "execution_price_codes": 1645,
+    "valid_price_and_factor_codes": 1645,
+    "missing_execution_price_codes": [
+      "SH511670",
+      "SH511920",
+      "SZ159578"
+    ],
+    "unsupported_exchange_codes": [
+      "158008.OF"
+    ],
+    "latest_pre_signal_disclosure_codes": 901,
+    "latest_disclosure_rows": 39543,
+    "exact_execution_pcf_codes": 0,
+    "historical_universe_verified": false,
+    "industry_mapping_verified": false,
+    "tradability_verified": false,
+    "complete_exposure_verified": false
+  },
+  "source_rows": {
+    "trade_cal": 10,
+    "ci_index_member": 6740,
+    "etf_basic": 1829,
+    "fund_basic": 22216,
+    "fund_daily": 1645,
+    "fund_adj": 1648,
+    "fund_portfolio": 373264,
+    "etf_sh_cons": 0,
+    "etf_sz_cons": 0
+  },
+  "candidate_code_set": {
+    "count": 1648,
+    "sha256": "15a518762015014cccbb02be567a4725136e178e2ab01c3247eb3e3b9860ce43"
+  },
+  "artifact_rows": {
+    "industry_members": 6740,
+    "etf_universe": 1829,
+    "etf_prices": 1645,
+    "etf_holdings": 39543,
+    "etf_pcf": 0
+  },
+  "validation": {
+    "focused_tests": 19,
+    "required_columns_against_current_rrg_config": "passed",
+    "ruff": "passed",
+    "format": "passed",
+    "diff_check": "passed"
+  },
+  "remaining_gates": [
+    "Authoritative historical CITIC member publication or known_at evidence",
+    "Versioned point-in-time ETF industry mapping selected without return optimization",
+    "Full comparison-window ETF price, adjustment, dividend and tradability coverage",
+    "Exact-day historical PCF coverage and verifiable pre-open publication timing",
+    "Independent review of partial portfolio disclosure and PCF semantics"
+  ]
+}
