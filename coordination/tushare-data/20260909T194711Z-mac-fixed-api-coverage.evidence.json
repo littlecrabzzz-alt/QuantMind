@@ -1,0 +1,574 @@
+{
+  "schema_version": 1,
+  "release_id": "data-0e961a886dafaefd91941dd113039652c294c1ccf0a60d4bb36aae15236b7c82",
+  "manifest_file_count": 397173,
+  "counts": {
+    "registered": 227,
+    "planned": 217,
+    "registered_planned": 217,
+    "registered_with_published_dataset": 189,
+    "published_dataset_apis": 189
+  },
+  "registered_not_planned": [
+    {
+      "api_name": "rt_etf_k",
+      "coverage": {},
+      "capabilities": []
+    },
+    {
+      "api_name": "rt_etf_sz_iopv",
+      "coverage": {},
+      "capabilities": []
+    },
+    {
+      "api_name": "rt_fut_min",
+      "coverage": {},
+      "capabilities": []
+    },
+    {
+      "api_name": "rt_fut_min_daily",
+      "coverage": {},
+      "capabilities": []
+    },
+    {
+      "api_name": "rt_idx_k",
+      "coverage": {},
+      "capabilities": []
+    },
+    {
+      "api_name": "rt_idx_min",
+      "coverage": {},
+      "capabilities": []
+    },
+    {
+      "api_name": "rt_idx_min_daily",
+      "coverage": {},
+      "capabilities": []
+    },
+    {
+      "api_name": "rt_k",
+      "coverage": {},
+      "capabilities": []
+    },
+    {
+      "api_name": "rt_sw_k",
+      "coverage": {},
+      "capabilities": []
+    },
+    {
+      "api_name": "stk_auction",
+      "coverage": {},
+      "capabilities": []
+    }
+  ],
+  "registered_planned_without_published_dataset": [
+    {
+      "api_name": "cb_price_chg",
+      "coverage": {
+        "blocked": 1,
+        "permission_blocked": 1164
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-08T17:27:06.134946+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "etf_mins",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T07:00:15.790101+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "factor_list",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T05:51:06.913240+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "ft_mins",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T07:00:16.512477+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "hk_adjfactor",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-08T18:37:50.120376+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "hk_balancesheet",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T02:55:58.681455+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "hk_cashflow",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T02:55:58.927560+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "hk_daily_adj",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-08T18:37:49.871183+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "hk_fina_indicator",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T02:55:59.770591+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "hk_income",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T02:55:58.547269+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "hk_mins",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T07:00:17.017170+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "idx_mins",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T07:00:16.028198+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "opt_mins",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T07:00:16.762808+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "stk_account_old",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": []
+    },
+    {
+      "api_name": "stk_alert",
+      "coverage": {
+        "empty": 3
+      },
+      "capabilities": []
+    },
+    {
+      "api_name": "stk_auction_c",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": []
+    },
+    {
+      "api_name": "stk_auction_o",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": []
+    },
+    {
+      "api_name": "stk_high_shock",
+      "coverage": {
+        "empty": 1
+      },
+      "capabilities": []
+    },
+    {
+      "api_name": "stk_premarket",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": []
+    },
+    {
+      "api_name": "sw_mins",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T07:00:16.266388+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "us_adjfactor",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-08T18:37:50.881189+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "us_balancesheet",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T02:56:00.066048+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "us_cashflow",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T02:56:00.318342+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "us_daily",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-08T18:37:50.370551+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "us_daily_adj",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-08T18:37:50.621547+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "us_fina_indicator",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T02:56:00.567097+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "us_income",
+      "coverage": {
+        "blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T02:55:59.814024+00:00"
+        }
+      ]
+    },
+    {
+      "api_name": "yc_cb",
+      "coverage": {
+        "blocked": 1,
+        "permission_blocked": 1
+      },
+      "capabilities": [
+        {
+          "status": "permission_denied",
+          "checked_at": "2026-09-09T04:52:53.417979+00:00"
+        }
+      ]
+    }
+  ],
+  "published_dataset_counts": {
+    "adj_factor": 108,
+    "anns_d": 286,
+    "bak_basic": 570,
+    "bak_daily": 6,
+    "balancesheet_vip": 45,
+    "bc_bestotcqt": 10,
+    "bc_otcqt": 2,
+    "block_trade": 7,
+    "bond_blk": 7,
+    "bond_blk_detail": 7,
+    "broker_recommend": 3,
+    "bse_mapping": 3,
+    "cashflow_vip": 73,
+    "cb_basic": 3,
+    "cb_call": 2,
+    "cb_daily": 6,
+    "cb_factor_pro": 9,
+    "cb_issue": 2,
+    "cb_rate": 210,
+    "cb_rating": 144,
+    "cb_share": 53,
+    "cctv_news": 1838,
+    "ci_daily": 241,
+    "ci_index_member": 118,
+    "cn_cpi": 1,
+    "cn_gdp": 1,
+    "cn_m": 1,
+    "cn_pmi": 1,
+    "cn_ppi": 1,
+    "cn_schedule": 17,
+    "cyq_chips": 168,
+    "cyq_perf": 242,
+    "daily": 108,
+    "daily_basic": 100,
+    "daily_info": 756,
+    "dc_daily": 443,
+    "dc_hot": 127,
+    "dc_index": 30,
+    "dc_member": 1252,
+    "disclosure_date": 187,
+    "dividend": 316,
+    "eco_cal": 10,
+    "etf_basic": 6,
+    "etf_index": 3,
+    "etf_limit": 9,
+    "etf_sh_cons": 981,
+    "etf_share_size": 9,
+    "etf_sz_cons": 776,
+    "express_vip": 13,
+    "factor_value": 457,
+    "fina_audit": 55,
+    "fina_indicator_vip": 92,
+    "fina_mainbz": 135,
+    "forecast_vip": 53,
+    "ft_limit": 250,
+    "fund_adj": 2923,
+    "fund_basic": 10,
+    "fund_company": 3,
+    "fund_daily": 1630,
+    "fund_div": 1058,
+    "fund_factor_pro": 9,
+    "fund_manager": 175,
+    "fund_nav": 54,
+    "fund_portfolio": 13299,
+    "fund_share": 11,
+    "fut_basic": 16,
+    "fut_daily": 31,
+    "fut_daily_adj": 7,
+    "fut_holding": 144,
+    "fut_index_daily": 1,
+    "fut_mapping": 6,
+    "fut_settle": 31,
+    "fut_trade_cal": 362,
+    "fut_weekly_detail": 354,
+    "fut_weekly_monthly": 11,
+    "fut_wsr": 19,
+    "fx_daily": 10,
+    "fx_obasic": 3,
+    "gz_index": 10,
+    "hibor": 28,
+    "hk_basic": 3,
+    "hk_daily": 1,
+    "hk_tradecal": 153,
+    "hm_detail": 568,
+    "hm_list": 3,
+    "hsgt_top10": 12,
+    "idx_anns": 8,
+    "idx_factor_pro": 9,
+    "income_vip": 75,
+    "index_basic": 8,
+    "index_classify": 10,
+    "index_daily": 105,
+    "index_dailybasic": 5,
+    "index_global": 179,
+    "index_member_all": 592,
+    "index_monthly": 378,
+    "index_weekly": 567,
+    "index_weight": 42,
+    "irm_qa_sh": 265,
+    "irm_qa_sz": 367,
+    "kpl_concept_cons": 96,
+    "kpl_list": 27,
+    "libor": 148,
+    "limit_cpt_list": 45,
+    "limit_list_d": 917,
+    "limit_list_ths": 209,
+    "limit_step": 45,
+    "major_news": 1651,
+    "margin": 3,
+    "margin_detail": 6,
+    "margin_secs": 8,
+    "mkt_idx_bmk": 7,
+    "monetary_policy": 26,
+    "moneyflow": 43,
+    "moneyflow_cnt_ths": 130,
+    "moneyflow_dc": 3594,
+    "moneyflow_ind_dc": 18,
+    "moneyflow_ind_ths": 34,
+    "moneyflow_mkt_dc": 7,
+    "moneyflow_ths": 9,
+    "monthly": 596,
+    "namechange": 5674,
+    "new_share": 201,
+    "news": 1105,
+    "npr": 182,
+    "opt_basic": 17,
+    "opt_daily": 5,
+    "pledge_detail": 20,
+    "pledge_stat": 1105,
+    "repo_daily": 8,
+    "report_rc": 7,
+    "repurchase": 3,
+    "research_report": 271,
+    "sf_month": 1,
+    "sge_basic": 3,
+    "sge_daily": 7,
+    "share_float": 11,
+    "shibor": 23,
+    "shibor_lpr": 14,
+    "shibor_quote": 32,
+    "slb_len": 1,
+    "slb_len_mm": 1,
+    "slb_sec": 1,
+    "slb_sec_detail": 1,
+    "st": 299,
+    "stk_account": 2,
+    "stk_ah_comparison": 253,
+    "stk_factor": 5,
+    "stk_factor_pro": 6,
+    "stk_holdernumber": 3,
+    "stk_holdertrade": 2,
+    "stk_limit": 70,
+    "stk_managers": 14,
+    "stk_mins": 1,
+    "stk_nineturn": 321,
+    "stk_rewards": 2,
+    "stk_shock": 9,
+    "stk_surv": 48,
+    "stk_week_month_adj": 4,
+    "stk_weekly_monthly": 4,
+    "stock_basic": 11,
+    "stock_company": 5,
+    "stock_hsgt": 416,
+    "stock_st": 88,
+    "suspend_d": 55,
+    "sw_daily": 6,
+    "sz_daily_info": 9,
+    "tdx_daily": 7,
+    "tdx_index": 23,
+    "tdx_member": 96,
+    "ths_daily": 9,
+    "ths_hot": 145,
+    "ths_index": 3,
+    "ths_member": 1371,
+    "top10_cb_holders": 35,
+    "top10_floatholders": 191,
+    "top10_holders": 191,
+    "top_inst": 9,
+    "top_list": 387,
+    "trade_cal": 22,
+    "us_basic": 18,
+    "us_tbr": 28,
+    "us_tltr": 30,
+    "us_tradecal": 153,
+    "us_trltr": 30,
+    "us_trycr": 27,
+    "us_tycr": 40,
+    "weekly": 881,
+    "wz_index": 14
+  },
+  "unregistered_planned": [],
+  "unregistered_published_dataset_apis": [],
+  "limitations": [
+    "This is one immutable release, not the current authority database.",
+    "Registration, planning and a published dataset are separate states.",
+    "A published dataset does not prove complete history, fields, revisions, attachments or point-in-time validity.",
+    "An empty or blocked partition can legitimately have no published dataset and remains explicit in coverage.",
+    "A registered but unplanned API may be intentionally disabled pending permission or runtime validation."
+  ]
+}

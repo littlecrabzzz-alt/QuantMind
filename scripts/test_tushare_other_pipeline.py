@@ -217,6 +217,7 @@ class OtherPipeline(unittest.TestCase):
             key = self.p.enqueue("opt_daily", {"trade_date": "20260908"})
             self.p.db.commit()
             self.capture({"opt_daily": rows})
+            self.capture({})  # Resume one durable fanout; no additional HTTP.
         split = self.p.db.execute(
             "SELECT * FROM partition_splits WHERE parent_id=?", (key,)
         ).fetchone()

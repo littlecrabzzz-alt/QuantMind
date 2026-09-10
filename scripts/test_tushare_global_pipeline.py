@@ -239,6 +239,8 @@ class GlobalPipeline(unittest.TestCase):
                 trust_env=False,
             ) as client:
                 self.p.run(client, "synthetic", {}, max_requests=1, pause=0)
+                resumed = self.p.run(client, "synthetic", {}, max_requests=1, pause=0)
+                self.assertEqual(resumed["requests"], 0)
         saved = self.p.db.execute("SELECT * FROM jobs WHERE id=?", (key,)).fetchone()
         self.assertEqual(saved["state"], "split_pending")
         result = json.loads(saved["result"])
