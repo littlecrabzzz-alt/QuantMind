@@ -119,9 +119,13 @@ def _planning_inputs(family, config, identifiers):
         contracts = {"stk_rewards": EXTENDED_CONTRACTS["stk_rewards"]}
     if family == "equity_announcements":
         contracts = {api: EXTENDED_CONTRACTS[api] for api in ANNOUNCEMENTS}
+    if family == "fund_share_history":
+        contracts = {"fund_share": EXTENDED_CONTRACTS["fund_share"]}
     selected = (
         ("stk_rewards",)
         if family == "stock_rewards_periods"
+        else ("fund_share",)
+        if family == "fund_share_history"
         else tuple(
             api
             for api in config.get("equity_event_apis", EQUITY_EVENT_CONTRACTS)
@@ -185,6 +189,9 @@ def _planning_inputs(family, config, identifiers):
         # its large per-stock cursor immutable.
         dependencies = set()
         keys = {"history_start", "equity_event_apis", "equity_event_history_start"}
+    if family == "fund_share_history":
+        dependencies = set()
+        keys = {"history_start", "market_apis"}
     policy = digest(
         json_bytes(
             {
@@ -1849,7 +1856,11 @@ class Pipeline:
         # Repeated dictionary keys keep their first insertion position.
         priority_append = {
             name: APPEND_PLANNERS[name]
-            for name in ("stock_rewards_periods", "equity_announcements")
+            for name in (
+                "stock_rewards_periods",
+                "equity_announcements",
+                "fund_share_history",
+            )
             if name in APPEND_PLANNERS
         }
         planners = {
@@ -1874,10 +1885,22 @@ class Pipeline:
                     or not set(selected).intersection(ANNOUNCEMENTS)
                 ):
                     continue
+            elif family == "fund_share_history":
+                selected = config.get("market_apis", tuple(EXTENDED_CONTRACTS))
+                if (
+                    "market" in blocked_families
+                    or not config.get("enable_market", False)
+                    or "fund_share" not in selected
+                ):
+                    continue
             elif family in blocked_families or not config.get("enable_" + family, False):
                 continue
             policy, current_ids = _planning_inputs(family, config, identifiers)
-            append_only = family in ("stock_rewards_periods", "equity_announcements")
+            append_only = family in (
+                "stock_rewards_periods",
+                "equity_announcements",
+                "fund_share_history",
+            )
             modes = ("history",) if append_only else ("recent", "history")
             family_budget = min(budget, 500) if append_only else budget
             for mode in modes:

@@ -450,6 +450,25 @@ def iter_equity_announcement_jobs(config, today, identifiers=None):
 APPEND_PLANNERS["equity_announcements"] = iter_equity_announcement_jobs
 
 
+def iter_fund_share_history_jobs(config, today, identifiers=None):
+    """History-only fund-share dates, independent of the larger market cursor."""
+    projected = {
+        "market_apis": ["fund_share"],
+        "history_start": config["history_start"],
+        **(
+            {"planning_epoch": config["planning_epoch"]}
+            if "planning_epoch" in config
+            else {}
+        ),
+    }
+    for job in iter_market_jobs(projected, today, identifiers):
+        if job["epoch"] == "history":
+            yield job
+
+
+APPEND_PLANNERS["fund_share_history"] = iter_fund_share_history_jobs
+
+
 TECHNICAL_EXTRA_RUNTIME_CONTRACTS = {
     api: {
         **spec,
