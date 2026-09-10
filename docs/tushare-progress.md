@@ -650,3 +650,10 @@
 - `index_weight` 第2批固定203个指数的360个完整自然月窗口，时间范围20171101—20260831，SH后缀246项、CSI后缀114项；无拆分后代或部分月回退，全部pending且attempt为0。44.706秒完成360次调用，316 done/9 empty/35 split_pending。manifest SHA `132c2479dd229531a0931d462a403d9368aee036e7a356f1a333afa03f1c5f28`，任务集SHA `850db14860259a8634600e5edb104af4f7ea06a1c85d5161653f8b725ada15ac`，receipt SHA `38f8fb58f9292242521e74426a04da349e1ce95108b920eef91bcec641181ae7`。
 - 两批共720次请求、90.586秒，均通过不可变manifest、任务集、配置、runner哈希、schema6、authority、共享锁、90秒和100GiB门控；不发布、不切换CURRENT。结束后专用worker和Beat恢复healthy、restart0、OOM false，重新订阅 `tushare_acquire` 并开始正常任务。云盘可用145720508416字节，距100GiB线38346326016字节；Tushare权威目录约103747731456字节。
 - `fund_nav` 空结果复核第一阶段prepare已实现：显式固定release，只读选择满24小时的一次有效空观察及同基金单日正向控制，固定原始observation/object和控制observation/parquet哈希，不追随CURRENT、不读取凭据、不调用上游、不改任务状态。显式d5固定版临时schema6夹具离线重建得到77个目标；生产runner、A/B执行、7天第二轮和收据仍未实现，未在生产执行。
+
+## 2026-09-11 02:07 基金净值与份额下一波补采
+
+- 固定版发布下一到期点尚有约36分钟，自动任务明确返回 `publication=deferred/pending=true`，因此等待期间继续补数。Beat停止并取消专用worker的 `tushare_acquire` consumer 后，已接收任务 `4d0c4d61…` 继续运行到165.176秒成功、active变0；随后才停止worker。本窗口没有撤销任务、没有重启在途请求。
+- `fund_nav` 第6批固定254只基金的360项首次请求，包括210个pending拆分叶和150个pending历史根。46.823秒完成360次调用，217 done/31 empty/112 split_pending。manifest SHA `e657e14e57c55e0610f3fbfc209d24fc07398e55c77aada06a8cd20e0dfa3e69`，任务集SHA `0abc7131c789c054becbdada6a238244063e722f924934e1a21e2d9dd4dcb76e`，receipt SHA `9ec3b31129be3e732a37a0b813bfb622ab4e9432ce06a740d265d645fea6d057`。
+- `fund_share` 第5批固定20240826—20250221的沪深各180项首次请求。45.523秒完成360次调用，248 done/112 empty。manifest SHA `ac7a797301125bba23ad4d99510643c39c0ff6fdb92fd46bc6f96fcad8798a9b`，任务集SHA `0db2e907d4a3ca84bc539d5cc33d47be30f9a1e4a2ee5c8d074b4380fd717d9f`，receipt SHA `cfb85916a177819a4a43ee09668fa107a1e4d45a9519edd9882aa1a2ae61ef8d`。
+- 两批共720次请求、92.346秒，均通过plan-only和任务/配置/prepare/runner哈希门控，不发布、不切换CURRENT。结束后专用worker和Beat恢复；新增结果与前一波720项共同等待正常固定版发布和Mac自动镜像。
