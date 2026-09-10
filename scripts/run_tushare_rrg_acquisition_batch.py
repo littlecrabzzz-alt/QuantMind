@@ -30,7 +30,7 @@ from scripts import import_tushare_rrg_acquisition_shard as importer  # noqa: E4
 MAX_BATCH_JOBS = 2000
 MAX_UPSTREAM_REQUESTS = 360
 MAX_SECONDS = 90
-ALLOWED_APIS = {"etf_limit", "fund_div"}
+ALLOWED_APIS = {"etf_limit", "fund_daily", "fund_div"}
 
 
 def sha(path):
@@ -70,7 +70,11 @@ def _records(verified):
         raise ValueError(
             "Verified batch contains an API outside the RRG acquisition scope"
         )
-    expected_groups = {"fund_div": "market", "etf_limit": "cross_asset_extra"}
+    expected_groups = {
+        "fund_div": "market",
+        "etf_limit": "cross_asset_extra",
+        "fund_daily": "rrg",
+    }
     if any(row["group_name"] != expected_groups[row["api_name"]] for row in rows):
         raise ValueError("Verified batch contains an unexpected Pipeline group")
     return rows

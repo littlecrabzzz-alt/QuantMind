@@ -51,4 +51,4 @@ python -B scripts/run_tushare_rrg_acquisition_batch.py \
   --execute
 ```
 
-This runner closes acquisition evidence for `fund_div` and `etf_limit`; it does not itself publish a fixed release or make RRG research-ready. Historical member `known_at`, versioned ETF-industry mapping, complete price/tradability/dividend coverage and exact daily PCF remain separate `blocked_data` gates.
+This runner closes acquisition evidence for `fund_div`, `etf_limit`, and an explicitly prepared `fund_daily` diagnostics-only batch; it does not itself publish a fixed release or make RRG research-ready. A zero-row diagnostic stays unclassified and is never filled or relabelled as a suspension. Historical member `known_at`, versioned ETF-industry mapping, authoritative tradability, and exact daily PCF remain separate `blocked_data` gates.

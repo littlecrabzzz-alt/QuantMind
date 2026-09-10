@@ -9,7 +9,7 @@
 - `fund_div`：逐个窗口内 ETF 的 `ts_code` 请求，固定 `history` epoch。Pipeline 的 `empty` 只证明该任务完成并返回 0 行；不能解释成历史上从未分红，也不能排除后续修订。
 - `etf_limit`：2022-09-01 至 2026-09-01 的 49 个自然月窗，固定 `history` epoch。接口行或空结果都是价格上下限采集证据，不证明停牌、开盘竞价可成交或 PIT。
 
-1,888 个 `fund_daily` 缺价诊断范围默认排除；只有显式传入 `--include-price-diagnostics` 才会生成低优先级任务，且 0 行仍保持未分类、禁止补价。5,774 个 PCF 任务无论是否打开诊断开关都拒绝进入批次，因为当前 ETF 行业映射不是权威历史 PIT 映射。
+1,888 个 `fund_daily` 缺价诊断范围默认排除；只有显式传入 `--include-price-diagnostics` 才会生成低优先级任务，且 0 行仍保持未分类、禁止补价。已经完成默认批次后，可改用 `--price-diagnostics-only` 生成只含 `fund_daily` 的独立批次，避免把已终态的分红任务和仍在拆分的涨跌停任务重复纳入 2,000 项执行上限。5,774 个 PCF 任务无论是否打开诊断开关都拒绝进入批次，因为当前 ETF 行业映射不是权威历史 PIT 映射。
 
 ```bash
 UV_OFFLINE=1 uv run --offline --no-project \

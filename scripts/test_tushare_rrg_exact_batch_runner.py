@@ -33,7 +33,7 @@ class ExactBatchRunnerTests(unittest.TestCase):
                     "upstream_calls": 0,
                     "credentials_accessed": False,
                     "window": {"start_date": "20220101", "end_date": "20221231"},
-                    "collection_plan": {"jobs": 3},
+                    "collection_plan": {"jobs": 4},
                 }
             )
         )
@@ -55,6 +55,16 @@ class ExactBatchRunnerTests(unittest.TestCase):
                 "params": {"start_date": "20220101", "end_date": "20220131"},
                 "gate": "collection_candidate",
                 "reason": "monthly bounds",
+            },
+            {
+                "api_name": "fund_daily",
+                "params": {
+                    "ts_code": "510300.SH",
+                    "start_date": "20220104",
+                    "end_date": "20220104",
+                },
+                "gate": "diagnostic_refresh_only",
+                "reason": "no fill",
             },
         ]
         self.plan = self.audit / "collection-plan.jsonl"
@@ -159,6 +169,26 @@ class ExactBatchRunnerTests(unittest.TestCase):
         self.assertEqual(result["selection"], "exact_manifest_task_ids_api_fair")
         self.assertFalse(result["would_access_authority"])
         self.assertEqual((self.root / "pipeline.sqlite").read_bytes(), before)
+
+    def test_plan_only_accepts_a_fund_daily_diagnostics_only_batch(self):
+        output = self.base / "diagnostics-only"
+        preparation.prepare(
+            self.report,
+            preparation.sha(self.report),
+            output,
+            2,
+            False,
+            diagnostics_only=True,
+        )
+        batch = output / "batch-manifest.json"
+        result = runner.run_batch(
+            batch,
+            preparation.sha(batch),
+            self.report,
+            root=self.base / "unused",
+        )
+        self.assertEqual(result["verified_jobs"], 1)
+        self.assertEqual(result["api_counts"], {"fund_daily": 1})
 
     def test_execute_is_exact_api_fair_bounded_and_does_not_publish(self):
         pipeline = runner.pipeline_module.Pipeline(self.root, self.verified["catalog"])

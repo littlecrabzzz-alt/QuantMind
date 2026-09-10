@@ -136,6 +136,17 @@ class AcquisitionBatchTests(unittest.TestCase):
         self.assertIn("must never be filled", result["terminal_receipt_semantics"]["fund_daily"])
         self.assertNotIn("etf_sh_cons", result["selection"]["prepared_counts"])
 
+    def test_price_diagnostics_can_be_prepared_as_a_bounded_standalone_batch(self):
+        result = self.invoke(self.base / "diagnostics-only", diagnostics_only=True)
+        self.assertEqual(result["selection"]["apis"], ["fund_daily"])
+        self.assertEqual(result["selection"]["prepared_counts"], {"fund_daily": 1})
+        self.assertEqual(
+            result["selection"]["excluded_counts"],
+            {"fund_div": 2, "etf_limit": 2, "etf_sh_cons": 1},
+        )
+        shard = self.base / "diagnostics-only" / result["shards"][0]["path"]
+        self.assertEqual(json.loads(shard.read_text())["group_name"], "rrg")
+
     def test_rejects_tampering_duplicates_bad_gates_and_protected_output(self):
         with self.assertRaisesRegex(ValueError, "hash mismatch"):
             module.prepare(self.report, "0" * 64, self.base / "bad-hash", 10, False)

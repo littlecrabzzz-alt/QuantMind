@@ -180,12 +180,23 @@ def _write_shards(output, jobs, shard_size):
     return inventory
 
 
-def _prepare(audit_report, report_sha256, output, shard_size, include_diagnostics):
+def _prepare(
+    audit_report,
+    report_sha256,
+    output,
+    shard_size,
+    include_diagnostics,
+    diagnostics_only=False,
+):
     if type(shard_size) is not int or not 1 <= shard_size <= 1000:
         raise ValueError("Shard size must be between 1 and 1000")
     report, plan_path, plan_sha = _source(audit_report, report_sha256)
     output = _output_guard(output, plan_path.parent)
-    selected_apis = set(DEFAULT_APIS)
+    if diagnostics_only:
+        selected_apis = {"fund_daily"}
+        include_diagnostics = True
+    else:
+        selected_apis = set(DEFAULT_APIS)
     if include_diagnostics:
         selected_apis.add("fund_daily")
 
@@ -326,6 +337,7 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--shard-size", type=int, default=250)
     parser.add_argument("--include-price-diagnostics", action="store_true")
+    parser.add_argument("--price-diagnostics-only", action="store_true")
     args = parser.parse_args()
     result = prepare(
         args.audit_report,
@@ -333,6 +345,7 @@ def main():
         args.output,
         args.shard_size,
         args.include_price_diagnostics,
+        args.price_diagnostics_only,
     )
     print(json.dumps({"status": result["status"], **result["selection"]}, indent=2))
 
