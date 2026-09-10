@@ -5,6 +5,9 @@ only at the outbound query boundary; full account authorization is unprobed.
 """
 
 from datetime import date, datetime, timedelta
+import hashlib
+import json
+import re
 
 from backend.shared.tushare_equity_event_contracts import _stocks
 from backend.shared.tushare_structured_contracts import _contract, _parse
@@ -295,6 +298,50 @@ def _starts(config, enabled):
     return starts
 
 
+def stock_context_stock_inventory(identifiers):
+    """Keep unsupported source identifiers observable without blocking valid leaves.
+
+    Container/configuration errors stay strict. The source inventory itself is
+    never modified; only this family's outbound stock requests are selected.
+    """
+    if not isinstance(identifiers, dict):
+        raise ValueError("identifiers must map discovery families to records")
+    values = identifiers.get("stocks", ())
+    if not isinstance(values, (list, tuple)):
+        raise ValueError("stocks must contain supplier codes or discovery records")
+    stocks, invalid_count, examples = set(), 0, []
+    for value in values:
+        try:
+            stocks.update(_stocks({"stocks": [value]}))
+        except ValueError:
+            invalid_count += 1
+            if len(examples) < 5:
+                code = value.get("ts_code") if isinstance(value, dict) else value
+                payload = json.dumps(
+                    code,
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    default=lambda item: type(item).__name__,
+                )
+                example = {
+                    "type": type(code).__name__,
+                    "value_sha256": hashlib.sha256(payload.encode()).hexdigest(),
+                }
+                if isinstance(code, str) and re.fullmatch(
+                    r"[A-Za-z0-9!]{1,16}\.[A-Za-z]{2,4}", code
+                ):
+                    example["source_code"] = code
+                examples.append(example)
+    return sorted(stocks), {
+        "valid_stock_count": len(stocks),
+        "invalid_identifier_count": invalid_count,
+        "invalid_identifier_examples": examples,
+        "example_limit": 5,
+        "source_inventory_complete": False,
+        "original_identifiers_retained": True,
+    }
+
+
 def observed_reward_periods(identifiers):
     """Return only valid observed code/period pairs; malformed evidence stays a gap."""
     values = identifiers.get("reward_periods", ())
@@ -332,12 +379,22 @@ def stock_context_prerequisites(identifiers=None, enabled_apis=None, config=None
         config["stock_context_apis"] = enabled_apis
     enabled = _enabled(config)
     starts = _starts(config, enabled)
-    stocks = (
-        _stocks(identifiers if identifiers is not None else {})
+    stocks, stock_inventory = (
+        stock_context_stock_inventory(identifiers if identifiers is not None else {})
         if "stk_rewards" in enabled
-        else []
+        else ([], {})
     )
     gaps = []
+    if stock_inventory.get("invalid_identifier_count"):
+        gaps.append(
+            {
+                "api_name": "stk_rewards",
+                "dependencies": [],
+                "reason": "malformed_stock_supplier_identifiers",
+                **stock_inventory,
+                "detail": "Unsupported source identities remain in raw/discovery. Valid stock leaves continue; no prefix repair, inferred market or complete-universe claim.",
+            }
+        )
     for api in enabled:
         spec = STOCK_CONTEXT_CONTRACTS[api]
         for kind in (
@@ -426,7 +483,7 @@ def iter_stock_context_jobs(config, today, identifiers=None):
     if any(start and start > today for start in starts.values()):
         raise ValueError("History start cannot be after today")
     stocks = (
-        _stocks(identifiers if identifiers is not None else {})
+        stock_context_stock_inventory(identifiers if identifiers is not None else {})[0]
         if "stk_rewards" in enabled
         else []
     )

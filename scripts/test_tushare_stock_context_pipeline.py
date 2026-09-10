@@ -226,7 +226,9 @@ class StockContextRuntime(unittest.TestCase):
 
     def test_validation_blocked_does_not_block_other_family(self):
         ids = self.p.identifiers()
-        ids["stock_context_stocks"] = ["bad;code"]
+        # Malformed containers remain strict; unsupported leaf codes now have
+        # their own observable gap while valid stock requests continue.
+        ids["stock_context_stocks"] = {"unexpected": "container"}
         cfg = {
             "enable_stock_context": True,
             "enable_technical_extra": True,
