@@ -22,7 +22,9 @@ class FinancialPitBatchTests(unittest.TestCase):
         self.base = Path(temporary.name)
         self.root = self.base / "authority"
         catalog = json.loads(
-            (Path(__file__).resolve().parents[1] / "config/tushare-catalog.json").read_bytes()
+            (
+                Path(__file__).resolve().parents[1] / "config/tushare-catalog.json"
+            ).read_bytes()
         )
         pipeline = runner.pipeline_module.Pipeline(self.root, catalog)
         self.selected = []
@@ -84,10 +86,14 @@ class FinancialPitBatchTests(unittest.TestCase):
         db = sqlite3.connect(self.root / "pipeline.sqlite")
         try:
             self.assertEqual(
-                db.execute("SELECT COUNT(*) FROM jobs WHERE state='pending'").fetchone()[0],
+                db.execute(
+                    "SELECT COUNT(*) FROM jobs WHERE state='pending'"
+                ).fetchone()[0],
                 10,
             )
-            self.assertEqual(db.execute("SELECT COUNT(*) FROM attempts").fetchone()[0], 0)
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM attempts").fetchone()[0], 0
+            )
         finally:
             db.close()
 
@@ -96,8 +102,67 @@ class FinancialPitBatchTests(unittest.TestCase):
         self.assertEqual(result["status"], "plan_only")
         self.assertEqual(result["verified_jobs"], 6)
         self.assertFalse(result["would_access_authority"])
+
+        legacy_manifest = self.base / "legacy-batch.json"
+        legacy = json.loads(self.manifest.read_bytes())
+        legacy["source"]["selection"] = "latest_period_common_code_specific_leaves"
+        legacy_manifest.write_bytes(preparation.json_bytes(legacy))
+        legacy_result = runner.run_batch(
+            legacy_manifest, preparation.sha(legacy_manifest)
+        )
+        self.assertEqual(legacy_result["status"], "plan_only")
+
         with self.assertRaisesRegex(ValueError, "hash mismatch"):
             runner.run_batch(self.manifest, "0" * 64)
+
+    def test_prepare_balances_markets_and_skips_cross_epoch_logical_duplicates(self):
+        root = self.base / "balanced-authority"
+        catalog = json.loads(
+            (
+                Path(__file__).resolve().parents[1] / "config/tushare-catalog.json"
+            ).read_bytes()
+        )
+        pipeline = runner.pipeline_module.Pipeline(root, catalog)
+        codes = (
+            "600001.SH",
+            "600002.SH",
+            "000001.SZ",
+            "000002.SZ",
+            "920001.BJ",
+            "920002.BJ",
+        )
+        for api in preparation.ALLOWED_APIS:
+            for code in codes:
+                pipeline.enqueue(
+                    api,
+                    {"ts_code": code, "period": "20260630", "report_type": "1"},
+                    priority=26,
+                    epoch="20260910",
+                )
+            pipeline.enqueue(
+                api,
+                {"ts_code": "600001.SH", "period": "20260630", "report_type": "1"},
+                priority=26,
+                epoch="20260909",
+            )
+            duplicate = pipeline.enqueue(
+                api,
+                {"ts_code": "000001.SZ", "period": "20260630", "report_type": "1"},
+                priority=26,
+                epoch="20260911",
+            )
+            pipeline.db.execute("UPDATE jobs SET state='done' WHERE id=?", (duplicate,))
+        pipeline.db.commit()
+        pipeline.close()
+
+        manifest = self.base / "balanced-batch.json"
+        result = preparation.prepare(root, manifest, "20260910", jobs_per_api=3)
+        selected = {row["job"]["params"]["ts_code"] for row in result["records"]}
+        self.assertEqual(selected, {"600002.SH", "000002.SZ", "920001.BJ"})
+        self.assertEqual(
+            result["source"]["selection"],
+            "latest_period_report_type_exchange_balanced_common_code_specific_leaves",
+        )
 
     def test_execute_is_api_fair_exact_bounded_and_does_not_publish(self):
         calls = []

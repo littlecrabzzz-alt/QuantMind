@@ -206,5 +206,47 @@
     "historical_versions_complete": false,
     "pit_ready": false,
     "note": "Open split-parent rows are queryable observations, not closure evidence; use date_field=nav_date for NAV-date filters."
+  },
+  "fifth_batch": {
+    "executed_at": "2026-09-10T17:18:00Z",
+    "deployed_revision": "c772307632830394419fdcbe84c254c4d71cf31c",
+    "manifest_path": "/data/tushare/validation/fund-nav-batch-20260910/batch-5-manifest.json",
+    "manifest_sha256": "c009b54e9b77eb1fe2d9238a430461c296dacfa6a35667c11a8629250494a052",
+    "task_set_sha256": "1909131e04bd0c7195bee0d01a295a629dccd5ef351fe40204199a4c9ab3b237",
+    "authority_config_sha256": "da45afae322463eacd54a97203f2ede46a9ff86aafbb58e6bec26b57ea009853",
+    "prepare_helper_sha256": "a4a4320a361cb710fb8fe6d91b0d4f6075d1a01e8c3dd8df2adbebccc27ba26e",
+    "runner_helper_sha256": "fcbca757dd604f5fcd3b995630260d80c4b094769335d14428b5edfc35dfd018",
+    "verified_jobs": 360,
+    "selection": {
+      "pending_split_leaf": 282,
+      "pending_history_root": 78,
+      "funds": 209
+    },
+    "before": {
+      "pending": 360,
+      "tries": 0
+    },
+    "upstream_calls": 360,
+    "elapsed_seconds": 46.609,
+    "after": {
+      "done": 212,
+      "empty": 43,
+      "split_pending": 105
+    },
+    "release_published_by_runner": false,
+    "current_switched_by_runner": false,
+    "release_before_batch": "data-d5d918ce4bc2cfd3ef6e58c5caeefa29c7d9f9715cd5b8cd0d03d4d07cab64de",
+    "receipt_path": "/data/tushare/validation/fund-nav-batch-20260910/acceptance-batch-5.json",
+    "receipt_sha256": "2cdd1fba67d8cbeff8ce9f65433e0d5edec46e4a84e53367f5bddf603d73a287",
+    "receipt_id": "0402f2a7567c79c42c2fbdb430c46124a5a5dfe318f15681a1068649ffb1bb65",
+    "published_by_scheduled_pipeline_after_batch": false
+  },
+  "five_batch_total": {
+    "verified_jobs": 1800,
+    "upstream_calls": 1800,
+    "elapsed_seconds": 243.295,
+    "done": 891,
+    "empty": 269,
+    "split_pending": 640
   }
 }

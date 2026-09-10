@@ -628,3 +628,10 @@
 - 常规任务排空后停Beat与专用worker，从权威库重新冻结三个互不重叠批次，1,080项均为 `pending/attempts=0`。财务三表第9批48.788秒完成360次，344 `done`/16 `empty`；`fund_nav`第4批49.170秒完成360次，179 `done`/41 `empty`/140 `split_pending`；`fund_share`第3批46.786秒完成360次，270 `done`/90 `empty`。三批固定manifest、任务集、配置、prepare/runner哈希，不发布、不切换CURRENT。
 - 批次完成后Tushare worker和Beat恢复healthy，文档worker继续按容量方案停用。云盘可用146862358528字节，距100GiB硬线39488176448字节（36.776GiB）。新增结果尚未进入固定版，等待正常一小时发布周期和Mac自动镜像；发布后再做断网reader及全清单哈希验收。
 - 固定版 `fund_nav` 当前可查询488037个最新自然键、529只基金，仅占22216只 `fund_basic` 代码的2.381%；36.26%的最新行来自仍开放的截断父区间。`fund_share` 当前可查询222116条最新观察、2210只基金、149个日期，仍有26037个pending。两者继续保持 `history_complete=false`、`historical_versions_complete=false`、PIT未就绪。
+
+## 2026-09-11 01:21 基金净值与份额继续补采
+
+- 正常固定版尚未到17:31Z发布点，因此没有把等待当作阻塞。暂停Beat后，前一常规任务 `f0594d64…` 已自然成功；随后另一个已接收任务 `e366f80d…` 在停止worker时被Celery标为revoked，重启后明确丢弃。它不属于精确清单；逐请求写入仍采用既有幂等终态，未完成逻辑请求由后续正常任务继续。该停机边界不用于宣称常规批次调用严格去重。
+- 停服权威库重新冻结 `fund_nav` 第5批：282个拆分叶、78个历史根、209只基金，46.609秒内360次请求得到212 done/43 empty/105 split_pending。`fund_share` 第4批固定2025-02-23至2025-08-21沪深各180项，46.919秒内得到279 done/81 empty。两批共720项均为pending/tries=0、通过plan-only和全部哈希固定，不发布或切换CURRENT。
+- 两批后worker和Beat恢复，`e366f80d…` 的撤销状态被消费，下一正常任务 `9ccb3909…` 已接收。固定版仍为 `data-d5d918…`，本轮及上一轮合计1,800个新增精确终态等待正常发布；Mac固定版继续保持可离线读取的上一版。
+- 财务精确准备器已改为沪、深、京轮询和跨epoch logical-key排重，避免第10批继续集中深市或重复已在其他epoch完成的同一请求。旧manifest兼容测试、均衡/排重测试及三类exact runner共14项通过，Ruff和格式检查通过；已有runner测试仍报告一个未关闭SQLite连接的既有 `ResourceWarning`，不影响本次结果，后续单独修复。

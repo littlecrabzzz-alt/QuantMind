@@ -18,9 +18,11 @@ from backend.shared.tushare_intake import digest, json_bytes  # noqa: E402
 
 
 ALLOWED_APIS = ("income_vip", "balancesheet_vip", "cashflow_vip")
+MARKETS = ("SH", "SZ", "BJ")
 MAX_JOBS_PER_API = 120
 MAX_BATCH_JOBS = len(ALLOWED_APIS) * MAX_JOBS_PER_API
 CANDIDATE_MULTIPLIER = 10
+SQLITE_PARAMETER_BATCH = 500
 
 
 def sha(path):
@@ -51,7 +53,9 @@ def _validate_record(record):
         or job.get("api_name") not in ALLOWED_APIS
         or record["group_name"] != "structured"
         or not isinstance(job.get("params"), dict)
-        or not re.fullmatch(r"[0-9]{6}\.(SH|SZ|BJ)", str(job["params"].get("ts_code", "")))
+        or not re.fullmatch(
+            r"[0-9]{6}\.(SH|SZ|BJ)", str(job["params"].get("ts_code", ""))
+        )
         or not re.fullmatch(r"[0-9]{8}", str(job["params"].get("period", "")))
     ):
         raise ValueError("Batch contains a non-financial or non-leaf task")
@@ -64,7 +68,10 @@ def _validate_record(record):
 
 def verify_manifest(path, manifest_sha256):
     path = _regular(path, "Batch manifest")
-    if not re.fullmatch(r"[a-f0-9]{64}", manifest_sha256) or sha(path) != manifest_sha256:
+    if (
+        not re.fullmatch(r"[a-f0-9]{64}", manifest_sha256)
+        or sha(path) != manifest_sha256
+    ):
         raise ValueError("Batch manifest hash mismatch")
     manifest = json.loads(path.read_bytes())
     if (
@@ -88,6 +95,66 @@ def verify_manifest(path, manifest_sha256):
     return manifest
 
 
+def _cross_epoch_duplicates(db, candidates, epoch):
+    logical_keys = {
+        record["logical_key"]
+        for rows in candidates.values()
+        for record in rows.values()
+    }
+    excluded = set()
+    other_epochs = [
+        row[0]
+        for row in db.execute("SELECT DISTINCT epoch FROM jobs ORDER BY epoch")
+        if row[0] != epoch
+    ]
+    for other_epoch in other_epochs:
+        task_ids = {
+            digest(json_bytes([logical_key, other_epoch])): logical_key
+            for logical_key in logical_keys
+        }
+        ids = list(task_ids)
+        for start in range(0, len(ids), SQLITE_PARAMETER_BATCH):
+            batch = ids[start : start + SQLITE_PARAMETER_BATCH]
+            placeholders = ",".join("?" for _ in batch)
+            for task_id, state in db.execute(
+                f"SELECT id,state FROM jobs WHERE id IN ({placeholders})", batch
+            ):
+                if state != "pending" or other_epoch < epoch:
+                    excluded.add(task_ids[task_id])
+    return excluded
+
+
+def _balanced_selection(common, limit):
+    cohorts = {}
+    for key in common:
+        cohorts.setdefault((key[0], key[1]), []).append(key)
+    selected = []
+    for cohort in sorted(
+        cohorts,
+        key=lambda key: (-int(key[0]), int(key[1]) if key[1] is not None else -1),
+    ):
+        buckets = {
+            market: iter(
+                sorted(key for key in cohorts[cohort] if key[2].endswith("." + market))
+            )
+            for market in MARKETS
+        }
+        while len(selected) < limit:
+            added = False
+            for market in MARKETS:
+                key = next(buckets[market], None)
+                if key is not None:
+                    selected.append(key)
+                    added = True
+                    if len(selected) == limit:
+                        break
+            if not added:
+                break
+        if len(selected) == limit:
+            break
+    return selected
+
+
 def prepare(root, output, epoch, jobs_per_api=MAX_JOBS_PER_API):
     if not re.fullmatch(r"[0-9]{8}", epoch):
         raise ValueError("Epoch must be YYYYMMDD")
@@ -95,7 +162,12 @@ def prepare(root, output, epoch, jobs_per_api=MAX_JOBS_PER_API):
         raise ValueError("jobs_per_api must be between 1 and 120")
     root, output = Path(root).resolve(), Path(output).resolve()
     database = _regular(root / "pipeline.sqlite", "Pipeline database")
-    if output.exists() or output.is_symlink() or output == root or root in output.parents:
+    if (
+        output.exists()
+        or output.is_symlink()
+        or output == root
+        or root in output.parents
+    ):
         raise ValueError("Output must not exist")
     candidates = {}
     db = sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=1)
@@ -104,48 +176,57 @@ def prepare(root, output, epoch, jobs_per_api=MAX_JOBS_PER_API):
         db.execute("PRAGMA query_only=ON")
         if db.execute("PRAGMA user_version").fetchone()[0] != 6:
             raise ValueError("Pipeline schema must already be version 6")
+        market_candidates = (
+            (jobs_per_api + len(MARKETS) - 1) // len(MARKETS)
+        ) * CANDIDATE_MULTIPLIER
         for api in ALLOWED_APIS:
-            rows = db.execute(
-                "SELECT id,logical_key,epoch,job,priority,group_name FROM jobs "
-                "WHERE epoch=? AND json_extract(job,'$.api_name')=? "
-                "AND state='pending' AND json_type(job,'$.params.ts_code')='text' "
-                "ORDER BY json_extract(job,'$.params.period') DESC,"
-                "CAST(json_extract(job,'$.params.report_type') AS INTEGER),"
-                "json_extract(job,'$.params.ts_code'),id LIMIT ?",
-                (epoch, api, jobs_per_api * CANDIDATE_MULTIPLIER),
-            ).fetchall()
             candidates[api] = {}
-            for row in rows:
-                job = json.loads(row["job"])
-                key = (
-                    job["params"]["period"],
-                    job["params"].get("report_type"),
-                    job["params"]["ts_code"],
-                )
-                candidates[api][key] = {
-                    "task_id": row["id"],
-                    "logical_key": row["logical_key"],
-                    "epoch": row["epoch"],
-                    "priority": row["priority"],
-                    "group_name": row["group_name"],
-                    "job": job,
-                }
+            for market in MARKETS:
+                rows = db.execute(
+                    "SELECT id,logical_key,epoch,job,priority,group_name FROM jobs "
+                    "WHERE epoch=? AND json_extract(job,'$.api_name')=? "
+                    "AND state='pending' AND json_extract(job,'$.params.ts_code') GLOB ? "
+                    "ORDER BY json_extract(job,'$.params.period') DESC,"
+                    "CAST(json_extract(job,'$.params.report_type') AS INTEGER),"
+                    "json_extract(job,'$.params.ts_code'),id LIMIT ?",
+                    (epoch, api, "*." + market, market_candidates),
+                ).fetchall()
+                for row in rows:
+                    job = json.loads(row["job"])
+                    key = (
+                        job["params"]["period"],
+                        job["params"].get("report_type"),
+                        job["params"]["ts_code"],
+                    )
+                    candidates[api][key] = {
+                        "task_id": row["id"],
+                        "logical_key": row["logical_key"],
+                        "epoch": row["epoch"],
+                        "priority": row["priority"],
+                        "group_name": row["group_name"],
+                        "job": job,
+                    }
+        excluded = _cross_epoch_duplicates(db, candidates, epoch)
     finally:
         db.close()
-    common = set.intersection(*(set(candidates[api]) for api in ALLOWED_APIS))
-    selected = sorted(
-        common,
-        key=lambda key: (
-            -int(key[0]),
-            int(key[1]) if key[1] is not None else -1,
-            key[2],
-        ),
-    )[:jobs_per_api]
+    common = set.intersection(
+        *(
+            {
+                key
+                for key, record in candidates[api].items()
+                if record["logical_key"] not in excluded
+            }
+            for api in ALLOWED_APIS
+        )
+    )
+    selected = _balanced_selection(common, jobs_per_api)
     if len(selected) != jobs_per_api:
         raise ValueError("Insufficient common pending statement leaves")
     records = [candidates[api][key] for api in ALLOWED_APIS for key in selected]
     counts = Counter(_validate_record(record) for record in records)
-    records.sort(key=lambda row: (ALLOWED_APIS.index(row["job"]["api_name"]), row["task_id"]))
+    records.sort(
+        key=lambda row: (ALLOWED_APIS.index(row["job"]["api_name"]), row["task_id"])
+    )
     task_ids = sorted(record["task_id"] for record in records)
     manifest = {
         "schema_version": 1,
@@ -153,7 +234,7 @@ def prepare(root, output, epoch, jobs_per_api=MAX_JOBS_PER_API):
         "source": {
             "epoch": epoch,
             "state": "pending",
-            "selection": "latest_period_common_code_specific_leaves",
+            "selection": "latest_period_report_type_exchange_balanced_common_code_specific_leaves",
         },
         "api_counts": dict(sorted(counts.items())),
         "all_task_ids_sha256": digest(json_bytes(task_ids)),
