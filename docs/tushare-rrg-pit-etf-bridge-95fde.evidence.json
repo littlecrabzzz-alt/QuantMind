@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-09-10T03:44:50Z",
+  "release_id": "data-95fde4b44d540739be6f42f622c8ef331a6e565833f213b36202308e8dd71f1b",
+  "signal_date": "20260831",
+  "execution_date": "20260901",
+  "status": "blocked_data",
+  "upstream_calls": 0,
+  "credentials_accessed": false,
+  "input_report_sha256": "9a21f125daf300b87fd8b05bebe7f239dcb69b06b7e59f394b194a7453a5b257",
+  "artifact_manifest_sha256": "a5984bfc96f2ac6c7353ed2f355b001f8207dfe5b1282c5627e88764534f5513",
+  "membership": {
+    "rows": 6740,
+    "candidate_on_signal_rows": 5497,
+    "known_at_rows": 0,
+    "pit_ready": false
+  },
+  "etf": {
+    "observed_codes": 1829,
+    "date_eligible_candidate_codes": 1648,
+    "execution_price_codes": 1645,
+    "valid_price_and_factor_codes": 1645,
+    "invalid_price_or_factor_codes": [],
+    "missing_execution_price_codes": [
+      "SH511670",
+      "SH511920",
+      "SZ159578"
+    ],
+    "unsupported_exchange_codes": [
+      "158008.OF"
+    ],
+    "latest_pre_signal_disclosure_codes": 902,
+    "exact_execution_pcf_codes": 0,
+    "historical_universe_verified": false,
+    "industry_mapping_verified": false,
+    "tradability_verified": false,
+    "complete_exposure_verified": false
+  },
+  "structures": {
+    "industry_members": "prepared_with_null_known_at_semantic_block",
+    "etf_prices": "prepared_exact_execution_rows_no_fill",
+    "etf_holdings": "prepared_latest_strictly_pre_signal_disclosure_partial_only",
+    "etf_pcf": "prepared_exact_execution_rows_publication_time_unverified"
+  },
+  "gaps": [
+    "ci_index_member has effective dates but no verified publication/known_at time; current observations cannot be backfilled as historical knowledge",
+    "CITIC classification versions, methodology and revisions still require authoritative historical evidence",
+    "ETF list records are an observed candidate universe, not a point-in-time industry-to-ETF mapping",
+    "One execution-day price and factor do not prove full-history continuity, corporate-action treatment or tradability at the open",
+    "fund_portfolio is a partial periodic stock disclosure; its rows are not a complete daily ETF exposure or PCF",
+    "The single-point holding search is bounded to 550 days; no result in that window does not prove earlier disclosures absent",
+    "PCF trade_date is applicability, while publication time and historical revisions remain unverified"
+  ],
+  "artifact_files": {
+    "data/quantdb/2_base_sector/sector_concept/sector_members.parquet": {
+      "sha256": "93bd8e5f052cac1b9c6c394b3a2b13db1bb8f662c16303eed9c44a1aa4326fd7",
+      "bytes": 72660
+    },
+    "data/quantdb/4_bond_etf/etf_kline/tushare-execution-point.parquet": {
+      "sha256": "94079a85d8820144368ac13a2552017d996fbac12bda8f74615f3e6466273dc2",
+      "bytes": 45335
+    },
+    "data/quantdb/4_bond_etf/etf_pcf/etf_components.parquet": {
+      "sha256": "ef61222db380e3088d857397f70335b9637d861012b4a67997c0fb749dbf3657",
+      "bytes": 460150
+    },
+    "data/quantdb/4_bond_etf/etf_pcf/etf_pcf.parquet": {
+      "sha256": "ccdc3dfd92c90abd9a92ea126e0c80c3053154e38ec5ef5cb51c003ff3144573",
+      "bytes": 2572
+    },
+    "input-report.json": {
+      "sha256": "9a21f125daf300b87fd8b05bebe7f239dcb69b06b7e59f394b194a7453a5b257",
+      "bytes": 27277
+    },
+    "sources/etf-universe.parquet": {
+      "sha256": "d66e89a00ed3623075b7d15e59c109db201ff5744fe6dfc72b5efb6eb7b327ed",
+      "bytes": 30817
+    }
+  },
+  "claim": "The current Mac fixed release can prepare exact execution-point ETF/RRG structures offline. It remains blocked_data and is not a return, signal or trading acceptance."
+}

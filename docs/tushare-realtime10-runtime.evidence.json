@@ -275,5 +275,15 @@
     "No API produced a nonempty sample.",
     "History, source timezone, PIT and other frequencies remain unverified.",
     "Five additional stk_auction variants were skipped after the exact API denial and are not counted as separate entitlement observations."
-  ]
+  ],
+  "mac_mirror_verification": {
+    "release_id": "data-95fde4b44d540739be6f42f622c8ef331a6e565833f213b36202308e8dd71f1b",
+    "current_pointer_verified": true,
+    "status": "verified_with_gaps",
+    "report_sha256": "f3fb4f999fb11fc677d7b1130c34ffd8e29ce61c4b52b2f0db3f96f212ab8b50",
+    "matches_cloud_report_bytes": true,
+    "equivalence_sha256": "aa1d32970e6c0a507c78c0844ed85d0bb97b1f379ac54bc43c42ef42fdaf2fa2",
+    "upstream_calls": 0,
+    "credentials_accessed": false
+  }
 }
