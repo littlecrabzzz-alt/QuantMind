@@ -27,6 +27,25 @@ FIELDS = {
         "sell_amount",
         "sell_volume",
     ],
+    "ggt_top10": [
+        "trade_date",
+        "ts_code",
+        "name",
+        "close",
+        "p_change",
+        "rank",
+        "market_type",
+        "amount",
+        "net_amount",
+        "sh_amount",
+        "sh_net_amount",
+        "sh_buy",
+        "sh_sell",
+        "sz_amount",
+        "sz_net_amount",
+        "sz_buy",
+        "sz_sell",
+    ],
 }
 
 INPUT_FIELDS = {
@@ -34,23 +53,27 @@ INPUT_FIELDS = {
     # names come from a historical official-page cache, so the planner stays on
     # exact days until range behavior is validated again.
     "moneyflow_hsgt": ["trade_date", "start_date", "end_date"],
-    # The only successful retained request used no parameters.  Do not promote
-    # date filters from an unexecuted proposal into a source contract.
-    "ggt_daily": [],
+    "ggt_daily": ["trade_date", "start_date", "end_date"],
+    "ggt_top10": ["trade_date"],
 }
 
-_DOCS = {"moneyflow_hsgt": 47, "ggt_daily": 196}
+_DOCS = {"moneyflow_hsgt": 47, "ggt_daily": 196, "ggt_top10": 49}
 _MISSING_BODY_SHA256 = (
     "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf"
 )
 
 LEGACY_CONNECT_CONTRACTS = {}
 for _api in FIELDS:
+    _keys = (
+        ("trade_date", "ts_code", "market_type")
+        if _api == "ggt_top10"
+        else ("trade_date",)
+    )
     _spec = _contract(
         1000,
-        ("trade_date",),
-        required=("trade_date",),
-        nullable=tuple(FIELDS[_api][1:]),
+        _keys,
+        required=_keys,
+        nullable=tuple(field for field in FIELDS[_api] if field not in _keys),
         split=False,
         rpm=30,
         extra=FIELDS[_api],
@@ -94,19 +117,36 @@ LEGACY_CONNECT_CONTRACTS["moneyflow_hsgt"].update(
     observed_default_fields=FIELDS["moneyflow_hsgt"],
     observed_rows=1,
     observed_probe_release_id="probe-bf606f5acd14434db107a47f29051143",
+    observed_range_request={"start_date": "20260903", "end_date": "20260904"},
+    observed_range_rows=2,
+    observed_probe_report_sha256="198c728ab4ccdc189c758c1be22d2d447ef375ae0c1740408551acaee12fc380",
     date_filter_status="trade_date_observed; start_date/end_date_historical_cache_only",
     unit_gap="The retained evidence does not define currency/scales or gross/net relationships. Preserve supplier numbers without deriving totals or filling nulls.",
 )
 LEGACY_CONNECT_CONTRACTS["ggt_daily"].update(
-    observed_request={},
+    observed_request={"trade_date": "20260904"},
     observed_default_fields=FIELDS["ggt_daily"],
-    observed_rows=1000,
-    observed_has_more=True,
-    observed_date_span=["20220526", "20260907"],
-    observed_probe_release_id="probe-bf606f5acd14434db107a47f29051143",
-    date_filter_status="unverified",
-    acquisition_gap="Only an unfiltered request is proven legal. The planner emits one schema-preserving observation job and cannot backfill history until legal partition inputs are verified.",
+    observed_rows=1,
+    observed_has_more=False,
+    observed_date_span=["20220523", "20260904"],
+    observed_probe_report_sha256="198c728ab4ccdc189c758c1be22d2d447ef375ae0c1740408551acaee12fc380",
+    previous_unfiltered_observation={
+        "rows": 1000,
+        "has_more": True,
+        "date_span": ["20220526", "20260907"],
+        "probe_release_id": "probe-bf606f5acd14434db107a47f29051143",
+    },
+    date_filter_status="trade_date and bounded start_date/end_date observed",
     unit_gap="Amount and volume scales/currencies are absent from retained primary evidence. Daily values must not be aggregated into the distinct ggt_monthly obligation.",
+)
+LEGACY_CONNECT_CONTRACTS["ggt_top10"].update(
+    observed_request={"trade_date": "20260904"},
+    observed_default_fields=FIELDS["ggt_top10"],
+    observed_rows=20,
+    observed_has_more=False,
+    observed_probe_report_sha256="198c728ab4ccdc189c758c1be22d2d447ef375ae0c1740408551acaee12fc380",
+    date_filter_status="trade_date observed",
+    unit_gap="The retained response does not define currency, amount scale, market_type enumeration or adjusted-price semantics. Preserve values and request identity without cross-market aggregation.",
 )
 
 
@@ -130,40 +170,35 @@ def iter_legacy_connect_jobs(config, today, identifiers=None):
         raise ValueError("today must be a date")
     selected = _selected(config)
     epoch = str(config.get("planning_epoch", today.strftime("%Y%m%d")))
-    if "ggt_daily" in selected:
-        yield {
-            "api_name": "ggt_daily",
-            "params": {},
-            "priority": 60,
-            "epoch": "unpartitioned-schema-observation",
-        }
-    if "moneyflow_hsgt" not in selected:
+    if not selected:
         return
     setting = config.get("legacy_connect_history_start", config.get("history_start"))
     start = _parse(setting) if setting is not None else None
     if start and start > today:
         raise ValueError("History start cannot be after today")
     recent = today - timedelta(days=6)
-    day = recent
-    while day <= today:
-        yield {
-            "api_name": "moneyflow_hsgt",
-            "params": {"trade_date": day.strftime("%Y%m%d")},
-            "priority": 20,
-            "epoch": epoch,
-        }
-        day += timedelta(days=1)
+    for api in selected:
+        day = recent
+        while day <= today:
+            yield {
+                "api_name": api,
+                "params": {"trade_date": day.strftime("%Y%m%d")},
+                "priority": 20,
+                "epoch": epoch,
+            }
+            day += timedelta(days=1)
     if start is None:
         return
-    day = start
-    while day < recent:
-        yield {
-            "api_name": "moneyflow_hsgt",
-            "params": {"trade_date": day.strftime("%Y%m%d")},
-            "priority": 40,
-            "epoch": "history",
-        }
-        day += timedelta(days=1)
+    for api in selected:
+        day = start
+        while day < recent:
+            yield {
+                "api_name": api,
+                "params": {"trade_date": day.strftime("%Y%m%d")},
+                "priority": 40,
+                "epoch": "history",
+            }
+            day += timedelta(days=1)
 
 
 def legacy_connect_prerequisites(config=None):
