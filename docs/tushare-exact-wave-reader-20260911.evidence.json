@@ -1,0 +1,285 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-10T19:21:52Z",
+  "status": "production_verified",
+  "git": {
+    "commit": "77c1a3faadab018a9a8c960413c0fb9c17133344",
+    "branch": "master",
+    "github_pushed": true,
+    "cloud_aligned": true,
+    "cloud_alignment_transport": "git_bundle_after_github_fetch_timeout",
+    "rate_policy_commits": [
+      "7ce9e55b118a3604ae47b22d2d12361363bafb85",
+      "5bc6707d38b794ea550d04663ff0a7e44897329e",
+      "eed2c88130d574bc4a6fdfb946e13db6a0b13b5d"
+    ]
+  },
+  "rate_policy": {
+    "mode": "tiered_v1",
+    "requests_per_minute": 500,
+    "rollout_account_rpm": 500,
+    "hard_account_ceiling_rpm": 500,
+    "current_authority_config_sha256": "da45afae322463eacd54a97203f2ede46a9ff86aafbb58e6bec26b57ea009853",
+    "rollout_receipts": {
+      "300_acceptance_sha256": "5e80adeb9e4fce6c1ac9768a589d6315c3d1f4c41e51db82e7a411108236909d",
+      "400_acceptance_sha256": "221d88aec8c0a4f97dbcc6eab6abfba2f7ef7f16b43d4f87533a95087f133c26",
+      "500_acceptance_sha256": "dcc7abb4414a7e119ff84799df55b4fbc7e726285921f5b02754e4e1f04f14d9"
+    },
+    "stage_500_sample": {
+      "http_calls": 100,
+      "http_200_calls": 100,
+      "confirmed_provider_rate_limit_events": 0,
+      "median_burst_implied_rpm": 495.868
+    },
+    "implementation_validation": {
+      "focused_tests_passed": 35,
+      "full_tushare_tests_passed": 777,
+      "ruff": "passed"
+    },
+    "current_automatic_batch": {
+      "task_id": "dec4e5f7-5604-46a0-8d8e-9ccc1a03f761",
+      "requests": 360,
+      "http_200": 360,
+      "http_429": 0,
+      "provider_rate_errors": 0,
+      "total_elapsed_seconds": 58.05,
+      "acquire_elapsed_seconds": 56.737,
+      "total_observed_rpm": 372.093,
+      "acquire_observed_rpm": 380.704,
+      "failed_stage": null
+    },
+    "current_observable_status": {
+      "notice": "expires_within_90_days",
+      "days_until_2000_point_expiry": 85,
+      "last_effective_account_rpm": 500,
+      "last_effective_min_interval_seconds": 0.12,
+      "cyq_perf_daily_cap": 200000,
+      "cyq_perf_daily_ledger_status": "ready"
+    },
+    "entitlement_expiry": {
+      "points_2000": "2026-12-05",
+      "expected_points_after_expiry": 8100,
+      "independent_permissions": "2027-09-08",
+      "observable_reminders": [
+        90,
+        30,
+        7
+      ]
+    }
+  },
+  "exact_wave": {
+    "authority": "/data/tushare",
+    "summary_path": "validation/exact-wave-20260911T0303/window-summary.json",
+    "summary_sha256": "2565ba8492ebdb0db0dda3b56f219a48b480bb91e8cbd745f38c253bf2418db4",
+    "upstream_calls": 1440,
+    "elapsed_seconds": 188.364,
+    "observed_sustained_rpm": 458.686,
+    "release_switched_by_exact_runners": false,
+    "batches": [
+      {
+        "name": "financial_pit_batch_11",
+        "calls": 360,
+        "elapsed_seconds": 49.138,
+        "observed_rpm": 439.578,
+        "states": {
+          "done": 335,
+          "empty": 25
+        },
+        "manifest_sha256": "3aff2f761ddec86fa433b3a6b622f1c951f4f5cda6a0a511baf73c6f5dc19a0a",
+        "receipt_sha256": "23cda4ada64ac89735c5523a342c24513de9f9d86fbd27b2d654ea32fd89fb50"
+      },
+      {
+        "name": "index_weight_batch_3",
+        "calls": 360,
+        "elapsed_seconds": 47.332,
+        "observed_rpm": 456.351,
+        "states": {
+          "done": 316,
+          "empty": 9,
+          "split_pending": 35
+        },
+        "manifest_sha256": "5490e660851da9e8cf1916156e251b1e4f1b0d9dab36768a7975582a9ca262ba",
+        "receipt_sha256": "75775e38ca73e3911af1447f85a2cd2f9a6d31825c81435945ab32b3bcc6a5b3"
+      },
+      {
+        "name": "fund_share_batch_6",
+        "calls": 360,
+        "elapsed_seconds": 46.794,
+        "observed_rpm": 461.598,
+        "states": {
+          "done": 248,
+          "empty": 112
+        },
+        "manifest_sha256": "86c2fc7aee8f1f80d13cd229675c27197276aa00622d3be1f130da959ff3e6cd",
+        "receipt_sha256": "e463be9b920f93a7f8ce38b4182fcc83be6df3c919f27b86df8be952385ad4e3"
+      },
+      {
+        "name": "fund_nav_batch_7",
+        "calls": 360,
+        "elapsed_seconds": 45.1,
+        "observed_rpm": 478.936,
+        "states": {
+          "done": 204,
+          "empty": 35,
+          "split_pending": 121
+        },
+        "manifest_sha256": "5acfd406c2e436995350c0c0b5ffff253e2649d9650f1767a85ffaca19d70e31",
+        "receipt_sha256": "a22dcccc842bd729bd578ada4617323de5cec6e10f89f6035d883723c71a6cfd"
+      }
+    ],
+    "fixed_release_closure": {
+      "path": "validation/exact-wave-20260911T0303/fixed-release-closure.json",
+      "sha256": "073eb220fe6a2ad3599b946610fd296139eae36a5d812743719148d9599ada21",
+      "task_ids": 1440,
+      "task_ids_unique": 1440,
+      "states": {
+        "done": 1103,
+        "empty": 181,
+        "split_pending": 156
+      },
+      "returned_rows": {
+        "balancesheet_vip": 232,
+        "cashflow_vip": 216,
+        "fund_nav": 244214,
+        "fund_share": 122450,
+        "income_vip": 217,
+        "index_weight": 132350
+      },
+      "verified_unique_file_references": 4139,
+      "physical_sha256_recomputed": true,
+      "live_sqlite_closed_before_file_verification": true,
+      "upstream_calls": 0
+    }
+  },
+  "reader_fix": {
+    "behavior": "CLI chooses index_code for index_weight and permits explicit source_* supplier-code filters",
+    "runtime_code_sha256": {
+      "backend/shared/tushare_store.py": "880ee53f0077cd7e143880b5563997b4af67cd8b1e23ec27af64087359807614",
+      "scripts/tushare_pipeline.py": "2cc88d242e2767dc831883f258d07ec27a9251de1a173aa9372469ab631c6f21"
+    },
+    "same_hash_on_mac_repo_cloud_container_and_mac_client": true,
+    "production_container_tests": {
+      "tests": 17,
+      "status": "passed",
+      "elapsed_seconds": 17.288
+    },
+    "cloud_offline": {
+      "release_id": "data-dbd1efcca51b442c2a72cbacc28dd4d61883c0a232eebecc410d48bdf02d7ec9",
+      "network": "none",
+      "tokens": "empty",
+      "internal_code": "SH000003",
+      "source_code": "000003.SH",
+      "rows_each": 40,
+      "export_rows": 7,
+      "export_sha256": "529084f1146c422c2355f3263f91993b4bfa676ee0a3d7b6997ffb84791b6b14",
+      "upstream_calls": 0
+    },
+    "mac_offline": {
+      "release_id": "data-dbd1efcca51b442c2a72cbacc28dd4d61883c0a232eebecc410d48bdf02d7ec9",
+      "socket_dns": "blocked",
+      "tokens": "unset",
+      "internal_code": "SH000003",
+      "source_code": "000003.SH",
+      "rows_each": 40,
+      "export_rows": 7,
+      "export_sha256": "529084f1146c422c2355f3263f91993b4bfa676ee0a3d7b6997ffb84791b6b14",
+      "upstream_calls": 0
+    },
+    "new_release_offline_readback": {
+      "release_id": "data-f9c557872d2b7793779791dded640acce597cf5ceb07e35dacf81d9d5af74ee9",
+      "cloud_network": "none",
+      "mac_socket_dns": "blocked",
+      "tokens": "empty_or_unset",
+      "cloud_and_mac_rows_equal": true,
+      "rows": {
+        "income_vip_SH600064_20260630": 4,
+        "index_weight_SH000001_201708": 1369,
+        "index_weight_source_000001_SH_201708": 1369,
+        "fund_share_20240820": 1015,
+        "fund_nav_003367_OF": 523
+      },
+      "upstream_calls": 0
+    }
+  },
+  "publication": {
+    "release_id": "data-f9c557872d2b7793779791dded640acce597cf5ceb07e35dacf81d9d5af74ee9",
+    "manifest_sha256": "f9c557872d2b7793779791dded640acce597cf5ceb07e35dacf81d9d5af74ee9",
+    "manifest_bytes": 274924292,
+    "files": 705154,
+    "datasets": 88415,
+    "gaps": 93724,
+    "coverage": {
+      "blocked": 748,
+      "deferred_legacy_period_plan": 9802,
+      "done": 83556,
+      "empty": 77490,
+      "pending": 3744437,
+      "permission_blocked": 2329,
+      "quality": 339,
+      "resolved": 1450,
+      "split_pending": 3016
+    },
+    "initial_task": {
+      "task_id": "24c1c298-58ed-4319-bf31-b0ee63cfabf6",
+      "elapsed_seconds": 303.982,
+      "result": "soft_timeout_after_atomic_current_switch"
+    },
+    "recovery_task": {
+      "task_id": "c402ac14-75b8-47e0-80df-f7ccebc286f8",
+      "elapsed_seconds": 173.057,
+      "checkpoint_recovery": "verified_current_intent",
+      "failed_stage": null,
+      "upstream_calls": 0
+    },
+    "history_complete": false,
+    "historical_versions_complete": false,
+    "rrg_status": "blocked_data"
+  },
+  "mac_mirror": {
+    "release_id": "data-f9c557872d2b7793779791dded640acce597cf5ceb07e35dacf81d9d5af74ee9",
+    "launch_agent_run": 140,
+    "downloaded_files": 12426,
+    "files_verified": 705154,
+    "last_exit_code": 0,
+    "error_log_bytes": 0,
+    "status": "verified"
+  },
+  "deployment": {
+    "quantmind_api_restarted": true,
+    "health_http_status": 200,
+    "health_body_status": "healthy",
+    "quantmind_restart_count": 0,
+    "tushare_worker_restarted_for_reader_fix": false,
+    "tushare_worker_status": "healthy",
+    "celery_beat_status": "healthy",
+    "db_status": "healthy",
+    "redis_status": "healthy",
+    "mac_client_code_updated": true,
+    "dual_node_handoff": {
+      "status": "passed",
+      "head": "77c1a3faadab018a9a8c960413c0fb9c17133344",
+      "source_files": 6091,
+      "source_digest": "c26f2215ab9063502350a4442c48d0b53c1998bee686a7884b29cd842ce0c79f",
+      "data_authority": "lzy-vm",
+      "mac_mode": "local-sandbox"
+    }
+  },
+  "storage": {
+    "cloud_authority_bytes": 105850949632,
+    "cloud_free_bytes": 143650902016,
+    "mac_fixed_mirror_bytes": 91216027648,
+    "stop_line_bytes": 107374182400,
+    "stop_line_triggered": false
+  },
+  "boundaries": {
+    "history_complete": false,
+    "historical_versions_complete": false,
+    "pit_verified": false,
+    "rrg_status": "blocked_data",
+    "new_exact_wave_fixed_release": "published_and_mirrored"
+  },
+  "security": {
+    "token_present": false,
+    "order_or_payment_data_present": false
+  }
+}

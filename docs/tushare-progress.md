@@ -673,3 +673,15 @@
 - `fund_nav` round 2已支持7天门控，固定round 1旧release、attempt、manifest和A/B四证据哈希；round 2可以使用当时的新release。`review_exhausted` 不改原empty任务或父拆分gap，非空恢复继续走标准normalize/reconcile。候选22项、Mac18项和云端生产镜像18项相关测试通过；生产尚未到round 1时间门，因此0复核调用。
 - `54ae40bd` 已合入并推送master，Mac/GitHub/云端Git统一；云端worker与Beat在在途任务自然成功后重建为healthy，restart0、OOM false。重启后首任务 `1783a093…` 用145.746秒成功。固定证据为 `docs/tushare-exact-wave-release-20260911.evidence.json`。
 - 非阻塞项：通用CLI的 `codes` 默认映射到 `ts_code`，但 `index_weight` 存储列是 `index_code`，因此按指数代码筛选会拒绝；按日期固定版读取已通过。这是reader选择器缺口，不影响本批原始数据闭包，后续单独修正。全局 `history_complete`、历史修订完整性和PIT仍为false，RRG仍为 `blocked_data`。
+
+## 2026-09-11 03:22 下一精确波次与指数代码 reader 上线
+
+- 停Beat、取消专用worker采集consumer并等待在途任务自然结束后，四个固定清单顺序完成1440次请求：财务三表第11批49.138秒，335 done/25 empty；`index_weight`第3批47.332秒，316 done/9 empty/35 split_pending；`fund_share`第6批46.794秒，248 done/112 empty；`fund_nav`第7批45.100秒，204 done/35 empty/121 split_pending。合计188.364秒，折算458.686 rpm；每批均固定任务集、配置和工具哈希，不发布或切换CURRENT。合并权威摘要SHA256为`2565ba8492ebdb0db0dda3b56f219a48b480bb91e8cbd745f38c253bf2418db4`。
+- 生产配置继续使用`tiered_v1`、账户硬上限与灰度档500 rpm。300/400/500三阶段验收收据仍在authority；500阶段已有100/100 HTTP 200、0供应商限频和495.868 rpm突发中位数证据。当前精确波次的持续吞吐接近但未超过账户门，API合同、显式冷却和`cyq_perf`日配额继续取更严限制。
+- 后续自动生产任务`dec4e5f7…`实际完成360请求，360个HTTP 200、0个HTTP 429、0个供应商频率错误；采集阶段56.737秒、任务总58.050秒，分别折算380.704/372.093 rpm，失败阶段为空。`pipeline-status.json`同时持久显示2000积分还有85天、`expires_within_90_days`提醒、预计到期后8100分，以及`cyq_perf`当日200000硬上限账本ready。
+- `77c1a3fa`修复通用CLI按registry键选择代码列：`index_weight`默认使用`index_code`，并允许显式已有`source_*`列接受供应商后缀代码。生产镜像17项相关测试通过。云端禁网/空Token与Mac禁socket/DNS/无Token分别查询`SH000003`和`000003.SH`，每种40行；两端7行导出SHA均为`529084f1146c422c2355f3263f91993b4bfa676ee0a3d7b6997ffb84791b6b14`，上游调用0。
+- 提交已推送并部署。云端GitHub fetch超时作为非阻塞网络项记录，改用同一Git提交的bundle快进，云端与Mac均为`77c1a3fa`且目标文件SHA一致。仅重启`quantmind` API加载reader，HTTP健康检查200；采集worker、Beat、DB和Redis保持healthy。Mac定时客户端副本已重装并核对脚本/存储层SHA。
+- 到期publisher在303.982秒软超时前已原子切换`CURRENT`到`data-f9c557872d2b7793779791dded640acce597cf5ceb07e35dacf81d9d5af74ee9`；指针和274924292字节manifest的SHA一致。下一任务用173.057秒完成`verified_current_intent`恢复，0上游请求、失败阶段为空，并推进`last_success_at`和下一发布点。新固定版有705154文件、88415数据分区、93724缺口；这再次暴露发布尾延迟，但没有半成品版本或重复上游抓取。
+- 任务级闭包逐一核对1440个task：1103 done、181 empty、156 split_pending；关闭SQLite读取后，对4139个唯一observation/raw object/Parquet引用重算物理SHA与字节，empty/split_pending同时存在于manifest gaps。返回行数为财务三表665、`index_weight`132350、`fund_nav`244214、`fund_share`122450；不可覆盖闭包报告SHA为`073eb220fe6a2ad3599b946610fd296139eae36a5d812743719148d9599ada21`。
+- Mac第140次标准LaunchAgent新增下载12426文件、完整校验705154文件，退出码0且错误日志0，原子追平同一固定版。云端`--network none`和Mac禁socket/DNS、无Token复核结果一致：`income_vip`4行、`index_weight`内部/来源码各1369行、`fund_share`1015行、`fund_nav`523行，全部0上游调用。
+- 最终云端authority约98.581GiB、Mac固定镜像约84.952GiB，云盘可用143650902016字节（133.785GiB），高于100GiB停采线。机器证据为`docs/tushare-exact-wave-reader-20260911.evidence.json`。全局历史、修订/PIT和RRG成员/ETF映射缺口仍开放，RRG继续`blocked_data`。
