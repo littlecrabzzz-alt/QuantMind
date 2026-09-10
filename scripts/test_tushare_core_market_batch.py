@@ -121,7 +121,15 @@ class CoreMarketBatchTest(unittest.TestCase):
 
     @staticmethod
     def _insert_job(db, api, trade_date, epoch, state="pending", tries=0):
-        job = {"api_name": api, "params": {"trade_date": trade_date}}
+        job = {
+            "api_name": api,
+            "params": {"trade_date": trade_date},
+            "fields": "trade_date,ts_code",
+            "row_cap": 6000,
+            "required_fields": ["ts_code", "trade_date"],
+            "nullable_fields": [],
+            "positive_fields": [],
+        }
         logical_key = digest(json_bytes(job))
         task_id = digest(json_bytes([logical_key, epoch]))
         db.execute(

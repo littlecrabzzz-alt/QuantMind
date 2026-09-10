@@ -167,7 +167,7 @@ def _job_api_day(record):
     job = record["job"]
     params = job.get("params") if isinstance(job, dict) else None
     if (
-        set(job or {}) != {"api_name", "params"}
+        not isinstance(job, dict)
         or job.get("api_name") not in ALLOWED_APIS
         or not isinstance(params, dict)
         or set(params) != {"trade_date"}
