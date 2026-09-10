@@ -74,13 +74,28 @@ class EtfWindowAuditTests(unittest.TestCase):
                 {"ts_code": "SH510001", "ann_date": "20250101", "ex_date": None, "pay_date": None, "div_proc": None}
             ],
             "etf_limit": [
-                {"trade_date": "20260202", "ts_code": "SH510001", "up_limit": 1.2, "down_limit": 0.8}
+                {
+                    "trade_date": "20260202",
+                    "ts_code": "FUND:510001.SH",
+                    "source_ts_code": "510001.SH",
+                    "up_limit": 1.2,
+                    "down_limit": 0.8,
+                }
             ],
             "etf_sh_cons": [
                 {"trade_date": "20260202", "ts_code": "SH510001", "con_code": "600000.SH", "exchange": "SH"}
             ],
             "etf_sz_cons": [],
         }
+        self.gaps = [
+            {
+                "id": "receipt",
+                "api_name": "fund_div",
+                "params": {"ts_code": "510001.SH"},
+                "state": "empty",
+                "assessment": "empty_unverified",
+            }
+        ]
 
     def invoke(self, **overrides):
         def reader(root, release_id, api, **params):
@@ -96,7 +111,10 @@ class EtfWindowAuditTests(unittest.TestCase):
             "output": self.output,
         }
         args.update(overrides)
-        manifest = {"datasets": [{"api_name": api} for api in self.values]}
+        manifest = {
+            "datasets": [{"api_name": api} for api in self.values],
+            "gaps": self.gaps,
+        }
         with (
             patch.object(module, "manifest_at", return_value=manifest),
             patch.object(module, "read_dataset", side_effect=reader),
@@ -118,13 +136,22 @@ class EtfWindowAuditTests(unittest.TestCase):
         self.assertEqual(report["coverage"]["joined_valid_price_factor_pairs"], 2)
         self.assertEqual(report["coverage"]["monthly_execution_expected_pairs"], 1)
         self.assertEqual(report["coverage"]["monthly_execution_valid_price_factor_pairs"], 0)
+        self.assertEqual(report["coverage"]["etf_limit_observed_code_day_pairs"], 1)
+        self.assertEqual(report["coverage"]["etf_limit_code_day_pairs"], 1)
         self.assertEqual(report["coverage"]["etf_limit_monthly_execution_pairs"], 1)
         self.assertEqual(report["coverage"]["pcf_monthly_execution_pairs"], 1)
+        self.assertTrue(
+            report["coverage"]["fund_div_empty_receipts_available_in_fixed_release"]
+        )
+        self.assertEqual(report["coverage"]["fund_div_empty_receipt_codes"], 1)
+        self.assertEqual(report["coverage"]["fund_div_terminal_receipt_codes"], 1)
+        self.assertEqual(report["coverage"]["fund_div_missing_terminal_receipt_codes"], 0)
         missing = [json.loads(line) for line in (self.output / "missing-observations.jsonl").read_text().splitlines()]
         self.assertEqual(missing[0]["ranges"], [{"start_date": "20260202", "end_date": "20260202"}])
         plans = [json.loads(line) for line in (self.output / "collection-plan.jsonl").read_text().splitlines()]
         pcf = [row for row in plans if row["api_name"] == "etf_sh_cons"]
         self.assertEqual(pcf[0]["gate"], "blocked_until_authoritative_etf_mapping")
+        self.assertFalse(any(row["api_name"] == "fund_div" for row in plans))
         self.assertFalse(report["universe"]["industry_mapping_verified"])
         self.assertTrue((self.output / "manifest.json").is_file())
 
@@ -138,6 +165,25 @@ class EtfWindowAuditTests(unittest.TestCase):
             self.invoke()
         with self.assertRaisesRegex(ValueError, "Output must be new"):
             module.audit(self.root, self.release, "20260130", "20260203", self.root / "bad")
+
+    def test_rejects_mismatched_etf_limit_namespace_and_plans_missing_receipt(self):
+        self.values["etf_limit"][0]["ts_code"] = "SH510001"
+        with self.assertRaisesRegex(ValueError, "ETF limit source namespace"):
+            self.invoke()
+
+        self.values["etf_limit"][0]["ts_code"] = "FUND:510001.SH"
+        self.gaps = []
+        self.values["fund_div"] = []
+        report = self.invoke()
+        self.assertFalse(
+            report["coverage"]["fund_div_empty_receipts_available_in_fixed_release"]
+        )
+        self.assertEqual(report["coverage"]["fund_div_missing_terminal_receipt_codes"], 1)
+        plans = [
+            json.loads(line)
+            for line in (self.output / "collection-plan.jsonl").read_text().splitlines()
+        ]
+        self.assertEqual(sum(row["api_name"] == "fund_div" for row in plans), 1)
 
 
 if __name__ == "__main__":

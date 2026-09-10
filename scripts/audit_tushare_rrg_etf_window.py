@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import re
 import socket
 import sys
 from unittest.mock import patch
@@ -140,6 +141,39 @@ def _valid_factor(row):
     )
 
 
+def _etf_limit_rows(rows):
+    mapped = []
+    for row in rows:
+        source = row.get("source_ts_code")
+        match = re.fullmatch(r"([0-9]{6,7})\.(SH|SZ|BJ)", str(source or ""))
+        if not match or row.get("ts_code") != "FUND:" + source:
+            raise ValueError("Invalid ETF limit source namespace")
+        mapped.append({**row, "ts_code": match[2] + match[1]})
+    return mapped
+
+
+def _fund_div_empty_receipts(manifest, source_codes):
+    by_source = {}
+    for code, source in source_codes.items():
+        if source in by_source and by_source[source] != code:
+            raise ValueError("Ambiguous ETF source identifier")
+        by_source[source] = code
+    receipts = set()
+    for gap in manifest.get("gaps", []):
+        if (
+            gap.get("api_name") != "fund_div"
+            or gap.get("state") != "empty"
+            or gap.get("assessment") != "empty_unverified"
+        ):
+            continue
+        params = gap.get("params")
+        if not isinstance(params, dict) or set(params) != {"ts_code"}:
+            raise ValueError("Invalid fund_div empty receipt")
+        if params["ts_code"] in by_source:
+            receipts.add(by_source[params["ts_code"]])
+    return receipts
+
+
 def _audit(root, release_id, start_date, end_date, output):
     root, output = Path(root).resolve(), Path(output).resolve()
     if (
@@ -220,13 +254,26 @@ def _audit(root, release_id, start_date, end_date, output):
         "fund_daily": read("fund_daily", limit=5_000_000, **window),
         "fund_adj": read("fund_adj", limit=5_000_000, **window),
         "fund_div": read("fund_div", limit=200_000, codes=codes),
-        "etf_limit": read("etf_limit", limit=1_000_000, **window),
+        # etf_limit intentionally uses the FUND: source namespace, unlike the
+        # SH/SZ ETF execution keys used by the RRG inputs. Read the date window
+        # first, then map its retained supplier code explicitly below.
+        "etf_limit": read(
+            "etf_limit",
+            limit=1_000_000,
+            date_field="trade_date",
+            start_date=start_date,
+            end_date=end_date,
+        ),
         "etf_sh_cons": read("etf_sh_cons", limit=5_000_000, **window),
         "etf_sz_cons": read("etf_sz_cons", limit=5_000_000, **window),
     }
     prices = distinct(rows["fund_daily"], ("trade_date", "ts_code"), "ETF price")
     factors = distinct(rows["fund_adj"], ("trade_date", "ts_code"), "ETF factor")
-    limits = distinct(rows["etf_limit"], ("trade_date", "ts_code"), "ETF limit")
+    limits = distinct(
+        _etf_limit_rows(rows["etf_limit"]),
+        ("trade_date", "ts_code"),
+        "ETF limit",
+    )
     pcf_keys = {
         (row.get("trade_date"), row.get("ts_code"))
         for api in ("etf_sh_cons", "etf_sz_cons")
@@ -235,6 +282,20 @@ def _audit(root, release_id, start_date, end_date, output):
     }
     positions = {day: index for index, day in enumerate(sessions)}
     source_codes = {row["EtfCode"]: row.get("source_etf_code") for row in supported}
+    empty_receipt_codes = _fund_div_empty_receipts(manifest, source_codes)
+    dividend_keys = set()
+    for row in rows["fund_div"]:
+        key = tuple(
+            row.get(field)
+            for field in ("ts_code", "ann_date", "ex_date", "pay_date", "div_proc")
+        )
+        if not key[0] or key in dividend_keys:
+            raise ValueError("Missing or duplicate fund dividend key")
+        dividend_keys.add(key)
+    dividend_codes = {key[0] for key in dividend_keys}
+    expected_dividend_codes = {row["EtfCode"] for row in overlapping}
+    terminal_dividend_codes = (empty_receipt_codes | dividend_codes) & expected_dividend_codes
+    missing_dividend_codes = expected_dividend_codes - terminal_dividend_codes
     missing_records, plans = [], []
     expected_pairs = set()
     for record in overlapping:
@@ -269,13 +330,13 @@ def _audit(root, release_id, start_date, end_date, output):
                 }
                 for span in ranges
             )
-    for code in sorted(row["EtfCode"] for row in overlapping):
+    for code in sorted(missing_dividend_codes):
         plans.append(
             {
                 "api_name": "fund_div",
                 "params": {"ts_code": source_codes[code]},
                 "gate": "requires_terminal_receipt",
-                "reason": "a fixed release contains event rows but no proof for empty responses",
+                "reason": "fixed release has neither event rows nor a terminal empty receipt for this ETF",
             }
         )
     for left, right in _months(start_date, end_date):
@@ -311,15 +372,6 @@ def _audit(root, release_id, start_date, end_date, output):
     execution_pairs = {pair for pair in expected_pairs if pair[0] in execution_days}
     valid_prices = {key for key, row in prices.items() if _valid_price(row)}
     valid_factors = {key for key, row in factors.items() if _valid_factor(row)}
-    dividend_keys = set()
-    for row in rows["fund_div"]:
-        key = tuple(
-            row.get(field)
-            for field in ("ts_code", "ann_date", "ex_date", "pay_date", "div_proc")
-        )
-        if not key[0] or key in dividend_keys:
-            raise ValueError("Missing or duplicate fund dividend key")
-        dividend_keys.add(key)
     status = "blocked_data"
     report = {
         "schema_version": 1,
@@ -374,9 +426,18 @@ def _audit(root, release_id, start_date, end_date, output):
                 execution_pairs & valid_prices & valid_factors
             ),
             "fund_div_event_rows": len(dividend_keys),
-            "fund_div_codes_with_events": len({key[0] for key in dividend_keys}),
-            "fund_div_empty_receipts_available_in_fixed_release": False,
-            "etf_limit_code_day_pairs": len(limits),
+            "fund_div_codes_with_events": len(dividend_codes),
+            "fund_div_empty_receipts_available_in_fixed_release": bool(
+                empty_receipt_codes
+            ),
+            "fund_div_empty_receipt_codes": len(
+                empty_receipt_codes & expected_dividend_codes
+            ),
+            "fund_div_terminal_receipt_codes": len(terminal_dividend_codes),
+            "fund_div_missing_terminal_receipt_codes": len(missing_dividend_codes),
+            "fund_div_terminal_receipt_coverage_complete": not missing_dividend_codes,
+            "etf_limit_observed_code_day_pairs": len(limits),
+            "etf_limit_code_day_pairs": len(expected_pairs & limits.keys()),
             "etf_limit_monthly_execution_pairs": len(execution_pairs & limits.keys()),
             "pcf_code_day_pairs": len(pcf_keys),
             "pcf_monthly_execution_pairs": len(execution_pairs & pcf_keys),
@@ -404,7 +465,7 @@ def _audit(root, release_id, start_date, end_date, output):
             "current ETF records do not provide a PIT industry mapping or complete historical universe",
             "missing fund_daily rows have no documented Tushare ETF suspension/open-tradability classifier",
             "etf_limit is a price-bound dataset and cannot substitute for suspension or opening-auction evidence",
-            "fixed releases do not publish terminal empty receipts needed to prove fund_div acquisition coverage",
+            "fund_div terminal receipts prove completed requests, not complete source history or revisions",
             "PCF applicability dates do not prove pre-open known_at, revisions or portfolio weights",
         ],
         "queries": queries,
