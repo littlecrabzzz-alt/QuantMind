@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import import_tushare_rrg_acquisition_shard as importer
 import prepare_tushare_rrg_acquisition_batch as preparation
 import run_tushare_rrg_acquisition_batch as runner
+import run_tushare_rrg_descendant_batch as descendant_runner
 
 
 class ExactBatchRunnerTests(unittest.TestCase):
@@ -160,6 +161,105 @@ class ExactBatchRunnerTests(unittest.TestCase):
         ):
             return self.invoke(**arguments)
 
+    def _split_etf_tree(self):
+        record = next(
+            row
+            for values in self.verified["records_by_path"].values()
+            for row in values
+            if row["api_name"] == "etf_limit"
+        )
+        pipeline = runner.pipeline_module.Pipeline(self.root, self.verified["catalog"])
+        try:
+            first = pipeline.enqueue(
+                "etf_limit",
+                {"start_date": "20220101", "end_date": "20220115"},
+                priority=24,
+                epoch=record["epoch"],
+            )
+            second = pipeline.enqueue(
+                "etf_limit",
+                {"start_date": "20220116", "end_date": "20220131"},
+                priority=24,
+                epoch=record["epoch"],
+            )
+            leaf_one = pipeline.enqueue(
+                "etf_limit",
+                {"start_date": "20220116", "end_date": "20220123"},
+                priority=24,
+                epoch=record["epoch"],
+            )
+            leaf_two = pipeline.enqueue(
+                "etf_limit",
+                {"start_date": "20220124", "end_date": "20220131"},
+                priority=24,
+                epoch=record["epoch"],
+            )
+            pipeline.record_partition(
+                record["task_id"],
+                [first, second],
+                "date_bisection",
+                True,
+                {"fixture": "root"},
+            )
+            pipeline.record_partition(
+                second,
+                [leaf_one, leaf_two],
+                "date_bisection",
+                True,
+                {"fixture": "child"},
+            )
+            pipeline.db.execute(
+                "UPDATE jobs SET state='split_pending',priority=24,tries=1 "
+                "WHERE id IN (?,?)",
+                (record["task_id"], second),
+            )
+            pipeline.db.executemany(
+                "INSERT INTO attempts(job_id,attempt,result) VALUES(?,1,'{}')",
+                [(record["task_id"],), (second,)],
+            )
+            pipeline.db.commit()
+        finally:
+            pipeline.close()
+        return record["task_id"], {first, second, leaf_one, leaf_two}
+
+    def descendant_plan(self, **overrides):
+        arguments = {
+            "batch_manifest": self.batch,
+            "manifest_sha256": self.batch_sha,
+            "audit_report": self.report,
+            "root": self.root,
+        }
+        arguments.update(overrides)
+        return descendant_runner.run_batch(**arguments)
+
+    def execute_descendants(self, handler, plan, **overrides):
+        arguments = {
+            "expected_authority_sha256": plan["authority_sha256"],
+            "expected_config_sha256": plan["authority_config_sha256"],
+            "expected_helper_sha256": descendant_runner.helper_sha256(),
+            "expected_task_set_sha256": plan["task_set_sha256"],
+            "max_requests": 2,
+            "max_seconds": 10,
+            "execute": True,
+        }
+        arguments.update(overrides)
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        disk = type("usage", (), {"free": 101 * 2**30})()
+        with (
+            patch.object(descendant_runner.pipeline_module, "ROOT", self.root),
+            patch.object(
+                descendant_runner.pipeline_module, "authority", return_value=None
+            ),
+            patch.object(
+                descendant_runner.pipeline_module,
+                "get_secret",
+                return_value="fixture",
+            ),
+            patch.object(descendant_runner.httpx, "Client", return_value=client),
+            patch.object(descendant_runner.shutil, "disk_usage", return_value=disk),
+        ):
+            return self.descendant_plan(**arguments)
+
     def test_plan_only_verifies_hash_chain_without_authority_or_credentials(self):
         before = (self.root / "pipeline.sqlite").read_bytes()
         result = self.invoke(root=self.base / "ignored")
@@ -284,6 +384,125 @@ class ExactBatchRunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "schema must already be version 6"):
             self.execute(respond)
         self.assertEqual(calls, 0)
+
+    def test_descendant_plan_reports_full_tree_without_secret_or_network(self):
+        parent, descendants = self._split_etf_tree()
+        before = (self.root / "pipeline.sqlite").read_bytes()
+        plan = self.descendant_plan()
+        self.assertEqual(plan["status"], "plan_only")
+        self.assertEqual(plan["descendant_root_tasks"], 1)
+        self.assertEqual(plan["descendant_tasks"], 4)
+        self.assertEqual(plan["pending_descendant_tasks"], 3)
+        self.assertEqual([row["tasks"] for row in plan["layers"]], [1, 2, 2])
+        self.assertEqual(plan["layers"][0]["task_ids"], [parent])
+        self.assertEqual(
+            {row["task_id"] for row in plan["tasks"] if row["depth"] > 0},
+            descendants,
+        )
+        self.assertFalse(plan["credentials_accessed"])
+        self.assertEqual(plan["upstream_calls"], 0)
+        self.assertEqual((self.root / "pipeline.sqlite").read_bytes(), before)
+
+    def test_descendant_execute_is_hash_pinned_bounded_and_exact(self):
+        _parent, descendants = self._split_etf_tree()
+        pipeline = runner.pipeline_module.Pipeline(self.root, self.verified["catalog"])
+        unrelated = pipeline.enqueue(
+            "etf_limit",
+            {"start_date": "20220201", "end_date": "20220228"},
+            priority=1,
+            epoch="history",
+        )
+        pipeline.db.commit()
+        pipeline.close()
+        plan = self.descendant_plan()
+        calls = []
+
+        def respond(request):
+            body = json.loads(request.content)
+            calls.append(body["params"])
+            fields = body["fields"].split(",")
+            return httpx.Response(
+                200, json={"code": 0, "data": {"fields": fields, "items": []}}
+            )
+
+        pointer = (self.root / "CURRENT.json").read_bytes()
+        with (
+            patch.object(
+                runner.pipeline_module.Pipeline,
+                "expand",
+                side_effect=AssertionError("exact descendant run must not expand"),
+            ),
+            patch.object(
+                runner.pipeline_module.Pipeline,
+                "resume_identifier_split",
+                side_effect=AssertionError("exact descendant run must not resume"),
+            ),
+        ):
+            result = self.execute_descendants(respond, plan)
+        self.assertEqual(result["status"], "exact_descendant_batch_executed")
+        self.assertEqual(result["upstream_calls"], 2)
+        self.assertEqual(result["scoped_jobs"], 4)
+        self.assertEqual(result["attempted_by_api"], {"etf_limit": 2})
+        self.assertEqual((self.root / "CURRENT.json").read_bytes(), pointer)
+        db = sqlite3.connect(self.root / "pipeline.sqlite")
+        try:
+            attempted = {
+                row[0]
+                for row in db.execute(
+                    "SELECT DISTINCT job_id FROM attempts WHERE attempt>0"
+                )
+            }
+            self.assertFalse(unrelated in attempted)
+            self.assertTrue(attempted & descendants)
+        finally:
+            db.close()
+        encoded = json.dumps(result, sort_keys=True)
+        self.assertNotIn(str(self.base), encoded)
+        self.assertFalse(result["release_published"])
+
+    def test_descendant_execute_rejects_hashes_bounds_lock_and_disk(self):
+        self._split_etf_tree()
+        plan = self.descendant_plan()
+
+        def no_http(_request):
+            raise AssertionError("HTTP must remain unreachable")
+
+        with self.assertRaisesRegex(ValueError, "helper hash mismatch"):
+            self.execute_descendants(no_http, plan, expected_helper_sha256="0" * 64)
+        with self.assertRaisesRegex(ValueError, "authority hash mismatch"):
+            self.execute_descendants(no_http, plan, expected_authority_sha256="0" * 64)
+        with self.assertRaisesRegex(ValueError, "task set hash mismatch"):
+            self.execute_descendants(no_http, plan, expected_task_set_sha256="0" * 64)
+        with self.assertRaisesRegex(ValueError, "request limit"):
+            self.descendant_plan(max_requests=361)
+        with self.assertRaisesRegex(ValueError, "at most 90"):
+            self.descendant_plan(max_seconds=91)
+        with (self.root / "pipeline.lock").open("a+") as held:
+            fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with self.assertRaises(BlockingIOError):
+                self.execute_descendants(no_http, plan)
+        disk = type("usage", (), {"free": 99 * 2**30})()
+        with (
+            patch.object(descendant_runner.pipeline_module, "ROOT", self.root),
+            patch.object(
+                descendant_runner.pipeline_module, "authority", return_value=None
+            ),
+            patch.object(
+                descendant_runner.pipeline_module,
+                "get_secret",
+                side_effect=AssertionError("disk gate must precede credentials"),
+            ),
+            patch.object(descendant_runner.shutil, "disk_usage", return_value=disk),
+        ):
+            result = self.descendant_plan(
+                expected_authority_sha256=plan["authority_sha256"],
+                expected_config_sha256=plan["authority_config_sha256"],
+                expected_helper_sha256=descendant_runner.helper_sha256(),
+                expected_task_set_sha256=plan["task_set_sha256"],
+                execute=True,
+            )
+        self.assertEqual(result["status"], "blocked_disk_reserve")
+        self.assertEqual(result["upstream_calls"], 0)
 
 
 if __name__ == "__main__":

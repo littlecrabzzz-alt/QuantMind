@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-10T09:53:20.002471+00:00",
+  "status": "plan_only",
+  "authority_schema_version": 6,
+  "source_revision": "2994e5226e1de4bd4e1be5ac47d49b2f40bde844",
+  "source": {
+    "batch_manifest_sha256": "3ceaa518a73af92df4c824a9fa2c4fc7a65343a75569396643b749b091927d81",
+    "source_task_ids_sha256": "62caad354d15bdf27022392a5dbc80b33e0a54f9f1c1038a26b0ad85477fb283",
+    "source_etf_parent_tasks": 49
+  },
+  "execution_pins": {
+    "authority_sha256": "f99f94730302327a7db0421f924f937ec35ee8649da8b1f98e09f4a66b3572eb",
+    "authority_config_sha256": "4ac7b38142097cda4af50dfadb00093fd635d5fd37859d68ee9632800d1e21d9",
+    "helper_sha256": "6de250e81d2a54a9a95b8cc30f1cf999b0f27d389d240019737893a9a9c034c9",
+    "task_set_sha256": "a71ac388353a8695be5057130806f44955b10a4486eae00e7822f51149ce6928"
+  },
+  "tree": {
+    "descendant_roots": 48,
+    "unique_descendants": 134,
+    "pending_descendants": 115,
+    "edges": 134,
+    "layers": [
+      {
+        "depth": 0,
+        "tasks": 48,
+        "states": {"split_pending": 48},
+        "priorities": {"24": 48},
+        "tries": {"1": 48},
+        "attempt_rows": {"1": 48}
+      },
+      {
+        "depth": 1,
+        "tasks": 96,
+        "states": {"pending": 77, "split_pending": 19},
+        "priorities": {"24": 96},
+        "tries": {"0": 77, "1": 19},
+        "attempt_rows": {"0": 77, "1": 19}
+      },
+      {
+        "depth": 2,
+        "tasks": 38,
+        "states": {"pending": 38},
+        "priorities": {"24": 38},
+        "tries": {"0": 38},
+        "attempt_rows": {"0": 38}
+      }
+    ]
+  },
+  "why_parent_runner_does_not_select_descendants": {
+    "original_exact_scope_task_ids": 1767,
+    "parent_etf_limit_task_ids": 49,
+    "parent_states": {"done": 1, "split_pending": 48},
+    "selection_requires_state": "pending",
+    "descendant_ids_in_original_scope": 0
+  },
+  "plan_artifact": {
+    "path": "/tmp/rrg-descendant-runner-plan-final-20260910.json",
+    "bytes": 157370,
+    "sha256": "7e19c4572686016b7ee6c9bf62b804049e4675cf138c10d1a41cf47ce6a7c67c",
+    "contains_full_task_ids_and_per-task_state": true
+  },
+  "runtime_guards": {
+    "free_bytes_observed": 156090028032,
+    "minimum_free_bytes": 107374182400,
+    "pipeline_lock_required_for_execute": true,
+    "max_upstream_calls": 360,
+    "max_seconds": 90,
+    "existing_rate_and_daily_quota_gates_reused": true,
+    "credentials_accessed": false,
+    "upstream_calls": 0,
+    "production_written": false,
+    "release_published": false,
+    "current_release_switched": false
+  },
+  "validation": {
+    "unittests_passed": 18,
+    "ruff_check_passed": true,
+    "ruff_format_check_passed": true
+  },
+  "source_sha256": {
+    "scripts/run_tushare_rrg_descendant_batch.py": "6de250e81d2a54a9a95b8cc30f1cf999b0f27d389d240019737893a9a9c034c9",
+    "scripts/test_tushare_rrg_exact_batch_runner.py": "2b0be82267877bdd35b9c9448ee8adbddc4949ac0939dc22879a0634333cf3b5"
+  },
+  "remaining_pit_blockers": [
+    "historical member known_at and revision publication evidence",
+    "versioned ETF-industry mapping and complete historical universe",
+    "authoritative suspension and opening-auction tradability classification",
+    "exact-day PCF availability, revision timing and portfolio weights"
+  ],
+  "sensitive_data_included": false
+}
