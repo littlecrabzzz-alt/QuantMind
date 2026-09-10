@@ -1,0 +1,9 @@
+# Tushare public Connect legacy next batch ready
+
+- Candidate branch `codex/tushare-catalog-public-readonly-next`; code commit `6bf4e442` from base `68c18fc2676ab1bf7e915dfca5ccda105dc29b9e`.
+- Registered `moneyflow_hsgt` (7 retained default fields) and `ggt_daily` (5 retained default fields) through pure contract, default-empty `legacy_connect` planner, registry, fixed-release store/query metadata and generic manifest/mirror path.
+- No enablement/config change. `legacy_connect_apis` defaults to `[]`; `moneyflow_hsgt` uses only observed exact `trade_date`; `ggt_daily` emits only the proven unfiltered observation when explicitly selected. No token, provider, production, deployment or authoritative release access.
+- Source constraints retained per API: official URLs doc47/doc196 now return the preserved missing-document body SHA; permission is `available_observed`, not inferred from points; numerical supplier rpm, full/hidden fields, row cap, complete history, PIT/revisions and units remain unverified. `ggt_daily` retained response was 1000 rows with `has_more=true`, so history is explicitly incomplete.
+- Exact offline audit after candidate: total named scope 236, registered/runtime-readable 229, unregistered 7. Remaining: `ggt_top10`, `ggt_monthly` public read-only contract blocked; `p_list`, `p_get` private read contracts; `p_save`, `p_delete` excluded mutations; `pro_bar` SDK-only.
+- Validation: Python 3.10.19 full `test_tushare*.py` suite 895 passed, 5 skipped; focused synthetic acquisition/publish/local-query test passed; Ruff passed; `git diff --check` passed.
+- Required real follow-up: recover current primary schema/legal inputs and bounded capability evidence for `ggt_top10`; recover current valid endpoint name, primary monthly schema and supplier month semantics for `ggt_monthly`. Do not substitute `ggt_daily` aggregation.
