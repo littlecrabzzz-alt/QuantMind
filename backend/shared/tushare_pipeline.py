@@ -2839,7 +2839,7 @@ class Pipeline:
             for r in self.db.execute("SELECT state,count(*) FROM jobs GROUP BY state")
         }
 
-    def publish(self):
+    def publish(self, *, staged=False, stage_budget_seconds=120):
         from contextlib import contextmanager
 
         publish_started = time.monotonic()
@@ -2863,6 +2863,46 @@ class Pipeline:
                 finished = time.monotonic()
                 timing["stage_seconds"][name] = max(0.0, finished - started)
                 timing["total_elapsed_seconds"] = max(0.0, finished - publish_started)
+
+        from backend.shared import tushare_publish_checkpoint as spool
+
+        if (
+            type(staged) is not bool
+            or type(stage_budget_seconds) not in (int, float)
+            or not 0 < stage_budget_seconds <= 130
+        ):
+            raise ValueError("Invalid publication stage budget")
+        saved = spool.load(self.root)
+        if saved and not staged:
+            raise ValueError("Pending publication requires explicit staged resume")
+        self.publication_step = {"phase": "legacy", "pending": False}
+
+        def deferred(phase):
+            elapsed = time.monotonic() - publish_started
+            self.publication_step = {
+                "phase": phase,
+                "pending": True,
+                "budget_seconds": stage_budget_seconds,
+                "budget_exceeded": elapsed >= stage_budget_seconds,
+                "elapsed_seconds": elapsed,
+                "content_sha256": saved["content_sha256"] if saved else None,
+                "previous_release_id": saved["previous_id"] if saved else None,
+            }
+            return None
+
+        if saved and saved["phase"] == "ready":
+            with measure("commit_ready"):
+                release = spool.verify_ready(self.root, saved)
+                atomic_json(
+                    self.root / "CURRENT.json",
+                    {"release_id": release, "manifest_sha256": release[5:]},
+                )
+                spool._sync(self.root)
+                spool.clear(self.root)
+            self.publication_step = {"phase": "committed", "pending": False}
+            return release
+        if saved and spool.current(self.root) != saved["previous_id"]:
+            raise ValueError("Publication predecessor changed")
 
         with measure("read_current"):
             previous_id, previous = None, None
@@ -2894,157 +2934,170 @@ class Pipeline:
             recovery["archived_releases"] = [mappings[key] for key in sorted(mappings)]
             return {**archive, "recovery": recovery}
 
-        with measure("scan_gaps"):
-            files = dict(previous["files"]) if previous else {}
-            active, gaps = {}, []
-            for row in self.db.execute(
-                "SELECT * FROM jobs WHERE state NOT IN ('done','pending') ORDER BY rowid"
-            ):
-                result = json.loads(row["result"]) if row["result"] else {}
-                if row["state"] not in ("done", "pending", "resolved"):
-                    gaps.append(
-                        {
-                            "id": row["id"],
-                            "state": row["state"],
-                            "api_name": json.loads(row["job"])["api_name"],
-                            "params": json.loads(row["job"])["params"],
-                            "assessment": result.get("status"),
-                        }
-                    )
-        with measure("scan_attempts_and_stat"):
-            # Repeated attempts and prior revisions remain queryable in the latest
-            # release; migration can recover only the attempts v1 had retained.
-            for row in self.db.execute(
-                "SELECT result FROM attempts ORDER BY job_id,attempt"
-            ):
-                result = json.loads(row[0])
-                if "observation" in result:
-                    paths = [
-                        (
-                            "observations/" + result["observation"],
-                            result["observation_sha256"],
-                        ),
-                        (
-                            "objects/" + result["object_sha256"] + ".json",
-                            result["object_sha256"],
-                        ),
-                    ]
-                    if "parquet" in result:
-                        paths.append(
-                            (result["parquet"]["path"], result["parquet"]["sha256"])
+        if saved:
+            with measure("restore_content"):
+                content = spool.content(self.root, saved)
+                files = content["files"]
+                self_archive_verified = saved["self_archive_verified"]
+        else:
+            with measure("scan_gaps"):
+                files = dict(previous["files"]) if previous else {}
+                active, gaps = {}, []
+                for row in self.db.execute(
+                    "SELECT * FROM jobs WHERE state NOT IN ('done','pending') ORDER BY rowid"
+                ):
+                    result = json.loads(row["result"]) if row["result"] else {}
+                    if row["state"] not in ("done", "pending", "resolved"):
+                        gaps.append(
+                            {
+                                "id": row["id"],
+                                "state": row["state"],
+                                "api_name": json.loads(row["job"])["api_name"],
+                                "params": json.loads(row["job"])["params"],
+                                "assessment": result.get("status"),
+                            }
                         )
-                    for name, sha in paths:
-                        files[name] = {
-                            "sha256": sha,
-                            "bytes": (self.root / name).stat().st_size,
+            with measure("scan_attempts_and_stat"):
+                # Repeated attempts and prior revisions remain queryable in the latest
+                # release; migration can recover only the attempts v1 had retained.
+                for row in self.db.execute(
+                    "SELECT result FROM attempts ORDER BY job_id,attempt"
+                ):
+                    result = json.loads(row[0])
+                    if "observation" in result:
+                        paths = [
+                            (
+                                "observations/" + result["observation"],
+                                result["observation_sha256"],
+                            ),
+                            (
+                                "objects/" + result["object_sha256"] + ".json",
+                                result["object_sha256"],
+                            ),
+                        ]
+                        if "parquet" in result:
+                            paths.append(
+                                (result["parquet"]["path"], result["parquet"]["sha256"])
+                            )
+                        for name, sha in paths:
+                            files[name] = {
+                                "sha256": sha,
+                                "bytes": (self.root / name).stat().st_size,
+                            }
+                    if "parquet" in result:
+                        active[result["parquet"]["path"]] = {
+                            "api_name": result["api_name"],
+                            "quality_state": result["status"],
+                            **result["parquet"],
                         }
-                if "parquet" in result:
-                    active[result["parquet"]["path"]] = {
-                        "api_name": result["api_name"],
-                        "quality_state": result["status"],
-                        **result["parquet"],
+            with measure("schema_metadata"):
+                # Ship the reviewed catalog/contract field definitions with every pinned
+                # release; code availability must not substitute for offline metadata.
+                metadata = {"catalog": self.catalog, "contracts": EXTENDED_CONTRACTS}
+                raw = json_bytes(metadata)
+                schema_name = "schemas/" + digest(raw) + ".json"
+                if not (self.root / schema_name).exists():
+                    atomic_bytes(self.root / schema_name, raw)
+                files[schema_name] = {"sha256": digest(raw), "bytes": len(raw)}
+            with measure("archive_inventory_before"):
+                archive = None
+                self_archive_verified = False
+                if (self.root / "archive.sqlite").exists():
+                    from backend.shared.tushare_archive import archive_inventory
+
+                    archived = archive_inventory(self.root)
+                    self_archive_verified = bool(
+                        previous_id
+                        and "archives/" + previous_id.removeprefix("data-") + ".json"
+                        in archived["files"]
+                    )
+                    files.update(archived["files"])
+                    for dataset in archived["datasets"]:
+                        active.setdefault(dataset["path"], dataset)
+                    archive = {"recovery": archived["recovery"], "gaps": archived["gaps"]}
+            with measure("document_index"):
+                documents = None
+                if (self.root / "documents.sqlite").exists():
+                    from backend.shared.tushare_documents import document_index
+
+                    inventory = document_index(self.root)
+                    for item in inventory["files"]:
+                        files[item["path"]] = {"sha256": item["sha256"], "bytes": item["bytes"]}
+                    documents = {
+                        "path": inventory["path"],
+                        "schema_version": inventory["schema_version"],
+                        "counts": inventory["counts"],
+                        "reference_counts": inventory["reference_counts"],
+                        "totals": inventory["totals"],
                     }
-        with measure("schema_metadata"):
-            # Ship the reviewed catalog/contract field definitions with every pinned
-            # release; code availability must not substitute for offline metadata.
-            metadata = {"catalog": self.catalog, "contracts": EXTENDED_CONTRACTS}
-            raw = json_bytes(metadata)
-            schema_name = "schemas/" + digest(raw) + ".json"
-            if not (self.root / schema_name).exists():
-                atomic_bytes(self.root / schema_name, raw)
-            files[schema_name] = {"sha256": digest(raw), "bytes": len(raw)}
-        with measure("archive_inventory_before"):
-            archive = None
-            self_archive_verified = False
-            if (self.root / "archive.sqlite").exists():
-                from backend.shared.tushare_archive import archive_inventory
-
-                archived = archive_inventory(self.root)
-                self_archive_verified = bool(
-                    previous_id
-                    and "archives/" + previous_id.removeprefix("data-") + ".json"
-                    in archived["files"]
-                )
-                files.update(archived["files"])
-                for dataset in archived["datasets"]:
-                    active.setdefault(dataset["path"], dataset)
-                archive = {"recovery": archived["recovery"], "gaps": archived["gaps"]}
-        with measure("document_index"):
-            documents = None
-            if (self.root / "documents.sqlite").exists():
-                from backend.shared.tushare_documents import document_index
-
-                inventory = document_index(self.root)
-                for item in inventory["files"]:
-                    files[item["path"]] = {"sha256": item["sha256"], "bytes": item["bytes"]}
-                documents = {
-                    "path": inventory["path"],
-                    "schema_version": inventory["schema_version"],
-                    "counts": inventory["counts"],
-                    "reference_counts": inventory["reference_counts"],
-                    "totals": inventory["totals"],
+                    del inventory
+            with measure("metadata_inventory"):
+                # Retain prior immutable metadata versions as well as the current index.
+                # A fresh Mac must not depend on having mirrored every earlier release.
+                for family in ("documents", "schemas", "archives"):
+                    if (self.root / family).is_symlink():
+                        raise ValueError("Unsafe immutable metadata directory")
+                    for path in (self.root / family).glob("*.json"):
+                        if not re.fullmatch(r"[a-f0-9]{64}", path.stem):
+                            continue
+                        if path.is_symlink():
+                            raise ValueError("Unsafe immutable metadata symlink")
+                        files[path.relative_to(self.root).as_posix()] = {
+                            "sha256": path.stem,
+                            "bytes": path.stat().st_size,
+                        }
+            with measure("coverage_and_closure"):
+                # One complete aggregation also supplies status totals and scope.
+                # SQL ordering preserves DISTINCT's SQLite ordering, including NULL
+                # and unknown API names; no fixed state/API allowlist can omit gaps.
+                coverage_by_api = [
+                    dict(r)
+                    for r in self.db.execute(
+                        "SELECT json_extract(job, '$.api_name') AS api_name,state,count(*) AS partitions FROM jobs GROUP BY api_name,state ORDER BY api_name,state"
+                    )
+                ]
+                coverage = {}
+                scope = []
+                for row in coverage_by_api:
+                    state = row["state"]
+                    coverage[state] = coverage.get(state, 0) + row["partitions"]
+                    if not scope or scope[-1] != row["api_name"]:
+                        scope.append(row["api_name"])
+                content = {
+                    "schema_version": 1,
+                    "files": files,
+                    "datasets": list(active.values()),
+                    "coverage": coverage,
+                    "coverage_by_api": coverage_by_api,
+                    "gaps": gaps,
+                    "history_complete": False,
+                    "partition_closure": self.partition_inventory(),
+                    "rrg_status": "blocked_data",
+                    "scope": scope,
+                    "implemented_contracts": sorted(set(CONTRACTS) | set(EXTENDED_CONTRACTS)),
+                    "schema_path": schema_name,
+                    "documents": documents,
+                    "archive": preserve_release_mapping(archive),
+                    "historical_versions_complete": False,
+                    "retained_observations_included": True,
+                    "capabilities": [
+                        dict(r)
+                        for r in self.db.execute("SELECT * FROM capability ORDER BY scope")
+                    ],
+                    "planning": [
+                        dict(r)
+                        for r in self.db.execute("SELECT * FROM planning_state ORDER BY name")
+                    ],
+                    "catalogued_interfaces": len(self.catalog["entries"]),
+                    "unimplemented_catalog_scope": True,
                 }
-                del inventory
-        with measure("metadata_inventory"):
-            # Retain prior immutable metadata versions as well as the current index.
-            # A fresh Mac must not depend on having mirrored every earlier release.
-            for family in ("documents", "schemas", "archives"):
-                if (self.root / family).is_symlink():
-                    raise ValueError("Unsafe immutable metadata directory")
-                for path in (self.root / family).glob("*.json"):
-                    if not re.fullmatch(r"[a-f0-9]{64}", path.stem):
-                        continue
-                    if path.is_symlink():
-                        raise ValueError("Unsafe immutable metadata symlink")
-                    files[path.relative_to(self.root).as_posix()] = {
-                        "sha256": path.stem,
-                        "bytes": path.stat().st_size,
-                    }
-        with measure("coverage_and_closure"):
-            # One complete aggregation also supplies status totals and scope.
-            # SQL ordering preserves DISTINCT's SQLite ordering, including NULL
-            # and unknown API names; no fixed state/API allowlist can omit gaps.
-            coverage_by_api = [
-                dict(r)
-                for r in self.db.execute(
-                    "SELECT json_extract(job, '$.api_name') AS api_name,state,count(*) AS partitions FROM jobs GROUP BY api_name,state ORDER BY api_name,state"
-                )
-            ]
-            coverage = {}
-            scope = []
-            for row in coverage_by_api:
-                state = row["state"]
-                coverage[state] = coverage.get(state, 0) + row["partitions"]
-                if not scope or scope[-1] != row["api_name"]:
-                    scope.append(row["api_name"])
-            content = {
-                "schema_version": 1,
-                "files": files,
-                "datasets": list(active.values()),
-                "coverage": coverage,
-                "coverage_by_api": coverage_by_api,
-                "gaps": gaps,
-                "history_complete": False,
-                "partition_closure": self.partition_inventory(),
-                "rrg_status": "blocked_data",
-                "scope": scope,
-                "implemented_contracts": sorted(set(CONTRACTS) | set(EXTENDED_CONTRACTS)),
-                "schema_path": schema_name,
-                "documents": documents,
-                "archive": preserve_release_mapping(archive),
-                "historical_versions_complete": False,
-                "retained_observations_included": True,
-                "capabilities": [
-                    dict(r)
-                    for r in self.db.execute("SELECT * FROM capability ORDER BY scope")
-                ],
-                "planning": [
-                    dict(r)
-                    for r in self.db.execute("SELECT * FROM planning_state ORDER BY name")
-                ],
-                "catalogued_interfaces": len(self.catalog["entries"]),
-                "unimplemented_catalog_scope": True,
-            }
+            if staged:
+                with measure("checkpoint_content"):
+                    saved = spool.freeze(
+                        self.root, content, previous_id, self_archive_verified
+                    )
+                return deferred("content_saved")
+
         with measure("compare_previous"):
             if previous:
                 # A crash after retaining CURRENT must not manufacture a new release
@@ -3105,7 +3158,12 @@ class Pipeline:
                     return value
 
                 if comparable(content) == comparable(previous):
+                    if saved:
+                        spool.ready(self.root, saved, previous_id)
+                        return deferred("ready_saved")
                     return previous_id
+        if staged and time.monotonic() - publish_started >= stage_budget_seconds:
+            return deferred("content_saved")
         if previous_id:
             from backend.shared.tushare_archive import archive_inventory, retain_release
 
@@ -3131,6 +3189,8 @@ class Pipeline:
                         "gaps": archived["gaps"],
                     }
                 )
+        if staged and time.monotonic() - publish_started >= stage_budget_seconds:
+            return deferred("content_saved")
         with measure("serialize_manifest"):
             # Comparison and the final inherited archive mapping are finished.
             # Keep needed shared file/mapping entries through content, but release
@@ -3143,6 +3203,14 @@ class Pipeline:
         with measure("write_manifest"):
             if not destination.exists():
                 atomic_bytes(destination, raw)
+            if staged:
+                # The immutable final manifest is durable before its journal can
+                # authorize the later CURRENT switch. Never expose a partial file.
+                spool._sync(destination.parent)
+                spool._sync(destination.parent.parent)
+                spool._sync(self.root)
+                spool.ready(self.root, saved, release)
+                return deferred("ready_saved")
             atomic_json(
                 self.root / "CURRENT.json", {"release_id": release, "manifest_sha256": sha}
             )
@@ -3184,6 +3252,17 @@ def tick(max_requests=None, max_seconds=None):
         publish_interval = config.get("publish_interval_seconds", 0)
         if type(publish_interval) is not int or publish_interval < 0:
             raise ValueError("Invalid publication interval")
+        staged_publication = config.get("publish_staged", False)
+        if type(staged_publication) is not bool or (
+            staged_publication and not publish_interval
+        ):
+            raise ValueError("Staged publication requires a positive publication interval")
+        pending_publication = ROOT / "publish-staging" / "checkpoint.json"
+        has_pending_publication = (
+            pending_publication.exists() or pending_publication.is_symlink()
+        )
+        if has_pending_publication and not staged_publication:
+            raise ValueError("Pending publication requires explicit staged resume")
         planning_interval = config.get("planning_interval_seconds", 0)
         if type(planning_interval) is not int or planning_interval < 0:
             raise ValueError("Invalid planning interval")
@@ -3239,7 +3318,16 @@ def tick(max_requests=None, max_seconds=None):
         def publish_existing():
             with measure("publish"):
                 publication["status"] = "publishing"
-                release_id = pipeline.publish()
+                if config.get("publish_staged", False):
+                    release_id = pipeline.publish(staged=True)
+                else:
+                    release_id = pipeline.publish()
+                step = getattr(pipeline, "publication_step", {})
+                if release_id is None:
+                    publication.update(
+                        status="staged", performed=False, pending=True, checkpoint=step
+                    )
+                    return
                 report["release_id"] = release_id
                 publication.update(
                     status="published",
@@ -3296,6 +3384,9 @@ def tick(max_requests=None, max_seconds=None):
                                 # an unbounded postponement based on a future timestamp.
                                 elapsed = time.time() - last_success
                                 due = not 0 <= elapsed < publish_interval
+                    # A durable unfinished publication cannot be postponed by a
+                    # cadence/config change or an already-switched CURRENT.
+                    due = due or has_pending_publication
                     if due:
                         report.update(status="publish_only", requests=0)
                         publication["mode"] = "publish_only"

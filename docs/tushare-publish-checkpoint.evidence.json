@@ -1,0 +1,217 @@
+{
+  "baseline": "0c18fb294a6c2524d8159225bb5f15aa2d38f91f",
+  "production_evidence_origin": "parent-provided task IDs and traceback summaries, not independently queried",
+  "production_failure_ids": [
+    "4b5ef897",
+    "51d0a598",
+    "fbd9f87e",
+    "b07a11b4"
+  ],
+  "production_success_seconds": [
+    143.05,
+    146.3,
+    158.86
+  ],
+  "hard160_bound_verified": false,
+  "production_enable_recommended": false,
+  "default_publish_staged": false,
+  "benchmark_path": "/tmp/tushare-publish-staged-benchmark-20260910.json",
+  "benchmark_sha256": "73cb76cb8046553565760f7891b49b32804a5cecdfd187aa93ca730b15356645",
+  "benchmark": {
+    "scope": "synthetic metadata references, no physical source objects; not cloud timing",
+    "files": 100000,
+    "closure_children": 100000,
+    "upstream_calls": 0,
+    "manifest_bytes_equal": true,
+    "reports": {
+      "legacy": {
+        "calls": [
+          {
+            "seconds": 0.4358566668815911,
+            "release_id": "data-619222b975ce39233c5a9b66d5b871809b9f10391fcb0a41aa794a4b74140782",
+            "step": {
+              "phase": "legacy",
+              "pending": false
+            },
+            "timing": {
+              "stage_seconds": {
+                "read_current": 0.07755391695536673,
+                "scan_gaps": 0.0009114169515669346,
+                "scan_attempts_and_stat": 1.4709075912833214e-05,
+                "schema_metadata": 0.004694584058597684,
+                "archive_inventory_before": 1.391582190990448e-05,
+                "document_index": 7.958849892020226e-06,
+                "metadata_inventory": 0.00019041704945266247,
+                "coverage_and_closure": 0.017143999924883246,
+                "compare_previous": 0.008973750052973628,
+                "retain_previous": 0.2318895421922207,
+                "archive_inventory_after": 0.00024466589093208313,
+                "serialize_manifest": 0.08618366601876915,
+                "write_manifest": 0.003327084006741643
+              },
+              "completed_stages": [
+                "read_current",
+                "scan_gaps",
+                "scan_attempts_and_stat",
+                "schema_metadata",
+                "archive_inventory_before",
+                "document_index",
+                "metadata_inventory",
+                "coverage_and_closure",
+                "compare_previous",
+                "retain_previous",
+                "archive_inventory_after",
+                "serialize_manifest",
+                "write_manifest"
+              ],
+              "failed_stage": null,
+              "total_elapsed_seconds": 0.4328267090022564,
+              "retention": {
+                "stage_seconds": {
+                  "reuse_stat": 2.9708025977015495e-05,
+                  "expected_files": 0.2162569579668343,
+                  "lock_wait": 4.62518073618412e-06,
+                  "archive_open": 0.0010151250753551722,
+                  "archive_record": 0.014260249910876155,
+                  "known_archives": 4.437519237399101e-05
+                },
+                "completed_stages": [
+                  "reuse_stat",
+                  "expected_files",
+                  "lock_wait",
+                  "archive_open",
+                  "archive_record",
+                  "known_archives"
+                ],
+                "failed_stage": null,
+                "reused_predecessor": true,
+                "total_elapsed_seconds": 0.23185791703872383
+              }
+            }
+          }
+        ],
+        "manifest_sha256": "619222b975ce39233c5a9b66d5b871809b9f10391fcb0a41aa794a4b74140782",
+        "manifest_bytes": 24304813
+      },
+      "staged": {
+        "calls": [
+          {
+            "seconds": 0.18200174998492002,
+            "release_id": null,
+            "step": {
+              "phase": "content_saved",
+              "pending": true,
+              "budget_seconds": 120,
+              "budget_exceeded": false,
+              "elapsed_seconds": 0.17833716701716185
+            },
+            "timing": {
+              "stage_seconds": {
+                "read_current": 0.07289766590110958,
+                "scan_gaps": 0.0008271250408142805,
+                "scan_attempts_and_stat": 1.3375189155340195e-05,
+                "schema_metadata": 0.004929875023663044,
+                "archive_inventory_before": 1.1916039511561394e-05,
+                "document_index": 6.2498729676008224e-06,
+                "metadata_inventory": 9.083305485546589e-05,
+                "coverage_and_closure": 0.01645133411511779,
+                "checkpoint_content": 0.08304225001484156
+              },
+              "completed_stages": [
+                "read_current",
+                "scan_gaps",
+                "scan_attempts_and_stat",
+                "schema_metadata",
+                "archive_inventory_before",
+                "document_index",
+                "metadata_inventory",
+                "coverage_and_closure",
+                "checkpoint_content"
+              ],
+              "failed_stage": null,
+              "total_elapsed_seconds": 0.17833508411422372
+            }
+          },
+          {
+            "seconds": 0.4366318329703063,
+            "release_id": null,
+            "step": {
+              "phase": "ready_saved",
+              "pending": true,
+              "budget_seconds": 120,
+              "budget_exceeded": false,
+              "elapsed_seconds": 0.43357483414001763
+            },
+            "timing": {
+              "stage_seconds": {
+                "read_current": 0.07287120795808733,
+                "restore_content": 0.04132620897144079,
+                "compare_previous": 0.00894579105079174,
+                "retain_previous": 0.22952629113569856,
+                "archive_inventory_after": 0.00023024994879961014,
+                "serialize_manifest": 0.07725920807570219,
+                "write_manifest": 0.0032561251427978277
+              },
+              "completed_stages": [
+                "read_current",
+                "restore_content",
+                "compare_previous",
+                "retain_previous",
+                "archive_inventory_after",
+                "serialize_manifest",
+                "write_manifest"
+              ],
+              "failed_stage": null,
+              "total_elapsed_seconds": 0.4335772921331227,
+              "retention": {
+                "stage_seconds": {
+                  "reuse_stat": 2.737506292760372e-05,
+                  "expected_files": 0.21493545803241432,
+                  "lock_wait": 3.3339019864797592e-06,
+                  "archive_open": 0.0006104579661041498,
+                  "archive_record": 0.013617209158837795,
+                  "known_archives": 3.533298149704933e-05
+                },
+                "completed_stages": [
+                  "reuse_stat",
+                  "expected_files",
+                  "lock_wait",
+                  "archive_open",
+                  "archive_record",
+                  "known_archives"
+                ],
+                "failed_stage": null,
+                "reused_predecessor": true,
+                "total_elapsed_seconds": 0.2294902498833835
+              }
+            }
+          },
+          {
+            "seconds": 0.00946279102936387,
+            "release_id": "data-619222b975ce39233c5a9b66d5b871809b9f10391fcb0a41aa794a4b74140782",
+            "step": {
+              "phase": "committed",
+              "pending": false
+            },
+            "timing": {
+              "stage_seconds": {
+                "commit_ready": 0.009374500019475818
+              },
+              "completed_stages": [
+                "commit_ready"
+              ],
+              "failed_stage": null,
+              "total_elapsed_seconds": 0.009454958140850067
+            }
+          }
+        ],
+        "manifest_sha256": "619222b975ce39233c5a9b66d5b871809b9f10391fcb0a41aa794a4b74140782",
+        "manifest_bytes": 24304813
+      }
+    }
+  },
+  "test_environment": "Python3.10.19 temporary dependencies",
+  "tests_passed": 66,
+  "production_changes": 0,
+  "upstream_calls": 0
+}
