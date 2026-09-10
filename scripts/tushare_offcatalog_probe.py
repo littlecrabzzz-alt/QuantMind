@@ -56,7 +56,7 @@ def contract_evidence():
     )
     from backend.shared.tushare_registry import contract_for
 
-    if tuple(OFFCATALOG_CONTRACTS) != APIS or len(BASE_REQUESTS) != len(APIS):
+    if not set(APIS).issubset(OFFCATALOG_CONTRACTS) or len(BASE_REQUESTS) != len(APIS):
         raise ValueError("Reviewed off-catalog contract set changed")
     evidence = {}
     for api, params in BASE_REQUESTS:

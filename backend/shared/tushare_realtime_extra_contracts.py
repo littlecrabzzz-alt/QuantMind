@@ -25,6 +25,8 @@ DOC_IDS = {
     "rt_idx_min": 420,
     "rt_sw_k": 417,
     "rt_fut_min": 340,
+    "rt_min": 374,
+    "rt_etf_min": 416,
     "rt_k": 372,
     "rt_etf_k": 400,
 }
@@ -36,8 +38,15 @@ SOURCE_HTML_SHA256 = {
     "rt_idx_min": "a6eb3ee102aa6a8446776137b15158b507ed7aa7d8d75badb8cff4da423ed879",
     "rt_sw_k": "4cb7963c01b5592ce0e62c40baa504f35933cc0d76957e6fb1b0255de48c0399",
     "rt_fut_min": "5f5012e5b93f067a93a2c82b38bd81e92194a18606b47a930fef63e79a882bb7",
+    "rt_min": "1ab1e6dfafee4a4ed07ee15605d449da284fef97f23e3f35742279d6f7bab320",
+    "rt_etf_min": "3f6791db049cc20ec38cf237cac20c508e42936b0e07f34ae29d6d3a0539e13b",
     "rt_k": "58905ec12e31c14a168bb781892ee3c89547d879252ac9ebbaad1062bb755912",
     "rt_etf_k": "4395c969142c0818405e4ce17fea6a1bbefde370a287edfa52c05253b5e5c478",
+}
+
+SOURCE_MARKDOWN_SHA256 = {
+    "rt_min": "ea569c9d205870e80b04f6ef36f593be4fe0692be7e1a0c0e8d697e6e9434ac9",
+    "rt_etf_min": "4e43c99f218a86820f5f03563494701ff961a517036272796531ec89f505a538",
 }
 
 _INPUT_ROWS = {
@@ -79,6 +88,14 @@ _INPUT_ROWS = {
     "rt_fut_min": [
         ("ts_code", "str", "Y", "股票代码，e.g.CU2310.SHF，支持多个合约（逗号分隔）"),
         ("freq", "str", "Y", "分钟频度（1MIN/5MIN/15MIN/30MIN/60MIN）"),
+    ],
+    "rt_min": [
+        ("freq", "str", "Y", "1MIN,5MIN,15MIN,30MIN,60MIN （大写）"),
+        ("ts_code", "str", "Y", "支持一个或逗号分隔的多个A股代码"),
+    ],
+    "rt_etf_min": [
+        ("freq", "str", "Y", "1MIN,5MIN,15MIN,30MIN,60MIN （大写）"),
+        ("ts_code", "str", "Y", "支持一个或逗号分隔的多个ETF代码"),
     ],
     "rt_k": [
         (
@@ -171,6 +188,26 @@ _FIELD_ROWS = {
         ("amount", "float", "Y", "成交金额"),
         ("oi", "float", "Y", "持仓量"),
     ],
+    "rt_min": [
+        ("ts_code", "str", "Y", "股票代码"),
+        ("time", "str", "Y", "交易时间"),
+        ("open", "float", "Y", "开盘价"),
+        ("close", "float", "Y", "收盘价"),
+        ("high", "float", "Y", "最高价"),
+        ("low", "float", "Y", "最低价"),
+        ("vol", "float", "Y", "成交量(股）"),
+        ("amount", "float", "Y", "成交额（元）"),
+    ],
+    "rt_etf_min": [
+        ("ts_code", "str", "Y", "股票代码"),
+        ("time", "None", "Y", "交易时间"),
+        ("open", "float", "Y", "开盘价"),
+        ("close", "float", "Y", "收盘价"),
+        ("high", "float", "Y", "最高价"),
+        ("low", "float", "Y", "最低价"),
+        ("vol", "float", "Y", "成交量(股）"),
+        ("amount", "float", "Y", "成交额（元）"),
+    ],
     "rt_k": [
         ("ts_code", "str", "Y", "股票代码"),
         ("name", "None", "Y", "股票名称"),
@@ -222,7 +259,7 @@ FIELD_METADATA = {
 FIELDS = {api: list(meta) for api, meta in FIELD_METADATA.items()}
 INPUT_FIELDS = {api: list(meta) for api, meta in INPUT_METADATA.items()}
 FREQUENCIES = ("1MIN", "5MIN", "15MIN", "30MIN", "60MIN")
-MINUTE_APIS = ("rt_idx_min", "rt_fut_min")
+MINUTE_APIS = ("rt_idx_min", "rt_fut_min", "rt_min", "rt_etf_min")
 SOURCE_FAMILIES = {
     "rt_k": "stocks",
     "rt_etf_k": "etfs",
@@ -231,6 +268,8 @@ SOURCE_FAMILIES = {
     "rt_idx_min": "indexes",
     "rt_sw_k": "sw_indexes",
     "rt_fut_min": "minute_futures",
+    "rt_min": "stocks",
+    "rt_etf_min": "etfs",
 }
 CODE_PATTERNS = {
     "stocks": r"T?[0-9]{6}\.(SH|SZ|BJ)",
@@ -247,6 +286,8 @@ for _api, _guard, _cap in (
     ("rt_idx_min", 1000, 1000),
     ("rt_sw_k", 1000, None),
     ("rt_fut_min", 1000, None),
+    ("rt_min", 1000, 1000),
+    ("rt_etf_min", 1000, 1000),
     ("rt_k", 6000, 6000),
     ("rt_etf_k", 1000, None),
 ):
@@ -321,7 +362,8 @@ for _api, _guard, _cap in (
         if _api == "rt_etf_k"
         else [],
         dependencies=[SOURCE_FAMILIES[_api]]
-        if _api in ("rt_k", "rt_idx_k", "rt_idx_min", "rt_fut_min")
+        if _api
+        in ("rt_k", "rt_idx_k", "rt_idx_min", "rt_fut_min", "rt_min", "rt_etf_min")
         else [],
         permission_gap="Independent realtime rights remain unprobed. 10100 points and purchased news/report rights do not grant access. Local30rpm and documented limits are not measured account quota.",
         history_gap="No historical date/range input: old unobserved snapshots cannot be reconstructed or backfilled from this endpoint.",
@@ -335,6 +377,14 @@ for _api, _guard, _cap in (
         },
     )
     REALTIME_EXTRA_CONTRACTS[_api] = _spec
+
+for _api, _sha256 in SOURCE_MARKDOWN_SHA256.items():
+    REALTIME_EXTRA_CONTRACTS[_api].update(
+        source_markdown_url=(
+            f"https://tushare.pro/wctapi/documents/{DOC_IDS[_api]}.md"
+        ),
+        source_markdown_sha256=_sha256,
+    )
 
 REALTIME_EXTRA_CONTRACTS["stk_auction"].update(
     documented_history_start_month="202501",
@@ -371,6 +421,18 @@ REALTIME_EXTRA_CONTRACTS["rt_fut_min"].update(
     mapping_gap="Requires actual futures contract codes. Official main-contract guidance requires dated fut_mapping; continuous/product/expired discovery cannot be rewritten into a guessed live contract. Preserve case and source code, do not impose stock sessions on night trading.",
     unit_gap="Endpoint340 gives no contract/currency units or multiplier for OHLC,vol,amount,oi. Descriptions wrongly say stock code; source output is code, not ts_code. Preserve raw numbers, no stock-share conversion.",
     catalog_gap="Saved catalog340 merges date_str from separately headed rt_fut_min_daily input table. rt_fut_min accepts only ts_code/freq; do not pass date_str. Catalog correction belongs to later integration.",
+)
+REALTIME_EXTRA_CONTRACTS["rt_min"].update(
+    target_namespace="equity_prefix_from_verified_stock_context",
+    frequencies=list(FREQUENCIES),
+    frequency_gap="All five uppercase frequencies are separate request identities. The source time has no documented timezone, bar-label convention or finality; never treat a captured bar as known earlier.",
+    unit_gap="vol is documented in shares and amount in CNY. Prices and volumes are retained exactly; no missing bar, zero or null may be filled or converted into suspension evidence.",
+)
+REALTIME_EXTRA_CONTRACTS["rt_etf_min"].update(
+    target_namespace="FUND:",
+    frequencies=list(FREQUENCIES),
+    frequency_gap="All five uppercase frequencies are separate request identities. The source time type is documented None; preserve the actual value and do not invent timezone or bar-finality semantics.",
+    unit_gap="The page labels vol as shares and amount as CNY, but ETF unit conventions are not independently verified. Preserve source values without stock-share or NAV conversion.",
 )
 REALTIME_EXTRA_CONTRACTS["rt_k"]["target_namespace"] = (
     "equity_prefix_from_verified_stock_context"
