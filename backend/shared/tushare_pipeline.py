@@ -191,7 +191,7 @@ def _planning_inputs(family, config, identifiers):
         keys = {"history_start", "equity_event_apis", "equity_event_history_start"}
     if family == "fund_share_history":
         dependencies = set()
-        keys = {"history_start", "market_apis"}
+        keys = {"history_start"}
     policy = digest(
         json_bytes(
             {

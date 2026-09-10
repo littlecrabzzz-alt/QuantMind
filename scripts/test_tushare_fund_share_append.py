@@ -83,6 +83,13 @@ class FundShareAppend(unittest.TestCase):
         self.assertEqual(self.state("history:market"), frozen)
         self.assertIsNone(self.state("recent:fund_share_history"))
 
+    def test_parent_api_list_spelling_does_not_reset_completed_scope(self):
+        self.plan_append()
+        frozen = self.state("history:fund_share_history")
+        config = {key: value for key, value in CONFIG.items() if key != "market_apis"}
+        self.assertNotIn("history:fund_share_history", self.plan_append(config))
+        self.assertEqual(self.state("history:fund_share_history"), frozen)
+
     def test_disabled_or_unselected_parent_does_not_create_scope(self):
         self.plan_append({**CONFIG, "enable_market": False})
         self.assertIsNone(self.state("history:fund_share_history"))
