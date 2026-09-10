@@ -1,0 +1,7 @@
+# Tushare 附件下载/解析主耗时候选就绪
+
+- 分支 `codex/tushare-document-phase-throughput-20260910`，候选 `e85d8f734386781267650c43e0389c28fdfa3cdb`，已基于当时最新 `origin/master` `4a1aafab`。只改附件回执计时、一个专项测试、离线基准证据和本主题记录；未访问生产、Token、上游，未改配置、并发、队列状态或共享主工作树。
+- 真实代码仍是两个下载子进程组成一波，`as_completed` 落库后必须等待同波慢任务结束，再运行单解析；解析不会与下载重叠。新增只读回执字段 `download_waves`、`download_wave_seconds`、`download_slot_capacity_seconds`、`download_slot_idle_seconds`。其中槽位容量按每波实际任务数乘墙钟时间计算，空闲时间为容量减各下载任务耗时之和并下限归零；现有 `download_job_seconds`、DB 等待和解析计时保持不变。
+- 一个保持两下载/一解析/全局锁/租约/原始证据语义的“完成快任务后补一个下载”原型被离线证伪并已撤销。12 个下载 + 12 个解析、真实临时 SQLite claim/finish、5 次重复：40/200ms 明显分化时中位墙钟 1.709053→1.511317 秒（-11.570%），100/100ms 为 1.116266→1.113999 秒（-0.203%），但合法的 100/160ms 顺序为 1.479905→1.656127 秒（+11.908%）。补入任务时长未知，生产又没有逐波分布，不能安全默认启用。完整证据 `docs/tushare-document-download-scheduling-benchmark.json`，SHA256 `a14287c1b3cc2bc3f38337b02781b9e5c28cf978fa2294c9651d3c3d49fc7871`；它是禁网确定性调度基准，不代表供应商真实延迟或生产吞吐。
+- Python 3.10 全部 `test_tushare_document*.py` 69 项通过（3.591 秒）；专项 parallel 14 项通过；Ruff 与 `git diff --check` 通过。新测试用 10/80ms 快慢对验证一波墙钟、容量和空闲时间的精确关系；既有测试继续覆盖最多两下载、解析不重叠、raw 先落库、全局锁、绝对截止、claim 过期/迟到 fencing、重试和锁冲突恢复。
+- 下一真实实验只需合入并在现有任务自然排空后重启文档 worker，不改 2 下载/1 解析、100 阶段/90 秒、0.5 CPU/1536 MiB 或 100 GiB 保护。无 live SQLite 审计事务地收集至少 20 个正常成功任务回执，计算 `sum(download_slot_idle_seconds)/sum(download_slot_capacity_seconds)`、解析耗时占比、parsed 状态增量/小时、timeout/失败/未释放 claim/OOM。只有空闲比例稳定且显著时才另做有开关的 refill 灰度；与相同任务数的当前调度比较，parsed/小时下降、任一 OOM、未释放 claim 增加或证据/重试不一致即回滚。当前补丁本身不会提速，只提供决定安全调度所缺的生产证据。
