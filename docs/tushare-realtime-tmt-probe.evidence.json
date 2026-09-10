@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "as_of_date": "2026-09-10",
+  "baseline_commit": "bec7e6aa9fcf6c94ba443dc9976478268c3dccee",
+  "status": "offline_candidate_only_no_upstream_calls",
+  "official_contract_review": [
+    {
+      "api_name": "rt_min",
+      "source_url": "https://tushare.pro/document/2?doc_id=374",
+      "inputs": ["freq", "ts_code"],
+      "requested_fields": ["ts_code", "time", "open", "close", "high", "low", "vol", "amount"],
+      "documented_row_cap": 1000,
+      "probe_scope": "one actual stock from a fixed verified release, 1MIN, current only"
+    },
+    {
+      "api_name": "rt_etf_min",
+      "source_url": "https://tushare.pro/document/2?doc_id=416",
+      "inputs": ["freq", "ts_code"],
+      "requested_fields": ["ts_code", "time", "open", "close", "high", "low", "vol", "amount"],
+      "documented_row_cap": 1000,
+      "probe_scope": "one actual Shenzhen ETF from a fixed verified release, 1MIN, current only"
+    },
+    {
+      "api_name": "rt_etf_min_daily",
+      "source_url": "https://tushare.pro/document/2?doc_id=416",
+      "inputs": ["ts_code", "freq"],
+      "requested_fields": ["ts_code", "time", "open", "close", "high", "low", "vol", "amount"],
+      "documented_row_cap": null,
+      "probe_scope": "one actual Shenzhen ETF from a fixed verified release, 1MIN, current-opening-to-now only",
+      "unverified": "the sibling rt_etf_min 1000-row cap and permission are not inherited"
+    },
+    {
+      "api_name": "tmt_twincome",
+      "source_url": "https://tushare.pro/document/2?doc_id=88",
+      "inputs": ["date", "item", "start_date", "end_date"],
+      "requested_fields": ["date", "item", "op_income"],
+      "documented_product_codes": "1..65",
+      "documented_window_months": 30,
+      "probe_scope": "official item 8 example, 20160201..20180731, then one exact date/item filter derived from its raw response"
+    },
+    {
+      "api_name": "tmt_twincomedetail",
+      "source_url": "https://tushare.pro/document/2?doc_id=87",
+      "inputs": ["date", "item", "symbol", "start_date", "end_date", "source"],
+      "requested_fields": ["date", "item", "symbol", "op_income", "consop_income"],
+      "documented_product_codes": "1..65",
+      "probe_scope": "official item 8 and symbol 6156 example, one month, then one exact date/item/symbol filter derived from its raw response"
+    }
+  ],
+  "execution_contract": {
+    "default_mode": "dry_run",
+    "max_upstream_calls": 7,
+    "max_seconds": 120,
+    "retries": 0,
+    "requires_exact_helper_sha256": true,
+    "requires_fixed_seed_recipe_sha256": true,
+    "requires_authority_root": "/data/tushare",
+    "requires_nonblocking_pipeline_lock": true,
+    "requires_authority_schema_version": 6,
+    "requires_rate_policy": "tiered_v1",
+    "persists_account_api_and_observed_quota_gates": true,
+    "raw_and_observation_evidence_retained": true,
+    "report_redacts_provider_prose_and_credentials": true,
+    "automatic_activation_permitted": false,
+    "configuration_changed": false,
+    "publication_required_after_probe": true
+  },
+  "permission_conclusion": "unprobed; points and sibling denials/successes do not establish access",
+  "validation": {
+    "python": "3.10",
+    "new_probe_tests": "7 passed",
+    "related_tushare_tests": "117 passed across two non-overlapping runs",
+    "ruff": "passed",
+    "diff_check": "passed"
+  }
+}
