@@ -487,47 +487,53 @@ def fetch_document(
     return result
 
 
-def _document_db(root):
+def _document_db(root, *, timeout=10, deadline=None):
     root = Path(root).resolve()
     root.mkdir(parents=True, exist_ok=True)
     path = root / "documents.sqlite"
     if path.is_symlink():
         raise DocumentError("unsafe_storage_path")
-    db = sqlite3.connect(path, timeout=10)
-    db.row_factory = sqlite3.Row
-    version = db.execute("PRAGMA user_version").fetchone()[0]
-    if version not in (0, 1, 2):
+    db = sqlite3.connect(path, timeout=timeout)
+    if deadline is not None:
+        db.set_progress_handler(lambda: int(time.monotonic() >= deadline), 1000)
+    try:
+        db.row_factory = sqlite3.Row
+        version = db.execute("PRAGMA user_version").fetchone()[0]
+        if version not in (0, 1, 2):
+            db.close()
+            raise ValueError("Unsupported document queue schema version")
+        if version == 0:
+            db.executescript("""
+                BEGIN IMMEDIATE;
+                CREATE TABLE IF NOT EXISTS documents (
+                    id TEXT PRIMARY KEY, observation TEXT NOT NULL, url TEXT NOT NULL,
+                    expected_mime TEXT, download_status TEXT NOT NULL DEFAULT 'pending',
+                    parse_status TEXT NOT NULL DEFAULT 'not_attempted',
+                    download_tries INTEGER NOT NULL DEFAULT 0, parse_tries INTEGER NOT NULL DEFAULT 0,
+                    retry_after REAL NOT NULL DEFAULT 0, parse_retry_after REAL NOT NULL DEFAULT 0,
+                    result TEXT NOT NULL DEFAULT '{}');
+                CREATE TABLE IF NOT EXISTS document_refs (
+                    id TEXT PRIMARY KEY, observation TEXT NOT NULL, api_name TEXT NOT NULL,
+                    record_sha256 TEXT, field TEXT, source_url TEXT, document_id TEXT, status TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS document_attempts (
+                    id INTEGER PRIMARY KEY, document_id TEXT NOT NULL,
+                    phase TEXT NOT NULL, result TEXT NOT NULL, created_at REAL NOT NULL);
+                CREATE INDEX IF NOT EXISTS document_download_due ON documents(download_status,retry_after);
+                PRAGMA user_version=1;
+                COMMIT;
+            """)
+        if db.execute("PRAGMA user_version").fetchone()[0] == 1:
+            # Version 2 only adds a reuse lookup index; old jobs/references stay intact.
+            db.executescript("""
+                BEGIN IMMEDIATE;
+                CREATE INDEX IF NOT EXISTS document_reference_reuse
+                    ON document_refs(api_name,record_sha256,field,source_url,document_id);
+                PRAGMA user_version=2;
+                COMMIT;
+            """)
+    except BaseException:
         db.close()
-        raise ValueError("Unsupported document queue schema version")
-    if version == 0:
-        db.executescript("""
-            BEGIN IMMEDIATE;
-            CREATE TABLE IF NOT EXISTS documents (
-                id TEXT PRIMARY KEY, observation TEXT NOT NULL, url TEXT NOT NULL,
-                expected_mime TEXT, download_status TEXT NOT NULL DEFAULT 'pending',
-                parse_status TEXT NOT NULL DEFAULT 'not_attempted',
-                download_tries INTEGER NOT NULL DEFAULT 0, parse_tries INTEGER NOT NULL DEFAULT 0,
-                retry_after REAL NOT NULL DEFAULT 0, parse_retry_after REAL NOT NULL DEFAULT 0,
-                result TEXT NOT NULL DEFAULT '{}');
-            CREATE TABLE IF NOT EXISTS document_refs (
-                id TEXT PRIMARY KEY, observation TEXT NOT NULL, api_name TEXT NOT NULL,
-                record_sha256 TEXT, field TEXT, source_url TEXT, document_id TEXT, status TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS document_attempts (
-                id INTEGER PRIMARY KEY, document_id TEXT NOT NULL,
-                phase TEXT NOT NULL, result TEXT NOT NULL, created_at REAL NOT NULL);
-            CREATE INDEX IF NOT EXISTS document_download_due ON documents(download_status,retry_after);
-            PRAGMA user_version=1;
-            COMMIT;
-        """)
-    if db.execute("PRAGMA user_version").fetchone()[0] == 1:
-        # Version 2 only adds a reuse lookup index; old jobs/references stay intact.
-        db.executescript("""
-            BEGIN IMMEDIATE;
-            CREATE INDEX IF NOT EXISTS document_reference_reuse
-                ON document_refs(api_name,record_sha256,field,source_url,document_id);
-            PRAGMA user_version=2;
-            COMMIT;
-        """)
+        raise
     return db
 
 
@@ -556,7 +562,7 @@ def _reference_hash(value):
     ).hexdigest()
 
 
-def enqueue_documents(root, observation, api_name, records, fields):
+def enqueue_documents(root, observation, api_name, records, fields, *, deadline=None):
     """Register references from saved JSON/Parquet rows; never guess missing URLs.
 
     Unchanged API/row identity/field/URL/MIME reuses downloaded or pending work.
@@ -574,12 +580,36 @@ def enqueue_documents(root, observation, api_name, records, fields):
     if len(set(fields)) != len(fields):
         raise ValueError("Duplicate attachment fields")
     count = {"enqueued": 0, "missing": 0, "existing": 0, "references": 0, "reused": 0}
-    db = _document_db(root)
+    if deadline is not None and (
+        type(deadline) not in (int, float)
+        or not -float("inf") < deadline < float("inf")
+    ):
+        raise ValueError("Invalid registration deadline")
+    if deadline is not None and time.monotonic() >= deadline:
+        return {
+            **count,
+            "processed_records": 0,
+            "complete": False,
+            "status": "deferred_budget",
+        }
+    db = None
+    processed, exhausted = 0, False
     try:
+        db = (
+            _document_db(root)
+            if deadline is None
+            else _document_db(
+                root,
+                timeout=min(0.05, max(0, deadline - time.monotonic())),
+                deadline=deadline,
+            )
+        )
         with db:
             db.execute("BEGIN IMMEDIATE")
             saw_record = False
             for record in records:
+                if deadline is not None and time.monotonic() >= deadline:
+                    break
                 if not isinstance(record, dict):
                     raise ValueError("records must contain saved record objects")
                 saw_record = True
@@ -676,7 +706,10 @@ def enqueue_documents(root, observation, api_name, records, fields):
                             status,
                         ),
                     ).rowcount
-            if not saw_record:
+                processed += 1
+            else:
+                exhausted = True
+            if not saw_record and exhausted:
                 ref_id = hashlib.sha256(
                     _json([observation, api_name, "no_records", fields])
                 ).hexdigest()
@@ -693,9 +726,45 @@ def enqueue_documents(root, observation, api_name, records, fields):
                         "no_records",
                     ),
                 ).rowcount
-        return count
+            if deadline is not None:
+                # Do not interrupt the commit of already bounded, completed rows.
+                # The connection still has its <=50ms busy timeout.
+                db.set_progress_handler(None, 0)
+        return (
+            count
+            if deadline is None
+            else {
+                **count,
+                "processed_records": processed,
+                "complete": exhausted,
+                "status": "complete" if exhausted else "deferred_budget",
+            }
+        )
+    except sqlite3.OperationalError as exc:
+        retryable = str(exc) == "interrupted" or str(exc).startswith(
+            (
+                "database is locked",
+                "database table is locked",
+                "database schema is locked",
+            )
+        )
+        if deadline is None or not retryable:
+            raise
+        if db is not None:
+            db.set_progress_handler(None, 0)
+            db.rollback()
+        # This chunk rolled back: report no committed progress or references.
+        return {
+            **dict.fromkeys(count, 0),
+            "processed_records": 0,
+            "complete": False,
+            "status": "deferred_budget"
+            if str(exc) == "interrupted"
+            else "deferred_database_busy",
+        }
     finally:
-        db.close()
+        if db is not None:
+            db.close()
 
 
 def _download_job(url, root, timeout, *, download_only=False):

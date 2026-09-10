@@ -137,7 +137,12 @@ class CalendarFactorRuntime(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             read_dataset(self.root, fixed, "factor_list", start_date="20260901")
-        with patch("backend.shared.tushare_documents.enqueue_documents") as enqueue:
+        from backend.shared.tushare_documents import enqueue_documents
+
+        with patch(
+            "backend.shared.tushare_documents.enqueue_documents",
+            wraps=enqueue_documents,
+        ) as enqueue:
             self.p.register_documents(max_observations=100)
         self.assertTrue(enqueue.called)
         self.assertEqual(

@@ -2795,43 +2795,188 @@ class Pipeline:
             **self.status(),
         }
 
-    def register_documents(self, max_observations=20):
+    def register_documents(self, max_observations=20, *, max_records=500, max_seconds=5):
         from backend.shared.tushare_documents import enqueue_documents
 
-        apis = [
-            api
+        if type(max_observations) is not int or max_observations < 0:
+            raise ValueError("Invalid document observation limit")
+        if type(max_records) is not int or not 1 <= max_records <= 5000:
+            raise ValueError("Invalid document record limit")
+        if type(max_seconds) not in (int, float) or not 0 < max_seconds <= 20:
+            raise ValueError("Invalid document registration budget")
+        started = time.monotonic()
+        deadline = started + max_seconds
+        apis = {
+            api: spec["attachment_fields"]
             for api, spec in EXTENDED_CONTRACTS.items()
             if spec.get("attachment_fields")
-        ]
+        }
+        report = {
+            "observations": 0,
+            "processed_records": 0,
+            "scanned_attempts": 0,
+            "status": "bounded_batch_complete",
+            "cursor": None,
+            "partial_attempt": None,
+            "record_offset": 0,
+        }
         if not apis:
-            return {"observations": 0}
-        last = self.db.execute(
-            "SELECT value FROM scheduler_state WHERE name='document_cursor'"
-        ).fetchone()
-        rows = self.db.execute(
-            "SELECT rowid,result FROM attempts WHERE rowid>? AND json_extract(result,'$.api_name') IN ("
-            + ",".join("?" for _ in apis)
-            + ") ORDER BY rowid LIMIT ?",
-            (last[0] if last else 0, *apis, max_observations),
-        ).fetchall()
-        count = 0
-        for row in rows:
-            result = json.loads(row["result"])
-            if result.get("observation") and result.get("object_sha256"):
-                enqueue_documents(
-                    self.root,
-                    result["observation"],
-                    result["api_name"],
-                    self.records(result),
-                    contract_for(result["api_name"])["attachment_fields"],
+            report.update(status="no_attachment_apis", elapsed_seconds=0.0)
+            return report
+        prefix = "document_offset:"
+        original_timeout = self.db.execute("PRAGMA busy_timeout").fetchone()[0]
+        self.db.execute("PRAGMA busy_timeout=50")
+        self.db.set_progress_handler(lambda: int(time.monotonic() >= deadline), 1000)
+
+        def checkpoint(cursor, partial=None, offset=0):
+            # Docs commit first. A failed pipeline checkpoint simply replays the
+            # same deterministic reference IDs; no committed row is skipped.
+            self.db.set_progress_handler(None, 0)
+            with self.db:
+                self.db.execute(
+                    "INSERT INTO scheduler_state(name,value) VALUES('document_cursor',?) "
+                    "ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                    (cursor,),
                 )
-                count += 1
-            self.db.execute(
-                "INSERT INTO scheduler_state(name,value) VALUES('document_cursor',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
-                (row["rowid"],),
+                self.db.execute(
+                    "DELETE FROM scheduler_state WHERE name GLOB 'document_offset:*'"
+                )
+                if partial is not None:
+                    self.db.execute(
+                        "INSERT INTO scheduler_state(name,value) VALUES(?,?)",
+                        (partial, offset),
+                    )
+            report.update(
+                cursor=cursor,
+                partial_attempt=int(partial.split(":")[1]) if partial else None,
+                record_offset=offset if partial else 0,
             )
-            self.db.commit()  # Idempotent document refs make crash replay safe.
-        return {"observations": count}
+            self.db.set_progress_handler(lambda: int(time.monotonic() >= deadline), 1000)
+
+        try:
+            last = self.db.execute(
+                "SELECT value FROM scheduler_state WHERE name='document_cursor'"
+            ).fetchone()
+            cursor = last[0] if last else 0
+            saved = self.db.execute(
+                "SELECT name,value FROM scheduler_state WHERE name GLOB 'document_offset:*'"
+            ).fetchall()
+            if type(cursor) is not int or cursor < 0 or len(saved) > 1:
+                raise ValueError("Invalid document registration checkpoint")
+            partial = saved[0]["name"] if saved else None
+            offset = saved[0]["value"] if saved else 0
+            if partial and (
+                not re.fullmatch(r"document_offset:[1-9][0-9]*:[a-f0-9]{64}", partial)
+                or type(offset) is not int
+                or offset < 0
+                or int(partial.split(":")[1]) <= cursor
+            ):
+                raise ValueError("Invalid partial document checkpoint")
+            report.update(
+                cursor=cursor,
+                partial_attempt=int(partial.split(":")[1]) if partial else None,
+                record_offset=offset,
+            )
+            # Scan a bounded contiguous attempt range instead of filtering through
+            # an unbounded tail of unrelated source results on every invocation.
+            rows = self.db.execute(
+                "SELECT rowid,result FROM attempts WHERE rowid>? ORDER BY rowid LIMIT 1000",
+                (cursor,),
+            ).fetchall()
+            if not rows and partial:
+                raise ValueError("Partial document attempt is missing")
+            for row in rows:
+                if (
+                    time.monotonic() >= deadline
+                    or report["observations"] >= max_observations
+                    or report["processed_records"] >= max_records
+                ):
+                    report["status"] = "deferred_budget"
+                    break
+                result = json.loads(row["result"])
+                report["scanned_attempts"] += 1
+                if partial and int(partial.split(":")[1]) < row["rowid"]:
+                    raise ValueError("Partial document attempt is missing")
+                eligible = (
+                    result.get("api_name") in apis
+                    and result.get("observation")
+                    and result.get("object_sha256")
+                )
+                if not eligible:
+                    if partial and int(partial.split(":")[1]) == row["rowid"]:
+                        raise ValueError("Partial document source changed")
+                    cursor = row["rowid"]
+                    continue
+                fields = apis[result["api_name"]]
+                key = (
+                    prefix + str(row["rowid"]) + ":" + digest(json_bytes([result, fields]))
+                )
+                if partial and partial != key:
+                    raise ValueError("Partial document identity changed")
+                records = self.records(result)
+                if offset > len(records):
+                    raise ValueError("Partial document offset exceeds source")
+                while True:
+                    if (
+                        time.monotonic() >= deadline
+                        or report["processed_records"] >= max_records
+                    ):
+                        checkpoint(cursor, key, offset)
+                        report["status"] = "deferred_budget"
+                        return report
+                    chunk = records[
+                        offset : offset
+                        + min(100, max_records - report["processed_records"])
+                    ]
+                    done = enqueue_documents(
+                        self.root,
+                        result["observation"],
+                        result["api_name"],
+                        chunk,
+                        fields,
+                        deadline=deadline,
+                    )
+                    offset += done["processed_records"]
+                    report["processed_records"] += done["processed_records"]
+                    complete = done["complete"] and offset == len(records)
+                    if complete:
+                        cursor = row["rowid"]
+                        checkpoint(cursor)
+                        partial, offset = None, 0
+                        report["observations"] += 1
+                        break
+                    checkpoint(cursor, key, offset)
+                    partial = key
+                    if not done["complete"]:
+                        report["status"] = done["status"]
+                        return report
+                del records
+            if cursor != report["cursor"]:
+                checkpoint(cursor, partial, offset)
+            return report
+        except sqlite3.OperationalError as exc:
+            if not (
+                str(exc) == "interrupted"
+                or str(exc).startswith(
+                    (
+                        "database is locked",
+                        "database table is locked",
+                        "database schema is locked",
+                    )
+                )
+            ):
+                raise
+            self.db.set_progress_handler(None, 0)
+            self.db.rollback()
+            report["status"] = (
+                "deferred_budget" if str(exc) == "interrupted" else "deferred_database_busy"
+            )
+            report["checkpoint_pending"] = True
+            return report
+        finally:
+            self.db.set_progress_handler(None, 0)
+            self.db.execute("PRAGMA busy_timeout=" + str(original_timeout))
+            report["elapsed_seconds"] = round(max(0, time.monotonic() - started), 6)
 
     def status(self):
         return {
