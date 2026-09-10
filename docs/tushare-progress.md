@@ -597,4 +597,4 @@
 - 同一固定版在云端与Mac分别执行覆盖审计，报告字节一致，SHA256 `c6d31d8736d43f8771e7a4076aa5a0769319c196a704b0748435f6abe63e3f89`：243个已登记运行时API全部进入规划，0个登记未规划；193个已有发布数据集，另外50个只有blocked/permission/empty等证据。该结论证明规划接线覆盖，不证明每项历史、修订、附件或PIT完整。
 - `66df93ba`上线`eco_cal`饱和后的来源观察值拆分。两个各100行的旧封顶父任务均从已保存object/observation原地恢复，父请求重发0次、原始引用和尝试保持；每个父任务连接24个后代并保留`coverage_proven=0 / universe_unverified`。Tushare原始`country`字段同时含国家名与分类标识，均按来源原样处理，不凭名称删值。
 - 阶段快照后继续由`calendar_extra`常规队列自然消费，48个唯一后代最终为24 done/24 empty，全部48次请求HTTP200、每个后代只尝试一次；空结果保留`empty_unverified`。最终闭包收据`/data/tushare/validation/eco-cal-saturation-20260910/closure-20260910T150820Z.json`，SHA256 `31499010eb699b440b69f48831c383197c092da710138db7e68d4d110bf3ade4`。
-- 完整回归989项、生产镜像断网专项29项及Ruff通过。结构化worker和Beat保持运行，文档worker继续按容量缓解方案停用；发布周期3600秒、账户灰度500rpm、单接口既有限速、100GiB硬停线均未改。扩盘仍是外部云控制面动作，不缩减已登记数据范围。
+- 完整回归989项、生产镜像断网专项29项及Ruff通过。结构化worker和Beat保持运行，文档worker继续按容量缓解方案停用；发布周期3600秒、账户灰度500rpm、单接口既有限速、100GiB硬停线均未改。扩盘仍是外部云控制面动作，不缩减已登记数据范围。 23:12复核worker/Beat均healthy、OOM false、restart0，部署后16个任务成功、HTTP429/错误/任务失败均为0；云盘可用148709466112字节，距100GiB停线41335283712字节（38.496GiB）。`fund_share`独立历史游标仍为offset26788/done1。

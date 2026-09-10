@@ -70,7 +70,28 @@
       }
     },
     "child_acquisition_complete": true,
-    "normal_worker_active": true
+    "normal_worker_active": true,
+    "final_runtime_audit": {
+      "observed_at": "2026-09-10T15:12:56Z",
+      "tushare_worker": "running_healthy",
+      "celery_beat": "running_healthy",
+      "document_worker": "intentionally_stopped_capacity_mitigation",
+      "worker_oom_killed": false,
+      "worker_restart_count": 0,
+      "successful_tasks_since_deploy": 16,
+      "http_429_since_deploy": 0,
+      "worker_errors_since_deploy": 0,
+      "task_failures_since_deploy": 0,
+      "volume_free_bytes": 148709466112,
+      "reserve_bytes": 107374182400,
+      "headroom_bytes": 41335283712,
+      "headroom_gib": 38.496,
+      "fund_share_history": {
+        "offset": 26788,
+        "done": true
+      },
+      "mac_release_matches_cloud": true
+    }
   },
   "deployed_revision": "66df93ba78268cf915a36d590bf83390f4db457f",
   "candidate_invariants": {
