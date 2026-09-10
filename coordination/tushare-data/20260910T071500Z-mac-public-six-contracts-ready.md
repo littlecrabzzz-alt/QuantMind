@@ -1,0 +1,10 @@
+# Tushare remaining public six contracts ready
+
+- Branch: `codex/tushare-public-six-contracts`; implementation commit `ac79ef9bda62c8de788b6c5b24f9279ca2134639`; rebased on `origin/master` `8e14ad6ba577dd2c71ae9dd66db7d4fc38a1bf97`.
+- Registered, default-disabled and locally readable: `rt_min`, `rt_etf_min`, `rt_etf_min_daily`, `tmt_twincome`, `tmt_twincomedetail`. The contracts retain independent real-time entitlement gates, actual stored discovery, current-session-only replay, exact frequency identity, 30-month/month partitions, hidden `consop_income`, source time/PIT, units, universe and saturation gaps.
+- Catalog/storage/mirror: immutable `config/tushare-catalog.json` remains unchanged; the current official documents stay in the coverage-ledger overlay and registry. Existing Pipeline/store/fixed-release paths were exercised with synthetic transport. The Mac installer now includes `tushare_offcatalog_contracts.py`; no credential or network is needed to read a mirrored fixed release.
+- Blocked public contract: `ggt_monthly` remains `public_read_only_contract_blocked`. Official page 197 returns the 23-byte missing-document body and retained provider evidence reports source code 40101 for the published name. Required before registration: an authoritative valid API name/endpoint, legal inputs, complete fields including hidden fields, monthly method/units, history/pagination/cap and independent entitlement evidence. `ggt_daily` aggregation is forbidden as a substitute.
+- Scope audit: 249 named capabilities, 243 runtime-readable, 6 non-runtime. The other five are private `p_list`/`p_get`, mutations `p_save`/`p_delete`, and SDK wrapper `pro_bar`.
+- Validation: Python 3.10.19 focused 53 tests passed; post-rebase off-catalog probe 6 tests passed; full `test_tushare*.py` suite 939 passed with 5 skips in 47.497s; Ruff and JSON/diff checks passed.
+- No provider data request, Token access, production host/config mutation, publication or CURRENT switch occurred.
+- Evidence: `docs/tushare-public-six-contracts.evidence.json`.
