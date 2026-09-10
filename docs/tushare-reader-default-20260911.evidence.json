@@ -1,0 +1,67 @@
+{
+  "boundaries": {
+    "con_code_normalized": false,
+    "history_complete": false,
+    "pit_verified": false,
+    "rrg_status": "blocked_data"
+  },
+  "commit": "6c9e79e782ca0ec3a5b45e809e01c19dbd3f6308",
+  "deployment": {
+    "api_health_http": 200,
+    "celery_beat": {
+      "health": "healthy",
+      "oom_killed": false,
+      "restart_count": 0
+    },
+    "database": {
+      "health": "healthy",
+      "oom_killed": false,
+      "restart_count": 0
+    },
+    "quantmind_api": {
+      "health": "healthy",
+      "oom_killed": false,
+      "restart_count": 0
+    },
+    "tushare_worker": {
+      "health": "healthy",
+      "oom_killed": false,
+      "restart_count": 0
+    }
+  },
+  "fixed_release_readback": {
+    "agent_first": {
+      "con_code": "000001.SZ",
+      "index_code": "SH000300",
+      "trade_date": "20260731",
+      "weight": 0.433
+    },
+    "agent_rows": 5,
+    "api_first": {
+      "con_code": "000001.SZ",
+      "index_code": "SH000300",
+      "trade_date": "20260731",
+      "weight": 0.433
+    },
+    "api_rows": 5,
+    "codes": [
+      "SH000300"
+    ],
+    "default_code_field": "index_code",
+    "network_guard": "socket_and_dns_blocked",
+    "release_id": "data-f9c557872d2b7793779791dded640acce597cf5ceb07e35dacf81d9d5af74ee9",
+    "token_present": false,
+    "upstream_calls": 0
+  },
+  "schema_version": 1,
+  "tests": {
+    "environment": "cloud production Python 3.10 image",
+    "passed": 21,
+    "suites": [
+      "scripts.test_tushare_store_extended",
+      "scripts.test_tushare_pipeline_cli_codes",
+      "scripts.test_tushare_data_api",
+      "scripts.test_tushare_agent_integration"
+    ]
+  }
+}

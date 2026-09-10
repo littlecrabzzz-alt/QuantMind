@@ -693,3 +693,10 @@
 - `CURRENT.json`窗口前后SHA256均为`96fad1dd7c619a8e0b8f45cf4c4706afcfda1220c598ef35f130887e054d872f`，未发布、未切换固定版。窗口后云盘可用143531327488字节，高于100GiB停采线。
 - 恢复`tushare-worker`时Compose同时重建postgres容器，数据卷保留；DB、API、专用worker和Beat均恢复healthy，restart0、OOM false。停写窗口前保留在Redis的两个普通采集消息因自带`expires=110`已过期，worker恢复后按Celery语义标记`REVOKED(expired)`，未形成部分任务。04:19:57 Beat按120秒周期投递新任务`aee5532f…`并由专用worker接收，后续幂等继续。
 - 机器证据为`docs/tushare-exact-wave-20260911T0406.evidence.json`。当前固定版尚未包含本次新增结果，等下一次正常publish-only后再做Mac单向镜像和双端断网读取验收。全局仍为`history_complete=false`、`pit_verified=false`，RRG继续`blocked_data`。
+
+## 2026-09-11 04:31 index_weight 公共 reader 一致化
+
+- `6c9e79e7`将代码字段默认解析下沉到`tushare_store`：只要查询携带`codes`且调用方没有显式指定`code_field`，store就按数据合同键选择`ts_code`或`index_code`。CLI、FastAPI、QuantBot和直接`read_dataset`现在共用同一逻辑，schema同时返回`default_code_field`。
+- 生产Python 3.10镜像中store/CLI/API/Agent联合21项通过；Mac宿主Python 3.13因未安装`duckdb`无法运行数据测试，不是代码回归。云端对固定版`data-f9c557…`屏蔽socket/DNS并置空Token，FastAPI与QuantBot都在未指定`code_field`时查到5行`SH000300`指数权重，首行一致，`upstream_calls=0`。
+- 代码已推送GitHub并在云端快进到同一提交；只重启`quantmind` API、健康检查HTTP 200。`tushare-worker`、Beat和DB未因这次代码发布重启，采集任务继续成功接续。
+- 保留数据缺口：旧固定版`index_weight.con_code`仍为`000001.SZ`这类供应商格式，没有`source_con_code`，不应与内部`SH/SZ/BJ`前缀代码直接联接。研究适配层暂时需显式转换；后续固定版再保留来源字段并发布内部规范列。证据为`docs/tushare-reader-default-20260911.evidence.json`。
