@@ -5,15 +5,13 @@
       "split_pending": 48
     },
     "fund_div": {
-      "done": 44,
-      "empty": 649,
-      "pending": 1025
+      "done": 150,
+      "empty": 1568,
+      "pending": 0
     }
   },
   "all_task_ids_sha256": "62caad354d15bdf27022392a5dbc80b33e0a54f9f1c1038a26b0ad85477fb283",
   "authority_config_sha256": "4ac7b38142097cda4af50dfadb00093fd635d5fd37859d68ee9632800d1e21d9",
-  "authority_receipt": "/data/tushare/validation/rrg-exact-batch-20260910/receipt-26d70867b68155d1.json",
-  "authority_receipt_sha256": "c995c383f985ba415fb25c6255e09fdd52917f2834bffbe2028b8f8c61572f6a",
   "batch_manifest_sha256": "3ceaa518a73af92df4c824a9fa2c4fc7a65343a75569396643b749b091927d81",
   "before": {
     "etf_limit": {
@@ -27,18 +25,48 @@
     }
   },
   "execution": {
-    "attempted_by_api": {
-      "fund_div": 360
+    "current_turn_totals": {
+      "upstream_calls": 1384,
+      "attempted_by_api": {
+        "fund_div": 1384
+      },
+      "elapsed_seconds": 182.701,
+      "release_published": false,
+      "current_release_switched": false
     },
-    "current_release_switched": false,
-    "elapsed_seconds": 51.961,
-    "max_requests": 360,
-    "max_seconds": 90,
-    "release_published": false,
-    "upstream_calls": 360
+    "batches": [
+      {
+        "receipt": "/data/tushare/validation/rrg-exact-batch-20260910/receipt-26d70867b68155d1.json",
+        "sha256": "c995c383f985ba415fb25c6255e09fdd52917f2834bffbe2028b8f8c61572f6a",
+        "upstream_calls": 360,
+        "elapsed_seconds": 51.961,
+        "fund_div_pending_after": 1025
+      },
+      {
+        "receipt": "/data/tushare/validation/rrg-exact-batch-20260910/receipt-e743bfa7e5c5a8e3.json",
+        "sha256": "e13a08ddd1081e1ff8980ecc8617c6c9e0a77ccc579ed17fb977e8382a9bbacc",
+        "upstream_calls": 360,
+        "elapsed_seconds": 46.237,
+        "fund_div_pending_after": 664
+      },
+      {
+        "receipt": "/data/tushare/validation/rrg-exact-batch-20260910/receipt-bf133a8aad9bbd6d.json",
+        "sha256": "55418b6298643e0f65f3a5161557c85364bada17394b28a62f02a7142ac7b0b4",
+        "upstream_calls": 360,
+        "elapsed_seconds": 45.614,
+        "fund_div_pending_after": 304
+      },
+      {
+        "receipt": "/data/tushare/validation/rrg-exact-batch-20260910/receipt-17608bed87972d92.json",
+        "sha256": "4d6c730a97e7a2cfd0415fc500f0a3f3440455f0feca9d07fa78be68649501ec",
+        "upstream_calls": 304,
+        "elapsed_seconds": 38.889,
+        "fund_div_pending_after": 0
+      }
+    ]
   },
   "helper_sha256": "cf5bffec76246cb414a4df18a80d8353af061613da0584af4d616bae05f98a4d",
-  "observed_at": "2026-09-10T09:05:00Z",
+  "observed_at": "2026-09-10T09:23:00Z",
   "remaining": {
     "blockers": [
       "historical member known_at",
@@ -47,7 +75,7 @@
       "PCF availability and revision timing"
     ],
     "etf_limit_parent_split_pending": 48,
-    "fund_div_parent_pending": 1025,
+    "fund_div_parent_pending": 0,
     "rrg_status": "blocked_data"
   },
   "schema_version": 1,
@@ -57,5 +85,30 @@
     "token_in_report": false
   },
   "source_revision": "892cd8fdd8685c1942ab5d2a43f14819ba6b5b43",
-  "status": "production_progress_with_remaining_gaps"
+  "status": "fund_div_parent_scope_complete_rrg_still_blocked",
+  "fixed_release_acceptance": {
+    "authority_receipt": "/data/tushare/validation/rrg-fund-div-closure-20260910/acceptance.json",
+    "authority_receipt_sha256": "4489963b84f036bb312c181caf5c61e69dc71a01c61cd08bda8df08361f83b05",
+    "publication_task_id": "8410029c-82c9-4619-9f92-cc1483bc9e43",
+    "publication_elapsed_seconds": 193.25686466507614,
+    "release_id": "data-20726c7b5acbe5d15183906bba8e224d58535965f08efb0363fc296fedb51e00",
+    "mac_mirror": {
+      "status": "verified",
+      "downloaded_files": 6147,
+      "verified_files": 587490
+    },
+    "offline_audit": {
+      "status": "blocked_data",
+      "report_sha256": "3e8d713d41999897d43843263960363fe281b737a3278953b9ab5c5399802df4",
+      "fund_div_event_rows": 926,
+      "fund_div_codes_with_events": 150,
+      "fund_div_empty_receipt_codes": 1568,
+      "fund_div_terminal_receipt_codes": 1718,
+      "fund_div_missing_terminal_receipt_codes": 0,
+      "etf_limit_observed_code_day_pairs": 167139,
+      "etf_limit_target_code_day_pairs": 117269,
+      "etf_limit_monthly_execution_pairs": 1648,
+      "pcf_monthly_execution_pairs": 0
+    }
+  }
 }

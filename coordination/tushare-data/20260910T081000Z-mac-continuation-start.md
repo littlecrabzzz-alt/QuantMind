@@ -33,3 +33,10 @@ No credential or token may be written to Git, logs, reports or coordination reco
 - RRG fixed-release audit now resolves the `FUND:<source_ts_code>` namespace and derives `fund_div` empty receipts from the immutable manifest. The pinned `data-d42bf11...` audit observes 107,293 target `etf_limit` code-days and 1,648 monthly execution points; `fund_div` still lacks terminal evidence for 1,386 of 1,718 ETF codes, so `blocked_data` remains.
 - Catalog closure remains 249 named / 243 runtime / 6 nonruntime. No registered public reader is missing; `ggt_monthly` remains contract-blocked, private portfolio reads require an owner-bound namespace, writes stay excluded, and `pro_bar` remains an SDK-derived compatibility layer.
 - Next production evidence: one automatic fixed publication under the new 300 second soft limit, no new document database lock failure in that acceptance window, then another exact 360-call RRG batch when the shared acquisition lock is available.
+
+## 17:31 CST checkpoint
+
+- Four continuation exact batches completed 1,384 `fund_div` calls in 182.701 seconds, moving the pinned 1,718 parent jobs from 21 done / 312 empty / 1,385 pending to 150 done / 1,568 empty / 0 pending.
+- Automatic task `8410029c-82c9-4619-9f92-cc1483bc9e43` published those results in 193.257 seconds as `data-20726c7b5acbe5d15183906bba8e224d58535965f08efb0363fc296fedb51e00`. The Mac mirror downloaded 6,147 files and verified all 587,490 files before switching `CURRENT`.
+- A network-disabled Mac audit of that fixed release reports 1,718/1,718 terminal `fund_div` codes, 0 missing; report SHA256 `3e8d713d41999897d43843263960363fe281b737a3278953b9ab5c5399802df4`. RRG remains `blocked_data` for member known-at, versioned industry mapping, authoritative tradability, PCF timing and split `etf_limit` descendants.
+- Immutable closure receipt: `/data/tushare/validation/rrg-fund-div-closure-20260910/acceptance.json`, SHA256 `4489963b84f036bb312c181caf5c61e69dc71a01c61cd08bda8df08361f83b05`.
