@@ -26,6 +26,7 @@ from backend.shared.tushare_registry import (
     MARKET_SENTIMENT_RUNTIME_CONTRACTS,
     FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
     CONNECT_RUNTIME_CONTRACTS,
+    LEGACY_CONNECT_RUNTIME_CONTRACTS,
     TRADING_EVENT_RUNTIME_CONTRACTS,
     LISTING_EXTRA_RUNTIME_CONTRACTS,
     LIMIT_EXTRA_RUNTIME_CONTRACTS,
@@ -70,6 +71,7 @@ CONTRACTS = {
     **LISTING_EXTRA_RUNTIME_CONTRACTS,
     **TRADING_EVENT_RUNTIME_CONTRACTS,
     **CONNECT_RUNTIME_CONTRACTS,
+    **LEGACY_CONNECT_RUNTIME_CONTRACTS,
     **ETF_BASKET_CONTRACTS,
     **CREDIT_EXTRA_CONTRACTS,
     **TEXT_CONTRACTS,
@@ -613,6 +615,19 @@ def _dataset(root, release_id, api_name):
                     "date_field",
                     "history_bound_verified",
                     "row_cap_verified",
+                ):
+                    metadata[note] = value
+        if api_name in LEGACY_CONNECT_RUNTIME_CONTRACTS:
+            for note, value in spec.items():
+                if note.endswith(("_gap", "_note")) or note in (
+                    "field_gaps",
+                    "hidden_fields",
+                    "permission_status",
+                    "date_field",
+                    "history_bound_verified",
+                    "row_cap_verified",
+                    "source_content_status",
+                    "documented_requests_per_minute",
                 ):
                     metadata[note] = value
         if identity_fields:
