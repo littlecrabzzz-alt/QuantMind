@@ -725,3 +725,13 @@
 - 分红历史批次按沪深北各120只股票固定360项，44.455秒完成360次请求，355 done、5 empty，返回17200行，等效485.885次/分钟。三个批次合计997次HTTP 200、0次429、280060行；逐文件验证997个object、997个observation和907个Parquet哈希，错误0。
 - 三批均固定release、任务集、配置、准备器和执行器SHA，使用authority/schema6/ENABLED/排他锁/100GiB余量门，且不发布、不切换CURRENT。权威闭包SHA分别为`0161dc75c71940750bafbb35fe10493480beeb9db1071aa452df062d81e4adab`、`c9b1a46c8db8918d36a1c6feb6d1176fb66d603927dd0b4d811afd926ecbb42a`、`8608a6b5c5b220efe33b9522c6c01a264dba4918bf040e74324dd9ad9f2fab87`；仓库机器证据为`docs/tushare-exact-history-batches-20260911.evidence.json`。
 - Tushare worker与Beat已恢复healthy；worker实际内存2147483648字节、restart0、OOM false。新增活动数据等待正常一小时固定发布和Mac LaunchAgent单向镜像，因此当前固定版仍为`data-7be20672…`。完整历史、修订/PIT和RRG准入仍未闭合，继续`blocked_data`。
+
+## 2026-09-11 06:25 发布时限、固定版闭包与公告首批
+
+- `1647f792`把专用 Celery 发布任务的软/硬上限从300/330秒扩大到600/630秒，采集本身仍由每轮请求数和秒数独立约束。Mac与生产镜像各26项针对性测试通过，容器运行时反射值为600/630。首个到期任务`a5dbe244…`在138.544秒内完成`publish_only`并原子发布`data-051d825b3220a2419e8291fcf15d7917eee9547ccb90c67ed8344b925f36c813`，没有再触发300秒软超时。
+- 新固定版manifest为282216992字节，SHA与release ID一致，含725606个文件条目和92254个数据集。只对不可变manifest做流式扫描，并用短索引查询映射任务：核心行情、基金行情、已购政策/央行和分红四批共1337个object、1337个observation、1246个Parquet全部进入固定版，逐实体重算SHA错误0；固定版闭包SHA为`552d4a076fb5173e2e5cf0530ebe4ab66c1995c4711192bb0d5c73d84ccbc834`。
+- Mac第148次标准LaunchAgent新增下载8991个文件、完整校验725606个文件，exit 0且错误日志0字节，原子追平同一release；本地282216992字节manifest实算SHA一致。在生产镜像`--network none`、两个Token变量为空、镜像只读挂载条件下，`fund_daily@20190410`返回5行、`upstream_calls=0`，证明当前存量可脱离Tushare Pro读取。
+- `9c383c8d`新增默认plan-only的公告`anns_d`精确批次入口；Mac和生产镜像各31项组合测试通过。停Beat、取消专用consumer并自然排空后，三份清单全部固定上述release、authority配置、任务集、准备器和runner哈希。基金行情第3批覆盖20180712—20190409的180个共同交易日，43.619秒完成360次、全部done、243626行；分红第2批沪深北各120项，44.333秒完成360次、352 done/8 empty、17501行。
+- 公告第1批90.674秒完成221次调用：219项返回2000行上限并进入`split_pending`，1项empty，140项保持pending；共1313650行。220次HTTP 200，另1次`ReadTimeout`按可重试pending保存且没有写入部分payload。第一次操作员验收脚本把这类pending误当成必须0尝试，原失败闭包保留；语义修正后的不可覆盖v2闭包逐文件核验220个object、220个observation和219个Parquet，验证错误0。
+- 本轮三批合计941次上游调用、940次HTTP 200、0次429、1次可重试传输超时，runner时间合计178.626秒、返回1574777行；941个调用对应的940个完整object/observation和931个Parquet物理SHA均通过。专用worker和Beat已恢复healthy，worker 2GiB、restart0、OOM false，`tushare_acquire`消费恢复并接收新任务。
+- 当前authority为106420995288字节，云盘可用141094637568字节，高于107374182400字节硬停线；Mac镜像93203988480字节。本轮三批尚未进入下一小时固定版或Mac镜像，保留`history_complete=false`、历史修订/PIT未完成和`rrg_status=blocked_data`。机器证据为`docs/tushare-publication-announcement-wave2-20260911.evidence.json`。

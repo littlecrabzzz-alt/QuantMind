@@ -1,0 +1,304 @@
+{
+  "boundaries": {
+    "historical_versions_complete": false,
+    "history_complete": false,
+    "next_action": "normal hourly publication followed by the standard one-way Mac mirror",
+    "pit_verified": false,
+    "rrg_status": "blocked_data",
+    "wave2_in_current_fixed_release": false,
+    "wave2_mac_mirror_available": false
+  },
+  "exact_wave2": {
+    "aggregate": {
+      "effective_calls_per_minute_over_runner_time": 316.079,
+      "elapsed_seconds_sum": 178.626,
+      "http_200": 940,
+      "http_429": 0,
+      "objects_verified": 940,
+      "observations_verified": 940,
+      "parquet_verified": 931,
+      "retryable_transport_errors": 1,
+      "rows": 1574777,
+      "tasks_planned": 1080,
+      "upstream_calls": 941
+    },
+    "batches": {
+      "anns_d_batch_1": {
+        "closure_sha256": "78b35ef807aceb8b9f16fbeb0ac0bd6f88679310b692e12f2e6297c339326da3",
+        "effective_calls_per_minute": 146.238,
+        "elapsed_seconds": 90.674,
+        "http_429": 0,
+        "manifest_sha256": "597188559af93ed2a0717c32243970c54329ae7faa9e92546882fc187f82cf0d",
+        "operator_closure_v1_superseded": true,
+        "reference_occurrences": {
+          "object": 220,
+          "observation": 220,
+          "parquet": 219
+        },
+        "result_statuses": {
+          "empty_unverified": 1,
+          "possibly_truncated": 219,
+          "transport_error": 1
+        },
+        "retryable_events": [
+          {
+            "error_type": "ReadTimeout",
+            "response_complete": false,
+            "retry_after": 1789078750.6623974,
+            "status": "transport_error",
+            "task_id": "84930ddb9e07f9b321e080fdb72872f0d68b08d40435302446c98dc2a41d2047",
+            "tries": 1
+          }
+        ],
+        "row_cap": 2000,
+        "rows": 1313650,
+        "rows_by_api": {
+          "anns_d": 1313650
+        },
+        "states": {
+          "empty": 1,
+          "pending": 140,
+          "split_pending": 219
+        },
+        "status": "verified_partial_time_budget_with_retry",
+        "tasks": 360,
+        "upstream_calls": 221
+      },
+      "dividend_batch_2": {
+        "closure_sha256": "1e74dc2e04f2f0cbd9b534012010b38d572ed9339de02b9688e0b4ccf8747f55",
+        "effective_calls_per_minute": 487.222,
+        "elapsed_seconds": 44.333,
+        "http_429": 0,
+        "manifest_sha256": "54827467a9f25d9b0a68fd49a3ee4874684f1801a5035ceb828e61c08bf4515f",
+        "market_counts": {
+          "BJ": 120,
+          "SH": 120,
+          "SZ": 120
+        },
+        "reference_occurrences": {
+          "object": 360,
+          "observation": 360,
+          "parquet": 352
+        },
+        "rows": 17501,
+        "rows_by_api": {
+          "dividend": 17501
+        },
+        "states": {
+          "done": 352,
+          "empty": 8
+        },
+        "status": "verified",
+        "tasks": 360,
+        "upstream_calls": 360
+      },
+      "fund_price_batch_3": {
+        "closure_sha256": "9e696beb6af0d7789fd0b20a351a9131761ec40131854ebf9d17c2b55c8762e1",
+        "effective_calls_per_minute": 495.197,
+        "elapsed_seconds": 43.619,
+        "http_429": 0,
+        "manifest_sha256": "4bbdd48bfc7431b35bbedfe5db7c5483dd4cc168ab75a52a1403fae084b8e276",
+        "reference_occurrences": {
+          "object": 360,
+          "observation": 360,
+          "parquet": 360
+        },
+        "rows": 243626,
+        "rows_by_api": {
+          "fund_adj": 135306,
+          "fund_daily": 108320
+        },
+        "selected_trade_date_range": [
+          "20180712",
+          "20190409"
+        ],
+        "states": {
+          "done": 360
+        },
+        "status": "verified",
+        "tasks": 360,
+        "upstream_calls": 360
+      }
+    },
+    "current_release_switched": false,
+    "fixed_input_release": "data-051d825b3220a2419e8291fcf15d7917eee9547ccb90c67ed8344b925f36c813",
+    "release_published": false
+  },
+  "git": {
+    "announcement_batch_commit": "9c383c8d",
+    "branch": "master",
+    "cloud_aligned": true,
+    "github_pushed": true,
+    "head_before_evidence_commit": "9c383c8d6fa001f3d77e9d8c2dbb094e5e6904b4",
+    "rate_envelope_commit": "1647f792"
+  },
+  "implementation_validation": {
+    "announcement_exact_batch": {
+      "default_mode": "plan_only",
+      "mac_tests_passed": 31,
+      "max_requests": 360,
+      "max_seconds": 90,
+      "production_image_tests_passed": 31,
+      "rate_contract": {
+        "account_rpm": 500,
+        "anns_d_rpm": 500
+      }
+    },
+    "publication_envelope": {
+      "celery_hard_time_limit_seconds": 630,
+      "celery_soft_time_limit_seconds": 600,
+      "mac_tests_passed": 26,
+      "production_image_tests_passed": 26,
+      "runtime_introspection_verified": true
+    }
+  },
+  "mac_mirror": {
+    "downloaded_files": 8991,
+    "error_log_bytes": 0,
+    "files_verified": 725606,
+    "last_exit_code": 0,
+    "launch_agent_run": 148,
+    "manifest_sha256_recomputed": "051d825b3220a2419e8291fcf15d7917eee9547ccb90c67ed8344b925f36c813",
+    "release_id": "data-051d825b3220a2419e8291fcf15d7917eee9547ccb90c67ed8344b925f36c813",
+    "status": "verified"
+  },
+  "observed_at": "2026-09-10T22:24:39.606733+00:00",
+  "offline_readback": {
+    "api_name": "fund_daily",
+    "container_network": "none",
+    "credentials": "TUSHARE_TOKEN and TUSHARE_API_TOKEN empty",
+    "limit": 5,
+    "machine": "mac",
+    "mount": "read_only_fixed_mirror",
+    "release_id": "data-051d825b3220a2419e8291fcf15d7917eee9547ccb90c67ed8344b925f36c813",
+    "rows": 5,
+    "trade_date": "20190410",
+    "upstream_calls": 0
+  },
+  "publication": {
+    "authority_closure": "validation/release-051d825b-closure-20260911.json",
+    "authority_closure_sha256": "552d4a076fb5173e2e5cf0530ebe4ab66c1995c4711192bb0d5c73d84ccbc834",
+    "elapsed_seconds": 138.54393276758492,
+    "fixed_manifest_inclusion": {
+      "batches": {
+        "core_market": {
+          "reference_occurrences": {
+            "object": 340,
+            "observation": 340,
+            "parquet": 339
+          },
+          "rows_by_api": {
+            "adj_factor": 310797,
+            "daily": 304489,
+            "daily_basic": 304489,
+            "moneyflow": 293838,
+            "stk_limit": 315191,
+            "suspend_d": 850
+          },
+          "states": {
+            "blocked": 1,
+            "done": 339,
+            "pending": 20
+          },
+          "status": "included",
+          "tasks": 360
+        },
+        "dividend": {
+          "reference_occurrences": {
+            "object": 360,
+            "observation": 360,
+            "parquet": 355
+          },
+          "rows_by_api": {
+            "dividend": 17200
+          },
+          "states": {
+            "done": 355,
+            "empty": 5
+          },
+          "status": "included",
+          "tasks": 360
+        },
+        "fund_price": {
+          "reference_occurrences": {
+            "object": 360,
+            "observation": 360,
+            "parquet": 360
+          },
+          "rows_by_api": {
+            "fund_adj": 142968,
+            "fund_daily": 116181
+          },
+          "states": {
+            "done": 360
+          },
+          "status": "included",
+          "tasks": 360
+        },
+        "paid_policy": {
+          "reference_occurrences": {
+            "object": 277,
+            "observation": 277,
+            "parquet": 192
+          },
+          "rows_by_api": {
+            "monetary_policy": 0,
+            "npr": 3711
+          },
+          "states": {
+            "done": 189,
+            "empty": 85,
+            "split_pending": 3
+          },
+          "status": "included",
+          "tasks": 277
+        }
+      },
+      "physical_hash_errors": [],
+      "unique_reference_bytes_verified": {
+        "object": 214179616,
+        "observation": 1187817,
+        "parquet": 177426387
+      },
+      "unique_references_verified": {
+        "object": 1337,
+        "observation": 1337,
+        "parquet": 1246
+      }
+    },
+    "manifest_bytes": 282216992,
+    "manifest_dataset_entries": 92254,
+    "manifest_file_entries": 725606,
+    "manifest_sha256": "051d825b3220a2419e8291fcf15d7917eee9547ccb90c67ed8344b925f36c813",
+    "mode": "publish_only",
+    "release_id": "data-051d825b3220a2419e8291fcf15d7917eee9547ccb90c67ed8344b925f36c813",
+    "status": "published",
+    "task_id": "a5dbe244-1739-4bf3-9bee-5914fafe76bb"
+  },
+  "schema_version": 1,
+  "security": {
+    "order_or_payment_data_present": false,
+    "token_present": false,
+    "upstream_response_bodies_present": false
+  },
+  "service_restore": {
+    "celery_beat_healthy": true,
+    "celery_beat_memory_bytes": 402653184,
+    "celery_beat_oom_killed": false,
+    "celery_beat_restart_count": 0,
+    "first_received_task_id": "b026b496-7d8f-4e23-abfe-a557453bbf7b",
+    "tushare_acquire_queue_restored": true,
+    "tushare_worker_healthy": true,
+    "tushare_worker_memory_bytes": 2147483648,
+    "tushare_worker_oom_killed": false,
+    "tushare_worker_restart_count": 0
+  },
+  "status": "production_verified_wave2_awaiting_next_fixed_release",
+  "storage": {
+    "cloud_authority_bytes": 106420995288,
+    "cloud_free_bytes": 141094637568,
+    "hard_reserve_bytes": 107374182400,
+    "mac_mirror_bytes": 93203988480,
+    "reserve_triggered": false
+  }
+}
