@@ -2418,7 +2418,7 @@ class Pipeline:
             self._partition_artifact_checks.pop(name, None)
             return "child_artifact_unreadable"
 
-    def reconcile_partitions(self, max_parents=1000, child_id=None):
+    def reconcile_partitions(self, max_parents=1000, child_id=None, deadline=None):
         """Bounded, restartable closure; descendants must carry positive evidence.
 
         A done pagination page or empty-unverified terminator is not a complete
@@ -2427,6 +2427,10 @@ class Pipeline:
         """
         if not 1 <= max_parents <= 10000:
             raise ValueError("Invalid partition reconciliation budget")
+        if deadline is not None and type(deadline) not in (int, float):
+            raise ValueError("Invalid partition reconciliation deadline")
+        selected = []
+        cursor = None
         if child_id is None:
             saved = self.db.execute(
                 "SELECT value FROM scheduler_state WHERE name='partition_cursor'"
@@ -2436,22 +2440,23 @@ class Pipeline:
                 "SELECT rowid,parent_id FROM partition_splits WHERE rowid>? ORDER BY rowid LIMIT ?",
                 (cursor, max_parents),
             ).fetchall()
-            self.db.execute(
-                "INSERT INTO scheduler_state VALUES('partition_cursor',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
-                (selected[-1]["rowid"] if selected else 0,),
-            )
-            pending = deque(row["parent_id"] for row in selected)
+            pending = deque((row["parent_id"], row["rowid"]) for row in selected)
         else:
             pending = deque(
-                r[0]
+                (r[0], None)
                 for r in self.db.execute(
                     "SELECT parent_id FROM partition_children WHERE child_id=? UNION SELECT parent_id FROM partition_splits WHERE parent_id=?",
                     (child_id, child_id),
                 )
             )
         checked, resolved = 0, 0
+        last_cursor = cursor
         while pending and checked < max_parents:
-            parent_id = pending.popleft()
+            if deadline is not None and time.monotonic() >= deadline:
+                break
+            parent_id, cursor_rowid = pending.popleft()
+            if cursor_rowid is not None:
+                last_cursor = cursor_rowid
             split = self.db.execute(
                 "SELECT * FROM partition_splits WHERE parent_id=?", (parent_id,)
             ).fetchone()
@@ -2513,7 +2518,7 @@ class Pipeline:
                 )
             if changed:
                 pending.extend(
-                    r[0]
+                    (r[0], None)
                     for r in self.db.execute(
                         "SELECT parent_id FROM partition_children WHERE child_id=?",
                         (parent_id,),
@@ -2521,6 +2526,11 @@ class Pipeline:
                 )
             checked += 1
             resolved += int(not gap)
+        if child_id is None:
+            self.db.execute(
+                "INSERT INTO scheduler_state VALUES('partition_cursor',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                (0 if not selected else last_cursor,),
+            )
         self.db.commit()
         return {"checked": checked, "resolved": resolved}
 
@@ -2615,7 +2625,7 @@ class Pipeline:
             )
             # Reconcile the exact parent before commit: unknown-universe evidence
             # remains a gap. The original capture attempt is never overwritten.
-            self.reconcile_partitions(child_id=row["id"])
+            self.reconcile_partitions(child_id=row["id"], deadline=deadline)
             self.db.commit()
         except BaseException:
             self.db.rollback()
@@ -2629,7 +2639,8 @@ class Pipeline:
 
     def run(self, client, token, config, max_requests=100, max_seconds=100, pause=0.6):
         started = time.monotonic()
-        partition_work = self.resume_identifier_split(started + max_seconds)
+        deadline = started + max_seconds
+        partition_work = self.resume_identifier_split(deadline)
         if partition_work is not None:
             # One expensive local fanout is the entire run. Never combine a full
             # discovery scan with another acquisition batch in the same task.
@@ -2639,7 +2650,7 @@ class Pipeline:
                 "partition_work": partition_work,
                 **self.status(),
             }
-        self.reconcile_partitions()
+        self.reconcile_partitions(deadline=deadline)
         completed = 0
         while completed < max_requests and time.monotonic() - started < max_seconds:
             self.expand(config)
@@ -2844,11 +2855,12 @@ class Pipeline:
                 ),
             )
             self.db.commit()  # response + object references checkpoint before next request
-            self.reconcile_partitions(child_id=row["id"])
+            self.reconcile_partitions(child_id=row["id"], deadline=deadline)
             completed += 1
             if pause:
                 time.sleep(pause)
-        self.expand(config)
+        if time.monotonic() < deadline:
+            self.expand(config)
         return {
             "requests": completed,
             "elapsed_seconds": round(time.monotonic() - started, 3),

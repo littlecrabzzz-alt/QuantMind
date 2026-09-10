@@ -374,6 +374,58 @@ class Closure(unittest.TestCase):
             self.reopen()
         self.assertTrue(all(self.state(parent) == "resolved" for parent in parents))
 
+    def test_deadline_advances_cursor_only_past_reconciled_parents(self):
+        parents = []
+        rowids = []
+        for n in range(3):
+            parent, children = self.split(epoch=f"deadline-{n}")
+            parents.append(parent)
+            for child in children:
+                self.finish(child)
+            rowids.append(
+                self.p.db.execute(
+                    "SELECT rowid FROM partition_splits WHERE parent_id=?", (parent,)
+                ).fetchone()[0]
+            )
+
+        with patch.object(module.time, "monotonic", side_effect=[1.0, 3.0]):
+            report = self.p.reconcile_partitions(deadline=2.0)
+        self.assertEqual(report, {"checked": 1, "resolved": 1})
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT value FROM scheduler_state WHERE name='partition_cursor'"
+            ).fetchone()[0],
+            rowids[0],
+        )
+        self.assertEqual(self.state(parents[0]), "resolved")
+        self.assertEqual([self.state(p) for p in parents[1:]], ["split_pending"] * 2)
+
+        self.reopen()
+        report = self.p.reconcile_partitions(max_parents=1)
+        self.assertEqual(report["checked"], 1)
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT value FROM scheduler_state WHERE name='partition_cursor'"
+            ).fetchone()[0],
+            rowids[1],
+        )
+        self.assertEqual(self.state(parents[1]), "resolved")
+
+    def test_expired_reconciliation_deadline_keeps_work_pending(self):
+        parent, children = self.split(epoch="expired-deadline")
+        for child in children:
+            self.finish(child)
+        with patch.object(module.time, "monotonic", return_value=2.0):
+            report = self.p.reconcile_partitions(deadline=1.0)
+        self.assertEqual(report, {"checked": 0, "resolved": 0})
+        self.assertEqual(self.state(parent), "split_pending")
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT value FROM scheduler_state WHERE name='partition_cursor'"
+            ).fetchone()[0],
+            0,
+        )
+
     def test_v1_v2_migration_preserves_jobs_and_original_attempt(self):
         for version in (1, 2):
             with tempfile.TemporaryDirectory() as tmp:
