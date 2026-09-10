@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "status": "candidate_verified_pending_production",
+  "observed_on": "2026-09-10",
+  "baseline_revision": "9f4b05f63ba49fb66d633fb0164b17a5070d4aee",
+  "production_observation": {
+    "publication_task": "0f50df00-c7b2-4c0b-889a-b828c60a9f2c",
+    "publication_received_at": "2026-09-10T15:56:55+08:00",
+    "publication_failed_stage": "serialize_manifest",
+    "publication_soft_timeout_seconds": 160,
+    "publication_total_observed_seconds": 172.7663532588631,
+    "document_index_seconds": 25.909513099119067,
+    "document_task_lock_failures": [
+      {
+        "task_id": "fb771140-a7fd-42b0-8598-022951ab108e",
+        "received_at": "2026-09-10T15:56:55+08:00",
+        "failed_at": "2026-09-10T15:57:51+08:00",
+        "phase": "download_finish",
+        "error_type": "OperationalError",
+        "error": "database is locked"
+      },
+      {
+        "task_id": "27aa7598-532d-4370-8b5c-e4d092eb4ef9",
+        "received_at": "2026-09-10T16:01:20+08:00",
+        "failed_at": "2026-09-10T16:01:45+08:00",
+        "phase": "parse_finish",
+        "error_type": "OperationalError",
+        "error": "database is locked"
+      }
+    ],
+    "audit_reader_overlapped": false,
+    "root_cause": "The acquisition task dispatched the independent document task before checking whether the same tick was a due fixed publication. Publication document_index held a documents.sqlite BEGIN IMMEDIATE transaction while document results tried to commit."
+  },
+  "candidate": {
+    "branch": "codex/tushare-publish-document-coordination",
+    "behavior": {
+      "publish_only": "Do not dispatch documents before publication. Dispatch once after a successful publication returns.",
+      "failed_publish": "Do not start a competing document task; leave the existing publication checkpoint pending for the next retry.",
+      "planning_or_acquisition": "Invoke the document dispatch hook before planning or acquisition so the two dedicated workers retain their existing parallelism.",
+      "disabled_or_blocked_tick": "After a normal tick return, perform the same bounded document dispatch and let the document worker enforce its existing authority, enable and disk gates."
+    },
+    "limits_unchanged": [
+      "160 second acquisition soft limit",
+      "105 second document soft limit",
+      "90 second document work budget",
+      "two download workers and one parse phase",
+      "900 second publication and planning intervals",
+      "100 GiB disk reserve",
+      "500 rpm rollout account ceiling"
+    ],
+    "files": {
+      "backend/shared/tushare_pipeline.py": "b0836e183edf01d9bbbc2303913906fd5fd27c7b23a0d759108abefcea711c16",
+      "backend/services/engine/tasks/tushare_tasks.py": "b9b302ea06e6d13c059a7bcf49d416740e03a319d703b2dcc4de08cb8fc80e1e",
+      "scripts/test_tushare_document_worker.py": "916e2f7b7431926986f1dd286d3da9f7b368b46ef288bc15df303b081b7c1f95",
+      "scripts/test_tushare_publish_interval.py": "7e94699cad2cfbc509d010b52d1d6ec9a6b1e8baadad0f292f25f959c16992ab"
+    }
+  },
+  "validation": {
+    "python": "3.10.19",
+    "full_tushare_suite": {
+      "passed": 955,
+      "skipped": 5,
+      "elapsed_seconds": 47.432
+    },
+    "document_worker_tests": 10,
+    "publication_interval_tests": 12,
+    "document_family_tests": 72,
+    "publish_family_tests": 20,
+    "planning_interval_tests": 9,
+    "tick_timing_tests": 5,
+    "publication_recovery_tests": 12,
+    "ruff_changed_files": "passed",
+    "diff_check": "passed",
+    "network_calls": 0,
+    "authority_writes": 0
+  },
+  "production_acceptance_required": [
+    "Deploy only after both dedicated queues are drained and source/Git are aligned.",
+    "Observe a due automatic publish below the 160 second soft limit without a simultaneous document task.",
+    "Verify the successful publish dispatches exactly one subsequent document task.",
+    "Observe later non-publication acquisition and document work running in parallel.",
+    "Verify no new database-is-locked document failure in the acceptance window and both workers remain healthy."
+  ],
+  "security": {
+    "token_read": false,
+    "credential_in_report": false,
+    "production_response_body_in_report": false
+  }
+}

@@ -3564,7 +3564,7 @@ class Pipeline:
         return release
 
 
-def tick(max_requests=None, max_seconds=None):
+def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None):
     from contextlib import contextmanager
 
     tick_started = time.monotonic()
@@ -3633,6 +3633,16 @@ def tick(max_requests=None, max_seconds=None):
             "rate_policy": policy_report(config),
             "planning_cadence": planning_cadence,
         }
+        nonpublication_work_started = False
+
+        def start_nonpublication_work():
+            nonlocal nonpublication_work_started
+            if nonpublication_work_started:
+                return
+            nonpublication_work_started = True
+            if before_nonpublication_work is not None:
+                before_nonpublication_work()
+
         stage_seconds = {}
         completed_stages = []
         failed_stage = None
@@ -3738,6 +3748,9 @@ def tick(max_requests=None, max_seconds=None):
                     report["release_id"] = publication["current_release_id"]
                     publication["status"] = "deferred"
                     publication["mode"] = "acquire_only"
+                    start_nonpublication_work()
+                else:
+                    start_nonpublication_work()
                 planning_due = not planning_interval
                 if planning_interval:
                     with measure("planning_check"):

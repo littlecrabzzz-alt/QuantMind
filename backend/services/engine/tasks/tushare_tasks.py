@@ -32,7 +32,12 @@ def tushare_acquire():
     from backend.shared.tushare_pipeline import tick
 
     dispatch = None
-    if _document_config() is not None:
+    document_config = _document_config()
+
+    def dispatch_documents():
+        nonlocal dispatch
+        if document_config is None or dispatch is not None:
+            return
         try:
             celery_app.send_task(
                 "engine.tasks.tushare_documents",
@@ -43,7 +48,13 @@ def tushare_acquire():
         except Exception as exc:
             # A document broker failure must not prevent the API continuation.
             dispatch = {"status": "dispatch_failed", "error_type": type(exc).__name__}
-    report = tick()
+
+    # Normal planning/acquisition starts the independent document worker before
+    # doing its own work. A due fixed publication returns without calling this
+    # hook, so the document task starts only after its long SQLite index
+    # transaction and manifest write have finished.
+    report = tick(before_nonpublication_work=dispatch_documents)
+    dispatch_documents()
     if dispatch is not None:
         report["document_dispatch"] = dispatch
     return report

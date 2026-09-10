@@ -98,12 +98,19 @@ class DocumentWorkerTest(unittest.TestCase):
     def save_config(self):
         (self.root / "pipeline-config.json").write_text(json.dumps(self.config))
 
-    def test_acquire_dispatches_before_tick_to_separate_queue(self):
+    def test_nonpublication_dispatches_before_pipeline_work(self):
         order = []
         self.app.send_task.side_effect = lambda *a, **k: order.append("documents")
-        self.tick.side_effect = lambda: order.append("api") or {"status": "api_done"}
+
+        def run_tick(**kwargs):
+            order.append("tick")
+            kwargs["before_nonpublication_work"]()
+            order.append("api")
+            return {"status": "api_done"}
+
+        self.tick.side_effect = run_tick
         result = self.tasks.tushare_acquire()
-        self.assertEqual(order, ["documents", "api"])
+        self.assertEqual(order, ["tick", "documents", "api"])
         self.app.send_task.assert_called_once_with(
             "engine.tasks.tushare_documents", queue="tushare_documents", expires=110
         )
@@ -111,11 +118,28 @@ class DocumentWorkerTest(unittest.TestCase):
         self.run.assert_not_called()
         self.authority.assert_called_once()
 
+    def test_publish_dispatches_documents_after_tick(self):
+        order = []
+        self.app.send_task.side_effect = lambda *a, **k: order.append("documents")
+        self.tick.side_effect = lambda **kwargs: (
+            order.append("publish") or {"status": "publish_only"}
+        )
+        result = self.tasks.tushare_acquire()
+        self.assertEqual(order, ["publish", "documents"])
+        self.assertEqual(result["document_dispatch"], {"status": "queued"})
+        self.app.send_task.assert_called_once()
+
+    def test_failed_publish_does_not_start_competing_document_task(self):
+        self.tick.side_effect = RuntimeError("synthetic publish failure")
+        with self.assertRaisesRegex(RuntimeError, "synthetic publish failure"):
+            self.tasks.tushare_acquire()
+        self.app.send_task.assert_not_called()
+
     def test_dispatch_failure_preserves_api_continuation(self):
         self.app.send_task.side_effect = RuntimeError("mock unavailable broker")
         result = self.tasks.tushare_acquire()
         self.assertEqual(result["document_dispatch"]["status"], "dispatch_failed")
-        self.tick.assert_called_once()
+        self.tick.assert_called_once_with(before_nonpublication_work=unittest.mock.ANY)
 
     def test_mode_and_operator_switch_disable_dispatch_and_consumption(self):
         for enabled, mode in ((False, "worker"), (True, "inline"), (True, None)):

@@ -84,10 +84,10 @@ class PublicationInterval(unittest.TestCase):
         self.registrations += 1
         return {"observations": 0}
 
-    def tick(self, advance=0):
+    def tick(self, advance=0, before_nonpublication_work=None):
         self.now += advance
         (self.root / "pipeline-config.json").write_text(json.dumps(self.config))
-        result = module.tick()
+        result = module.tick(before_nonpublication_work=before_nonpublication_work)
         self.assertEqual(result, self.saved())
         return result
 
@@ -235,6 +235,35 @@ class PublicationInterval(unittest.TestCase):
         self.assertEqual(deferred["publication"]["mode"], "acquire_only")
         self.assertEqual(self.acquisitions, 1)
         self.assertEqual(self.registrations, 1)
+
+    def test_document_hook_skips_publish_and_precedes_acquisition(self):
+        events = []
+        self.collect = lambda: events.append("acquire") or {"requests": 0}
+        published = self.tick(
+            before_nonpublication_work=lambda: events.append("documents")
+        )
+        self.assertEqual(published["status"], "publish_only")
+        self.assertEqual(events, [])
+        acquired = self.tick(
+            120, before_nonpublication_work=lambda: events.append("documents")
+        )
+        self.assertEqual(acquired["publication"]["mode"], "acquire_only")
+        self.assertEqual(events, ["documents", "acquire"])
+
+    def test_failed_publish_does_not_run_document_hook(self):
+        events = []
+        with (
+            patch.object(
+                module.Pipeline,
+                "publish",
+                side_effect=RuntimeError("fixture publish failure"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "fixture publish failure"),
+        ):
+            self.tick(
+                before_nonpublication_work=lambda: events.append("documents")
+            )
+        self.assertEqual(events, [])
 
     def test_60_second_publish_and_90_second_acquire_never_share_interval_tick(self):
         elapsed = [0.0]
