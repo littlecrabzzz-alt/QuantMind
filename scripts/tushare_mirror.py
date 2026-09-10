@@ -190,6 +190,7 @@ def install_schedule(root):
         "backend/shared/tushare_credit_extra_contracts.py",
         "backend/shared/tushare_etf_basket_contracts.py",
         "backend/shared/tushare_connect_contracts.py",
+        "backend/shared/tushare_legacy_connect_contracts.py",
         "backend/shared/tushare_trading_event_contracts.py",
         "backend/shared/tushare_listing_extra_contracts.py",
         "backend/shared/tushare_limit_extra_contracts.py",
