@@ -1,0 +1,137 @@
+{
+  "candidate": {
+    "behavior": "Retry pypdf once with strict=false only after PdfReadError; record lenient_fallback and the strict error type.",
+    "database_changes": false,
+    "download_concurrency_changes": false,
+    "failure_behavior": "If the lenient attempt also fails, parse_status remains parse_failed with both final and strict error types.",
+    "normal_pdf_output_changed": false,
+    "task_timeout_changes": false
+  },
+  "limitations": [
+    "The recent-attempt sample is bounded and is not an estimate of the full 93-document parse_failed population.",
+    "Three of the four sampled current PdfReadError documents have parse_tries=5, so this candidate does not requeue them or alter retry exhaustion.",
+    "Two larger parser_process_failed samples parsed in the local extraction core but remain unresolved because production process startup and the existing 15-second boundary are material; the candidate does not change that boundary.",
+    "The four recovered retained samples have valid page trees but no pypdf-extractable text; they remain explicit no_text results rather than parsed documents. OCR is outside this candidate."
+  ],
+  "production_readonly": {
+    "query": {
+      "busy_timeout_ms": 0,
+      "connection": "SQLite URI mode=ro, isolation_level=None, query_only=ON",
+      "progress_deadline_seconds": 3,
+      "rows": 5000,
+      "selection": "document_attempts ORDER BY id DESC LIMIT 5000; current documents fetched only by primary key"
+    },
+    "recent_attempt_statuses": {
+      "encrypted": 1,
+      "no_text": 88,
+      "parse_failed": 52,
+      "parse_timeout": 47,
+      "parsed": 2105
+    },
+    "recent_current_failure_sample": {
+      "PdfReadError": 4,
+      "parse_timeout": 3,
+      "parser_process_failed": 9,
+      "unique_documents": 16
+    },
+    "worker_status": {
+      "counts": {
+        "blocked_not_attempted": 3019,
+        "downloaded_encrypted": 19,
+        "downloaded_no_text": 751,
+        "downloaded_not_applicable": 271,
+        "downloaded_parse_failed": 93,
+        "downloaded_parse_timeout": 24,
+        "downloaded_parsed": 17179,
+        "pending_not_attempted": 1075704,
+        "retry_not_attempted": 2
+      },
+      "download_workers": 2,
+      "elapsed_seconds": 91.812,
+      "phase_counts": {
+        "download": 24,
+        "parse": 20
+      },
+      "timing_seconds": {
+        "claim_db_total": 1.647761,
+        "claim_db_wait": 0.000948,
+        "download_jobs_total": 40.049209,
+        "download_slot_capacity": 82.951081,
+        "download_slot_idle": 42.901872,
+        "download_wave_wall": 41.475541,
+        "finish_db_total": 8.240009,
+        "finish_db_wait": 8.138266,
+        "parse_jobs_total": 46.945205
+      },
+      "updated_at": "2026-09-10T06:56:56.016465+00:00"
+    }
+  },
+  "representative_benchmark": {
+    "environment": "Mac isolated worktree, Python 3.10, pypdf 6.17.0; retained production PDFs copied read-only to /tmp and SHA-256 verified; no document text emitted or committed",
+    "retained_samples": [
+      {
+        "bytes": 953045,
+        "candidate_page_count": 3,
+        "candidate_parse_status": "no_text",
+        "candidate_parser_mode": "lenient_fallback",
+        "candidate_seconds": 0.029083,
+        "raw_sha_unchanged": true,
+        "sha256": "039ef73d2e08c2a55002f09efe7e84a18ee447c8457f2e7f5cecfe96bfbefb87",
+        "strict_result": "PdfReadError"
+      },
+      {
+        "bytes": 1934029,
+        "candidate_page_count": 7,
+        "candidate_parse_status": "no_text",
+        "candidate_parser_mode": "lenient_fallback",
+        "candidate_seconds": 0.001933,
+        "raw_sha_unchanged": true,
+        "sha256": "2123f69d42ab949c93533d58ea9a82f79c207c73c26984caf2769562dd8ff465",
+        "strict_result": "PdfReadError"
+      },
+      {
+        "bytes": 963535,
+        "candidate_page_count": 3,
+        "candidate_parse_status": "no_text",
+        "candidate_parser_mode": "lenient_fallback",
+        "candidate_seconds": 0.000937,
+        "raw_sha_unchanged": true,
+        "sha256": "4469b060a2a153830aa4d40fa367d7a22543238857db6a59ad566f01d65810dd",
+        "strict_result": "PdfReadError"
+      },
+      {
+        "bytes": 3214299,
+        "candidate_page_count": 4,
+        "candidate_parse_status": "no_text",
+        "candidate_parser_mode": "lenient_fallback",
+        "candidate_seconds": 0.001412,
+        "raw_sha_unchanged": true,
+        "sha256": "5fb4fc43635a0b0e7e44f52549b5fd742891b79787d74d271749e2bb5ca0de90",
+        "strict_result": "PdfReadError"
+      },
+      {
+        "bytes": 6384851,
+        "candidate_page_count": 382,
+        "candidate_parse_status": "parsed",
+        "candidate_parser_mode": "strict",
+        "candidate_seconds": 5.36674,
+        "raw_sha_unchanged": true,
+        "sha256": "8d3202be6f4c4897a9d00c9a27a7c9db715efcf77bf6c5ea4f68116a45c35e83",
+        "strict_result": "parsed"
+      },
+      {
+        "bytes": 5368526,
+        "candidate_page_count": 292,
+        "candidate_parse_status": "parsed",
+        "candidate_parser_mode": "strict",
+        "candidate_seconds": 4.901021,
+        "raw_sha_unchanged": true,
+        "sha256": "9e83765c93b7c067919e5fceca322f59a831f0cac8b83fe44206434748629370",
+        "strict_result": "parsed"
+      }
+    ],
+    "synthetic_regression": "A generated two-page PDF with a one-byte-invalid startxref fails strict parsing, succeeds through the fallback with both page texts, produces an immutable extracted artifact, and repeats with the same file inventory."
+  },
+  "scope": "Tushare retained-document parse failure closure",
+  "source_revision": "bec7e6aa9fcf6c94ba443dc9976478268c3dccee"
+}

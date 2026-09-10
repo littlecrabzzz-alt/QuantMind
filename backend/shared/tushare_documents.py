@@ -177,6 +177,39 @@ def _parse_worker(path):
     return _extract_pdf(path)
 
 
+def _extract_pdf_reader(pypdf, path, *, strict):
+    reader = pypdf.PdfReader(path, strict=strict)
+    if reader.is_encrypted:
+        return {"parse_status": "encrypted", "pages": []}
+    page_count = len(reader.pages)
+    if page_count > MAX_PARSE_PAGES:
+        return {
+            "parse_status": "parse_limit",
+            "reason": "page_limit",
+            "page_count": page_count,
+        }
+    pages, size = [], 0
+    for number, page in enumerate(reader.pages, 1):
+        text = page.extract_text() or ""
+        size += len(text.encode("utf-8"))
+        if size > MAX_PARSE_TEXT_BYTES:
+            return {
+                "parse_status": "parse_limit",
+                "reason": "text_limit",
+                "page_count": page_count,
+            }
+        pages.append({"page_number": number, "text": text})
+    return {
+        "parse_status": "parsed"
+        if any(p["text"].strip() for p in pages)
+        else "no_text",
+        "page_count": page_count,
+        "pages": pages,
+        "parser": "pypdf",
+        "parser_version": pypdf.__version__,
+    }
+
+
 def _extract_pdf(path):
     """Extraction core; production callers must use the bounded worker."""
     try:
@@ -184,35 +217,20 @@ def _extract_pdf(path):
     except ImportError:
         return {"parse_status": "parse_unavailable", "reason": "pypdf_not_installed"}
     try:
-        reader = pypdf.PdfReader(path, strict=True)
-        if reader.is_encrypted:
-            return {"parse_status": "encrypted", "pages": []}
-        page_count = len(reader.pages)
-        if page_count > MAX_PARSE_PAGES:
+        return _extract_pdf_reader(pypdf, path, strict=True)
+    except pypdf.errors.PdfReadError as strict_error:
+        try:
+            result = _extract_pdf_reader(pypdf, path, strict=False)
+        except Exception as exc:
             return {
-                "parse_status": "parse_limit",
-                "reason": "page_limit",
-                "page_count": page_count,
+                "parse_status": "parse_failed",
+                "error_type": type(exc).__name__,
+                "strict_error_type": type(strict_error).__name__,
             }
-        pages, size = [], 0
-        for number, page in enumerate(reader.pages, 1):
-            text = page.extract_text() or ""
-            size += len(text.encode("utf-8"))
-            if size > MAX_PARSE_TEXT_BYTES:
-                return {
-                    "parse_status": "parse_limit",
-                    "reason": "text_limit",
-                    "page_count": page_count,
-                }
-            pages.append({"page_number": number, "text": text})
         return {
-            "parse_status": "parsed"
-            if any(p["text"].strip() for p in pages)
-            else "no_text",
-            "page_count": page_count,
-            "pages": pages,
-            "parser": "pypdf",
-            "parser_version": pypdf.__version__,
+            **result,
+            "parser_mode": "lenient_fallback",
+            "strict_error_type": type(strict_error).__name__,
         }
     except Exception as exc:
         return {"parse_status": "parse_failed", "error_type": type(exc).__name__}
