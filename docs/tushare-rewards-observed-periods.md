@@ -90,3 +90,11 @@ PYTHONPATH=scripts:. python -m unittest test_tushare_stock_context_invalid_ident
 专项命令：`PYTHONPATH=scripts:. python -m unittest test_tushare_rewards_period_append test_tushare_stock_context_invalid_identifiers test_tushare_rewards_observed_periods test_tushare_stock_context_pipeline test_tushare_planning_progress test_tushare_history_budget test_tushare_member_append_scope`。Python3.10共53项/1.846秒通过；隔离临时SQLite、MockTransport，socket/DNS/secret getter禁用。覆盖原快照未完即可追加、持续新增不饥饿、进程重开、稳定身份与父任务保持、关闭/未选/校验失败0追加、500上限及时间预算恢复。候选未部署、未改生产配置或队列，没有上游请求。
 
 该追加候选完整Python3.10 Tushare回归856项/42.721秒通过，`OK (skipped=5)`，日志 `/tmp/rewards-fast-append-full310.log`；Ruff与diff检查通过。
+
+### 追加 scope 必须先提交
+
+首轮生产规划在普通家族enqueue阶段触160秒软超时，末尾追加不能保证执行。基线4e4b58d的最小修复把内部stock_rewards_periods放在规划循环首位，其他PLANNERS/APPEND_PLANNERS的相对顺序完全不变。沿用原追加预算和独立checkpoint commit；不改初始化、来源发现、前置校验、配置、采集或发布。若在到达规划循环之前即超时，仍不能保证追加执行，本修复没有解决整个planning的160秒上界。
+
+新增两项回退对照：恢复旧末尾顺序时两项均失败；新顺序验证其余家族顺序保持，以及后续普通家族模拟耗时161秒并抛错后，通过独立SQLite只读连接确认追加任务和offset已经提交，原recent/history游标逐字段不变。专项55项/1.626秒通过，日志 `/tmp/rewards-append-first-target310.log`；旧顺序复现 `/tmp/rewards-append-first-before310.log`。全部隔离，不操作生产。
+
+优先级修复完整Python3.10回归865项/43.108秒通过，`OK (skipped=5)`，日志 `/tmp/rewards-append-first-full310.log`；Ruff与diff检查通过。

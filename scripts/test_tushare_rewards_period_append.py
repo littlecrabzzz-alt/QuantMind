@@ -3,6 +3,7 @@
 from copy import deepcopy
 from datetime import date
 import json
+import sqlite3
 from pathlib import Path
 import sys
 import unittest
@@ -218,6 +219,80 @@ class RewardAppend(unittest.TestCase):
             self.plan(ids, config)
         self.assertEqual(len(self.pairs()), 601)
         self.assertTrue(self.state(SCOPE)["done"])
+
+    def test_append_first_preserves_all_other_planner_relative_order(self):
+        calls = []
+        real_append = APPEND_PLANNERS["stock_rewards_periods"]
+
+        def append(config, today, ids):
+            calls.append("stock_rewards_periods")
+            yield from real_append(config, today, ids)
+
+        def empty(name):
+            def planner(config, today, ids):
+                calls.append(name)
+                return iter(())
+
+            return planner
+
+        # Named empty fixtures isolate sequence from each family's data contract.
+        normal = {name: empty(name) for name in ("prior_first", "prior_second")}
+        extra = {"prior_append": empty("prior_append"), "stock_rewards_periods": append}
+        config = {
+            **CONFIG,
+            **{"enable_" + name: True for name in (*normal, "prior_append")},
+        }
+        with (
+            patch.dict(module.PLANNERS, normal, clear=True),
+            patch.dict(module.APPEND_PLANNERS, extra, clear=True),
+        ):
+            self.plan(identifiers(["20251231"]), config)
+        self.assertEqual(
+            list(dict.fromkeys(calls)),
+            ["stock_rewards_periods", "prior_first", "prior_second", "prior_append"],
+        )
+
+    def test_slow_ordinary_failure_cannot_rollback_committed_append(self):
+        self.plan(identifiers(["20201231"]))
+        old_states = {
+            name: self.state(name)
+            for name in ("recent:stock_context", "history:stock_context")
+        }
+        clock = {"seconds": 0.0}
+
+        def slow_failure(config, today, ids):
+            # Deterministic elapsed time, no real sleep or source request.
+            clock["seconds"] += 161
+            raise TimeoutError("simulated ordinary-family soft deadline")
+            yield  # This error occurs at next(), like an expensive real stream.
+
+        with (
+            patch.dict(module.PLANNERS, {"stock_context": slow_failure}, clear=True),
+            patch.object(
+                module.time, "monotonic", side_effect=lambda: clock["seconds"]
+            ),
+        ):
+            with self.assertRaisesRegex(TimeoutError, "ordinary-family"):
+                self.plan(identifiers(["20201231", "20251231"]))
+        self.assertEqual(clock["seconds"], 161)
+        self.p.db.rollback()  # Discard anything the failing family did not commit.
+        with sqlite3.connect(
+            f"file:{self.root / 'pipeline.sqlite'}?mode=ro", uri=True
+        ) as observer:
+            # A separate connection proves durability, not same-transaction visibility.
+            row = observer.execute(
+                "SELECT offset,done FROM planning_state WHERE name=?", (SCOPE,)
+            ).fetchone()
+            self.assertEqual(row, (2, 0))  # Budget boundary; next round can mark done.
+            pairs = {
+                json.loads(r[0])["params"]["end_date"]
+                for r in observer.execute(
+                    "SELECT job FROM jobs WHERE epoch='history' AND json_extract(job,'$.api_name')='stk_rewards'"
+                )
+            }
+            self.assertEqual(pairs, {"20201231", "20251231"})
+        for name, state in old_states.items():
+            self.assertEqual(self.state(name), state)
 
 
 if __name__ == "__main__":

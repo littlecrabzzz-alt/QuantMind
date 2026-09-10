@@ -1736,7 +1736,10 @@ class Pipeline:
         ):
             raise ValueError("Invalid historical planner time limit")
         stats = {}
-        for family, planner in {**PLANNERS, **APPEND_PLANNERS}.items():
+        # Commit observed-period supplements before expensive ordinary families.
+        # Repeated dictionary keys keep their first insertion position.
+        planners = {"stock_rewards_periods": APPEND_PLANNERS["stock_rewards_periods"], **PLANNERS, **APPEND_PLANNERS}
+        for family, planner in planners.items():
             self.planning_timing["active_stage"] = family + ":policy"
             if family == "stock_rewards_periods":
                 if (
