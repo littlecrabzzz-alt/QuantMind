@@ -144,5 +144,46 @@
     "receipt_path": "/data/tushare/validation/financial-pit-batch-20260910/acceptance-batch-5.json",
     "receipt_sha256": "8f088af0b5ab123a8e41e04ddfe1d7fde66513e7b675c91b8f6597eeb4018881",
     "receipt_id": "99ee41ba70d640c66002dc2112f880b7fcfac8a452c40353bf974bea1872d733"
+  },
+  "sixth_batch": {
+    "executed_at": "2026-09-10T14:15:49Z",
+    "deployed_revision": "e57d3da38ece08403a34bf66f52b1c42f5117633",
+    "manifest_path": "/data/tushare/validation/financial-pit-batch-20260910/batch-6-manifest.json",
+    "manifest_sha256": "696ae5762b5294a5836ed30d0c9808a53e7cefa2b9b9658a39eb93e5334021e0",
+    "all_task_ids_sha256": "26648868abac02af8f78b46cb52a201287dd43bc4bab77e35207492082185360",
+    "authority_config_sha256": "da45afae322463eacd54a97203f2ede46a9ff86aafbb58e6bec26b57ea009853",
+    "helper_sha256": "7b2e40d3a4e7b4feda1ff50e1e3c8f07eb9c34931cd12e3122e3f7c104aa2658",
+    "verified_jobs": 360,
+    "upstream_calls": 360,
+    "elapsed_seconds": 49.49,
+    "api_results": {
+      "income_vip": {
+        "done": 115,
+        "empty": 5
+      },
+      "balancesheet_vip": {
+        "done": 115,
+        "empty": 5
+      },
+      "cashflow_vip": {
+        "done": 115,
+        "empty": 5
+      }
+    },
+    "release_published": false,
+    "current_release_switched": false,
+    "receipt_path": "/data/tushare/validation/financial-pit-batch-20260910/acceptance-batch-6.json",
+    "receipt_sha256": "77c30b102c78833aa90cbcc62fe5d698d75f47362803bf68bee195d2fd8d1289",
+    "receipt_id": "7e28c03de7d533ecfc3500f6aa1f39778ab336cfad246de3bfa7deae665cc51f",
+    "published_by_scheduled_pipeline_after_batch": true,
+    "release_after_scheduled_pipeline": "data-66f5a3d5084ac67a14240f56ebc0e4b9eb54fbdf3911cec06bfc7ca2f8da3ffb",
+    "publication_seconds": 246.873,
+    "mac_mirror_after_publication": {
+      "status": "verified",
+      "release_id": "data-66f5a3d5084ac67a14240f56ebc0e4b9eb54fbdf3911cec06bfc7ca2f8da3ffb",
+      "downloaded_files": 11645,
+      "verified_files": 646423,
+      "last_exit_code": 0
+    }
   }
 }

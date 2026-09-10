@@ -13,3 +13,5 @@ python3 scripts/audit_tushare_fixed_coverage.py \
 ```
 
 可用`--release-id data-...`固定旧输入。输出必须位于镜像根目录之外；脚本通过release ID校验manifest，不读取生产SQLite、Token或网络。
+
+2026-09-10T14:20Z 对云端固定版 `data-66f5a3d5084ac67a14240f56ebc0e4b9eb54fbdf3911cec06bfc7ca2f8da3ffb` 的离线对账结果为：代码注册243项、固定版规划243项、注册但未规划0项、已有可查询数据集193项、已规划但尚无数据集50项。后50项均保留各自的blocked、permission_blocked或合法empty证据，不能填充伪数据；明细见 `tushare-fixed-coverage-20260910T1420.evidence.json`。这个结果证明命名运行时接口都已进入规划口径，不证明其中任何一项的历史或PIT已经完整。
