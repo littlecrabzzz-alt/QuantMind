@@ -1848,7 +1848,12 @@ class Pipeline:
                 count, done = 0, False
                 attempted, inserted = 0, 0
                 stop_reason = "job_budget"
-                while (attempted if mode == "history" else count) < family_budget:
+                # Only this append scope budgets new jobs; existing history IDs
+                # still consume the shared scan/time bounds and advance offset.
+                while (
+                    inserted if family == "stock_rewards_periods"
+                    else attempted if mode == "history" else count
+                ) < family_budget:
                     if mode == "history":
                         if count >= history_scan_limit:
                             stop_reason = "scan_limit"
