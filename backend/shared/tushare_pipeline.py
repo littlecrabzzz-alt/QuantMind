@@ -3727,7 +3727,7 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                             release_id = current["release_id"]
                             if current.get("manifest_sha256") != release_id[5:]:
                                 raise ValueError("Current manifest identity mismatch")
-                            manifest_at(ROOT, release_id)
+                            verify_manifest_identity_at(ROOT, release_id)
                             publication["current_release_id"] = release_id
                             saved = pipeline.db.execute(
                                 "SELECT value FROM scheduler_state WHERE name='publish_success_at'"
@@ -3953,7 +3953,7 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                 atomic_json(ROOT / "pipeline-status.json", report)
 
 
-def manifest_at(root, release_id):
+def _manifest_path_at(root, release_id):
     if not re.fullmatch(r"data-[a-f0-9]{64}", release_id):
         raise ValueError("Invalid release ID")
     root = Path(root).resolve()
@@ -3964,6 +3964,21 @@ def manifest_at(root, release_id):
         path = root / "archives" / (release_id.removeprefix("data-") + ".json")
         if path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
             raise ValueError("Unsafe archived manifest path")
+    return path
+
+
+def verify_manifest_identity_at(root, release_id):
+    path = _manifest_path_at(root, release_id)
+    sha = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            sha.update(chunk)
+    if sha.hexdigest() != release_id.removeprefix("data-"):
+        raise ValueError("Manifest checksum mismatch")
+
+
+def manifest_at(root, release_id):
+    path = _manifest_path_at(root, release_id)
     raw = path.read_bytes()
     if digest(raw) != release_id.removeprefix("data-"):
         raise ValueError("Manifest checksum mismatch")

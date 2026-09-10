@@ -210,6 +210,15 @@ class PublicationInterval(unittest.TestCase):
             self.tick()
         self.assertEqual(self.checkpoint(), checkpoint)
 
+    def test_deferred_check_verifies_identity_without_parsing_manifest(self):
+        first = self.tick()["release_id"]
+        with patch.object(
+            module, "manifest_at", side_effect=AssertionError("must not parse")
+        ):
+            report = self.tick(120)
+        self.assertEqual(report["release_id"], first)
+        self.assertEqual(report["publication"]["status"], "deferred")
+
     def test_due_publish_needs_no_provider_token_client_or_planning(self):
         with (
             patch.object(
