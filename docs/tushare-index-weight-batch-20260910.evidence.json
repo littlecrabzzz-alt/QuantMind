@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "audited_at": "2026-09-10T11:50:00Z",
+  "authority": "lzy-vm:/root/data/disk/quantmind/project/data/tushare",
+  "authority_revision": "ca9fdaf3d655ab973dd921e5a90634fde68e42b0",
+  "authority_schema_version": 6,
+  "release_at_review": "data-14b0eaaeaae841ab728eaca5a3c6fbc79b63991cb5517716049e050b48c2e634",
+  "authority_config_sha256": "4ac7b38142097cda4af50dfadb00093fd635d5fd37859d68ee9632800d1e21d9",
+  "disk_free_bytes": 153101168640,
+  "rate_policy": {
+    "effective_account_rpm": 500,
+    "resolved_api_rpm": 500,
+    "source": "points_regular_allowlist_doc290",
+    "review_required": false,
+    "reported_points": 10100,
+    "points_expiry_notice": "2000 points expire 2026-12-05; expected balance 8100"
+  },
+  "runtime_capability": {
+    "scope": "index_weight:",
+    "status": "available",
+    "checked_at": "2026-09-10T11:39:34.652088+00:00",
+    "evidence": "312 empty and 90 possibly_truncated retained upstream attempts"
+  },
+  "queue": {
+    "all_epochs": {
+      "empty": 312,
+      "pending": 96849,
+      "split_pending": 90,
+      "pending_indexes": 9551,
+      "request_start_min": "19900101",
+      "request_end_max": "20260908"
+    },
+    "history": {
+      "empty": 1,
+      "pending": 87497,
+      "split_pending": 90,
+      "pending_indexes": 199,
+      "suffix_indexes": {"CSI": 54, "SH": 145},
+      "request_start_min": "19900101",
+      "request_end_max": "20260901"
+    },
+    "recent_20260909": {"empty": 310, "pending": 9352}
+  },
+  "retained_attempts": {
+    "empty_unverified": 312,
+    "possibly_truncated": 90,
+    "saturated_request_index": "000001.SH",
+    "saturated_requested_start_min": "20190301",
+    "saturated_requested_end_max": "20260831",
+    "saturated_rows_min": 1493,
+    "saturated_rows_max": 2251,
+    "partition_splits": 90,
+    "partition_expected_children": 180,
+    "partition_status": "gap"
+  },
+  "candidate": {
+    "status": "prepared_not_executed",
+    "cloud_path": "/tmp/tushare-index-weight-batch-20260910T1200Z.json",
+    "manifest_bytes": 190398,
+    "manifest_sha256": "526027196072ab9d51a6303de81cdfcdcadcb09d0b6c742ac0dda89fb00923c1",
+    "all_task_ids_sha256": "8342c8d55a5b642608d5316f99256297893a758d09b9b2759459c46f1c4ae784",
+    "prepare_helper_sha256": "be8d9847bb85ff0c9a7f95187f12ea8c0a165a7ee3134ea0539364fd1567e52f",
+    "runner_helper_sha256": "c210a1d1cc48e4607c82d880649bffa389dfe4cb713c77b2a36df3f2e7f758cf",
+    "source_pending_jobs": 87870,
+    "source_pending_indexes": 200,
+    "jobs": 360,
+    "indexes": 200,
+    "requests_per_index_counts": {"1": 40, "2": 160},
+    "suffix_counts": {"CSI": 110, "SH": 250},
+    "request_start_min": "20260801",
+    "request_end_max": "20260901",
+    "estimated_seconds": {"lower_bound": 43.2, "acceptance_range": [45, 90], "hard_limit": 90},
+    "estimated_retained_mib": {"median_projection": 58.5, "p95_projection": 65.7, "reserve": 100}
+  },
+  "execution_contract": {
+    "default_plan_only": true,
+    "max_upstream_calls": 360,
+    "max_seconds": 90,
+    "minimum_free_gib": 100,
+    "exact_task_scope": true,
+    "publishes_release": false,
+    "switches_current": false
+  },
+  "boundaries": {
+    "history_start_is_request_scope_not_verified_availability": true,
+    "index_universe_complete": false,
+    "known_at_verified": false,
+    "single_index_single_day_saturation_proves_coverage": false,
+    "research_ready": false
+  },
+  "sensitive_content": {
+    "token": false,
+    "payment_or_order": false,
+    "upstream_response_body": false
+  }
+}
