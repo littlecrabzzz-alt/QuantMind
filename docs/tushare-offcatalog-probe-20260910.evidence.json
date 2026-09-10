@@ -26,5 +26,26 @@
     {"api_name": "fund_sales_vol", "status": "api_error", "observation_sha256": "e57b2944bac901485925898ce2d1c3d889de7186125251da27717b670c2ffa13"}
   ],
   "decision": "Keep all eight contracts registered and disabled. The sampled provider endpoint rejected every reviewed API name; this is neither a permission denial nor evidence that historical data never existed.",
+  "publication": {
+    "mode": "publish_only",
+    "upstream_calls": 0,
+    "release_id": "data-4eda061875363dca00d51bd58ca4ca54c0ae23628410b5e055e79a9e1aa2c339",
+    "automatic_celery_attempt_hit_soft_limit": true,
+    "bounded_probe_data_preserved_before_manual_publish": true
+  },
+  "mac_mirror": {
+    "status": "verified",
+    "release_id": "data-4eda061875363dca00d51bd58ca4ca54c0ae23628410b5e055e79a9e1aa2c339",
+    "downloaded_files": 928,
+    "manifest_files": 559787,
+    "offline_observation_sha_checks": 8,
+    "offline_object_sha_checks": 1,
+    "network_access_during_offline_verification": false
+  },
+  "mirror_client_followup": {
+    "commit": "56585dfcdfc057cfa88536f316e329667d7b1218",
+    "issue": "The installed client copy list omitted tushare_legacy_connect_contracts.py.",
+    "result": "The missing module is copied and the isolated installed entrypoint imports successfully."
+  },
   "sensitive_data_included": false
 }

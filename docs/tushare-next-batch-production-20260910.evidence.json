@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-10T14:49:00+08:00",
+  "git": {
+    "master_head": "56585dfcdfc057cfa88536f316e329667d7b1218",
+    "cloud_source_digest": "0fc6d098496c44ec479e8f1778f2a26bf9954444052701befb54282d4c87abdc"
+  },
+  "verification": {
+    "python": "3.10.19",
+    "tushare_tests_passed": 939,
+    "tushare_tests_skipped": 5,
+    "mirror_install_tests_passed": 7,
+    "ruff_passed": true,
+    "json_and_diff_checks_passed": true
+  },
+  "rate_policy": {
+    "config_sha256": "4ac7b38142097cda4af50dfadb00093fd635d5fd37859d68ee9632800d1e21d9",
+    "policy": "tiered_v1",
+    "account_ceiling_rpm": 500,
+    "rollout_account_rpm": 500,
+    "planning_interval_seconds": 900,
+    "existing_500_tier_acceptance_sha256": "dcc7abb4414a7e119ff84799df55b4fbc7e726285921f5b02754e4e1f04f14d9",
+    "entitlement_expiry_reminder_active": true,
+    "points_expiry_date": "2026-12-05",
+    "expected_points_after_expiry": 8100,
+    "cyq_perf_daily_cap_retained": true
+  },
+  "post_deploy_real_batches": [
+    {
+      "task_id": "a77ca6ea-5792-4fe6-b2db-5db67988794f",
+      "requests": 360,
+      "request_window_seconds": 60.526,
+      "effective_requests_per_minute": 356.87,
+      "acquire_stage_seconds": 61.3660454005003,
+      "total_seconds": 82.37299232929945,
+      "failed_stage": null
+    },
+    {
+      "task_id": "984e218a-44ba-49b4-b496-d2e10547da3a",
+      "requests": 360,
+      "request_window_seconds": 63.664,
+      "effective_requests_per_minute": 339.28,
+      "acquire_stage_seconds": 64.61557904817164,
+      "total_seconds": 86.61451253667474,
+      "failed_stage": null
+    }
+  ],
+  "recent_attempts": {
+    "window": 1000,
+    "http_200": 1000,
+    "rate_limited": 0,
+    "status_counts": {
+      "sample_ok": 504,
+      "empty_unverified": 436,
+      "api_error": 36,
+      "possibly_truncated": 22,
+      "schema_gap": 2
+    }
+  },
+  "offcatalog_probe": {
+    "report_sha256": "745925821b4f928cb9baac0c7ae4ee2c34fc16ae2066ded4c02a019941d7c7a2",
+    "actual_calls": 8,
+    "max_calls": 11,
+    "result": "all_supplier_api_name_rejected",
+    "enabled": false,
+    "first_fixed_release": "data-4eda061875363dca00d51bd58ca4ca54c0ae23628410b5e055e79a9e1aa2c339"
+  },
+  "public_contract_scope": {
+    "frozen_named_capabilities": 249,
+    "runtime_readable": 243,
+    "nonruntime": 6,
+    "new_default_off": [
+      "rt_min",
+      "rt_etf_min",
+      "rt_etf_min_daily",
+      "tmt_twincome",
+      "tmt_twincomedetail"
+    ],
+    "remaining_public_read_contract_blocker": "ggt_monthly"
+  },
+  "rrg_imported_batch": {
+    "jobs": 1767,
+    "found": 1767,
+    "fund_div": {"empty": 4, "pending": 1714},
+    "etf_limit": {"split_pending": 6, "pending": 43},
+    "priority_24": 1765,
+    "preserved_completed_priority_25": 2,
+    "rrg_status": "blocked_data"
+  },
+  "fixed_mirror": {
+    "cloud_release_id": "data-d92680d004c2633d88288d9a53d965178ca811b3371b68965d4753c3a9ef90fd",
+    "mac_release_id": "data-d92680d004c2633d88288d9a53d965178ca811b3371b68965d4753c3a9ef90fd",
+    "downloaded_files": 2139,
+    "manifest_files": 561927,
+    "mac_size": "70G",
+    "offline_probe_object_and_observations_verified": true
+  },
+  "runtime": {
+    "quantmind": "healthy",
+    "tushare_worker": "healthy",
+    "tushare_document_worker": "healthy",
+    "queue_ownership": {
+      "tushare_worker": ["tushare_acquire"],
+      "tushare_document_worker": ["tushare_documents"],
+      "research_worker": ["research"],
+      "general_worker": ["qlib_backtest_srv"]
+    },
+    "authority_size": "83G",
+    "disk_available_bytes": 160741429248,
+    "stop_threshold_bytes": 107374182400
+  },
+  "limits": [
+    "Effective batch rate is below the 500 rpm ceiling because API-specific gates and response latency remain binding.",
+    "The eight rejected legacy/off-catalog names remain evidence, not available datasets or permission denials.",
+    "RRG remains blocked by authoritative member known_at, versioned mapping, price/tradability gaps and point-in-time evidence.",
+    "Complete history, revisions, attachment terminal states and the remaining ggt_monthly contract are still open."
+  ],
+  "sensitive_data_included": false
+}
