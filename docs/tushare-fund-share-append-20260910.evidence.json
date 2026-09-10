@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "audited_at": "2026-09-10T13:42:00Z",
+  "authority": "lzy-vm:/root/data/disk/quantmind/project/data/tushare",
+  "deployed_revision": "8a9e5dfb5e44a436d82b1321cc1fe435b95a8652",
+  "candidate": {
+    "status": "prepared_not_executed",
+    "jobs": 26788,
+    "new_jobs_at_audit": 26788,
+    "markets": {"SH": 13394, "SZ": 13394},
+    "trade_date_min": "19900101",
+    "trade_date_max": "20260902",
+    "task_ids_sha256": "44088911b86a7b59a72b230cb4c3eb06a73a8c50dae230d42fbbee9070409243",
+    "authority_writes": 0,
+    "upstream_calls": 0,
+    "credentials_read": false
+  },
+  "production_execution": {
+    "config_sha256": "da45afae322463eacd54a97203f2ede46a9ff86aafbb58e6bec26b57ea009853",
+    "first_helper": {
+      "sha256": "012f7614229c3e426e0ec8120ec4a0139072d2941b68d7cbf7cad84d0c894ed9",
+      "status": "failed_after_committed_round",
+      "committed_new_jobs": 500,
+      "offset_after": 500,
+      "upstream_calls": 0
+    },
+    "v2_helper": {
+      "sha256": "4cfab98a383001089355282449b002ca6bbff53cf72362bcd8d0cbe599f09158",
+      "rounds": 53,
+      "before": {"pending": 500},
+      "after": {"pending": 26788},
+      "planning_state_after": {"offset": 26788, "done": true},
+      "receipt_path": "/data/tushare/validation/fund-share-append-20260910/acceptance-v2.json",
+      "receipt_sha256": "a337c4e90e4d0f250cff290ebba08c5a5c11c75a85df68a115f48416f067c00a",
+      "upstream_calls": 0,
+      "credentials_read": false,
+      "release_published": false,
+      "current_switched": false
+    },
+    "first_consumption_observation": {
+      "observed_at": "2026-09-10T13:42:00Z",
+      "all_epochs": {"done": 12, "empty": 4, "pending": 26787}
+    }
+  },
+  "validation": {
+    "mac_related_tests": 44,
+    "mac_result": "passed",
+    "cloud_python": "3.10",
+    "cloud_full_tests": 985,
+    "cloud_full_seconds": 180.631,
+    "cloud_full_result": "passed_at_4_cpu",
+    "cloud_2_cpu_resource_observation": "one existing time-budget test returned 3 rather than 5 requests; focused rerun passed",
+    "ruff": "passed",
+    "git_diff_check": "passed"
+  },
+  "boundaries": {
+    "history_start_is_request_scope_not_verified_availability": true,
+    "supplier_history_complete": false,
+    "known_at_verified": false,
+    "planning_complete_is_data_complete": false
+  },
+  "sensitive_content": {"token": false, "upstream_response_body": false}
+}

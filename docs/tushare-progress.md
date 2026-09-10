@@ -576,3 +576,10 @@
 - `fund_nav`有效批次在49.349秒内完成360次请求，得到165 done/53 empty/142 split_pending；`index_weight`在46.728秒内完成360次，得到139 done/204 empty/17 split_pending。两批合720次，共享500rpm账户闸门、接口限速、100GiB停采线和不发布契约；无配置或CURRENT竞态。
 - `history:equity_announcements`一轮正常规划新增500，随后两轮断网、锁内有界规划再新增500/281，最终offset1323/done1。三接口合计1332任务：8 done/54 empty/1270 pending，已恢复常驻消费。两批数据已由192.183秒发布进入`data-3eee75afb22ae4bea72b9ac5826e6bea6b7d98f0f2e600adfd1b04f11677c2e1`；Mac新增1994文件、完整校验626068文件并原子追平。
 - 三个专属服务healthy、GitHub/Mac/云端源码均为`a4a5595d`。生产可用空闲151496171520字节，最新80分钟趋势估计26.938小时后触及100GiB线，仍是`reserve_within_72h_at_observed_trend`警告。扩至至少1TiB的云厂商侧操作待外部控制面/API执行；采集不缩范围，并由100GiB硬保护自动停领。RRG的成员known_at、版本化ETF行业映射、权威可交易分类和PCF时点仍未闭合，继续`blocked_data`。
+
+## 2026-09-10 21:42 基金份额历史规划、第五批财务三表与容量缓解
+
+- `8a9e5dfb`新增独立 `history:fund_share_history`，不重置未完成的 `history:market`。断网候选固定19900101—20260902日×沪深共26788个任务及集合SHA；部署后首helper提交500项再因报告字段读取错误退出，v2从offset500幂等继续53轮，最终offset26788/done1、26788 pending。两helper均保留，上游/凭据/发布/CURRENT均为0；常驻worker恢复后已开始消费。
+- 第五个三表精确批次固定20260630、report type 1的120个共同股票，三API各120。62.104秒完成360次真实调用，各API均116 done/4 empty，批内0 pending；配置和CURRENT未变、未发布。manifest SHA `6012834024373909222a59b83cdc4440f64b997021f7e633d7991cfa55ef9460`，收据 SHA `8f088af0b5ab123a8e41e04ddfe1d7fde66513e7b675c91b8f6597eeb4018881`。
+- 容量复核确认当前全量manifest为230623171字节；同一旧版在release和archive路径共享inode（link count 2），每次发布的物理新增约一份manifest，不能按两条路径重复计算。按近20—22分钟一版约占短窗1.8GB/小时增长的35%—40%，仍是可压缩的显著来源；文档另有约109.5万pending。生产发布间隔已从900秒原子改为3600秒，账户500rpm、360请求/90秒、规划、镜像和100GiB硬停线均未改；配置SHA由 `4ac7b381…` 变为 `da45afae…`。当前文档批次自然结束后已暂停文档worker，保留全部队列/原文；结构化采集和Beat恢复healthy。扩盘完成并复核后再恢复文档消费。
+- 候选在Mac相邻44项通过；云端生产镜像、断网、只读源码、4CPU下985项完整Tushare回归180.631秒通过。2CPU全套仅一项既有时间预算测试偶发少完成2个请求，单项与新追加3项重跑均通过。RRG只读复核确认PCF历史队列已在推进，但现有Tushare接口仍不能补出成员known_at、历史ETF行业映射、权威可交易分类或PCF公布时间/修订/权重分母；继续保持blocked_data并停止重复拉相同缺价范围。

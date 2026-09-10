@@ -121,5 +121,49 @@
       "reserve_within_72h_at_observed_trend"
     ],
     "interpretation": "The window includes large publications and exact batches; it is an actionable expansion warning, not a steady-state growth estimate."
+  },
+  "capacity_mitigation": {
+    "observed_at": "2026-09-10T13:42:00Z",
+    "finding": {
+      "current_manifest_bytes": 230623171,
+      "previous_release_manifest_inode": 16123245,
+      "previous_archive_manifest_inode": 16123245,
+      "previous_manifest_link_count": 2,
+      "release_archive_paths_share_inode": true,
+      "release_archive_separate_apparent_bytes": 53030336896,
+      "release_archive_combined_unique_bytes": 30592541720,
+      "per_publication_physical_manifest_bytes_estimate": 230623171,
+      "estimated_manifest_share_of_short_window_growth": "35_to_40_percent",
+      "document_pending_estimate": 1095000,
+      "interpretation": "Release and archive paths for the same sealed manifest are hard links. Count one physical manifest per publication, not two."
+    },
+    "config_change": {
+      "publish_interval_seconds": {
+        "before": 900,
+        "after": 3600
+      },
+      "before_config_sha256": "4ac7b38142097cda4af50dfadb00093fd635d5fd37859d68ee9632800d1e21d9",
+      "after_config_sha256": "da45afae322463eacd54a97203f2ede46a9ff86aafbb58e6bec26b57ea009853",
+      "receipt_path": "/data/tushare/validation/capacity-publish-interval-20260910/acceptance.json",
+      "receipt_sha256": "d3622b3431bf75dd97d6a5452f1cd2a7d7ee4db9b36b72c55d9ded5167bc1f14"
+    },
+    "document_worker": "stopped_after_current_task_completed",
+    "tushare_worker": "healthy_and_active",
+    "celery_beat": "healthy_and_active",
+    "unchanged": {
+      "account_rpm": 500,
+      "batch_requests": 360,
+      "batch_seconds": 90,
+      "reserve_bytes": 107374182400,
+      "planning_interval_seconds": 900,
+      "mac_mirror_interval_seconds": 900
+    },
+    "boundaries": {
+      "deleted_data": false,
+      "dropped_queue_items": false,
+      "reduced_api_scope": false,
+      "cloud_volume_expanded": false,
+      "document_processing_resume_requires_capacity_recheck": true
+    }
   }
 }

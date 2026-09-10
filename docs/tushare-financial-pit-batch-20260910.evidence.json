@@ -15,9 +15,21 @@
   "upstream_calls": 360,
   "elapsed_seconds": 48.807,
   "api_results": {
-    "income_vip": {"requests": 120, "done": 102, "empty": 18},
-    "balancesheet_vip": {"requests": 120, "done": 104, "empty": 16},
-    "cashflow_vip": {"requests": 120, "done": 102, "empty": 18}
+    "income_vip": {
+      "requests": 120,
+      "done": 102,
+      "empty": 18
+    },
+    "balancesheet_vip": {
+      "requests": 120,
+      "done": 104,
+      "empty": 16
+    },
+    "cashflow_vip": {
+      "requests": 120,
+      "done": 102,
+      "empty": 18
+    }
   },
   "release_published_by_batch": false,
   "current_release_switched_by_batch": false,
@@ -37,8 +49,16 @@
       "batch_manifest_sha256": "60289943b1cff0625d0c9e77dd8de9d7646a8b4593b3f397980deb225da42d80",
       "all_task_ids_sha256": "db050c8702a9d5a7ec31e9fa94ab2986e790fa3b32093961a462387028f5e0bf",
       "attempt_windows": [
-        {"upstream_calls": 255, "elapsed_seconds": 90.072, "acceptance_sha256": "f7dd6e6de646a8714d271923f1e803bc2fdb88d0810a45845ad68ebc30d56147"},
-        {"upstream_calls": 106, "elapsed_seconds": 48.136, "acceptance_sha256": "dd37165de10615d6a081d8ee1140a308755a17cdc091ec7838c830c29dbbdb0b"}
+        {
+          "upstream_calls": 255,
+          "elapsed_seconds": 90.072,
+          "acceptance_sha256": "f7dd6e6de646a8714d271923f1e803bc2fdb88d0810a45845ad68ebc30d56147"
+        },
+        {
+          "upstream_calls": 106,
+          "elapsed_seconds": 48.136,
+          "acceptance_sha256": "dd37165de10615d6a081d8ee1140a308755a17cdc091ec7838c830c29dbbdb0b"
+        }
       ],
       "done": 303,
       "empty": 57,
@@ -93,5 +113,36 @@
     "token": false,
     "payment_or_order": false,
     "upstream_response_body": false
+  },
+  "fifth_batch": {
+    "executed_at": "2026-09-10T13:40:00Z",
+    "deployed_revision": "8a9e5dfb5e44a436d82b1321cc1fe435b95a8652",
+    "manifest_path": "/data/tushare/validation/financial-pit-batch-20260910/batch-5-manifest.json",
+    "manifest_sha256": "6012834024373909222a59b83cdc4440f64b997021f7e633d7991cfa55ef9460",
+    "all_task_ids_sha256": "ed82db2413356a7bf6bcafbc46bd172c1a133431f9bb7f59a3b5ebca3abbe53d",
+    "authority_config_sha256": "da45afae322463eacd54a97203f2ede46a9ff86aafbb58e6bec26b57ea009853",
+    "helper_sha256": "7b2e40d3a4e7b4feda1ff50e1e3c8f07eb9c34931cd12e3122e3f7c104aa2658",
+    "verified_jobs": 360,
+    "upstream_calls": 360,
+    "elapsed_seconds": 62.104,
+    "api_results": {
+      "income_vip": {
+        "done": 116,
+        "empty": 4
+      },
+      "balancesheet_vip": {
+        "done": 116,
+        "empty": 4
+      },
+      "cashflow_vip": {
+        "done": 116,
+        "empty": 4
+      }
+    },
+    "release_published": false,
+    "current_release_switched": false,
+    "receipt_path": "/data/tushare/validation/financial-pit-batch-20260910/acceptance-batch-5.json",
+    "receipt_sha256": "8f088af0b5ab123a8e41e04ddfe1d7fde66513e7b675c91b8f6597eeb4018881",
+    "receipt_id": "99ee41ba70d640c66002dc2112f880b7fcfac8a452c40353bf974bea1872d733"
   }
 }
