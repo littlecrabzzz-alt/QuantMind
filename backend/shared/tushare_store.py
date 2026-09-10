@@ -868,6 +868,7 @@ def _query(
             not isinstance(c, str) or not c for c in codes
         ):
             raise ValueError("codes must contain stored identifiers")
+        column = _identifier(code_field, columns)
         mapping_source = code_field in ("o_code", "n_code") and {
             "o_code",
             "n_code",
@@ -879,15 +880,11 @@ def _query(
             )
             and code_field in ("ts_code", "con_code", "leading_code")
         )
-        asset_source = (
-            (api_name in CROSS_ASSET_RUNTIME_CONTRACTS or api_name in BOND_EXTRA_RUNTIME_CONTRACTS)
-            and code_field == "source_ts_code"
-        )
-        if not (mapping_source or concept_source or asset_source) and any(
+        source_identifier = code_field.startswith("source_")
+        if not (mapping_source or concept_source or source_identifier) and any(
             re.fullmatch(r"[0-9]{6}\.(SH|SZ|BJ)", c) for c in codes
         ):
             raise ValueError("Use internal prefix stock codes, for example SH600036")
-        column = _identifier(code_field, columns)
         filters.append(
             column + " IN (" + ",".join("?" for _ in codes) + ")" if codes else "false"
         )
