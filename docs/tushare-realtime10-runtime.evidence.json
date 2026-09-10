@@ -1,0 +1,279 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-09-10T03:25:08.387194+00:00",
+  "scope": "Exact per-API bounded runtime permission evidence; no family or sibling inference.",
+  "source_seed_release_id": "data-2c8715f9920400555ccab3f739c982938cb127f72db1a1c6c0bb18378b6f1662",
+  "fixed_release_id": "data-95fde4b44d540739be6f42f622c8ef331a6e565833f213b36202308e8dd71f1b",
+  "probe_report": "/data/tushare/validation/realtime-probe-20260910/probe.json",
+  "probe_report_sha256": "62ee99ff5b802b29d05a019ad8e8f40bca106f18071c21b40f02caad2f1a93a9",
+  "cloud_fixed_evidence": "/data/tushare/validation/realtime-probe-20260910/cloud-fixed.json",
+  "cloud_fixed_evidence_sha256": "f3fb4f999fb11fc677d7b1130c34ffd8e29ce61c4b52b2f0db3f96f212ab8b50",
+  "cloud_status": "verified_with_gaps",
+  "equivalence_sha256": "aa1d32970e6c0a507c78c0844ed85d0bb97b1f379ac54bc43c42ef42fdaf2fa2",
+  "planned_requests": 15,
+  "actual_upstream_calls": 10,
+  "automatic_activation_permitted": false,
+  "configuration_changed": false,
+  "apis": [
+    {
+      "path": "/data/tushare/validation/realtime-probe-20260910/probe.json",
+      "probe_report_sha256": "62ee99ff5b802b29d05a019ad8e8f40bca106f18071c21b40f02caad2f1a93a9",
+      "fixed_release_id": "data-95fde4b44d540739be6f42f622c8ef331a6e565833f213b36202308e8dd71f1b",
+      "cloud_fixed_evidence": "/data/tushare/validation/realtime-probe-20260910/cloud-fixed.json",
+      "cloud_fixed_evidence_sha256": "f3fb4f999fb11fc677d7b1130c34ffd8e29ce61c4b52b2f0db3f96f212ab8b50",
+      "offline_status": "verified_with_gaps",
+      "equivalence_sha256": "aa1d32970e6c0a507c78c0844ed85d0bb97b1f379ac54bc43c42ef42fdaf2fa2",
+      "checked_at": "2026-09-10T03:25:08.387194+00:00",
+      "enabled": false,
+      "automatic_activation_permitted": false,
+      "history_complete": false,
+      "pit_verified": false,
+      "api_name": "stk_auction",
+      "status": "permission_denied",
+      "sample_rows": 0,
+      "sample_requests": [
+        {
+          "trade_date": "20260909",
+          "ts_code": "000001.SZ"
+        }
+      ],
+      "observation": "580d184eeef446a59dc204b973399fd8.json",
+      "observation_sha256": "515335a76c980ef9cb1e00d0a8872dc60cdd5c8bf626b932f636e87530b771ca",
+      "object_sha256": "fe3dd5df16a0b7fbe4ed9ccbc04853efc22fa0a4fed21e2a636903a85a703a4f"
+    },
+    {
+      "path": "/data/tushare/validation/realtime-probe-20260910/probe.json",
+      "probe_report_sha256": "62ee99ff5b802b29d05a019ad8e8f40bca106f18071c21b40f02caad2f1a93a9",
+      "fixed_release_id": "data-95fde4b44d540739be6f42f622c8ef331a6e565833f213b36202308e8dd71f1b",
+      "cloud_fixed_evidence": "/data/tushare/validation/realtime-probe-20260910/cloud-fixed.json",
+      "cloud_fixed_evidence_sha256": "f3fb4f999fb11fc677d7b1130c34ffd8e29ce61c4b52b2f0db3f96f212ab8b50",
+      "offline_status": "verified_with_gaps",
+      "equivalence_sha256": "aa1d32970e6c0a507c78c0844ed85d0bb97b1f379ac54bc43c42ef42fdaf2fa2",
+      "checked_at": "2026-09-10T03:25:08.387194+00:00",
+      "enabled": false,
+      "automatic_activation_permitted": false,
+      "history_complete": false,
+      "pit_verified": false,
+      "api_name": "rt_etf_sz_iopv",
+      "status": "permission_denied",
+      "sample_rows": 0,
+      "sample_requests": [
+        {
+          "ts_code": "159915.SZ"
+        }
+      ],
+      "observation": "bab6bda8633140c696811f65971418f4.json",
+      "observation_sha256": "7fb999b231bd6f1cd09fddcae6ec07158dfc6ba42f173a18c3ccc4b4237d5719",
+      "object_sha256": "f3ab98685a127ab7c699eb3f82d52e13e01b404e3a34d4fd5b96b31e030414e4"
+    },
+    {
+      "path": "/data/tushare/validation/realtime-probe-20260910/probe.json",
+      "probe_report_sha256": "62ee99ff5b802b29d05a019ad8e8f40bca106f18071c21b40f02caad2f1a93a9",
+      "fixed_release_id": "data-95fde4b44d540739be6f42f622c8ef331a6e565833f213b36202308e8dd71f1b",
+      "cloud_fixed_evidence": "/data/tushare/validation/realtime-probe-20260910/cloud-fixed.json",
+      "cloud_fixed_evidence_sha256": "f3fb4f999fb11fc677d7b1130c34ffd8e29ce61c4b52b2f0db3f96f212ab8b50",
+      "offline_status": "verified_with_gaps",
+      "equivalence_sha256": "aa1d32970e6c0a507c78c0844ed85d0bb97b1f379ac54bc43c42ef42fdaf2fa2",
+      "checked_at": "2026-09-10T03:25:08.387194+00:00",
+      "enabled": false,
+      "automatic_activation_permitted": false,
+      "history_complete": false,
+      "pit_verified": false,
+      "api_name": "rt_idx_k",
+      "status": "permission_denied",
+      "sample_rows": 0,
+      "sample_requests": [
+        {
+          "ts_code": "000300.SH"
+        }
+      ],
+      "observation": "f795d29eb0a348858cdcc9d31f4f2f2e.json",
+      "observation_sha256": "c425462ed1314f8122054aa81b6411af51f6dc97eff4bc351f86095a6fe23e0c",
+      "object_sha256": "defc3ff510b1541931a7740bc626ef6cebb597ffd7071c2736cd5f938594a0bf"
+    },
+    {
+      "path": "/data/tushare/validation/realtime-probe-20260910/probe.json",
+      "probe_report_sha256": "62ee99ff5b802b29d05a019ad8e8f40bca106f18071c21b40f02caad2f1a93a9",
+      "fixed_release_id": "data-95fde4b44d540739be6f42f622c8ef331a6e565833f213b36202308e8dd71f1b",
+      "cloud_fixed_evidence": "/data/tushare/validation/realtime-probe-20260910/cloud-fixed.json",
+      "cloud_fixed_evidence_sha256": "f3fb4f999fb11fc677d7b1130c34ffd8e29ce61c4b52b2f0db3f96f212ab8b50",
+      "offline_status": "verified_with_gaps",
+      "equivalence_sha256": "aa1d32970e6c0a507c78c0844ed85d0bb97b1f379ac54bc43c42ef42fdaf2fa2",
+      "checked_at": "2026-09-10T03:25:08.387194+00:00",
+      "enabled": false,
+      "automatic_activation_permitted": false,
+      "history_complete": false,
+      "pit_verified": false,
+      "api_name": "rt_idx_min",
+      "status": "permission_denied",
+      "sample_rows": 0,
+      "sample_requests": [
+        {
+          "freq": "1MIN",
+          "ts_code": "000300.SH"
+        }
+      ],
+      "observation": "280240595ab04abb98a4a3f4b2742f1d.json",
+      "observation_sha256": "76d798ca051ef1cc189e7c79b399f4edb3c4bc971c92e889a19b164d78018a2a",
+      "object_sha256": "6b6d5a1998bd43f835ec4e2f583886bb567a6e16693865fb07d17e1cd5a41318"
+    },
+    {
+      "path": "/data/tushare/validation/realtime-probe-20260910/probe.json",
+      "probe_report_sha256": "62ee99ff5b802b29d05a019ad8e8f40bca106f18071c21b40f02caad2f1a93a9",
+      "fixed_release_id": "data-95fde4b44d540739be6f42f622c8ef331a6e565833f213b36202308e8dd71f1b",
+      "cloud_fixed_evidence": "/data/tushare/validation/realtime-probe-20260910/cloud-fixed.json",
+      "cloud_fixed_evidence_sha256": "f3fb4f999fb11fc677d7b1130c34ffd8e29ce61c4b52b2f0db3f96f212ab8b50",
+      "offline_status": "verified_with_gaps",
+      "equivalence_sha256": "aa1d32970e6c0a507c78c0844ed85d0bb97b1f379ac54bc43c42ef42fdaf2fa2",
+      "checked_at": "2026-09-10T03:25:08.387194+00:00",
+      "enabled": false,
+      "automatic_activation_permitted": false,
+      "history_complete": false,
+      "pit_verified": false,
+      "api_name": "rt_sw_k",
+      "status": "permission_denied",
+      "sample_rows": 0,
+      "sample_requests": [
+        {
+          "ts_code": "801010.SI"
+        }
+      ],
+      "observation": "fe17d29faf47478bae931cee4c13ab2b.json",
+      "observation_sha256": "2f88a8a9fb6b9563da0317f26f18c7d3bcdb5cf974c4bfdefc5f2283be86122e",
+      "object_sha256": "852b37003eaed4d330a5e31eeb0480a8da97b81e70aef94dac0d5b5b28a75209"
+    },
+    {
+      "path": "/data/tushare/validation/realtime-probe-20260910/probe.json",
+      "probe_report_sha256": "62ee99ff5b802b29d05a019ad8e8f40bca106f18071c21b40f02caad2f1a93a9",
+      "fixed_release_id": "data-95fde4b44d540739be6f42f622c8ef331a6e565833f213b36202308e8dd71f1b",
+      "cloud_fixed_evidence": "/data/tushare/validation/realtime-probe-20260910/cloud-fixed.json",
+      "cloud_fixed_evidence_sha256": "f3fb4f999fb11fc677d7b1130c34ffd8e29ce61c4b52b2f0db3f96f212ab8b50",
+      "offline_status": "verified_with_gaps",
+      "equivalence_sha256": "aa1d32970e6c0a507c78c0844ed85d0bb97b1f379ac54bc43c42ef42fdaf2fa2",
+      "checked_at": "2026-09-10T03:25:08.387194+00:00",
+      "enabled": false,
+      "automatic_activation_permitted": false,
+      "history_complete": false,
+      "pit_verified": false,
+      "api_name": "rt_fut_min",
+      "status": "permission_denied",
+      "sample_rows": 0,
+      "sample_requests": [
+        {
+          "freq": "1MIN",
+          "ts_code": "LC2612.GFE"
+        }
+      ],
+      "observation": "ef46727ec4034b7abe6bffcf62790e4b.json",
+      "observation_sha256": "efaf93b1a13ed8872907ba6c466919b34c577d34bc7d1bfb45fea0912734e074",
+      "object_sha256": "718ffc7eba1df4efb88668e717a2a2d000014138c3203e5453517dc04edc58d4"
+    },
+    {
+      "path": "/data/tushare/validation/realtime-probe-20260910/probe.json",
+      "probe_report_sha256": "62ee99ff5b802b29d05a019ad8e8f40bca106f18071c21b40f02caad2f1a93a9",
+      "fixed_release_id": "data-95fde4b44d540739be6f42f622c8ef331a6e565833f213b36202308e8dd71f1b",
+      "cloud_fixed_evidence": "/data/tushare/validation/realtime-probe-20260910/cloud-fixed.json",
+      "cloud_fixed_evidence_sha256": "f3fb4f999fb11fc677d7b1130c34ffd8e29ce61c4b52b2f0db3f96f212ab8b50",
+      "offline_status": "verified_with_gaps",
+      "equivalence_sha256": "aa1d32970e6c0a507c78c0844ed85d0bb97b1f379ac54bc43c42ef42fdaf2fa2",
+      "checked_at": "2026-09-10T03:25:08.387194+00:00",
+      "enabled": false,
+      "automatic_activation_permitted": false,
+      "history_complete": false,
+      "pit_verified": false,
+      "api_name": "rt_k",
+      "status": "permission_denied",
+      "sample_rows": 0,
+      "sample_requests": [
+        {
+          "ts_code": "000001.SZ"
+        }
+      ],
+      "observation": "9b036ab58cf64c21b4eb990f42ec9723.json",
+      "observation_sha256": "fd22fc29e984b4bb7dfaf84eaec8f43676a932b3ce9f6bbbbf1bcc0a356a71a6",
+      "object_sha256": "79a61c1ceb75b10acc082b952641894606b7bbcea9872a776d1332dc30e48703"
+    },
+    {
+      "path": "/data/tushare/validation/realtime-probe-20260910/probe.json",
+      "probe_report_sha256": "62ee99ff5b802b29d05a019ad8e8f40bca106f18071c21b40f02caad2f1a93a9",
+      "fixed_release_id": "data-95fde4b44d540739be6f42f622c8ef331a6e565833f213b36202308e8dd71f1b",
+      "cloud_fixed_evidence": "/data/tushare/validation/realtime-probe-20260910/cloud-fixed.json",
+      "cloud_fixed_evidence_sha256": "f3fb4f999fb11fc677d7b1130c34ffd8e29ce61c4b52b2f0db3f96f212ab8b50",
+      "offline_status": "verified_with_gaps",
+      "equivalence_sha256": "aa1d32970e6c0a507c78c0844ed85d0bb97b1f379ac54bc43c42ef42fdaf2fa2",
+      "checked_at": "2026-09-10T03:25:08.387194+00:00",
+      "enabled": false,
+      "automatic_activation_permitted": false,
+      "history_complete": false,
+      "pit_verified": false,
+      "api_name": "rt_etf_k",
+      "status": "permission_denied",
+      "sample_rows": 0,
+      "sample_requests": [
+        {
+          "ts_code": "159915.SZ"
+        }
+      ],
+      "observation": "945be5d8dd4243a3be24338105dfb128.json",
+      "observation_sha256": "ccf56a5119f7a9694ae5b0be72949918dde44622a52e4e9e93ba322356dda21b",
+      "object_sha256": "f1184abaabe52c9074928df599c79008cd92d4f98f0aec3e94ac29f59aec153f"
+    },
+    {
+      "path": "/data/tushare/validation/realtime-probe-20260910/probe.json",
+      "probe_report_sha256": "62ee99ff5b802b29d05a019ad8e8f40bca106f18071c21b40f02caad2f1a93a9",
+      "fixed_release_id": "data-95fde4b44d540739be6f42f622c8ef331a6e565833f213b36202308e8dd71f1b",
+      "cloud_fixed_evidence": "/data/tushare/validation/realtime-probe-20260910/cloud-fixed.json",
+      "cloud_fixed_evidence_sha256": "f3fb4f999fb11fc677d7b1130c34ffd8e29ce61c4b52b2f0db3f96f212ab8b50",
+      "offline_status": "verified_with_gaps",
+      "equivalence_sha256": "aa1d32970e6c0a507c78c0844ed85d0bb97b1f379ac54bc43c42ef42fdaf2fa2",
+      "checked_at": "2026-09-10T03:25:08.387194+00:00",
+      "enabled": false,
+      "automatic_activation_permitted": false,
+      "history_complete": false,
+      "pit_verified": false,
+      "api_name": "rt_idx_min_daily",
+      "status": "permission_denied",
+      "sample_rows": 0,
+      "sample_requests": [
+        {
+          "freq": "1MIN",
+          "ts_code": "000300.SH"
+        }
+      ],
+      "observation": "9c0c704f521d491a97544aafaf3a427a.json",
+      "observation_sha256": "3af41c6f5f02907a26e0e5175c5a91357fffad68520d540af6d01858b317981e",
+      "object_sha256": "a08b6875f12bf9ad7196adb225b7be08a82a1ab4a97a7d458c1b559d97e99d8b"
+    },
+    {
+      "path": "/data/tushare/validation/realtime-probe-20260910/probe.json",
+      "probe_report_sha256": "62ee99ff5b802b29d05a019ad8e8f40bca106f18071c21b40f02caad2f1a93a9",
+      "fixed_release_id": "data-95fde4b44d540739be6f42f622c8ef331a6e565833f213b36202308e8dd71f1b",
+      "cloud_fixed_evidence": "/data/tushare/validation/realtime-probe-20260910/cloud-fixed.json",
+      "cloud_fixed_evidence_sha256": "f3fb4f999fb11fc677d7b1130c34ffd8e29ce61c4b52b2f0db3f96f212ab8b50",
+      "offline_status": "verified_with_gaps",
+      "equivalence_sha256": "aa1d32970e6c0a507c78c0844ed85d0bb97b1f379ac54bc43c42ef42fdaf2fa2",
+      "checked_at": "2026-09-10T03:25:08.387194+00:00",
+      "enabled": false,
+      "automatic_activation_permitted": false,
+      "history_complete": false,
+      "pit_verified": false,
+      "api_name": "rt_fut_min_daily",
+      "status": "permission_denied",
+      "sample_rows": 0,
+      "sample_requests": [
+        {
+          "freq": "1MIN",
+          "ts_code": "LC2612.GFE"
+        }
+      ],
+      "observation": "2f6d0a502d4e4d418192da5a3fd9564f.json",
+      "observation_sha256": "200cd60bf50101e85343eaf2ad7a8641c27be4e7726711564a74a51dc3bb5d3d",
+      "object_sha256": "fbd3acc1776f89016cb0699caeefe0696d220e7c53e45c7c5e419e9aeda3d843"
+    }
+  ],
+  "remaining_gaps": [
+    "No API produced a nonempty sample.",
+    "History, source timezone, PIT and other frequencies remain unverified.",
+    "Five additional stk_auction variants were skipped after the exact API denial and are not counted as separate entitlement observations."
+  ]
+}

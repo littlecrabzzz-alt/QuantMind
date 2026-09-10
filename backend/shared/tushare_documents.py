@@ -981,9 +981,7 @@ def _claim_documents(db, owner, phase, limit, seconds, timing=None):
             claimed_at = time.time()
             for row in rows:
                 actual_phase = (
-                    "parse"
-                    if row["download_status"] == "downloaded"
-                    else "download"
+                    "parse" if row["download_status"] == "downloaded" else "download"
                 )
                 db.execute(
                     "INSERT INTO document_claims VALUES(?,?,?,?,?)",
@@ -1176,9 +1174,7 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                             timing["download_job_seconds"] += job_seconds
                             if job_error is not None:
                                 result = _document_failure(job, "download", job_error)
-                            _finish_document(
-                                db, owner, job, result, "download", timing
-                            )
+                            _finish_document(db, owner, job, result, "download", timing)
                             phase_counts["download"] += 1
                             processed += 1
                     parse_turns = 2
