@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan or execute one hash-pinned first-round fund_nav empty review."""
+"""Plan or execute one hash-pinned paired fund_nav empty review."""
 
 from __future__ import annotations
 
@@ -124,8 +124,9 @@ def verify_manifest(path, expected_sha256):
         or manifest.get("kind") != "fund_nav_empty_review_plan"
         or manifest.get("source")
         != {"api_name": "fund_nav", "epoch": "history", "state": "empty"}
-        or manifest.get("review_round") != 1
-        or manifest.get("minimum_age_seconds") != preparation.MINIMUM_AGE_SECONDS
+        or manifest.get("review_round") not in (1, 2)
+        or manifest.get("minimum_age_seconds")
+        != preparation.MINIMUM_AGE_SECONDS_BY_ROUND.get(manifest.get("review_round"))
         or manifest.get("boundaries") != preparation.BOUNDARIES
         or set(manifest)
         != {
@@ -143,8 +144,9 @@ def verify_manifest(path, expected_sha256):
             "records",
         }
     ):
-        raise ValueError("Invalid first-round review manifest")
+        raise ValueError("Invalid review manifest")
     as_of = _time(manifest["as_of"], "manifest as_of")
+    review_round = manifest["review_round"]
     fixed = manifest.get("fixed_release")
     if (
         not isinstance(fixed, dict)
@@ -167,14 +169,17 @@ def verify_manifest(path, expected_sha256):
         raise ValueError("Eligible target count mismatch")
     task_ids = []
     for record in records:
-        if not isinstance(record, dict) or set(record) != {
+        record_keys = {
             "target",
             "parent_ids",
             "first_empty",
             "review_round",
             "not_before",
             "control",
-        }:
+        }
+        if review_round == 2:
+            record_keys.add("round1_valid_empty")
+        if not isinstance(record, dict) or set(record) != record_keys:
             raise ValueError("Invalid review record")
         target = record["target"]
         if not isinstance(target, dict) or set(target) != {
@@ -203,7 +208,7 @@ def verify_manifest(path, expected_sha256):
             or type(target["tries"]) is not int
             or target["tries"] < 1
             or not isinstance(target["group_name"], str)
-            or record["review_round"] != 1
+            or record["review_round"] != review_round
         ):
             raise ValueError("Review target identity mismatch")
         if (
@@ -229,9 +234,11 @@ def verify_manifest(path, expected_sha256):
         if set(first["observation"]) != {"path", "sha256", "fetched_at"}:
             raise ValueError("Invalid first observation")
         not_before = _time(record["not_before"], "not_before")
-        if not_before > as_of or not_before != _time(
+        if not_before > as_of:
+            raise ValueError("Review timing mismatch")
+        if review_round == 1 and not_before != _time(
             first["observation"]["fetched_at"], "first fetched_at"
-        ) + timedelta(seconds=preparation.MINIMUM_AGE_SECONDS):
+        ) + timedelta(seconds=preparation.ROUND1_MINIMUM_AGE_SECONDS):
             raise ValueError("Review timing mismatch")
         control = record["control"]
         natural = control.get("natural_key") if isinstance(control, dict) else None
@@ -276,6 +283,39 @@ def verify_manifest(path, expected_sha256):
         ):
             raise ValueError("Invalid control parquet")
         _hash(parquet["sha256"], "control parquet hash")
+        if review_round == 2:
+            pinned = record["round1_valid_empty"]
+            if (
+                not isinstance(pinned, dict)
+                or set(pinned)
+                != {
+                    "attempt",
+                    "manifest_sha256",
+                    "fixed_release_id",
+                    "request_observation_sha256",
+                    "request_object_sha256",
+                    "control_observation_sha256",
+                    "control_object_sha256",
+                    "completed_at",
+                }
+                or type(pinned["attempt"]) is not int
+                or pinned["attempt"] < 1
+            ):
+                raise ValueError("Invalid round-one evidence pin")
+            for key in (
+                "manifest_sha256",
+                "request_observation_sha256",
+                "request_object_sha256",
+                "control_observation_sha256",
+                "control_object_sha256",
+            ):
+                _hash(pinned[key], "round-one " + key)
+            if not re.fullmatch(r"data-[a-f0-9]{64}", str(pinned["fixed_release_id"])):
+                raise ValueError("Invalid round-one fixed release identity")
+            if not_before != _time(
+                pinned["completed_at"], "round-one completed_at"
+            ) + timedelta(seconds=preparation.ROUND2_MINIMUM_AGE_SECONDS):
+                raise ValueError("Review timing mismatch")
         task_ids.append(task_id)
     if len(set(task_ids)) != len(task_ids):
         raise ValueError("Duplicate review target")
@@ -370,6 +410,21 @@ def _verify_sources(
         code = target["job"]["params"]["ts_code"]
         if controls.get(code) != record["control"]:
             raise ValueError("Positive control drifted from fixed release")
+        if record["review_round"] == 2:
+            pinned = record["round1_valid_empty"]
+            attempt = pipeline.db.execute(
+                "SELECT result FROM attempts WHERE job_id=? AND attempt=?",
+                (target["task_id"], pinned["attempt"]),
+            ).fetchone()
+            evidence = preparation._round1_evidence(
+                root,
+                release_root,
+                target["job"],
+                pinned["attempt"],
+                json.loads(attempt["result"]) if attempt else None,
+            )
+            if evidence != pinned:
+                raise ValueError("Round-one evidence drifted from review manifest")
 
 
 def _rate_interval(config):
@@ -464,11 +519,13 @@ def _classify(pipeline, record, request_result, control_result):
         and control_result.get("field_coverage") == "complete_for_explicit_request"
         and _matching_rows(control_rows, record["control"]["request_params"])
     ):
-        return "round1_valid_empty"
+        return (
+            "round1_valid_empty" if record["review_round"] == 1 else "review_exhausted"
+        )
     return "review_inconclusive"
 
 
-def _previous_reviews(pipeline, task_id):
+def _previous_reviews(pipeline, task_id, review_round=None):
     reviews = []
     for row in pipeline.db.execute(
         "SELECT attempt,result FROM attempts WHERE job_id=? ORDER BY attempt",
@@ -479,7 +536,8 @@ def _previous_reviews(pipeline, task_id):
         if (
             isinstance(review, dict)
             and review.get("schema_version") == 1
-            and review.get("review_round") == 1
+            and review.get("review_round") in (1, 2)
+            and (review_round is None or review.get("review_round") == review_round)
         ):
             reviews.append((row["attempt"], result))
     return reviews
@@ -523,7 +581,8 @@ def _review_pair(
     deadline,
 ):
     task_id = record["target"]["task_id"]
-    previous = _previous_reviews(pipeline, task_id)
+    review_round = record["review_round"]
+    previous = _previous_reviews(pipeline, task_id, review_round)
     same = [
         result
         for _, result in previous
@@ -532,13 +591,13 @@ def _review_pair(
     if same:
         return same[-1], 0
     terminal = {
-        "round1_valid_empty",
+        "round1_valid_empty" if review_round == 1 else "review_exhausted",
         "review_conflict",
         "manual_hold",
         "review_recovered_data",
     }
     if any(result["status"] in terminal for _, result in previous):
-        raise ValueError("Review target already has a terminal round-one result")
+        raise ValueError("Review target already has a terminal result for this round")
     inconclusive = [
         result for _, result in previous if result["status"] == "review_inconclusive"
     ]
@@ -574,7 +633,7 @@ def _review_pair(
     review = {
         "schema_version": 1,
         "kind": "fund_nav_empty_review",
-        "review_round": 1,
+        "review_round": review_round,
         "manifest_sha256": manifest_sha256,
         "authority_sha256": authority_sha256,
         "fixed_release_id": release_id,
@@ -789,8 +848,8 @@ def _execute(
     receipt = {
         "schema_version": 1,
         "kind": "fund_nav_empty_review_receipt",
-        "status": "round1_review_executed",
-        "review_round": 1,
+        "status": f"round{manifest['review_round']}_review_executed",
+        "review_round": manifest["review_round"],
         "manifest_sha256": manifest_sha256,
         "all_task_ids_sha256": manifest["all_task_ids_sha256"],
         "fixed_release_id": release_id,
@@ -863,7 +922,7 @@ def run_review(
         return {
             "schema_version": 1,
             "status": "plan_only",
-            "review_round": 1,
+            "review_round": verified["review_round"],
             "manifest_sha256": manifest_sha256,
             "all_task_ids_sha256": verified["all_task_ids_sha256"],
             "code_sha256": current_code_sha256,

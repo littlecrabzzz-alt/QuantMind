@@ -90,7 +90,7 @@ class FundNavEmptyReviewRunnerTests(unittest.TestCase):
             body = json.loads(request.content)
             calls.append(body["params"])
             fields = body["fields"].split(",")
-            is_control = body["params"]["start_date"] == "20130503"
+            is_control = body["params"]["start_date"] != "19900101"
             if (is_control and not control_ok) or (not is_control and request_empty):
                 items = []
             else:
@@ -123,6 +123,30 @@ class FundNavEmptyReviewRunnerTests(unittest.TestCase):
             ]
         finally:
             db.close()
+
+    def complete_round1(self):
+        _calls, handler = self.response()
+        self.execute(handler, self.base / "round1-receipt.json")
+        return self.attempts()[-1]
+
+    def prepare_round2(self, round1):
+        completed = max(
+            runner._fetched_at(self.authority, round1["request_result"]),
+            runner._fetched_at(self.authority, round1["control_result"]),
+        )
+        due = completed + timedelta(seconds=preparation.ROUND2_MINIMUM_AGE_SECONDS)
+        early = self.fixture._prepare(due - timedelta(seconds=1), review_round=2)
+        self.assertEqual(early["records"], [])
+        self.now = due
+        self.manifest_path = self.base / "round2-plan.json"
+        self.manifest = self.fixture._prepare(
+            self.now, self.manifest_path, review_round=2
+        )
+
+    def complete_round1_and_prepare_round2(self):
+        round1 = self.complete_round1()
+        self.prepare_round2(round1)
+        return round1
 
     def test_plan_only_rejects_tampering_without_authority_secret_or_network(self):
         before = (self.authority / "pipeline.sqlite").read_bytes()
@@ -282,6 +306,196 @@ class FundNavEmptyReviewRunnerTests(unittest.TestCase):
         blocked = self.execute(wrong, disk_free=runner.MIN_FREE_BYTES - 1)
         self.assertEqual(blocked["status"], "blocked_disk_reserve")
         self.assertEqual(calls, before)
+
+    def test_round2_plan_requires_and_pins_verified_round1_pair(self):
+        absent = self.fixture._prepare(self.now + timedelta(days=30), review_round=2)
+        self.assertEqual(absent["records"], [])
+        round1 = self.complete_round1_and_prepare_round2()
+        self.assertEqual(self.manifest["review_round"], 2)
+        self.assertEqual(
+            self.manifest["minimum_age_seconds"],
+            preparation.ROUND2_MINIMUM_AGE_SECONDS,
+        )
+        pinned = self.manifest["records"][0]["round1_valid_empty"]
+        self.assertEqual(pinned["attempt"], 2)
+        for key in (
+            "manifest_sha256",
+            "request_observation_sha256",
+            "request_object_sha256",
+            "control_observation_sha256",
+            "control_object_sha256",
+        ):
+            self.assertEqual(pinned[key], round1["empty_review"][key])
+        self.assertEqual(
+            pinned["fixed_release_id"], round1["empty_review"]["fixed_release_id"]
+        )
+        self.assertEqual(self.plan()["review_round"], 2)
+
+        request_object = (
+            self.authority / "objects" / f"{pinned['request_object_sha256']}.json"
+        )
+        request_object.write_bytes(request_object.read_bytes() + b" ")
+        calls, handler = self.response()
+        with self.assertRaisesRegex(ValueError, "hash mismatch"):
+            self.execute(handler)
+        self.assertEqual(calls, [])
+
+    def test_round2_uses_new_release_while_pinning_round1_release(self):
+        old_release_id = self.release_id
+        round1 = self.complete_round1()
+        self.release_id = self.fixture._fixed_release("20130504", "d")
+        self.fixture.release_id = self.release_id
+        self.assertNotEqual(self.release_id, old_release_id)
+        self.prepare_round2(round1)
+        record = self.manifest["records"][0]
+        self.assertEqual(self.manifest["fixed_release"]["release_id"], self.release_id)
+        self.assertEqual(
+            record["round1_valid_empty"]["fixed_release_id"], old_release_id
+        )
+        self.assertEqual(record["control"]["request_params"]["start_date"], "20130504")
+
+        calls, handler = self.response()
+        receipt = self.execute(handler)
+        self.assertEqual(calls[-1]["start_date"], "20130504")
+        self.assertEqual(receipt["outcome_counts"], {"review_exhausted": 1})
+
+    def test_round2_valid_empty_exhausts_without_closing_original_gap(self):
+        self.complete_round1_and_prepare_round2()
+        db = sqlite3.connect(self.authority / "pipeline.sqlite")
+        try:
+            original = db.execute(
+                "SELECT result FROM jobs WHERE id=?", (self.fixture.target_id,)
+            ).fetchone()[0]
+        finally:
+            db.close()
+        calls, handler = self.response()
+        receipt = self.execute(handler)
+        self.assertEqual(
+            calls,
+            [
+                {
+                    "ts_code": "000022.OF",
+                    "start_date": "19900101",
+                    "end_date": "20080502",
+                },
+                {
+                    "ts_code": "000022.OF",
+                    "start_date": "20130503",
+                    "end_date": "20130503",
+                },
+            ],
+        )
+        self.assertEqual(receipt["review_round"], 2)
+        self.assertEqual(receipt["status"], "round2_review_executed")
+        self.assertEqual(receipt["outcome_counts"], {"review_exhausted": 1})
+        self.assertFalse(receipt["history_complete"])
+        self.assertFalse(receipt["pit_verified"])
+        saved = self.attempts()[-1]
+        self.assertEqual(saved["status"], "review_exhausted")
+        self.assertFalse(saved["history_complete"])
+        self.assertFalse(saved["pit_verified"])
+        parent_id = self.manifest["records"][0]["parent_ids"][0]
+        db = sqlite3.connect(self.authority / "pipeline.sqlite")
+        try:
+            state, tries, current = db.execute(
+                "SELECT state,tries,result FROM jobs WHERE id=?",
+                (self.fixture.target_id,),
+            ).fetchone()
+            parent_state = db.execute(
+                "SELECT state FROM jobs WHERE id=?", (parent_id,)
+            ).fetchone()[0]
+            split = db.execute(
+                "SELECT status,gap FROM partition_splits WHERE parent_id=?",
+                (parent_id,),
+            ).fetchone()
+        finally:
+            db.close()
+        self.assertEqual((state, tries, current), ("empty", 1, original))
+        self.assertEqual(parent_state, "split_pending")
+        self.assertEqual(split, ("gap", "child_not_verified"))
+        later = self.fixture._prepare(self.now + timedelta(days=30), review_round=2)
+        self.assertEqual(later["records"], [])
+
+    def test_round2_recovered_data_uses_normal_partition_path(self):
+        self.complete_round1_and_prepare_round2()
+        _calls, handler = self.response(request_empty=False)
+        receipt = self.execute(handler)
+        self.assertEqual(receipt["outcome_counts"], {"review_recovered_data": 1})
+        saved = self.attempts()[-1]
+        self.assertIn("parquet", saved["request_result"])
+        db = sqlite3.connect(self.authority / "pipeline.sqlite")
+        try:
+            state = db.execute(
+                "SELECT state FROM jobs WHERE id=?", (self.fixture.target_id,)
+            ).fetchone()[0]
+        finally:
+            db.close()
+        self.assertEqual(state, "done")
+
+    def test_round2_conflict_is_terminal_and_keeps_empty_task(self):
+        self.complete_round1_and_prepare_round2()
+
+        def wrong(request):
+            body = json.loads(request.content)
+            fields = body["fields"].split(",")
+            values = {"ts_code": "WRONG.OF", "nav_date": "19900101"}
+            return httpx.Response(
+                200,
+                json={
+                    "code": 0,
+                    "data": {
+                        "fields": fields,
+                        "items": [[values.get(field) for field in fields]],
+                    },
+                },
+            )
+
+        receipt = self.execute(wrong)
+        self.assertEqual(receipt["outcome_counts"], {"review_conflict": 1})
+        db = sqlite3.connect(self.authority / "pipeline.sqlite")
+        try:
+            state = db.execute(
+                "SELECT state FROM jobs WHERE id=?", (self.fixture.target_id,)
+            ).fetchone()[0]
+        finally:
+            db.close()
+        self.assertEqual(state, "empty")
+        later = self.fixture._prepare(self.now + timedelta(days=30), review_round=2)
+        self.assertEqual(later["records"], [])
+
+    def test_round2_inconclusive_retries_reach_manual_hold(self):
+        self.complete_round1_and_prepare_round2()
+        _calls, handler = self.response(control_ok=False)
+        for index in range(3):
+            receipt = self.execute(handler, self.base / f"round2-receipt-{index}.json")
+            expected = "manual_hold" if index == 2 else "review_inconclusive"
+            self.assertEqual(receipt["outcome_counts"], {expected: 1})
+            if index < 2:
+                retry = self.attempts()[-1]["empty_review"]["retry_not_before"]
+                self.now = max(
+                    self.now + timedelta(seconds=1),
+                    runner._time(retry, "retry") + timedelta(seconds=1),
+                )
+                self.manifest_path = self.base / f"round2-plan-{index}.json"
+                self.manifest = self.fixture._prepare(
+                    self.now, self.manifest_path, review_round=2
+                )
+        held = self.fixture._prepare(self.now + timedelta(days=30), review_round=2)
+        self.assertEqual(held["records"], [])
+
+    def test_round2_same_manifest_crash_recovers_without_more_http(self):
+        self.complete_round1_and_prepare_round2()
+        calls, handler = self.response()
+        with patch.object(
+            runner, "_write_receipt", side_effect=OSError("fixture crash")
+        ):
+            with self.assertRaisesRegex(OSError, "fixture crash"):
+                self.execute(handler, self.base / "lost-round2-receipt.json")
+        self.assertEqual(len(calls), 2)
+        rebuilt = self.execute(handler, self.base / "rebuilt-round2-receipt.json")
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(rebuilt["upstream_calls"], 0)
+        self.assertEqual(rebuilt["outcome_counts"], {"review_exhausted": 1})
 
 
 if __name__ == "__main__":

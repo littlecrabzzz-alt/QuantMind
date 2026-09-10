@@ -123,16 +123,16 @@ class FundNavEmptyReviewTests(unittest.TestCase):
             (attempt, json.dumps(result), row["id"]),
         )
 
-    def _fixed_release(self):
-        observation_name = "b" * 32 + ".json"
+    def _fixed_release(self, nav_date="20130503", observation_prefix="b"):
+        observation_name = observation_prefix * 32 + ".json"
         observation = {
             "schema_version": 1,
             "request": {
                 "api_name": "fund_nav",
                 "params": {
                     "ts_code": "000022.OF",
-                    "start_date": "20130503",
-                    "end_date": "20130503",
+                    "start_date": nav_date,
+                    "end_date": nav_date,
                 },
                 "fields": "ts_code,ann_date,nav_date,unit_nav",
             },
@@ -144,7 +144,7 @@ class FundNavEmptyReviewTests(unittest.TestCase):
         }
         observation_raw = review.json_bytes(observation)
         observation_path = self.release_root / "observations" / observation_name
-        observation_path.parent.mkdir(parents=True)
+        observation_path.parent.mkdir(parents=True, exist_ok=True)
         observation_path.write_bytes(observation_raw)
         temporary = self.release_root / "control.parquet"
         pq.write_table(
@@ -152,7 +152,7 @@ class FundNavEmptyReviewTests(unittest.TestCase):
                 [
                     {
                         "ts_code": "000022.OF",
-                        "nav_date": "20130503",
+                        "nav_date": nav_date,
                         "ann_date": None,
                         "_observation": observation_name,
                     }
@@ -163,7 +163,7 @@ class FundNavEmptyReviewTests(unittest.TestCase):
         parquet_sha = review.sha(temporary)
         parquet_name = f"parquet/{parquet_sha}.parquet"
         parquet_path = self.release_root / parquet_name
-        parquet_path.parent.mkdir()
+        parquet_path.parent.mkdir(exist_ok=True)
         temporary.replace(parquet_path)
         manifest = {
             "files": {
@@ -195,7 +195,7 @@ class FundNavEmptyReviewTests(unittest.TestCase):
         (release / "manifest.json").write_bytes(raw)
         return release_id
 
-    def _prepare(self, now, output=None):
+    def _prepare(self, now, output=None, **overrides):
         with (
             patch("socket.socket.connect", side_effect=AssertionError("offline")),
             patch("socket.getaddrinfo", side_effect=AssertionError("offline")),
@@ -210,6 +210,7 @@ class FundNavEmptyReviewTests(unittest.TestCase):
                 self.release_id,
                 output,
                 now=now,
+                **overrides,
             )
 
     def test_due_plan_pins_original_and_positive_control_without_writing_inputs(self):
