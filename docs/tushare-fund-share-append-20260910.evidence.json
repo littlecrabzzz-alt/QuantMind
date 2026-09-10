@@ -1,13 +1,16 @@
 {
   "schema_version": 1,
-  "audited_at": "2026-09-10T13:42:00Z",
+  "audited_at": "2026-09-10T14:00:00Z",
   "authority": "lzy-vm:/root/data/disk/quantmind/project/data/tushare",
-  "deployed_revision": "8a9e5dfb5e44a436d82b1321cc1fe435b95a8652",
+  "deployed_revision": "4302970a8ef993bfd506397245aa04c3efc01dda",
   "candidate": {
     "status": "prepared_not_executed",
     "jobs": 26788,
     "new_jobs_at_audit": 26788,
-    "markets": {"SH": 13394, "SZ": 13394},
+    "markets": {
+      "SH": 13394,
+      "SZ": 13394
+    },
     "trade_date_min": "19900101",
     "trade_date_max": "20260902",
     "task_ids_sha256": "44088911b86a7b59a72b230cb4c3eb06a73a8c50dae230d42fbbee9070409243",
@@ -27,9 +30,16 @@
     "v2_helper": {
       "sha256": "4cfab98a383001089355282449b002ca6bbff53cf72362bcd8d0cbe599f09158",
       "rounds": 53,
-      "before": {"pending": 500},
-      "after": {"pending": 26788},
-      "planning_state_after": {"offset": 26788, "done": true},
+      "before": {
+        "pending": 500
+      },
+      "after": {
+        "pending": 26788
+      },
+      "planning_state_after": {
+        "offset": 26788,
+        "done": true
+      },
       "receipt_path": "/data/tushare/validation/fund-share-append-20260910/acceptance-v2.json",
       "receipt_sha256": "a337c4e90e4d0f250cff290ebba08c5a5c11c75a85df68a115f48416f067c00a",
       "upstream_calls": 0,
@@ -39,7 +49,61 @@
     },
     "first_consumption_observation": {
       "observed_at": "2026-09-10T13:42:00Z",
-      "all_epochs": {"done": 12, "empty": 4, "pending": 26787}
+      "all_epochs": {
+        "done": 12,
+        "empty": 4,
+        "pending": 26787
+      }
+    },
+    "post_v2_normal_worker_reset": {
+      "observed_planning_state": {
+        "offset": 12495,
+        "done": false
+      },
+      "cause": "pre-fix policy signature distinguished explicit ['fund_share'] from the production default",
+      "existing_jobs_or_results_lost": false,
+      "duplicate_task_ids_created": false,
+      "status": "corrected"
+    },
+    "v3_helper": {
+      "sha256": "8e526bd450b5f37ee6ea37cba8c83e761d42cf7ff5332f3df8a4ed1e009d1f57",
+      "rounds": 1,
+      "before": {
+        "done": 5,
+        "pending": 26783
+      },
+      "after": {
+        "done": 5,
+        "pending": 26783
+      },
+      "planning_state_after": {
+        "offset": 26788,
+        "done": true
+      },
+      "task_ids_sha256": "44088911b86a7b59a72b230cb4c3eb06a73a8c50dae230d42fbbee9070409243",
+      "receipt_path": "/data/tushare/validation/fund-share-append-20260910/acceptance-v3.json",
+      "receipt_sha256": "604cf8835dad7ff8df7fc8b174e8cb742370a10826bcbfafdca40ed668b71ed0",
+      "upstream_calls": 0,
+      "credentials_read": false,
+      "release_published": false,
+      "current_switched": false
+    },
+    "normal_scheduler_validation": {
+      "task_id": "981a461b-8193-4560-86ff-3995a021369e",
+      "started_at": "2026-09-10T13:57:18Z",
+      "completed_at": "2026-09-10T13:59:31Z",
+      "elapsed_seconds": 133.442,
+      "task_result": "succeeded",
+      "planning_state_after": {
+        "offset": 26788,
+        "done": true
+      },
+      "fund_share_history_jobs_after": {
+        "done": 5,
+        "pending": 26783,
+        "error": 0
+      },
+      "cursor_reset_recurred": false
     }
   },
   "validation": {
@@ -51,7 +115,10 @@
     "cloud_full_result": "passed_at_4_cpu",
     "cloud_2_cpu_resource_observation": "one existing time-budget test returned 3 rather than 5 requests; focused rerun passed",
     "ruff": "passed",
-    "git_diff_check": "passed"
+    "git_diff_check": "passed",
+    "mac_related_tests_after_fix": 45,
+    "cloud_focused_tests_after_fix": 4,
+    "cloud_focused_result_after_fix": "passed_network_disabled_production_image"
   },
   "boundaries": {
     "history_start_is_request_scope_not_verified_availability": true,
@@ -59,5 +126,8 @@
     "known_at_verified": false,
     "planning_complete_is_data_complete": false
   },
-  "sensitive_content": {"token": false, "upstream_response_body": false}
+  "sensitive_content": {
+    "token": false,
+    "upstream_response_body": false
+  }
 }

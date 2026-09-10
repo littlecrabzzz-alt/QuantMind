@@ -583,3 +583,9 @@
 - 第五个三表精确批次固定20260630、report type 1的120个共同股票，三API各120。62.104秒完成360次真实调用，各API均116 done/4 empty，批内0 pending；配置和CURRENT未变、未发布。manifest SHA `6012834024373909222a59b83cdc4440f64b997021f7e633d7991cfa55ef9460`，收据 SHA `8f088af0b5ab123a8e41e04ddfe1d7fde66513e7b675c91b8f6597eeb4018881`。
 - 容量复核确认当前全量manifest为230623171字节；同一旧版在release和archive路径共享inode（link count 2），每次发布的物理新增约一份manifest，不能按两条路径重复计算。按近20—22分钟一版约占短窗1.8GB/小时增长的35%—40%，仍是可压缩的显著来源；文档另有约109.5万pending。生产发布间隔已从900秒原子改为3600秒，账户500rpm、360请求/90秒、规划、镜像和100GiB硬停线均未改；配置SHA由 `4ac7b381…` 变为 `da45afae…`。当前文档批次自然结束后已暂停文档worker，保留全部队列/原文；结构化采集和Beat恢复healthy。扩盘完成并复核后再恢复文档消费。
 - 候选在Mac相邻44项通过；云端生产镜像、断网、只读源码、4CPU下985项完整Tushare回归180.631秒通过。2CPU全套仅一项既有时间预算测试偶发少完成2个请求，单项与新追加3项重跑均通过。RRG只读复核确认PCF历史队列已在推进，但现有Tushare接口仍不能补出成员known_at、历史ETF行业映射、权威可交易分类或PCF公布时间/修订/权重分母；继续保持blocked_data并停止重复拉相同缺价范围。
+
+## 2026-09-10 22:00 基金份额追加游标生产修复
+
+- 首版追加 planner 的策略签名同时包含 `history_start` 和 `market_apis`。v2 helper 显式传入 `['fund_share']`，生产配置依赖相同的默认值；两种表示生成不同签名，恢复常驻 worker 后游标曾重置到offset12495/done0。任务ID是幂等主键，已规划任务、终态与原始响应没有删除、覆盖或重复。
+- `4302970a`把该固定family的签名缩为真正改变任务集合的`history_start`，并增加“显式/默认父API列表不得重置已完成范围”的回归测试。修复后Mac相关45项和Ruff通过，云端生产镜像断网4项通过。v3在共享锁内确认任务集合仍为26788项、SHA不变、offset26788/done1；收据SHA `604cf8835dad7ff8df7fc8b174e8cb742370a10826bcbfafdca40ed668b71ed0`。
+- Beat恢复后立即触发一次正常生产采集，133.442秒成功结束；周期后游标仍为offset26788/done1，任务为5 done、26783 pending、0 error，证明一次性helper与常驻配置不再互相重置。Tushare worker和Beat保持healthy，文档worker继续停用等待扩盘；固定版发布仍按3600秒周期执行。
