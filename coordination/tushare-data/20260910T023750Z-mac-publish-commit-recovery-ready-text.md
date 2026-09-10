@@ -1,0 +1,7 @@
+# Publication commit recovery ready
+
+Owner text_contracts, isolated quantmind-tushare-text/codex/tushare-publish-commit-recovery from4e4b58d. Candidatead37d5f1 pushed;3files pipeline narrowpublish/periodiccheckpoint helpers+12newtests+doc. No production/upstream/credentials/schema/config/queue/resource/timeout changes.
+
+Sealedmanifest→durable scheduler_state publish_intent:<exactrelease>→atomicCURRENT→transactionlegacy publish_success_at +publish_success:<identity> +deleteintent. Verifiednoop recordsintent too, coveringlargecontainer destruction aftersuccessful comparison. publication_check verifiesCURRENT/bodySHA first and onlymatchingintent canrecover. Pointer recheckedbeforecommit. No mtime; futuretime/clockrollback forcesrealcheck; olderintent cannotregress; recoveredtimestamp isoriginalintent, no fresh900s. OldCURRENT lackingintent stayslegacyunverifiedforautorecovery (rootalreadyhadnormalc59dsuccess, no e201 backfill).
+
+12newisolatedfault/lock/clock/legacytests +existingpublishing/serializer/3generationbytes/retain/archive/planning/closure =83Python3.10.19 tests passed1.639s; Ruff/diffcheckpassed. Initialnewfixture missingenqueue commit wasfixedwithoutrelaxingassertions. Tests coverbefore/after swapSignal,bootstrap,noopsignal,missing/corruptbody,legacyfuturemtime,rollback,expired/olderintent,pointerdrift,atomicSQLrollback,sharedlockbusy. Recommend parentreview+controlledintegration; doesnotassertserialization<160, onlyrecoveryofcommittedpointerbeforebookkeeping.
