@@ -15,6 +15,7 @@
 - 存量读入口 `backend.shared.tushare_store.read_dataset(root, release_id, api_name)` 只读取固定版本。按自然键保留该版本中最新抓取记录，保存供应商原代码、未知字段和抓取时间；金额/量的原单位不偷偷转换。它是已观察数据视图，抓取时间不能证明历史当时已知，且不改变现有 QuantDB/业务查询路由。
 - 云端现有 Celery 每 120 秒发起一轮，最多 100 请求/100 秒（单次请求可能再花 30 秒），任务硬上限 180 秒；独立 tushare_acquire 队列和单并发 worker（1 GiB 内存、0.75 CPU），复用已有镜像及 Redis，避免与长时研究/行情作业互相阻塞。100 GiB 磁盘余量以下停止采集，不自动购盘。
 - 文档 worker 每轮把 `disk_capacity` 写入既有 `/data/tushare/document-worker-status.json` 和 Celery 回执，不访问 Token 或上游。字段包含当前可用字节、100 GiB 停采线、相对停采线的 headroom，以及从首次有效观测累计至少 30 分钟后的消耗速度和预计触线小时数。headroom 少于 40 GiB，或按该长期观测趋势预计 72 小时内触线时标为 `warning`；低于 100 GiB 时标为 `blocked`，并沿用原有 `blocked_disk_reserve` 停止领取新文档。趋势用于提醒扩容，不替代“下一批 + 30 天增长 + 快照峰值 + 100 GiB 恢复余量”的容量预算。
+- 生产数据盘当前是整盘 ext4 `/dev/vdb` 直接挂载到 `/root/data/disk`，无分区层和 LVM。容量告警触发后，先在云厂商控制面/API 扩大块设备；宿主看到新容量后复核挂载源和健康，再在线执行 `resize2fs /dev/vdb`，无需 `growpart`。扩容前后保留 `lsblk`/`findmnt`/`df` 证据，复核数据库完整性、worker 健康和 100 GiB 余量保护。当前主机未安装云厂商 CLI，不能从项目主机自动执行会产生计费的云盘扩容。
 - Mac 的 `scripts/tushare_mirror.py` 通过 SSH 获取固定清单，rsync 只拉缺失/损坏对象；下载和 SHA256 校验全部通过才更新本地 CURRENT。重复执行不重新下载完整对象；断线保留原版，重试续传。默认保存在 Mac `~/Library/Application Support/QuantMind/tushare`（不参与 Syncthing），首轮手动验收副本仍在 `logs/tushare-mirror`，不覆盖旧 data/results 或沙盒数据。
 
 生产启用前先双端预检、确认没有活动研究/训练和排队任务。源码合并和元数据对齐后，通过 `cloud-compose` 启动专用 tushare-worker，并重新创建 beat 使其 authority 角色生效。云端容器内，将示例配置复制到 `/data/tushare/pipeline-config.json`，创建 `/data/tushare/ENABLED` 才允许采集。删除 ENABLED 可暂停后续轮次，已在途请求正常完成。

@@ -55,5 +55,56 @@
     "payment_or_order": false,
     "upstream_response_body": false,
     "document_url_or_text": false
+  },
+  "production_followup": {
+    "observed_at": "2026-09-10T12:05:37Z",
+    "status_observed_at": "2026-09-10T12:03:53.442567+00:00",
+    "free_bytes": 152439779328,
+    "reserve_bytes": 107374182400,
+    "headroom_bytes": 45065596928,
+    "trend_window_seconds": 2514.482,
+    "consumption_bytes_per_hour": 1932998425.808,
+    "projected_hours_to_reserve": 23.314,
+    "status": "warning",
+    "warning_reasons": [
+      "reserve_within_72h_at_observed_trend"
+    ],
+    "interpretation": "The short window includes large publications and exact batches; it is an actionable expansion warning, not a steady-state growth estimate."
+  },
+  "host_storage_layout": {
+    "device": "/dev/vdb",
+    "device_bytes": 536870912000,
+    "filesystem": "ext4",
+    "partition_layer": false,
+    "lvm": false,
+    "mountpoint": "/root/data/disk",
+    "filesystem_bytes": 528239599616,
+    "filesystem_available_bytes": 152405426176,
+    "resize2fs_available": true,
+    "provider_cli_available": false
+  },
+  "directory_apparent_bytes": {
+    "attachments": 12924368679,
+    "extracted": 476951703,
+    "documents": 22826561577,
+    "objects": 13338397464,
+    "observations": 134105825,
+    "parquet": 5827564714,
+    "archives": 25421565077,
+    "releases": 25782175211,
+    "validation": 3937878382,
+    "aggregation_warning": "Do not sum these as physical usage; releases, archives and active data may share hard links."
+  },
+  "expansion_execution": {
+    "recommended_provider_target_minimum": "1 TiB",
+    "provider_side_action_required": true,
+    "provider_side_action_available_from_host": false,
+    "post_provider_steps": [
+      "verify /dev/vdb size and /root/data/disk source",
+      "run online resize2fs /dev/vdb",
+      "verify findmnt, df, SQLite integrity, worker health, publication and one-way Mac mirror"
+    ],
+    "growpart_required": false,
+    "collection_policy": "Continue while above the 100 GiB hard reserve; stop automatically at the reserve without shrinking scope."
   }
 }
