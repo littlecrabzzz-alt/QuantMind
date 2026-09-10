@@ -929,14 +929,17 @@ class Pipeline:
                     row["source_hk_code"] = value
                     if re.fullmatch(r"[0-9]{5}(?:![A-Z]{0,8})?\.HK", value):
                         row["hk_code"] = "HK" + value.removesuffix(".HK")
-            for key in (
+            code_fields = (
                 "ts_code",
                 "symbol",
                 "l1_code",
                 "l2_code",
                 "l3_code",
                 "index_code",
-            ):
+            )
+            if result["api_name"] == "index_weight":
+                code_fields += ("con_code",)
+            for key in code_fields:
                 if result["api_name"] in REALTIME_RUNTIME_CONTRACTS:
                     continue  # Already projected using source API/request asset identity.
                 if result["api_name"] in CALENDAR_EXTRA_RUNTIME_CONTRACTS or result["api_name"] in ACCOUNT_HISTORY_RUNTIME_CONTRACTS or result["api_name"] == "factor_list":

@@ -266,16 +266,56 @@ class DataAPITest(unittest.TestCase):
         self.release = self.publish(self.manifest)
         schema = self.get("/datasets/index_weight/schema").json()
         self.assertEqual(schema["default_code_field"], "index_code")
+        self.assertIn("source_con_code", [field["name"] for field in schema["fields"]])
         response = self.query(
             api_name="index_weight",
-            fields=["index_code", "con_code"],
+            fields=["index_code", "con_code", "source_con_code", "weight"],
             codes=["SH000300"],
         )
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(
             response.json()["rows"],
-            [{"index_code": "SH000300", "con_code": "600000.SH"}],
+            [
+                {
+                    "index_code": "SH000300",
+                    "con_code": "SH600000",
+                    "source_con_code": "600000.SH",
+                    "weight": 1.0,
+                }
+            ],
         )
+
+        sink = pa.BufferOutputStream()
+        pq.write_table(
+            pa.Table.from_pylist(
+                [
+                    {
+                        "index_code": "SH000300",
+                        "con_code": "SH600000",
+                        "source_con_code": "600000.SH",
+                        "trade_date": "20260908",
+                        "weight": 2.0,
+                        "_fetched_at": "2026-09-10T01:00:00+00:00",
+                        "_observation": "index-new",
+                    }
+                ]
+            ),
+            sink,
+        )
+        current = self.put("parquet", "parquet", sink.getvalue().to_pybytes())
+        self.manifest["files"] = self.files.copy()
+        self.manifest["datasets"].append(
+            {"api_name": "index_weight", "path": current}
+        )
+        self.release = self.publish(self.manifest)
+        response = self.query(
+            api_name="index_weight",
+            fields=["index_code", "con_code", "source_con_code", "weight"],
+            codes=["SH000300"],
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["returned_rows"], 1)
+        self.assertEqual(response.json()["rows"][0]["weight"], 2.0)
 
     def test_sql_and_path_escape_rejected(self):
         for filters in (

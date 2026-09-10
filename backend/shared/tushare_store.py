@@ -456,6 +456,22 @@ def _dataset(root, release_id, api_name):
                 "THEN 'HK' || left(ts_code, length(ts_code) - 3) "
                 "ELSE ts_code END AS ts_code)"
             )
+        if api_name == "index_weight":
+            # Old fixed releases kept constituent codes only in supplier suffix
+            # form. Project old and new partitions to one natural key before
+            # latest-version selection, while retaining the original spelling.
+            if "source_con_code" in columns:
+                relation = relation.project(
+                    "* REPLACE (COALESCE(source_con_code, con_code) AS source_con_code)"
+                )
+            else:
+                relation = relation.project("*, con_code AS source_con_code")
+            relation = relation.project(
+                "* REPLACE (CASE WHEN regexp_full_match(con_code, 'T?[0-9]{6}[.](SH|SZ|BJ)') "
+                "THEN split_part(con_code, '.', 2) || split_part(con_code, '.', 1) "
+                "ELSE con_code END AS con_code)"
+            )
+            columns = relation.columns
         relation.create_view("stored")
         metadata = _metadata(manifest, release_id, api_name, aliases)
         metadata["source_api_names"] = sorted(source_apis)

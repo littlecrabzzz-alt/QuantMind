@@ -78,6 +78,25 @@ class PipelineCliCodeTest(unittest.TestCase):
             )
             self.assertEqual(source["data"][0]["index_code"], "SH000300")
             self.assertEqual(source["data"][0]["source_index_code"], "000300.SH")
+            self.assertEqual(source["data"][0]["con_code"], "SH600000")
+            self.assertEqual(source["data"][0]["source_con_code"], "600000.SH")
+            for field, code in (
+                ("con_code", "SH600000"),
+                ("source_con_code", "600000.SH"),
+            ):
+                self.assertEqual(
+                    self.cli(
+                        root,
+                        release,
+                        "query",
+                        "index_weight",
+                        "--codes",
+                        code,
+                        "--code-field",
+                        field,
+                    )["rows"],
+                    1,
+                )
 
             for api, code in (("daily", "SH600000"), ("fund_adj", "SH510300")):
                 self.assertEqual(
