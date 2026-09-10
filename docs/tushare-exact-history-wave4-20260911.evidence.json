@@ -1,0 +1,246 @@
+{
+  "authority": {
+    "apparent_bytes_after_wave": 108096892848,
+    "closure": "validation/exact-history-wave4-20260911/closure.json",
+    "closure_sha256": "c7863997652553170b7fc051d9a61c61f5ed09bd94d7b06d612bde5effd5d143",
+    "fixed_input_release": "data-bdb8d5c76f676b5595a8af871cbc563e3705ff25713c4a5514c61b9aca9e6b68",
+    "free_bytes_after_wave": 232403939328,
+    "hard_reserve_bytes": 107374182400,
+    "role": "cloud_formal_writer",
+    "root": "/data/tushare"
+  },
+  "capacity": {
+    "resume_condition": "expand cloud disk and revalidate snapshot peak headroom",
+    "whole_project_snapshot_timer_active": false,
+    "whole_project_snapshot_timer_enabled": false
+  },
+  "exact_wave4": {
+    "aggregate": {
+      "elapsed_seconds_sum": 153.701,
+      "http_200": 904,
+      "http_429": 0,
+      "reference_occurrences": {
+        "object": 904,
+        "observation": 904,
+        "parquet": 904
+      },
+      "rows": 1315020,
+      "tasks": 1084,
+      "unique_references_verified": {
+        "object": 904,
+        "observation": 904,
+        "parquet": 904
+      },
+      "upstream_calls": 904
+    },
+    "batches": {
+      "anns_d_batch_3": {
+        "current_release_switched": false,
+        "elapsed_seconds": 63.277,
+        "http_statuses": {
+          "200": 180
+        },
+        "manifest_sha256": "5b0347e19be79a9a4e17e30894d6d8ecd52fd19d266a714f4543981fd00e07a4",
+        "receipt_id": "79ea9bc13592af0349bee2427dc1115e40938a0206cafe4a5146ab087e768d81",
+        "reference_bytes_verified": {
+          "object": 200295760,
+          "observation": 156920,
+          "parquet": 65720023
+        },
+        "reference_occurrences": {
+          "object": 180,
+          "observation": 180,
+          "parquet": 180
+        },
+        "release_published": false,
+        "result_statuses": {
+          "possibly_truncated": 176,
+          "sample_ok": 4
+        },
+        "rows": 1051468,
+        "rows_by_api": {
+          "anns_d": 1051468
+        },
+        "states": {
+          "done": 4,
+          "pending": 180,
+          "split_pending": 176
+        },
+        "task_inventory_sha256": "0411e8890a8fe9d818f5c1ed2dc6870fd7a93f91b921f5ab7165e5e57cd7dc13",
+        "tasks": 360,
+        "upstream_calls": 180
+      },
+      "dividend_batch_4": {
+        "current_release_switched": false,
+        "elapsed_seconds": 44.779,
+        "http_statuses": {
+          "200": 360
+        },
+        "manifest_sha256": "38d2947ee323fae4b13906e5622930d329300fe5cd6ceb01114a83e484d6d6e3",
+        "receipt_id": "a26b483b85307fde7e02fcb28f30fff2b8e76adaea0c6cf3a1ea6b496a8a9ef9",
+        "reference_bytes_verified": {
+          "object": 2816191,
+          "observation": 322559,
+          "parquet": 3743603
+        },
+        "reference_occurrences": {
+          "object": 360,
+          "observation": 360,
+          "parquet": 360
+        },
+        "release_published": false,
+        "result_statuses": {
+          "sample_ok": 360
+        },
+        "rows": 22402,
+        "rows_by_api": {
+          "dividend": 22402
+        },
+        "states": {
+          "done": 360
+        },
+        "task_inventory_sha256": "b8c3641e86a2a12bea924f723af6e3977ac38ec7a26f08b36233ab2219879135",
+        "tasks": 360,
+        "upstream_calls": 360
+      },
+      "fund_price_batch_5": {
+        "current_release_switched": false,
+        "elapsed_seconds": 43.86,
+        "http_statuses": {
+          "200": 360
+        },
+        "manifest_sha256": "89fa7f1339dfcde5f5db499adcc7803fe301a4848737411fce056d380499cbf0",
+        "receipt_id": "4718c0792d1439e36059a2148a5d426e3c8fb5c7c3ae5f39d34a8fa127eeebcd",
+        "reference_bytes_verified": {
+          "object": 13335891,
+          "observation": 317728,
+          "parquet": 16932087
+        },
+        "reference_occurrences": {
+          "object": 360,
+          "observation": 360,
+          "parquet": 360
+        },
+        "release_published": false,
+        "result_statuses": {
+          "sample_ok": 360
+        },
+        "rows": 240136,
+        "rows_by_api": {
+          "fund_adj": 126760,
+          "fund_daily": 113376
+        },
+        "states": {
+          "done": 360
+        },
+        "task_inventory_sha256": "bb07fdb0cea3332e828358070badd7f2a3352cfeeaad64c457c9eec7a667e34f",
+        "tasks": 360,
+        "upstream_calls": 360
+      },
+      "npr_history_leaf_batch_2": {
+        "current_release_switched": false,
+        "elapsed_seconds": 1.785,
+        "http_statuses": {
+          "200": 4
+        },
+        "manifest_sha256": "835efee60857b6e0b9efc18e538b03968840f1ebbe8879bec54be091b83f9e34",
+        "receipt_id": "abd431a13ce661d53effc1d9618bbb111373e22547272a73e4d30b5183b4fe19",
+        "reference_bytes_verified": {
+          "object": 13514310,
+          "observation": 3625,
+          "parquet": 3236050
+        },
+        "reference_occurrences": {
+          "object": 4,
+          "observation": 4,
+          "parquet": 4
+        },
+        "release_published": false,
+        "result_statuses": {
+          "possibly_truncated": 2,
+          "sample_ok": 2
+        },
+        "rows": 1014,
+        "rows_by_api": {
+          "npr": 1014
+        },
+        "states": {
+          "done": 2,
+          "split_pending": 2
+        },
+        "task_inventory_sha256": "c0a761dff373e251a046aa34335a323df31185552d5686e75659eb5377c21482",
+        "tasks": 4,
+        "upstream_calls": 4
+      }
+    },
+    "current_release_switched": false,
+    "fund_price_trade_date_range": [
+      "20170118",
+      "20171017"
+    ],
+    "release_published": false
+  },
+  "execution_contract": {
+    "plan_only": {
+      "all_batches_verified": true,
+      "would_access_authority": false,
+      "would_access_credentials": false,
+      "would_call_upstream": false,
+      "would_publish": false,
+      "would_write": false
+    },
+    "rate_policy": {
+      "account_rpm": 500,
+      "announcement_requested_call_cap": 180,
+      "cyq_perf_daily_cap": 200000,
+      "mode": "tiered_v1"
+    },
+    "safe_drain": {
+      "beat_stopped_before_freeze": true,
+      "consumer_cancelled": "tushare_acquire",
+      "inflight_elapsed_seconds": 186.77568292990327,
+      "inflight_task_naturally_completed": "c3bb96f6-d340-448d-8a8c-76febdb502e8",
+      "revoked_tasks": 0,
+      "worker_stopped_only_after_active_and_reserved_empty": true
+    },
+    "service_restore": {
+      "api_health": "healthy",
+      "beat_health": "healthy",
+      "oom_killed": false,
+      "restart_count": 0,
+      "tushare_worker_health": "healthy",
+      "tushare_worker_memory_bytes": 2147483648
+    }
+  },
+  "git": {
+    "branch": "master",
+    "head_before_evidence_commit": "2920615d591a9fbb371726ce4a49ff206ac4ee1b",
+    "mac_github_cloud_aligned_before_evidence_commit": true
+  },
+  "observed_at": "2026-09-10T23:55:45Z",
+  "publication_and_mirror": {
+    "current_manifest_sha256": "bdb8d5c76f676b5595a8af871cbc563e3705ff25713c4a5514c61b9aca9e6b68",
+    "current_release_id": "data-bdb8d5c76f676b5595a8af871cbc563e3705ff25713c4a5514c61b9aca9e6b68",
+    "mac_poll_interval_seconds": 900,
+    "next_due_at_epoch": 1789085820,
+    "next_due_at_local": "2026-09-11T08:17:00+08:00",
+    "npr_residual_batches_in_current_fixed_release": false,
+    "wave4_in_current_fixed_release": false,
+    "wave4_mac_mirror_available": false
+  },
+  "rrg_boundary": {
+    "history_complete": false,
+    "pit_verified": false,
+    "price_and_calendar_data_already_high_coverage": true,
+    "primary_open_gap": "PIT industry membership and classification versions with known_at and source evidence",
+    "status": "blocked_data",
+    "strategy_or_return_computed": false
+  },
+  "schema_version": 1,
+  "security": {
+    "order_or_payment_data_present": false,
+    "token_present": false,
+    "upstream_response_bodies_present": false
+  },
+  "status": "production_verified_unpublished_wave"
+}

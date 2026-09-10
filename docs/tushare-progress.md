@@ -751,3 +751,12 @@
 - Mac第152次标准镜像新增13006个文件并完整校验738613项，exit0、错误日志0字节，原子追平同一release；本地manifest SHA一致，镜像约94820483072字节。生产镜像在`--network none`、两个Token变量为空和只读镜像挂载下读取`fund_daily@20171018`返回5行，上游调用0。
 - `a6d3a9ef`新增NPR历史叶默认plan-only精确批次。生产首次准备发现原审计6项中已有1项被常驻worker完成，0调用安全停止；`206e6c5d`改为冻结当前最多6个合格叶并把实际任务哈希写入清单，执行器仍在排他锁内跨所有epoch重查logical attempts。剩余5项用2.3秒完成5次HTTP 200、0次429、1223行，结果2 done、1 empty、2 split_pending；5个object、5个observation和4个Parquet物理SHA全通过。清单SHA为`c311855ef87ee00b6f491bb296f2b9620277c36e77e5149baeef637306476831`，闭包SHA为`4bfd840c22dc760b110e1a4a8ea7ae57c27f5d9675f3e12c5f93c81e67003f39`。
 - 主API已用`docker-compose.yml + deploy/compose.cloud.yml`正确重建，监听`127.0.0.1:18000`并返回HTTP 200；Web、专用worker和Beat均healthy、restart0、OOM false。新Python进程默认`LITELLM_LOCAL_MODEL_COST_MAP=True`且不再产生无关远程费用表请求。Mac、GitHub和云端源码在证据提交前对齐`206e6c5d`；NPR尾批尚未进入下一固定版，完整历史、修订/PIT仍未完成，RRG继续`blocked_data`。机器证据为`docs/tushare-wave23-fixed-npr-storage-20260911.evidence.json`。
+
+## 2026-09-11 07:56 第四次历史精确波次
+
+- Beat先停止，专用worker取消`tushare_acquire`接新任务；已在途的`c3bb96f6…`用186.776秒自然成功，active/reserved均为空后才停止worker，全程没有revoke。四份清单均固定`data-bdb8d5c76f676b5595a8af871cbc563e3705ff25713c4a5514c61b9aca9e6b68`、配置、任务集、prepare和runner哈希；默认plan-only的authority、凭据、上游、写入、发布访问均为false。
+- 基金行情第5批覆盖20170118—20171017的180个共同SSE交易日，43.860秒完成`fund_daily`与`fund_adj`各180次，360项全部done、240136行。分红第4批固定沪深各180只，44.779秒完成360次，全部done、22402行。
+- NPR首批二分后新生成的4个未尝试叶在1.785秒完成4次调用，2 done/2 split_pending、1014行。公告第3批固定360个未尝试拆分页，但执行上限主动降为180次；63.277秒完成180次HTTP 200，4 done/176 split_pending/180项保持pending，返回1051468行，没有再次触及90秒规范化边界。
+- 四批合计904次上游调用、904次HTTP 200、0次429、1315020行；逐实体重算904个object、904个observation和904个Parquet SHA全部通过。权威闭包`validation/exact-history-wave4-20260911/closure.json` SHA256为`c7863997652553170b7fc051d9a61c61f5ed09bd94d7b06d612bde5effd5d143`，清单和收据均以0444不可覆盖方式归档。
+- 专用worker与Beat已恢复healthy、restart0、OOM false，主API保持healthy；authority约108096892848字节，云盘可用232403939328字节，高于100GiB硬停线。`CURRENT`仍为`data-bdb8d5c7…`，本波与两批NPR尾项等待08:17之后的正常固定发布及Mac单向镜像。
+- 并行RRG只读审计确认行业价格与日历覆盖已经较高，P0缺口仍是带`known_at`、修订版本和来源证据的中信行业分类与历史成员PIT；继续增加普通价格行不能解除`blocked_data`。完整历史、历史修订和PIT仍未闭合。机器证据为`docs/tushare-exact-history-wave4-20260911.evidence.json`。
