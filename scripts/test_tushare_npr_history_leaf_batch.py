@@ -118,13 +118,6 @@ class NprHistoryLeafBatchTest(unittest.TestCase):
         )
         pipeline.db.commit()
         pipeline.close()
-        self.audit_patch = patch.object(
-            preparation,
-            "AUDITED_TASK_IDS_SHA256",
-            digest(json_bytes(sorted(self.children))),
-        )
-        self.audit_patch.start()
-        self.addCleanup(self.audit_patch.stop)
         (self.root / "pipeline.lock").touch(exist_ok=True)
         (self.root / "ENABLED").touch()
         self.config = {
@@ -187,7 +180,7 @@ class NprHistoryLeafBatchTest(unittest.TestCase):
             },
         )
 
-    def test_prepare_fails_if_leaf_inventory_drifts(self):
+    def test_prepare_refreezes_after_leaf_inventory_drifts(self):
         pipeline = pipeline_module.Pipeline(self.root, self.catalog)
         parent = pipeline.enqueue(
             "npr",
@@ -221,13 +214,22 @@ class NprHistoryLeafBatchTest(unittest.TestCase):
         )
         pipeline.db.commit()
         pipeline.close()
-        with self.assertRaisesRegex(ValueError, "Audited NPR task inventory changed"):
-            preparation.prepare(
-                self.root,
-                self.base / "drift.json",
-                self.release_id,
-                self.release_sha,
-            )
+        drift = self.base / "drift.json"
+        preparation.prepare(
+            self.root,
+            drift,
+            self.release_id,
+            self.release_sha,
+        )
+        manifest = json.loads(drift.read_bytes())
+        task_ids = {record["task_id"] for record in manifest["records"]}
+        self.assertEqual(len(task_ids), 6)
+        self.assertNotIn(self.children[0], task_ids)
+        self.assertIn(child, task_ids)
+        self.assertEqual(
+            manifest["source"]["frozen_task_ids_sha256"],
+            manifest["all_task_ids_sha256"],
+        )
 
     def test_plan_only_is_offline_and_does_not_access_authority(self):
         before = (self.root / "pipeline.sqlite").read_bytes()

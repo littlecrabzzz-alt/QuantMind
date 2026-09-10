@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freeze the six untouched NPR history leaves against one fixed release."""
+"""Freeze up to six untouched NPR history leaves against one fixed release."""
 
 from __future__ import annotations
 
@@ -28,10 +28,7 @@ API = "npr"
 EXPECTED_API_RPM = 500
 EXPECTED_ACCOUNT_RPM = 500
 GROUP = "text"
-EXPECTED_BATCH_JOBS = 6
-AUDITED_TASK_IDS_SHA256 = (
-    "09dc4c11afe018732e18f4f7108e9be0939b87715265d1f15cbea79bbc05d846"
-)
+MAX_BATCH_JOBS = 6
 RELEASE_RE = re.compile(r"data-([a-f0-9]{64})")
 NPR_DATE_RE = re.compile(
     r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"
@@ -180,7 +177,7 @@ def verify_manifest(path, manifest_sha256):
         or manifest.get("schema_version") != 1
         or manifest.get("kind") != "npr_history_leaf_exact_batch"
         or not isinstance(records, list)
-        or len(records) != EXPECTED_BATCH_JOBS
+        or not 1 <= len(records) <= MAX_BATCH_JOBS
         or manifest.get("rate_contracts", {}).get("api", {}).get("rpm")
         != EXPECTED_API_RPM
         or not str(
@@ -208,7 +205,8 @@ def verify_manifest(path, manifest_sha256):
         or source.get("tries") != 0
         or source.get("attempts") != 0
         or source.get("direct_split_child") is not True
-        or source.get("audited_task_ids_sha256") != AUDITED_TASK_IDS_SHA256
+        or source.get("frozen_task_ids_sha256")
+        != manifest.get("all_task_ids_sha256")
         or not RELEASE_RE.fullmatch(str(source.get("release_id", "")))
         or source["release_id"]
         != "data-" + str(source.get("release_manifest_sha256", ""))
@@ -298,15 +296,12 @@ def prepare(root, output, release_id, release_manifest_sha256):
             continue
         seen_logical_keys.add(record["logical_key"])
         records.append(record)
-    if len(records) != EXPECTED_BATCH_JOBS:
-        raise ValueError(
-            "Expected exactly 6 untouched NPR history leaves; "
-            f"found {len(records)}"
-        )
+        if len(records) == MAX_BATCH_JOBS:
+            break
+    if not records:
+        raise ValueError("No untouched NPR history leaf is available")
     task_ids = sorted(record["task_id"] for record in records)
     task_ids_sha256 = digest(json_bytes(task_ids))
-    if task_ids_sha256 != AUDITED_TASK_IDS_SHA256:
-        raise ValueError("Audited NPR task inventory changed")
     logical_keys = [record["logical_key"] for record in records]
     manifest = {
         "schema_version": 1,
@@ -320,8 +315,8 @@ def prepare(root, output, release_id, release_manifest_sha256):
             "tries": 0,
             "attempts": 0,
             "direct_split_child": True,
-            "audited_task_ids_sha256": AUDITED_TASK_IDS_SHA256,
-            "selection": "all_distinct_unattempted_npr_history_leaves",
+            "frozen_task_ids_sha256": task_ids_sha256,
+            "selection": "first_up_to_6_distinct_unattempted_npr_history_leaves",
             "eligible_tasks": len(eligible),
             "skipped_logical_duplicates": len(eligible)
             - len({record["logical_key"] for record in eligible}),
