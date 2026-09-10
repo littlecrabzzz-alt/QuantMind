@@ -532,3 +532,14 @@
 - 到期后用同一生产`tick()`入口先完成0请求规划，再完成0请求固定发布；最终固定版为`data-6c9f0b0b777f5edfbb3654809006b01ea22770dd23fce20839be1a9be0d20ab1`，清单574380文件、243项scope/合同、193个已有非空发布数据集。标准Mac镜像随后原子追平同一CURRENT，镜像约72G；本地在禁网络条件下用前缀代码`SZ000001`读取`rt_min`一行成功，证明该新数据可离线消费且不会访问Tushare Pro。
 - 合并后Python3.10完整Tushare回归951项通过、skipped5；本轮新改文件的Ruff检查通过，`backend/shared/tushare_pipeline.py`全文件仍有4个此前已存在的UP038建议。专属采集与文档worker均healthy，普通采集任务重启后成功完成；采集队列仍只由专属worker消费。云盘可用158941462528字节，仍高于107374182400字节停采线。
 - 机器验收摘要`docs/tushare-realtime-rrg-production-20260910.evidence.json`，SHA256 `0e332138791537481ad05c472d156ac194c7f434aa623711b6270a0e4dd93d45`，不含Token、订单或付款信息。固定版发布时仍有约310.9万结构化pending；稍后实时库文档仍有约107.9万pending。RRG的成员known_at、版本化ETF行业映射、价格/可交易/分红/PCF窗口，以及大清单发布的160秒尾延迟继续开放，因此本轮完成的是接入、有限实测、精确补数、发布和本地离线闭包，不代表Tushare历史全量或RRG研究准入完成。
+
+## 2026-09-10 17:12 发布与文档互斥、任务预算及 RRG 第二批生产验收
+
+- 生产日志确认发布`document_index`长写事务与文档结果提交争用同一SQLite写锁：约100分钟窗口中36批成功、4次`database is locked`，发布本身又已接近160秒采集任务软限。`46e930a8`/`b4cf6a2e`让到期发布在浏览文档库前非阻塞取得既有`documents.lock`并持有至原子CURRENT切换完成；文档任务正活跃时显式返回`publish_deferred_documents_active`，不改CURRENT/检查点且不重复派发。非发布轮在规划/采集前调用一次文档派发钩子，保留两个专用worker并行。
+- 首个互斥真实任务`04441eff…`在文档锁忙时13.676秒快速延期。随后固定清单已增长到约200MB，旧Celery 160/180秒软硬限与实测155–189秒发布不兼容；`40f0acc3`仅把专用采集任务外层改为300/330秒，内部上游请求数、90秒采集窗口、900秒发布/规划周期和100GiB停采线未改。部署时进一步发现未重启的Celery Beat仍在消息头写160/180；排空后只重启Beat和采集worker，清除1条过期Tushare续跑消息。
+- 新Beat产生的自动发布任务`4f6896c5-354d-4a1c-ae33-359ce437cb0e`运行188.692秒后成功，0上游请求，原子切换到`data-d889a510fffc39f0c5cbeba77be0896801213f77744f67b2e2c50e7d7d116491`；发布结束后64毫秒只接收1个文档任务。重载后验收窗口的`database is locked=0`、`160s soft timeout=0`，Beat/采集/文档三服务healthy。不可覆盖收据`/data/tushare/validation/publish-document-coordination-20260910/acceptance.json`，SHA256 `db2ec1b27f676951a77a1cc3aa3773f833a41c837724fa87d8ace75636f2b6e2`。
+- 标准Mac客户端增量下载1335个文件并校验581342个文件后，原子追平同一`data-d889a5…`。本地研究可继续固定release离线读取，新镜像不向Tushare Pro重拉存量，也不回写云端权威库。
+- `892cd8fd`修正RRG审计的`FUND:<source_ts_code>`命名空间和固定manifest空回执计算。针对`data-d42bf11…`离线重算为：`etf_limit`观察152139对、RRG生命周期内107293对、月度执行点1648对；`fund_div`有21个代码有事件、311个有空回执，而不是旧报告的0覆盖。成员`known_at`、版本化ETF-行业映射、4887个缺价生命周期的权威可交易分类和PCF时点仍使RRG保持`blocked_data`。
+- 第二个精确RRG批次验证8分片/1767任务整批哈希、authority/schema6/配置/工具哈希和100GiB阈值后，在51.961秒内完成360次`fund_div`请求：由21 done/312 empty/1385 pending推进到44 done/649 empty/1025 pending。任务身份和优先级不变，不发布、不切换CURRENT；不可覆盖收据`/data/tushare/validation/rrg-exact-batch-20260910/receipt-26d70867b68155d1.json`，SHA256 `c995c383f985ba415fb25c6255e09fdd52917f2834bffbe2028b8f8c61572f6a`。
+- 目录边界复核仍为249个命名能力、243个运行时可读、6个非运行时义务，没有已注册却无reader的公开数据。`ggt_monthly`继续等待有效官方合同；`p_list/p_get`需账户所有者绑定的独立私有namespace/manifest/mirror/reader；`p_save/p_delete`永久排除自动化；`pro_bar`是SDK派生层，底层数据集已接入。这些不阻塔243项公开数据的历史闭包继续运行。
+- 合并后Python3.10完整Tushare回归959项通过、skipped5，日志SHA256 `6c18f121fe2452623c439ce060dcbac72b0bdb4943bb85e5332209507855f253`；相邻33项、Ruff和diff check通过。本轮未把Token、订单、付款或上游响应正文写入Git或报告。

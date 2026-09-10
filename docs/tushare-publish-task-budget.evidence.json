@@ -20,13 +20,23 @@
     "The document publication lock remains non-blocking and unchanged."
   ],
   "validation": {
-    "status": "candidate_tests_passed",
+    "status": "production_verified",
     "targeted_tests": 30,
     "full_python_3_10_tests": 958,
     "full_python_3_10_skipped": 5,
     "full_test_log_sha256": "ed515eca35ab04cbae1186fc331f1368920a6d0529f24f37840e52e831b30094",
     "ruff": "passed",
     "diff_check": "passed",
-    "production_required": "Cloud worker reload and one successful real fixed publication under 300 seconds"
+    "production": {
+      "authority_receipt": "/data/tushare/validation/publish-document-coordination-20260910/acceptance.json",
+      "authority_receipt_sha256": "db2ec1b27f676951a77a1cc3aa3773f833a41c837724fa87d8ace75636f2b6e2",
+      "celery_beat_reloaded": true,
+      "stale_tushare_messages_purged": 1,
+      "task_id": "4f6896c5-354d-4a1c-ae33-359ce437cb0e",
+      "elapsed_seconds": 188.69239789620042,
+      "release_id": "data-d889a510fffc39f0c5cbeba77be0896801213f77744f67b2e2c50e7d7d116491",
+      "soft_160_after_reload": 0,
+      "database_locked_after_reload": 0
+    }
   }
 }

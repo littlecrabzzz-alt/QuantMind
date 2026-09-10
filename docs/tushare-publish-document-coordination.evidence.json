@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "candidate_verified_pending_production",
+  "status": "production_verified",
   "observed_on": "2026-09-10",
   "baseline_revision": "9f4b05f63ba49fb66d633fb0164b17a5070d4aee",
   "production_observation": {
@@ -78,17 +78,29 @@
     "network_calls": 0,
     "authority_writes": 0
   },
-  "production_acceptance_required": [
-    "Deploy only after both dedicated queues are drained and source/Git are aligned.",
-    "Observe an active document task causing one fast publish_deferred_documents_active result without changing CURRENT or the checkpoint.",
-    "Observe the following due automatic publish below the 160 second soft limit while it holds documents.lock.",
-    "Verify the successful publish dispatches exactly one subsequent document task.",
-    "Observe later non-publication acquisition and document work running in parallel.",
-    "Verify no new database-is-locked document failure in the acceptance window and both workers remain healthy."
-  ],
+  "production_acceptance_required": [],
   "security": {
     "token_read": false,
     "credential_in_report": false,
     "production_response_body_in_report": false
+  },
+  "production_acceptance_results": [
+    "A due publication deferred in 13.676 seconds while the document lock was active without changing CURRENT or the publication checkpoint.",
+    "After the Celery producer and worker loaded the 300/330 second envelope, automatic publication completed in 188.692 seconds and atomically switched CURRENT.",
+    "Exactly one subsequent document task was received 64 milliseconds after publication completion.",
+    "Non-publication acquisition and document tasks overlapped; the post-reload acceptance window had no database-is-locked failure."
+  ],
+  "production_acceptance": {
+    "authority_receipt": "/data/tushare/validation/publish-document-coordination-20260910/acceptance.json",
+    "authority_receipt_sha256": "db2ec1b27f676951a77a1cc3aa3773f833a41c837724fa87d8ace75636f2b6e2",
+    "deferred_task_id": "04441eff-5361-4828-8757-6b9520a84d3b",
+    "deferred_elapsed_seconds": 13.675788896158338,
+    "published_task_id": "4f6896c5-354d-4a1c-ae33-359ce437cb0e",
+    "published_elapsed_seconds": 188.69239789620042,
+    "release_id": "data-d889a510fffc39f0c5cbeba77be0896801213f77744f67b2e2c50e7d7d116491",
+    "subsequent_document_task_id": "55b1f5d4-945b-4f75-9beb-eaabb85b27f3",
+    "nonpublication_parallelism_observed": true,
+    "post_reload_database_locked_count": 0,
+    "workers_healthy": true
   }
 }
