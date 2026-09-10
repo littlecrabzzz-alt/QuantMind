@@ -1,0 +1,496 @@
+{
+  "schema_version": 1,
+  "reviewed_on": "2026-09-10",
+  "network_scope": "public official documentation and official GitHub repositories only; no token or data API calls",
+  "official_reference": {
+    "repository": "https://github.com/waditu/tushare-data",
+    "commit": "b68d5517e0cbe84d61774de26ad366d900c7eb92",
+    "reference_path": "tushare/references/数据接口.md",
+    "content_sha256": "800e4305729d29c134d32be64c73bdf29d6c1470edeca85ebebeca6c2d9bc33c",
+    "rows": 229,
+    "unique_labels": 224
+  },
+  "official_sdk": {
+    "repository": "https://github.com/waditu/tushare",
+    "commit": "093856995af0811d3ebbe8c179b8febf4ae706f0",
+    "version": "1.2.18",
+    "client_path": "tushare/pro/client.py",
+    "client_sha256": "2919f2a844201a5de4e613964231245c042f9ac463d155ec16ff3bb6da467af1",
+    "finding": "The current Pro client is a generic dynamic query transport and does not enumerate provider API names."
+  },
+  "current_document_checks": [
+    {
+      "doc_id": "416",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/416.md",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 1446,
+      "sha256": "4e43c99f218a86820f5f03563494701ff961a517036272796531ec89f505a538",
+      "missing": false
+    },
+    {
+      "doc_id": "416",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=416",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 33384,
+      "sha256": "3f6791db049cc20ec38cf237cac20c508e42936b0e07f34ae29d6d3a0539e13b",
+      "missing": false
+    },
+    {
+      "doc_id": "374",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/374.md",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 1210,
+      "sha256": "ea569c9d205870e80b04f6ef36f593be4fe0692be7e1a0c0e8d697e6e9434ac9",
+      "missing": false
+    },
+    {
+      "doc_id": "374",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=374",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 33144,
+      "sha256": "1ab1e6dfafee4a4ed07ee15605d449da284fef97f23e3f35742279d6f7bab320",
+      "missing": false
+    },
+    {
+      "doc_id": "383",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/383.md",
+      "status": "404",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "missing": false
+    },
+    {
+      "doc_id": "383",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=383",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 23,
+      "sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "missing": true
+    },
+    {
+      "doc_id": "188",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/188.md",
+      "status": "404",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "missing": false
+    },
+    {
+      "doc_id": "188",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=188",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 23,
+      "sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "missing": true
+    },
+    {
+      "doc_id": "274",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/274.md",
+      "status": "404",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "missing": false
+    },
+    {
+      "doc_id": "274",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=274",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 23,
+      "sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "missing": true
+    },
+    {
+      "doc_id": "295",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/295.md",
+      "status": "404",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "missing": false
+    },
+    {
+      "doc_id": "295",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=295",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 23,
+      "sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "missing": true
+    },
+    {
+      "doc_id": "156",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/156.md",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 1298,
+      "sha256": "ae01d7d43283ddce615b2396b8128c727c242cb8dc1ea803470c8b6bcdb874d9",
+      "missing": false
+    },
+    {
+      "doc_id": "156",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=156",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 32579,
+      "sha256": "9e1db3aacbc3fcea52490d79e0091ac1375cece7e432cdaf88f342ee6f1a1253",
+      "missing": false
+    },
+    {
+      "doc_id": "180",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/180.md",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 9152,
+      "sha256": "d9006e0885d400b25a844d0a09673bc6a9f769c8fde513868b4e3d8b923dc152",
+      "missing": false
+    },
+    {
+      "doc_id": "180",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=180",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 40657,
+      "sha256": "25a717294d849869bd32c726a6b5fc1a081266808b301f70ad782d7c41a76ee1",
+      "missing": false
+    },
+    {
+      "doc_id": "87",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/87.md",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 17680,
+      "sha256": "78783ad408be75da349ba1b1c4e4810868edb6f528897b20d892e2b9fc23248e",
+      "missing": false
+    },
+    {
+      "doc_id": "87",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=87",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 74210,
+      "sha256": "06752694e11c741360878b00be31c63f3df3f349ec547a980517332d2612950d",
+      "missing": false
+    },
+    {
+      "doc_id": "88",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/88.md",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 3109,
+      "sha256": "48220e5bfa9b612f8dba1ff7357a65fcd25b1c3f71d9721f84f8c7de92def7c6",
+      "missing": false
+    },
+    {
+      "doc_id": "88",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=88",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 35828,
+      "sha256": "8b5158b21154e38b60283ada098692a09f48d4274e18e6d4b5987823bda11d92",
+      "missing": false
+    },
+    {
+      "doc_id": "113",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/113.md",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 2085,
+      "sha256": "ce6deb35f51c0b9589643f3b36adc5d58dfc2098b3b5df42391361302e17a579",
+      "missing": false
+    },
+    {
+      "doc_id": "113",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=113",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 33336,
+      "sha256": "a32a92a05ef308d82127f3be47daf298eef25b59e34a06b5b067439fa495f799",
+      "missing": false
+    },
+    {
+      "doc_id": "115",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/115.md",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 1920,
+      "sha256": "3ba68a95f550a4142feb94aa99159cc61985ec4d1c0bedd3efdecfc0326be78f",
+      "missing": false
+    },
+    {
+      "doc_id": "115",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=115",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 33163,
+      "sha256": "9a519590a676cb87e838d4fa55ba0cad49df8c2031e99dbc6d96ba6ae4386fb3",
+      "missing": false
+    },
+    {
+      "doc_id": "116",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/116.md",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 2647,
+      "sha256": "a3c1aa247402a93124a924884f6d199b6977228a44b6706f7928a79983962855",
+      "missing": false
+    },
+    {
+      "doc_id": "116",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=116",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 33840,
+      "sha256": "a4fd1ebe9b704f524d4031b4e5578b181218d3e09cb658d5aef2b28cf295cf95",
+      "missing": false
+    },
+    {
+      "doc_id": "114",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/114.md",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 1853,
+      "sha256": "b239a24ae7e8ccad2a020494c6f956ed43f256ee70fa2b985011fc2686e12c38",
+      "missing": false
+    },
+    {
+      "doc_id": "114",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=114",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 33097,
+      "sha256": "c53b5175a2c71ab5d9b5ff8a071d4badd8948a651f96fcb40d1230b11a483bb5",
+      "missing": false
+    },
+    {
+      "doc_id": "265",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/265.md",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 1153,
+      "sha256": "12265eab1aeaf510fb51956d7a695ecec808ce8f52fa16fc4429b00046bd6de0",
+      "missing": false
+    },
+    {
+      "doc_id": "265",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=265",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 32242,
+      "sha256": "4404527d1f1fc1fabb661ee34ec2ea12198bf1c1d9849128c9d8f6fa9f723b9a",
+      "missing": false
+    },
+    {
+      "doc_id": "266",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/266.md",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 2267,
+      "sha256": "2b39c7688fe216b9e1cdd52cf0490c39454868f09dfa5108e997850eff5ff6cf",
+      "missing": false
+    },
+    {
+      "doc_id": "266",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=266",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 33444,
+      "sha256": "d0663b517e919e7384c1636231cc4c8da0bf71b4703c37d8bf6945434b6143e9",
+      "missing": false
+    },
+    {
+      "doc_id": "422",
+      "kind": "md",
+      "url": "https://tushare.pro/wctapi/documents/422.md",
+      "status": "404",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "missing": false
+    },
+    {
+      "doc_id": "422",
+      "kind": "page",
+      "url": "https://tushare.pro/document/2?doc_id=422",
+      "status": "200",
+      "curl_exit": 0,
+      "stderr": "",
+      "bytes": 23,
+      "sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "missing": true
+    }
+  ],
+  "resolved_current_public_read_only": {
+    "374": [
+      "rt_min"
+    ],
+    "416": [
+      "rt_etf_min",
+      "rt_etf_min_daily"
+    ],
+    "156": [
+      "film_record"
+    ],
+    "180": [
+      "teleplay_record"
+    ],
+    "87": [
+      "tmt_twincomedetail"
+    ],
+    "88": [
+      "tmt_twincome"
+    ],
+    "113": [
+      "bo_monthly"
+    ],
+    "114": [
+      "bo_weekly"
+    ],
+    "115": [
+      "bo_daily"
+    ],
+    "116": [
+      "bo_cinema"
+    ],
+    "265": [
+      "fund_sales_ratio"
+    ],
+    "266": [
+      "fund_sales_vol"
+    ]
+  },
+  "current_missing_documents": {
+    "383": [
+      "rt_hk_k"
+    ],
+    "188": [
+      "hk_hold"
+    ],
+    "274": [
+      "ccass_hold_detail"
+    ],
+    "295": [
+      "ccass_hold"
+    ],
+    "422": [
+      "dc_concept_cons"
+    ]
+  },
+  "selection": {
+    "implemented_candidate": [
+      "film_record",
+      "teleplay_record",
+      "bo_monthly",
+      "bo_weekly",
+      "bo_daily",
+      "bo_cinema",
+      "fund_sales_ratio",
+      "fund_sales_vol"
+    ],
+    "retained_later": [
+      "rt_min",
+      "rt_etf_min",
+      "rt_etf_min_daily",
+      "tmt_twincomedetail",
+      "tmt_twincome"
+    ],
+    "reason": "Prefer bounded historical/public datasets; realtime requires independent entitlement and TMT needs a separate product/symbol completeness plan."
+  },
+  "limitations": [
+    "Reference labels can be stale: doc416 is labeled rt_min in the reference, while the current body names rt_etf_min and rt_etf_min_daily.",
+    "A current document proves a public contract, not account entitlement, actual rows, complete history, revisions or point-in-time availability.",
+    "Missing current pages remain discovery gaps; cached or third-party schemas are not promoted."
+  ],
+  "implementation_result": {
+    "base_commit": "222a3791cda67d544e8a0d869657665b2f4a6e34",
+    "contracts_added": 8,
+    "documented_output_fields_added": 73,
+    "enablement": "default_disabled; enable_offcatalog plus an explicit offcatalog_apis list are both required",
+    "scope_counts": {
+      "total_named_scope": 249,
+      "registered_union": 238,
+      "runtime_readable": 238,
+      "not_registered_in_scope": 11,
+      "public_read_only_contract_blocked": 6
+    },
+    "real_probe_required": [
+      "account permission and default-field response for every added API",
+      "nullable fields, row saturation, oldest period, corrections and deletions",
+      "fund_sales_ratio optional year wire name before filtered planning"
+    ]
+  }
+}

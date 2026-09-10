@@ -27,6 +27,7 @@ from backend.shared.tushare_registry import (
     FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
     CONNECT_RUNTIME_CONTRACTS,
     LEGACY_CONNECT_RUNTIME_CONTRACTS,
+    OFFCATALOG_RUNTIME_CONTRACTS,
     TRADING_EVENT_RUNTIME_CONTRACTS,
     LISTING_EXTRA_RUNTIME_CONTRACTS,
     LIMIT_EXTRA_RUNTIME_CONTRACTS,
@@ -72,6 +73,7 @@ CONTRACTS = {
     **TRADING_EVENT_RUNTIME_CONTRACTS,
     **CONNECT_RUNTIME_CONTRACTS,
     **LEGACY_CONNECT_RUNTIME_CONTRACTS,
+    **OFFCATALOG_RUNTIME_CONTRACTS,
     **ETF_BASKET_CONTRACTS,
     **CREDIT_EXTRA_CONTRACTS,
     **TEXT_CONTRACTS,
@@ -630,6 +632,18 @@ def _dataset(root, release_id, api_name):
                     "documented_requests_per_minute",
                 ):
                     metadata[note] = value
+        if api_name in OFFCATALOG_RUNTIME_CONTRACTS:
+            for note, value in spec.items():
+                if note.endswith(("_gap", "_note")) or note in (
+                    "field_gaps",
+                    "hidden_fields",
+                    "permission_status",
+                    "date_field",
+                    "history_bound_verified",
+                    "row_cap_verified",
+                    "minimum_points",
+                ):
+                    metadata[note] = value
         if identity_fields:
             metadata["request_identity_fields"] = list(identity_fields)
             metadata["request_identity_status"] = "verified_from_immutable_observations"
@@ -696,6 +710,24 @@ def _date_expression(field, columns):
     column = "CAST(" + _identifier(field, columns) + " AS VARCHAR)"
     if field == "month":
         return "CAST(TRY_STRPTIME(" + column + ", '%Y%m') AS DATE)"
+    if field == "report_date":
+        return (
+            "COALESCE(CAST(TRY_STRPTIME("
+            + column
+            + ", '%Y%m%d') AS DATE),CAST(TRY_STRPTIME("
+            + column
+            + ", '%Y%m') AS DATE),TRY_CAST("
+            + column
+            + " AS DATE))"
+        )
+    if field == "year":
+        return (
+            "TRY_CAST(CASE WHEN regexp_full_match("
+            + column
+            + ", '[0-9]{4}') THEN "
+            + column
+            + " || '-01-01' END AS DATE)"
+        )
     if field == "quarter":
         return (
             "TRY_CAST(CASE WHEN regexp_full_match("
@@ -739,6 +771,8 @@ def _default_date_field(api_name, columns):
         return STOCK_CONTEXT_RUNTIME_CONTRACTS[api_name]["date_field"]
     if api_name in RISK_EVENT_RUNTIME_CONTRACTS:
         return RISK_EVENT_RUNTIME_CONTRACTS[api_name]["date_field"]
+    if api_name in OFFCATALOG_RUNTIME_CONTRACTS:
+        return OFFCATALOG_RUNTIME_CONTRACTS[api_name]["date_field"]
     return next((field for field in DATE_FIELDS if field in columns), None)
 
 
@@ -795,6 +829,20 @@ def _query(
             expression = "TRY_STRPTIME(replace(" + column + ", 'T', ' '), '%Y-%m-%d %H:%M:%S')"
             if api_name in REALTIME_RUNTIME_CONTRACTS and db.execute("SELECT 1 FROM stored WHERE " + expression + " IS NULL LIMIT 1").fetchone():
                 raise ValueError("realtime_timestamp_unverified: cannot filter unknown source timestamp without inventing date/timezone")
+        elif api_name == "fund_sales_vol" and date_field == "year" and "quarter" in columns:
+            year = "CAST(" + _identifier("year", columns) + " AS VARCHAR)"
+            quarter = "CAST(" + _identifier("quarter", columns) + " AS VARCHAR)"
+            expression = (
+                "TRY_CAST(CASE WHEN regexp_full_match("
+                + year
+                + ", '[0-9]{4}') AND regexp_full_match("
+                + quarter
+                + ", 'Q[1-4]') THEN "
+                + year
+                + " || '-' || lpad(CAST((CAST(right("
+                + quarter
+                + ",1) AS INTEGER)-1)*3+1 AS VARCHAR),2,'0') || '-01' END AS DATE)"
+            )
         else:
             expression = _date_expression(
                 "_period_end" if old_period and date_field == "date" else date_field, columns

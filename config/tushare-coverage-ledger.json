@@ -2,7 +2,7 @@
   "schema_version": 1,
   "catalog_fetched_at": "2026-09-08T15:22:12.131618+00:00",
   "catalog_index_sha256": "182240e4826c7e65a6b63ef83efdc4e14b7b3589a6249ed54cd36ac66c937dce",
-  "reviewed_at": "2026-09-10T03:25:08.387194+00:00",
+  "reviewed_at": "2026-09-10T04:36:52+00:00",
   "entry_count": 263,
   "scope": "Every entry in pinned official catalogue plus independently discovered linked entries. entry_count remains the immutable baseline count, not a scope ceiling. Runtime evidence controls entitlement and coverage.",
   "entries": [
@@ -8360,6 +8360,348 @@
         "probe_release_id": "probe-bf606f5acd14434db107a47f29051143"
       },
       "next_action": "Resolve current API-name rejection against supplier documentation; preserve monthly historical-data obligation without substituting derived daily totals."
+    },
+    {
+      "doc_id": "374",
+      "url": "https://tushare.pro/document/2?doc_id=374",
+      "api_names": [
+        "rt_min"
+      ],
+      "access_mode": "public_read_only",
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "1ab1e6dfafee4a4ed07ee15605d449da284fef97f23e3f35742279d6f7bab320",
+      "input_fields": [
+        "freq",
+        "ts_code"
+      ],
+      "output_fields": [
+        "ts_code",
+        "time",
+        "open",
+        "close",
+        "high",
+        "low",
+        "vol",
+        "amount"
+      ],
+      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
+      "next_action": "Independent real-time permission and current response remain unverified; implement only in an isolated realtime batch."
+    },
+    {
+      "doc_id": "416",
+      "url": "https://tushare.pro/document/2?doc_id=416",
+      "api_names": [
+        "rt_etf_min",
+        "rt_etf_min_daily"
+      ],
+      "access_mode": "public_read_only",
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "3f6791db049cc20ec38cf237cac20c508e42936b0e07f34ae29d6d3a0539e13b",
+      "input_fields": [
+        "freq",
+        "ts_code"
+      ],
+      "output_fields": [
+        "ts_code",
+        "time",
+        "open",
+        "close",
+        "high",
+        "low",
+        "vol",
+        "amount"
+      ],
+      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
+      "next_action": "Separate multi-code snapshot from single-code intraday replay, then verify each independent entitlement without inferring sibling access."
+    },
+    {
+      "doc_id": "156",
+      "url": "https://tushare.pro/document/2?doc_id=156",
+      "api_names": [
+        "film_record"
+      ],
+      "access_mode": "public_read_only",
+      "status": "implementing",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "9e1db3aacbc3fcea52490d79e0091ac1375cece7e432cdaf88f342ee6f1a1253",
+      "input_fields": [
+        "ann_date",
+        "start_date",
+        "end_date"
+      ],
+      "output_fields": [
+        "rec_no",
+        "film_name",
+        "rec_org",
+        "script_writer",
+        "rec_result",
+        "rec_area",
+        "classified",
+        "date_range",
+        "ann_date"
+      ],
+      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
+      "next_action": "Code candidate remains default-disabled; verify actual permission, fields, saturation and oldest history before enablement."
+    },
+    {
+      "doc_id": "180",
+      "url": "https://tushare.pro/document/2?doc_id=180",
+      "api_names": [
+        "teleplay_record"
+      ],
+      "access_mode": "public_read_only",
+      "status": "implementing",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "25a717294d849869bd32c726a6b5fc1a081266808b301f70ad782d7c41a76ee1",
+      "input_fields": [
+        "report_date",
+        "start_date",
+        "end_date",
+        "org",
+        "name"
+      ],
+      "output_fields": [
+        "name",
+        "classify",
+        "types",
+        "org",
+        "report_date",
+        "license_key",
+        "episodes",
+        "shooting_date",
+        "prod_cycle",
+        "content",
+        "pro_opi",
+        "dept_opi",
+        "remarks"
+      ],
+      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
+      "next_action": "Code candidate remains default-disabled; verify actual permission, fields, month coverage and revisions before enablement."
+    },
+    {
+      "doc_id": "87",
+      "url": "https://tushare.pro/document/2?doc_id=87",
+      "api_names": [
+        "tmt_twincomedetail"
+      ],
+      "access_mode": "public_read_only",
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "06752694e11c741360878b00be31c63f3df3f349ec547a980517332d2612950d",
+      "input_fields": [
+        "date",
+        "item",
+        "symbol",
+        "start_date",
+        "end_date",
+        "source"
+      ],
+      "output_fields": [
+        "date",
+        "item",
+        "symbol",
+        "op_income",
+        "consop_income"
+      ],
+      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
+      "next_action": "Build a bounded product/symbol discovery and 30-month saturation plan before registration; permission and live schema remain unverified."
+    },
+    {
+      "doc_id": "88",
+      "url": "https://tushare.pro/document/2?doc_id=88",
+      "api_names": [
+        "tmt_twincome"
+      ],
+      "access_mode": "public_read_only",
+      "status": "review_required",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "8b5158b21154e38b60283ada098692a09f48d4274e18e6d4b5987823bda11d92",
+      "input_fields": [
+        "date",
+        "item",
+        "start_date",
+        "end_date"
+      ],
+      "output_fields": [
+        "date",
+        "item",
+        "op_income"
+      ],
+      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
+      "next_action": "Build complete product-code coverage and <=30-month range planning before registration; permission and live schema remain unverified."
+    },
+    {
+      "doc_id": "113",
+      "url": "https://tushare.pro/document/2?doc_id=113",
+      "api_names": [
+        "bo_monthly"
+      ],
+      "access_mode": "public_read_only",
+      "status": "implementing",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "a32a92a05ef308d82127f3be47daf298eef25b59e34a06b5b067439fa495f799",
+      "input_fields": [
+        "date"
+      ],
+      "output_fields": [
+        "date",
+        "name",
+        "list_date",
+        "avg_price",
+        "month_amount",
+        "list_day",
+        "p_pc",
+        "wom_index",
+        "m_ratio",
+        "rank"
+      ],
+      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
+      "next_action": "Code candidate remains default-disabled; verify permission, complete monthly history, fields and unverified row cap."
+    },
+    {
+      "doc_id": "114",
+      "url": "https://tushare.pro/document/2?doc_id=114",
+      "api_names": [
+        "bo_weekly"
+      ],
+      "access_mode": "public_read_only",
+      "status": "implementing",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "c53b5175a2c71ab5d9b5ff8a071d4badd8948a651f96fcb40d1230b11a483bb5",
+      "input_fields": [
+        "date"
+      ],
+      "output_fields": [
+        "date",
+        "name",
+        "avg_price",
+        "week_amount",
+        "total",
+        "list_day",
+        "p_pc",
+        "wom_index",
+        "up_ratio",
+        "rank"
+      ],
+      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
+      "next_action": "Code candidate remains default-disabled; verify permission, exact first week, fields and unverified row cap."
+    },
+    {
+      "doc_id": "115",
+      "url": "https://tushare.pro/document/2?doc_id=115",
+      "api_names": [
+        "bo_daily"
+      ],
+      "access_mode": "public_read_only",
+      "status": "implementing",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "9a519590a676cb87e838d4fa55ba0cad49df8c2031e99dbc6d96ba6ae4386fb3",
+      "input_fields": [
+        "date"
+      ],
+      "output_fields": [
+        "date",
+        "name",
+        "avg_price",
+        "day_amount",
+        "total",
+        "list_day",
+        "p_pc",
+        "wom_index",
+        "up_ratio",
+        "rank"
+      ],
+      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
+      "next_action": "Code candidate remains default-disabled; verify permission, historical holes, fields and unverified row cap."
+    },
+    {
+      "doc_id": "116",
+      "url": "https://tushare.pro/document/2?doc_id=116",
+      "api_names": [
+        "bo_cinema"
+      ],
+      "access_mode": "public_read_only",
+      "status": "implementing",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "a4fd1ebe9b704f524d4031b4e5578b181218d3e09cb658d5aef2b28cf295cf95",
+      "input_fields": [
+        "date"
+      ],
+      "output_fields": [
+        "date",
+        "c_name",
+        "aud_count",
+        "att_ratio",
+        "day_amount",
+        "day_showcount",
+        "avg_price",
+        "p_pc",
+        "rank"
+      ],
+      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
+      "next_action": "Code candidate remains default-disabled; verify permission, historical holes, fields and unverified row cap."
+    },
+    {
+      "doc_id": "265",
+      "url": "https://tushare.pro/document/2?doc_id=265",
+      "api_names": [
+        "fund_sales_ratio"
+      ],
+      "access_mode": "public_read_only",
+      "status": "implementing",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "4404527d1f1fc1fabb661ee34ec2ea12198bf1c1d9849128c9d8f6fa9f723b9a",
+      "input_fields": [],
+      "output_fields": [
+        "year",
+        "bank",
+        "sec_comp",
+        "fund_comp",
+        "indep_comp",
+        "rests"
+      ],
+      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
+      "next_action": "Code candidate uses only the documented unfiltered request; verify the actual wire name for the Chinese-labeled optional year input and entitlement before enablement."
+    },
+    {
+      "doc_id": "266",
+      "url": "https://tushare.pro/document/2?doc_id=266",
+      "api_names": [
+        "fund_sales_vol"
+      ],
+      "access_mode": "public_read_only",
+      "status": "implementing",
+      "permission_status": "unverified",
+      "content_status": "document_present",
+      "source_sha256": "d0663b517e919e7384c1636231cc4c8da0bf71b4703c37d8bf6945434b6143e9",
+      "input_fields": [
+        "year",
+        "quarter",
+        "name"
+      ],
+      "output_fields": [
+        "year",
+        "quarter",
+        "inst_name",
+        "fund_scale",
+        "scale",
+        "rank"
+      ],
+      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
+      "next_action": "Code candidate remains default-disabled; verify actual permission, complete quarters, revisions and fields before enablement."
     }
   ],
   "unresolved_api_mentions": [
