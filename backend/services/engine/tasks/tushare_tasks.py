@@ -99,12 +99,11 @@ def _document_config():
 
 @celery_app.task(
     name="engine.tasks.tushare_acquire",
-    # A fixed-release publication currently spends about 155 seconds scanning
-    # and serializing the authority manifest. Keep the Celery envelope above
-    # that measured work while tick() retains its configured acquisition
-    # request and wall-clock budgets.
-    soft_time_limit=300,
-    time_limit=330,
+    # The authority manifest now exceeds 275 MiB and a real publication can
+    # take slightly more than five minutes on the capped worker. Acquisition
+    # remains bounded inside tick(); this wider envelope is for atomic publish.
+    soft_time_limit=600,
+    time_limit=630,
     acks_late=True,
     reject_on_worker_lost=True,
 )

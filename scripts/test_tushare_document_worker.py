@@ -277,7 +277,7 @@ class DocumentWorkerTest(unittest.TestCase):
         acquire_options = self.app.options["engine.tasks.tushare_acquire"]
         self.assertEqual(
             (acquire_options["soft_time_limit"], acquire_options["time_limit"]),
-            (300, 330),
+            (600, 630),
         )
         self.assertTrue(acquire_options["acks_late"])
         self.assertTrue(acquire_options["reject_on_worker_lost"])
