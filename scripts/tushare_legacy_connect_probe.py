@@ -137,6 +137,8 @@ def safe_result(result):
     for name in ("object_sha256", "observation_sha256"):
         if re.fullmatch(r"[a-f0-9]{64}", str(result.get(name, ""))):
             out[name] = result[name]
+    if result.get("api_name") in APIS:
+        out["api_name"] = result["api_name"]
     if re.fullmatch(r"[a-f0-9]{32}\.json", str(result.get("observation", ""))):
         out["observation"] = result["observation"]
     part = result.get("parquet")

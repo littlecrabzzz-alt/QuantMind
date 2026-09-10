@@ -120,6 +120,7 @@ class LegacyConnectProbeTest(unittest.TestCase):
         result = probe.safe_result(
             {
                 "status": "api_error",
+                "api_name": "ggt_top10",
                 "message": "secret provider prose",
                 "code": 50101,
                 "object_sha256": "a" * 64,
@@ -130,6 +131,7 @@ class LegacyConnectProbeTest(unittest.TestCase):
         self.assertNotIn("message", result)
         self.assertNotIn("code", result)
         self.assertEqual(result["status"], "api_error")
+        self.assertEqual(result["api_name"], "ggt_top10")
 
 
 if __name__ == "__main__":
