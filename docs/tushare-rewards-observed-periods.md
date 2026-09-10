@@ -78,3 +78,15 @@ PYTHONPATH=scripts:. python -m unittest test_tushare_stock_context_invalid_ident
 候选仅在隔离 worktree 测试；未部署或修改正式任务／配置，RRG 准入不变。
 
 该修复候选 Python3.10 专项 25 项/0.687 秒通过；完整 `test_tushare*.py` 840 项/46.199 秒通过（既有 5 项跳过），日志 `/tmp/stock-context-invalid-full310.log`。Ruff 与 `git diff --check` 通过；这里只确认隔离回归。
+
+## 2026-09-10：已观察期间的独立有限追加
+
+02:15:07Z 只读精确两个规划行和白名单配置（0.0025秒）：`recent:stock_context` offset1000，近期前缀6317，剩5317；`history:stock_context` offset7317，总枚举21496，剩14179，其中管理层13079、九转1027、AH73。两者冻结的薪酬组合仍54；父同时核验实际已观察393、已计划54。按每轮500、间隔900秒且每轮完整推进，旧recent还需11轮、history还需29轮；history约7小时15分钟后才结束，再下一轮才能刷新。这是条件规划时间，不是下载ETA；调度相位、失败和时间预算会延后。只读元数据 `/tmp/rewards-frozen-progress-source.json` SHA `4d7020206e0264a6296cb149db83b94d73db3915488d283dd5d5539b492f5e30`，纯重算 `/tmp/rewards-frozen-progress-assessment.json`。
+
+候选基线8193d14，复用既有 `APPEND_PLANNERS` 和版本JSON快照，新增内部规划行 `history:stock_rewards_periods`。它只含实际已观察合法 code/end_date，不复制股票全集；只在stock_context启用、明确选择stk_rewards且家族校验通过时执行，不引入新的配置开关或采集family。复用原纯planner及字段契约，只保留其history补采，任务仍属stock_context、priority55、epoch=history，与原规划路径生成完全相同的ID。
+
+每轮最多 `min(plan_jobs_per_tick,500)` 次幂等入队尝试，沿用history扫描/时间预算。新发现不会打断未完成的有限快照；完成后再按最新发现刷新。已有期间任务不改，重启从SQLite offset继续，时间预算耗尽保留未完成状态。原stock_context recent/history照常推进、签名和游标不重置；code-only发现、原quality父与未知期间全集缺口保留。仅新增一个紧凑pair快照，未来大规模发现仍有有限轮次延迟和单次迭代的协作式时间边界，不能承诺秒级追平。
+
+专项命令：`PYTHONPATH=scripts:. python -m unittest test_tushare_rewards_period_append test_tushare_stock_context_invalid_identifiers test_tushare_rewards_observed_periods test_tushare_stock_context_pipeline test_tushare_planning_progress test_tushare_history_budget test_tushare_member_append_scope`。Python3.10共53项/1.846秒通过；隔离临时SQLite、MockTransport，socket/DNS/secret getter禁用。覆盖原快照未完即可追加、持续新增不饥饿、进程重开、稳定身份与父任务保持、关闭/未选/校验失败0追加、500上限及时间预算恢复。候选未部署、未改生产配置或队列，没有上游请求。
+
+该追加候选完整Python3.10 Tushare回归856项/42.721秒通过，`OK (skipped=5)`，日志 `/tmp/rewards-fast-append-full310.log`；Ruff与diff检查通过。

@@ -396,6 +396,17 @@ def stock_context_runtime_prerequisites(identifiers, config=None):
     ]
 
 
+def iter_reward_period_append_jobs(config, today, identifiers=None):
+    """Only observed supplements; same source contract, group and history IDs."""
+    ids = {"reward_periods": (identifiers or {}).get("stock_context_reward_periods", [])}
+    for job in iter_stock_context_jobs({"stock_context_apis": ["stk_rewards"]}, today, ids):
+        if job["epoch"] == "history":
+            yield job
+
+
+APPEND_PLANNERS["stock_rewards_periods"] = iter_reward_period_append_jobs
+
+
 TECHNICAL_EXTRA_RUNTIME_CONTRACTS = {
     api: {
         **spec,

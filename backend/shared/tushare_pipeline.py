@@ -115,7 +115,9 @@ def _planning_inputs(family, config, identifiers):
     }
     if family == "market_members":
         contracts = {api: EXTENDED_CONTRACTS[api] for api in MARKET_MEMBER_APIS}
-    selected = config.get(family + "_apis", tuple(contracts))
+    if family == "stock_rewards_periods":
+        contracts = {"stk_rewards": EXTENDED_CONTRACTS["stk_rewards"]}
+    selected = ("stk_rewards",) if family == "stock_rewards_periods" else config.get(family + "_apis", tuple(contracts))
     if any(api not in contracts for api in selected):
         raise ValueError("Unknown " + family + " API")
     contracts = {api: contracts[api] for api in selected}
@@ -161,6 +163,11 @@ def _planning_inputs(family, config, identifiers):
         keys.add("foreign_financial_recent_days")
     if family == "text":
         keys.update(("text_history_starts", "text_history_window"))
+    if family == "stock_rewards_periods":
+        # Internal append scope: only actual pairs affect its finite stream.
+        # Parent stock_context validation/selection gates it; no new config keys.
+        dependencies = {"stock_context_reward_periods"}
+        keys = set()
     policy = digest(
         json_bytes(
             {
@@ -1691,10 +1698,19 @@ class Pipeline:
         stats = {}
         for family, planner in {**PLANNERS, **APPEND_PLANNERS}.items():
             self.planning_timing["active_stage"] = family + ":policy"
-            if family in blocked_families or not config.get("enable_" + family, False):
+            if family == "stock_rewards_periods":
+                if (
+                    "stock_context" in blocked_families
+                    or not config.get("enable_stock_context", False)
+                    or "stk_rewards" not in config.get("stock_context_apis", STOCK_CONTEXT_RUNTIME_CONTRACTS)
+                ):
+                    continue
+            elif family in blocked_families or not config.get("enable_" + family, False):
                 continue
             policy, current_ids = _planning_inputs(family, config, identifiers)
-            for mode in ("recent", "history"):
+            modes = ("history",) if family == "stock_rewards_periods" else ("recent", "history")
+            family_budget = min(budget, 500) if family == "stock_rewards_periods" else budget
+            for mode in modes:
                 name = mode + ":" + family
                 self.planning_timing["active_stage"] = name + ":snapshot"
                 epoch = (
@@ -1789,7 +1805,7 @@ class Pipeline:
                 count, done = 0, False
                 attempted, inserted = 0, 0
                 stop_reason = "job_budget"
-                while (attempted if mode == "history" else count) < budget:
+                while (attempted if mode == "history" else count) < family_budget:
                     if mode == "history":
                         if count >= history_scan_limit:
                             stop_reason = "scan_limit"
