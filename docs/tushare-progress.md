@@ -658,3 +658,9 @@
 - `fund_share` 第5批固定20240826—20250221的沪深各180项首次请求。45.523秒完成360次调用，248 done/112 empty。manifest SHA `ac7a797301125bba23ad4d99510643c39c0ff6fdb92fd46bc6f96fcad8798a9b`，任务集SHA `0db2e907d4a3ca84bc539d5cc33d47be30f9a1e4a2ee5c8d074b4380fd717d9f`，receipt SHA `cfb85916a177819a4a43ee09668fa107a1e4d45a9519edd9882aa1a2ae61ef8d`。
 - 两批共720次请求、92.346秒，均通过plan-only和任务/配置/prepare/runner哈希门控，不发布、不切换CURRENT。结束后专用worker和Beat恢复；新增结果与前一波720项共同等待正常固定版发布和Mac自动镜像。
 - `fund_nav` 第一轮空结果成对复核runner已合入：默认仅离线验证不可信manifest；执行固定authority/release/config/任务集/组合代码哈希，以非阻塞共享 `pipeline.lock` 强制writer排他，并按A原请求+B单日正向控制成对追加不可变观察、attempt和receipt。有效空、合法非空恢复、冲突、两次失败重冻结后manual_hold及收据崩溃恢复均有测试；宿主停Beat/worker仍是明确操作前提，runner如实记录但不在无Docker socket的容器内伪装验证。Mac和云端生产镜像联合10项通过，commit `f3b9489d`。第二轮7天门控、`review_exhausted`、发布和生产复核仍未执行。
+
+## 2026-09-11 02:21 基金净值空复核到期审计
+
+- 当前固定版 `data-469f7738…` 与停写authority按真实时间生成第一轮清单，得到0个到期目标，0凭据读取、0上游请求、0任务状态变化。未来时间只读审计暴露单个无正向控制基金会使整批失败；`84b5ca7f`改为逐基金跳过缺控制项并继续，其余证据损坏仍整批拒绝。Mac与云端prepare+runner联合11项通过。
+- 修复后的未来到期审计得到181个结构候选，其中155个有固定版正向控制、26个缺控制而保持未选；最早 `not_before=2026-09-11T12:26:34.077603Z`，最晚 `2026-09-11T16:58:11.073563Z`。这只是显式未来时间的只读调度审计，不是可执行生产manifest或复核结果；届时须重新停写、使用当时固定release和authority生成新清单，最多155组/310次A-B请求。
+- 审计结束后专用worker和Beat恢复；正常固定版仍等待一小时发布周期。缺控制的26项记为非阻塞数据缺口，不影响其余155项后续复核，也不授予任何历史完整或PIT结论。
