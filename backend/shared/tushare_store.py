@@ -47,17 +47,11 @@ from backend.shared.tushare_research_extra_contracts import RESEARCH_EXTRA_CONTR
 from backend.shared.tushare_pipeline import manifest_at
 from backend.shared.tushare_structured_contracts import STRUCTURED_CONTRACTS
 from backend.shared.tushare_text_contracts import TEXT_CONTRACTS
+from backend.shared.tushare_rrg_contracts import RRG_CONTRACTS
 
-KEYS = {
-    "trade_cal": ("exchange", "cal_date"),
-    "ci_daily": ("ts_code", "trade_date"),
-    "ci_index_member": ("l1_code", "l2_code", "l3_code", "ts_code", "in_date"),
-    "etf_basic": ("ts_code",),
-    "fund_daily": ("ts_code", "trade_date"),
-    "fund_adj": ("ts_code", "trade_date"),
-    "fund_portfolio": ("ts_code", "ann_date", "end_date", "symbol"),
-}
+KEYS = {}
 CONTRACTS = {
+    **RRG_CONTRACTS,
     **REALTIME_RUNTIME_CONTRACTS,    **ACCOUNT_HISTORY_RUNTIME_CONTRACTS,
     **SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS,
     **HISTORY_MINUTES_RUNTIME_CONTRACTS,
@@ -610,6 +604,17 @@ def _dataset(root, release_id, api_name):
             ):
                 if spec.get(note):
                     metadata[note] = spec[note]
+        if api_name in RRG_CONTRACTS:
+            for note, value in spec.items():
+                if note.endswith(("_gap", "_note")) or note in (
+                    "field_gaps",
+                    "hidden_fields",
+                    "permission_status",
+                    "date_field",
+                    "history_bound_verified",
+                    "row_cap_verified",
+                ):
+                    metadata[note] = value
         if identity_fields:
             metadata["request_identity_fields"] = list(identity_fields)
             metadata["request_identity_status"] = "verified_from_immutable_observations"
@@ -697,6 +702,8 @@ def _date_expression(field, columns):
 
 
 def _default_date_field(api_name, columns):
+    if api_name in RRG_CONTRACTS:
+        return RRG_CONTRACTS[api_name]["date_field"]
     if api_name in REALTIME_RUNTIME_CONTRACTS:
         return REALTIME_RUNTIME_CONTRACTS[api_name]["date_field"]
     if api_name in ACCOUNT_HISTORY_RUNTIME_CONTRACTS:

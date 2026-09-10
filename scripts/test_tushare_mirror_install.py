@@ -127,6 +127,9 @@ class MirrorInstall(unittest.TestCase):
                 self.runtime / "backend/shared/tushare_futures_extra_contracts.py"
             ).is_file()
         )
+        self.assertTrue(
+            (self.runtime / "backend/shared/tushare_rrg_contracts.py").is_file()
+        )
 
     def test_existing_healthy_environment_is_offline_and_install_is_idempotent(self):
         self.existing_environment()

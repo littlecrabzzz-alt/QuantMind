@@ -90,16 +90,12 @@ from backend.shared.tushare_dc_extra_contracts import dc_extra_prerequisites
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
+from backend.shared.tushare_rrg_contracts import RRG_CONTRACTS
 
 ROOT = Path("/data/tushare")
 CONTRACTS = {
-    "trade_cal": (6000, ["cal_date", "is_open"]),
-    "ci_daily": (4000, ["ts_code", "trade_date", "open", "close"]),
-    "ci_index_member": (5000, ["l1_code", "ts_code", "in_date", "out_date"]),
-    "etf_basic": (5000, ["ts_code", "list_status", "list_date"]),
-    "fund_daily": (5000, ["ts_code", "trade_date", "open", "close", "vol", "amount"]),
-    "fund_adj": (2000, ["ts_code", "trade_date", "adj_factor"]),
-    "fund_portfolio": (2000, ["ts_code", "ann_date", "end_date", "symbol", "mkv"]),
+    api: (spec["row_cap"], spec["required_fields"])
+    for api, spec in RRG_CONTRACTS.items()
 }
 
 
