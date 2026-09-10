@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "audited_at": "2026-09-10T12:44:00Z",
+  "authority": "lzy-vm:/root/data/disk/quantmind/project/data/tushare",
+  "deployed_revision": "a4a5595d54c6c7385187f04966415d2767fa0f5c",
+  "authority_config_sha256": "4ac7b38142097cda4af50dfadb00093fd635d5fd37859d68ee9632800d1e21d9",
+  "rate_policy": {
+    "effective_account_rpm": 500,
+    "resolved_api_rpm": 500,
+    "source": "points_regular_allowlist_doc290",
+    "reported_points": 10100
+  },
+  "rejected_candidate": {
+    "status": "rejected_stale_candidate",
+    "receipt_path": "/data/tushare/validation/fund-nav-batch-20260910/acceptance.json",
+    "receipt_sha256": "21a0e6d8ac6f5fd5cc4a21cab76b5a4c8ca57371836e57cd8dd67c63db04469c",
+    "upstream_calls": 0,
+    "authority_write": false,
+    "reason": "The regular worker completed part of the frozen candidate before execution."
+  },
+  "production_execution": {
+    "executed_manifest_path": "/data/tushare/validation/fund-nav-batch-20260910/executed-manifest.json",
+    "executed_manifest_sha256": "05b263c19d15f73494a08452966332a38734b18baaf7719301ead8949cdd3016",
+    "task_set_sha256": "f8918c3373c87cced86c5aadb64a38e5f171a6fc1c9788c2fabf27854c48755e",
+    "prepare_helper_sha256": "a4a4320a361cb710fb8fe6d91b0d4f6075d1a01e8c3dd8df2adbebccc27ba26e",
+    "runner_helper_sha256": "5fa32b52871722d8ab6c74e999f442d201a4cbef2b7f081228697148c7f7fe89",
+    "receipt_path": "/data/tushare/validation/fund-nav-batch-20260910/acceptance-v2.json",
+    "receipt_sha256": "d41683b40e8c4b9482f72c44e3da2e7bb80cffb4d0680e21571458966bb5d564",
+    "receipt_id": "e8cc0b85a19257fed58e27d48f584f544a8fb3aeb861bb105b680177cb73a860",
+    "elapsed_seconds": 49.349,
+    "upstream_calls": 360,
+    "before": {"pending": 360},
+    "after": {"done": 165, "empty": 53, "split_pending": 142},
+    "release_published_by_runner": false,
+    "current_switched_by_runner": false,
+    "published_release": "data-3eee75afb22ae4bea72b9ac5826e6bea6b7d98f0f2e600adfd1b04f11677c2e1",
+    "publication_task_seconds": 192.183,
+    "mac_mirror": {
+      "release_id": "data-3eee75afb22ae4bea72b9ac5826e6bea6b7d98f0f2e600adfd1b04f11677c2e1",
+      "downloaded_files": 1994,
+      "verified_files": 626068
+    }
+  },
+  "execution_contract": {
+    "default_plan_only": true,
+    "max_upstream_calls": 360,
+    "max_seconds": 90,
+    "minimum_free_gib": 100,
+    "exact_task_scope": true,
+    "publishes_release": false,
+    "switches_current": false
+  },
+  "boundaries": {
+    "history_start_is_request_scope_not_verified_availability": true,
+    "fund_universe_complete": false,
+    "known_at_verified": false,
+    "research_ready": false
+  },
+  "sensitive_content": {
+    "token": false,
+    "upstream_response_body": false
+  }
+}

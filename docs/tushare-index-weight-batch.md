@@ -40,3 +40,9 @@ python3 scripts/run_tushare_index_weight_batch.py \
 按 500 次/分钟，360 次理论下限为 43.2 秒；近期三大财务表精确批次为 48.807 秒。指数权重响应更宽且可能触发日期二分，因此首次验收按 45—90 秒估算，以 90 秒硬边界为准。90 个既有非空样本的原始对象、观察和 Parquet 合计中位数约 167 KiB，P95 约 187 KiB；按 360 个非空响应外推约 59—66 MiB，连同 SQLite/WAL 和分区元数据按 100 MiB 预留。固定版本发布与 Mac 镜像不属于本批耗时或空间估算。
 
 本候选只扩大可复核的原始指数权重数据。`known_at`、指数发现全集、历史下界和单日饱和闭包继续保持未验证，不能据此解除 PIT 或研究 `blocked_data`。
+
+## 生产执行
+
+2026-09-10 部署后，在 Beat 停止发新任务、采集 worker 自然排空后，从当时权威库重新生成360项清单。任务集合与候选一致，但来源队列计数已变，所以执行清单 SHA256 为 `4afd148c3739a5ad3c882306f0cfc41d472b57938c206bdf25223323fb5cce37`。
+
+真实执行在46.728秒内完成360次 `index_weight` 请求：139个任务进入 `done`、204个进入 `empty`、17个进入 `split_pending`。执行器没有发布或切换 `CURRENT`，收据位于 `/data/tushare/validation/index-weight-batch-20260910/acceptance.json`，SHA256 为 `a6009ba35e1d79bc5f49476b0399f167ea9bbfd4abbb804dbc7d5e8846946aa0`。随后自动发布 `data-3eee75afb22ae4bea72b9ac5826e6bea6b7d98f0f2e600adfd1b04f11677c2e1`，Mac 增量下载1994个文件并完整校验626068个文件后原子追平。

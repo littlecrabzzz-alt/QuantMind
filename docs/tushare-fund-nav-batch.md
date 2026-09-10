@@ -66,3 +66,9 @@ python3 scripts/run_tushare_fund_nav_batch.py \
 ```
 
 500 次/分钟下 360 次的限速理论下限为 43.2 秒，生产验收保留 90 秒硬上限。现有 51 次饱和样本的原始 JSON 加 Parquet 平均约 186 KiB，按 360 次估算约 67 MiB；按观测单次最大值外推约 136 MiB，首批连同 SQLite 与拆分元数据按 200 MiB 预留。审计时云端空闲 153,100,898,304 字节，超过 100 GiB 停采线。全量历史仍会继续递归拆分，22,207 个当前 pending 只是调用下界，不能据此给出最终时长或容量承诺。
+
+## 生产执行
+
+2026-09-10 第一次执行在任何上游请求前拒绝旧候选，因为候选冻结后常驻 worker 已完成其中少量任务。该拒绝记录为 `/data/tushare/validation/fund-nav-batch-20260910/acceptance.json`，上游调用0，SHA256 `21a0e6d8ac6f5fd5cc4a21cab76b5a4c8ca57371836e57cd8dd67c63db04469c`。
+
+排空后从权威库重新固定360项当前任务，新清单 SHA256 `05b263c19d15f73494a08452966332a38734b18baaf7719301ead8949cdd3016`，任务集合 SHA256 `f8918c3373c87cced86c5aadb64a38e5f171a6fc1c9788c2fabf27854c48755e`。真实执行在49.349秒内完成360次 `fund_nav` 请求：165个 `done`、53个 `empty`、142个 `split_pending`。执行中 `CURRENT` 和生产配置均不变；有效收据 `acceptance-v2.json` SHA256 为 `d41683b40e8c4b9482f72c44e3da2e7bb80cffb4d0680e21571458966bb5d564`。该结果同样已进入 `data-3eee75afb22ae4bea72b9ac5826e6bea6b7d98f0f2e600adfd1b04f11677c2e1` 并追平 Mac。

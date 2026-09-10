@@ -81,6 +81,27 @@
     "publishes_release": false,
     "switches_current": false
   },
+  "production_execution": {
+    "deployed_revision": "a4a5595d54c6c7385187f04966415d2767fa0f5c",
+    "executed_manifest_path": "/data/tushare/validation/index-weight-batch-20260910/executed-manifest.json",
+    "executed_manifest_sha256": "4afd148c3739a5ad3c882306f0cfc41d472b57938c206bdf25223323fb5cce37",
+    "task_set_sha256": "8342c8d55a5b642608d5316f99256297893a758d09b9b2759459c46f1c4ae784",
+    "receipt_path": "/data/tushare/validation/index-weight-batch-20260910/acceptance.json",
+    "receipt_sha256": "a6009ba35e1d79bc5f49476b0399f167ea9bbfd4abbb804dbc7d5e8846946aa0",
+    "elapsed_seconds": 46.728,
+    "upstream_calls": 360,
+    "before": {"pending": 360},
+    "after": {"done": 139, "empty": 204, "split_pending": 17},
+    "release_published_by_runner": false,
+    "current_switched_by_runner": false,
+    "published_release": "data-3eee75afb22ae4bea72b9ac5826e6bea6b7d98f0f2e600adfd1b04f11677c2e1",
+    "publication_task_seconds": 192.183,
+    "mac_mirror": {
+      "release_id": "data-3eee75afb22ae4bea72b9ac5826e6bea6b7d98f0f2e600adfd1b04f11677c2e1",
+      "downloaded_files": 1994,
+      "verified_files": 626068
+    }
+  },
   "boundaries": {
     "history_start_is_request_scope_not_verified_availability": true,
     "index_universe_complete": false,

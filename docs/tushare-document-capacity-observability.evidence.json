@@ -106,5 +106,20 @@
     ],
     "growpart_required": false,
     "collection_policy": "Continue while above the 100 GiB hard reserve; stop automatically at the reserve without shrinking scope."
+  },
+  "production_followup_latest": {
+    "observed_at": "2026-09-10T12:44:00Z",
+    "volume_total_bytes": 528239599616,
+    "free_bytes": 151580393472,
+    "reserve_bytes": 107374182400,
+    "headroom_bytes": 44206211072,
+    "trend_window_seconds": 4847.069,
+    "consumption_bytes_per_hour": 1641048994,
+    "projected_hours_to_reserve": 26.938,
+    "status": "warning",
+    "warning_reasons": [
+      "reserve_within_72h_at_observed_trend"
+    ],
+    "interpretation": "The window includes large publications and exact batches; it is an actionable expansion warning, not a steady-state growth estimate."
   }
 }
