@@ -4,7 +4,13 @@
   "authority": "lzy-vm:/root/data/disk/quantmind/project/data/tushare",
   "official_contract": {
     "url": "https://tushare.pro/document/2?doc_id=207",
-    "supported_filters": ["ts_code", "trade_date", "start_date", "end_date", "market"],
+    "supported_filters": [
+      "ts_code",
+      "trade_date",
+      "start_date",
+      "end_date",
+      "market"
+    ],
     "documented_row_cap": 2000
   },
   "execution_contract": {
@@ -25,14 +31,21 @@
     "task_set_sha256": "7453a1ead52b802d4131b8041cf2bd00ae06c7ed801f57b5cfc600e20a450fe5",
     "selected": {
       "jobs": 360,
-      "market_counts": {"SH": 180, "SZ": 180},
+      "market_counts": {
+        "SH": 180,
+        "SZ": 180
+      },
       "trade_date_min": "19900101",
       "trade_date_max": "19900629"
     },
     "upstream_calls": 360,
     "elapsed_seconds": 46.368,
-    "before": {"pending": 360},
-    "after": {"empty": 360},
+    "before": {
+      "pending": 360
+    },
+    "after": {
+      "empty": 360
+    },
     "receipt_path": "/data/tushare/validation/fund-share-batch-20260911/acceptance-batch-1.json",
     "receipt_sha256": "47f764871e17a5a5c18cf890bb569777e8b4b9008d5f109fd1b4dd44d63abb99",
     "receipt_id": "a897c565a4175d95270c2022025b10d54824bad59627fdecefaf34e64bccfee8"
@@ -66,7 +79,10 @@
     "prepare_helper_sha256": "614022500a4d83396d44ed14bd885106238ebbba0819a992a178ac4a3f10bfa7",
     "selected": {
       "jobs": 360,
-      "market_counts": {"SH": 180, "SZ": 180},
+      "market_counts": {
+        "SH": 180,
+        "SZ": 180
+      },
       "trade_date_min": "20260219",
       "trade_date_max": "20260818"
     },
@@ -79,8 +95,13 @@
     },
     "upstream_calls": 360,
     "elapsed_seconds": 51.099,
-    "before": {"pending": 360},
-    "after": {"done": 256, "empty": 104},
+    "before": {
+      "pending": 360
+    },
+    "after": {
+      "done": 256,
+      "empty": 104
+    },
     "receipt_path": "/data/tushare/validation/fund-share-batch-20260911/acceptance-batch-2.json",
     "receipt_sha256": "80d8490b2412615153849b6edcd9561491481a4c0d4fe813ec3888982d2dc0bc",
     "receipt_id": "b63ebdaf30062ce41edcdf9cdd2c3e92f939702854d5580e77c25c51e3540078"
@@ -109,7 +130,11 @@
       "status": "verified",
       "release_id": "data-d5d918ce4bc2cfd3ef6e58c5caeefa29c7d9f9715cd5b8cd0d03d4d07cab64de",
       "api_name": "fund_share",
-      "fields": ["ts_code", "trade_date", "fd_share"],
+      "fields": [
+        "ts_code",
+        "trade_date",
+        "fd_share"
+      ],
       "date_min": "20260219",
       "date_max": "20260818",
       "sample_rows": 5,
@@ -141,5 +166,75 @@
     "token": false,
     "orders_or_payment_information": false,
     "upstream_response_body": false
+  },
+  "third_batch": {
+    "executed_at": "2026-09-10T17:00:00Z",
+    "deployed_revision": "dd8c555b516b32816130970b244ad25c875e2753",
+    "manifest_path": "/data/tushare/validation/fund-share-batch-20260911/batch-3-manifest.json",
+    "manifest_sha256": "5a5173cebe2f8b63cbea5686d82c87e0b9045fc4fd4324679bc66b50f0da74cb",
+    "task_set_sha256": "c122d92211f2f3118565c892a32f8b0eb5987213c61779f978fb6c06e75f807b",
+    "authority_config_sha256": "da45afae322463eacd54a97203f2ede46a9ff86aafbb58e6bec26b57ea009853",
+    "runner_helper_sha256": "769f24b875ba6155d3992db7ffb460f8fcfb4504f1487f4cd4d09f4ee8d9b920",
+    "prepare_helper_sha256": "614022500a4d83396d44ed14bd885106238ebbba0819a992a178ac4a3f10bfa7",
+    "selected": {
+      "jobs": 360,
+      "market_counts": {
+        "SH": 180,
+        "SZ": 180
+      },
+      "trade_date_min": "20250823",
+      "trade_date_max": "20260219"
+    },
+    "before": {
+      "pending": 360,
+      "attempts": 0
+    },
+    "upstream_calls": 360,
+    "elapsed_seconds": 46.786,
+    "after": {
+      "done": 270,
+      "empty": 90
+    },
+    "receipt_path": "/data/tushare/validation/fund-share-batch-20260911/acceptance-batch-3.json",
+    "receipt_sha256": "0fbdbb190a9cb723b9d08d8294b54c79cf589dca34e7bd46dfdcad5de591aa9f",
+    "receipt_id": "805baa3c88262fd5488ab90da5f49bb53266ff24a44ff84ea9da2b035071e58a",
+    "release_published_by_runner": false,
+    "current_switched_by_runner": false,
+    "release_before_batch": "data-d5d918ce4bc2cfd3ef6e58c5caeefa29c7d9f9715cd5b8cd0d03d4d07cab64de"
+  },
+  "three_batch_total": {
+    "verified_jobs": 1080,
+    "upstream_calls": 1080,
+    "elapsed_seconds": 144.253,
+    "done": 526,
+    "empty": 554
+  },
+  "fixed_release_offline_audit": {
+    "release_id": "data-d5d918ce4bc2cfd3ef6e58c5caeefa29c7d9f9715cd5b8cd0d03d4d07cab64de",
+    "published_files": 290,
+    "published_bytes": 11847041,
+    "raw_rows": 224843,
+    "latest_rows": 222116,
+    "duplicate_natural_keys": 2727,
+    "conflicting_fd_share_values_within_release": 0,
+    "trade_date_min": "20260223",
+    "trade_date_max": "20260908",
+    "trade_dates": 149,
+    "fund_codes": 2210,
+    "market_latest_rows": {
+      "SH": 127215,
+      "SZ": 94901
+    },
+    "codes_with_fewer_than_20_dates": 493,
+    "codes_with_at_least_100_dates": 1556,
+    "manifest_states": {
+      "done": 290,
+      "empty": 476,
+      "pending": 26037
+    },
+    "history_complete": false,
+    "historical_versions_complete": false,
+    "pit_ready": false,
+    "note": "Weekend-like dates can still return rows; no calendar-based skipping is allowed. Empty is exact-request evidence only."
   }
 }

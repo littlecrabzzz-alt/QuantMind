@@ -146,5 +146,65 @@
     "receipt_sha256": "6826ccd3616cdbaa4c900770dd22fd8e7f48629db36ea2dc5861e2655426ebf9",
     "receipt_id": "f119b5cfb65cfffd8e01aede11c21c3581ff689a7f671427640cc30495f6ce2e",
     "published_by_scheduled_pipeline_after_batch": false
+  },
+  "fourth_batch": {
+    "executed_at": "2026-09-10T16:58:00Z",
+    "deployed_revision": "dd8c555b516b32816130970b244ad25c875e2753",
+    "deployed_source_digest": "7c85825c7d73e3b2b3c697ebc496e7b71bde9c4dce8b499dd966b22c081f8eb9",
+    "manifest_path": "/data/tushare/validation/fund-nav-batch-20260910/batch-4-manifest.json",
+    "manifest_sha256": "72549cc8e06d78c03354a2e73d04b24b4dba68455add5e3bc9bf0152436b231a",
+    "task_set_sha256": "3de26af98ca7f88dddad0df056fb4b050d48645abef2cf5699c1c5b24cf02ad4",
+    "authority_config_sha256": "da45afae322463eacd54a97203f2ede46a9ff86aafbb58e6bec26b57ea009853",
+    "prepare_helper_sha256": "a4a4320a361cb710fb8fe6d91b0d4f6075d1a01e8c3dd8df2adbebccc27ba26e",
+    "runner_helper_sha256": "fcbca757dd604f5fcd3b995630260d80c4b094769335d14428b5edfc35dfd018",
+    "verified_jobs": 360,
+    "selection": {
+      "pending_split_leaf": 238,
+      "pending_history_root": 122,
+      "funds": 237
+    },
+    "before": {
+      "pending": 360,
+      "attempts": 0
+    },
+    "upstream_calls": 360,
+    "elapsed_seconds": 49.17,
+    "after": {
+      "done": 179,
+      "empty": 41,
+      "split_pending": 140
+    },
+    "release_published_by_runner": false,
+    "current_switched_by_runner": false,
+    "release_before_batch": "data-d5d918ce4bc2cfd3ef6e58c5caeefa29c7d9f9715cd5b8cd0d03d4d07cab64de",
+    "receipt_path": "/data/tushare/validation/fund-nav-batch-20260910/acceptance-batch-4.json",
+    "receipt_sha256": "94a9a3ce6200fdb9e662ca53bbfecd2eb5ea01c9d027859c10540b9c7521be78",
+    "receipt_id": "89953fdea949c129f3df997eb74d68fedd2dc0f9890d13440fb7d90eccf1de1a",
+    "published_by_scheduled_pipeline_after_batch": false
+  },
+  "four_batch_total": {
+    "verified_jobs": 1440,
+    "upstream_calls": 1440,
+    "elapsed_seconds": 196.686,
+    "done": 679,
+    "empty": 226,
+    "split_pending": 535
+  },
+  "fixed_release_offline_audit": {
+    "release_id": "data-d5d918ce4bc2cfd3ef6e58c5caeefa29c7d9f9715cd5b8cd0d03d4d07cab64de",
+    "latest_natural_keys": 488037,
+    "funds_with_rows": 529,
+    "fund_basic_codes": 22216,
+    "fund_code_coverage_percent": 2.381,
+    "nav_date_min": "20121023",
+    "nav_date_max": "20260908",
+    "open_split_parents": 374,
+    "latest_rows_from_open_split_parents": 176964,
+    "latest_rows_from_open_split_parents_percent": 36.26,
+    "empty_child_blocked_open_nodes": 77,
+    "history_complete": false,
+    "historical_versions_complete": false,
+    "pit_ready": false,
+    "note": "Open split-parent rows are queryable observations, not closure evidence; use date_field=nav_date for NAV-date filters."
   }
 }

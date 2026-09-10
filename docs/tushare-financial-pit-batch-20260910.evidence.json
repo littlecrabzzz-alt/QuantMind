@@ -270,5 +270,61 @@
     "receipt_sha256": "702572f42c48783721c57834770178d0c0c9a60096f4e84f98708dc1648f5a81",
     "receipt_id": "0affd73955721222d2e33d6c0107ac395d659452a07923d3ff2efdfe47b1302e",
     "published_by_scheduled_pipeline_after_batch": false
+  },
+  "ninth_batch": {
+    "executed_at": "2026-09-10T16:56:00Z",
+    "deployed_revision": "dd8c555b516b32816130970b244ad25c875e2753",
+    "deployed_source_digest": "7c85825c7d73e3b2b3c697ebc496e7b71bde9c4dce8b499dd966b22c081f8eb9",
+    "manifest_path": "/data/tushare/validation/financial-pit-batch-20260910/batch-9-manifest.json",
+    "manifest_sha256": "9bf0c0e42721cc4d360969b7755354eef93ab959372aa5ce901ac60c22bd2cd8",
+    "all_task_ids_sha256": "e10f001866142f7dc06c38dee60d66542b693bd022d2cc97148996faca30f481",
+    "authority_config_sha256": "da45afae322463eacd54a97203f2ede46a9ff86aafbb58e6bec26b57ea009853",
+    "preparation_sha256": "d58c9bdf5acbeebd7d03d93e9075d01c5418ababdc830748048569ed9b48a7e3",
+    "helper_sha256": "7b2e40d3a4e7b4feda1ff50e1e3c8f07eb9c34931cd12e3122e3f7c104aa2658",
+    "verified_jobs": 360,
+    "selection": {
+      "stocks": 120,
+      "ts_code_min": "002336.SZ",
+      "ts_code_max": "002455.SZ",
+      "period": "20260630",
+      "report_type": "1"
+    },
+    "before": {
+      "pending": 360,
+      "attempts": 0
+    },
+    "upstream_calls": 360,
+    "elapsed_seconds": 48.788,
+    "api_results": {
+      "income_vip": {
+        "done": 114,
+        "empty": 6
+      },
+      "balancesheet_vip": {
+        "done": 116,
+        "empty": 4
+      },
+      "cashflow_vip": {
+        "done": 114,
+        "empty": 6
+      }
+    },
+    "release_published": false,
+    "current_release_switched": false,
+    "release_before_batch": "data-d5d918ce4bc2cfd3ef6e58c5caeefa29c7d9f9715cd5b8cd0d03d4d07cab64de",
+    "receipt_path": "/data/tushare/validation/financial-pit-batch-20260910/acceptance-batch-9.json",
+    "receipt_sha256": "71f6fbf7665c6d6628ac803abfff5ecb51e1b60c9da4b7688ab3d0984976636c",
+    "receipt_id": "85d5e15763eda2c54e2d6588a4880938f94e4edf2e4eea4b3f2713078a853e7b",
+    "published_by_scheduled_pipeline_after_batch": false
+  },
+  "nine_batch_total": {
+    "verified_jobs": 3240,
+    "upstream_calls": 3241,
+    "elapsed_seconds": 589.71,
+    "done": 2999,
+    "empty": 241,
+    "pending": 0,
+    "stocks_in_latest_period_report_type_scope": 1080,
+    "sampling_boundary": "all selected stocks through batch 9 are Shenzhen listings ordered by ts_code; this is not a representative A-share cross-section"
   }
 }

@@ -621,3 +621,10 @@
 - 第二批从26,397个pending中固定当前最新360项，日期2026-02-19至2026-08-18、沪深各180。51.099秒完成360次调用，256 done/104 empty、批内0 pending。manifest SHA `e2606ccd5a9671ba42211025939056512af8465b0d2e75cce701283a1f84c8ba`，receipt SHA `80d8490b2412615153849b6edcd9561491481a4c0d4fe813ec3888982d2dc0bc`。
 - 两批均默认plan-only并固定任务、配置、准备器和共享执行器哈希；真实执行通过authority/schema6/ENABLED/共享锁/360请求90秒/100GiB余量门控，不发布、不切换CURRENT。worker和Beat已恢复healthy，云盘可用147501383680字节；结果等待正常固定版发布和Mac自动镜像。
 - 到期后的正常publish-only任务 `0b768175…` 用220.122秒原子切换到 `data-d5d918ce4bc2cfd3ef6e58c5caeefa29c7d9f9715cd5b8cd0d03d4d07cab64de`。Mac标准镜像新增下载14028个文件、完整校验670543个文件后退出0并追平，错误日志0字节；无Token且禁止网络/DNS的固定版读取返回5行 `fund_share` 样本并标记0上游调用。最终worker/Beat healthy、restart0、OOM false，部署后HTTP429、供应商频率错误和任务失败均为0；云盘可用146955538432字节，距100GiB线39581435632字节（36.863GiB）。
+
+## 2026-09-11 01:02 三组精确批次与全接口固定版覆盖
+
+- 对固定版 `data-d5d918ce4bc2cfd3ef6e58c5caeefa29c7d9f9715cd5b8cd0d03d4d07cab64de` 断网审计：243个运行时API全部已规划，193个已有发布数据集，50个只有显式empty/blocked/permission证据；249项冻结命名范围中243项运行时可读，唯一公共只读合同缺口为 `ggt_monthly`，其余5项是2个私有读、2个写操作和1个SDK包装。机器证据为 `docs/tushare-fixed-coverage-20260911.evidence.json`；这证明接线范围，不证明每项历史、修订、附件或PIT完整。
+- 常规任务排空后停Beat与专用worker，从权威库重新冻结三个互不重叠批次，1,080项均为 `pending/attempts=0`。财务三表第9批48.788秒完成360次，344 `done`/16 `empty`；`fund_nav`第4批49.170秒完成360次，179 `done`/41 `empty`/140 `split_pending`；`fund_share`第3批46.786秒完成360次，270 `done`/90 `empty`。三批固定manifest、任务集、配置、prepare/runner哈希，不发布、不切换CURRENT。
+- 批次完成后Tushare worker和Beat恢复healthy，文档worker继续按容量方案停用。云盘可用146862358528字节，距100GiB硬线39488176448字节（36.776GiB）。新增结果尚未进入固定版，等待正常一小时发布周期和Mac自动镜像；发布后再做断网reader及全清单哈希验收。
+- 固定版 `fund_nav` 当前可查询488037个最新自然键、529只基金，仅占22216只 `fund_basic` 代码的2.381%；36.26%的最新行来自仍开放的截断父区间。`fund_share` 当前可查询222116条最新观察、2210只基金、149个日期，仍有26037个pending。两者继续保持 `history_complete=false`、`historical_versions_complete=false`、PIT未就绪。
