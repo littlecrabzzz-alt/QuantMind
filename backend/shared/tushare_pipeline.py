@@ -3040,6 +3040,47 @@ class Pipeline:
             for r in self.db.execute("SELECT state,count(*) FROM jobs GROUP BY state")
         }
 
+    def _publication_intent(self, release_id):
+        """Commit identity before exposing CURRENT; caller holds pipeline.lock."""
+        if not re.fullmatch(r"data-[a-f0-9]{64}", release_id):
+            raise ValueError("Invalid publication intent identity")
+        started_at = int(time.time())
+        if started_at < 0:
+            raise ValueError("Invalid publication intent time")
+        with self.db:
+            self.db.execute("DELETE FROM scheduler_state WHERE name GLOB 'publish_intent:*'")
+            self.db.execute(
+                "INSERT INTO scheduler_state(name,value) VALUES(?,?)",
+                ("publish_intent:" + release_id, started_at),
+            )
+
+    def _publication_success(self, release_id, successful_at):
+        """Checkpoint a caller-verified CURRENT; no filesystem mtime inference."""
+        pointer = self.root / "CURRENT.json"
+        if pointer.is_symlink():
+            raise ValueError("Unsafe current pointer")
+        current = json.loads(pointer.read_bytes())
+        if (
+            not re.fullmatch(r"data-[a-f0-9]{64}", release_id)
+            or current.get("release_id") != release_id
+            or current.get("manifest_sha256") != release_id[5:]
+            or type(successful_at) is not int
+            or successful_at < 0
+        ):
+            raise ValueError("Publication identity changed before checkpoint")
+        with self.db:
+            self.db.execute(
+                "INSERT INTO scheduler_state(name,value) VALUES('publish_success_at',?) "
+                "ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                (successful_at,),
+            )
+            self.db.execute("DELETE FROM scheduler_state WHERE name GLOB 'publish_success:*'")
+            self.db.execute(
+                "INSERT INTO scheduler_state(name,value) VALUES(?,?)",
+                ("publish_success:" + release_id, successful_at),
+            )
+            self.db.execute("DELETE FROM scheduler_state WHERE name GLOB 'publish_intent:*'")
+
     def publish(self):
         from contextlib import contextmanager
 
@@ -3306,6 +3347,9 @@ class Pipeline:
                     return value
 
                 if comparable(content) == comparable(previous):
+                    # A successful no-op can also be interrupted while its large
+                    # local containers are being released on function return.
+                    self._publication_intent(previous_id)
                     return previous_id
         if previous_id:
             from backend.shared.tushare_archive import archive_inventory, retain_release
@@ -3366,6 +3410,7 @@ class Pipeline:
                         os.fsync(fd)
                     finally:
                         os.close(fd)
+                self._publication_intent(release)
                 atomic_json(
                     self.root / "CURRENT.json", {"release_id": release, "manifest_sha256": sha}
                 )
@@ -3474,11 +3519,7 @@ def tick(max_requests=None, max_seconds=None):
                 )
                 if publish_interval:
                     successful_at = int(time.time())
-                    pipeline.db.execute(
-                        "INSERT INTO scheduler_state(name,value) VALUES('publish_success_at',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
-                        (successful_at,),
-                    )
-                    pipeline.db.commit()
+                    pipeline._publication_success(release_id, successful_at)
                     publication.update(
                         last_success_at=successful_at,
                         next_due_at=successful_at + publish_interval,
@@ -3509,10 +3550,30 @@ def tick(max_requests=None, max_seconds=None):
                             saved = pipeline.db.execute(
                                 "SELECT value FROM scheduler_state WHERE name='publish_success_at'"
                             ).fetchone()
+                            if saved and (type(saved[0]) is not int or saved[0] < 0):
+                                raise ValueError("Invalid publication checkpoint")
+                            intent = pipeline.db.execute(
+                                "SELECT value FROM scheduler_state WHERE name=?",
+                                ("publish_intent:" + release_id,),
+                            ).fetchone()
+                            if intent:
+                                completed_at = intent[0]
+                                if type(completed_at) is not int or completed_at < 0:
+                                    raise ValueError("Invalid publication intent time")
+                                now = time.time()
+                                if completed_at > now or (saved and saved[0] > now):
+                                    publication["checkpoint_recovery"] = "clock_rollback"
+                                elif not saved or completed_at >= saved[0]:
+                                    # manifest_at above verified the immutable body;
+                                    # recheck the pointer inside the commit helper.
+                                    pipeline._publication_success(release_id, completed_at)
+                                    saved = (completed_at,)
+                                    publication["checkpoint_recovery"] = "verified_current_intent"
+                                    publication["recovered_release_id"] = release_id
+                                else:
+                                    publication["checkpoint_recovery"] = "older_intent"
                             if saved:
                                 last_success = saved[0]
-                                if type(last_success) is not int or last_success < 0:
-                                    raise ValueError("Invalid publication checkpoint")
                                 publication["last_success_at"] = last_success
                                 publication["next_due_at"] = (
                                     last_success + publish_interval
@@ -3520,7 +3581,10 @@ def tick(max_requests=None, max_seconds=None):
                                 # Clock rollback forces a real publication check, never
                                 # an unbounded postponement based on a future timestamp.
                                 elapsed = time.time() - last_success
-                                due = not 0 <= elapsed < publish_interval
+                                due = (
+                                    not 0 <= elapsed < publish_interval
+                                    or publication.get("checkpoint_recovery") == "clock_rollback"
+                                )
                     if due:
                         report.update(status="publish_only", requests=0)
                         publication["mode"] = "publish_only"
