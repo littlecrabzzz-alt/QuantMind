@@ -236,6 +236,13 @@ class DocumentWorkerTest(unittest.TestCase):
         self.assertEqual(self.tasks.tushare_documents()["processed"], 0)
 
     def test_route_resource_bounds_and_snapshot_writer(self):
+        acquire_options = self.app.options["engine.tasks.tushare_acquire"]
+        self.assertEqual(
+            (acquire_options["soft_time_limit"], acquire_options["time_limit"]),
+            (300, 330),
+        )
+        self.assertTrue(acquire_options["acks_late"])
+        self.assertTrue(acquire_options["reject_on_worker_lost"])
         options = self.app.options["engine.tasks.tushare_documents"]
         self.assertEqual(
             (options["soft_time_limit"], options["time_limit"]), (105, 110)
