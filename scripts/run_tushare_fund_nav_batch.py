@@ -1,0 +1,345 @@
+#!/usr/bin/env python3
+"""Plan or execute one hash-pinned fund_nav history batch."""
+
+from __future__ import annotations
+
+import argparse
+from collections import Counter
+from contextlib import closing, contextmanager, ExitStack
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import signal
+import sqlite3
+import sys
+import threading
+from unittest.mock import patch
+
+import httpx
+
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
+
+from backend.shared import tushare_pipeline as pipeline_module  # noqa: E402
+from backend.shared.tushare_intake import digest, json_bytes  # noqa: E402
+from scripts import prepare_tushare_fund_nav_batch as preparation  # noqa: E402
+
+
+MAX_UPSTREAM_REQUESTS = 360
+MAX_SECONDS = 90
+
+
+def sha(path):
+    return digest(Path(path).read_bytes())
+
+
+def helper_sha256():
+    return sha(Path(__file__).resolve())
+
+
+def preparation_sha256():
+    return sha(Path(preparation.__file__).resolve())
+
+
+def _regular(path, label):
+    path = Path(path)
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"Authority {label} must be a regular file")
+    return path
+
+
+@contextmanager
+def _hard_deadline(seconds):
+    if threading.current_thread() is not threading.main_thread() or not hasattr(
+        signal, "setitimer"
+    ):
+        yield
+        return
+    previous = signal.getsignal(signal.SIGALRM)
+
+    def expired(_signum, _frame):
+        raise TimeoutError("Exact batch wall-clock deadline reached")
+
+    signal.signal(signal.SIGALRM, expired)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
+
+
+def _state_counts(pipeline):
+    return [
+        {"api_name": api, "state": state, "jobs": jobs}
+        for api, state, jobs in pipeline.db.execute(
+            "SELECT json_extract(j.job,'$.api_name'),j.state,COUNT(*) "
+            "FROM exact_task_scope s CROSS JOIN jobs j ON j.id=s.task_id "
+            "GROUP BY 1,2 ORDER BY 1,2"
+        )
+    ]
+
+
+def _attempt_counts(pipeline):
+    return Counter(
+        dict(
+            pipeline.db.execute(
+                "SELECT json_extract(j.job,'$.api_name'),COUNT(a.attempt) "
+                "FROM exact_task_scope s CROSS JOIN jobs j ON j.id=s.task_id "
+                "LEFT JOIN attempts a ON a.job_id=j.id GROUP BY 1"
+            )
+        )
+    )
+
+
+def _verify_authority_jobs(pipeline, records):
+    for expected in records:
+        saved = pipeline.db.execute(
+            "SELECT id,logical_key,epoch,job,priority,group_name,state FROM jobs WHERE id=?",
+            (expected["task_id"],),
+        ).fetchone()
+        if saved is None:
+            raise ValueError("Verified batch task is missing from authority")
+        actual = {
+            "task_id": saved["id"],
+            "logical_key": saved["logical_key"],
+            "epoch": saved["epoch"],
+            "priority": saved["priority"],
+            "group_name": saved["group_name"],
+            "job": json.loads(saved["job"]),
+        }
+        if actual != expected:
+            raise ValueError("Authority task identity does not match verified batch")
+        if saved["state"] != "pending":
+            raise ValueError("Verified fund_nav task is no longer pending")
+
+
+def _execute(
+    root,
+    manifest,
+    manifest_sha256,
+    expected_task_ids_sha256,
+    expected_config_sha256,
+    max_requests,
+    max_seconds,
+):
+    root = Path(root)
+    if root.is_symlink() or root.resolve() != pipeline_module.ROOT.resolve():
+        raise ValueError("Execute root is not the configured authority root")
+    root = root.resolve()
+    pipeline_module.authority()
+    _regular(root / "ENABLED", "enable marker")
+    lock_path = root / "pipeline.lock"
+    if lock_path.is_symlink():
+        raise ValueError("Unsafe pipeline lock")
+    descriptor = os.open(
+        lock_path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600
+    )
+    with os.fdopen(descriptor, "a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        database = _regular(root / "pipeline.sqlite", "pipeline database")
+        with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as db:
+            if db.execute("PRAGMA user_version").fetchone()[0] != 6:
+                raise ValueError("Authority pipeline schema must already be version 6")
+        verified = preparation.verify_manifest(manifest, manifest_sha256)
+        if verified["all_task_ids_sha256"] != expected_task_ids_sha256:
+            raise ValueError("Explicit task ID inventory hash mismatch")
+        config_path = _regular(root / "pipeline-config.json", "pipeline config")
+        config_bytes = config_path.read_bytes()
+        if digest(config_bytes) != expected_config_sha256:
+            raise ValueError("Explicit authority config hash mismatch")
+        pipeline = pipeline_module.Pipeline(
+            root, json.loads((REPO / "config/tushare-catalog.json").read_bytes())
+        )
+        try:
+            _verify_authority_jobs(pipeline, verified["records"])
+            task_ids = [record["task_id"] for record in verified["records"]]
+            pipeline._install_exact_task_scope(task_ids)
+            before_states = _state_counts(pipeline)
+            before_attempts = _attempt_counts(pipeline)
+            pointer = root / "CURRENT.json"
+            pointer_before = sha(_regular(pointer, "current pointer"))
+            if shutil.disk_usage(root).free < 100 * 2**30:
+                return {
+                    "status": "blocked_disk_reserve",
+                    "upstream_calls": 0,
+                    "release_published": False,
+                }
+            token = pipeline_module.get_secret("TUSHARE_TOKEN")
+            if not token:
+                return {
+                    "status": "blocked_missing_token",
+                    "upstream_calls": 0,
+                    "release_published": False,
+                }
+            with (
+                _hard_deadline(max_seconds),
+                httpx.Client(
+                    trust_env=False,
+                    timeout=min(30, max_seconds),
+                    follow_redirects=False,
+                ) as client,
+            ):
+                run = pipeline.run(
+                    client,
+                    token,
+                    json.loads(config_bytes),
+                    max_requests=max_requests,
+                    max_seconds=max_seconds,
+                    pause=0,
+                    task_ids=task_ids,
+                )
+            after_attempts = _attempt_counts(pipeline)
+            after_states = _state_counts(pipeline)
+            attempted = {
+                api: after_attempts[api] - before_attempts[api]
+                for api in sorted(after_attempts | before_attempts)
+                if after_attempts[api] != before_attempts[api]
+            }
+            if _regular(config_path, "pipeline config").read_bytes() != config_bytes:
+                raise RuntimeError("Authority config changed while lock was held")
+            if sha(_regular(pointer, "current pointer")) != pointer_before:
+                raise RuntimeError("Current release pointer changed during exact batch")
+        finally:
+            pipeline.close()
+    receipt = {
+        "schema_version": 1,
+        "status": "exact_batch_executed",
+        "batch_manifest_sha256": manifest_sha256,
+        "all_task_ids_sha256": expected_task_ids_sha256,
+        "authority_config_sha256": expected_config_sha256,
+        "helper_sha256": helper_sha256(),
+        "preparation_sha256": preparation_sha256(),
+        "verified_jobs": len(verified["records"]),
+        "before_states": before_states,
+        "after_states": after_states,
+        "attempted_by_api": attempted,
+        "upstream_calls": run["requests"],
+        "max_upstream_calls": max_requests,
+        "max_seconds": max_seconds,
+        "elapsed_seconds": run["elapsed_seconds"],
+        "exact_task_scope": run["exact_task_scope"],
+        "release_published": False,
+        "current_release_switched": False,
+    }
+    receipt["receipt_id"] = digest(json_bytes(receipt))
+    return receipt
+
+
+def run_batch(
+    manifest,
+    manifest_sha256,
+    *,
+    expected_task_ids_sha256=None,
+    expected_config_sha256=None,
+    expected_helper_sha256=None,
+    expected_preparation_sha256=None,
+    root=None,
+    max_requests=MAX_UPSTREAM_REQUESTS,
+    max_seconds=MAX_SECONDS,
+    execute=False,
+):
+    if type(max_requests) is not int or not 1 <= max_requests <= MAX_UPSTREAM_REQUESTS:
+        raise ValueError("Upstream request limit must be an integer from 1 to 360")
+    if type(max_seconds) not in (int, float) or not 0 < max_seconds <= MAX_SECONDS:
+        raise ValueError(
+            "Wall-clock limit must be greater than 0 and at most 90 seconds"
+        )
+    current_helper_sha256 = helper_sha256()
+    if expected_helper_sha256 and expected_helper_sha256 != current_helper_sha256:
+        raise ValueError("Explicit helper hash mismatch")
+    current_preparation_sha256 = preparation_sha256()
+    if (
+        expected_preparation_sha256
+        and expected_preparation_sha256 != current_preparation_sha256
+    ):
+        raise ValueError("Explicit preparation hash mismatch")
+    if not execute:
+        with ExitStack() as guards:
+            for target in (
+                "socket.socket.connect",
+                "socket.getaddrinfo",
+                "backend.shared.tushare_pipeline.get_secret",
+                "backend.shared.runtime_secrets.get_secret",
+            ):
+                guards.enter_context(
+                    patch(
+                        target,
+                        side_effect=AssertionError("Offline fund_nav batch plan"),
+                    )
+                )
+            verified = preparation.verify_manifest(manifest, manifest_sha256)
+        return {
+            "schema_version": 1,
+            "status": "plan_only",
+            "batch_manifest_sha256": manifest_sha256,
+            "all_task_ids_sha256": verified["all_task_ids_sha256"],
+            "helper_sha256": current_helper_sha256,
+            "preparation_sha256": current_preparation_sha256,
+            "verified_jobs": len(verified["records"]),
+            "api_counts": verified["api_counts"],
+            "max_upstream_calls": max_requests,
+            "max_seconds": max_seconds,
+            "would_access_authority": False,
+            "would_access_credentials": False,
+            "would_call_upstream": False,
+            "would_publish": False,
+        }
+    if not all(
+        isinstance(value, str) and re.fullmatch(r"[a-f0-9]{64}", value)
+        for value in (
+            expected_task_ids_sha256,
+            expected_config_sha256,
+            expected_helper_sha256,
+            expected_preparation_sha256,
+        )
+    ):
+        raise ValueError(
+            "Execute requires pinned task, config, helper and preparation SHA-256 values"
+        )
+    if root is None:
+        raise ValueError("Execute requires authority root")
+    return _execute(
+        root,
+        manifest,
+        manifest_sha256,
+        expected_task_ids_sha256,
+        expected_config_sha256,
+        max_requests,
+        max_seconds,
+    )
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--manifest-sha256", required=True)
+    parser.add_argument("--expected-task-ids-sha256")
+    parser.add_argument("--expected-config-sha256")
+    parser.add_argument("--expected-helper-sha256")
+    parser.add_argument("--expected-preparation-sha256")
+    parser.add_argument("--root", type=Path, default=pipeline_module.ROOT)
+    parser.add_argument("--max-requests", type=int, default=MAX_UPSTREAM_REQUESTS)
+    parser.add_argument("--max-seconds", type=float, default=MAX_SECONDS)
+    parser.add_argument("--execute", action="store_true")
+    args = parser.parse_args()
+    result = run_batch(
+        args.manifest,
+        args.manifest_sha256,
+        expected_task_ids_sha256=args.expected_task_ids_sha256,
+        expected_config_sha256=args.expected_config_sha256,
+        expected_helper_sha256=args.expected_helper_sha256,
+        expected_preparation_sha256=args.expected_preparation_sha256,
+        root=args.root,
+        max_requests=args.max_requests,
+        max_seconds=args.max_seconds,
+        execute=args.execute,
+    )
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()
