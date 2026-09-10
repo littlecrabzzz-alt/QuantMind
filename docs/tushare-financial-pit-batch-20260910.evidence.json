@@ -229,5 +229,46 @@
       "manifest_sha256_verified": true,
       "error_log_bytes": 0
     }
+  },
+  "eighth_batch": {
+    "executed_at": "2026-09-10T15:50:00Z",
+    "deployed_revision": "4b359b29076ff6336cd5b5d52eb26268217794f9",
+    "deployed_source_digest": "6023c69e3294a1cd0d0f6cbacf61f9d5e3440684ddbef5054e61e76226d36f31",
+    "manifest_path": "/data/tushare/validation/financial-pit-batch-20260910/batch-8-manifest.json",
+    "manifest_sha256": "2b485d6b92ea4ad198a8d466640dd00676a52365929eedbbf15859e91dfc54c5",
+    "all_task_ids_sha256": "f3ec50c66ce9ee1f9239beec299b300a6f0fac817f4ee1707602cfb4617d9060",
+    "authority_config_sha256": "da45afae322463eacd54a97203f2ede46a9ff86aafbb58e6bec26b57ea009853",
+    "preparation_sha256": "d58c9bdf5acbeebd7d03d93e9075d01c5418ababdc830748048569ed9b48a7e3",
+    "helper_sha256": "7b2e40d3a4e7b4feda1ff50e1e3c8f07eb9c34931cd12e3122e3f7c104aa2658",
+    "catalog_sha256": "3578b9063c2ff0f0f612d2dd70712cec42e4cadf8c1dc9fd3bc7a7268ea667b4",
+    "pipeline_sha256": "4fe9743dba7b3db13c8ada4b5b25d23d5056d67eaa6ae1a185a37942f3e1c474",
+    "current_before_sha256": "09573a2b84594660ac1c81b744dff15bc2da4e0ceb68e81691b108e83d1c044a",
+    "verified_jobs": 360,
+    "before": {
+      "pending": 360
+    },
+    "upstream_calls": 360,
+    "elapsed_seconds": 47.626,
+    "api_results": {
+      "income_vip": {
+        "done": 116,
+        "empty": 4
+      },
+      "balancesheet_vip": {
+        "done": 116,
+        "empty": 4
+      },
+      "cashflow_vip": {
+        "done": 116,
+        "empty": 4
+      }
+    },
+    "release_published": false,
+    "current_release_switched": false,
+    "release_before_batch": "data-1ed56821ebf8f42ca999dc754829b80fa0ee27cbae3a0501ec399001ee62e10f",
+    "receipt_path": "/data/tushare/validation/financial-pit-batch-20260910/acceptance-batch-8.json",
+    "receipt_sha256": "702572f42c48783721c57834770178d0c0c9a60096f4e84f98708dc1648f5a81",
+    "receipt_id": "0affd73955721222d2e33d6c0107ac395d659452a07923d3ff2efdfe47b1302e",
+    "published_by_scheduled_pipeline_after_batch": false
   }
 }

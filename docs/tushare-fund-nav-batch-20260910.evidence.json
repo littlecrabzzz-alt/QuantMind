@@ -109,5 +109,42 @@
       "manifest_sha256_verified": true,
       "error_log_bytes": 0
     }
+  },
+  "third_batch": {
+    "executed_at": "2026-09-10T15:52:00Z",
+    "deployed_revision": "4b359b29076ff6336cd5b5d52eb26268217794f9",
+    "deployed_source_digest": "6023c69e3294a1cd0d0f6cbacf61f9d5e3440684ddbef5054e61e76226d36f31",
+    "manifest_path": "/data/tushare/validation/fund-nav-batch-20260910/batch-3-manifest.json",
+    "manifest_sha256": "add2f3cf9c145628fea2e861d908d8940cc1914a32f51244645ec187bb7d91c7",
+    "task_set_sha256": "84cfbeb5687c11af812d26db9e69b7173c6eb320509003bb4128e77132a3d039",
+    "authority_config_sha256": "da45afae322463eacd54a97203f2ede46a9ff86aafbb58e6bec26b57ea009853",
+    "prepare_helper_sha256": "a4a4320a361cb710fb8fe6d91b0d4f6075d1a01e8c3dd8df2adbebccc27ba26e",
+    "runner_helper_sha256": "5fa32b52871722d8ab6c74e999f442d201a4cbef2b7f081228697148c7f7fe89",
+    "catalog_sha256": "3578b9063c2ff0f0f612d2dd70712cec42e4cadf8c1dc9fd3bc7a7268ea667b4",
+    "pipeline_sha256": "4fe9743dba7b3db13c8ada4b5b25d23d5056d67eaa6ae1a185a37942f3e1c474",
+    "current_before_sha256": "09573a2b84594660ac1c81b744dff15bc2da4e0ceb68e81691b108e83d1c044a",
+    "verified_jobs": 360,
+    "selection": {
+      "pending_split_leaf": 270,
+      "pending_history_root": 90,
+      "funds": 225
+    },
+    "upstream_calls": 360,
+    "elapsed_seconds": 49.602,
+    "before": {
+      "pending": 360
+    },
+    "after": {
+      "done": 202,
+      "empty": 39,
+      "split_pending": 119
+    },
+    "release_published_by_runner": false,
+    "current_switched_by_runner": false,
+    "release_before_batch": "data-1ed56821ebf8f42ca999dc754829b80fa0ee27cbae3a0501ec399001ee62e10f",
+    "receipt_path": "/data/tushare/validation/fund-nav-batch-20260910/acceptance-batch-3.json",
+    "receipt_sha256": "6826ccd3616cdbaa4c900770dd22fd8e7f48629db36ea2dc5861e2655426ebf9",
+    "receipt_id": "f119b5cfb65cfffd8e01aede11c21c3581ff689a7f671427640cc30495f6ce2e",
+    "published_by_scheduled_pipeline_after_batch": false
   }
 }
