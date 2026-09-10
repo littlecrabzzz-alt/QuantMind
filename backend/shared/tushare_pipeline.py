@@ -368,6 +368,57 @@ class Pipeline:
     def _next_structured_job(self, now, check_gates=True):
         return self._next_family_job("structured", now, check_gates)
 
+    def _next_exact_task_job(self, now, check_gates=True):
+        """Round-robin APIs only inside the connection-local exact task scope."""
+        prefix = "exact_batch_api_turn:"
+        previous = self.db.execute(
+            "SELECT name,value FROM scheduler_state WHERE name GLOB ? "
+            "ORDER BY value DESC,name LIMIT 1",
+            (prefix + "*",),
+        ).fetchone()
+        cursor = previous["name"][len(prefix) :] if previous else None
+        turn = previous["value"] + 1 if previous else 1
+        seen = set()
+        while True:
+            candidate = self.db.execute(
+                "SELECT json_extract(j.job,'$.api_name') AS api "
+                "FROM exact_task_scope s CROSS JOIN jobs j ON j.id=s.task_id "
+                "WHERE j.state='pending' "
+                + (
+                    "AND json_extract(j.job,'$.api_name')>? "
+                    if cursor is not None
+                    else ""
+                )
+                + "ORDER BY json_extract(j.job,'$.api_name') LIMIT 1",
+                (cursor,) if cursor is not None else (),
+            ).fetchone()
+            if candidate is None and cursor is not None:
+                cursor = None
+                continue
+            if candidate is None:
+                return None, []
+            api = candidate["api"]
+            if not isinstance(api, str) or not api:
+                raise ValueError("Exact pending job has missing/invalid api_name")
+            if api in seen:
+                return None, []
+            seen.add(api)
+            cursor = api
+            if check_gates:
+                gate = self.db.execute(
+                    "SELECT next_at FROM request_gates WHERE scope=?", ("api:" + api,)
+                ).fetchone()
+                if gate and gate[0] > now:
+                    continue
+            row = self.db.execute(
+                "SELECT j.* FROM exact_task_scope s CROSS JOIN jobs j ON j.id=s.task_id "
+                "WHERE j.state='pending' AND json_extract(j.job,'$.api_name')=? "
+                "AND j.retry_after<=? ORDER BY j.priority,j.rowid LIMIT 1",
+                (api, now),
+            ).fetchone()
+            if row:
+                return row, [(prefix + api, turn)]
+
     def _next_family_job(self, family, now, check_gates=True):
         """Seek pending APIs; preserve structured keys and isolate other families."""
         namespace = (
@@ -435,7 +486,7 @@ class Pipeline:
                     # borrowed the other one, or the ensuing request later fails.
                     return row, [(prefix + api, turn), (phase_name, (phase + 1) % 4)]
 
-    def next_job(self, config, deadline):
+    def next_job(self, config, deadline, *, task_scope=False):
         # Preserve legacy structured fallback behavior; extend only enabled families.
         fair_families = {"structured"} | {
             name for name in PLANNERS if name != "rrg" and config.get("enable_" + name)
@@ -452,11 +503,34 @@ class Pipeline:
             rpm = min(positive_int(rpm, "account request rate"), rollout)
         if rpm is None:
             now = time.time()
-            row = self.db.execute(
-                "SELECT * FROM jobs INDEXED BY jobs_ready_order WHERE state='pending' AND retry_after<=? ORDER BY priority,rowid LIMIT 1",
-                (now,),
-            ).fetchone()
-            if row and row["group_name"] in fair_families:
+            if task_scope:
+                row = self.db.execute(
+                    "SELECT j.* FROM exact_task_scope s CROSS JOIN jobs j "
+                    "ON j.id=s.task_id WHERE j.state='pending' AND j.retry_after<=? "
+                    "ORDER BY j.priority,j.rowid LIMIT 1",
+                    (now,),
+                ).fetchone()
+            else:
+                row = self.db.execute(
+                    "SELECT * FROM jobs INDEXED BY jobs_ready_order "
+                    "WHERE state='pending' AND retry_after<=? "
+                    "ORDER BY priority,rowid LIMIT 1",
+                    (now,),
+                ).fetchone()
+            if row and task_scope:
+                row, checkpoints = self._next_exact_task_job(
+                    now, check_gates=False
+                )
+                try:
+                    self.db.executemany(
+                        "INSERT INTO scheduler_state(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                        checkpoints,
+                    )
+                    self.db.commit()
+                except BaseException:
+                    self.db.rollback()
+                    raise
+            elif row and row["group_name"] in fair_families:
                 row, checkpoints = self._next_family_job(
                     row["group_name"], now, check_gates=False
                 )
@@ -483,20 +557,30 @@ class Pipeline:
                     return None
                 time.sleep(account_wait)
                 continue
-            groups = ["rrg"] + [
-                name for name in PLANNERS if config.get("enable_" + name)
-            ]
-            weights = config.get("group_weights", {})
-            if any(not 1 <= int(weights.get(name, 1)) <= 10 for name in groups):
-                raise ValueError("Invalid family scheduling weight")
-            groups = [name for name in groups for _ in range(int(weights.get(name, 1)))]
-            group = groups[self._fair_turn % len(groups)]
+            if not task_scope:
+                groups = ["rrg"] + [
+                    name for name in PLANNERS if config.get("enable_" + name)
+                ]
+                weights = config.get("group_weights", {})
+                if any(not 1 <= int(weights.get(name, 1)) <= 10 for name in groups):
+                    raise ValueError("Invalid family scheduling weight")
+                groups = [
+                    name for name in groups for _ in range(int(weights.get(name, 1)))
+                ]
+                group = groups[self._fair_turn % len(groups)]
+            else:
+                group = None
             sql = """SELECT j.* FROM jobs j INDEXED BY {ready_index} LEFT JOIN request_gates g
                 ON g.scope='api:' || json_extract(j.job,'$.api_name')
                 WHERE j.state='pending' AND j.retry_after<=? AND COALESCE(g.next_at,0)<=?
                 {group_filter} ORDER BY j.priority,j.rowid LIMIT 1"""
             checkpoints = []
-            if group in fair_families:
+            if task_scope:
+                # An exact batch is fair across its APIs regardless of the normal
+                # family policy. The same account/API gates and reservations below
+                # still apply, and priority remains ordered within each API.
+                row, checkpoints = self._next_exact_task_job(now)
+            elif group in fair_families:
                 row, checkpoints = self._next_family_job(group, now)
             else:
                 row = self.db.execute(
@@ -506,7 +590,7 @@ class Pipeline:
                     ),
                     (now, now, group),
                 ).fetchone()
-            if row is None:
+            if row is None and not task_scope:
                 row = self.db.execute(
                     sql.format(group_filter="", ready_index="jobs_ready_order"),
                     (now, now),
@@ -556,11 +640,19 @@ class Pipeline:
                     raise
                 self._fair_turn += 1
                 return row
-            earliest = self.db.execute("""
+            earliest_sql = """
                 SELECT MIN(MAX(j.retry_after,COALESCE(g.next_at,0)))
-                FROM jobs j LEFT JOIN request_gates g ON g.scope='api:' || json_extract(j.job,'$.api_name')
+                FROM {source} LEFT JOIN request_gates g
+                  ON g.scope='api:' || json_extract(j.job,'$.api_name')
                 WHERE j.state='pending'
-            """).fetchone()[0]
+            """.format(
+                source=(
+                    "exact_task_scope s CROSS JOIN jobs j ON j.id=s.task_id"
+                    if task_scope
+                    else "jobs j"
+                )
+            )
+            earliest = self.db.execute(earliest_sql).fetchone()[0]
             delay = max(0.01, earliest - now) if earliest is not None else None
             if delay is None or delay >= deadline - time.monotonic():
                 return None
@@ -2637,10 +2729,40 @@ class Pipeline:
             "upstream_calls": 0,
         }
 
-    def run(self, client, token, config, max_requests=100, max_seconds=100, pause=0.6):
+    def _install_exact_task_scope(self, task_ids):
+        task_ids = list(task_ids)
+        if not task_ids or len(task_ids) > 5000 or len(set(task_ids)) != len(task_ids):
+            raise ValueError("Exact task scope must contain 1..5000 unique task IDs")
+        if any(not isinstance(task_id, str) or not task_id for task_id in task_ids):
+            raise ValueError("Exact task scope contains an invalid task ID")
+        self.db.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS exact_task_scope "
+            "(task_id TEXT PRIMARY KEY) WITHOUT ROWID"
+        )
+        self.db.execute("DELETE FROM exact_task_scope")
+        self.db.executemany(
+            "INSERT INTO exact_task_scope(task_id) VALUES(?)",
+            ((task_id,) for task_id in task_ids),
+        )
+        self.db.commit()
+        return len(task_ids)
+
+    def run(
+        self,
+        client,
+        token,
+        config,
+        max_requests=100,
+        max_seconds=100,
+        pause=0.6,
+        *,
+        task_ids=None,
+    ):
         started = time.monotonic()
         deadline = started + max_seconds
-        partition_work = self.resume_identifier_split(deadline)
+        task_scope = task_ids is not None
+        scoped_jobs = self._install_exact_task_scope(task_ids) if task_scope else 0
+        partition_work = None if task_scope else self.resume_identifier_split(deadline)
         if partition_work is not None:
             # One expensive local fanout is the entire run. Never combine a full
             # discovery scan with another acquisition batch in the same task.
@@ -2650,13 +2772,17 @@ class Pipeline:
                 "partition_work": partition_work,
                 **self.status(),
             }
-        self.reconcile_partitions(deadline=deadline)
+        if not task_scope:
+            self.reconcile_partitions(deadline=deadline)
         completed = 0
         while completed < max_requests and time.monotonic() - started < max_seconds:
-            self.expand(config)
+            if not task_scope:
+                self.expand(config)
             if time.monotonic() - started >= max_seconds:
                 break
-            row = self.next_job(config, started + max_seconds)
+            row = self.next_job(
+                config, started + max_seconds, task_scope=task_scope
+            )
             if row is None or time.monotonic() - started >= max_seconds:
                 break
             job = json.loads(row["job"])
@@ -2859,13 +2985,16 @@ class Pipeline:
             completed += 1
             if pause:
                 time.sleep(pause)
-        if time.monotonic() < deadline:
+        if not task_scope and time.monotonic() < deadline:
             self.expand(config)
-        return {
+        report = {
             "requests": completed,
             "elapsed_seconds": round(time.monotonic() - started, 3),
             **self.status(),
         }
+        if task_scope:
+            report.update(exact_task_scope=True, scoped_jobs=scoped_jobs)
+        return report
 
     def register_documents(self, max_observations=20, *, max_records=500, max_seconds=5):
         from backend.shared.tushare_documents import enqueue_documents
