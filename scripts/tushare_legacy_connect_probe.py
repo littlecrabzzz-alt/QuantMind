@@ -7,6 +7,7 @@ import fcntl
 import hashlib
 import json
 import math
+import mmap
 from pathlib import Path
 import re
 import signal
@@ -28,8 +29,6 @@ def canonical(value):
 
 def seed_requests(root, seeds_path, expected_sha):
     """Build the fixed four requests only from a verified trade-calendar object."""
-    from backend.shared.tushare_pipeline import manifest_at
-
     if seeds_path.is_symlink() or seeds_path.stat().st_size > 1024 * 1024:
         raise ValueError("Unsafe/oversized seed recipe")
     body = seeds_path.read_bytes()
@@ -44,13 +43,37 @@ def seed_requests(root, seeds_path, expected_sha):
         "history_end",
     }:
         raise ValueError("Unexpected seed recipe keys")
-    manifest = manifest_at(root, recipe["release_id"])
+    release_id = recipe["release_id"]
+    if not isinstance(release_id, str) or not re.fullmatch(r"data-[a-f0-9]{64}", release_id):
+        raise ValueError("Invalid fixed release ID")
+    manifest_path = root / "releases" / release_id / "manifest.json"
+    if manifest_path.is_symlink() or manifest_path.stat().st_size > 1024**3:
+        raise ValueError("Unsafe/oversized fixed manifest")
+    manifest_hash = hashlib.sha256()
+    with manifest_path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            manifest_hash.update(chunk)
+    if manifest_hash.hexdigest() != release_id.removeprefix("data-"):
+        raise ValueError("Fixed manifest checksum mismatch")
+    manifest_stream = manifest_path.open("rb")
+    manifest = mmap.mmap(manifest_stream.fileno(), 0, access=mmap.ACCESS_READ)
+
+    def manifest_entry(name):
+        token = json.dumps(name, ensure_ascii=False).encode() + b": "
+        offset = manifest.find(token)
+        if offset < 0 or manifest.find(token, offset + len(token)) >= 0:
+            raise ValueError("Source is absent or ambiguous in fixed manifest")
+        sample = manifest[offset + len(token) : offset + len(token) + 512].decode()
+        entry, _ = json.JSONDecoder().raw_decode(sample)
+        if set(entry) != {"bytes", "sha256"}:
+            raise ValueError("Unexpected fixed manifest entry")
+        return entry
 
     def checked(name):
         if not re.fullmatch(r"(objects|observations)/[a-f0-9]{32,64}\.json", name):
             raise ValueError("Invalid source path")
         path = root / name
-        expected = manifest["files"][name]
+        expected = manifest_entry(name)
         if path.is_symlink() or path.parent.is_symlink() or path.stat().st_size > 32 * 1024 * 1024:
             raise ValueError("Unsafe/oversized source file")
         raw = path.read_bytes()
@@ -58,24 +81,28 @@ def seed_requests(root, seeds_path, expected_sha):
             raise ValueError("Source is outside fixed verified evidence")
         return json.loads(raw)
 
-    calendar = recipe["calendar"]
-    values = [calendar[k] for k in ("recent_start", "recent_end", "history_start", "history_end")]
-    if set(calendar["observations"]) != set(values):
-        raise ValueError("Every reviewed date requires an explicit calendar observation")
-    open_days = set()
-    for day, name in calendar["observations"].items():
-        obs = checked("observations/" + name)
-        if obs["request"]["api_name"] != "trade_cal" or obs["request"]["params"].get("exchange") not in ("SSE", "SZSE"):
-            raise ValueError("Connect dates require actual exchange-calendar rows")
-        source = checked("objects/" + obs["object_sha256"] + ".json")
-        if source.get("code") != 0 or len(source.get("data", {}).get("items", [])) > 50000:
-            raise ValueError("Invalid calendar source")
-        data = source["data"]
-        rows = [dict(zip(data["fields"], row, strict=True)) for row in data["items"]]
-        if any(r.get("cal_date") == day and r.get("is_open") in (1, "1") for r in rows):
-            open_days.add(day)
-    if any(not isinstance(v, str) or not re.fullmatch(r"[0-9]{8}", v) or v not in open_days for v in values):
-        raise ValueError("Probe date missing actual open-calendar evidence")
+    try:
+        calendar = recipe["calendar"]
+        values = [calendar[k] for k in ("recent_start", "recent_end", "history_start", "history_end")]
+        if set(calendar["observations"]) != set(values):
+            raise ValueError("Every reviewed date requires an explicit calendar observation")
+        open_days = set()
+        for day, name in calendar["observations"].items():
+            obs = checked("observations/" + name)
+            if obs["request"]["api_name"] != "trade_cal" or obs["request"]["params"].get("exchange") not in ("SSE", "SZSE"):
+                raise ValueError("Connect dates require actual exchange-calendar rows")
+            source = checked("objects/" + obs["object_sha256"] + ".json")
+            if source.get("code") != 0 or len(source.get("data", {}).get("items", [])) > 50000:
+                raise ValueError("Invalid calendar source")
+            data = source["data"]
+            rows = [dict(zip(data["fields"], row, strict=True)) for row in data["items"]]
+            if any(r.get("cal_date") == day and r.get("is_open") in (1, "1") for r in rows):
+                open_days.add(day)
+        if any(not isinstance(v, str) or not re.fullmatch(r"[0-9]{8}", v) or v not in open_days for v in values):
+            raise ValueError("Probe date missing actual open-calendar evidence")
+    finally:
+        manifest.close()
+        manifest_stream.close()
     recent_start, recent_end, history_start, history_end = values
     if not recent_start <= recent_end or not history_start <= history_end < recent_start:
         raise ValueError("Invalid bounded Connect date order")
