@@ -5,6 +5,12 @@
 # python process at startup, before any user code imports litellm. Each block
 # below is a harmless no-op when its underlying issue is absent.
 #
+# Importing LiteLLM loads its model-cost table. Use the bundled copy by default
+# so every Python process does not make an unrelated network request at startup.
+import os as _os
+
+_os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+
 # (1) typing backport -- litellm>=1.98 does `from typing import NotRequired`
 #     (PEP 655, Python 3.11+). The container base is python:3.10-slim, so the
 #     import raises ImportError and RDLoop.mount() dies at step 1. Backfill the
