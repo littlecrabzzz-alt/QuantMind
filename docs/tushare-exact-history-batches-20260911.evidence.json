@@ -229,6 +229,19 @@
     "npr_api_rpm": 500
   },
   "production_git_head": "907ad7b50d379eb0e4e0e42e2a8320d71edc647d",
+  "related_scheduler_lock_event": {
+    "failed_phase": "pipeline.initialize commit",
+    "failed_task_id": "f9861892-bbf9-45ed-aab2-d5b27f9c1714",
+    "failure": "sqlite3.OperationalError: database is locked",
+    "publication": {
+      "current_release_id": "data-7be20672a3a9d0fbaecd571b0ce6da741da23e1257fe55f02d114b06e8865a09",
+      "next_due_at": "2026-09-11T06:01:51+08:00",
+      "status": "deferred"
+    },
+    "recovery_elapsed_seconds": 176.32873784936965,
+    "recovery_status": "succeeded",
+    "recovery_task_id": "60a25fb1-5b8c-46de-8ff2-940d39d517ad"
+  },
   "schema_version": 1,
   "service_restore": {
     "beat_healthy": true,
