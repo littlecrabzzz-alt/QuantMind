@@ -36,3 +36,9 @@ python3 scripts/prepare_tushare_financial_pit_batch.py \
 - `index_weight` history 有 87,493 pending、88 split_pending，具备指数研究价值，但完整指数发现、单指数单月饱和和发布时点仍需单独有界方案。
 - `fund_nav` history 有 22,205 pending、49 split_pending，当前 epoch 另有 7,057 pending；适合后续基金研究批次，本轮先完成能形成同股票三表闭环的数据。
 - `fund_basic` 当前 4 done、2 empty、2 blocked；阻塞项来自大响应/完整性问题，不能通过重复相同请求宣称基金基础全集闭包。
+
+## 2026-09-10 生产首批
+
+云端在两个专用 worker 自然排空并暂停后，重新从权威队列生成同一固定清单；清单和任务集合 SHA256 与上述计划完全一致。执行器在 48.807 秒内完成 360 次上游调用：三项 API 各 120 次。结果为 308 个 `done` 和 52 个 `empty`，没有遗留 `pending`；空响应保留为该次精确请求的终态证据，不外推为供应商历史完整。
+
+执行期间配置哈希和 `CURRENT` 均未变化，执行器未发布、未切换固定版本。不可覆盖回执位于 `/data/tushare/validation/financial-pit-batch-20260910/acceptance.json`，文件 SHA256 为 `2768ade4231d33915ebe5d0498fc79b070d7a2599dec10c24356599842ec1e1c`，回执 ID 为 `c9b6a0372afc6a1543f0fd0b87614dcc35fd25209272b18d9c0ed11d48101174`。专用 worker 随后恢复，由既有发布周期把结果纳入固定版本。

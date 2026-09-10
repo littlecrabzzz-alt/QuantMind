@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "executed_at": "2026-09-10T11:26:44Z",
+  "authority": "lzy-vm:/root/data/disk/quantmind/project/data/tushare",
+  "deployed_revision": "abd49fb5f7e8c2778cc9345b471c1ba60d915e48",
+  "release_before": "data-00224f3bd42e76db16916d1ae05960bb8e23945e49d9941e067d9ce95ced43fd",
+  "release_after": "data-4c12ba6d74691859358234f6aa34c7202eb3b2c90f3b04aa89eb64bac763bfe3",
+  "publication_seconds": 184.582,
+  "publication_identity_check_seconds": 0.222,
+  "batch_manifest_sha256": "07a7eb666e9302e8eb4fbce956113f0059621b04e87126bb18d488732ed63390",
+  "all_task_ids_sha256": "1ef0e80551582d911d778e6943bd1ad113f32b9b5a3cb284af9d993887b88810",
+  "authority_config_sha256": "4ac7b38142097cda4af50dfadb00093fd635d5fd37859d68ee9632800d1e21d9",
+  "helper_sha256": "7b2e40d3a4e7b4feda1ff50e1e3c8f07eb9c34931cd12e3122e3f7c104aa2658",
+  "verified_jobs": 360,
+  "upstream_calls": 360,
+  "elapsed_seconds": 48.807,
+  "api_results": {
+    "income_vip": {"requests": 120, "done": 102, "empty": 18},
+    "balancesheet_vip": {"requests": 120, "done": 104, "empty": 16},
+    "cashflow_vip": {"requests": 120, "done": 102, "empty": 18}
+  },
+  "release_published_by_batch": false,
+  "current_release_switched_by_batch": false,
+  "published_by_scheduled_pipeline_after_batch": true,
+  "mac_mirror": {
+    "status": "verified",
+    "release_id": "data-4c12ba6d74691859358234f6aa34c7202eb3b2c90f3b04aa89eb64bac763bfe3",
+    "downloaded_files": 3984,
+    "verified_files": 614824,
+    "approximate_size_gib": 77
+  },
+  "receipt_id": "c9b6a0372afc6a1543f0fd0b87614dcc35fd25209272b18d9c0ed11d48101174",
+  "acceptance_sha256": "2768ade4231d33915ebe5d0498fc79b070d7a2599dec10c24356599842ec1e1c",
+  "interpretation": {
+    "empty_is_request_terminal_evidence": true,
+    "source_history_complete": false,
+    "point_in_time_ready": false
+  },
+  "sensitive_content": {
+    "token": false,
+    "payment_or_order": false,
+    "upstream_response_body": false
+  }
+}
