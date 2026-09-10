@@ -28,7 +28,7 @@ class ReadArguments(BaseModel):
     start_date: str | None = None
     end_date: str | None = None
     codes: list[str] | None = Field(default=None, max_length=100)
-    code_field: str = "ts_code"
+    code_field: str | None = None
     keyword: str | None = Field(default=None, max_length=1000)
     keyword_fields: list[str] | None = Field(default=None, max_length=20)
     as_of: str | None = None

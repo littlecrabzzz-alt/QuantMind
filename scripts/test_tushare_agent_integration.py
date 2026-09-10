@@ -81,6 +81,19 @@ def engine_app():
 
 
 class AgentIntegration(unittest.TestCase):
+    def test_query_code_field_is_resolved_by_store(self):
+        self.assertIsNone(
+            tushare_tool.ReadArguments.model_validate(
+                {
+                    "action": "query",
+                    "release_id": "data-" + "a" * 64,
+                    "api_name": "index_weight",
+                    "fields": ["index_code"],
+                    "codes": ["SH000300"],
+                }
+            ).code_field
+        )
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="tushare-agent-test-")
         self.addCleanup(self.tmp.cleanup)

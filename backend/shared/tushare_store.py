@@ -776,6 +776,15 @@ def _default_date_field(api_name, columns):
     return next((field for field in DATE_FIELDS if field in columns), None)
 
 
+def _default_code_field(api_name, columns):
+    keys = KEYS.get(api_name, ())
+    return (
+        "index_code"
+        if "ts_code" not in keys and "index_code" in keys and "index_code" in columns
+        else "ts_code"
+    )
+
+
 def _query(
     db,
     columns,
@@ -787,7 +796,7 @@ def _query(
     start_date=None,
     end_date=None,
     codes=None,
-    code_field="ts_code",
+    code_field=None,
     keyword=None,
     keyword_fields=None,
     as_of=None,
@@ -868,6 +877,7 @@ def _query(
             not isinstance(c, str) or not c for c in codes
         ):
             raise ValueError("codes must contain stored identifiers")
+        code_field = code_field or _default_code_field(api_name, columns)
         column = _identifier(code_field, columns)
         mapping_source = code_field in ("o_code", "n_code") and {
             "o_code",
@@ -950,6 +960,7 @@ def dataset_schema(root, release_id, api_name):
             ],
             "keys": keys,
             "default_date_field": _default_date_field(api_name, columns),
+            "default_code_field": _default_code_field(api_name, columns),
             "period_date_semantics": metadata.get("period_date_semantics", "month and quarter filters use the period's first calendar day"),
         }
 

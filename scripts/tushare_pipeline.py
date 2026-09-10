@@ -8,12 +8,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from backend.shared.tushare_pipeline import manifest_at, tick, verify_data
-from backend.shared.tushare_registry import contract_for
-
-
-def _default_code_field(api_name):
-    keys = contract_for(api_name).get("keys", ())
-    return "index_code" if "ts_code" not in keys and "index_code" in keys else "ts_code"
 
 
 def main():
@@ -83,10 +77,8 @@ def main():
             )
             if getattr(args, name) is not None
         }
-        if args.codes is not None:
-            filters["code_field"] = args.code_field or _default_code_field(
-                args.api_name
-            )
+        if args.code_field is not None:
+            filters["code_field"] = args.code_field
         if args.command == "export":
             print(
                 json.dumps(

@@ -241,6 +241,42 @@ class DataAPITest(unittest.TestCase):
         self.assertEqual(self.query(limit=True).status_code, 422)
         self.assertEqual(self.query(url="https://example.com").status_code, 422)
 
+    def test_index_weight_uses_contract_code_field(self):
+        sink = pa.BufferOutputStream()
+        pq.write_table(
+            pa.Table.from_pylist(
+                [
+                    {
+                        "index_code": "SH000300",
+                        "con_code": "600000.SH",
+                        "trade_date": "20260908",
+                        "weight": 1.0,
+                        "_fetched_at": "2026-09-09T01:00:00+00:00",
+                        "_observation": "index",
+                    }
+                ]
+            ),
+            sink,
+        )
+        index = self.put("parquet", "parquet", sink.getvalue().to_pybytes())
+        self.manifest["files"] = self.files.copy()
+        self.manifest["datasets"].append(
+            {"api_name": "index_weight", "path": index}
+        )
+        self.release = self.publish(self.manifest)
+        schema = self.get("/datasets/index_weight/schema").json()
+        self.assertEqual(schema["default_code_field"], "index_code")
+        response = self.query(
+            api_name="index_weight",
+            fields=["index_code", "con_code"],
+            codes=["SH000300"],
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(
+            response.json()["rows"],
+            [{"index_code": "SH000300", "con_code": "600000.SH"}],
+        )
+
     def test_sql_and_path_escape_rejected(self):
         for filters in (
             {"fields": ["close); DROP TABLE stored;--"]},
