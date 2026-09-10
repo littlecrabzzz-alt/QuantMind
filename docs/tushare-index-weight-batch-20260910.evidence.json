@@ -35,11 +35,17 @@
       "pending": 87497,
       "split_pending": 90,
       "pending_indexes": 199,
-      "suffix_indexes": {"CSI": 54, "SH": 145},
+      "suffix_indexes": {
+        "CSI": 54,
+        "SH": 145
+      },
       "request_start_min": "19900101",
       "request_end_max": "20260901"
     },
-    "recent_20260909": {"empty": 310, "pending": 9352}
+    "recent_20260909": {
+      "empty": 310,
+      "pending": 9352
+    }
   },
   "retained_attempts": {
     "empty_unverified": 312,
@@ -65,12 +71,29 @@
     "source_pending_indexes": 200,
     "jobs": 360,
     "indexes": 200,
-    "requests_per_index_counts": {"1": 40, "2": 160},
-    "suffix_counts": {"CSI": 110, "SH": 250},
+    "requests_per_index_counts": {
+      "1": 40,
+      "2": 160
+    },
+    "suffix_counts": {
+      "CSI": 110,
+      "SH": 250
+    },
     "request_start_min": "20260801",
     "request_end_max": "20260901",
-    "estimated_seconds": {"lower_bound": 43.2, "acceptance_range": [45, 90], "hard_limit": 90},
-    "estimated_retained_mib": {"median_projection": 58.5, "p95_projection": 65.7, "reserve": 100}
+    "estimated_seconds": {
+      "lower_bound": 43.2,
+      "acceptance_range": [
+        45,
+        90
+      ],
+      "hard_limit": 90
+    },
+    "estimated_retained_mib": {
+      "median_projection": 58.5,
+      "p95_projection": 65.7,
+      "reserve": 100
+    }
   },
   "execution_contract": {
     "default_plan_only": true,
@@ -90,8 +113,14 @@
     "receipt_sha256": "a6009ba35e1d79bc5f49476b0399f167ea9bbfd4abbb804dbc7d5e8846946aa0",
     "elapsed_seconds": 46.728,
     "upstream_calls": 360,
-    "before": {"pending": 360},
-    "after": {"done": 139, "empty": 204, "split_pending": 17},
+    "before": {
+      "pending": 360
+    },
+    "after": {
+      "done": 139,
+      "empty": 204,
+      "split_pending": 17
+    },
     "release_published_by_runner": false,
     "current_switched_by_runner": false,
     "published_release": "data-3eee75afb22ae4bea72b9ac5826e6bea6b7d98f0f2e600adfd1b04f11677c2e1",
@@ -113,5 +142,49 @@
     "token": false,
     "payment_or_order": false,
     "upstream_response_body": false
+  },
+  "fixed_release_offline_audit": {
+    "audited_release": "data-d5d918ce4bc2cfd3ef6e58c5caeefa29c7d9f9715cd5b8cd0d03d4d07cab64de",
+    "published_files": 259,
+    "published_bytes": 11281947,
+    "raw_rows": 254697,
+    "latest_rows": 252470,
+    "duplicate_natural_keys": 2227,
+    "duplicate_weight_conflicts": 0,
+    "trade_date_min": "20180228",
+    "trade_date_max": "20260831",
+    "trade_dates": 103,
+    "index_date_snapshots": 258,
+    "source_indexes": 156,
+    "constituents": 11399,
+    "latest_from_possibly_truncated_rows": 222350,
+    "latest_from_possibly_truncated_percent": 88.1,
+    "latest_from_sample_ok_rows": 30120,
+    "manifest_states": {
+      "done": 139,
+      "empty": 554,
+      "pending": 98341,
+      "split_pending": 120
+    },
+    "open_split_nodes": 120,
+    "current_leaves": 239,
+    "pending_leaves": 238,
+    "empty_leaves": 1,
+    "history_complete": false,
+    "historical_versions_complete": false,
+    "pit_ready": false
+  },
+  "second_batch_candidate_offline_reconstruction": {
+    "jobs": 360,
+    "planned_indexes": 203,
+    "market_jobs": {
+      "SH": 246,
+      "CSI": 114
+    },
+    "new_monthly_leaves": 326,
+    "split_children": 34,
+    "date_min": "20260601",
+    "date_max": "20260901",
+    "recommendation": "execute for monthly coverage; do not present date bisection as closure for single-day row-cap saturation"
   }
 }
