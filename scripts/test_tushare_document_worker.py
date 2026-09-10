@@ -170,6 +170,9 @@ class DocumentWorkerTest(unittest.TestCase):
             json.loads((self.root / "document-worker-status.json").read_bytes()), result
         )
         self.assertEqual(result["processed"], 3)
+        self.assertEqual(result["disk_capacity"]["reserve_bytes"], 100 * 2**30)
+        self.assertEqual(result["disk_capacity"]["headroom_bytes"], 1 * 2**30)
+        self.assertEqual(result["disk_capacity"]["status"], "warning")
         self.config.update(
             document_worker_max_documents=7,
             document_worker_max_seconds=12.5,
@@ -205,7 +208,42 @@ class DocumentWorkerTest(unittest.TestCase):
             self.assertEqual(
                 self.tasks.tushare_documents()["status"], "blocked_disk_reserve"
             )
+            status = json.loads(
+                (self.root / "document-worker-status.json").read_bytes()
+            )
+            self.assertEqual(status["disk_capacity"]["status"], "blocked")
+            self.assertEqual(status["disk_capacity"]["headroom_bytes"], -(1 * 2**30))
         self.run.assert_not_called()
+
+    def test_disk_capacity_reports_long_window_consumption_warning(self):
+        first = self.tasks._disk_capacity_report(
+            free_bytes=150 * 2**30,
+            observed_at="2026-09-10T00:00:00+00:00",
+        )
+        self.assertEqual(first["status"], "healthy")
+        self.assertIsNone(first["consumption_bytes_per_hour"])
+
+        short = self.tasks._disk_capacity_report(
+            free_bytes=145 * 2**30,
+            observed_at="2026-09-10T00:20:00+00:00",
+            previous=first,
+        )
+        self.assertEqual(short["status"], "healthy")
+        self.assertIsNone(short["consumption_bytes_per_hour"])
+
+        second = self.tasks._disk_capacity_report(
+            free_bytes=145 * 2**30,
+            observed_at="2026-09-10T02:00:00+00:00",
+            previous=first,
+        )
+        self.assertEqual(second["baseline_observed_at"], first["observed_at"])
+        self.assertEqual(second["trend_window_seconds"], 7200)
+        self.assertEqual(second["consumption_bytes_per_hour"], 2.5 * 2**30)
+        self.assertEqual(second["projected_hours_to_reserve"], 18)
+        self.assertEqual(second["status"], "warning")
+        self.assertIn(
+            "reserve_within_72h_at_observed_trend", second["warning_reasons"]
+        )
 
     def test_authority_denial_precedes_reads_and_writes(self):
         self.authority.side_effect = ValueError("not authority")
