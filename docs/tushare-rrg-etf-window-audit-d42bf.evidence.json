@@ -1,0 +1,108 @@
+{
+  "checked_at": "2026-09-10T08:33:33Z",
+  "status": "blocked_data",
+  "release_id": "data-d42bf11af1d9654c16e9a3382c17aae352f3c18b5d97b615bba6cedc32973aa5",
+  "window": {
+    "start_date": "20220901",
+    "end_date": "20260901",
+    "sse_sessions": 969,
+    "monthly_signal_execution_pairs": 48
+  },
+  "output": "/tmp/quantmind-rrg-etf-window-audit-d42bf-v3",
+  "corrections": {
+    "etf_limit": "Validated FUND:<source_ts_code>, then mapped the retained supplier suffix code to the RRG prefix namespace before comparison.",
+    "fund_div": "Counted exact empty terminal receipts from fixed-manifest gap task evidence instead of a hard-coded capability flag."
+  },
+  "files": {
+    "report.json": {
+      "bytes": 34676,
+      "sha256": "c6d992fa8fbd51b5c0bd6cbce2ddbfc340af8c4fc2501f9f051407b7267ac86d"
+    },
+    "missing-observations.jsonl": {
+      "bytes": 115763,
+      "rows": 232,
+      "sha256": "c5e20724ad1fb4b61df011f2c8b637408492f73da1450317ccd9d60522432ce0"
+    },
+    "collection-plan.jsonl": {
+      "bytes": 1900480,
+      "rows": 9097,
+      "sha256": "d4b7926bbe19d6fd44818fcf4e5f56558cb4315eedc9514faa06e117bb3d901c"
+    },
+    "manifest.json": {
+      "bytes": 564,
+      "sha256": "c3527e89b183d7a0b21986b4a235aeeb6c5b7a10cea7987f0a93cf6e0d12c214"
+    }
+  },
+  "membership": {
+    "rows": 6740,
+    "effective_interval_candidates_on_window_end": 5504,
+    "known_at_rows": 0,
+    "known_at_verified": false,
+    "revision_publication_evidence_verified": false
+  },
+  "universe": {
+    "observed_etf_rows": 1829,
+    "supported_observed_codes": 1826,
+    "known_lifecycle_codes": 1786,
+    "window_lifecycle_codes": 1718,
+    "unknown_list_date_codes": 40,
+    "historical_universe_verified": false,
+    "industry_mapping_verified": false
+  },
+  "coverage": {
+    "expected_lifecycle_session_pairs": 1027679,
+    "fund_daily_valid_pairs": 1022792,
+    "fund_daily_missing_pairs": 4887,
+    "fund_daily_invalid_pairs": 0,
+    "fund_adj_valid_pairs": 1027562,
+    "fund_adj_lifecycle_missing_pairs": 117,
+    "fund_adj_missing_for_price_pairs": 0,
+    "monthly_execution_expected_pairs": 51278,
+    "monthly_execution_valid_price_factor_pairs": 51055,
+    "fund_div_event_rows": 118,
+    "fund_div_codes_with_events": 21,
+    "fund_div_empty_receipt_codes": 311,
+    "fund_div_terminal_receipt_codes": 332,
+    "fund_div_missing_terminal_receipt_codes": 1386,
+    "fund_div_terminal_receipt_coverage_complete": false,
+    "etf_limit_observed_code_day_pairs": 152139,
+    "etf_limit_target_code_day_pairs": 107293,
+    "etf_limit_monthly_execution_pairs": 1648,
+    "pcf_code_day_pairs": 2,
+    "pcf_monthly_execution_pairs": 0
+  },
+  "collection_plan": {
+    "fund_daily_diagnostic_ranges": 1888,
+    "fund_div_terminal_receipts": 1386,
+    "etf_limit_month_windows": 49,
+    "active_candidate_jobs": 3323,
+    "dormant_pcf_jobs": 5774,
+    "jobs": 9097,
+    "automatically_enqueued": false
+  },
+  "guards": {
+    "upstream_calls": 0,
+    "credentials_accessed": false,
+    "price_fill": false,
+    "strategy_or_returns_calculated": false,
+    "production_written": false
+  },
+  "validation": {
+    "adjacent_unittests_passed": 19,
+    "ruff_check_passed": true,
+    "git_diff_check_passed": true
+  },
+  "source_sha256": {
+    "scripts/audit_tushare_rrg_etf_window.py": "dea963cdc98c1fd0b92261af01dbbf7b1d2a7e930b84428f93164af8a7056352",
+    "scripts/test_tushare_rrg_etf_window_audit.py": "7f510811a2283f77a634b2abc9c0fbabfe63f6177d5b3745f3cf36c621a2cb00"
+  },
+  "remaining_blockers": [
+    "ci_index_member has no verified known_at or revision publication evidence",
+    "current ETF records do not provide a PIT industry mapping or complete historical universe",
+    "missing fund_daily rows have no documented Tushare ETF suspension/open-tradability classifier",
+    "etf_limit cannot substitute for suspension or opening-auction evidence",
+    "fund_div terminal receipts do not prove complete source history or revisions",
+    "PCF applicability dates do not prove pre-open known_at, revisions or portfolio weights"
+  ],
+  "sensitive_data_included": false
+}
