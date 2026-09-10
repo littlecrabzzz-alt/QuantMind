@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import re
 import socket
 import subprocess
 import sys
@@ -47,6 +48,14 @@ def pdf():
         canvas.showPage()
     canvas.save()
     return stream.getvalue()
+
+
+def broken_xref_pdf():
+    body = pdf()
+    match = re.search(rb"startxref\s+(\d+)", body)
+    replacement = str(int(match.group(1)) + 1).encode()
+    assert len(replacement) == len(match.group(1))
+    return body[: match.start(1)] + replacement + body[match.end(1) :]
 
 
 class Documents(unittest.TestCase):
@@ -93,6 +102,7 @@ class Documents(unittest.TestCase):
         pages = json.loads((self.root / first["files"][1]["path"]).read_text())["pages"]
         self.assertEqual([p["page_number"] for p in pages], [1, 2])
         self.assertIn("fixture page 2", pages[1]["text"])
+        self.assertNotIn("parser_mode", first["parse_detail"])
         with patch.object(
             docs,
             "_parse_pdf",
@@ -107,6 +117,59 @@ class Documents(unittest.TestCase):
         headers = conn.request.call_args.kwargs["headers"]
         self.assertNotIn("Authorization", headers)
         self.assertNotIn("Cookie", headers)
+
+    def test_broken_xref_lenient_fallback_preserves_raw(self):
+        body = broken_xref_pdf()
+        raw = docs._save(
+            self.root, "attachments", ".pdf", body, "application/pdf"
+        )
+        original = (self.root / raw["path"]).read_bytes()
+        with patch.object(
+            docs,
+            "_parse_pdf",
+            side_effect=lambda path, timeout: docs._extract_pdf(path),
+        ):
+            result = docs._parse_saved(
+                self.root,
+                {"status": "downloaded", "parse_status": "parse_failed", "files": [raw]},
+                15,
+            )
+            repeated = docs._parse_saved(
+                self.root,
+                {"status": "downloaded", "parse_status": "parse_failed", "files": [raw]},
+                15,
+            )
+        self.assertEqual(result["parse_status"], "parsed")
+        self.assertEqual(result["validation_status"], "pdf_structure_valid")
+        self.assertEqual(result["parse_detail"]["parser_mode"], "lenient_fallback")
+        self.assertEqual(result["parse_detail"]["strict_error_type"], "PdfReadError")
+        self.assertEqual((self.root / raw["path"]).read_bytes(), original)
+        self.assertEqual(hashlib.sha256(original).hexdigest(), raw["sha256"])
+        self.assertEqual(result["files"], repeated["files"])
+        extracted = json.loads((self.root / result["files"][1]["path"]).read_text())
+        self.assertEqual(extracted["parser_mode"], "lenient_fallback")
+        self.assertEqual([page["page_number"] for page in extracted["pages"]], [1, 2])
+
+    def test_lenient_fallback_failure_stays_failed(self):
+        import pypdf
+
+        with patch.object(
+            pypdf,
+            "PdfReader",
+            side_effect=[
+                pypdf.errors.PdfReadError("strict failure"),
+                RuntimeError("lenient failure"),
+            ],
+        ):
+            result = docs._extract_pdf(self.root / "unused.pdf")
+        self.assertEqual(
+            result,
+            {
+                "parse_status": "parse_failed",
+                "error_type": "RuntimeError",
+                "strict_error_type": "PdfReadError",
+            },
+        )
 
     def test_url_and_dns_denials(self):
         urls = [
