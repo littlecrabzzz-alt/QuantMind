@@ -250,6 +250,10 @@ class PublishEquivalence(unittest.TestCase):
             # Old method globals are isolated by exec; patch its encoder too.
             with (
                 patch.object(module, "json_bytes", side_effect=fail),
+                patch.object(
+                    module, "serialize_manifest_file",
+                    side_effect=MemoryError("synthetic serialization interruption"),
+                ),
                 patch.dict(self.legacy.__globals__, {"json_bytes": fail}),
             ):
                 with self.assertRaises(MemoryError):
@@ -263,6 +267,7 @@ class PublishEquivalence(unittest.TestCase):
     def test_previous_manifest_is_released_at_final_serialization_only(self):
         self.compare_publish()
         original_read, original_encode = module.manifest_at, module.json_bytes
+        original_file_encode = module.serialize_manifest_file
 
         class Tracked(dict):
             pass
@@ -285,6 +290,10 @@ class PublishEquivalence(unittest.TestCase):
                     observed.append(refs[0]() is None)
                 return original_encode(value)
 
+            def encode_file(directory, value, *args, refs=refs, observed=observed):
+                observed.append(refs[0]() is None)
+                return original_file_encode(directory, value, *args)
+
             p.db.execute(
                 "UPDATE jobs SET state='future_changed' WHERE id='fixture-3-9'"
             )
@@ -292,6 +301,7 @@ class PublishEquivalence(unittest.TestCase):
             with (
                 patch.object(module, "manifest_at", side_effect=tracked),
                 patch.object(module, "json_bytes", side_effect=encode),
+                patch.object(module, "serialize_manifest_file", side_effect=encode_file),
                 patch.dict(
                     self.legacy.__globals__,
                     {"manifest_at": tracked, "json_bytes": encode},

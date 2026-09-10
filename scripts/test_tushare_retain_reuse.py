@@ -193,19 +193,19 @@ class RetainReuse(unittest.TestCase):
         p.enqueue('trade_cal', {'start_date': '20200101'}, 1, 'fixture')
         refs = []
         original = archive.retain_release
-        encode = m.json_bytes
+        encode = m.serialize_manifest_file
         class Retained(dict):
             pass
         def retain(*args, **kwargs):
             value = Retained(original(*args, **kwargs))
             refs.append(weakref.ref(value))
             return value
-        def serialize(value):
+        def serialize(directory, value, *args):
             if isinstance(value, dict) and 'retained_observations_included' in value:
                 self.assertTrue(refs)
                 self.assertIsNone(refs[-1]())
-            return encode(value)
-        with patch.object(archive, 'retain_release', side_effect=retain), patch.object(m, 'json_bytes', side_effect=serialize):
+            return encode(directory, value, *args)
+        with patch.object(archive, 'retain_release', side_effect=retain), patch.object(m, 'serialize_manifest_file', side_effect=serialize):
             current = p.publish()
         self.assertNotEqual(first, current)
         self.assertIn('retention', p.publish_timing)

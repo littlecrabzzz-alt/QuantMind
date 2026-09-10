@@ -1,0 +1,83 @@
+{
+  "baseline": "8193d14c40f30e65f42f1800c04ac1f1a19d2903",
+  "production_evidence": "parent supplied IDs/traces only, no new production query",
+  "failure_task_prefixes": [
+    "56d6bf71",
+    "ae6f2d6f"
+  ],
+  "benchmark_file": "/tmp/tushare-manifest-c-chunks-benchmark-20260910.json",
+  "benchmark_sha256": "2eb191aca524c479505c0fcc6534bd2d3ee7cd8f7f857937273d0c148cb28e9d",
+  "benchmark_script_sha256": "7742947305c6f5ee112ffb6be2a259d1a6e41a4542f5bc92b5d8115bc49ebd37",
+  "python": "3.10.19",
+  "platform": "macOS-26.4-arm64-arm-64bit",
+  "per_case_counts": {
+    "files": 250000,
+    "closure_children": 750000,
+    "gaps": 62500
+  },
+  "fresh_process_runs": 18,
+  "summaries": {
+    "ascii": {
+      "legacy": {
+        "median_seconds": 0.35236750007607043,
+        "max_seconds": 0.3552696250844747,
+        "max_encoder_call_seconds": 0.3159697081428021,
+        "max_rss_bytes": 623886336
+      },
+      "chunks": {
+        "median_seconds": 0.3406343748793006,
+        "max_seconds": 0.3442692921962589,
+        "max_encoder_call_seconds": 0.3045252920128405,
+        "max_rss_bytes": 432324608
+      }
+    },
+    "bmp": {
+      "legacy": {
+        "median_seconds": 0.39793054200708866,
+        "max_seconds": 0.40325929201208055,
+        "max_encoder_call_seconds": 0.36309637501835823,
+        "max_rss_bytes": 736886784
+      },
+      "chunks": {
+        "median_seconds": 0.3423898748587817,
+        "max_seconds": 0.354860374936834,
+        "max_encoder_call_seconds": 0.3114627089817077,
+        "max_rss_bytes": 443842560
+      }
+    },
+    "astral": {
+      "legacy": {
+        "median_seconds": 0.41752383299171925,
+        "max_seconds": 0.424019165802747,
+        "max_encoder_call_seconds": 0.3838380000088364,
+        "max_rss_bytes": 956760064
+      },
+      "chunks": {
+        "median_seconds": 0.36345770792104304,
+        "max_seconds": 0.36743379198014736,
+        "max_encoder_call_seconds": 0.32056750007905066,
+        "max_rss_bytes": 459931648
+      }
+    }
+  },
+  "digests": {
+    "ascii": {
+      "sha256": "832a17cfbaefe5c99143001ef19103761e81aab0c8614bf1877656b42a049988",
+      "bytes": 101926624
+    },
+    "bmp": {
+      "sha256": "f86d004889951b6765ba4e83517e7a6ca8e2947771ed52dbc15c046bfbb80346",
+      "bytes": 102176628
+    },
+    "astral": {
+      "sha256": "24ffc8751065eb28c85867ed20845e14dd6b062e1809095037b2b5482e4de647",
+      "bytes": 102426632
+    }
+  },
+  "all_bytes_equal": true,
+  "test_count": 79,
+  "upstream_calls": 0,
+  "production_changes": 0,
+  "guaranteed_production160s": false,
+  "recommendation": "controlled integration and live phase verification, no new config"
+}
