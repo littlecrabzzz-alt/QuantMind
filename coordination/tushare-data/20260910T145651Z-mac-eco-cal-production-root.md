@@ -1,0 +1,7 @@
+# eco_cal saturation production completion
+
+- Revision `66df93ba78268cf915a36d590bf83390f4db457f` was synced to the cloud authority and loaded by the normal dedicated Tushare worker. Integrated no-network focused tests passed 29/29; the candidate full Tushare suite passed 989/989 and Ruff passed.
+- Two retained 100-row legacy parents were recovered through ordinary scheduled tasks. Both preserve the original object/observation references and one original attempt, add `partition_recovery.upstream_calls=0`, connect 24 stable children each, and remain `coverage_proven=0`, `gap=universe_unverified`.
+- The source `country` field contains both country labels and taxonomy strings. All legal source values remain auditable; no configured or invented values were added. The normal `calendar_extra` queue completed all 48 unique children: 24 done and 24 `empty_unverified`. All 48 child requests returned HTTP 200 and every child was attempted exactly once.
+- Final closure receipt: `/data/tushare/validation/eco-cal-saturation-20260910/closure-20260910T150820Z.json`, SHA256 `31499010eb699b440b69f48831c383197c092da710138db7e68d4d110bf3ade4`. Current fixed release remains `data-66f5a3d5084ac67a14240f56ebc0e4b9eb54fbdf3911cec06bfc7ca2f8da3ffb`, already verified on the Mac mirror.
+- The structured worker and Beat remain active. The document worker stays intentionally stopped until capacity expansion/recheck. No token, order, payment record or upstream response body is stored in Git evidence.

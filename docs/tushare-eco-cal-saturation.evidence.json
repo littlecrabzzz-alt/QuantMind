@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "candidate_offline_validated",
+  "status": "deployed_production_validated",
   "base_revision": "e57d3da38ece08403a34bf66f52b1c42f5117633",
   "scope": {
     "api_name": "eco_cal",
@@ -17,19 +17,6 @@
     "legacy_blocked_parent_recovery": true,
     "legacy_recovery_upstream_calls": 0
   },
-  "invariants": {
-    "raw_parent_object_reference_preserved": true,
-    "stable_enqueue_identity_reused": true,
-    "parent_planning_signature_unchanged_by_country_discovery": true,
-    "parent_planning_cursor_reset": false,
-    "partition_coverage_proven": false,
-    "partition_gap": "universe_unverified",
-    "existing_rate_path_reused": true,
-    "credentials_read": false,
-    "upstream_calls": 0,
-    "production_writes": 0,
-    "production_config_changed": false
-  },
   "validation": {
     "focused_tests": 31,
     "focused_result": "passed",
@@ -42,5 +29,61 @@
     "ruff": "passed",
     "git_diff_check": "passed"
   },
-  "production_validation": null
+  "production_validation": {
+    "observed_at": "2026-09-10T15:08:20Z",
+    "authority": "/data/tushare",
+    "receipt_path": "/data/tushare/validation/eco-cal-saturation-20260910/closure-20260910T150820Z.json",
+    "receipt_sha256": "31499010eb699b440b69f48831c383197c092da710138db7e68d4d110bf3ade4",
+    "receipt_id": "bb0babcc7f5f2414ed5fed5185d4669198352c66327f1a183e8c28959cf89e5a",
+    "parent_count": 2,
+    "parents_recovered_from_retained_results": 2,
+    "parent_recovery_upstream_calls": 0,
+    "original_object_and_observation_references_preserved": true,
+    "children_total": 48,
+    "children_unique": 48,
+    "source_values_per_parent": 24,
+    "parent_raw_distinct_country_field_values": 18,
+    "additional_values_from_prior_immutable_eco_cal_results": 6,
+    "child_states_at_snapshot": {
+      "done": 24,
+      "empty": 24
+    },
+    "child_attempts_at_snapshot": 48,
+    "child_attempt_http_200": 48,
+    "child_attempts_more_than_once": 0,
+    "partition_coverage_proven": false,
+    "partition_gap": "universe_unverified",
+    "current_release_id": "data-66f5a3d5084ac67a14240f56ebc0e4b9eb54fbdf3911cec06bfc7ca2f8da3ffb",
+    "authority_config_sha256": "da45afae322463eacd54a97203f2ede46a9ff86aafbb58e6bec26b57ea009853",
+    "normal_queue": "calendar_extra",
+    "normal_acquisition_active": false,
+    "raw_response_bodies_in_committed_evidence": false,
+    "credentials_or_payment_information_in_committed_evidence": false,
+    "progress_snapshot": {
+      "observed_at": "2026-09-10T14:56:51Z",
+      "receipt_path": "/data/tushare/validation/eco-cal-saturation-20260910/acceptance-20260910T145651Z.json",
+      "receipt_sha256": "15e3c6bd0cfc8bfd278547dab7b9dc36f0ce0a4bc0c224d9d2973edaa560a79b",
+      "child_states": {
+        "done": 12,
+        "empty": 13,
+        "pending": 23
+      }
+    },
+    "child_acquisition_complete": true,
+    "normal_worker_active": true
+  },
+  "deployed_revision": "66df93ba78268cf915a36d590bf83390f4db457f",
+  "candidate_invariants": {
+    "raw_parent_object_reference_preserved": true,
+    "stable_enqueue_identity_reused": true,
+    "parent_planning_signature_unchanged_by_country_discovery": true,
+    "parent_planning_cursor_reset": false,
+    "partition_coverage_proven": false,
+    "partition_gap": "universe_unverified",
+    "existing_rate_path_reused": true,
+    "credentials_read": false,
+    "upstream_calls": 0,
+    "production_writes": 0,
+    "production_config_changed": false
+  }
 }

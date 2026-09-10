@@ -589,3 +589,12 @@
 - 首版追加 planner 的策略签名同时包含 `history_start` 和 `market_apis`。v2 helper 显式传入 `['fund_share']`，生产配置依赖相同的默认值；两种表示生成不同签名，恢复常驻 worker 后游标曾重置到offset12495/done0。任务ID是幂等主键，已规划任务、终态与原始响应没有删除、覆盖或重复。
 - `4302970a`把该固定family的签名缩为真正改变任务集合的`history_start`，并增加“显式/默认父API列表不得重置已完成范围”的回归测试。修复后Mac相关45项和Ruff通过，云端生产镜像断网4项通过。v3在共享锁内确认任务集合仍为26788项、SHA不变、offset26788/done1；收据SHA `604cf8835dad7ff8df7fc8b174e8cb742370a10826bcbfafdca40ed668b71ed0`。
 - Beat恢复后立即触发一次正常生产采集，133.442秒成功结束；周期后游标仍为offset26788/done1，任务为5 done、26783 pending、0 error，证明一次性helper与常驻配置不再互相重置。Tushare worker和Beat保持healthy，文档worker继续停用等待扩盘；固定版发布仍按3600秒周期执行。
+
+## 2026-09-10 23:00 第六批财务三表、固定版全覆盖审计与经济日历饱和接线
+
+- 第六个财务三表精确批次固定20260630、report type 1的120个共同股票，三API各120，在49.490秒内完成360次上游调用；`income_vip`、`balancesheet_vip`、`cashflow_vip`各115 done/5 empty，批内0 pending。批次本身不发布、不切换CURRENT；收据`/data/tushare/validation/financial-pit-batch-20260910/acceptance-batch-6.json`，SHA256 `77c30b102c78833aa90cbcc62fe5d698d75f47362803bf68bee195d2fd8d1289`。
+- 后续一小时周期由正常生产入口在246.873秒发布`data-66f5a3d5084ac67a14240f56ebc0e4b9eb54fbdf3911cec06bfc7ca2f8da3ffb`。标准Mac镜像新增11645个文件、完整校验646423个文件后原子追平，LaunchAgent退出0；Mac继续从固定版离线读取，不向Tushare Pro重拉存量。
+- 同一固定版在云端与Mac分别执行覆盖审计，报告字节一致，SHA256 `c6d31d8736d43f8771e7a4076aa5a0769319c196a704b0748435f6abe63e3f89`：243个已登记运行时API全部进入规划，0个登记未规划；193个已有发布数据集，另外50个只有blocked/permission/empty等证据。该结论证明规划接线覆盖，不证明每项历史、修订、附件或PIT完整。
+- `66df93ba`上线`eco_cal`饱和后的来源观察值拆分。两个各100行的旧封顶父任务均从已保存object/observation原地恢复，父请求重发0次、原始引用和尝试保持；每个父任务连接24个后代并保留`coverage_proven=0 / universe_unverified`。Tushare原始`country`字段同时含国家名与分类标识，均按来源原样处理，不凭名称删值。
+- 阶段快照后继续由`calendar_extra`常规队列自然消费，48个唯一后代最终为24 done/24 empty，全部48次请求HTTP200、每个后代只尝试一次；空结果保留`empty_unverified`。最终闭包收据`/data/tushare/validation/eco-cal-saturation-20260910/closure-20260910T150820Z.json`，SHA256 `31499010eb699b440b69f48831c383197c092da710138db7e68d4d110bf3ade4`。
+- 完整回归989项、生产镜像断网专项29项及Ruff通过。结构化worker和Beat保持运行，文档worker继续按容量缓解方案停用；发布周期3600秒、账户灰度500rpm、单接口既有限速、100GiB硬停线均未改。扩盘仍是外部云控制面动作，不缩减已登记数据范围。
