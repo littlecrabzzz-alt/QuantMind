@@ -259,7 +259,7 @@ def _audit(root, release_id, start_date, end_date, output):
         # first, then map its retained supplier code explicitly below.
         "etf_limit": read(
             "etf_limit",
-            limit=1_000_000,
+            limit=5_000_000,
             date_field="trade_date",
             start_date=start_date,
             end_date=end_date,
