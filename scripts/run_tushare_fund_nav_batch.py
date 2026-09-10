@@ -36,12 +36,14 @@ def sha(path):
     return digest(Path(path).read_bytes())
 
 
-def helper_sha256():
-    return sha(Path(__file__).resolve())
+def helper_sha256(path=None):
+    if isinstance(path, (list, tuple)):
+        return digest(json_bytes([sha(item) for item in path]))
+    return sha(Path(path or __file__).resolve())
 
 
-def preparation_sha256():
-    return sha(Path(preparation.__file__).resolve())
+def preparation_sha256(module=None):
+    return sha(Path((module or preparation).__file__).resolve())
 
 
 def _regular(path, label):
@@ -95,7 +97,7 @@ def _attempt_counts(pipeline):
     )
 
 
-def _verify_authority_jobs(pipeline, records):
+def _verify_authority_jobs(pipeline, records, api_name):
     for expected in records:
         saved = pipeline.db.execute(
             "SELECT id,logical_key,epoch,job,priority,group_name,state FROM jobs WHERE id=?",
@@ -114,7 +116,7 @@ def _verify_authority_jobs(pipeline, records):
         if actual != expected:
             raise ValueError("Authority task identity does not match verified batch")
         if saved["state"] != "pending":
-            raise ValueError("Verified fund_nav task is no longer pending")
+            raise ValueError(f"Verified {api_name} task is no longer pending")
 
 
 def _execute(
@@ -125,6 +127,9 @@ def _execute(
     expected_config_sha256,
     max_requests,
     max_seconds,
+    preparation_module,
+    helper_path,
+    api_name,
 ):
     root = Path(root)
     if root.is_symlink() or root.resolve() != pipeline_module.ROOT.resolve():
@@ -144,7 +149,7 @@ def _execute(
         with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as db:
             if db.execute("PRAGMA user_version").fetchone()[0] != 6:
                 raise ValueError("Authority pipeline schema must already be version 6")
-        verified = preparation.verify_manifest(manifest, manifest_sha256)
+        verified = preparation_module.verify_manifest(manifest, manifest_sha256)
         if verified["all_task_ids_sha256"] != expected_task_ids_sha256:
             raise ValueError("Explicit task ID inventory hash mismatch")
         config_path = _regular(root / "pipeline-config.json", "pipeline config")
@@ -155,7 +160,7 @@ def _execute(
             root, json.loads((REPO / "config/tushare-catalog.json").read_bytes())
         )
         try:
-            _verify_authority_jobs(pipeline, verified["records"])
+            _verify_authority_jobs(pipeline, verified["records"], api_name)
             task_ids = [record["task_id"] for record in verified["records"]]
             pipeline._install_exact_task_scope(task_ids)
             before_states = _state_counts(pipeline)
@@ -211,8 +216,8 @@ def _execute(
         "batch_manifest_sha256": manifest_sha256,
         "all_task_ids_sha256": expected_task_ids_sha256,
         "authority_config_sha256": expected_config_sha256,
-        "helper_sha256": helper_sha256(),
-        "preparation_sha256": preparation_sha256(),
+        "helper_sha256": helper_sha256(helper_path),
+        "preparation_sha256": preparation_sha256(preparation_module),
         "verified_jobs": len(verified["records"]),
         "before_states": before_states,
         "after_states": after_states,
@@ -229,10 +234,13 @@ def _execute(
     return receipt
 
 
-def run_batch(
+def run_exact_batch(
     manifest,
     manifest_sha256,
     *,
+    preparation_module,
+    helper_path,
+    api_name,
     expected_task_ids_sha256=None,
     expected_config_sha256=None,
     expected_helper_sha256=None,
@@ -248,10 +256,10 @@ def run_batch(
         raise ValueError(
             "Wall-clock limit must be greater than 0 and at most 90 seconds"
         )
-    current_helper_sha256 = helper_sha256()
+    current_helper_sha256 = helper_sha256(helper_path)
     if expected_helper_sha256 and expected_helper_sha256 != current_helper_sha256:
         raise ValueError("Explicit helper hash mismatch")
-    current_preparation_sha256 = preparation_sha256()
+    current_preparation_sha256 = preparation_sha256(preparation_module)
     if (
         expected_preparation_sha256
         and expected_preparation_sha256 != current_preparation_sha256
@@ -268,10 +276,10 @@ def run_batch(
                 guards.enter_context(
                     patch(
                         target,
-                        side_effect=AssertionError("Offline fund_nav batch plan"),
+                        side_effect=AssertionError(f"Offline {api_name} batch plan"),
                     )
                 )
-            verified = preparation.verify_manifest(manifest, manifest_sha256)
+            verified = preparation_module.verify_manifest(manifest, manifest_sha256)
         return {
             "schema_version": 1,
             "status": "plan_only",
@@ -310,6 +318,39 @@ def run_batch(
         expected_config_sha256,
         max_requests,
         max_seconds,
+        preparation_module,
+        helper_path,
+        api_name,
+    )
+
+
+def run_batch(
+    manifest,
+    manifest_sha256,
+    *,
+    expected_task_ids_sha256=None,
+    expected_config_sha256=None,
+    expected_helper_sha256=None,
+    expected_preparation_sha256=None,
+    root=None,
+    max_requests=MAX_UPSTREAM_REQUESTS,
+    max_seconds=MAX_SECONDS,
+    execute=False,
+):
+    return run_exact_batch(
+        manifest,
+        manifest_sha256,
+        preparation_module=preparation,
+        helper_path=__file__,
+        api_name=preparation.API,
+        expected_task_ids_sha256=expected_task_ids_sha256,
+        expected_config_sha256=expected_config_sha256,
+        expected_helper_sha256=expected_helper_sha256,
+        expected_preparation_sha256=expected_preparation_sha256,
+        root=root,
+        max_requests=max_requests,
+        max_seconds=max_seconds,
+        execute=execute,
     )
 
 
