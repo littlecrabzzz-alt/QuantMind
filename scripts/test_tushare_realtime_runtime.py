@@ -28,7 +28,7 @@ CODES = {
     else "801005.SI"
     if api == "rt_sw_k"
     else "T600001.SH"
-    if api in ("rt_k", "stk_auction")
+    if api in ("rt_k", "rt_min", "stk_auction")
     else "000001.SH"
     for api in CONTRACTS
 }
@@ -68,8 +68,8 @@ class RealtimeRuntime(unittest.TestCase):
     capture = fixtures.TechnicalExtraRuntime.capture
     discovery = fixtures.TechnicalExtraRuntime.discovery
 
-    def test_ten_apis_full105_fields_raw_roundtrip_and_namespaces(self):
-        self.assertEqual(sum(len(s["fields"]) for s in CONTRACTS.values()), 105)
+    def test_thirteen_apis_full129_fields_raw_roundtrip_and_namespaces(self):
+        self.assertEqual(sum(len(s["fields"]) for s in CONTRACTS.values()), 129)
         expected_codes = {}
         for api in CONTRACTS:
             row = source(api)
@@ -82,7 +82,7 @@ class RealtimeRuntime(unittest.TestCase):
                 else "FUND:" + CODES[api]
                 if "etf" in api
                 else "SHT600001"
-                if api == "rt_k"
+                if api in ("rt_k", "rt_min")
                 else "AUCTION_UNTYPED:" + CODES[api]
                 if api == "stk_auction"
                 else "IDX:" + CODES[api]
@@ -92,7 +92,9 @@ class RealtimeRuntime(unittest.TestCase):
             rows = read_dataset(self.root, fixed, api).to_pylist()
             self.assertEqual(len(rows), 1)
             row = rows[0]
-            self.assertEqual(row[spec["source_code_field"]], expected_codes[api])
+            self.assertEqual(
+                row[spec["source_code_field"]], expected_codes[api], msg=api
+            )
             self.assertEqual(row["ts_code"], expected_codes[api])
             for field, value in source(api).items():
                 self.assertEqual(
@@ -135,7 +137,16 @@ class RealtimeRuntime(unittest.TestCase):
                 )
 
     def test_five_freq_optional_dimensions_and_mixed_auction_never_collapse(self):
-        for api in ("rt_idx_min", "rt_idx_min_daily", "rt_fut_min", "rt_fut_min_daily"):
+        minute_apis = (
+            "rt_idx_min",
+            "rt_idx_min_daily",
+            "rt_fut_min",
+            "rt_fut_min_daily",
+            "rt_min",
+            "rt_etf_min",
+            "rt_etf_min_daily",
+        )
+        for api in minute_apis:
             for freq in ("1MIN", "5MIN", "15MIN", "30MIN", "60MIN"):
                 self.capture(
                     api,
@@ -157,7 +168,7 @@ class RealtimeRuntime(unittest.TestCase):
             epoch="prior",
         )
         fixed = self.p.publish()
-        for api in ("rt_idx_min", "rt_idx_min_daily", "rt_fut_min", "rt_fut_min_daily"):
+        for api in minute_apis:
             rows = read_dataset(self.root, fixed, api).to_pylist()
             self.assertEqual(len(rows), 6 if api == "rt_fut_min_daily" else 5)
             self.assertEqual(
@@ -249,7 +260,7 @@ class RealtimeRuntime(unittest.TestCase):
         self.assertEqual(before, module._planning_inputs("structured", cfg, {}))
         self.assertEqual(self.p.plan_extended({}, date(2026, 9, 9)), {})
 
-    def test_dispatch_all_nine_reject_old_future_invalid_with_zero_http(self):
+    def test_dispatch_all_twelve_reject_old_future_invalid_with_zero_http(self):
         config = {
             "enable_realtime_extra": True,
             "enable_realtime_replay": True,
@@ -327,10 +338,10 @@ class RealtimeRuntime(unittest.TestCase):
             ) as capture,
         ):
             result = self.p.run(
-                None, "fixture", config, max_requests=9, max_seconds=2, pause=0
+                None, "fixture", config, max_requests=12, max_seconds=2, pause=0
             )
-        self.assertEqual(result["requests"], 9)
-        self.assertEqual(capture.call_count, 9)
+        self.assertEqual(result["requests"], 12)
+        self.assertEqual(capture.call_count, 12)
 
     def test_same_day_old_slot_is_zero_http_and_new_config_slot_executes(self):
         config = {
@@ -388,11 +399,11 @@ class RealtimeRuntime(unittest.TestCase):
             ) as capture,
         ):
             result = self.p.run(
-                None, "fixture", config, max_requests=9, max_seconds=2, pause=0
+                None, "fixture", config, max_requests=12, max_seconds=2, pause=0
             )
-        self.assertEqual(result["requests"], 9)
-        self.assertEqual(capture.call_count, 9)
-        self.assertEqual(len(set(old_ids + current_ids)), 18)
+        self.assertEqual(result["requests"], 12)
+        self.assertEqual(capture.call_count, 12)
+        self.assertEqual(len(set(old_ids + current_ids)), 24)
         for key in old_ids:
             row = self.p.db.execute(
                 "SELECT state,tries,result FROM jobs WHERE id=?", (key,)
@@ -430,7 +441,7 @@ class RealtimeRuntime(unittest.TestCase):
                     None,
                     "fixture",
                     {"enable_realtime_extra": True, "enable_realtime_replay": True},
-                    max_requests=9,
+                    max_requests=12,
                     max_seconds=2,
                     pause=0,
                 )["requests"],

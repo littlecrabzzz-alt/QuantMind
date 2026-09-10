@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "reviewed_on": "2026-09-10",
+  "network_scope": "Current official public documentation only; no token, provider data API, production host, production config, publication, or CURRENT switch.",
+  "catalog_policy": {
+    "frozen_index": "config/tushare-catalog.json",
+    "frozen_index_changed": false,
+    "reason": "The file is the immutable 263-page acquisition snapshot. Current off-catalog documents remain enumerated in config/tushare-coverage-ledger.json and become executable through reviewed registry overlays; rewriting the frozen source snapshot would falsify its provenance.",
+    "overlay": "config/tushare-coverage-ledger.json"
+  },
+  "official_documents": [
+    {
+      "doc_id": "374",
+      "apis": [
+        "rt_min"
+      ],
+      "page_sha256": "1ab1e6dfafee4a4ed07ee15605d449da284fef97f23e3f35742279d6f7bab320",
+      "markdown_sha256": "ea569c9d205870e80b04f6ef36f593be4fe0692be7e1a0c0e8d697e6e9434ac9",
+      "status": "present",
+      "contract_fact": "freq and ts_code required; five uppercase minute frequencies; multiple stock codes allowed; eight output fields; 1000 rows per call."
+    },
+    {
+      "doc_id": "416",
+      "apis": [
+        "rt_etf_min",
+        "rt_etf_min_daily"
+      ],
+      "page_sha256": "3f6791db049cc20ec38cf237cac20c508e42936b0e07f34ae29d6d3a0539e13b",
+      "markdown_sha256": "4e43c99f218a86820f5f03563494701ff961a517036272796531ec89f505a538",
+      "status": "present",
+      "contract_fact": "rt_etf_min accepts one or multiple ETF codes and has a 1000-row limit; the separately named daily endpoint accepts one ETF and replays current opening-to-now. The page does not establish that the sibling row cap applies to daily."
+    },
+    {
+      "doc_id": "88",
+      "apis": [
+        "tmt_twincome"
+      ],
+      "page_sha256": "8b5158b21154e38b60283ada098692a09f48d4274e18e6d4b5987823bda11d92",
+      "markdown_sha256": "48220e5bfa9b612f8dba1ff7357a65fcd25b1c3f71d9721f84f8c7de92def7c6",
+      "status": "present",
+      "contract_fact": "item is required; date/start_date/end_date are legal filters; date,item,op_income are documented outputs; each request is limited to 30 months; current product table enumerates codes 1 through 65."
+    },
+    {
+      "doc_id": "87",
+      "apis": [
+        "tmt_twincomedetail"
+      ],
+      "page_sha256": "06752694e11c741360878b00be31c63f3df3f349ec547a980517332d2612950d",
+      "markdown_sha256": "78783ad408be75da349ba1b1c4e4810868edb6f528897b20d892e2b9fc23248e",
+      "status": "present",
+      "contract_fact": "date/item/symbol/start_date/end_date/source are optional; five outputs include default-hidden consop_income; company and product lists have no effective dates."
+    },
+    {
+      "doc_id": "197",
+      "apis": [
+        "ggt_monthly"
+      ],
+      "page_sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
+      "status": "missing_document_body",
+      "retained_provider_evidence": {
+        "path": "/data/tushare/validation/connect-legacy-probe.json",
+        "request": "empty params",
+        "source_code": 40101,
+        "meaning": "API name rejected; this is not permission or permanent-removal proof."
+      }
+    }
+  ],
+  "implemented": {
+    "apis": [
+      "rt_min",
+      "rt_etf_min",
+      "rt_etf_min_daily",
+      "tmt_twincome",
+      "tmt_twincomedetail"
+    ],
+    "registration": "catalog overlay, registry, generic Pipeline enqueue/capture, immutable store/read_dataset, planner and credential-free mirror installer",
+    "default_activation": "off",
+    "planning": {
+      "rt_min": "Explicit realtime_extra activation, explicit current UTC snapshot epoch, actual stored stock discovery, one or more codes, five exact frequencies.",
+      "rt_etf_min": "Explicit realtime_extra activation, explicit current UTC snapshot epoch, actual stored ETF discovery, one or more codes, five exact frequencies.",
+      "rt_etf_min_daily": "Explicit realtime_replay activation, explicit current UTC snapshot epoch, one actual stored ETF per request, current opening-to-now only, five exact frequencies.",
+      "tmt_twincome": "Explicit offcatalog_apis selection; recent 30-month window for each documented product 1..65; optional history is split into at most 30-calendar-month windows.",
+      "tmt_twincomedetail": "Explicit offcatalog_apis selection; prior/current month for each documented product 1..65; optional history is monthly per product. Current company labels are not used as PIT fanout."
+    },
+    "invariants": [
+      "No execution-price forward fill or missing-bar-to-suspension inference.",
+      "Request epoch and observation time do not replace supplier time or point-in-time availability.",
+      "Current stock, ETF, product and company lists do not prove historical membership or completeness.",
+      "Empty, below-cap and terminal saturated responses remain distinct from complete coverage.",
+      "No unit conversion is inferred where the current page omits currency or scale."
+    ]
+  },
+  "blocked": {
+    "api": "ggt_monthly",
+    "reason": "The current official page has no contract and retained provider evidence rejects the published API name. Inputs, fields, monthly methodology, valid endpoint, entitlement and history are therefore not reliable enough to register.",
+    "required_evidence": [
+      "authoritative valid API name or replacement endpoint",
+      "legal input table",
+      "complete output table including hidden fields",
+      "monthly calculation/units",
+      "history boundary and pagination/cap",
+      "independent permission observation"
+    ],
+    "forbidden_substitute": "Do not aggregate ggt_daily into ggt_monthly."
+  },
+  "scope_audit": {
+    "total_named_scope": 249,
+    "runtime_readable": 243,
+    "not_registered": 6,
+    "public_read_only_contract_blocked": [
+      "ggt_monthly"
+    ],
+    "other_nonruntime": [
+      "p_list",
+      "p_get",
+      "p_save",
+      "p_delete",
+      "pro_bar"
+    ]
+  },
+  "validation": {
+    "python": "3.10.19",
+    "focused_unittests": 53,
+    "focused_status": "passed",
+    "full_tushare_suite": {
+      "ran": 939,
+      "status": "passed",
+      "skipped": 5,
+      "elapsed_seconds": 47.497
+    },
+    "ruff": "passed",
+    "scope_audit": "passed",
+    "post_rebase_offcatalog_probe_unittests": {
+      "ran": 6,
+      "status": "passed"
+    }
+  }
+}

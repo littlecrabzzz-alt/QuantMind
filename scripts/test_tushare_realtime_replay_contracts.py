@@ -28,6 +28,7 @@ class RealtimeReplayContracts(unittest.TestCase):
         self.ids = {
             "indexes": ["000001.SH", "399300.SZ"],
             "minute_futures": ["cu2609.SHF", "IF2609.CFX"],
+            "etfs": ["159915.SZ", "510300.SH"],
         }
 
     def jobs(self, ids=None, today=None, **config):
@@ -50,8 +51,8 @@ class RealtimeReplayContracts(unittest.TestCase):
             **changes,
         }
 
-    def test18_full_fields_shared_evidence_and_independent_limits(self):
-        self.assertEqual(sum(map(len, replay.FIELDS.values())), 18)
+    def test26_full_fields_shared_evidence_and_independent_limits(self):
+        self.assertEqual(sum(map(len, replay.FIELDS.values())), 26)
         for api, base in replay.BASE_APIS.items():
             spec = replay.REALTIME_REPLAY_CONTRACTS[api]
             parent = REALTIME_EXTRA_CONTRACTS[base]
@@ -73,6 +74,7 @@ class RealtimeReplayContracts(unittest.TestCase):
         self.assertEqual(
             replay.INPUT_FIELDS["rt_fut_min_daily"], ["ts_code", "freq", "date_str"]
         )
+        self.assertEqual(replay.INPUT_FIELDS["rt_etf_min_daily"], ["ts_code", "freq"])
         self.assertEqual(
             replay.REALTIME_REPLAY_CONTRACTS["rt_fut_min_daily"]["source_code_field"],
             "code",
@@ -94,13 +96,13 @@ class RealtimeReplayContracts(unittest.TestCase):
         jobs = self.jobs(
             history_start="19900101", realtime_replay_date_str="1990-01-01"
         )
-        self.assertEqual(len(jobs), 20)
+        self.assertEqual(len(jobs), 30)
         self.assertTrue(all(set(j["params"]) == {"ts_code", "freq"} for j in jobs))
         for epoch in ("20260908T080000Z", "20260910T080000Z", "20260909"):
             with self.assertRaises(ValueError):
                 self.jobs(realtime_replay_snapshot_epoch=epoch)
         self.assertEqual(
-            len(self.jobs(realtime_replay_snapshot_epoch="20260908T160000Z")), 20
+            len(self.jobs(realtime_replay_snapshot_epoch="20260908T160000Z")), 30
         )
 
     def test_five_exact_frequency_identities_single_source_and_case(self):
@@ -112,7 +114,7 @@ class RealtimeReplayContracts(unittest.TestCase):
             )
         self.assertTrue(any(j["params"]["ts_code"] == "cu2609.SHF" for j in jobs))
         self.assertTrue(all("," not in j["params"]["ts_code"] for j in jobs))
-        self.assertEqual([j["api_name"] for j in jobs[:2]], list(replay.BASE_APIS))
+        self.assertEqual([j["api_name"] for j in jobs[:3]], list(replay.BASE_APIS))
         for bad in ("1min", "1m", "60", 1):
             with self.assertRaises(ValueError):
                 self.jobs(realtime_replay_frequencies=[bad])
@@ -125,14 +127,16 @@ class RealtimeReplayContracts(unittest.TestCase):
         ids = {
             "indexes": ["000001.SH", "801001.SI"],
             "minute_futures": ["CU8888.SHF", "CU9999.SHF", "cu2609.SHF", "CU.SHF"],
+            "etfs": ["159915.SZ"],
         }
         jobs = self.jobs(ids)
         self.assertEqual(
-            {j["params"]["ts_code"] for j in jobs}, {"000001.SH", "cu2609.SHF"}
+            {j["params"]["ts_code"] for j in jobs},
+            {"000001.SH", "cu2609.SHF", "159915.SZ"},
         )
         gaps = replay.realtime_replay_prerequisites(ids, config=self.config)
         states = [g for g in gaps if "unsupported_codes" in g]
-        self.assertEqual([g["unsupported_codes"] for g in states], [1, 3])
+        self.assertEqual([g["unsupported_codes"] for g in states], [1, 3, 0])
         self.assertEqual(
             replay.REALTIME_REPLAY_CONTRACTS["rt_idx_min_daily"]["target_namespace"],
             "IDX:",
@@ -140,6 +144,10 @@ class RealtimeReplayContracts(unittest.TestCase):
         self.assertEqual(
             replay.REALTIME_REPLAY_CONTRACTS["rt_fut_min_daily"]["target_namespace"],
             "FUT:",
+        )
+        self.assertEqual(
+            replay.REALTIME_REPLAY_CONTRACTS["rt_etf_min_daily"]["target_namespace"],
+            "FUND:",
         )
 
     def test_prior_only_from_same_epoch_per_contract_verified_window(self):
@@ -165,7 +173,7 @@ class RealtimeReplayContracts(unittest.TestCase):
             jobs = self.jobs(
                 ids, realtime_replay_futures_scope="current_and_verified_previous"
             )
-            self.assertEqual(len(jobs), 20)
+            self.assertEqual(len(jobs), 30)
             self.assertTrue(all("date_str" not in j["params"] for j in jobs))
 
     def test_weekend_holiday_leap_boundaries_require_evidence_not_subtraction(self):

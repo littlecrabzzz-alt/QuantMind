@@ -8352,14 +8352,14 @@
       "permission_status": "unverified",
       "content_status": "document_missing_http_200",
       "source_sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
-      "evidence": "docs/tushare-connect-intake.md",
+      "evidence": "docs/tushare-public-six-contracts.evidence.json",
       "runtime_evidence": {
         "path": "/data/tushare/validation/connect-legacy-probe.json",
         "status": "api_error",
         "row_count": 0,
         "probe_release_id": "probe-bf606f5acd14434db107a47f29051143"
       },
-      "next_action": "Resolve current API-name rejection against supplier documentation; preserve monthly historical-data obligation without substituting derived daily totals."
+      "next_action": "Current page197 still returns the missing-document body and retained provider evidence rejects the API name. Recover an authoritative valid endpoint plus monthly fields/semantics; never derive it from ggt_daily."
     },
     {
       "doc_id": "374",
@@ -8368,7 +8368,7 @@
         "rt_min"
       ],
       "access_mode": "public_read_only",
-      "status": "review_required",
+      "status": "implementing",
       "permission_status": "unverified",
       "content_status": "document_present",
       "source_sha256": "1ab1e6dfafee4a4ed07ee15605d449da284fef97f23e3f35742279d6f7bab320",
@@ -8386,8 +8386,8 @@
         "vol",
         "amount"
       ],
-      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
-      "next_action": "Independent real-time permission and current response remain unverified; implement only in an isolated realtime batch."
+      "evidence": "docs/tushare-public-six-contracts.evidence.json",
+      "next_action": "Default-disabled realtime snapshot contract is registered; verify independent entitlement, all fields, source timestamp/finality, saturation and actual stock universe before enablement."
     },
     {
       "doc_id": "416",
@@ -8397,7 +8397,7 @@
         "rt_etf_min_daily"
       ],
       "access_mode": "public_read_only",
-      "status": "review_required",
+      "status": "implementing",
       "permission_status": "unverified",
       "content_status": "document_present",
       "source_sha256": "3f6791db049cc20ec38cf237cac20c508e42936b0e07f34ae29d6d3a0539e13b",
@@ -8415,8 +8415,8 @@
         "vol",
         "amount"
       ],
-      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
-      "next_action": "Separate multi-code snapshot from single-code intraday replay, then verify each independent entitlement without inferring sibling access."
+      "evidence": "docs/tushare-public-six-contracts.evidence.json",
+      "next_action": "Default-disabled realtime ETF snapshot contract is registered; verify independent entitlement, all fields, ETF units, timestamp/finality, saturation and actual ETF universe before enablement. Default-disabled same-session ETF replay contract is registered separately; verify independent entitlement, actual fields/cap and current-session timing before enablement."
     },
     {
       "doc_id": "156",
@@ -8491,7 +8491,7 @@
         "tmt_twincomedetail"
       ],
       "access_mode": "public_read_only",
-      "status": "review_required",
+      "status": "implementing",
       "permission_status": "unverified",
       "content_status": "document_present",
       "source_sha256": "06752694e11c741360878b00be31c63f3df3f349ec547a980517332d2612950d",
@@ -8510,8 +8510,8 @@
         "op_income",
         "consop_income"
       ],
-      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
-      "next_action": "Build a bounded product/symbol discovery and 30-month saturation plan before registration; permission and live schema remain unverified."
+      "evidence": "docs/tushare-public-six-contracts.evidence.json",
+      "next_action": "Default-disabled contract plans all 65 currently documented products in monthly ranges; verify permission, hidden consop_income, company/product completeness, units and saturation before enablement."
     },
     {
       "doc_id": "88",
@@ -8520,7 +8520,7 @@
         "tmt_twincome"
       ],
       "access_mode": "public_read_only",
-      "status": "review_required",
+      "status": "implementing",
       "permission_status": "unverified",
       "content_status": "document_present",
       "source_sha256": "8b5158b21154e38b60283ada098692a09f48d4274e18e6d4b5987823bda11d92",
@@ -8535,8 +8535,8 @@
         "item",
         "op_income"
       ],
-      "evidence": "docs/tushare-offcatalog-audit-20260910.evidence.json",
-      "next_action": "Build complete product-code coverage and <=30-month range planning before registration; permission and live schema remain unverified."
+      "evidence": "docs/tushare-public-six-contracts.evidence.json",
+      "next_action": "Default-disabled contract plans all 65 currently documented product codes in <=30-month ranges; verify permission, rows, units, historical lower bound, product revisions and saturation before enablement."
     },
     {
       "doc_id": "113",

@@ -38,6 +38,8 @@ APIS = {
     "bo_cinema",
     "fund_sales_ratio",
     "fund_sales_vol",
+    "tmt_twincome",
+    "tmt_twincomedetail",
 }
 
 
@@ -57,7 +59,7 @@ class OffCatalogContractsTest(unittest.TestCase):
             for api in entry.get("api_names", [])
         }
         self.assertEqual(set(OFFCATALOG_CONTRACTS), APIS)
-        self.assertEqual(sum(map(len, FIELDS.values())), 73)
+        self.assertEqual(sum(map(len, FIELDS.values())), 81)
         for api, spec in OFFCATALOG_CONTRACTS.items():
             entry = entries[api]
             self.assertEqual(spec["source_url"], entry["url"])
@@ -91,6 +93,8 @@ class OffCatalogContractsTest(unittest.TestCase):
             "bo_cinema": "20260901",
             "fund_sales_ratio": "20200101",
             "fund_sales_vol": "20260101",
+            "tmt_twincome": "20200101",
+            "tmt_twincomedetail": "20260101",
         }
         jobs = list(
             iter_offcatalog_jobs(
@@ -104,11 +108,11 @@ class OffCatalogContractsTest(unittest.TestCase):
         )
         recent = [job for job in jobs if job["priority"] == 20]
         history = [job for job in jobs if job["priority"] == 40]
-        self.assertEqual(len(recent), 25)
+        self.assertEqual(len(recent), 220)
         self.assertTrue(all(job["epoch"] == "fixture" for job in recent))
         self.assertTrue(all(job["epoch"] == "history" for job in history))
         self.assertEqual(
-            [job["api_name"] for job in history[:7]],
+            [job["api_name"] for job in history[:9]],
             [
                 "film_record",
                 "teleplay_record",
@@ -117,6 +121,8 @@ class OffCatalogContractsTest(unittest.TestCase):
                 "bo_daily",
                 "bo_cinema",
                 "fund_sales_vol",
+                "tmt_twincome",
+                "tmt_twincomedetail",
             ],
         )
         identities = [
@@ -150,6 +156,40 @@ class OffCatalogContractsTest(unittest.TestCase):
             self.assertIn("refresh_gap", reasons)
         self.assertIn("acquisition_gap", by_api["fund_sales_ratio"])
         self.assertIn("saturation_gap", by_api["bo_cinema"])
+        self.assertIn("universe_gap", by_api["tmt_twincome"])
+        self.assertIn("universe_gap", by_api["tmt_twincomedetail"])
+
+    def test_tmt_uses_all_documented_products_and_bounded_month_windows(self):
+        jobs = list(
+            iter_offcatalog_jobs(
+                {
+                    "offcatalog_apis": ["tmt_twincome", "tmt_twincomedetail"],
+                    "offcatalog_history_start": "20200115",
+                },
+                date(2026, 9, 10),
+            )
+        )
+        self.assertEqual(
+            {job["params"]["item"] for job in jobs}, {str(i) for i in range(1, 66)}
+        )
+        for job in jobs:
+            start = date.fromisoformat(
+                job["params"]["start_date"][:4]
+                + "-"
+                + job["params"]["start_date"][4:6]
+                + "-"
+                + job["params"]["start_date"][6:]
+            )
+            end = date.fromisoformat(
+                job["params"]["end_date"][:4]
+                + "-"
+                + job["params"]["end_date"][4:6]
+                + "-"
+                + job["params"]["end_date"][6:]
+            )
+            months = (end.year - start.year) * 12 + end.month - start.month + 1
+            limit = 30 if job["api_name"] == "tmt_twincome" else 1
+            self.assertLessEqual(months, limit)
 
     def test_synthetic_acquire_publish_and_local_query(self):
         def handler(request):
@@ -242,8 +282,8 @@ class OffCatalogContractsTest(unittest.TestCase):
             ADJACENT_API_OBLIGATIONS,
         )
         self.assertEqual(result["counts"]["total_named_scope"], 249)
-        self.assertEqual(result["counts"]["registered_union"], 238)
-        self.assertEqual(result["counts"]["not_registered_in_scope"], 11)
+        self.assertEqual(result["counts"]["registered_union"], 243)
+        self.assertEqual(result["counts"]["not_registered_in_scope"], 6)
         remaining = {
             row["api_name"]: row["implementation"]
             for row in result["apis"]
@@ -253,11 +293,6 @@ class OffCatalogContractsTest(unittest.TestCase):
             remaining,
             {
                 "ggt_monthly": "public_read_only_contract_blocked",
-                "rt_min": "public_read_only_contract_blocked",
-                "rt_etf_min": "public_read_only_contract_blocked",
-                "rt_etf_min_daily": "public_read_only_contract_blocked",
-                "tmt_twincomedetail": "public_read_only_contract_blocked",
-                "tmt_twincome": "public_read_only_contract_blocked",
                 "p_list": "pure_contract_only_private",
                 "p_get": "pure_contract_only_private",
                 "p_save": "excluded_mutation",
@@ -265,6 +300,10 @@ class OffCatalogContractsTest(unittest.TestCase):
                 "pro_bar": "sdk_only",
             },
         )
+
+    def test_mirror_installer_bundles_offcatalog_contract(self):
+        installer = (ROOT / "scripts/tushare_mirror.py").read_text()
+        self.assertIn('"backend/shared/tushare_offcatalog_contracts.py"', installer)
 
 
 if __name__ == "__main__":

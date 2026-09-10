@@ -46,8 +46,8 @@ class RealtimeContracts(unittest.TestCase):
             )
         )
 
-    def test_all87_columns_hidden8_and_legal_table_scope(self):
-        self.assertEqual(sum(map(len, rt.FIELDS.values())), 87)
+    def test_all103_columns_hidden8_and_legal_table_scope(self):
+        self.assertEqual(sum(map(len, rt.FIELDS.values())), 103)
         self.assertEqual(
             sum(len(s["hidden_fields"]) for s in rt.REALTIME_EXTRA_CONTRACTS.values()),
             8,
@@ -58,6 +58,13 @@ class RealtimeContracts(unittest.TestCase):
                 "entries"
             ]
             for a in e["api_names"]
+        }
+        discovered = {
+            a: e
+            for e in json.loads(
+                (ROOT / "config/tushare-coverage-ledger.json").read_text()
+            )["discovered_entries"]
+            for a in e.get("api_names", [])
         }
         for api, spec in rt.REALTIME_EXTRA_CONTRACTS.items():
             self.assertEqual(spec["fields"], spec["required_fields"])
@@ -77,9 +84,19 @@ class RealtimeContracts(unittest.TestCase):
                     {"date_str"} if api == "rt_fut_min" else set(),
                 )
                 self.assertTrue(set(rt.INPUT_FIELDS[api]) <= set(catalog_inputs))
-            else:
+            elif api in DISCOVERED_CONTRACTS:
                 self.assertEqual(
                     rt.FIELDS[api], DISCOVERED_CONTRACTS[api]["extra_fields"]
+                )
+            else:
+                self.assertIn(api, {"rt_min", "rt_etf_min"})
+                self.assertEqual(spec["source_url"], discovered[api]["url"])
+                self.assertEqual(
+                    spec["source_html_sha256"], discovered[api]["source_sha256"]
+                )
+                self.assertEqual(len(spec["source_markdown_sha256"]), 64)
+                self.assertEqual(
+                    spec["requested_fields"], discovered[api]["output_fields"]
                 )
         self.assertEqual(rt.INPUT_FIELDS["rt_fut_min"], ["ts_code", "freq"])
         self.assertEqual(rt.FIELD_METADATA["stk_auction"]["price"]["type"], "int")
@@ -135,7 +152,7 @@ class RealtimeContracts(unittest.TestCase):
 
     def test_each_source_code_all5_frequencies_distinct_request_identity(self):
         rows = self.jobs(list(rt.MINUTE_APIS))
-        self.assertEqual(len(rows), 20)
+        self.assertEqual(len(rows), 40)
         for api in rt.MINUTE_APIS:
             calls = [j for j in rows if j["api_name"] == api]
             self.assertEqual(

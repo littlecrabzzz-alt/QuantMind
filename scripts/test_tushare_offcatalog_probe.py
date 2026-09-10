@@ -36,6 +36,8 @@ class OffCatalogProbeTest(unittest.TestCase):
     def test_exact_bounded_plan_and_runtime_contracts(self):
         evidence = probe.contract_evidence()
         self.assertEqual(tuple(evidence), probe.APIS)
+        self.assertNotIn("tmt_twincome", evidence)
+        self.assertNotIn("tmt_twincomedetail", evidence)
         self.assertEqual(probe.MAX_REQUESTS, 11)
         self.assertEqual(
             hashlib.sha256(probe.canonical(evidence).encode()).hexdigest(),

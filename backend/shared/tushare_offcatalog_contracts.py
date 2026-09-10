@@ -15,6 +15,8 @@ FIELDS = {
     "bo_cinema": "date c_name aud_count att_ratio day_amount day_showcount avg_price p_pc rank".split(),
     "fund_sales_ratio": "year bank sec_comp fund_comp indep_comp rests".split(),
     "fund_sales_vol": "year quarter inst_name fund_scale scale rank".split(),
+    "tmt_twincome": "date item op_income".split(),
+    "tmt_twincomedetail": "date item symbol op_income consop_income".split(),
 }
 
 INPUT_FIELDS = {
@@ -28,6 +30,15 @@ INPUT_FIELDS = {
     # unfiltered. Do not invent a wire name from the output column.
     "fund_sales_ratio": [],
     "fund_sales_vol": ["year", "quarter", "name"],
+    "tmt_twincome": ["date", "item", "start_date", "end_date"],
+    "tmt_twincomedetail": [
+        "date",
+        "item",
+        "symbol",
+        "start_date",
+        "end_date",
+        "source",
+    ],
 }
 
 _DOCS = {
@@ -95,6 +106,22 @@ _DOCS = {
         "2b39c7688fe216b9e1cdd52cf0490c39454868f09dfa5108e997850eff5ff6cf",
         "d0663b517e919e7384c1636231cc4c8da0bf71b4703c37d8bf6945434b6143e9",
     ),
+    "tmt_twincome": (
+        88,
+        1000,
+        None,
+        None,
+        "48220e5bfa9b612f8dba1ff7357a65fcd25b1c3f71d9721f84f8c7de92def7c6",
+        "8b5158b21154e38b60283ada098692a09f48d4274e18e6d4b5987823bda11d92",
+    ),
+    "tmt_twincomedetail": (
+        87,
+        1000,
+        None,
+        None,
+        "78783ad408be75da349ba1b1c4e4810868edb6f528897b20d892e2b9fc23248e",
+        "06752694e11c741360878b00be31c63f3df3f349ec547a980517332d2612950d",
+    ),
 }
 
 _KEYS = {
@@ -106,7 +133,11 @@ _KEYS = {
     "bo_cinema": ("date", "c_name", "rank"),
     "fund_sales_ratio": ("year",),
     "fund_sales_vol": ("year", "quarter", "inst_name", "rank"),
+    "tmt_twincome": ("date", "item"),
+    "tmt_twincomedetail": ("date", "item", "symbol"),
 }
+
+DOCUMENTED_TMT_ITEMS = tuple(str(value) for value in range(1, 66))
 
 OFFCATALOG_CONTRACTS = {}
 for _api, (_doc, _cap, _points, _start, _markdown_sha, _html_sha) in _DOCS.items():
@@ -129,7 +160,7 @@ for _api, (_doc, _cap, _points, _start, _markdown_sha, _html_sha) in _DOCS.items
         official_reference_commit="b68d5517e0cbe84d61774de26ad366d900c7eb92",
         input_fields=INPUT_FIELDS[_api],
         requested_fields=FIELDS[_api],
-        hidden_fields=[],
+        hidden_fields=["consop_income"] if _api == "tmt_twincomedetail" else [],
         permission_status="unprobed",
         independent_permission=False,
         minimum_points=_points,
@@ -199,6 +230,24 @@ OFFCATALOG_CONTRACTS["fund_sales_vol"].update(
     saturation_gap="A saturated year-quarter remains incomplete. The optional name filter has no exhaustive institution universe and cannot prove full coverage.",
     quarter_note="quarter is a source label such as Q1. fund_scale and scale are CNY 100-million; rank is based on fund_scale rounded to 0.01 according to the page.",
 )
+OFFCATALOG_CONTRACTS["tmt_twincome"].update(
+    required_params=["item"],
+    documented_product_codes=list(DOCUMENTED_TMT_ITEMS),
+    documented_window_months=30,
+    row_cap_verified=False,
+    row_cap_basis="local 1000-row saturation alarm; the page limits a request to 30 months but gives no row cap",
+    saturation_gap="Each request is limited to one documented product and no more than 30 calendar months. A local1000-row or has_more result remains incomplete because no pagination or finer legal dimension is documented.",
+    universe_gap="The current page enumerates product codes1..65. It does not prove that the list was historically complete, that retired/new products are absent, or when classifications changed.",
+    unit_gap="op_income is described as str while the sample is numeric; currency and scale are absent. Preserve supplier type/value without conversion or aggregation.",
+)
+OFFCATALOG_CONTRACTS["tmt_twincomedetail"].update(
+    documented_product_codes=list(DOCUMENTED_TMT_ITEMS),
+    row_cap_verified=False,
+    row_cap_basis="local 1000-row saturation alarm; the page publishes no row cap",
+    saturation_gap="Requests use one documented product and one calendar month. A local1000-row or has_more result remains incomplete; the long current symbol table is not a PIT-complete pagination dimension.",
+    universe_gap="The page's company and product lists are current document labels without effective dates or revision history. They cannot prove historical symbol/product completeness or delistings.",
+    unit_gap="op_income/consop_income are documented as str while samples are numeric; currency, scale and consolidation semantics are not defined. consop_income is default-hidden and requested explicitly.",
+)
 
 
 def _selected(config):
@@ -233,6 +282,23 @@ def _quarters(start, end):
         value = date(value.year + (month > 12), month - 12 if month > 12 else month, 1)
 
 
+def _month_end(value):
+    return value.replace(day=monthrange(value.year, value.month)[1])
+
+
+def _advance_months(value, count):
+    month = value.year * 12 + value.month - 1 + count
+    return date(month // 12, month % 12 + 1, 1)
+
+
+def _tmt_windows(start, end, width):
+    value = start
+    while value <= end:
+        last = min(end, _month_end(_advance_months(_month_start(value), width - 1)))
+        yield value, last
+        value = _advance_months(_month_start(last), 1)
+
+
 def _job(api, params, priority, epoch):
     return {"api_name": api, "params": params, "priority": priority, "epoch": epoch}
 
@@ -248,6 +314,33 @@ def _recent(api, today, epoch):
                 20,
                 epoch,
             )
+    elif api == "tmt_twincome":
+        start = _advance_months(_month_start(today), -29)
+        for item in DOCUMENTED_TMT_ITEMS:
+            yield _job(
+                api,
+                {
+                    "item": item,
+                    "start_date": start.strftime("%Y%m%d"),
+                    "end_date": today.strftime("%Y%m%d"),
+                },
+                20,
+                epoch,
+            )
+    elif api == "tmt_twincomedetail":
+        for month in (_previous_month(today), _month_start(today)):
+            end = min(today, _month_end(month))
+            for item in DOCUMENTED_TMT_ITEMS:
+                yield _job(
+                    api,
+                    {
+                        "item": item,
+                        "start_date": month.strftime("%Y%m%d"),
+                        "end_date": end.strftime("%Y%m%d"),
+                    },
+                    20,
+                    epoch,
+                )
     elif api in ("film_record", "teleplay_record", "bo_monthly"):
         for value in (_previous_month(today), _month_start(today)):
             if api == "film_record":
@@ -304,6 +397,23 @@ def _history(api, start, today):
                 40,
                 "history",
             )
+    elif api in ("tmt_twincome", "tmt_twincomedetail"):
+        recent = _advance_months(
+            _month_start(today), -29 if api == "tmt_twincome" else -1
+        )
+        width = 30 if api == "tmt_twincome" else 1
+        for first, last in _tmt_windows(start, recent - timedelta(days=1), width):
+            for item in DOCUMENTED_TMT_ITEMS:
+                yield _job(
+                    api,
+                    {
+                        "item": item,
+                        "start_date": first.strftime("%Y%m%d"),
+                        "end_date": last.strftime("%Y%m%d"),
+                    },
+                    40,
+                    "history",
+                )
     elif api == "bo_weekly":
         value = start + timedelta(days=(-start.weekday()) % 7)
         last = today - timedelta(days=today.weekday() + 14)
@@ -370,6 +480,7 @@ def offcatalog_prerequisites(config=None):
             "acquisition_gap",
             "identity_gap",
             "unit_gap",
+            "universe_gap",
         ):
             if spec.get(reason):
                 gaps.append(

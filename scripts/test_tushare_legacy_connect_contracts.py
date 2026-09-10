@@ -198,7 +198,7 @@ class LegacyConnectContractsTest(unittest.TestCase):
             PORTFOLIO_READ_CONTRACTS,
             ADJACENT_API_OBLIGATIONS,
         )
-        self.assertEqual(result["counts"]["not_registered_in_scope"], 11)
+        self.assertEqual(result["counts"]["not_registered_in_scope"], 6)
         remaining = {
             row["api_name"]
             for row in result["apis"]
@@ -208,11 +208,6 @@ class LegacyConnectContractsTest(unittest.TestCase):
             remaining,
             {
                 "ggt_monthly",
-                "rt_min",
-                "rt_etf_min",
-                "rt_etf_min_daily",
-                "tmt_twincomedetail",
-                "tmt_twincome",
                 "p_list",
                 "p_get",
                 "p_save",

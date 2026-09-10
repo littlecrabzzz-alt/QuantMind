@@ -15,6 +15,7 @@ from backend.shared.tushare_realtime_extra_contracts import (
 BASE_APIS = {
     "rt_idx_min_daily": "rt_idx_min",
     "rt_fut_min_daily": "rt_fut_min",
+    "rt_etf_min_daily": "rt_etf_min",
 }
 REALTIME_REPLAY_CONTRACTS = {}
 for _api, _base in BASE_APIS.items():
@@ -89,6 +90,28 @@ REALTIME_REPLAY_CONTRACTS["rt_fut_min_daily"].update(
     sibling_limit_note="Page340 says rt_fut_min500 requests/minute; daily endpoint inheritance is unconfirmed. No numeric row cap disclosed. Local1000 guard cannot prove completion.",
     discovery_window_gap="Verified previous-day windows are not invented from master codes or prose. Runtime must retain actual request/response/date-filter evidence and relevant exchange calendar/session mapping; missing or stale windows only block prior-day requests, not default current replay.",
     update_time_gap="No exact minute publication schedule/finality or timezone given. The planner does not synthesize night-session rows or determine the supplier trading day.",
+)
+REALTIME_REPLAY_CONTRACTS["rt_etf_min_daily"].update(
+    required_params=["ts_code", "freq"],
+    allowed_params=["ts_code", "freq"],
+    input_metadata={
+        "ts_code": {
+            "type": "str",
+            "required": "Y",
+            "description": "仅支持一次提取一个ETF代码",
+        },
+        "freq": {
+            "type": "str",
+            "required": "Y",
+            "description": "1MIN,5MIN,15MIN,30MIN,60MIN （大写）",
+        },
+    },
+    named_api_evidence="Page416 explicitly names rt_etf_min_daily, limits it to one ETF code and describes current-opening-to-now minute history.",
+    documented_scope="current opening-to-now, one actual ETF per request",
+    history_gap="Only the current opening-to-now session is documented. There is no date/range input and no arbitrary historical replay or reconstruction of an earlier observation.",
+    sibling_limit_note="Page416 states a 1000-row cap for rt_etf_min; it does not explicitly assign that cap to the separately named daily endpoint. Local1000 remains a saturation alarm, not completeness proof.",
+    update_time_gap="No update clock, source timezone, final-bar availability or closed-day behavior is specified. The endpoint does not provide arbitrary historical dates.",
+    namespace_gap="Use only actual stored ETF identifiers and retain FUND: plus the supplier code. A suffix or current ETF list does not establish historical listing, tradability, holdings or PIT membership.",
 )
 FIELDS = {api: list(spec["fields"]) for api, spec in REALTIME_REPLAY_CONTRACTS.items()}
 INPUT_FIELDS = {

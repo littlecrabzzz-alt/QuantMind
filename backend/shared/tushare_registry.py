@@ -599,7 +599,9 @@ from backend.shared.tushare_discovered_contracts import _epoch as _realtime_epoc
 
 REALTIME_SOURCE_FAMILIES = {
     "stk_auction": "realtime_auction_untyped", "rt_k": "realtime_stocks",
+    "rt_min": "realtime_stocks",
     "rt_etf_k": "realtime_etfs", "rt_etf_sz_iopv": "realtime_etfs",
+    "rt_etf_min": "realtime_etfs", "rt_etf_min_daily": "realtime_etfs",
     "rt_idx_k": "realtime_indexes", "rt_idx_min": "realtime_indexes",
     "rt_idx_min_daily": "realtime_indexes", "rt_sw_k": "realtime_sw_indexes",
     "rt_fut_min": "realtime_futures", "rt_fut_min_daily": "realtime_futures",
@@ -739,14 +741,24 @@ def project_realtime_row(api, row, params):
     value = row.get(field)
     if not isinstance(value, str) or not value:
         raise ValueError("Realtime source code requires schema review")
-    if api in ("rt_idx_min", "rt_idx_min_daily", "rt_fut_min", "rt_fut_min_daily"):
+    if api in (
+        "rt_idx_min", "rt_idx_min_daily", "rt_fut_min", "rt_fut_min_daily",
+        "rt_min", "rt_etf_min", "rt_etf_min_daily",
+    ):
         requested = params.get("ts_code")
-        codes = requested.split(",") if isinstance(requested, str) and api in ("rt_idx_min", "rt_fut_min") else [requested]
+        codes = (
+            requested.split(",")
+            if isinstance(requested, str)
+            and api in ("rt_idx_min", "rt_fut_min", "rt_min", "rt_etf_min")
+            else [requested]
+        )
         if value not in codes or ("freq" in row and row["freq"] != params.get("freq")):
             raise ValueError("Realtime source code/frequency does not match immutable request")
     row["source_" + field] = value
     kind = (params.get("ts_type") or "AUCTION_UNTYPED") if api == "stk_auction" else (
-        "STK" if api == "rt_k" else "ETF" if api in ("rt_etf_k", "rt_etf_sz_iopv")
+        "STK" if api in ("rt_k", "rt_min") else "ETF" if api in (
+            "rt_etf_k", "rt_etf_sz_iopv", "rt_etf_min", "rt_etf_min_daily"
+        )
         else "FUT" if api in ("rt_fut_min", "rt_fut_min_daily") else "IDX"
     )
     if kind == "STK" and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", value):
