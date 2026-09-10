@@ -880,64 +880,127 @@ def _parse_saved(root, result, timeout):
 CLAIM_GRACE_SECONDS = 30
 
 
-def _claims_setup(db):
+def _add_elapsed(timing, key, started):
+    if timing is not None:
+        timing[key] = timing.get(key, 0.0) + time.monotonic() - started
+
+
+def _timed_begin(db, timing, prefix):
+    started = time.monotonic()
+    try:
+        db.execute("BEGIN IMMEDIATE")
+    finally:
+        _add_elapsed(timing, f"{prefix}_db_wait_seconds", started)
+        if timing is not None:
+            calls = f"{prefix}_db_calls"
+            timing[calls] = timing.get(calls, 0) + 1
+
+
+def _claims_setup(db, timing=None):
     # Separate versioned metadata keeps queue-v2 and index-v2 consumers compatible.
-    if db.execute(
-        "SELECT 1 FROM sqlite_master WHERE name='document_claim_meta'"
-    ).fetchone():
-        row = db.execute("SELECT version FROM document_claim_meta").fetchone()
-        if row is None or row[0] != 1:
-            raise DocumentError("unsupported_document_claim_schema")
-        return
-    with db:
-        db.execute("BEGIN IMMEDIATE")
-        db.execute("CREATE TABLE document_claim_meta(version INTEGER NOT NULL)")
-        db.execute("INSERT INTO document_claim_meta VALUES(1)")
-        db.execute(
-            "CREATE TABLE document_claims(document_id TEXT PRIMARY KEY,owner TEXT NOT NULL,phase TEXT NOT NULL,claimed_at REAL NOT NULL,lease_until REAL NOT NULL)"
-        )
-        db.execute("CREATE INDEX document_claim_expiry ON document_claims(lease_until)")
-
-
-def _claim_documents(db, owner, phase, limit, seconds):
-    now = time.time()
-    download = "(download_status IN ('pending','retry') AND retry_after<=?)"
-    parse = "(download_status='downloaded' AND parse_status IN ('parse_pending','parse_unavailable','parse_failed','parse_timeout') AND parse_tries<5 AND parse_retry_after<=?)"
-    condition = (
-        download
-        if phase == "download"
-        else parse
-        if phase == "parse"
-        else "(" + download + " OR " + parse + ")"
-    )
-    with db:
-        db.execute("BEGIN IMMEDIATE")
-        db.execute("DELETE FROM document_claims WHERE lease_until<=?", (now,))
-        rows = db.execute(
-            "SELECT * FROM documents WHERE "
-            + condition
-            + " AND NOT EXISTS(SELECT 1 FROM document_claims c WHERE c.document_id=documents.id) ORDER BY id LIMIT ?",
-            ((now, now, limit) if phase is None else (now, limit)),
-        ).fetchall()
-        claimed_at = time.time()
-        for row in rows:
-            actual_phase = (
-                "parse" if row["download_status"] == "downloaded" else "download"
+    started = time.monotonic()
+    try:
+        if db.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='document_claim_meta'"
+        ).fetchone():
+            row = db.execute("SELECT version FROM document_claim_meta").fetchone()
+            if row is None or row[0] not in (1, 2):
+                raise DocumentError("unsupported_document_claim_schema")
+            if row[0] == 2:
+                return
+            with db:
+                _timed_begin(db, timing, "setup")
+                db.execute(
+                    "CREATE INDEX IF NOT EXISTS document_pending_claim_order "
+                    "ON documents(id) WHERE download_status='pending'"
+                )
+                db.execute("UPDATE document_claim_meta SET version=2")
+            return
+        with db:
+            _timed_begin(db, timing, "setup")
+            db.execute("CREATE TABLE document_claim_meta(version INTEGER NOT NULL)")
+            db.execute(
+                "CREATE TABLE document_claims(document_id TEXT PRIMARY KEY,owner TEXT NOT NULL,phase TEXT NOT NULL,claimed_at REAL NOT NULL,lease_until REAL NOT NULL)"
             )
             db.execute(
-                "INSERT INTO document_claims VALUES(?,?,?,?,?)",
-                (
-                    row["id"],
-                    owner,
-                    actual_phase,
-                    claimed_at,
-                    claimed_at + seconds + CLAIM_GRACE_SECONDS,
-                ),
+                "CREATE INDEX document_claim_expiry ON document_claims(lease_until)"
             )
+            db.execute(
+                "CREATE INDEX document_pending_claim_order "
+                "ON documents(id) WHERE download_status='pending'"
+            )
+            db.execute("INSERT INTO document_claim_meta VALUES(2)")
+    finally:
+        _add_elapsed(timing, "setup_db_total_seconds", started)
+
+
+def _eligible_documents(db, phase, now, limit):
+    rows = []
+    unclaimed = (
+        " AND NOT EXISTS(SELECT 1 FROM document_claims c "
+        "WHERE c.document_id=documents.id) ORDER BY id LIMIT ?"
+    )
+    if phase in (None, "download"):
+        rows.extend(
+            db.execute(
+                "SELECT * FROM documents INDEXED BY document_pending_claim_order "
+                "WHERE download_status='pending' AND retry_after<=?" + unclaimed,
+                (now, limit),
+            ).fetchall()
+        )
+        # Retry volume is small and retry_after is selective. Keep the existing
+        # due-time index so a large future-retry tail cannot become an ID scan.
+        rows.extend(
+            db.execute(
+                "SELECT * FROM documents WHERE download_status='retry' "
+                "AND retry_after<=?" + unclaimed,
+                (now, limit),
+            ).fetchall()
+        )
+    if phase in (None, "parse"):
+        rows.extend(
+            db.execute(
+                "SELECT * FROM documents WHERE download_status='downloaded' "
+                "AND parse_status IN ('parse_pending','parse_unavailable',"
+                "'parse_failed','parse_timeout') AND parse_tries<5 "
+                "AND parse_retry_after<=?" + unclaimed,
+                (now, limit),
+            ).fetchall()
+        )
+    return sorted(rows, key=lambda row: row["id"])[:limit]
+
+
+def _claim_documents(db, owner, phase, limit, seconds, timing=None):
+    now = time.time()
+    started = time.monotonic()
+    try:
+        with db:
+            _timed_begin(db, timing, "claim")
+            db.execute("DELETE FROM document_claims WHERE lease_until<=?", (now,))
+            rows = _eligible_documents(db, phase, now, limit)
+            claimed_at = time.time()
+            for row in rows:
+                actual_phase = (
+                    "parse"
+                    if row["download_status"] == "downloaded"
+                    else "download"
+                )
+                db.execute(
+                    "INSERT INTO document_claims VALUES(?,?,?,?,?)",
+                    (
+                        row["id"],
+                        owner,
+                        actual_phase,
+                        claimed_at,
+                        claimed_at + seconds + CLAIM_GRACE_SECONDS,
+                    ),
+                )
+    finally:
+        _add_elapsed(timing, "claim_db_total_seconds", started)
     return rows
 
 
-def _finish_document(db, owner, job, result, phase):
+def _finish_document(db, owner, job, result, phase, timing=None):
     now = time.time()
     if (
         phase == "download"
@@ -968,35 +1031,41 @@ def _finish_document(db, owner, job, result, phase):
     }
     state = "downloaded" if good else "blocked" if terminal or dtries >= 5 else "retry"
     delay = min(3600, 60 * 2 ** min(max(dtries, ptries), 6))
-    with db:
-        db.execute("BEGIN IMMEDIATE")
-        claim = db.execute(
-            "SELECT owner,claimed_at FROM document_claims WHERE document_id=?",
-            (job["id"],),
-        ).fetchone()
-        if not claim or claim[0] != owner:
-            raise DocumentError("stale_document_claim")
-        db.execute(
-            "INSERT INTO document_attempts(document_id,phase,result,created_at) VALUES(?,?,?,?)",
-            (job["id"], phase, json.dumps(result), claim[1]),
-        )
-        db.execute(
-            "UPDATE documents SET download_status=?,parse_status=?,download_tries=?,parse_tries=?,retry_after=?,parse_retry_after=?,result=? WHERE id=?",
-            (
-                state,
-                result.get("parse_status", "not_attempted"),
-                dtries,
-                ptries,
-                now + delay,
-                now if result.get("parse_status") == "parse_pending" else now + delay,
-                json.dumps(result),
-                job["id"],
-            ),
-        )
-        db.execute(
-            "DELETE FROM document_claims WHERE document_id=? AND owner=?",
-            (job["id"], owner),
-        )
+    started = time.monotonic()
+    try:
+        with db:
+            _timed_begin(db, timing, "finish")
+            claim = db.execute(
+                "SELECT owner,claimed_at FROM document_claims WHERE document_id=?",
+                (job["id"],),
+            ).fetchone()
+            if not claim or claim[0] != owner:
+                raise DocumentError("stale_document_claim")
+            db.execute(
+                "INSERT INTO document_attempts(document_id,phase,result,created_at) VALUES(?,?,?,?)",
+                (job["id"], phase, json.dumps(result), claim[1]),
+            )
+            db.execute(
+                "UPDATE documents SET download_status=?,parse_status=?,download_tries=?,parse_tries=?,retry_after=?,parse_retry_after=?,result=? WHERE id=?",
+                (
+                    state,
+                    result.get("parse_status", "not_attempted"),
+                    dtries,
+                    ptries,
+                    now + delay,
+                    now
+                    if result.get("parse_status") == "parse_pending"
+                    else now + delay,
+                    json.dumps(result),
+                    job["id"],
+                ),
+            )
+            db.execute(
+                "DELETE FROM document_claims WHERE document_id=? AND owner=?",
+                (job["id"], owner),
+            )
+    finally:
+        _add_elapsed(timing, "finish_db_total_seconds", started)
 
 
 def _document_failure(job, phase, exc):
@@ -1035,6 +1104,21 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
     processed, started, owner = 0, time.monotonic(), uuid4().hex
     deadline = started + max_seconds
     phase_counts = {"download": 0, "parse": 0}
+    timing = {
+        "setup_db_calls": 0,
+        "setup_db_wait_seconds": 0.0,
+        "setup_db_total_seconds": 0.0,
+        "claim_db_calls": 0,
+        "claim_db_wait_seconds": 0.0,
+        "claim_db_total_seconds": 0.0,
+        "finish_db_calls": 0,
+        "finish_db_wait_seconds": 0.0,
+        "finish_db_total_seconds": 0.0,
+        "download_jobs": 0,
+        "download_job_seconds": 0.0,
+        "parse_jobs": 0,
+        "parse_job_seconds": 0.0,
+    }
     try:
         lock_path = root / "documents.lock"
         if lock_path.is_symlink():
@@ -1044,7 +1128,7 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 return {"status": "already_running", "processed": 0}
-            _claims_setup(db)
+            _claims_setup(db, timing)
             parse_turns = 1  # Finish old pending parses before admitting more raw PDFs.
             while processed < max_documents and time.monotonic() < deadline:
                 remaining = deadline - time.monotonic()
@@ -1055,34 +1139,46 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                 )
                 count = min(2 if phase == "download" else 1, max_documents - processed)
                 seconds = min(20, remaining) if phase == "download" else remaining
-                jobs = _claim_documents(db, owner, phase, count, seconds)
+                jobs = _claim_documents(db, owner, phase, count, seconds, timing)
                 if not jobs and download_workers == 2:
                     phase = "download" if phase == "parse" else "parse"
                     count = min(
                         2 if phase == "download" else 1, max_documents - processed
                     )
                     seconds = min(20, remaining) if phase == "download" else remaining
-                    jobs = _claim_documents(db, owner, phase, count, seconds)
+                    jobs = _claim_documents(db, owner, phase, count, seconds, timing)
                 if not jobs:
                     break
                 if phase == "download":
 
                     def transfer(job):
                         budget = min(20, max(0.001, deadline - time.monotonic()))
-                        return _download_job(
-                            job["url"], root, budget, download_only=True
-                        )
+                        job_started = time.monotonic()
+                        try:
+                            result = _download_job(
+                                job["url"], root, budget, download_only=True
+                            )
+                            return result, None, time.monotonic() - job_started
+                        except Exception as download_error:
+                            return (
+                                None,
+                                download_error,
+                                time.monotonic() - job_started,
+                            )
 
                     # Two subprocess waiters only; SQLite and parsing stay on this thread.
                     with ThreadPoolExecutor(max_workers=2) as pool:
                         futures = {pool.submit(transfer, job): job for job in jobs}
                         for future in as_completed(futures):
                             job = futures[future]
-                            try:
-                                result = future.result()
-                            except Exception as exc:
-                                result = _document_failure(job, "download", exc)
-                            _finish_document(db, owner, job, result, "download")
+                            result, job_error, job_seconds = future.result()
+                            timing["download_jobs"] += 1
+                            timing["download_job_seconds"] += job_seconds
+                            if job_error is not None:
+                                result = _document_failure(job, "download", job_error)
+                            _finish_document(
+                                db, owner, job, result, "download", timing
+                            )
                             phase_counts["download"] += 1
                             processed += 1
                     parse_turns = 2
@@ -1094,6 +1190,7 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                         else "download"
                     )
                     remaining = max(0.001, deadline - time.monotonic())
+                    job_started = time.monotonic()
                     try:
                         result = (
                             _parse_saved(root, json.loads(job["result"]), remaining)
@@ -1102,7 +1199,9 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                         )
                     except Exception as exc:
                         result = _document_failure(job, actual_phase, exc)
-                    _finish_document(db, owner, job, result, actual_phase)
+                    timing[f"{actual_phase}_jobs"] += 1
+                    _add_elapsed(timing, f"{actual_phase}_job_seconds", job_started)
+                    _finish_document(db, owner, job, result, actual_phase, timing)
                     phase_counts[actual_phase] += 1
                     processed += 1
                     parse_turns = max(0, parse_turns - 1)
@@ -1112,6 +1211,10 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
             "counts": _document_counts(db),
             "download_workers": download_workers,
             "phase_counts": phase_counts,
+            "timing": {
+                key: round(value, 6) if key.endswith("_seconds") else value
+                for key, value in timing.items()
+            },
             "elapsed_seconds": round(time.monotonic() - started, 3),
         }
     finally:

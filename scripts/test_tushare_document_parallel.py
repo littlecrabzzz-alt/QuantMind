@@ -113,6 +113,23 @@ class ParallelDocuments(unittest.TestCase):
         self.assertEqual(peak, 2)
         self.assertEqual(len(set(called)), 2)
         self.assertEqual(report["phase_counts"], {"download": 2, "parse": 2})
+        timing = report["timing"]
+        self.assertEqual(
+            (
+                timing["setup_db_calls"],
+                timing["finish_db_calls"],
+                timing["download_jobs"],
+                timing["parse_jobs"],
+            ),
+            (1, 4, 2, 2),
+        )
+        self.assertGreaterEqual(timing["download_job_seconds"], 0.03)
+        for phase in ("setup", "claim", "finish"):
+            self.assertGreaterEqual(timing[f"{phase}_db_wait_seconds"], 0)
+            self.assertGreaterEqual(
+                timing[f"{phase}_db_total_seconds"],
+                timing[f"{phase}_db_wait_seconds"],
+            )
         self.assertEqual(
             self.query("SELECT download_tries,parse_tries FROM documents"),
             [(1, 1), (1, 1)],
@@ -225,7 +242,109 @@ class ParallelDocuments(unittest.TestCase):
         )
         self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 2)
         self.assertEqual(
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 2
+        )
+        db.close()
+
+    def test_ordered_claim_preserves_future_retry_claim_and_phase_semantics(self):
+        db = docs._document_db(self.root)
+        docs._claims_setup(db)
+        now = time.time()
+
+        def row(number, download, parse="not_attempted", retry=0, parse_retry=0):
+            ident = f"{number:064x}"
+            db.execute(
+                "INSERT INTO documents(id,observation,url,download_status,"
+                "parse_status,retry_after,parse_retry_after) VALUES(?,?,?,?,?,?,?)",
+                (
+                    ident,
+                    "edge",
+                    f"https://example.com/{number}",
+                    download,
+                    parse,
+                    retry,
+                    parse_retry,
+                ),
+            )
+            return ident
+
+        future_pending = row(0, "pending", retry=now + 3600)
+        future_retry = row(1, "retry", retry=now + 3600)
+        claimed_pending = row(2, "pending")
+        due_retry = row(3, "retry", retry=now - 1)
+        due_parse = row(4, "downloaded", "parse_pending", parse_retry=now - 1)
+        due_pending = row(5, "pending")
+        db.execute(
+            "INSERT INTO document_claims VALUES(?,?,?,?,?)",
+            (claimed_pending, "other", "download", now, now + 3600),
+        )
+        db.commit()
+
+        jobs = docs._claim_documents(db, "mixed", None, 2, 20)
+        self.assertEqual([job["id"] for job in jobs], [due_retry, due_parse])
+        with db:
+            db.execute("DELETE FROM document_claims WHERE owner='mixed'")
+        jobs = docs._claim_documents(db, "download", "download", 2, 20)
+        self.assertEqual([job["id"] for job in jobs], [due_retry, due_pending])
+        with db:
+            db.execute("DELETE FROM document_claims WHERE owner='download'")
+        jobs = docs._claim_documents(db, "parse", "parse", 1, 20)
+        self.assertEqual([job["id"] for job in jobs], [due_parse])
+        selected = {job["id"] for job in jobs}
+        self.assertFalse(
+            selected & {future_pending, future_retry, claimed_pending}
+        )
+        plan = db.execute(
+            "EXPLAIN QUERY PLAN SELECT * FROM documents INDEXED BY "
+            "document_pending_claim_order WHERE download_status='pending' "
+            "AND retry_after<=? AND NOT EXISTS(SELECT 1 FROM document_claims c "
+            "WHERE c.document_id=documents.id) ORDER BY id LIMIT ?",
+            (now, 2),
+        ).fetchall()
+        detail = [item[3] for item in plan]
+        self.assertTrue(any("document_pending_claim_order" in item for item in detail))
+        self.assertFalse(any("TEMP B-TREE" in item for item in detail))
+        db.close()
+
+    def test_claim_v1_migration_is_transactional_and_observable(self):
+        db = docs._document_db(self.root)
+        docs._claims_setup(db)
+        with db:
+            db.execute("DROP INDEX document_pending_claim_order")
+            db.execute("UPDATE document_claim_meta SET version=1")
+        db.set_authorizer(
+            lambda action, *_: (
+                sqlite3.SQLITE_DENY
+                if action == sqlite3.SQLITE_CREATE_INDEX
+                else sqlite3.SQLITE_OK
+            )
+        )
+        with self.assertRaises(sqlite3.DatabaseError):
+            docs._claims_setup(db)
+        db.set_authorizer(lambda *_: sqlite3.SQLITE_OK)
+        self.assertEqual(
             db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 1
+        )
+        self.assertFalse(
+            db.execute(
+                "SELECT 1 FROM sqlite_master "
+                "WHERE type='index' AND name='document_pending_claim_order'"
+            ).fetchone()
+        )
+        timing = {}
+        docs._claims_setup(db, timing)
+        self.assertEqual(
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 2
+        )
+        self.assertTrue(
+            db.execute(
+                "SELECT 1 FROM sqlite_master "
+                "WHERE type='index' AND name='document_pending_claim_order'"
+            ).fetchone()
+        )
+        self.assertEqual(timing["setup_db_calls"], 1)
+        self.assertGreaterEqual(
+            timing["setup_db_total_seconds"], timing["setup_db_wait_seconds"]
         )
         db.close()
 
