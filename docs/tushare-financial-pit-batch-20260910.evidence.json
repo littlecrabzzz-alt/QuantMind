@@ -31,6 +31,59 @@
   },
   "receipt_id": "c9b6a0372afc6a1543f0fd0b87614dcc35fd25209272b18d9c0ed11d48101174",
   "acceptance_sha256": "2768ade4231d33915ebe5d0498fc79b070d7a2599dec10c24356599842ec1e1c",
+  "additional_batches": [
+    {
+      "batch": 2,
+      "batch_manifest_sha256": "60289943b1cff0625d0c9e77dd8de9d7646a8b4593b3f397980deb225da42d80",
+      "all_task_ids_sha256": "db050c8702a9d5a7ec31e9fa94ab2986e790fa3b32093961a462387028f5e0bf",
+      "attempt_windows": [
+        {"upstream_calls": 255, "elapsed_seconds": 90.072, "acceptance_sha256": "f7dd6e6de646a8714d271923f1e803bc2fdb88d0810a45845ad68ebc30d56147"},
+        {"upstream_calls": 106, "elapsed_seconds": 48.136, "acceptance_sha256": "dd37165de10615d6a081d8ee1140a308755a17cdc091ec7838c830c29dbbdb0b"}
+      ],
+      "done": 303,
+      "empty": 57,
+      "pending": 0
+    },
+    {
+      "batch": 3,
+      "batch_manifest_sha256": "30b10776d06c222cda0792b9807ee38792040b467ffe45f6930d1960ddc676b0",
+      "all_task_ids_sha256": "addb3f84cb37d3b37bf0bb63eddb4ca77d18bbb25e3799de4698074478c1a2f5",
+      "upstream_calls": 360,
+      "elapsed_seconds": 61.499,
+      "acceptance_sha256": "1fab9385ed4acd841f58ac6a592ec1624bdfe7b1078881ba775b21487aef1210",
+      "done": 321,
+      "empty": 39,
+      "pending": 0
+    },
+    {
+      "batch": 4,
+      "batch_manifest_sha256": "9072a57b084a01ff06fe067ee155437088cca9003ad7364987d142bf44cb5e86",
+      "all_task_ids_sha256": "4760c86d100de5f259ef0c22cd2cf4b2d0a8cbc9361067170100f7962a27a615",
+      "upstream_calls": 360,
+      "elapsed_seconds": 48.051,
+      "acceptance_sha256": "bce6ed5d397fb7c5f9b447dab877222edfd9e781a93ab54401f0b8ba6a7e9fe8",
+      "done": 328,
+      "empty": 32,
+      "pending": 0
+    }
+  ],
+  "aggregate": {
+    "verified_jobs": 1440,
+    "upstream_calls": 1441,
+    "elapsed_seconds": 296.565,
+    "done": 1260,
+    "empty": 180,
+    "pending": 0
+  },
+  "release_after_additional_batches": "data-14b0eaaeaae841ab728eaca5a3c6fbc79b63991cb5517716049e050b48c2e634",
+  "additional_publication_seconds": 208.297,
+  "additional_publication_identity_check_seconds": 0.226,
+  "mac_mirror_after_additional_batches": {
+    "status": "verified",
+    "release_id": "data-14b0eaaeaae841ab728eaca5a3c6fbc79b63991cb5517716049e050b48c2e634",
+    "downloaded_files": 6749,
+    "verified_files": 621574
+  },
   "interpretation": {
     "empty_is_request_terminal_evidence": true,
     "source_history_complete": false,
