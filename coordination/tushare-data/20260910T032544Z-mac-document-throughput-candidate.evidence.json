@@ -1,0 +1,123 @@
+{
+  "baseline": {
+    "None": {
+      "max_seconds": 0.12606087513267994,
+      "median_seconds": 0.12198204104788601,
+      "min_seconds": 0.1181602911092341,
+      "selected": [
+        "0000000000000000000000000000000000000000000000000000000000000002",
+        "0000000000000000000000000000000000000000000000000000000000000003"
+      ]
+    },
+    "download": {
+      "max_seconds": 0.10451537510380149,
+      "median_seconds": 0.09438650007359684,
+      "min_seconds": 0.0936923329718411,
+      "selected": [
+        "0000000000000000000000000000000000000000000000000000000000000002",
+        "000000e0684882bec572dfa8fa45079f3dda4e565311019be9047591fd73a050"
+      ]
+    },
+    "parse": {
+      "max_seconds": 0.001141624990850687,
+      "median_seconds": 0.0009583327919244766,
+      "min_seconds": 0.000934625044465065,
+      "selected": [
+        "0000000000000000000000000000000000000000000000000000000000000003",
+        "026bb271eb7c340a5f276ac29d988a3fc8b070bf7fa672ade2a0094ddd83b115"
+      ]
+    }
+  },
+  "candidate": {
+    "None": {
+      "max_seconds": 0.0010079159401357174,
+      "median_seconds": 0.0009659589268267155,
+      "min_seconds": 0.0009424590971320868,
+      "selected": [
+        "0000000000000000000000000000000000000000000000000000000000000002",
+        "0000000000000000000000000000000000000000000000000000000000000003"
+      ]
+    },
+    "download": {
+      "max_seconds": 0.00014124996960163116,
+      "median_seconds": 3.7416815757751465e-05,
+      "min_seconds": 3.516697324812412e-05,
+      "selected": [
+        "0000000000000000000000000000000000000000000000000000000000000002",
+        "000000e0684882bec572dfa8fa45079f3dda4e565311019be9047591fd73a050"
+      ]
+    },
+    "parse": {
+      "max_seconds": 0.0010450829286128283,
+      "median_seconds": 0.0009453338570892811,
+      "min_seconds": 0.0009199590422213078,
+      "selected": [
+        "0000000000000000000000000000000000000000000000000000000000000003",
+        "026bb271eb7c340a5f276ac29d988a3fc8b070bf7fa672ade2a0094ddd83b115"
+      ]
+    }
+  },
+  "candidate_plans": {
+    "download_pending": [
+      "SCAN documents USING INDEX document_pending_claim_order",
+      "CORRELATED SCALAR SUBQUERY 1",
+      "SEARCH c USING COVERING INDEX sqlite_autoindex_document_claims_1 (document_id=?)"
+    ],
+    "download_retry": [
+      "SEARCH documents USING INDEX document_download_due (download_status=? AND retry_after<?)",
+      "CORRELATED SCALAR SUBQUERY 1",
+      "SEARCH c USING COVERING INDEX sqlite_autoindex_document_claims_1 (document_id=?)",
+      "USE TEMP B-TREE FOR ORDER BY"
+    ],
+    "parse_unchanged": [
+      "SEARCH documents USING INDEX document_download_due (download_status=?)",
+      "CORRELATED SCALAR SUBQUERY 1",
+      "SEARCH c USING COVERING INDEX sqlite_autoindex_document_claims_1 (document_id=?)",
+      "USE TEMP B-TREE FOR ORDER BY"
+    ]
+  },
+  "database_bytes_after_index": 348188672,
+  "database_bytes_before_index": 269475840,
+  "index_bytes_added": 78712832,
+  "index_migration_seconds": 0.761984207900241,
+  "plans_before": {
+    "None": [
+      "MULTI-INDEX OR",
+      "INDEX 1",
+      "SEARCH documents USING INDEX document_download_due (download_status=? AND retry_after<?)",
+      "INDEX 2",
+      "SEARCH documents USING INDEX document_download_due (download_status=?)",
+      "CORRELATED SCALAR SUBQUERY 1",
+      "SEARCH c USING COVERING INDEX sqlite_autoindex_document_claims_1 (document_id=?)",
+      "USE TEMP B-TREE FOR ORDER BY"
+    ],
+    "download": [
+      "SEARCH documents USING INDEX document_download_due (download_status=? AND retry_after<?)",
+      "CORRELATED SCALAR SUBQUERY 1",
+      "SEARCH c USING COVERING INDEX sqlite_autoindex_document_claims_1 (document_id=?)",
+      "USE TEMP B-TREE FOR ORDER BY"
+    ],
+    "parse": [
+      "SEARCH documents USING INDEX document_download_due (download_status=?)",
+      "CORRELATED SCALAR SUBQUERY 1",
+      "SEARCH c USING COVERING INDEX sqlite_autoindex_document_claims_1 (document_id=?)",
+      "USE TEMP B-TREE FOR ORDER BY"
+    ]
+  },
+  "python": "3.10.19",
+  "rows": 1100004,
+  "semantics": {
+    "due_parse_selected": true,
+    "due_retry_selected": true,
+    "exact_results_equal": true,
+    "future_retry_excluded": true,
+    "live_claim_excluded": true
+  },
+  "setup_seconds": 5.164917667163536,
+  "speedup": {
+    "None": 126.2807741200869,
+    "download": 2522.569015083632,
+    "parse": 1.013750628667019
+  },
+  "sqlite": "3.50.4"
+}
