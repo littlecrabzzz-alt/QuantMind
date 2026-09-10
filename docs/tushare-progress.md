@@ -613,3 +613,11 @@
 - 常规采集任务 `fca03d57…` 自然运行145.086秒并成功后暂停Beat，再停稳专用worker。第八批财务三表重新固定 `002215.SZ` 至 `002335.SZ` 的120个共同股票，三API各120；47.626秒完成360次请求，各API均116 `done`、4 `empty`，批内0 `pending`。manifest SHA `2b485d6b92ea4ad198a8d466640dd00676a52365929eedbbf15859e91dfc54c5`，receipt SHA `702572f42c48783721c57834770178d0c0c9a60096f4e84f98708dc1648f5a81`。
 - 同一独占窗口的第三批 `fund_nav` 重新固定270个当前拆分叶和90个历史根、共225只基金；49.602秒完成360次请求，得到202 `done`、39 `empty`、119 `split_pending`。manifest SHA `add2f3cf9c145628fea2e861d908d8940cc1914a32f51244645ec187bb7d91c7`，receipt SHA `6826ccd3616cdbaa4c900770dd22fd8e7f48629db36ea2dc5861e2655426ebf9`。
 - 两个批次均先通过默认plan-only，再以重新冻结的任务集合、配置、prepare/runner哈希逐项核对authority任务，使用共享锁、500rpm账户闸门、360请求/90秒边界和100GiB停线；总计720次请求、97.228秒，不发布、不切换CURRENT。结束后worker/Beat恢复healthy并收到下一正常任务，文档worker继续停用。批次后云盘可用147769589760字节，距100GiB线40395407360字节（37.622GiB）；这两批与上一波720项一起等待2026-09-11 00:26:31到期发布。
+
+## 2026-09-11 00:25 fund_share 精确批次
+
+- `a7982586`复用现有 exact runner 增加 `fund_share` 固定清单和执行入口；`54a517c4`根据首批诊断将新清单从最早pending改为最近pending优先，旧清单仍可验证。历史任务、普通planner游标和数据均未删除或改写。相关10项测试、Ruff、格式及语法检查通过；改动前生产镜像断网全套994项通过、174.688秒。
+- 第一批固定1990-01-01至1990-06-29的沪深各180项，46.368秒完成360次真实请求，全部empty。它只证明这些精确请求当次为空，不证明相邻日期或供应商历史下界。manifest SHA `b1b70f174b342a8e72587ec61445d9b3821620b57e252c0eb9803e61012f85db`，receipt SHA `47f764871e17a5a5c18cf890bb569777e8b4b9008d5f109fd1b4dd44d63abb99`。
+- 第二批从26,397个pending中固定当前最新360项，日期2026-02-19至2026-08-18、沪深各180。51.099秒完成360次调用，256 done/104 empty、批内0 pending。manifest SHA `e2606ccd5a9671ba42211025939056512af8465b0d2e75cce701283a1f84c8ba`，receipt SHA `80d8490b2412615153849b6edcd9561491481a4c0d4fe813ec3888982d2dc0bc`。
+- 两批均默认plan-only并固定任务、配置、准备器和共享执行器哈希；真实执行通过authority/schema6/ENABLED/共享锁/360请求90秒/100GiB余量门控，不发布、不切换CURRENT。worker和Beat已恢复healthy，云盘可用147501383680字节；结果等待正常固定版发布和Mac自动镜像。
+- 到期后的正常publish-only任务 `0b768175…` 用220.122秒原子切换到 `data-d5d918ce4bc2cfd3ef6e58c5caeefa29c7d9f9715cd5b8cd0d03d4d07cab64de`。Mac标准镜像新增下载14028个文件、完整校验670543个文件后退出0并追平，错误日志0字节；无Token且禁止网络/DNS的固定版读取返回5行 `fund_share` 样本并标记0上游调用。最终worker/Beat healthy、restart0、OOM false，部署后HTTP429、供应商频率错误和任务失败均为0；云盘可用146955538432字节，距100GiB线39581435632字节（36.863GiB）。
