@@ -14,6 +14,7 @@ Production facts:
 6. A normal production acquisition task completed 360 upstream requests in 86.354 seconds. The latest read-only sample of 1,000 attempts was all HTTP 200 with zero 429 and zero stored errors.
 7. Fixed release `data-ce5a5f6e39ec31c50145671115b76b891db4e0bad36ff978f56f65141121a3fb` is verified on Mac with 554,935 manifest files after downloading 3,303 files. Cloud and Mac offline readers both return the three legacy datasets; the Mac report SHA256 is `4426de7c04d33904e02c2636d051c60510571ba97c5fc114a284efd181319ed8`.
 8. Production acceptance is `/data/tushare/validation/legacy-connect-probe-20260910T044428Z/acceptance.json`, SHA256 `e081500233c7b34a38e7ed8d5200739b5f0332fb486c558b4a57192461a6b80e`. Two automatic publisher tasks reached the 160-second Celery soft limit around the 206,530,431-byte manifest; exact intent recovery left CURRENT and `publish_success_at` consistent. Keep this tail latency as an open performance issue.
+9. After publication, two planning-only retries reached 160 seconds while scanning the full identifier set; the next planning-only task succeeded in 155.375 seconds and a normal acquisition task then succeeded in 89.952 seconds. Receipt SHA256: `2cdc9e5a80c3aba35bc37cd6fd22573a867336f64f6a0a67be34bda8d8e021cd`. Preserve this separate planning tail-latency gap.
 
 Do next without waiting for unrelated full-history or document completion:
 
