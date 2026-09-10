@@ -34,6 +34,7 @@ def audit(ledger, extended, legacy, reader_keys, pure, adjacent):
     rows = []
     for api in sorted(scope | registered):
         is_registered = api in registered
+        entries = [e for e in pages if api in names(e)]
         if is_registered:
             state = "runtime_readable" if api in reader_keys else "registered_reader_missing"
         elif api in MUTATIONS:
@@ -42,11 +43,12 @@ def audit(ledger, extended, legacy, reader_keys, pure, adjacent):
             state = "sdk_only"
         elif api in pure:
             state = "pure_contract_only_private"
-        elif api in PUBLIC_BLOCKED:
+        elif api in PUBLIC_BLOCKED or any(
+            entry.get("access_mode") == "public_read_only" for entry in entries
+        ):
             state = "public_read_only_contract_blocked"
         else:
             state = "unclassified_named_obligation"
-        entries = [e for e in pages if api in names(e)]
         spec = extended.get(api, pure.get(api, {}))
         rows.append({
             "api_name": api, "implementation": state,

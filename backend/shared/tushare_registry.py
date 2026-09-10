@@ -49,6 +49,10 @@ from backend.shared.tushare_legacy_connect_contracts import (
     LEGACY_CONNECT_CONTRACTS,
     iter_legacy_connect_jobs,
 )
+from backend.shared.tushare_offcatalog_contracts import (
+    OFFCATALOG_CONTRACTS,
+    iter_offcatalog_jobs,
+)
 
 from backend.shared.tushare_trading_event_contracts import (
     TRADING_EVENT_CONTRACTS,
@@ -530,6 +534,11 @@ LEGACY_CONNECT_RUNTIME_CONTRACTS = {
     for api, spec in LEGACY_CONNECT_CONTRACTS.items()
 }
 
+OFFCATALOG_RUNTIME_CONTRACTS = {
+    api: {**spec, "group": "offcatalog"}
+    for api, spec in OFFCATALOG_CONTRACTS.items()
+}
+
 from backend.shared.tushare_securities_lending_history_contracts import (
     SECURITIES_LENDING_HISTORY_CONTRACTS,
     iter_securities_lending_history_jobs,
@@ -774,6 +783,7 @@ EXTENDED_CONTRACTS = {
     **TRADING_EVENT_RUNTIME_CONTRACTS,
     **CONNECT_RUNTIME_CONTRACTS,
     **LEGACY_CONNECT_RUNTIME_CONTRACTS,
+    **OFFCATALOG_RUNTIME_CONTRACTS,
     **{
         api: {**spec, "group": "etf_basket"}
         for api, spec in ETF_BASKET_CONTRACTS.items()
@@ -838,6 +848,7 @@ PLANNERS = {
     "trading_event": iter_trading_event_jobs,
     "connect": iter_connect_jobs,
     "legacy_connect": iter_legacy_connect_jobs,
+    "offcatalog": iter_offcatalog_jobs,
     "etf_basket": iter_etf_basket_jobs,
     "credit_extra": iter_credit_extra_jobs,
     "text": lambda config, today, ids: iter_text_jobs(config, today),

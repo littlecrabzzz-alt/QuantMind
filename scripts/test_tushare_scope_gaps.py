@@ -21,7 +21,11 @@ class ScopeAuditTests(unittest.TestCase):
                 {"doc_id": "2", "api_names": [], "status": "review_required"},
                 {"doc_id": "3", "api_names": ["ggt_daily", "p_list", "p_save", "pro_bar"]},
             ],
-            "discovered_entries": [{"doc_id": "4", "api_names": ["income_vip", "new_unknown"]}],
+            "discovered_entries": [
+                {"doc_id": "4", "api_names": ["income_vip", "new_unknown"]},
+                {"doc_id": "6", "api_names": ["reviewed_public"],
+                 "access_mode": "public_read_only"},
+            ],
             "unresolved_api_mentions": [{"api_name": "index_member", "status": "unresolved"}],
             "discovery_seeds": [{"doc_id": "5", "name": "not_a_verified_api"}],
         }
@@ -33,8 +37,8 @@ class ScopeAuditTests(unittest.TestCase):
     def test_alias_overlap_adjacent_and_unresolved_denominators(self):
         result = self.run_audit()
         self.assertEqual(result["counts"]["baseline_pages"], 3)
-        self.assertEqual(result["counts"]["catalog_and_discovered_named_apis"], 6)
-        self.assertEqual(result["counts"]["total_named_scope"], 7)
+        self.assertEqual(result["counts"]["catalog_and_discovered_named_apis"], 7)
+        self.assertEqual(result["counts"]["total_named_scope"], 8)
         self.assertEqual(result["counts"]["nameless_pages"], 1)
         self.assertEqual(result["reader_only_aliases"], ["income"])
         self.assertEqual(result["source_ledger"], self.fixture())
@@ -45,6 +49,7 @@ class ScopeAuditTests(unittest.TestCase):
         expected = {"income_vip": "runtime_readable", "p_list": "pure_contract_only_private",
                     "p_save": "excluded_mutation", "pro_bar": "sdk_only",
                     "ggt_daily": "public_read_only_contract_blocked",
+                    "reviewed_public": "public_read_only_contract_blocked",
                     "new_unknown": "unclassified_named_obligation"}
         for api, state in expected.items():
             self.assertEqual(rows[api]["implementation"], state)
