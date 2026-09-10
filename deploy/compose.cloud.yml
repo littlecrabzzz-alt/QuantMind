@@ -55,7 +55,7 @@ services:
       HOST_PROJECT_PATH: /root/data/disk/quantmind/project
       TRAINING_PAUSE_OTHERS: "false"
     container_name: quantmind-tushare-worker
-    mem_limit: 1g
+    mem_limit: 2g
     cpus: 0.75
     command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q tushare_acquire --loglevel=info --concurrency=1 --prefetch-multiplier=1
   tushare-document-worker:
