@@ -99,9 +99,9 @@ def _document_config():
 
 @celery_app.task(
     name="engine.tasks.tushare_acquire",
-    # The authority manifest now exceeds 275 MiB and a real publication can
-    # take slightly more than five minutes on the capped worker. Acquisition
-    # remains bounded inside tick(); this wider envelope is for atomic publish.
+    # The authority manifest now exceeds 275 MiB and the last successful
+    # publication took 288 seconds. Leave room for transient lock delay;
+    # acquisition remains bounded inside tick() independently.
     soft_time_limit=600,
     time_limit=630,
     acks_late=True,
