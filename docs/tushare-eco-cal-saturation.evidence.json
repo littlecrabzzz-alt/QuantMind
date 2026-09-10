@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "status": "candidate_offline_validated",
+  "base_revision": "e57d3da38ece08403a34bf66f52b1c42f5117633",
+  "scope": {
+    "api_name": "eco_cal",
+    "parent_partition": "exact date without country",
+    "child_partition": "same date plus retained-row country",
+    "country_universe_complete": false
+  },
+  "fanout": {
+    "source": "immutable eco_cal job and attempt results only",
+    "configured_or_invented_values": 0,
+    "contract_max_new_jobs_per_run": 100,
+    "effective_new_job_budget": "min(plan_jobs_per_tick, 100)",
+    "partial_progress_durable": true,
+    "legacy_blocked_parent_recovery": true,
+    "legacy_recovery_upstream_calls": 0
+  },
+  "invariants": {
+    "raw_parent_object_reference_preserved": true,
+    "stable_enqueue_identity_reused": true,
+    "parent_planning_signature_unchanged_by_country_discovery": true,
+    "parent_planning_cursor_reset": false,
+    "partition_coverage_proven": false,
+    "partition_gap": "universe_unverified",
+    "existing_rate_path_reused": true,
+    "credentials_read": false,
+    "upstream_calls": 0,
+    "production_writes": 0,
+    "production_config_changed": false
+  },
+  "validation": {
+    "focused_tests": 31,
+    "focused_result": "passed",
+    "focused_seconds": 1.759,
+    "full_tushare_tests": 989,
+    "full_result": "passed",
+    "full_seconds": 84.263,
+    "network": "docker --network none",
+    "image": "quantmind-oss:latest",
+    "ruff": "passed",
+    "git_diff_check": "passed"
+  },
+  "production_validation": null
+}

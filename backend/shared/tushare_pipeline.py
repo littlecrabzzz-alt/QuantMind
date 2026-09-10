@@ -83,6 +83,9 @@ from backend.shared.tushare_connect_contracts import (
     CONNECT_CONTRACTS,
     connect_prerequisites,
 )
+from backend.shared.tushare_calendar_extra_contracts import (
+    ECO_CAL_OBSERVED_FANOUT,
+)
 from backend.shared.tushare_trading_event_contracts import trading_event_prerequisites
 from backend.shared.tushare_listing_extra_contracts import (
     DAILY_INFO_STARTS,
@@ -1156,6 +1159,7 @@ class Pipeline:
         families = {
             **dict.fromkeys(REALTIME_RUNTIME_CONTRACTS, "realtime_source_only"),
             **dict.fromkeys(SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS, "stocks"),
+            "eco_cal": "eco_cal_countries",
             "factor_list": "factor_library_factors",
             "factor_value": "factor_library_stocks",
             **dict.fromkeys(bond_source_apis, "bond_extra_convertibles"),
@@ -1244,6 +1248,7 @@ class Pipeline:
                 "ts_code", "index_code", "level", "fut_code", "o_code", "n_code",
                 "name", "hm_name", "l1_code", "l2_code", "l3_code", "con_code",
                 "factor_name", "asset_type", "mapping_ts_code", "code", "end_date",
+                "country",
             )
         )
         placeholders = ",".join("?" for _ in families)
@@ -1337,6 +1342,16 @@ class Pipeline:
                     code = record.get("ts_code")
                     if isinstance(code, str) and re.fullmatch(r"T?[0-9]{6}\.(SH|SZ|BJ)", code):
                         result["factor_library_stocks"].add(code)
+                    continue
+                if saved["api_name"] == "eco_cal":
+                    country = record.get("country")
+                    if (
+                        isinstance(country, str)
+                        and 0 < len(country) <= 128
+                        and country == country.strip()
+                        and not any(ord(char) < 32 or ord(char) == 127 for char in country)
+                    ):
+                        result["eco_cal_countries"].add(country)
                     continue
                 if saved["api_name"] == "ci_index_member":
                     for field in ("l1_code", "l2_code", "l3_code"):
@@ -2365,16 +2380,25 @@ class Pipeline:
             "gaps": issues,
         }
 
-    def split_request(self, row, job, result=None):
+    def split_request(self, row, job, result=None, *, max_new_jobs=None):
         spec = contract_for(job["api_name"])
+        if max_new_jobs is not None and (
+            type(max_new_jobs) is not int or not 1 <= max_new_jobs <= 10000
+        ):
+            raise ValueError("Invalid saturation fanout budget")
         params = job["params"]
         if spec.get("group") == "global" and spec.get("pagination"):
             return None
         existing = self.db.execute(
             "SELECT * FROM partition_splits WHERE parent_id=?", (row["id"],)
         ).fetchone()
-        family = spec.get("saturation_fallback")
-        param = spec.get("saturation_param", "ts_code")
+        observed_rule = (
+            ECO_CAL_OBSERVED_FANOUT if job["api_name"] == "eco_cal" else {}
+        )
+        family = spec.get("saturation_fallback") or observed_rule.get("family")
+        param = spec.get("saturation_param") or observed_rule.get(
+            "param", "ts_code"
+        )
         fanout = family and param not in params
         if (
             existing
@@ -2409,6 +2433,13 @@ class Pipeline:
         if fanout:
 
             def usable(code):
+                if observed_rule:
+                    return (
+                        isinstance(code, str)
+                        and 0 < len(code) <= 128
+                        and code == code.strip()
+                        and not any(ord(char) < 32 or ord(char) == 127 for char in code)
+                    )
                 return (
                     isinstance(code, str)
                     and bool(code)
@@ -2439,6 +2470,30 @@ class Pipeline:
                     (row["id"],),
                 )
             }
+            limit = spec.get("saturation_jobs_per_run") or observed_rule.get(
+                "jobs_per_run"
+            )
+            if limit is not None and (
+                type(limit) is not int or not 1 <= limit <= 10000
+            ):
+                raise ValueError("Invalid contract saturation fanout budget")
+            if max_new_jobs is not None:
+                limit = min(limit or max_new_jobs, max_new_jobs)
+            if limit is None:
+                selected_codes = sorted(codes)
+                remaining = 0
+            else:
+                previous_codes = {
+                    json.loads(child[0])["params"].get(param)
+                    for child in self.db.execute(
+                        "SELECT j.job FROM partition_children c "
+                        "JOIN jobs j ON j.id=c.child_id WHERE c.parent_id=?",
+                        (row["id"],),
+                    )
+                }
+                new_codes = sorted(codes - previous_codes)
+                selected_codes = new_codes[:limit]
+                remaining = len(new_codes) - len(selected_codes)
             ids = previous_ids | {
                 self.enqueue(
                     job["api_name"],
@@ -2446,13 +2501,18 @@ class Pipeline:
                     row["priority"] + 1,
                     row["epoch"],
                 )
-                for code in sorted(codes)
+                for code in selected_codes
             }
             if ids:
                 evidence = (
                     json.loads(existing["evidence"]) if existing else {"origin": "v4"}
                 )
                 evidence.update(family=family, universe_complete=False)
+                if limit is not None:
+                    evidence.update(
+                        new_job_budget=limit,
+                        observed_values_remaining=remaining,
+                    )
                 if saved.get("object_sha256"):
                     evidence.update(
                         parent_observed_code_count=len(observed),
@@ -2496,7 +2556,7 @@ class Pipeline:
                         "UPDATE partition_splits SET status=?,gap=? WHERE parent_id=?",
                         (existing["status"], existing["gap"], row["id"]),
                     )
-                return {
+                response = {
                     "method": "identifier_fanout",
                     "children": len(ids),
                     "universe_complete": False,
@@ -2504,6 +2564,9 @@ class Pipeline:
                         "parent_observed_added_count", 0
                     ),
                 }
+                if limit is not None:
+                    response["remaining_observed_values"] = remaining
+                return response
         return None
 
     def partition_artifact_gap(self, parquet):
@@ -2731,15 +2794,22 @@ class Pipeline:
 
     def identifier_split_needs_discovery(self, job):
         spec = contract_for(job["api_name"])
+        observed_rule = (
+            ECO_CAL_OBSERVED_FANOUT if job["api_name"] == "eco_cal" else {}
+        )
         return bool(
-            spec.get("saturation_fallback")
-            and spec.get("saturation_param", "ts_code") not in job["params"]
+            (spec.get("saturation_fallback") or observed_rule.get("family"))
+            and (
+                spec.get("saturation_param")
+                or observed_rule.get("param", "ts_code")
+            )
+            not in job["params"]
             and job["api_name"] not in ("fut_holding", "fut_weekly_detail")
             and not (spec.get("group") == "global" and spec.get("pagination"))
             and not self.date_children(job)
         )
 
-    def resume_identifier_split(self, deadline):
+    def resume_identifier_split(self, deadline, config):
         # Existing state index limits this read to unresolved parents, not the
         # millions of pending acquisition jobs. The result is already durable.
         row = self.db.execute(
@@ -2747,11 +2817,35 @@ class Pipeline:
             "AND json_type(result,'$.partition_deferred') IS NOT NULL "
             "ORDER BY priority,rowid LIMIT 1"
         ).fetchone()
+        recovered_legacy = False
+        if row is None:
+            # Older eco_cal caps were terminal only because country fanout was
+            # absent. Reuse their retained response; never repeat the HTTP call.
+            row = self.db.execute(
+                "SELECT * FROM jobs WHERE state='blocked' "
+                "AND json_extract(job,'$.api_name')='eco_cal' "
+                "AND json_type(job,'$.params.country') IS NULL "
+                "AND json_extract(result,'$.status')='possibly_truncated' "
+                "AND json_type(result,'$.object_sha256')='text' "
+                "AND json_type(result,'$.observation')='text' "
+                "ORDER BY priority,rowid LIMIT 1"
+            ).fetchone()
+            recovered_legacy = row is not None
         if row is None:
             return None
         if time.monotonic() >= deadline:
             return {"status": "deadline_deferred", "job_id": row["id"], "upstream_calls": 0}
         job, result = json.loads(row["job"]), json.loads(row["result"])
+        if recovered_legacy:
+            result["partition_deferred"] = {
+                "version": 1,
+                "kind": "identifier_fanout",
+            }
+            result["partition_recovery"] = {
+                "version": 1,
+                "source_state": "blocked",
+                "upstream_calls": 0,
+            }
         if (
             result.get("partition_deferred") != {"version": 1, "kind": "identifier_fanout"}
             or result.get("status") != "possibly_truncated"
@@ -2761,8 +2855,16 @@ class Pipeline:
                 "Unsupported deferred identifier partition; evidence preserved"
             )
         try:
-            split = self.split_request(row, job, result)
-            result.pop("partition_deferred")
+            max_new_jobs = (
+                config.get("plan_jobs_per_tick", 2000)
+                if job["api_name"] == "eco_cal"
+                else None
+            )
+            split = self.split_request(
+                row, job, result, max_new_jobs=max_new_jobs
+            )
+            if not split or not split.get("remaining_observed_values"):
+                result.pop("partition_deferred")
             if split:
                 result["split"] = split
             else:
@@ -2785,9 +2887,16 @@ class Pipeline:
             self.db.rollback()
             raise
         return {
-            "status": "partitioned" if split else "blocked",
+            "status": (
+                "partition_progress"
+                if split and split.get("remaining_observed_values")
+                else "partitioned"
+                if split
+                else "blocked"
+            ),
             "job_id": row["id"],
             "split": split,
+            "legacy_parent_recovered": recovered_legacy,
             "upstream_calls": 0,
         }
 
@@ -2824,7 +2933,9 @@ class Pipeline:
         deadline = started + max_seconds
         task_scope = task_ids is not None
         scoped_jobs = self._install_exact_task_scope(task_ids) if task_scope else 0
-        partition_work = None if task_scope else self.resume_identifier_split(deadline)
+        partition_work = (
+            None if task_scope else self.resume_identifier_split(deadline, config)
+        )
         if partition_work is not None:
             # One expensive local fanout is the entire run. Never combine a full
             # discovery scan with another acquisition batch in the same task.
