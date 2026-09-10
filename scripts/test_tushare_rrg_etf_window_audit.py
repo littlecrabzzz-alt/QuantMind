@@ -96,6 +96,46 @@ class EtfWindowAuditTests(unittest.TestCase):
                 "assessment": "empty_unverified",
             }
         ]
+        self.lineage = self.base / "lineage.json"
+        self.lineage.write_text(
+            json.dumps(
+                {
+                    "rows": [
+                        {
+                            "root_id": "root",
+                            "task_id": "root",
+                            "depth": 0,
+                            "state": "split_pending",
+                            "child_count": 2,
+                            "gap": {"reason": "child_not_verified"},
+                            "params": {
+                                "start_date": "20260130",
+                                "end_date": "20260203",
+                            },
+                        },
+                        {
+                            "root_id": "root",
+                            "task_id": "closed-leaf",
+                            "depth": 1,
+                            "state": "empty",
+                            "child_count": 0,
+                            "params": {
+                                "start_date": "20260131",
+                                "end_date": "20260201",
+                            },
+                        },
+                        {
+                            "root_id": "root",
+                            "task_id": "open-leaf",
+                            "depth": 1,
+                            "state": "empty",
+                            "child_count": 0,
+                            "params": {"trade_date": "20260203"},
+                        },
+                    ]
+                }
+            )
+        )
 
     def invoke(self, **overrides):
         def reader(root, release_id, api, **params):
@@ -123,6 +163,7 @@ class EtfWindowAuditTests(unittest.TestCase):
 
     def test_reports_exact_missingness_without_filling_or_enabling_pcf(self):
         report = self.invoke()
+        self.assertEqual(report["etf_limit_lineage"], {"provided": False})
         self.assertEqual(report["status"], "blocked_data")
         self.assertEqual(report["membership"]["rows"], 1)
         self.assertEqual(report["membership"]["known_at_rows"], 0)
@@ -138,7 +179,9 @@ class EtfWindowAuditTests(unittest.TestCase):
         self.assertEqual(report["coverage"]["monthly_execution_valid_price_factor_pairs"], 0)
         self.assertEqual(report["coverage"]["etf_limit_observed_code_day_pairs"], 1)
         self.assertEqual(report["coverage"]["etf_limit_code_day_pairs"], 1)
+        self.assertEqual(report["coverage"]["etf_limit_missing_lifecycle_pairs"], 2)
         self.assertEqual(report["coverage"]["etf_limit_monthly_execution_pairs"], 1)
+        self.assertEqual(report["coverage"]["etf_limit_missing_monthly_execution_pairs"], 0)
         self.assertEqual(report["coverage"]["pcf_monthly_execution_pairs"], 1)
         self.assertTrue(
             report["coverage"]["fund_div_empty_receipts_available_in_fixed_release"]
@@ -154,6 +197,29 @@ class EtfWindowAuditTests(unittest.TestCase):
         self.assertFalse(any(row["api_name"] == "fund_div" for row in plans))
         self.assertFalse(report["universe"]["industry_mapping_verified"])
         self.assertTrue((self.output / "manifest.json").is_file())
+        limit_missing = [
+            json.loads(line)
+            for line in (self.output / "etf-limit-missing-observations.jsonl")
+            .read_text()
+            .splitlines()
+        ]
+        self.assertEqual(
+            [(row["trade_date"], row["ts_code"]) for row in limit_missing],
+            [("20260130", "SH510001"), ("20260203", "SH510001")],
+        )
+
+    def test_classifies_only_closed_session_empty_leaves_as_calendar_excluded(self):
+        report = self.invoke(lineage=self.lineage)
+        evidence = report["etf_limit_lineage"]
+        self.assertEqual(evidence["roots"], 1)
+        self.assertEqual(evidence["descendants"], 2)
+        self.assertEqual(evidence["child_not_verified_roots"], 1)
+        self.assertEqual(evidence["calendar_covered_child_not_verified_roots"], 0)
+        self.assertEqual(evidence["empty_leaf_tasks"], 2)
+        self.assertEqual(evidence["calendar_excluded_empty_leaf_tasks"], 1)
+        self.assertEqual(evidence["open_session_empty_unverified_leaf_tasks"], 1)
+        self.assertEqual(evidence["open_session_empty_unverified_missing_pairs"], 1)
+        self.assertIn("never prove suspension", evidence["semantics"])
 
     def test_rejects_calendar_gaps_conflicts_and_protected_outputs(self):
         self.values["trade_cal"].pop(1)

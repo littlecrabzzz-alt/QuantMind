@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import argparse
-from collections import defaultdict
+from collections import Counter, defaultdict
 from contextlib import ExitStack
 from datetime import datetime, timedelta
 import hashlib
@@ -174,7 +174,130 @@ def _fund_div_empty_receipts(manifest, source_codes):
     return receipts
 
 
-def _audit(root, release_id, start_date, end_date, output):
+def _lineage_calendar_evidence(
+    path,
+    sessions,
+    expected_pairs,
+    missing_pairs,
+    execution_pairs,
+    start_date,
+    end_date,
+):
+    if path is None:
+        return {"provided": False}
+    path = Path(path).resolve()
+    payload = json.loads(path.read_text())
+    rows = payload.get("rows")
+    if not isinstance(rows, list):
+        raise ValueError("Invalid ETF limit lineage evidence")
+    task_ids = [row.get("task_id") for row in rows]
+    if any(not isinstance(value, str) or not value for value in task_ids) or len(
+        set(task_ids)
+    ) != len(task_ids):
+        raise ValueError("Invalid ETF limit lineage task identifiers")
+    roots = [row for row in rows if row.get("depth") == 0]
+    root_ids = {row["task_id"] for row in roots}
+    if any(row.get("root_id") not in root_ids for row in rows):
+        raise ValueError("Invalid ETF limit lineage root identifiers")
+    lifecycle_by_day = Counter(day for day, _ in expected_pairs)
+    missing_by_day = Counter(day for day, _ in missing_pairs)
+    empty_windows = []
+    for row in rows:
+        if row.get("state") != "empty" or row.get("child_count") != 0:
+            continue
+        params = row.get("params")
+        if not isinstance(params, dict):
+            raise ValueError("Invalid ETF limit empty leaf parameters")
+        if set(params) == {"trade_date"}:
+            left = right = date8(params["trade_date"], "ETF limit leaf date")
+        elif set(params) == {"start_date", "end_date"}:
+            left = date8(params["start_date"], "ETF limit leaf start")
+            right = date8(params["end_date"], "ETF limit leaf end")
+        else:
+            raise ValueError("Invalid ETF limit empty leaf parameters")
+        if left > right:
+            raise ValueError("Invalid ETF limit empty leaf range")
+        if left < start_date or right > end_date:
+            raise ValueError("ETF limit empty leaf falls outside audited window")
+        open_days = [day for day in sessions if left <= day <= right]
+        empty_windows.append(
+            {
+                "_root_id": row.get("root_id"),
+                "_task_id": row.get("task_id"),
+                "params": params,
+                "sse_open_sessions": len(open_days),
+                "fixed_lifecycle_pairs": sum(
+                    count for day, count in lifecycle_by_day.items() if left <= day <= right
+                ),
+                "missing_etf_limit_pairs": sum(
+                    count for day, count in missing_by_day.items() if left <= day <= right
+                ),
+                "classification": (
+                    "calendar_excluded_non_session"
+                    if not open_days
+                    else "open_session_empty_unverified"
+                ),
+            }
+        )
+    leaves = [row for row in rows if row.get("child_count") == 0]
+    blocked_root_ids = {
+        row.get("root_id", row.get("task_id"))
+        for row in roots
+        if row.get("state") == "split_pending"
+        and isinstance(row.get("gap"), dict)
+        and row["gap"].get("reason") == "child_not_verified"
+    }
+    calendar_excluded_leaf_ids = {
+        row["_task_id"]
+        for row in empty_windows
+        if row["classification"] == "calendar_excluded_non_session"
+    }
+    leaf_root_ids = {row["root_id"] for row in leaves}
+    unresolved_leaf_root_ids = {
+        row["root_id"]
+        for row in leaves
+        if row.get("state") != "done"
+        and row.get("task_id") not in calendar_excluded_leaf_ids
+    }
+    calendar_covered_root_ids = (
+        blocked_root_ids & leaf_root_ids
+    ) - unresolved_leaf_root_ids
+    for row in empty_windows:
+        row.pop("_root_id", None)
+        row.pop("_task_id", None)
+    return {
+        "provided": True,
+        "sha256": _sha(path),
+        "roots": len(roots),
+        "descendants": len(rows) - len(roots),
+        "child_not_verified_roots": len(blocked_root_ids),
+        "calendar_covered_child_not_verified_roots": len(calendar_covered_root_ids),
+        "leaf_tasks": len(leaves),
+        "empty_leaf_tasks": len(empty_windows),
+        "calendar_excluded_empty_leaf_tasks": sum(
+            row["classification"] == "calendar_excluded_non_session"
+            for row in empty_windows
+        ),
+        "open_session_empty_unverified_leaf_tasks": sum(
+            row["classification"] == "open_session_empty_unverified"
+            for row in empty_windows
+        ),
+        "open_session_empty_unverified_missing_pairs": sum(
+            row["missing_etf_limit_pairs"]
+            for row in empty_windows
+            if row["classification"] == "open_session_empty_unverified"
+        ),
+        "missing_lifecycle_session_pairs": len(missing_pairs),
+        "missing_monthly_execution_pairs": len(missing_pairs & execution_pairs),
+        "empty_leaf_windows": empty_windows,
+        "semantics": (
+            "Closed-session leaves are excluded only from the fixed RRG lifecycle "
+            "envelope; open-session empty leaves remain unverified and never prove suspension"
+        ),
+    }
+
+
+def _audit(root, release_id, start_date, end_date, output, lineage=None):
     root, output = Path(root).resolve(), Path(output).resolve()
     if (
         output.exists()
@@ -370,6 +493,7 @@ def _audit(root, release_id, start_date, end_date, output):
     executions = _monthly_executions(sessions)
     execution_days = {row["execution_date"] for row in executions}
     execution_pairs = {pair for pair in expected_pairs if pair[0] in execution_days}
+    missing_limit_pairs = expected_pairs - limits.keys()
     valid_prices = {key for key, row in prices.items() if _valid_price(row)}
     valid_factors = {key for key, row in factors.items() if _valid_factor(row)}
     status = "blocked_data"
@@ -438,7 +562,11 @@ def _audit(root, release_id, start_date, end_date, output):
             "fund_div_terminal_receipt_coverage_complete": not missing_dividend_codes,
             "etf_limit_observed_code_day_pairs": len(limits),
             "etf_limit_code_day_pairs": len(expected_pairs & limits.keys()),
+            "etf_limit_missing_lifecycle_pairs": len(missing_limit_pairs),
             "etf_limit_monthly_execution_pairs": len(execution_pairs & limits.keys()),
+            "etf_limit_missing_monthly_execution_pairs": len(
+                execution_pairs - limits.keys()
+            ),
             "pcf_code_day_pairs": len(pcf_keys),
             "pcf_monthly_execution_pairs": len(execution_pairs & pcf_keys),
         },
@@ -474,13 +602,35 @@ def _audit(root, release_id, start_date, end_date, output):
             for api in (*CORE, *WINDOW_DATASETS)
         },
         "partition_count_semantics": "Physical observations, not unique dates or completeness proof",
+        "etf_limit_lineage": _lineage_calendar_evidence(
+            lineage,
+            sessions,
+            expected_pairs,
+            missing_limit_pairs,
+            execution_pairs,
+            start_date,
+            end_date,
+        ),
     }
 
     output.mkdir(parents=True, exist_ok=False)
     (output / "report.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n"
     )
-    for name, values in (("missing-observations.jsonl", missing_records), ("collection-plan.jsonl", plans)):
+    missing_limit_records = [
+        {
+            "trade_date": day,
+            "ts_code": code,
+            "monthly_execution": (day, code) in execution_pairs,
+            "classification": "open_session_lifecycle_pair_unverified",
+        }
+        for day, code in sorted(missing_limit_pairs)
+    ]
+    for name, values in (
+        ("missing-observations.jsonl", missing_records),
+        ("etf-limit-missing-observations.jsonl", missing_limit_records),
+        ("collection-plan.jsonl", plans),
+    ):
         with (output / name).open("w") as target:
             for row in values:
                 target.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
@@ -515,8 +665,16 @@ def main():
     parser.add_argument("--start-date", required=True)
     parser.add_argument("--end-date", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--lineage", type=Path)
     args = parser.parse_args()
-    report = audit(args.root, args.release_id, args.start_date, args.end_date, args.output)
+    report = audit(
+        args.root,
+        args.release_id,
+        args.start_date,
+        args.end_date,
+        args.output,
+        lineage=args.lineage,
+    )
     print(json.dumps({"status": report["status"], "coverage": report["coverage"]}, indent=2))
 
 

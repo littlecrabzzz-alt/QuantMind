@@ -9,6 +9,7 @@
 - `report.json`：固定 release、查询来源、逐日和月度执行点覆盖、阻塞门槛。
 - `missing-observations.jsonl`：按 ETF 和连续 SSE 交易位置压缩的实际缺价范围；没有任何补价。
 - `collection-plan.jsonl`：Tushare 原始后缀代码及精确参数。日线缺口只允许诊断复查；分红要求持久化终态/空响应回执；PCF 计划在权威历史 ETF 行业映射到位前保持休眠。
+- `etf-limit-missing-observations.jsonl`：固定交易日和基金生命周期包络内缺少的涨跌停代码日；逐项保留，不能用周末、停牌或空响应补齐。
 - `manifest.json`：上述文件的字节数和 SHA256。
 
 固定发布版的 `gaps` 保存逐任务状态和精确参数，审计可据此区分已持久化的 `fund_div` 空回执与尚未完成的请求；空回执只证明该次请求完成，不能证明源端历史和修订完整。`etf_limit` 的规范键是 `FUND:<原始后缀代码>`，审计先核对该命名空间，再显式转换成 RRG 使用的前缀代码。它仍只是价格上下限，不含可用于 ETF 的停复牌或开盘竞价语义；日线 0 行也不能直接标成停牌。PCF 的 `trade_date` 是清单适用日，不是可核验的盘前 `known_at`，数量也不是持仓权重。
@@ -21,8 +22,11 @@ UV_OFFLINE=1 uv run --offline --no-project \
   --release-id data-<manifest-sha256> \
   --start-date 20220901 \
   --end-date 20260901 \
+  --lineage /tmp/read-only-etf-limit-lineage.json \
   --output /tmp/quantmind-rrg-etf-window-audit-new
 ```
+
+`--lineage` 是可选的只读谱系快照。提供时，工具仅将固定 `trade_cal` 明确为非开市日的空叶窗口标为 `calendar_excluded_non_session`；只要窗口含一个 SSE 开市日，就继续标为 `open_session_empty_unverified`。基金生命周期只定义当前固定观察池的比较包络，不能证明完整历史 ETF 池，也不能把开市日空响应解释成停牌或不可交易。
 
 ## 2026-09-10 固定版结果
 
@@ -43,3 +47,11 @@ UV_OFFLINE=1 uv run --offline --no-project \
 在当前固定版 `data-d42bf11af1d9654c16e9a3382c17aae352f3c18b5d97b615bba6cedc32973aa5` 上，`etf_limit` 共观察到 152,139 个代码日；其中 107,293 个属于 RRG 生命周期包络，1,648 个落在月度执行点。`fund_div` 有 118 条事件、涉及 21 个 ETF 代码；manifest 另提供 311 个逐代码空回执。两者合并后，1,718 个窗口 ETF 中有 332 个代码具备终态证据，仍有 1,386 个待补。候选计划因此从旧版 9,429 项降为 9,097 项，其中 3,323 项可审查但未入队，5,774 项 PCF 计划继续休眠。
 
 修复不改变研究门槛：成员数据仍没有可验证的 `known_at` 或修订发布时间，历史 ETF 行业映射和历史全集不完整，4,887 个缺价代码日没有权威的停牌/开盘可交易分类，PCF 也不能证明盘前可知时间、修订或组合权重。固定版重跑没有调用上游、读取凭据、填补价格、计算策略/收益或写生产；机器证据见 `tushare-rrg-etf-window-audit-d42bf.evidence.json`。
+
+## 2026-09-10 最终版日历感知缺口复核
+
+对固定发布版 `data-d54865a93b3468b2e6f4c03a6d60dbf85289e8219d87797a3478178d17cc16ab` 和只读导出的 49 个原始月窗谱系复核后，1,462 个后代、780 个叶任务与生产闭包回执一致。25 个根仍因 `child_not_verified` 保持 `split_pending`，其唯一原因是后代含 53 个 `empty` 叶。
+
+固定 SSE 日历证明这 53 个空叶全部只覆盖非开市日；对应的固定基金生命周期代码日和 74 个剩余缺失代码日均为 0。因此，53 个空叶可从本次 RRG 交易日比较包络中排除，25 个根的日期窗口可视为日历覆盖。该结论不改变发布版任务状态，也不声称 Tushare 历史源端完整。
+
+`etf_limit` 仍有 74 个缺失代码日。它们全部位于 SSE 开市日和固定观察到的基金生命周期内，与 53 个空叶无重叠，不能由周末、节假日、空响应或未经证实的停牌假设消除。唯一月度执行缺口为 `20260401 / SH560890`。逐项缺口、谱系快照哈希、离线报告哈希和零上游/零凭据/零生产写证据见 `tushare-rrg-etf-calendar-evidence-20260910.json`；整体状态继续为 `blocked_data`。

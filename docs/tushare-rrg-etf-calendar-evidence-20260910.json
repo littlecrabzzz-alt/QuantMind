@@ -1,0 +1,503 @@
+{
+  "schema_version": 1,
+  "audited_at": "2026-09-10T11:14:35.750926+00:00",
+  "status": "blocked_data",
+  "release_id": "data-d54865a93b3468b2e6f4c03a6d60dbf85289e8219d87797a3478178d17cc16ab",
+  "window": {
+    "start_date": "20220901",
+    "end_date": "20260901",
+    "sse_sessions": 969
+  },
+  "safety": {
+    "upstream_calls": 0,
+    "credentials_accessed": false,
+    "production_writes": 0
+  },
+  "lineage_snapshot": {
+    "sha256": "33401b8e060392a00a98e9a9e51475bfe553b3402c795045a858fe6edd2f1617",
+    "roots": 49,
+    "descendants": 1462,
+    "leaf_tasks": 780,
+    "child_not_verified_roots": 25
+  },
+  "calendar_proof": {
+    "empty_leaf_tasks": 53,
+    "calendar_excluded_empty_leaf_tasks": 53,
+    "open_session_empty_unverified_leaf_tasks": 0,
+    "calendar_covered_child_not_verified_roots": 25,
+    "fixed_lifecycle_pairs_in_calendar_excluded_leaves": 0,
+    "missing_pairs_in_calendar_excluded_leaves": 0,
+    "claim": "Calendar exclusion applies only to the fixed RRG comparison envelope; it does not prove upstream history or suspension."
+  },
+  "remaining": {
+    "etf_limit_lifecycle_session_pairs": 74,
+    "etf_limit_monthly_execution_pairs": 1,
+    "monthly_execution_pair": {
+      "trade_date": "20260401",
+      "ts_code": "SH560890",
+      "monthly_execution": true,
+      "classification": "open_session_lifecycle_pair_unverified"
+    },
+    "pairs": [
+      {
+        "trade_date": "20220930",
+        "ts_code": "SH515610",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20221027",
+        "ts_code": "SZ159986",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20221109",
+        "ts_code": "SZ159962",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20221111",
+        "ts_code": "SH517060",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20221122",
+        "ts_code": "SZ159932",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20221130",
+        "ts_code": "SH516680",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20221130",
+        "ts_code": "SZ159955",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20221221",
+        "ts_code": "SZ159979",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20221222",
+        "ts_code": "SH510440",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20221222",
+        "ts_code": "SH512610",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20221227",
+        "ts_code": "SH510220",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20221227",
+        "ts_code": "SH561150",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230112",
+        "ts_code": "SH512780",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230112",
+        "ts_code": "SZ159978",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230208",
+        "ts_code": "SH512920",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230308",
+        "ts_code": "SH511310",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230313",
+        "ts_code": "SZ159657",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230314",
+        "ts_code": "SZ159657",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230315",
+        "ts_code": "SZ159657",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230316",
+        "ts_code": "SH515870",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230316",
+        "ts_code": "SZ159657",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230317",
+        "ts_code": "SZ159657",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230320",
+        "ts_code": "SZ159999",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230322",
+        "ts_code": "SH515820",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230327",
+        "ts_code": "SH513680",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230330",
+        "ts_code": "SZ159832",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230410",
+        "ts_code": "SH515500",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230428",
+        "ts_code": "SH512590",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230428",
+        "ts_code": "SZ159815",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230508",
+        "ts_code": "SH515510",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230606",
+        "ts_code": "SZ159833",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230613",
+        "ts_code": "SH515520",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230710",
+        "ts_code": "SZ159984",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230731",
+        "ts_code": "SH515930",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230811",
+        "ts_code": "SH510110",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20230811",
+        "ts_code": "SH510120",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20231025",
+        "ts_code": "SZ159789",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20231114",
+        "ts_code": "SH517780",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20231127",
+        "ts_code": "SZ159853",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20231218",
+        "ts_code": "SH515570",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20231221",
+        "ts_code": "SH517500",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20231229",
+        "ts_code": "SH560600",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240105",
+        "ts_code": "SZ159983",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240125",
+        "ts_code": "SZ159710",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240306",
+        "ts_code": "SZ159733",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240416",
+        "ts_code": "SH512320",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240520",
+        "ts_code": "SH517270",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240529",
+        "ts_code": "SH517760",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240605",
+        "ts_code": "SZ159646",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240607",
+        "ts_code": "SZ159693",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240628",
+        "ts_code": "SH515670",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240710",
+        "ts_code": "SZ159769",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240717",
+        "ts_code": "SZ159990",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240719",
+        "ts_code": "SZ159503",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240819",
+        "ts_code": "SZ159823",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240826",
+        "ts_code": "SH517280",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240827",
+        "ts_code": "SH516690",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240828",
+        "ts_code": "SZ159522",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240903",
+        "ts_code": "SZ159987",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240904",
+        "ts_code": "SH517960",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240920",
+        "ts_code": "SH561710",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20240925",
+        "ts_code": "SH515280",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20241108",
+        "ts_code": "SH513960",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20250115",
+        "ts_code": "SZ159683",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20250320",
+        "ts_code": "SZ159579",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20250530",
+        "ts_code": "SH515780",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20250626",
+        "ts_code": "SH560960",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20250728",
+        "ts_code": "SH562260",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20250821",
+        "ts_code": "SH512280",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20251014",
+        "ts_code": "SH516480",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20260312",
+        "ts_code": "SZ159969",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20260401",
+        "ts_code": "SH560890",
+        "monthly_execution": true,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20260715",
+        "ts_code": "SH560000",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      },
+      {
+        "trade_date": "20260824",
+        "ts_code": "SH560650",
+        "monthly_execution": false,
+        "classification": "open_session_lifecycle_pair_unverified"
+      }
+    ],
+    "requirement": "Every pair is an SSE open session inside the observed fund lifecycle and still needs authoritative limit/tradability evidence; no suspension is inferred."
+  },
+  "artifacts": {
+    "report_json": {
+      "sha256": "b569175e231e51e964208193d4de0f1761c1615c22da0fea4bd3a09b3d2b9c65",
+      "bytes": 50554
+    },
+    "etf_limit_missing_observations_jsonl": {
+      "sha256": "835890e23ef6bfb43e5e4678720802417c4d26e3a61d413bcea9265c4fc89ef1",
+      "bytes": 9693
+    },
+    "manifest_json": {
+      "sha256": "2579201775903af139b92556292b08b38b2c8f04d84d206ccf48bad96141b233",
+      "bytes": 721
+    }
+  }
+}
