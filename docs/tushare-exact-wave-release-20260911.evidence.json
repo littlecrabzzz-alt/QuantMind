@@ -1,0 +1,156 @@
+{
+  "deployment": {
+    "first_post_deploy_task": {
+      "elapsed_seconds": 145.74595420993865,
+      "status": "succeeded",
+      "task_id": "1783a093-0f7f-4c39-88b0-3477b4b5f2e7"
+    },
+    "healthy": true,
+    "oom_killed": false,
+    "restart_count": 0,
+    "services": [
+      "tushare-worker",
+      "celery-beat",
+      "db"
+    ]
+  },
+  "exact_wave_closure": {
+    "batches": {
+      "financial-pit-batch-20260909/batch-10-manifest.json": {
+        "returned_rows": {
+          "balancesheet_vip": 205,
+          "cashflow_vip": 188,
+          "income_vip": 201
+        },
+        "states": {
+          "done": 339,
+          "empty": 21
+        },
+        "tasks": 360
+      },
+      "fund-nav-batch-20260910/batch-6-manifest.json": {
+        "returned_rows": {
+          "fund_nav": 246610
+        },
+        "states": {
+          "done": 217,
+          "empty": 31,
+          "split_pending": 112
+        },
+        "tasks": 360
+      },
+      "fund-share-batch-20260911/batch-5-manifest.json": {
+        "returned_rows": {
+          "fund_share": 124615
+        },
+        "states": {
+          "done": 248,
+          "empty": 112
+        },
+        "tasks": 360
+      },
+      "index-weight-batch-20260910/batch-2-manifest.json": {
+        "returned_rows": {
+          "index_weight": 132936
+        },
+        "states": {
+          "done": 316,
+          "empty": 9,
+          "split_pending": 35
+        },
+        "tasks": 360
+      }
+    },
+    "evidence_closed": 1440,
+    "report_sha256": "4251f6cdae60858a1ed5cf9545da170637476e96f5bd5f17c0720b0e52941a63",
+    "task_ids_unique": 1440,
+    "verification": "Every current observation, object and parquet reference was found in the fixed manifest and its local file SHA-256 was recomputed; empty and split_pending task IDs were found in manifest gaps."
+  },
+  "fund_nav_empty_review_round2": {
+    "candidate_full_related_tests_passed": 22,
+    "cloud_unittests_passed": 18,
+    "cross_release_round1_evidence_pinned": true,
+    "first_round_earliest_not_before": "2026-09-11T12:26:34.077603+00:00",
+    "implemented": true,
+    "local_unittests_passed": 18,
+    "production_executed": false,
+    "production_image_ruff_available": false,
+    "review_delay_seconds": 604800,
+    "review_exhausted_closes_history": false,
+    "ruff_candidate_passed": true
+  },
+  "git": {
+    "cloud_head": "54ae40bd3277538f0e59cd392211b4d00c3ef37f",
+    "github_head": "54ae40bd3277538f0e59cd392211b4d00c3ef37f",
+    "mac_head": "54ae40bd3277538f0e59cd392211b4d00c3ef37f",
+    "master_commit": "54ae40bd3277538f0e59cd392211b4d00c3ef37f"
+  },
+  "mac_mirror": {
+    "downloaded_files": 12735,
+    "files_verified": 692727,
+    "last_exit_code": 0,
+    "launch_agent_run": 136,
+    "release_id": "data-dbd1efcca51b442c2a72cbacc28dd4d61883c0a232eebecc410d48bdf02d7ec9",
+    "status": "verified"
+  },
+  "observed_at": "2026-09-10T18:57:30.646682+00:00",
+  "offline_readback": {
+    "credentials": "TUSHARE_TOKEN and TUSHARE_API_TOKEN unset/empty",
+    "network": "socket connect and DNS blocked in Mac client; Docker --network none in cloud",
+    "queries": [
+      {
+        "api_name": "income_vip",
+        "filter": "SH600018, end_date=20260630",
+        "rows": 4
+      },
+      {
+        "api_name": "fund_nav",
+        "filter": "002261.OF, nav_date=20080503..20170702",
+        "rows": 301
+      },
+      {
+        "api_name": "index_weight",
+        "filter": "trade_date=20260701..20260731, limit=2000",
+        "rows": 2000
+      },
+      {
+        "api_name": "fund_share",
+        "filter": "trade_date=20250221",
+        "rows": 1138
+      }
+    ],
+    "rrg_status": "blocked_data",
+    "upstream_calls": 0
+  },
+  "open_boundaries": {
+    "fund_nav_first_round_due_targets_now": 0,
+    "fund_nav_missing_positive_controls_future_audit": 26,
+    "historical_versions_complete": false,
+    "history_complete": false,
+    "index_weight_cli_code_filter": "Existing default code_field=ts_code does not match stored index_code; date-filtered offline read succeeds. Record and fix separately.",
+    "pit_verified": false
+  },
+  "publication": {
+    "coverage": {
+      "blocked": 733,
+      "deferred_legacy_period_plan": 9802,
+      "done": 81569,
+      "empty": 76175,
+      "pending": 3705514,
+      "permission_blocked": 2329,
+      "quality": 332,
+      "resolved": 1397,
+      "split_pending": 2854
+    },
+    "elapsed_seconds": 284.5943722408265,
+    "files": 692727,
+    "manifest_sha256": "dbd1efcca51b442c2a72cbacc28dd4d61883c0a232eebecc410d48bdf02d7ec9",
+    "mode": "publish_only",
+    "performed": true,
+    "release_id": "data-dbd1efcca51b442c2a72cbacc28dd4d61883c0a232eebecc410d48bdf02d7ec9",
+    "status": "published",
+    "task_id": "104fd67c-d895-434b-8b8c-cc93a3e237bc",
+    "upstream_calls": 0
+  },
+  "schema_version": 1
+}

@@ -664,3 +664,12 @@
 - 当前固定版 `data-469f7738…` 与停写authority按真实时间生成第一轮清单，得到0个到期目标，0凭据读取、0上游请求、0任务状态变化。未来时间只读审计暴露单个无正向控制基金会使整批失败；`84b5ca7f`改为逐基金跳过缺控制项并继续，其余证据损坏仍整批拒绝。Mac与云端prepare+runner联合11项通过。
 - 修复后的未来到期审计得到181个结构候选，其中155个有固定版正向控制、26个缺控制而保持未选；最早 `not_before=2026-09-11T12:26:34.077603Z`，最晚 `2026-09-11T16:58:11.073563Z`。这只是显式未来时间的只读调度审计，不是可执行生产manifest或复核结果；届时须重新停写、使用当时固定release和authority生成新清单，最多155组/310次A-B请求。
 - 审计结束后专用worker和Beat恢复；正常固定版仍等待一小时发布周期。缺控制的26项记为非阻塞数据缺口，不影响其余155项后续复核，也不授予任何历史完整或PIT结论。
+
+## 2026-09-11 02:56 精确波次固定版与二轮复核部署
+
+- 正常任务 `104fd67c…` 在284.594秒内完成 `publish_only`，0上游请求，原子切换到 `data-dbd1efcca51b442c2a72cbacc28dd4d61883c0a232eebecc410d48bdf02d7ec9`。新manifest有692727个文件；done81569、empty76175、split_pending2854、pending3705514。
+- 财务三表第10批、`index_weight` 第2批、`fund_nav` 第6批和 `fund_share` 第5批共1440个唯一task均已在该固定版闭包。逐任务核对当前observation/object/parquet引用并重算实体SHA，empty/split_pending任务同时出现在manifest gaps；闭包报告SHA256为 `4251f6cdae60858a1ed5cf9545da170637476e96f5bd5f17c0720b0e52941a63`。这些任务返回财务三表594行、指数权重132936行、基金净值246610行、基金份额124615行，空和拆分状态仍如实保留。
+- Mac标准LaunchAgent新增12735个文件、完整校验692727个文件后以exit 0原子追平同一release。Mac客户端屏蔽socket/DNS并清除token，云端容器使用 `--network none` 和空token，两端都对新版完成离线读取：`income_vip`4行、`fund_nav`301行、`index_weight`2000行、`fund_share`1138行，全部 `upstream_calls=0`。
+- `fund_nav` round 2已支持7天门控，固定round 1旧release、attempt、manifest和A/B四证据哈希；round 2可以使用当时的新release。`review_exhausted` 不改原empty任务或父拆分gap，非空恢复继续走标准normalize/reconcile。候选22项、Mac18项和云端生产镜像18项相关测试通过；生产尚未到round 1时间门，因此0复核调用。
+- `54ae40bd` 已合入并推送master，Mac/GitHub/云端Git统一；云端worker与Beat在在途任务自然成功后重建为healthy，restart0、OOM false。重启后首任务 `1783a093…` 用145.746秒成功。固定证据为 `docs/tushare-exact-wave-release-20260911.evidence.json`。
+- 非阻塞项：通用CLI的 `codes` 默认映射到 `ts_code`，但 `index_weight` 存储列是 `index_code`，因此按指数代码筛选会拒绝；按日期固定版读取已通过。这是reader选择器缺口，不影响本批原始数据闭包，后续单独修正。全局 `history_complete`、历史修订完整性和PIT仍为false，RRG仍为 `blocked_data`。
