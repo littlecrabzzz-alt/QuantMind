@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "status": "production_verified_with_gaps",
+  "observed_at": "2026-09-10T07:46:26.953336+00:00",
+  "source_revision": "d75353c16d2092ed2a16380fbf141434dd048db9",
+  "validation": {
+    "tushare_tests": {
+      "passed": 951,
+      "skipped": 5,
+      "python": "3.10.19",
+      "elapsed_seconds": 48.678
+    },
+    "document_tests": {
+      "passed": 71
+    },
+    "realtime_tmt_tests": {
+      "passed": 117
+    },
+    "ruff": "new and changed files passed; four existing UP038 findings in tushare_pipeline.py remain outside this change"
+  },
+  "document_lenient_fallback": {
+    "worker_healthy": true,
+    "download_workers": 2,
+    "parse_workers": 1,
+    "timeout_seconds": 15,
+    "retained_pdf_sha256": "039ef73d2e08c2a55002f09efe7e84a18ee447c8457f2e7f5cecfe96bfbefb87",
+    "raw_sha_unchanged": true,
+    "bounded_production_result": {
+      "parse_status": "no_text",
+      "page_count": 3,
+      "parser_mode": "lenient_fallback",
+      "strict_error_type": "PdfReadError"
+    },
+    "database_mutated_for_acceptance": false,
+    "sample_parse_tries_at_acceptance": 5
+  },
+  "realtime_tmt_probe": {
+    "helper_sha256": "2f8ca6547fa097bd98b2fe860b72ae9b532d753d4ff125fe22c4744252965313",
+    "seed_sha256": "3e5cf1f34823a868952b9664646a9803fffaeb4ee5315164fede4209b1ad9a92",
+    "report_path": "/data/tushare/validation/realtime-tmt-probe-20260910/probe.json",
+    "report_sha256": "1ad7b980e68111b8f12e6b2ca85f5c19fe7270dbc47cdb08c76585e7afe11840",
+    "max_upstream_calls": 7,
+    "actual_upstream_calls": 5,
+    "deadline_seconds": 120,
+    "configuration_changed": false,
+    "automatic_activation_permitted": false,
+    "results": [
+      {
+        "api_name": "rt_min",
+        "status": "sample_ok",
+        "source_code": 0,
+        "rows": 1,
+        "observed_fields": [
+          "amount",
+          "close",
+          "high",
+          "low",
+          "open",
+          "time",
+          "ts_code",
+          "vol"
+        ],
+        "observation": "e4cf3bd2457049bf833de216762e0cd4.json",
+        "object_sha256": "14c1ec1d69a3f6d303bfb4e82e87e3dfebd39f061c5458a12d54018d1fa1801a"
+      },
+      {
+        "api_name": "rt_etf_min",
+        "status": "permission_denied",
+        "source_code": 40203,
+        "observation": "d1b9fcadb01a41218644a1ff9acc5233.json",
+        "object_sha256": "8c1d31a7ed37b94d134aea485867ac146245d0fdebfb90ebd9e86946faae5e1e"
+      },
+      {
+        "api_name": "rt_etf_min_daily",
+        "status": "permission_denied",
+        "source_code": 40203,
+        "observation": "981866fc27cb474fae60b44738f632c4.json",
+        "object_sha256": "150a4c7ddb337cb590658946a69df57dbb59c4b54700c8be6fc4175c0d2f9732"
+      },
+      {
+        "api_name": "tmt_twincome",
+        "status": "api_error",
+        "source_code": 40101,
+        "observation": "3a820a9b7c9d4ea4a1702ffcf93854c5.json",
+        "object_sha256": "f8f00c12283dbb2123ccee6f5afb59063d2fed51e47acfc2a1812e933c6b164b"
+      },
+      {
+        "api_name": "tmt_twincomedetail",
+        "status": "api_error",
+        "source_code": 40101,
+        "observation": "18d5f3530a314f7c87984baa83e3f58c.json",
+        "object_sha256": "f8f00c12283dbb2123ccee6f5afb59063d2fed51e47acfc2a1812e933c6b164b"
+      }
+    ]
+  },
+  "rrg_exact_batch": {
+    "helper_sha256": "cf5bffec76246cb414a4df18a80d8353af061613da0584af4d616bae05f98a4d",
+    "batch_manifest_sha256": "3ceaa518a73af92df4c824a9fa2c4fc7a65343a75569396643b749b091927d81",
+    "all_task_ids_sha256": "62caad354d15bdf27022392a5dbc80b33e0a54f9f1c1038a26b0ad85477fb283",
+    "authority_config_sha256": "4ac7b38142097cda4af50dfadb00093fd635d5fd37859d68ee9632800d1e21d9",
+    "plan_only_verified_jobs": 1767,
+    "max_upstream_calls": 360,
+    "actual_upstream_calls": 360,
+    "max_seconds": 90,
+    "elapsed_seconds": 69.23,
+    "attempted_by_api": {
+      "etf_limit": 35,
+      "fund_div": 325
+    },
+    "before_states": {
+      "etf_limit": {
+        "pending": 35,
+        "split_pending": 14
+      },
+      "fund_div": {
+        "empty": 6,
+        "pending": 1712
+      }
+    },
+    "after_states": {
+      "etf_limit": {
+        "done": 1,
+        "split_pending": 48
+      },
+      "fund_div": {
+        "done": 21,
+        "empty": 310,
+        "pending": 1387
+      }
+    },
+    "receipt_id": "f80427372d3dc2b90d7e254e98d8fc3fe6dfce6d28a286f76ac4f5fa188bc474",
+    "receipt_path": "/data/tushare/validation/rrg-exact-batch-20260910/receipt-f80427372d3dc2b9.json",
+    "receipt_file_sha256": "bd4a0e3bb4c4f6711b560b63a178db4e6375b50ee5006639cd33d889c4e6cca2",
+    "task_identity_preserved": true,
+    "release_published_by_runner": false
+  },
+  "fixed_release": {
+    "release_id": "data-6c9f0b0b777f5edfbb3654809006b01ea22770dd23fce20839be1a9be0d20ab1",
+    "manifest_sha256": "6c9f0b0b777f5edfbb3654809006b01ea22770dd23fce20839be1a9be0d20ab1",
+    "upstream_calls": 0,
+    "publish_total_seconds": 127.90025088004768,
+    "manifest_bytes": 211833337,
+    "manifest_files": 574380,
+    "implemented_contracts": 243,
+    "planned_scope": 243,
+    "published_dataset_apis": 193,
+    "probe_objects_and_observations_present": true,
+    "coverage": {
+      "blocked": 629,
+      "deferred_legacy_period_plan": 9802,
+      "done": 65898,
+      "empty": 62214,
+      "pending": 3108838,
+      "permission_blocked": 2329,
+      "quality": 268,
+      "resolved": 510,
+      "split_pending": 1878
+    }
+  },
+  "mac_mirror": {
+    "status": "verified",
+    "release_id": "data-6c9f0b0b777f5edfbb3654809006b01ea22770dd23fce20839be1a9be0d20ab1",
+    "downloaded_files": 3209,
+    "verified_files": 574380,
+    "approximate_size": "72G",
+    "offline_rt_min_rows": 1,
+    "offline_upstream_calls": 0
+  },
+  "runtime": {
+    "tushare_worker_healthy": true,
+    "document_worker_healthy": true,
+    "queue_ownership": {
+      "general_worker": [
+        "qlib_backtest_srv"
+      ],
+      "research_worker": [
+        "research"
+      ],
+      "document_worker": [
+        "tushare_documents"
+      ],
+      "tushare_worker": [
+        "tushare_acquire"
+      ]
+    },
+    "disk_available_bytes": 158941462528,
+    "stop_threshold_bytes": 107374182400
+  },
+  "live_snapshot_after_acceptance": {
+    "pipeline": {
+      "blocked": 630,
+      "deferred_legacy_period_plan": 9802,
+      "done": 66063,
+      "empty": 62393,
+      "pending": 3108494,
+      "permission_blocked": 2329,
+      "quality": 270,
+      "resolved": 510,
+      "split_pending": 1883
+    },
+    "documents": {
+      "blocked_not_attempted": 3088,
+      "downloaded_encrypted": 19,
+      "downloaded_no_text": 771,
+      "downloaded_not_applicable": 276,
+      "downloaded_parse_failed": 94,
+      "downloaded_parse_pending": 1,
+      "downloaded_parse_timeout": 25,
+      "downloaded_parsed": 17619,
+      "pending_not_attempted": 1079301,
+      "retry_not_attempted": 1
+    }
+  },
+  "security": {
+    "token_in_git_or_report": false,
+    "credentials_in_receipts": false,
+    "production_reports_redacted": true
+  },
+  "limitations": [
+    "One rt_min snapshot does not prove historical replay, current-session completeness, source timezone semantics or point-in-time validity; automatic activation remains disabled.",
+    "Permission and invalid-API responses are retained as observations and are not reclassified as empty data.",
+    "RRG remains blocked_data for historical member known_at, a versioned ETF-industry mapping, remaining price and tradability coverage, dividends and point-in-time PCF.",
+    "The exact RRG runner does not consume child split jobs created during its run; ordinary workers continue them later.",
+    "The PDF fallback helps future or retried PdfReadError documents; already exhausted parse failures were not requeued or rewritten.",
+    "Automatic fixed publication can still exceed the Celery soft limit; this accepted release used the same production tick outside Celery after the queue was drained.",
+    "Published datasets, successful samples and empty partitions do not prove complete history, revisions, attachments or point-in-time coverage."
+  ]
+}
