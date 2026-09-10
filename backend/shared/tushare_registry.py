@@ -7,6 +7,7 @@ from backend.shared.tushare_structured_contracts import (
 )
 
 from backend.shared.tushare_market_contracts import MARKET_CONTRACTS, iter_market_jobs
+from backend.shared.tushare_rrg_contracts import RRG_CONTRACTS
 
 from backend.shared.tushare_global_contracts import GLOBAL_CONTRACTS, iter_global_jobs
 
@@ -743,6 +744,7 @@ def project_realtime_row(api, row, params):
 
 
 EXTENDED_CONTRACTS = {
+    **{api: {**spec, "group": "rrg"} for api, spec in RRG_CONTRACTS.items()},
     **REALTIME_RUNTIME_CONTRACTS,
     **ACCOUNT_HISTORY_RUNTIME_CONTRACTS,
     **SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS,
