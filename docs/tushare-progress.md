@@ -1204,3 +1204,9 @@
 - The six batches closed 2,160 HTTP-200 responses in 266.873 seconds (485.624 observed RPM), retaining 590,235 rows. States are 1,842 `sample_ok`, 213 `empty_unverified` and 105 `possibly_truncated`; the latter created 210 pristine pending child tasks.
 - Independent read-only closure verified 6,267 object/observation/Parquet references and 91,464,651 bytes by size and SHA. Worker and Beat were restored exactly; the expired queued tick was naturally discarded and a fresh normal task started.
 - Fixed release inclusion and Mac offline readback remain the next acceptance gates. Empty responses, split descendants, complete history, revisions, known-at/PIT semantics and RRG classification remain explicit gaps.
+## 2026-09-12 05:58 fixed release eb6b and automatic Mac acceptance
+
+- Normal publisher task `88fab916-342e-45d1-9fa6-1f9a686cd06a` completed in 231.392 seconds and atomically published `data-eb6bf9a06e48821b8dccf7765846c2f87593aa3560c60ebbdef57a0529d9e1bd`; it was `publish_only`, with zero upstream requests.
+- The six-batch inventory has 6,267 references and 91,464,651 bytes. Old 76b excluded all references as expected; new eb6b included and physically verified all references with zero metadata, missing or SHA errors.
+- Mac LaunchAgent run 232 automatically downloaded 8,183 files, verified 883,963 files and switched CURRENT at 05:58:34. Local exact verification passed and socket/DNS-blocked reads returned `index_daily` 3x17 and `index_weight` 3x11 with empty token variables and zero upstream calls.
+- Worker and Beat were restored with their existing containers and are healthy. The next priority remains index daily/weight continuation plus the 210 pristine index-weight descendants; empty, PIT and RRG mapping gaps remain explicit.
