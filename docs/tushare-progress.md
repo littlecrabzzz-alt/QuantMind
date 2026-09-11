@@ -1026,3 +1026,9 @@
 - 固定版266b闭环后，经无revoke流程排空，冻结`income_vip`、`balancesheet_vip`、`cashflow_vip`各100个pristine叶。300项均为pending、tries 0、attempt 0，报告期2026-06-30、report_type 1，共用100个公司代码键，并与财务19及其恢复清单零任务重叠；生产一次性容器plan-only为0 authority、0凭据、0上游、0写入和0发布。
 - 75.148秒完成300次HTTP 200：每个API均98 done/2 empty，合计294 done、6 empty、545行、零不确定调用。300个object、300个observation和294个Parquet共894个唯一引用、11815432字节，逐文件SHA256通过。
 - 首次host Python执行因使用主机路径而被配置根目录保护在锁、凭据、上游和写入前拒绝；随后使用生产compose容器的`/data/tushare`及全部固定哈希执行成功。Worker与Beat恢复healthy，云盘距100 GiB硬线还有113359052800字节；`CURRENT`仍为266b。894项等待正常固定版和Mac镜像；完整财务历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-financial-pit-batch20-20260911.evidence.json`。
+
+### 2026-09-11 index_daily exact batch 9 at 300-request gray tier
+
+- 财务20记录后再次经无revoke流程排空，从108950个合格任务中冻结300个`index_daily` pristine历史叶，覆盖300个唯一`.CSI`代码、请求范围2026-01-01至2026-09-01；固定版、合格库存、任务、配置、preparer和helper均哈希冻结，plan-only为0调用/0写入。
+- 41.893秒完成300次HTTP 200：298 done、2 empty，保留47942行。300个object、300个observation和298个Parquet共898个唯一引用、9917692字节，逐文件SHA256通过，不确定调用0。
+- Worker与Beat恢复healthy，云盘距100 GiB硬线还有113341112320字节；`CURRENT`仍为266b。常规exact窗口继续保持300请求/90秒；898项等待正常固定版和Mac镜像。完整指数历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-index-daily-batch9-20260911.evidence.json`。
