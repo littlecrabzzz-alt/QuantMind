@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-11T02:45:38Z",
+  "status": "verified_fixed_release_mac_mirror_and_offline_read",
+  "git": {
+    "branch": "master",
+    "head": "38c579a96f5c0758c37eeec3154a857220d42905"
+  },
+  "permissions_and_rate": {
+    "reported_points": 10100,
+    "expected_points_after_2026_12_05": 8100,
+    "points_expiry_notice_date": "2026-12-05",
+    "account_rpm": 500,
+    "cyq_perf_daily_cap": 200000,
+    "official_rate_document": "https://tushare.pro/document/1?doc_id=290"
+  },
+  "safe_service_window": {
+    "beat_stopped_first": true,
+    "exact_consumer_cancelled": true,
+    "stable_idle_inspections": 2,
+    "worker_stop_timeout_seconds": 300,
+    "revoked_tasks": 0,
+    "forced_worker_kills": 0,
+    "services_restored_healthy": true
+  },
+  "production_batches": [
+    {
+      "name": "index_daily_batch_2",
+      "requests": 360,
+      "elapsed_seconds": 45.687,
+      "rows": 51037,
+      "states": {
+        "done": 317,
+        "empty": 43
+      },
+      "manifest_sha256": "6cf6f20345b96799c85666f2a48168a5929a70caf34284694b66ec65c50b2526",
+      "all_task_ids_sha256": "0fd0c450a87b48676538e6d7ad819d24d61e20c2381c5520b134e54526826a83",
+      "receipt_file_sha256": "d54560329580596aff8b5af1459c2ad9c59a8eb0897a0f44ee97e323acc71de9",
+      "closure_sha256": "e82dac1096c1247332ca1a3189fd3b732ddc956fb4a5304494804b7eab74a025",
+      "references": {
+        "objects": 360,
+        "observations": 360,
+        "parquet": 317
+      },
+      "physical_bytes": {
+        "objects": 5965091,
+        "observations": 316016,
+        "parquet": 7413157
+      }
+    },
+    {
+      "name": "index_weight_batch_5",
+      "requests": 360,
+      "elapsed_seconds": 47.476,
+      "rows": 131562,
+      "states": {
+        "done": 316,
+        "empty": 9,
+        "split_pending": 35
+      },
+      "manifest_sha256": "3d97c956901cb9688941839c74d6eca79b135771c185dbc05269c9e59c967b33",
+      "all_task_ids_sha256": "2c459b5a5ee7982398c7c739ec92e1709a332a2d13ed273f46372a065b9ada8d",
+      "receipt_file_sha256": "9d905ae297efc7b95aa8f6472f540319438086cf17aa74e0a09c1f7fdb37de53",
+      "closure_sha256": "f3befb9268a5a91ad17551c0f0b72045daf7f6471a04c9a8171ff079141b5c80",
+      "references": {
+        "objects": 360,
+        "observations": 360,
+        "parquet": 351
+      },
+      "physical_bytes": {
+        "objects": 6065019,
+        "observations": 311255,
+        "parquet": 7549385
+      }
+    },
+    {
+      "name": "fund_daily_fund_adj_batch_9",
+      "requests": 360,
+      "elapsed_seconds": 45.013,
+      "rows": 130292,
+      "states": {
+        "done": 360
+      },
+      "manifest_sha256": "de3ced78220302fba320c677750cb0ec20c57f18130f32662dc8d162aa19ab03",
+      "all_task_ids_sha256": "17d8228fbeb07b485aa21adc1cc06b5cfd020c10a30b62176366557d89ac83e1",
+      "receipt_file_sha256": "5ed0bb7b8b1176c77e54a97d14448e4ee627855d7041c0ab0de9fb2fb7bee63c",
+      "failed_closure_sha256": "e348722d214e1328cd1180a8159b7bb248ab435b5c6ba43a55d6c43df73ff71a",
+      "closure_v2_sha256": "1368765624eaf28c6eb5ef82584acea4c0a36f6fde4f2ab3cf1f2c41e69bd381",
+      "references": {
+        "objects": 360,
+        "observations": 360,
+        "parquet": 360
+      },
+      "physical_bytes": {
+        "objects": 7302871,
+        "observations": 318176,
+        "parquet": 10483049
+      }
+    }
+  ],
+  "aggregate": {
+    "upstream_calls": 1080,
+    "http_200": 1080,
+    "http_429": 0,
+    "elapsed_seconds": 138.176,
+    "rows": 312891,
+    "unique_references_verified": {
+      "objects": 1080,
+      "observations": 1080,
+      "parquet": 1028
+    },
+    "physical_bytes_verified": {
+      "objects": 19332981,
+      "observations": 945447,
+      "parquet": 25445591,
+      "total": 45724019
+    }
+  },
+  "fixed_release": {
+    "release_id": "data-00177d548289255711d171ddd8ffc86332f5078951ccb8a618792c82a0528288",
+    "manifest_sha256": "00177d548289255711d171ddd8ffc86332f5078951ccb8a618792c82a0528288",
+    "manifest_bytes": 295830034,
+    "file_references": 768829,
+    "datasets": 101451,
+    "gaps": 100894,
+    "referenced_bytes": 95181283444,
+    "missing_references": 0,
+    "bad_sizes": 0,
+    "sampled_sha256_files": 1024,
+    "sampled_sha256_errors": 0,
+    "index_daily_batch_included": true,
+    "index_weight_batch_included": true,
+    "fund_price_batch_included": true,
+    "fina_mainbz_vip_batches_included": true
+  },
+  "mac_mirror": {
+    "release_id": "data-00177d548289255711d171ddd8ffc86332f5078951ccb8a618792c82a0528288",
+    "current_pointer_sha256": "b40ec7d272c461199b5d55758bfc00d9328222a11994f89a07d64e318846519e",
+    "manifest_sha256": "00177d548289255711d171ddd8ffc86332f5078951ccb8a618792c82a0528288",
+    "manifest_bytes": 295830034,
+    "launch_agent_runs": 164,
+    "last_exit_code": 0,
+    "stderr_bytes": 0,
+    "downloaded_files": 7439,
+    "batch_references_verified": 4363,
+    "missing_references": 0,
+    "metadata_errors": 0,
+    "physical_errors": 0
+  },
+  "offline_read": {
+    "network": "none",
+    "token_variables_empty": true,
+    "mirror_read_only": true,
+    "release_pinned": true,
+    "queries": {
+      "index_daily": 3,
+      "fund_daily": 3,
+      "fina_mainbz_vip": 3
+    },
+    "upstream_calls": 0,
+    "vip_reader_fix_commit": "38c579a9"
+  },
+  "nonblocking_gaps": [
+    {
+      "scope": "financial_pit_exact_batch",
+      "status": "needs_replan",
+      "detail": "Both 360-task and 180-task preparations found insufficient common pending statement leaves; zero upstream calls and zero authority writes."
+    },
+    {
+      "scope": "index_weight_plan_schema",
+      "status": "tool_schema_gap",
+      "detail": "The older plan-only runner omits would_write; authority, credentials, upstream and publish flags were false and execution reused the frozen manifest."
+    },
+    {
+      "scope": "document_originals",
+      "status": "capacity_deferred",
+      "detail": "The document worker remains intentionally stopped until storage expansion and headroom validation; structured rows do not prove original document localization."
+    }
+  ],
+  "boundaries": {
+    "history_complete": false,
+    "historical_versions_complete": false,
+    "known_at_verified": false,
+    "pit_verified": false,
+    "rrg_status": "blocked_data",
+    "secrets_included": false,
+    "upstream_response_bodies_included": false,
+    "order_information_included": false
+  }
+}

@@ -794,3 +794,13 @@
 - 四批逐实体重算438个object、438个observation和299个非空Parquet的SHA与字节数，错误0；对应验证文件合计287123009字节。闭包SHA依次为`35c45154523d5e8f77812168fc457b2de78e3cf52a8e255ddc266a99786c7ff4`、`9945a40fc8a1a48ef22e7a0a3edf86863d60bb41d5c5a357d737c7d286c0df50`、`82951b4f3d0ac19c446c8ae311af09bf44f0ea807f6ec315ee0260dea6669a94`、`cf4674b64458ac974fb0b5e089a6d71acfae1ee88b9e4b67716f314cea6cca1b`。第三批首个闭包错误要求`empty_unverified`也有Parquet，原失败证据保留，v2语义修正后零错误。
 - 239项返回`has_more`或达到操作性饱和阈值。官方VIP输入只记录`period`和`type`，没有offset/page/limit，因此没有猜测分页；原始返回全部保留，等待供应商确认合法续页方式。空响应也不证明供应商全历史不存在，`history_complete=false`、历史修订、`known_at`和PIT仍未验证，RRG保持`blocked_data`。
 - 当前固定版`data-3eec661f…`已包含第六波和index/fina新runner结果；Mac LaunchAgent第161轮exit0并追平同一版本。VIP四批等待10:26:06 CST正常固定发布和随后15分钟单向镜像。API、专用worker和Beat已恢复healthy、restart0、OOM false，常规采集继续；云盘可用229843632128字节，高于100GiB硬线。机器证据为`docs/tushare-fina-mainbz-vip-production-20260911.evidence.json`。
+
+## 2026-09-11 10:49 指数/基金波次发布与董秘问答首批
+
+- 在安全排空窗口内执行 `index_daily` 第2批、`index_weight` 第5批和 `fund_daily+fund_adj` 第9批，共1080次请求、全部HTTP 200、零429、312891行；逐实体重算1080个object、1080个observation和1028个Parquet的SHA与字节，错误0，总计45724019字节。财务PIT按360和180两种规模准备均因共同待拉叶不足而零调用停止；旧`index_weight` plan缺`would_write`字段作为工具schema缺口保留。
+- 10:30:25 CST正常发布原子切换到`data-00177d548289255711d171ddd8ffc86332f5078951ccb8a618792c82a0528288`。295830034字节manifest实算SHA与release ID一致，含768829个文件引用、101451个数据集和100894个缺口；全部引用存在且大小匹配，抽样1024个SHA零错误。本轮三批及438个`fina_mainbz_vip`任务都已进入固定版。
+- `ee548878`、`32558212`新增并优化沪深董秘问答默认plan-only精确入口。它只选history未尝试叶，排除跨epoch已有尝试/终态，按SH/SZ与question/reply四层公平轮转并优先拆分页。Mac与生产容器各16项组合测试、compile和diff check通过；两端运行时均未安装Ruff，旧drain模拟测试在应用容器内有两项子进程超时，真实云端排空正常且没有revoke或强杀。
+- 董秘问答首批固定上述新release与配置/代码/任务哈希，360项含320个拆分叶和40个未拆历史窗；85.95秒完成360次HTTP 200、零429、857441行，结果133 done、40 empty、187 split_pending，并生成374个子任务。360个object、360个observation和320个Parquet物理SHA全通过，共689364476字节；authority闭包SHA为`bdafe46d30482cb4b68d8a12adf66a2ce034113d8826e9ad912893903e315a9e`。
+- Mac第164轮标准镜像在10:49:38 CST下载7439个缺失文件并原子追平同一固定版；双端manifest SHA/字节一致，本轮4363个引用在Mac全部通过物理校验。在`--network none`、Token为空和镜像只读条件下，`index_daily`与`fund_daily`各读取3行且`upstream_calls=0`。
+- 禁网验收同时发现`fina_mainbz_vip`虽有299个Parquet进入固定版，但公共reader未注册该runtime-only合同而返回`Unknown dataset`。`38c579a9`把VIP合同加入store并复用`dataset_identity=fina_mainbz`，11项相关测试通过；云端与Mac随后均在同样禁网条件下读取3行、0上游调用。只重启主API加载reader，采集worker和Beat保持运行。
+- API、专用worker和Beat均healthy、restart0、OOM false，云盘可用228590608384字节，高于100GiB硬线。董秘问答首批仍等待下一次固定发布；原始文档worker继续等扩盘/headroom验证。完整历史、修订、known_at和PIT未闭合，RRG继续`blocked_data`。机器证据为`docs/tushare-index-fund-exact-wave-20260911.evidence.json`与`docs/tushare-irm-qa-production-20260911.evidence.json`。

@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-11T02:45:38Z",
+  "status": "verified_authority_only_pending_fixed_publication_and_mac_mirror",
+  "git": {
+    "branch": "master",
+    "head": "38c579a96f5c0758c37eeec3154a857220d42905",
+    "commits": [
+      "ee548878",
+      "32558212",
+      "38c579a9"
+    ]
+  },
+  "implementation": {
+    "apis": [
+      "irm_qa_sh",
+      "irm_qa_sz"
+    ],
+    "prepare": "scripts/prepare_tushare_irm_qa_batch.py",
+    "runner": "scripts/run_tushare_irm_qa_batch.py",
+    "test": "scripts/test_tushare_irm_qa_batch.py",
+    "default_mode": "plan_only",
+    "plan_only_access_flags_false": true,
+    "history_only": true,
+    "cross_epoch_prior_attempts_excluded": true,
+    "selection": "balanced_api_axis_history_leaves_without_prior_attempts"
+  },
+  "validation": {
+    "local_combined_tests_passed": 16,
+    "cloud_container_combined_tests_passed": 16,
+    "compile": "passed",
+    "git_diff_check": "passed",
+    "ruff_check": "unavailable_on_mac_and_cloud_runtime",
+    "ruff_format_check": "unavailable_on_mac_and_cloud_runtime",
+    "cloud_drain_test_note": "Two old fake-command drain tests timed out inside the application container; the new IRM tests passed and the real cloud drain completed safely."
+  },
+  "permissions_and_rate": {
+    "reported_points": 10100,
+    "expected_points_after_2026_12_05": 8100,
+    "points_expiry_notice_date": "2026-12-05",
+    "independent_permission_expires_at": "2027-09-08",
+    "account_rpm": 500,
+    "irm_qa_sh_rpm": 500,
+    "irm_qa_sz_rpm": 500,
+    "rate_source": "user_purchased_permission_family",
+    "official_rate_document": "https://tushare.pro/document/1?doc_id=290",
+    "official_sh_document": "https://tushare.pro/document/2?doc_id=366",
+    "official_sz_document": "https://tushare.pro/document/2?doc_id=367"
+  },
+  "production_batch": {
+    "batch": 1,
+    "fixed_input_release": "data-00177d548289255711d171ddd8ffc86332f5078951ccb8a618792c82a0528288",
+    "manifest_sha256": "39b13ed25c19b7f81095882cc3a8dfcba0ea7c85b899af8cd71cb9dba429f4b6",
+    "all_task_ids_sha256": "26206a9b702e0ee1fbc32df9ff03b85cc5e1b3cfca3e695321cf6d24f4771b4b",
+    "receipt_file_sha256": "157e93451de6e0713c143bd36e1f71bd7e10d3efceeca039d865628287ca380f",
+    "receipt_id": "dc51d03f5ed5df3e35a470b984b05dfb5311c5ff399e00fd7b48d7dd76fe7f26",
+    "closure_sha256": "bdafe46d30482cb4b68d8a12adf66a2ce034113d8826e9ad912893903e315a9e",
+    "authority_archive": "validation/irm-qa-batch-20260911",
+    "eligible_history_tasks": 534,
+    "requests": 360,
+    "elapsed_seconds": 85.95,
+    "effective_rpm": 251.309,
+    "http_200": 360,
+    "http_429": 0,
+    "rows": 857441,
+    "api_counts": {
+      "irm_qa_sh": 164,
+      "irm_qa_sz": 196
+    },
+    "axis_counts": {
+      "irm_qa_sh:question": 98,
+      "irm_qa_sh:reply": 66,
+      "irm_qa_sz:question": 98,
+      "irm_qa_sz:reply": 98
+    },
+    "partition_counts": {
+      "child": 320,
+      "unsplit": 40
+    },
+    "job_states": {
+      "done": 133,
+      "empty": 40,
+      "split_pending": 187
+    },
+    "result_statuses": {
+      "sample_ok": 133,
+      "empty_unverified": 40,
+      "possibly_truncated": 187
+    },
+    "split_children_created": 374,
+    "unique_references_verified": {
+      "objects": 360,
+      "observations": 360,
+      "parquet": 320
+    },
+    "physical_bytes_verified": {
+      "objects": 471927598,
+      "observations": 317906,
+      "parquet": 217118972,
+      "total": 689364476
+    },
+    "validation_errors": []
+  },
+  "runtime_after_batch": {
+    "api_health": "healthy",
+    "tushare_worker_health": "healthy",
+    "celery_beat_health": "healthy",
+    "restart_count": 0,
+    "oom_killed": false,
+    "free_bytes": 228590608384,
+    "hard_reserve_bytes": 107374182400
+  },
+  "operational_notes": [
+    "The first preparation attempt used an unbounded correlated query and was terminated before any upstream call or authority write.",
+    "The optimized preparation uses bounded set scans and completed in about seven seconds.",
+    "The first execute attempt failed closed on a stale read lock left by the interrupted preparation; the stale read-only process was terminated and the same frozen manifest then executed successfully.",
+    "All execution commands after the masked tee exit were run with shell pipefail enabled."
+  ],
+  "boundaries": {
+    "history_complete": false,
+    "historical_versions_complete": false,
+    "known_at_verified": false,
+    "pit_verified": false,
+    "rrg_status": "blocked_data",
+    "split_parents_are_complete": false,
+    "empty_response_proves_absence": false,
+    "secrets_included": false,
+    "upstream_response_bodies_included": false,
+    "order_information_included": false
+  }
+}
