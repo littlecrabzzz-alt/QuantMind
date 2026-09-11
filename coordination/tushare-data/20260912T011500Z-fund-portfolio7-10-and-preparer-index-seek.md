@@ -6,4 +6,4 @@
 - Exact execution: four 240-call `fund_portfolio` batches completed in 62.333, 64.586, 69.555 and 66.968 seconds. Totals are 960 HTTP 200, 734 done, 225 empty, one conservative saturation block, 68,680 rows, zero uncertain calls.
 - Physical closure: 2,655 unique object/observation/Parquet references, 13,907,170 bytes, all SHA256 verified; task and request-signature overlap across consecutive batches is zero.
 - Services: Tushare worker and Beat were drained without revoke, restored healthy with restart 0 and no OOM. Exact work did not publish or switch CURRENT.
-- Next: allow the normal publisher to create the next fixed release, run the Mac mirror, verify all 2,655 references, and retain the one 2,000-row saturation response as `blocked` pending a legal split strategy.
+- Next: allow the normal publisher to create the next fixed release, run the Mac mirror, verify all 2,655 references, and retain the one 2,001-row saturation response as `blocked` pending a legal split strategy.

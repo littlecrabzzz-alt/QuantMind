@@ -1114,5 +1114,13 @@
 
 - 普通worker连续三轮只做identifier fanout且0上游调用；最后一轮拆出1047个子任务，pending到4486085。无revoke排空后只清除2条已过期的自动`tushare_acquire`消息，没有用户或研究任务。
 - 准备器旧查询在194秒后仍扫描全jobs库存且未生成manifest，安全终止后改用已有`jobs_partition_lookup`按epoch/API读取；保持全epoch语义peer验证，不新增索引。Mac与生产容器专项测试各9项通过，生产准备耗时降至20、10、11、9秒；代码`cee03761`已推送并对齐云端Git。
-- 四批各240次，执行62.333、64.586、69.555、66.968秒；合计960次HTTP 200、734 done、225 empty、1 blocked、68680行、不确定调用0。唯一blocked为2000行饱和响应，保留`possibly_truncated`且不计完整覆盖。
+- 四批各240次，执行62.333、64.586、69.555、66.968秒；合计960次HTTP 200、734 done、225 empty、1 blocked、68680行、不确定调用0。唯一blocked为2001行饱和响应，保留`possibly_truncated`且不计完整覆盖。
 - 2655个唯一物理引用、13907170字节逐文件SHA256通过，四批任务及请求签名互不重叠。Worker和Beat恢复healthy、restart0、OOM false；云盘距100GiB硬线412759347200字节。exact未发布或切换CURRENT，等待下一正常固定版和Mac镜像后再声明离线可用。机器证据为`docs/tushare-fund-portfolio-batches7-10-20260912.evidence.json`。
+
+
+### 2026-09-12 固定版b0c6基金持仓7至10本地闭环
+
+- 正常publisher任务`63b4877e-a124-4e4c-a7a8-81fff622732a`以Celery SUCCESS、上游请求0、146.442秒完成publish-only，原子生成`data-b0c60c5371a3daa77c3f0108c84f3cdef2f7ddca78650fd0a3d49ce92f784adb`；349679239字节manifest含117238个dataset和860189个文件。
+- Mac标准LaunchAgent第217轮下载3632个增量文件，完整验证后exit 0、stderr 0并原子切换。基金持仓批次7至10的2655个唯一引用、13907170字节全部通过：manifest缺失0、元数据错误0、本地物理错误0。
+- 生产镜像在`--network none`、socket/DNS阻断、空Token、只读镜像条件下读取`fund_portfolio`3行15列，上游调用0。唯一`possibly_truncated`阻塞响应的authority结果为2001行，旧摘要写成2000行已更正；没有重放，也不计完整覆盖。
+- Worker与Beat通过无revoke流程恢复healthy，普通采集任务已继续；API、general worker、研究worker均healthy。云盘可用519452131328字节，距100GiB硬线还有412077948928字节。四批现已可在本地脱离Tushare读取；完整持仓、每日PCF、历史盘中`known_at`、修订、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fixed-release-b0c6-fund-portfolio7-10-20260912.evidence.json`。
