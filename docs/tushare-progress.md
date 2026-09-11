@@ -1081,3 +1081,10 @@
 - Mac标准LaunchAgent第207轮下载6113个增量文件、完整验证851048项、stderr 0、exit 0后原子切换。固定版验收器对基金份额13/14的1775个唯一引用、12225439字节全部通过：manifest缺失0、元数据错误0、本地物理错误0。
 - 生产镜像在只读镜像、空Token、Docker禁网和socket/DNS阻断下通过固定版store读取`fund_share` 3行9列，上游调用0。独立审计复算10个归档、manifest/task/receipt哈希、两个吞吐值和跨批重叠，task、语义及市场日期交集均为0，未发现实质问题。
 - 一次只读SSH连接关闭和一次本地shell将远端release变量展开为空均通过有限重试修正，未改authority或镜像。Worker、Beat、API healthy，云盘距100 GiB硬线还有111709761536字节。两批现已可在本地脱离Tushare读取；完整份额历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fixed-release-f1e-fund-share13-14-20260911.evidence.json`。
+
+### 2026-09-11 fund_portfolio第5批精确闭环
+
+- 固定版f1e闭环后，无revoke排空等待一笔普通planning-only任务自然运行346.724秒。准备器扫描多百万任务库存45.53秒，冻结240个current_v2、pristine、leaf-only、跨epoch语义唯一请求，覆盖240只基金，period边界2024-12-31至2025-03-31，仍有13530个合格语义请求；该准备耗时作为后续API-first索引是否必要的可观察依据。
+- 清单固定f1e固定版、配置、准备器、组合runner、任务和请求签名哈希；plan-only为0 authority、0凭据、0上游、0写入、0发布。64.245秒完成240次HTTP 200：134 done、106 empty、3206行、不确定调用0。该接口维持保守240 rpm及`rate_review_required=true`，未套用常规360项提速。
+- 240个object、240个observation和134个Parquet共614个唯一引用、1408988字节，逐文件SHA256通过。Worker与Beat恢复healthy，云盘距100 GiB硬线还有111690616832字节，`CURRENT`仍为f1e。
+- 本批扩大可用于RRG ETF行业暴露候选的定期披露持仓输入，但不证明持仓完整、日度PCF、历史盘中`known_at`、修订、权威ETF行业映射或PIT闭合。614项等待下一正常固定版和Mac镜像。机器证据为`docs/tushare-fund-portfolio-batch5-20260911.evidence.json`。
