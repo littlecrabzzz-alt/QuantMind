@@ -440,12 +440,20 @@ def prepare(root, output, release_id, release_manifest_sha256, jobs=MAX_BATCH_JO
                 "WHERE pc.parent_id=j.id) ORDER BY j.id",
                 (EPOCH, API, GROUP),
             ).fetchall()
-            inventory = db.execute(
-                "SELECT j.job,j.state,EXISTS(SELECT 1 FROM attempts a "
-                "WHERE a.job_id=j.id) attempted FROM jobs j "
-                "WHERE json_extract(j.job,'$.api_name')=? ORDER BY j.id",
-                (API,),
+            inventory = []
+            epochs = db.execute(
+                "SELECT DISTINCT epoch FROM jobs INDEXED BY jobs_partition_lookup"
             ).fetchall()
+            for (epoch,) in epochs:
+                inventory.extend(
+                    db.execute(
+                        "SELECT j.job,j.state,EXISTS(SELECT 1 FROM attempts a "
+                        "WHERE a.job_id=j.id) attempted FROM jobs j "
+                        "INDEXED BY jobs_partition_lookup WHERE j.epoch=? "
+                        "AND json_extract(j.job,'$.api_name')=? ORDER BY j.id",
+                        (epoch, API),
+                    ).fetchall()
+                )
         finally:
             db.close()
     blocked_signatures = set()
