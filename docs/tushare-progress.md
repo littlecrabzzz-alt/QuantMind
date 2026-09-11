@@ -1108,3 +1108,11 @@
 - Mac标准LaunchAgent第214轮下载5507个增量文件，完整验证后exit 0并切换固定版。基金持仓批次5/6的1284个唯一引用、6065292字节全部进入manifest，元数据错误0、本地物理错误0。
 - 生产基础镜像在`--network none`、socket/DNS阻断、空Token和只读镜像条件下读取`fund_portfolio`3行15列，上游调用0。云盘扩容后可用520229150720字节，距100 GiB硬线还有412854968320字节；general worker、研究worker、Tushare worker、Beat均healthy，整项目快照timer已恢复。
 - 两批已从权威端闭环提升为本地固定版离线可用。完整基金持仓历史、每日PCF、上游修订、`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fixed-release-4ebc-fund-portfolio5-6-20260912.evidence.json`。
+
+
+### 2026-09-12 fund_portfolio第7至10批与准备器性能修复
+
+- 普通worker连续三轮只做identifier fanout且0上游调用；最后一轮拆出1047个子任务，pending到4486085。无revoke排空后只清除2条已过期的自动`tushare_acquire`消息，没有用户或研究任务。
+- 准备器旧查询在194秒后仍扫描全jobs库存且未生成manifest，安全终止后改用已有`jobs_partition_lookup`按epoch/API读取；保持全epoch语义peer验证，不新增索引。Mac与生产容器专项测试各9项通过，生产准备耗时降至20、10、11、9秒；代码`cee03761`已推送并对齐云端Git。
+- 四批各240次，执行62.333、64.586、69.555、66.968秒；合计960次HTTP 200、734 done、225 empty、1 blocked、68680行、不确定调用0。唯一blocked为2000行饱和响应，保留`possibly_truncated`且不计完整覆盖。
+- 2655个唯一物理引用、13907170字节逐文件SHA256通过，四批任务及请求签名互不重叠。Worker和Beat恢复healthy、restart0、OOM false；云盘距100GiB硬线412759347200字节。exact未发布或切换CURRENT，等待下一正常固定版和Mac镜像后再声明离线可用。机器证据为`docs/tushare-fund-portfolio-batches7-10-20260912.evidence.json`。
