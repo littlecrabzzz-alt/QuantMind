@@ -1,0 +1,191 @@
+{
+  "authority_closure": {
+    "minimum_unique_references": {
+      "objects": 1813,
+      "observations": 1813,
+      "parquet": 1811
+    },
+    "path": "validation/release-512b55ad-wave45-closure-20260911-v3.json",
+    "physical_bytes_verified": {
+      "objects": 463667999,
+      "observations": 1607361,
+      "parquet": 178774995,
+      "validation_artifacts": 1760897
+    },
+    "release_manifest_required_paths_checked": 5437,
+    "role": "cloud_formal_writer",
+    "root": "/data/tushare",
+    "sha256": "8174984804f4bfbfa66037a44e4f613ad735369785a8b36c1c4934c08d6a6a69",
+    "status": "verified",
+    "superseded_attempts": [
+      {
+        "path": "validation/release-512b55ad-wave45-closure-20260911.json",
+        "status": "failed_parser_marker_assumption"
+      },
+      {
+        "path": "validation/release-512b55ad-wave45-closure-20260911-v2.json",
+        "status": "failed_validation_directory_manifest_policy_assumption"
+      }
+    ],
+    "unique_references_verified": {
+      "objects": 1813,
+      "observations": 1813,
+      "parquet": 1811
+    },
+    "validation_artifact_manifest_policy": "excluded_by_release_builder",
+    "validation_artifacts_verified_on_authority": 13,
+    "validation_errors": []
+  },
+  "boundaries": {
+    "historical_versions_complete": false,
+    "history_complete": false,
+    "pit_verified": false,
+    "rrg_p0_gap": "versioned CITIC L1 classification and membership with known_at, revision, and source evidence",
+    "rrg_status": "blocked_data",
+    "trading_authorized": false
+  },
+  "git": {
+    "branch": "master",
+    "head_before_evidence_commit": "7fab51668b028260f0a19993a468fe7e3b8eab77"
+  },
+  "included_work": {
+    "combined_upstream_calls_before_publication": 1813,
+    "npr_batch_1": {
+      "objects": 5,
+      "observations": 5,
+      "parquet": 4
+    },
+    "publication_upstream_calls": 0,
+    "wave4": {
+      "objects": 904,
+      "observations": 904,
+      "parquet": 904,
+      "rows": 1315020,
+      "upstream_calls": 904
+    },
+    "wave5": {
+      "objects": 904,
+      "observations": 904,
+      "parquet": 903,
+      "rows": 1281772,
+      "upstream_calls": 904
+    }
+  },
+  "mac_mirror": {
+    "direction": "cloud_to_mac_only",
+    "downloaded_files": 10080,
+    "exit_code": 0,
+    "launch_agent": "com.quantmind.tushare-mirror",
+    "manifest_sha256": "512b55ad56927ba2924e95bd0904ac35df963b4243d2df5b51f2a9a04b54cbca",
+    "release_id": "data-512b55ad56927ba2924e95bd0904ac35df963b4243d2df5b51f2a9a04b54cbca",
+    "root": "~/Library/Application Support/QuantMind/tushare",
+    "run": 156,
+    "stderr_bytes": 0,
+    "verified_files": 748694
+  },
+  "observed_at": "2026-09-11T00:36:00Z",
+  "offline_readback": {
+    "credentials": "TUSHARE_TOKEN and TUSHARE_API_TOKEN empty",
+    "empty_window_observed": {
+      "api_name": "npr",
+      "classification": "valid_local_empty_window_not_filled",
+      "filter": "20080316..20080324",
+      "rows": 0
+    },
+    "network": "docker --network none plus socket connect and DNS guards",
+    "queries": [
+      {
+        "api_name": "fund_daily",
+        "fields": 17,
+        "filter": "trade_date=20160426",
+        "rows": 5
+      },
+      {
+        "api_name": "dividend",
+        "fields": 22,
+        "filter": "code=SH600416",
+        "rows": 5
+      },
+      {
+        "api_name": "anns_d",
+        "fields": 12,
+        "filter": "20120201..20120215",
+        "rows": 5
+      },
+      {
+        "api_name": "npr",
+        "fields": 12,
+        "filter": "limit=5",
+        "rows": 5
+      }
+    ],
+    "root_mount": "read_only",
+    "runtime": "quantmind-oss:latest",
+    "upstream_calls": 0
+  },
+  "post_release_job_state_snapshot": {
+    "blocked": 799,
+    "deferred_legacy_period_plan": 9802,
+    "done": 91794,
+    "empty": 81304,
+    "pending": 3875074,
+    "permission_blocked": 2329,
+    "quality": 358,
+    "resolved": 1575,
+    "split_pending": 3997
+  },
+  "publication": {
+    "celery_task_id": "bab2fab7-c0ac-4bd0-b817-293e247663d4",
+    "elapsed_seconds": 215.574672,
+    "manifest_bytes": 289623876,
+    "manifest_dataset_entries": 97480,
+    "manifest_file_entries": 748694,
+    "manifest_sha256": "512b55ad56927ba2924e95bd0904ac35df963b4243d2df5b51f2a9a04b54cbca",
+    "mode": "publish_only",
+    "performed": true,
+    "release_id": "data-512b55ad56927ba2924e95bd0904ac35df963b4243d2df5b51f2a9a04b54cbca",
+    "status": "published",
+    "upstream_requests": 0
+  },
+  "rate_policy": {
+    "account_ceiling_rpm": 500,
+    "cyq_perf_daily_cap": 200000,
+    "daily_quota_remaining_at_publication": 199914,
+    "daily_quota_used_at_publication": 86,
+    "days_until_expiry_at_publication": 85,
+    "entitlement_source": "user_reported_not_supplier_verified",
+    "expected_points_after_expiry": 8100,
+    "mode": "tiered_v1",
+    "notice": "expires_within_90_days",
+    "points_expiry_date": "2026-12-05",
+    "reported_points": 10100,
+    "rollout_account_rpm": 500,
+    "secrets_included": false
+  },
+  "runtime": {
+    "api": {
+      "health": "healthy",
+      "oom_killed": false,
+      "restart_count": 0
+    },
+    "celery_beat": {
+      "health": "healthy",
+      "oom_killed": false,
+      "restart_count": 0
+    },
+    "cloud_free_bytes": 231380914176,
+    "hard_reserve_bytes": 107374182400,
+    "tushare_worker": {
+      "health": "healthy",
+      "oom_killed": false,
+      "restart_count": 0
+    },
+    "whole_project_snapshot_timer": {
+      "active": false,
+      "enabled": false,
+      "reason": "await_disk_expansion_and_peak_headroom_validation"
+    }
+  },
+  "schema_version": 1,
+  "status": "verified_fixed_release_mirrored_offline_readable"
+}

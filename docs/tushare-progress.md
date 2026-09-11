@@ -768,3 +768,12 @@
 - 合计904次HTTP 200、0次429、1281772行。904个object、904个observation与903个Parquet逐实体SHA通过，少1个Parquet对应真实empty。权威闭包`validation/exact-history-wave5-20260911/closure.json` SHA256为`f6d735723ca2204af5fbba28ebb85b1e05572ab09b321ecd1a3d9e400f7b4c6d`；worker与Beat恢复healthy、restart0、OOM false。
 - 08:05只读一致快照显示history尚有2205669 pending、3570 split_pending。最大待扩展族依次包括`dc_member`346878、股东集中度173867、`fina_mainbz`134362、`index_daily`102082、`factor_value`101987、`tdx_member`101980、筹码族85465、ETF申赎篮子82051、`fund_portfolio`45725。下一阶段优先为`index_daily`和`fina_mainbz`增加同等级exact runner，再处理需PIT版本/known_at/来源证据的成员类与ETF篮子；`cyq_perf`继续受200000/日硬账本约束。
 - authority约108426751071字节、云盘可用232011051008字节。当前固定版仍为`data-bdb8d5c7…`，第四、第五波与NPR链等待08:17后的正常发布和Mac镜像；完整历史、修订/PIT与RRG准入仍未闭合。机器证据为`docs/tushare-exact-history-wave5-20260911.evidence.json`。
+
+## 2026-09-11 08:36 第四、五波固定版发布与Mac断网验收
+
+- 正常定时任务`bab2fab7…`用215.575秒执行`publish_only`，0次上游请求，原子发布`data-512b55ad56927ba2924e95bd0904ac35df963b4243d2df5b51f2a9a04b54cbca`。289623876字节manifest实算SHA与release ID一致，包含748694个文件条目和97480个数据集条目。
+- 固定版闭包确认NPR首个尾批及第四、第五波至少1813个唯一object、1813个observation和1811个Parquet全部进入发行清单并通过物理SHA，检查5437个发行路径，错误0；相关数据约644.05MB。最终权威闭包`validation/release-512b55ad-wave45-closure-20260911-v3.json` SHA256为`8174984804f4bfbfa66037a44e4f613ad735369785a8b36c1c4934c08d6a6a69`。
+- 发布器按设计排除`validation/`。13个批次manifest、receipt和波次闭包在authority独立通过存在性与SHA校验；前两个不可变闭包文件分别记录清单分段标记和验证目录纳入策略的错误假设，由v3显式取代，没有删除审计轨迹。
+- Mac标准LaunchAgent第156次运行下载10080个文件、完整校验748694项，exit0、stderr 0字节，原子追平同一release和manifest SHA。生产镜像在`--network none`、socket/DNS双重阻断、两个Token变量为空和只读挂载下，`fund_daily@20160426`、`dividend@SH600416`、`anns_d@20120201..20120215`及`npr`均返回5行，上游调用0；NPR 20080316—20080324窄窗真实返回0行，保持为空而未补值或重拉。
+- 发布报告继续保留账户500rpm、`cyq_perf`每日200000次硬账本、10100积分及2026-12-05后预计8100积分事实，并在到期前85天产生可观察提醒；证据不含Token或订单信息。API、专用worker和Beat均healthy、restart0、OOM false；云盘可用231380914176字节，高于100GiB硬线。
+- 全库任务继续推进，08:36快照为91794 done、81304 empty、3875074 pending、3997 split_pending。完整历史、历史修订和PIT仍未闭合；RRG P0仍缺带`known_at`、修订版本与来源证据的中信一级行业分类及历史成员，因此保持`blocked_data`。整机快照timer继续disabled/inactive，待扩盘和峰值headroom验证后再恢复。机器证据为`docs/tushare-fixed-release-wave45-20260911.evidence.json`。

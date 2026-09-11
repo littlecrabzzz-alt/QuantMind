@@ -1,0 +1,13 @@
+# Tushare fixed release closure for waves 4 and 5
+
+- Owner boundary: the cloud authority remained the sole formal writer; Mac only pulled a fixed release and ran read-only queries.
+- Publication: scheduled task `bab2fab7…` completed in 215.575 seconds as `publish_only`, made zero upstream requests, and atomically published `data-512b55ad56927ba2924e95bd0904ac35df963b4243d2df5b51f2a9a04b54cbca`.
+- Manifest: the 289,623,876-byte body hashes exactly to the release ID and contains 748,694 file entries plus 97,480 dataset entries.
+- Inclusion closure: the fixed version includes at least the NPR residual first batch and exact waves 4 and 5. Physical verification passed for 1,813 unique objects, 1,813 observations, and 1,811 Parquet files, with no missing manifest path or SHA error. Authority closure `validation/release-512b55ad-wave45-closure-20260911-v3.json` has SHA-256 `8174984804f4bfbfa66037a44e4f613ad735369785a8b36c1c4934c08d6a6a69`.
+- Validation evidence boundary: the release builder intentionally excludes `validation/`; 13 batch manifests, receipts, and wave closures were verified independently on the authority. Two immutable failed closure attempts record corrected parser and manifest-policy assumptions; v3 supersedes both.
+- Mac mirror: LaunchAgent run 156 downloaded 10,080 files, verified all 748,694 manifest files, exited 0, wrote no stderr, and switched the local pointer to the same manifest hash.
+- Offline acceptance: in `quantmind-oss:latest`, with `--network none`, socket/DNS guards, both token variables empty, and a read-only data mount, `fund_daily`, `dividend`, `anns_d`, and `npr` each returned five local rows with zero upstream calls. An NPR 2008-03-16..24 window returned a valid local empty result and was not filled or re-fetched.
+- Rate policy: the publication report retained the 500 rpm account ceiling, 200,000/day `cyq_perf` cap, user-reported 10,100 points, expected 8,100 points after 2026-12-05, and an expiry-within-90-days notice. No token or order detail is present.
+- Runtime: API, dedicated Tushare worker, and Beat are healthy with restart 0 and OOM false. Cloud free space is 231,380,914,176 bytes, above the 100 GiB hard reserve. The whole-project snapshot timer remains disabled until disk expansion and peak-headroom validation.
+- Boundaries: `history_complete=false`, historical versions and PIT remain incomplete, and RRG remains `blocked_data`. Its P0 input gap is versioned CITIC L1 classification and historical membership with `known_at`, revision, and source evidence.
+- Machine evidence: `docs/tushare-fixed-release-wave45-20260911.evidence.json`.
