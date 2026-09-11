@@ -103,6 +103,11 @@ class FinancialPitBatchTests(unittest.TestCase):
         self.assertEqual(result["status"], "plan_only")
         self.assertEqual(result["verified_jobs"], 6)
         self.assertFalse(result["would_access_authority"])
+        self.assertFalse(result["would_access_credentials"])
+        self.assertFalse(result["would_call_upstream"])
+        self.assertFalse(result["would_write"])
+        self.assertFalse(result["would_publish"])
+        self.assertEqual(result["preparation_sha256"], runner.preparation_sha256())
 
         legacy_manifest = self.base / "legacy-batch.json"
         legacy = json.loads(self.manifest.read_bytes())
@@ -115,6 +120,12 @@ class FinancialPitBatchTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "hash mismatch"):
             runner.run_batch(self.manifest, "0" * 64)
+        with self.assertRaisesRegex(ValueError, "preparation hash mismatch"):
+            runner.run_batch(
+                self.manifest,
+                self.manifest_sha,
+                expected_preparation_sha256="0" * 64,
+            )
 
     def test_prepare_balances_markets_and_skips_cross_epoch_logical_duplicates(self):
         root = self.base / "balanced-authority"
@@ -252,6 +263,7 @@ class FinancialPitBatchTests(unittest.TestCase):
                 expected_task_ids_sha256=self.verified["all_task_ids_sha256"],
                 expected_config_sha256=runner.sha(self.config_path),
                 expected_helper_sha256=runner.helper_sha256(),
+                expected_preparation_sha256=runner.preparation_sha256(),
                 root=self.root,
                 max_requests=3,
                 max_seconds=10,

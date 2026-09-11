@@ -40,6 +40,10 @@ def helper_sha256():
     return sha(Path(__file__).resolve())
 
 
+def preparation_sha256():
+    return sha(Path(preparation.__file__).resolve())
+
+
 def _regular(path, label):
     path = Path(path)
     if path.is_symlink() or not path.is_file():
@@ -117,6 +121,7 @@ def _execute(
     manifest_sha256,
     expected_task_ids_sha256,
     expected_config_sha256,
+    expected_preparation_sha256,
     max_requests,
     max_seconds,
 ):
@@ -204,6 +209,7 @@ def _execute(
         "all_task_ids_sha256": expected_task_ids_sha256,
         "authority_config_sha256": expected_config_sha256,
         "helper_sha256": helper_sha256(),
+        "preparation_sha256": expected_preparation_sha256,
         "verified_jobs": len(verified["records"]),
         "before_states": before_states,
         "after_states": after_states,
@@ -227,6 +233,7 @@ def run_batch(
     expected_task_ids_sha256=None,
     expected_config_sha256=None,
     expected_helper_sha256=None,
+    expected_preparation_sha256=None,
     root=None,
     max_requests=MAX_UPSTREAM_REQUESTS,
     max_seconds=MAX_SECONDS,
@@ -237,8 +244,14 @@ def run_batch(
     if type(max_seconds) not in (int, float) or not 0 < max_seconds <= MAX_SECONDS:
         raise ValueError("Wall-clock limit must be greater than 0 and at most 90 seconds")
     current_helper_sha256 = helper_sha256()
+    current_preparation_sha256 = preparation_sha256()
     if expected_helper_sha256 and expected_helper_sha256 != current_helper_sha256:
         raise ValueError("Explicit helper hash mismatch")
+    if (
+        expected_preparation_sha256
+        and expected_preparation_sha256 != current_preparation_sha256
+    ):
+        raise ValueError("Explicit preparation hash mismatch")
     if not execute:
         with ExitStack() as guards:
             for target in (
@@ -257,6 +270,7 @@ def run_batch(
             "batch_manifest_sha256": manifest_sha256,
             "all_task_ids_sha256": verified["all_task_ids_sha256"],
             "helper_sha256": current_helper_sha256,
+            "preparation_sha256": current_preparation_sha256,
             "verified_jobs": len(verified["records"]),
             "api_counts": verified["api_counts"],
             "max_upstream_calls": max_requests,
@@ -264,6 +278,7 @@ def run_batch(
             "would_access_authority": False,
             "would_access_credentials": False,
             "would_call_upstream": False,
+            "would_write": False,
             "would_publish": False,
         }
     if not all(
@@ -272,6 +287,7 @@ def run_batch(
             expected_task_ids_sha256,
             expected_config_sha256,
             expected_helper_sha256,
+            expected_preparation_sha256,
         )
     ):
         raise ValueError("Execute requires pinned task, config and helper SHA-256 values")
@@ -283,6 +299,7 @@ def run_batch(
         manifest_sha256,
         expected_task_ids_sha256,
         expected_config_sha256,
+        expected_preparation_sha256,
         max_requests,
         max_seconds,
     )
@@ -295,6 +312,7 @@ def main():
     parser.add_argument("--expected-task-ids-sha256")
     parser.add_argument("--expected-config-sha256")
     parser.add_argument("--expected-helper-sha256")
+    parser.add_argument("--expected-preparation-sha256")
     parser.add_argument("--root", type=Path, default=pipeline_module.ROOT)
     parser.add_argument("--max-requests", type=int, default=MAX_UPSTREAM_REQUESTS)
     parser.add_argument("--max-seconds", type=float, default=MAX_SECONDS)
@@ -306,6 +324,7 @@ def main():
         expected_task_ids_sha256=args.expected_task_ids_sha256,
         expected_config_sha256=args.expected_config_sha256,
         expected_helper_sha256=args.expected_helper_sha256,
+        expected_preparation_sha256=args.expected_preparation_sha256,
         root=args.root,
         max_requests=args.max_requests,
         max_seconds=args.max_seconds,
