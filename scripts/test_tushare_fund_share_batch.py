@@ -101,6 +101,7 @@ class FundShareBatchTests(unittest.TestCase):
         self.assertFalse(result["would_access_authority"])
         self.assertFalse(result["would_access_credentials"])
         self.assertFalse(result["would_call_upstream"])
+        self.assertFalse(result["would_write"])
         self.assertFalse(result["would_publish"])
         self.assertNotEqual(runner.helper_sha256(), runner.sha(Path(runner.__file__)))
         with self.assertRaisesRegex(ValueError, "hash mismatch"):

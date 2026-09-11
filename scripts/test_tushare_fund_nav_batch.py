@@ -163,6 +163,7 @@ class FundNavBatchTests(unittest.TestCase):
         self.assertEqual(result["verified_jobs"], 4)
         self.assertFalse(result["would_access_authority"])
         self.assertFalse(result["would_access_credentials"])
+        self.assertFalse(result["would_write"])
         with self.assertRaisesRegex(ValueError, "hash mismatch"):
             runner.run_batch(self.manifest, "0" * 64)
         with self.assertRaisesRegex(ValueError, "preparation hash mismatch"):
