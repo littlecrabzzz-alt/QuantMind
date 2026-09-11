@@ -14,6 +14,30 @@ from scripts import prepare_tushare_fund_portfolio_batch as preparation
 from scripts import run_tushare_fund_portfolio_batch as runner
 
 
+def insert_legacy_variant(db, source_task_id, epoch):
+    row = db.execute(
+        "SELECT job,priority,group_name FROM jobs WHERE id=?", (source_task_id,)
+    ).fetchone()
+    job = json.loads(row[0])
+    job["required_fields"] = list(preparation.LEGACY_REQUIRED_FIELDS)
+    job["nullable_fields"] = []
+    logical_key = digest(json_bytes(job))
+    task_id = digest(json_bytes([logical_key, epoch]))
+    db.execute(
+        "INSERT INTO jobs(id,logical_key,epoch,job,priority,state,tries,group_name) "
+        "VALUES(?,?,?,?,?,'pending',0,?)",
+        (
+            task_id,
+            logical_key,
+            epoch,
+            json_bytes(job).decode(),
+            row[1],
+            row[2],
+        ),
+    )
+    return task_id
+
+
 class FundPortfolioBatchTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -40,6 +64,9 @@ class FundPortfolioBatchTest(unittest.TestCase):
         self.a_new_publication = enqueue(
             "510300.SH", period="20250930", ann_date="20251030"
         )
+        self.a_new_publication_legacy = insert_legacy_variant(
+            pipeline.db, self.a_new_publication, preparation.EPOCH
+        )
         self.b_new = enqueue("159919.SZ", period="20240930")
         self.b_old = enqueue("159919.SZ", period="20240630")
 
@@ -58,11 +85,8 @@ class FundPortfolioBatchTest(unittest.TestCase):
         self.filler = enqueue("512000.SH", period="20231231")
 
         self.attempted_history = enqueue("588000.SH", period="20250630")
-        attempted_sibling = pipeline.enqueue(
-            preparation.API,
-            {"ts_code": "588000.SH", "period": "20250630"},
-            priority=30,
-            epoch="20260901",
+        attempted_sibling = insert_legacy_variant(
+            pipeline.db, self.attempted_history, "20260901"
         )
         pipeline.db.execute(
             "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
@@ -70,11 +94,8 @@ class FundPortfolioBatchTest(unittest.TestCase):
         )
 
         self.terminal_history = enqueue("513100.SH", period="20250331")
-        terminal_sibling = pipeline.enqueue(
-            preparation.API,
-            {"ts_code": "513100.SH", "period": "20250331"},
-            priority=30,
-            epoch="20260908",
+        terminal_sibling = insert_legacy_variant(
+            pipeline.db, self.terminal_history, "20260908"
         )
         pipeline.db.execute(
             "UPDATE jobs SET state='empty',tries=1 WHERE id=?", (terminal_sibling,)
@@ -128,10 +149,12 @@ class FundPortfolioBatchTest(unittest.TestCase):
         codes = [record["job"]["params"]["ts_code"] for record in manifest["records"]]
 
         self.assertEqual(manifest["source"]["eligible_jobs"], 7)
+        self.assertEqual(manifest["source"]["eligible_variants"], 8)
         self.assertEqual(manifest["source"]["eligible_funds"], 4)
         self.assertEqual(manifest["selected"]["unique_funds"], 4)
         self.assertEqual(len(codes), len(set(codes)))
         self.assertIn(self.a_new_publication, task_ids)
+        self.assertNotIn(self.a_new_publication_legacy, task_ids)
         self.assertNotIn(self.a_late_period, task_ids)
         self.assertEqual(
             manifest["selected"]["selection_counts"]["split_child_leaf"], 1
@@ -144,6 +167,40 @@ class FundPortfolioBatchTest(unittest.TestCase):
             preparation.sha(self.root / "pipeline.sqlite"), database_before
         )
         self.assertEqual(manifest["source"]["rate_gate"]["api_rpm"], 240)
+        self.assertEqual(manifest["selected"]["unique_request_signatures"], 4)
+        self.assertEqual(len(set(manifest["request_signatures"].values())), 4)
+        self.assertEqual(
+            manifest["semantic_dedup"]["winner_rule"],
+            "current_contract_then_task_id",
+        )
+        self.assertEqual(manifest["selected"]["contract_versions"], {"current_v2": 4})
+
+    def test_exactly_legacy_and_current_contract_shapes_are_accepted(self):
+        with closing(sqlite3.connect(self.root / "pipeline.sqlite")) as db:
+            current = json.loads(
+                db.execute(
+                    "SELECT job FROM jobs WHERE id=?", (self.a_new_publication,)
+                ).fetchone()[0]
+            )
+            legacy = json.loads(
+                db.execute(
+                    "SELECT job FROM jobs WHERE id=?",
+                    (self.a_new_publication_legacy,),
+                ).fetchone()[0]
+            )
+        self.assertEqual(
+            preparation.request_from_job(current)["contract_version"], "current_v2"
+        )
+        self.assertEqual(
+            preparation.request_from_job(legacy)["contract_version"], "legacy_v1"
+        )
+        self.assertEqual(
+            preparation.request_from_job(current)["request_signature_sha256"],
+            preparation.request_from_job(legacy)["request_signature_sha256"],
+        )
+        legacy["nullable_fields"] = ["ann_date"]
+        with self.assertRaisesRegex(ValueError, "Unknown.*contract version"):
+            preparation.request_from_job(legacy)
 
     def test_cross_epoch_attempts_terminal_siblings_and_split_parents_are_excluded(
         self,
@@ -167,6 +224,31 @@ class FundPortfolioBatchTest(unittest.TestCase):
         self.assertTrue(set(self.split_children).issubset(task_ids))
         self.assertIn(self.a_late_period, task_ids)
         self.assertNotIn(self.b_old, task_ids)
+
+    def test_pending_date_epoch_variant_does_not_displace_history_leaf(self):
+        catalog = json.loads(
+            (
+                Path(__file__).resolve().parents[1] / "config/tushare-catalog.json"
+            ).read_bytes()
+        )
+        pipeline = runner.pipeline_module.Pipeline(self.root, catalog)
+        try:
+            recent_current = pipeline.enqueue(
+                preparation.API,
+                {"ts_code": "516000.SH", "period": "20250630"},
+                priority=30,
+                epoch="20260908",
+            )
+            legacy_history = insert_legacy_variant(
+                pipeline.db, recent_current, preparation.EPOCH
+            )
+            pipeline.db.commit()
+        finally:
+            pipeline.close()
+        manifest = self._prepare(jobs=8)
+        self.assertIn(
+            legacy_history, {record["task_id"] for record in manifest["records"]}
+        )
 
     def test_plan_only_has_zero_external_and_write_access(self):
         manifest = self._prepare()
@@ -257,6 +339,54 @@ class FundPortfolioBatchTest(unittest.TestCase):
                 ).fetchone()[0],
                 0,
             )
+
+    def test_execute_rechecks_signature_replay_under_lock(self):
+        manifest = self._prepare(jobs=1)
+        pipeline = runner.pipeline_module.Pipeline(
+            self.root,
+            json.loads(
+                (
+                    Path(__file__).resolve().parents[1] / "config/tushare-catalog.json"
+                ).read_bytes()
+            ),
+        )
+        try:
+            with self.assertRaisesRegex(ValueError, "duplicate upstream request"):
+                runner._verify_authority_jobs(
+                    pipeline, [manifest["records"][0], manifest["records"][0]]
+                )
+        finally:
+            pipeline.close()
+        with closing(sqlite3.connect(self.root / "pipeline.sqlite")) as db:
+            replay = insert_legacy_variant(
+                db, manifest["records"][0]["task_id"], "20260910"
+            )
+            db.execute(
+                "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+                (replay, 1, '{"status":"transport_error"}'),
+            )
+            db.commit()
+        with (
+            patch.object(runner.pipeline_module, "ROOT", self.root),
+            patch.object(runner.pipeline_module, "authority"),
+        ):
+            with self.assertRaisesRegex(ValueError, "signature has a prior attempt"):
+                runner.run_batch(
+                    self.output,
+                    preparation.sha(self.output),
+                    expected_task_ids_sha256=manifest["all_task_ids_sha256"],
+                    expected_config_sha256=manifest["source"][
+                        "authority_config_sha256"
+                    ],
+                    expected_helper_sha256=runner.helper_sha256(),
+                    expected_preparation_sha256=runner.preparation_sha256(),
+                    expected_release_id=self.release_id,
+                    expected_release_manifest_sha256=self.release_sha,
+                    root=self.root,
+                    max_requests=1,
+                    max_seconds=10,
+                    execute=True,
+                )
 
     def test_manifest_and_execute_pins_fail_closed(self):
         self._prepare()

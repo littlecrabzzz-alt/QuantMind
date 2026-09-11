@@ -63,7 +63,7 @@ def _verify_release(root, verified):
 
 
 def _verify_authority_jobs(pipeline, records):
-    logical_keys = set()
+    selected_signatures = {}
     for expected in records:
         saved = pipeline.db.execute(
             "SELECT id,logical_key,epoch,job,priority,group_name,state,tries "
@@ -94,19 +94,41 @@ def _verify_authority_jobs(pipeline, records):
             (expected["task_id"],),
         ).fetchone():
             raise ValueError("Authority task is no longer a leaf")
-        logical_keys.add(expected["logical_key"])
-    for logical_key in logical_keys:
-        if pipeline.db.execute(
-            "SELECT 1 FROM attempts a JOIN jobs j ON j.id=a.job_id "
-            "WHERE j.logical_key=? LIMIT 1",
-            (logical_key,),
-        ).fetchone():
-            raise ValueError("Logical request has a prior attempt in another epoch")
-        if pipeline.db.execute(
-            "SELECT 1 FROM jobs WHERE logical_key=? AND state<>'pending' LIMIT 1",
-            (logical_key,),
-        ).fetchone():
-            raise ValueError("Logical request has a terminal sibling in another epoch")
+        signature = preparation.request_from_job(expected["job"])[
+            "request_signature_sha256"
+        ]
+        if signature in selected_signatures:
+            raise ValueError("Batch selects a duplicate upstream request signature")
+        selected_signatures[signature] = expected["task_id"]
+    inventory = pipeline.db.execute(
+        "SELECT j.id,j.epoch,j.group_name,j.job,j.state,j.tries,"
+        "EXISTS(SELECT 1 FROM attempts a WHERE a.job_id=j.id) attempted,"
+        "EXISTS(SELECT 1 FROM partition_children pc WHERE pc.parent_id=j.id) "
+        "has_children FROM jobs j WHERE json_extract(j.job,'$.api_name')=?",
+        (preparation.API,),
+    ).fetchall()
+    pristine_variants = {signature: [] for signature in selected_signatures}
+    for row in inventory:
+        request = preparation.request_from_job(json.loads(row["job"]))
+        signature = request["request_signature_sha256"]
+        if signature not in selected_signatures:
+            continue
+        if row["attempted"]:
+            raise ValueError("Upstream request signature has a prior attempt")
+        if row["state"] != "pending":
+            raise ValueError("Upstream request signature has a terminal variant")
+        if (
+            row["epoch"] == preparation.EPOCH
+            and row["group_name"] == preparation.GROUP
+            and row["tries"] == 0
+            and not row["has_children"]
+        ):
+            pristine_variants[signature].append(
+                (request["contract_version"] != "current_v2", row["id"])
+            )
+    for signature, variants in pristine_variants.items():
+        if not variants or min(variants)[1] != selected_signatures[signature]:
+            raise ValueError("Preferred upstream request variant changed")
 
 
 def _execute(
@@ -215,9 +237,16 @@ def _execute(
         "api_counts": verified["api_counts"],
         "selected": verified["selected"],
         "selection_reasons": verified["selection_reasons"],
+        "semantic_dedup": verified["semantic_dedup"],
+        "request_signatures": verified["request_signatures"],
+        "all_request_signatures_sha256": verified["all_request_signatures_sha256"],
         "boundaries": verified["boundaries"],
         "eligible_jobs": verified["source"]["eligible_jobs"],
+        "eligible_variants": verified["source"]["eligible_variants"],
         "eligible_task_ids_sha256": verified["source"]["eligible_task_ids_sha256"],
+        "eligible_request_signatures_sha256": verified["source"][
+            "eligible_request_signatures_sha256"
+        ],
         "rate_gate": verified["source"]["rate_gate"],
         "helper_sha256": helper_sha256(),
         "preparation_sha256": preparation_sha256(),
@@ -296,9 +325,16 @@ def run_batch(
             "api_counts": verified["api_counts"],
             "selected": verified["selected"],
             "selection_reasons": verified["selection_reasons"],
+            "semantic_dedup": verified["semantic_dedup"],
+            "request_signatures": verified["request_signatures"],
+            "all_request_signatures_sha256": verified["all_request_signatures_sha256"],
             "boundaries": verified["boundaries"],
             "eligible_jobs": verified["source"]["eligible_jobs"],
+            "eligible_variants": verified["source"]["eligible_variants"],
             "eligible_task_ids_sha256": verified["source"]["eligible_task_ids_sha256"],
+            "eligible_request_signatures_sha256": verified["source"][
+                "eligible_request_signatures_sha256"
+            ],
             "rate_gate": verified["source"]["rate_gate"],
             "helper_sha256": current_helper_sha256,
             "preparation_sha256": current_preparation_sha256,
