@@ -856,3 +856,8 @@
 - Normal publish-only generated `data-5f796b5046adfec0d3cb98bff41b00c098a87b090b9df7a1aeeb40202b0d2019`; its 312082232-byte manifest contains 106454 datasets and 799038 files with retained observations enabled. The standard Mac LaunchAgent downloaded 6933 new physical files, verified all manifest entries, exited 0, and atomically switched local `CURRENT`.
 - The exact-batch export resolved 1701 unique physical references: 600 objects, 600 observations, and 501 Parquet files totaling 16688120 bytes. Manifest metadata, local sizes, and SHA256 values all matched with zero errors.
 - The production image, with `--network none`, empty Token variables, and read-only mirror mount, read three rows each from `fund_portfolio`, `income_vip`, `balancesheet_vip`, and `cashflow_vip`, with zero upstream calls. This closes local availability for these batches; complete history, revisions, `known_at`, and PIT coverage remain open. Machine evidence is `docs/tushare-fixed-release-5f796b-financial-portfolio-20260911.evidence.json`.
+
+### 2026-09-11 index_daily exact batch 4
+
+- 在`data-5f796b5046adfec0d3cb98bff41b00c098a87b090b9df7a1aeeb40202b0d2019`固定版、配置、候选清单、任务清单、preparer和helper全部哈希冻结后，plan-only验证240个pristine `history`任务且上游调用为0。保守240次窗口在31.561秒完成，全部HTTP 200，得到217 done、23 empty和34859行，覆盖240个`.CSI`指数代码。
+- 240个object、240个observation和217个Parquet共697个唯一引用、8191869字节，逐文件SHA256通过。批次没有发布或切换`CURRENT`；Worker与Beat恢复healthy。云盘可用224923148288字节，距100 GiB硬线还有117548965888字节。697项等待后续正常固定版发布和Mac镜像闭环；完整历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-index-daily-batch4-20260911.evidence.json`。
