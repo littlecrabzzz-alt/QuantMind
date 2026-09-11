@@ -1156,3 +1156,10 @@
 - 两轮独立复核发现并修复跨行业区间冲突漏检、任意来源权威性升级、绝对路径、错误后的半成品、根manifest自签升级、Parquet行级与报告边界升级。最终16项测试、Ruff、编译和diff检查通过；重签后2/2行级升级与18/18报告边界升级均被拒绝。
 - 对Mac固定版a21e的真实负向控制读取6740条`ci_index_member`，0上游调用；没有权威公告包时对账0条、历史`known_at`验证0条，并发现11组源区间重叠，结果保持`blocked_data`与`rrg_ready=false`。没有访问凭据、改写QuantDB或修改RRG case。
 - 下一步需要取得并核验中信权威公告及修订链，当前`in_date`、`out_date`和抓取时间仍不能作为历史可知时间。机器证据为`docs/tushare-rrg-member-pit-reconciler-20260912.evidence.json`。
+
+### 2026-09-12 基金持仓第13批
+
+- Beat先停、普通任务在Worker warm shutdown中自然完成，全程未撤销任务；生产preparer精确复现只读审计候选哈希，从11608个可用语义请求中冻结240个`current_v2`历史叶任务，与第7至12批任务ID和请求签名均零重叠。
+- 生产容器66.574秒完成240次HTTP 200：122 done、118 empty、4912行、不确定调用0，吞吐216.301次/分钟，低于接口保守240 rpm与账户500 rpm门。独立审计逐项核对job、attempt、result和observation链，并验证602个唯一物理引用、1568175字节的大小与SHA256。
+- Worker和Beat恢复healthy、restart0、OOM false，普通采集继续；云盘距100GiB硬线还有411031371776字节。首次把preparer输出指向authority被保护逻辑在锁、凭据、上游和数据写入前拒绝，校验并清理零字节stdout占位后改用独立临时挂载完成。
+- `CURRENT`仍为a21e，第13批尚未进入固定发布和Mac镜像。完整持仓、每日PCF、历史修订、盘中`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fund-portfolio-batch13-20260912.evidence.json`。
