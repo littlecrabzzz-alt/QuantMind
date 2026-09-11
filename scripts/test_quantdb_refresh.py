@@ -13,6 +13,26 @@ import dual_node_snapshot as snapshot
 
 
 class QuantDBRefresh(unittest.TestCase):
+    def test_signal_interrupt_runs_cleanup(self):
+        import subprocess
+        import sys
+
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp) / "restored"
+            code = (
+                "import os,signal,sys; from pathlib import Path; "
+                "import dual_node_snapshot as s; s.install_signal_handlers()\n"
+                "try: os.kill(os.getpid(), signal.SIGTERM)\n"
+                "finally: Path(sys.argv[1]).write_text('restored')\n"
+            )
+            result = subprocess.run(
+                [sys.executable, "-c", code, str(marker)],
+                cwd=Path(__file__).parent,
+                capture_output=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(marker.read_text(), "restored")
+
     def test_publish_only_quantdb_and_preserve_previous_version(self):
         with tempfile.TemporaryDirectory() as tmp:
             remote = Path(tmp)

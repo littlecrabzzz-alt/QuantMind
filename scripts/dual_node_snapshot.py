@@ -271,7 +271,7 @@ def install_mac_pull():
     print("Installed hourly snapshot pull:", destination)
 
 
-if __name__ == "__main__":
+def install_signal_handlers():
     def interrupted(signum, frame):
         # Give finally a chance to restore writers even if SSH disconnects or
         # another interrupt arrives while Docker is restarting them.
@@ -281,6 +281,10 @@ if __name__ == "__main__":
 
     for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, interrupted)
+
+
+if __name__ == "__main__":
+    install_signal_handlers()
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("create", "pull", "install-mac-pull"))

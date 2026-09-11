@@ -229,6 +229,8 @@ def refresh(project, base):
 
 
 if __name__ == '__main__':
+    snapshot.install_signal_handlers()
+    os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['publish', 'refresh', 'apply'])
     parser.add_argument('--project', type=Path, default=snapshot.PROJECT)
