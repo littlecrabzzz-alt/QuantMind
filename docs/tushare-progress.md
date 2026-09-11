@@ -1032,3 +1032,11 @@
 - 财务20记录后再次经无revoke流程排空，从108950个合格任务中冻结300个`index_daily` pristine历史叶，覆盖300个唯一`.CSI`代码、请求范围2026-01-01至2026-09-01；固定版、合格库存、任务、配置、preparer和helper均哈希冻结，plan-only为0调用/0写入。
 - 41.893秒完成300次HTTP 200：298 done、2 empty，保留47942行。300个object、300个observation和298个Parquet共898个唯一引用、9917692字节，逐文件SHA256通过，不确定调用0。
 - Worker与Beat恢复healthy，云盘距100 GiB硬线还有113341112320字节；`CURRENT`仍为266b。常规exact窗口继续保持300请求/90秒；898项等待正常固定版和Mac镜像。完整指数历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-index-daily-batch9-20260911.evidence.json`。
+
+
+### 2026-09-11 基金行情第16批300请求灰度闭环
+
+- 固定版266b后的第三个exact窗口经无revoke流程排空，冻结`fund_daily`和`fund_adj`各150个pristine历史叶，覆盖相同的150个开市日（2009-05-04至2009-12-09）。300项均为pending、tries 0、attempt 0；固定版、日历、任务、配置、准备器和执行器哈希全部锁定，生产镜像plan-only为0 authority、0凭据、0上游、0写入和0发布。
+- 真实执行45.987秒完成300次请求，全部HTTP 200并进入done，共保留23128行，不确定调用0。300个object、300个observation和300个Parquet构成900个唯一物理引用、4813161字节，逐文件SHA256通过。
+- 主机准备器因缺少`pyarrow`在导入阶段失败，尚未访问authority、凭据或上游；改用生产镜像后完成。服务恢复后的首次人工Celery探针用了旧模块名，只影响探针客户端；按容器实际app重试后3个节点均pong，Worker与Beat为healthy。
+- 云盘距100 GiB硬线还有113327689728字节，`CURRENT`仍为266b。900项等待正常固定版和Mac镜像；完整基金历史、修订、可交易性、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-price-batch16-20260911.evidence.json`。
