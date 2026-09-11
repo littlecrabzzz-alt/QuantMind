@@ -198,8 +198,13 @@ def pull_snapshot(base=None, only_new=False, remote_base="snapshots"):
             metadata_args += ["--link-dest=" + str(previous)]
             data_args += ["--link-dest=" + str(previous / "project")]
         else:
-            # First download reuses matching local bytes WITHOUT hard-linking live data.
-            data_args += ["--copy-dest=" + str(PROJECT)]
+            # QuantDB's first limited snapshot can share immutable full-snapshot files.
+            # Never hard-link the writable sandbox or the live legacy data tree.
+            full_reference = (base.parent / "latest" / "project").resolve()
+            if remote_base == "quantdb-snapshots" and full_reference.is_dir():
+                data_args += ["--link-dest=" + str(full_reference)]
+            else:
+                data_args += ["--copy-dest=" + str(PROJECT)]
             backups = sorted((PROJECT / "logs").glob("dual-node-*/postgres.dump"))
             if backups:
                 # PostgreSQL dump headers can change; rsync still reuses matching blocks.
