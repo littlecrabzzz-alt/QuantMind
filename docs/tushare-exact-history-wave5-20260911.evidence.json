@@ -1,0 +1,302 @@
+{
+  "authority": {
+    "apparent_bytes_after_wave": 108426751071,
+    "closure": "validation/exact-history-wave5-20260911/closure.json",
+    "closure_sha256": "f6d735723ca2204af5fbba28ebb85b1e05572ab09b321ecd1a3d9e400f7b4c6d",
+    "fixed_input_release": "data-bdb8d5c76f676b5595a8af871cbc563e3705ff25713c4a5514c61b9aca9e6b68",
+    "free_bytes_after_wave": 232011051008,
+    "hard_reserve_bytes": 107374182400,
+    "role": "cloud_formal_writer",
+    "root": "/data/tushare"
+  },
+  "boundaries": {
+    "historical_versions_complete": false,
+    "history_complete": false,
+    "pit_verified": false,
+    "rrg_status": "blocked_data",
+    "whole_project_snapshot_timer_active": false,
+    "whole_project_snapshot_timer_enabled": false
+  },
+  "exact_wave5": {
+    "aggregate": {
+      "elapsed_seconds_sum": 164.272,
+      "http_200": 904,
+      "http_429": 0,
+      "reference_occurrences": {
+        "object": 904,
+        "observation": 904,
+        "parquet": 903
+      },
+      "rows": 1281772,
+      "tasks": 1084,
+      "unique_references_verified": {
+        "object": 904,
+        "observation": 904,
+        "parquet": 903
+      },
+      "upstream_calls": 904
+    },
+    "batches": {
+      "anns_d_batch_4": {
+        "current_release_switched": false,
+        "elapsed_seconds": 66.745,
+        "http_statuses": {
+          "200": 180
+        },
+        "manifest_sha256": "69fc52e5ead0629c40b58d0c004e37a29a268884d98c60ef9ca5c05cecd7276e",
+        "receipt_id": "b99c7b7eac1328d089da252302291ae60026a5a86b032733e4cd30302cd410f0",
+        "reference_bytes_verified": {
+          "object": 189417168,
+          "observation": 156923,
+          "parquet": 62162336
+        },
+        "reference_occurrences": {
+          "object": 180,
+          "observation": 180,
+          "parquet": 180
+        },
+        "release_published": false,
+        "result_statuses": {
+          "possibly_truncated": 174,
+          "sample_ok": 6
+        },
+        "rows": 1036404,
+        "rows_by_api": {
+          "anns_d": 1036404
+        },
+        "states": {
+          "done": 6,
+          "pending": 180,
+          "split_pending": 174
+        },
+        "task_inventory_sha256": "524b33263afd394dd5c765a5cc58fa0fbcac33898cddfa85ba524647827ff8c7",
+        "tasks": 360,
+        "upstream_calls": 180
+      },
+      "dividend_batch_5": {
+        "current_release_switched": false,
+        "elapsed_seconds": 51.828,
+        "http_statuses": {
+          "200": 360
+        },
+        "manifest_sha256": "34ce92b18ac0a3b4109cf6ecc2ca19f99037b699ac113a827ec12ddfbb01b04b",
+        "receipt_id": "d6a06ae17e2990672900362be777fd89218310d8ab8b2ed6ebab1dcdb5801554",
+        "reference_bytes_verified": {
+          "object": 2794880,
+          "observation": 322561,
+          "parquet": 3728482
+        },
+        "reference_occurrences": {
+          "object": 360,
+          "observation": 360,
+          "parquet": 360
+        },
+        "release_published": false,
+        "result_statuses": {
+          "sample_ok": 360
+        },
+        "rows": 22381,
+        "rows_by_api": {
+          "dividend": 22381
+        },
+        "states": {
+          "done": 360
+        },
+        "task_inventory_sha256": "a68d924071001a8a169fbe9ec0678c986cc9d965d452af31a94befed85770ff6",
+        "tasks": 360,
+        "upstream_calls": 360
+      },
+      "fund_price_batch_6": {
+        "current_release_switched": false,
+        "elapsed_seconds": 43.795,
+        "http_statuses": {
+          "200": 360
+        },
+        "manifest_sha256": "6f475220c95ada4707ff8d79d3eefa77180fa7d169863606d4873a5a5b2645bb",
+        "receipt_id": "1a49b266ec53ff9e807314434ca2349733a6a0458129b96c98ad8ff830ccc900",
+        "reference_bytes_verified": {
+          "object": 12588041,
+          "observation": 318880,
+          "parquet": 16349985
+        },
+        "reference_occurrences": {
+          "object": 360,
+          "observation": 360,
+          "parquet": 360
+        },
+        "release_published": false,
+        "result_statuses": {
+          "sample_ok": 360
+        },
+        "rows": 221980,
+        "rows_by_api": {
+          "fund_adj": 114721,
+          "fund_daily": 107259
+        },
+        "states": {
+          "done": 360
+        },
+        "task_inventory_sha256": "c52c4f7871f291bfb63ae5d0001baa124d0d55eecbfa6eb0274003e5ebe74be9",
+        "tasks": 360,
+        "upstream_calls": 360
+      },
+      "npr_history_leaf_batch_3": {
+        "current_release_switched": false,
+        "elapsed_seconds": 1.904,
+        "http_statuses": {
+          "200": 4
+        },
+        "manifest_sha256": "9f1b97b58d703501f689b77efbe514f8a26e205c5f2ac5297239de15d5a54831",
+        "receipt_id": "8664b7396f714f50f923d3ae866d6149e0fb4ae8fd332c61316a67c84821ee44",
+        "reference_bytes_verified": {
+          "object": 13518094,
+          "observation": 3631,
+          "parquet": 3224301
+        },
+        "reference_occurrences": {
+          "object": 4,
+          "observation": 4,
+          "parquet": 3
+        },
+        "release_published": false,
+        "result_statuses": {
+          "empty_unverified": 1,
+          "possibly_truncated": 2,
+          "sample_ok": 1
+        },
+        "rows": 1007,
+        "rows_by_api": {
+          "npr": 1007
+        },
+        "states": {
+          "done": 1,
+          "empty": 1,
+          "split_pending": 2
+        },
+        "task_inventory_sha256": "97f6710d6a2f0c54b20996723e3d061897716cc8d6bda99a2d3270cecfe5d3e9",
+        "tasks": 4,
+        "upstream_calls": 4
+      }
+    },
+    "current_release_switched": false,
+    "fund_price_trade_date_range": [
+      "20160426",
+      "20170117"
+    ],
+    "release_published": false
+  },
+  "execution_contract": {
+    "plan_only": {
+      "all_batches_verified": true,
+      "would_access_authority": false,
+      "would_access_credentials": false,
+      "would_call_upstream": false,
+      "would_publish": false,
+      "would_write": false
+    },
+    "rate_policy": {
+      "account_rpm": 500,
+      "announcement_requested_call_cap": 180,
+      "cyq_perf_daily_cap": 200000,
+      "mode": "tiered_v1"
+    },
+    "safe_drain": {
+      "beat_stopped_before_freeze": true,
+      "consumer_cancelled": "tushare_acquire",
+      "inflight_elapsed_seconds": 186.70773031376302,
+      "inflight_task_naturally_completed": "b2bd0a1d-9609-4548-b076-c22e0f5054f1",
+      "revoked_tasks": 0,
+      "worker_stopped_only_after_active_and_reserved_empty": true
+    },
+    "service_restore": {
+      "api_health": "healthy",
+      "beat_health": "healthy",
+      "oom_killed": false,
+      "restart_count": 0,
+      "tushare_worker_health": "healthy",
+      "tushare_worker_memory_bytes": 2147483648
+    }
+  },
+  "git": {
+    "branch": "master",
+    "head_before_evidence_commit": "f89cf0c1ce9dd4bc5890fc9d767624c74a090d9a"
+  },
+  "history_backlog_snapshot": {
+    "history_pending": 2205669,
+    "history_split_pending": 3570,
+    "next_exact_runner_families": [
+      {
+        "api": "dc_member",
+        "pending": 346878,
+        "requirement": "preserve PIT version, known_at, and source evidence"
+      },
+      {
+        "api": "top10_holders+top10_floatholders",
+        "pending": 173867
+      },
+      {
+        "api": "fina_mainbz",
+        "pending": 134362
+      },
+      {
+        "api": "index_daily",
+        "pending": 102082
+      },
+      {
+        "api": "factor_value",
+        "pending": 101987
+      },
+      {
+        "api": "tdx_member",
+        "pending": 101980
+      },
+      {
+        "api": "cyq_perf+cyq_chips",
+        "pending": 85465,
+        "requirement": "retain cyq_perf daily quota"
+      },
+      {
+        "api": "etf_sh_cons+etf_sz_cons",
+        "pending": 82051
+      },
+      {
+        "api": "fund_portfolio",
+        "pending": 45725
+      }
+    ],
+    "observed_at": "2026-09-11T00:05:32Z",
+    "observed_before_wave5_completed": true,
+    "pipeline_database_bytes": 5569683456,
+    "pipeline_schema_version": 6,
+    "top_groups": {
+      "dc_extra": 352602,
+      "equity_event": 178836,
+      "etf_basket": 82051,
+      "factor_library": 101987,
+      "global": 148342,
+      "market": 136642,
+      "market_sentiment": 233550,
+      "research_extra": 166242,
+      "structured": 173460,
+      "technical_extra": 123453
+    }
+  },
+  "observed_at": "2026-09-11T00:09:05Z",
+  "publication_and_mirror": {
+    "current_manifest_sha256": "bdb8d5c76f676b5595a8af871cbc563e3705ff25713c4a5514c61b9aca9e6b68",
+    "current_release_id": "data-bdb8d5c76f676b5595a8af871cbc563e3705ff25713c4a5514c61b9aca9e6b68",
+    "mac_poll_interval_seconds": 900,
+    "next_due_at_epoch": 1789085820,
+    "next_due_at_local": "2026-09-11T08:17:00+08:00",
+    "npr_residual_batches_in_current_fixed_release": false,
+    "wave4_in_current_fixed_release": false,
+    "wave5_in_current_fixed_release": false
+  },
+  "schema_version": 1,
+  "security": {
+    "order_or_payment_data_present": false,
+    "token_present": false,
+    "upstream_response_bodies_present": false
+  },
+  "status": "production_verified_unpublished_wave"
+}

@@ -760,3 +760,11 @@
 - 四批合计904次上游调用、904次HTTP 200、0次429、1315020行；逐实体重算904个object、904个observation和904个Parquet SHA全部通过。权威闭包`validation/exact-history-wave4-20260911/closure.json` SHA256为`c7863997652553170b7fc051d9a61c61f5ed09bd94d7b06d612bde5effd5d143`，清单和收据均以0444不可覆盖方式归档。
 - 专用worker与Beat已恢复healthy、restart0、OOM false，主API保持healthy；authority约108096892848字节，云盘可用232403939328字节，高于100GiB硬停线。`CURRENT`仍为`data-bdb8d5c7…`，本波与两批NPR尾项等待08:17之后的正常固定发布及Mac单向镜像。
 - 并行RRG只读审计确认行业价格与日历覆盖已经较高，P0缺口仍是带`known_at`、修订版本和来源证据的中信行业分类与历史成员PIT；继续增加普通价格行不能解除`blocked_data`。完整历史、历史修订和PIT仍未闭合。机器证据为`docs/tushare-exact-history-wave4-20260911.evidence.json`。
+
+## 2026-09-11 08:10 第五次历史精确波次与全库缺口排序
+
+- 第二个有界窗口同样先停Beat、取消专用consumer接新任务，已在途`b2bd0a1d…`用186.708秒自然成功；active/reserved为空后才停worker，未撤销任务。四份新清单固定同一`data-bdb8d5c7…`版本和全部配置/代码/任务哈希，默认plan-only所有访问标志为false。
+- 基金行情第6批覆盖20160426—20170117，43.795秒完成360次、全部done、221980行；分红第5批沪深各180项，51.828秒完成360次、全部done、22381行；NPR第3批4次得到1 done/1 empty/2 split_pending、1007行；公告第4批继续以180次执行上限在66.745秒得到6 done/174 split_pending/180项未开始、1036404行。
+- 合计904次HTTP 200、0次429、1281772行。904个object、904个observation与903个Parquet逐实体SHA通过，少1个Parquet对应真实empty。权威闭包`validation/exact-history-wave5-20260911/closure.json` SHA256为`f6d735723ca2204af5fbba28ebb85b1e05572ab09b321ecd1a3d9e400f7b4c6d`；worker与Beat恢复healthy、restart0、OOM false。
+- 08:05只读一致快照显示history尚有2205669 pending、3570 split_pending。最大待扩展族依次包括`dc_member`346878、股东集中度173867、`fina_mainbz`134362、`index_daily`102082、`factor_value`101987、`tdx_member`101980、筹码族85465、ETF申赎篮子82051、`fund_portfolio`45725。下一阶段优先为`index_daily`和`fina_mainbz`增加同等级exact runner，再处理需PIT版本/known_at/来源证据的成员类与ETF篮子；`cyq_perf`继续受200000/日硬账本约束。
+- authority约108426751071字节、云盘可用232011051008字节。当前固定版仍为`data-bdb8d5c7…`，第四、第五波与NPR链等待08:17后的正常发布和Mac镜像；完整历史、修订/PIT与RRG准入仍未闭合。机器证据为`docs/tushare-exact-history-wave5-20260911.evidence.json`。
