@@ -143,9 +143,10 @@ def _execute(
             or verified["source"]["authority_config_sha256"] != expected_config_sha256
         ):
             raise ValueError("Explicit authority config hash mismatch")
-        if preparation.rate_contracts(json.loads(config_bytes)) != verified[
-            "rate_contracts"
-        ]:
+        if (
+            preparation.rate_contracts(json.loads(config_bytes))
+            != verified["rate_contracts"]
+        ):
             raise ValueError("fina_mainbz rate contracts changed")
         pipeline = pipeline_module.Pipeline(
             root, json.loads((REPO / "config/tushare-catalog.json").read_bytes())
@@ -210,9 +211,7 @@ def _execute(
         "batch_manifest_sha256": manifest_sha256,
         "all_task_ids_sha256": expected_task_ids_sha256,
         "eligible_tasks": verified["source"]["eligible_tasks"],
-        "eligible_task_ids_sha256": verified["source"][
-            "eligible_task_ids_sha256"
-        ],
+        "eligible_task_ids_sha256": verified["source"]["eligible_task_ids_sha256"],
         "authority_config_sha256": expected_config_sha256,
         "release_id": verified["source"]["release_id"],
         "release_manifest_sha256": verified["source"]["release_manifest_sha256"],
@@ -292,9 +291,7 @@ def run_batch(
             "batch_manifest_sha256": manifest_sha256,
             "all_task_ids_sha256": verified["all_task_ids_sha256"],
             "eligible_tasks": verified["source"]["eligible_tasks"],
-            "eligible_task_ids_sha256": verified["source"][
-                "eligible_task_ids_sha256"
-            ],
+            "eligible_task_ids_sha256": verified["source"]["eligible_task_ids_sha256"],
             "authority_config_sha256": verified["source"]["authority_config_sha256"],
             "release_id": verified["source"]["release_id"],
             "release_manifest_sha256": verified["source"]["release_manifest_sha256"],

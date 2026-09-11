@@ -37,8 +37,7 @@ RELEASE_RE = re.compile(r"data-([a-f0-9]{64})")
 DAY_RE = re.compile(r"[0-9]{8}")
 CODE_RE = re.compile(r"[A-Z0-9]+\.(SH|SZ|BJ)")
 EXPECTED_FIELDS = (
-    "bz_code,bz_cost,bz_item,bz_profit,bz_sales,curr_type,end_date,ts_code,"
-    "update_flag"
+    "bz_code,bz_cost,bz_item,bz_profit,bz_sales,curr_type,end_date,ts_code,update_flag"
 )
 BOUNDARIES = {
     "output_end_date_is_report_period": True,
@@ -109,8 +108,7 @@ def rate_contracts(config):
     resolved = resolved_api_rate(API, contract_for(API), config)
     if (
         resolved.get("rpm") != EXPECTED_API_RPM
-        or resolved.get("source", "").split("+")[0]
-        != "points_regular_allowlist_doc290"
+        or resolved.get("source", "").split("+")[0] != "points_regular_allowlist_doc290"
         or resolved.get("review_required") is not False
     ):
         raise ValueError("Unexpected fina_mainbz rate contract")
@@ -119,9 +117,7 @@ def rate_contracts(config):
     )
     rollout = config.get("rollout_account_rpm")
     if rollout is not None:
-        account_rpm = min(
-            account_rpm, positive_int(rollout, "rollout account rate")
-        )
+        account_rpm = min(account_rpm, positive_int(rollout, "rollout account rate"))
     if account_rpm != EXPECTED_ACCOUNT_RPM:
         raise ValueError("Unexpected account rate contract")
     return {
@@ -209,9 +205,7 @@ def _selected(records):
         "company_ids_sha256": digest(json_bytes(codes)),
         "market_counts": dict(
             sorted(
-                Counter(
-                    item["ts_code"].rsplit(".", 1)[1] for item in params
-                ).items()
+                Counter(item["ts_code"].rsplit(".", 1)[1] for item in params).items()
             )
         ),
         "type_counts": dict(sorted(Counter(item["type"] for item in params).items())),
@@ -310,11 +304,7 @@ def verify_manifest(path, manifest_sha256):
 
 
 def _fair_selection(inventory, jobs):
-    buckets = {
-        (kind, market): deque()
-        for kind in TYPES
-        for market in MARKETS
-    }
+    buckets = {(kind, market): deque() for kind in TYPES for market in MARKETS}
     for record in inventory:
         params = _validate_record(record)
         buckets[(params["type"], params["ts_code"].rsplit(".", 1)[1])].append(record)

@@ -89,7 +89,7 @@ class IndexDailyBatchTest(unittest.TestCase):
         self.assertEqual(manifest["source"]["eligible_jobs"], 11)
         self.assertEqual(manifest["selected"]["unique_index_codes"], 4)
         self.assertEqual(
-            {code for code, _day in pairs}, set(code for code, _ in self.tasks)
+            {code for code, _day in pairs}, {code for code, _ in self.tasks}
         )
         self.assertEqual(sum(day == "20251231" for _code, day in pairs), 3)
         self.assertNotIn(self.attempted, {row["task_id"] for row in records})
@@ -127,9 +127,7 @@ class IndexDailyBatchTest(unittest.TestCase):
             self.output, preparation.sha(self.output)
         )
         (self.root / "CURRENT.json").write_bytes(
-            json_bytes(
-                {"manifest_sha256": "0" * 64, "release_id": "data-" + "0" * 64}
-            )
+            json_bytes({"manifest_sha256": "0" * 64, "release_id": "data-" + "0" * 64})
         )
         with self.assertRaisesRegex(ValueError, "current fixed release"):
             runner._verify_release(self.root, verified)
@@ -215,9 +213,7 @@ class IndexDailyBatchTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "at most 90"):
             runner.run_batch(self.output, preparation.sha(self.output), max_seconds=91)
         with self.assertRaisesRegex(ValueError, "Execute requires pinned"):
-            runner.run_batch(
-                self.output, preparation.sha(self.output), execute=True
-            )
+            runner.run_batch(self.output, preparation.sha(self.output), execute=True)
 
 
 if __name__ == "__main__":

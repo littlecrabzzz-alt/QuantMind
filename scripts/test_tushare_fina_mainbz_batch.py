@@ -30,7 +30,7 @@ class FinaMainbzBatchTest(unittest.TestCase):
         self.tasks = []
         for year in (2024, 2023):
             for kind in preparation.TYPES:
-                for market, code in (
+                for _market, code in (
                     ("SH", "600001.SH"),
                     ("SZ", "000001.SZ"),
                     ("BJ", "920001.BJ"),
@@ -86,16 +86,12 @@ class FinaMainbzBatchTest(unittest.TestCase):
             self.root, self.output, self.release_id, self.release_sha, jobs=9
         )
         self.manifest_sha = preparation.sha(self.output)
-        self.manifest = preparation.verify_manifest(
-            self.output, self.manifest_sha
-        )
+        self.manifest = preparation.verify_manifest(self.output, self.manifest_sha)
 
     def test_prepare_is_read_only_pristine_and_semantically_balanced(self):
         before = (self.root / "pipeline.sqlite").read_bytes()
         copy = self.base / "copy.json"
-        preparation.prepare(
-            self.root, copy, self.release_id, self.release_sha, jobs=9
-        )
+        preparation.prepare(self.root, copy, self.release_id, self.release_sha, jobs=9)
         self.assertEqual(copy.read_bytes(), self.output.read_bytes())
         self.assertEqual((self.root / "pipeline.sqlite").read_bytes(), before)
         self.assertEqual(
@@ -143,9 +139,7 @@ class FinaMainbzBatchTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "rate contract"):
             preparation.rate_contracts(limited)
         (self.root / "CURRENT.json").write_bytes(
-            json_bytes(
-                {"manifest_sha256": "0" * 64, "release_id": "data-" + "0" * 64}
-            )
+            json_bytes({"manifest_sha256": "0" * 64, "release_id": "data-" + "0" * 64})
         )
         with self.assertRaisesRegex(ValueError, "no longer CURRENT"):
             runner._verify_release(self.root, self.manifest)
