@@ -25,6 +25,10 @@ MAX_BATCH_JOBS = len(ALLOWED_APIS) * MAX_JOBS_PER_API
 # Read deeply enough to reach the next cohort while keeping the query bounded.
 CANDIDATE_MULTIPLIER = 100
 SQLITE_PARAMETER_BATCH = 500
+SELECTION_MODE = (
+    "latest_period_report_type_exchange_balanced_"
+    "common_first_independent_api_fill_code_specific_leaves"
+)
 
 
 def sha(path):
@@ -126,9 +130,9 @@ def _cross_epoch_duplicates(db, candidates, epoch):
     return excluded
 
 
-def _balanced_selection(common, limit):
+def _balanced_selection(keys, limit):
     cohorts = {}
-    for key in common:
+    for key in keys:
         cohorts.setdefault((key[0], key[1]), []).append(key)
     selected = []
     for cohort in sorted(
@@ -211,20 +215,30 @@ def prepare(root, output, epoch, jobs_per_api=MAX_JOBS_PER_API):
         excluded = _cross_epoch_duplicates(db, candidates, epoch)
     finally:
         db.close()
-    common = set.intersection(
-        *(
-            {
-                key
-                for key, record in candidates[api].items()
-                if record["logical_key"] not in excluded
-            }
-            for api in ALLOWED_APIS
+    eligible = {
+        api: {
+            key
+            for key, record in candidates[api].items()
+            if record["logical_key"] not in excluded
+        }
+        for api in ALLOWED_APIS
+    }
+    common = set.intersection(*(eligible[api] for api in ALLOWED_APIS))
+    common_selected = _balanced_selection(common, jobs_per_api)
+    common_selected_set = set(common_selected)
+    selected = {
+        api: common_selected
+        + _balanced_selection(
+            eligible[api] - common_selected_set,
+            jobs_per_api - len(common_selected),
         )
-    )
-    selected = _balanced_selection(common, jobs_per_api)
-    if len(selected) != jobs_per_api:
-        raise ValueError("Insufficient common pending statement leaves")
-    records = [candidates[api][key] for api in ALLOWED_APIS for key in selected]
+        for api in ALLOWED_APIS
+    }
+    records = [
+        candidates[api][key] for api in ALLOWED_APIS for key in selected[api]
+    ]
+    if not records:
+        raise ValueError("No eligible pending financial statement leaves")
     counts = Counter(_validate_record(record) for record in records)
     records.sort(
         key=lambda row: (ALLOWED_APIS.index(row["job"]["api_name"]), row["task_id"])
@@ -236,7 +250,7 @@ def prepare(root, output, epoch, jobs_per_api=MAX_JOBS_PER_API):
         "source": {
             "epoch": epoch,
             "state": "pending",
-            "selection": "latest_period_report_type_exchange_balanced_common_code_specific_leaves",
+            "selection": SELECTION_MODE,
         },
         "api_counts": dict(sorted(counts.items())),
         "all_task_ids_sha256": digest(json_bytes(task_ids)),

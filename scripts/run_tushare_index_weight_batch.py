@@ -268,6 +268,7 @@ def run_batch(
             "would_access_authority": False,
             "would_access_credentials": False,
             "would_call_upstream": False,
+            "would_write": False,
             "would_publish": False,
         }
     if not all(

@@ -26,6 +26,7 @@ class FinancialPitBatchTests(unittest.TestCase):
                 Path(__file__).resolve().parents[1] / "config/tushare-catalog.json"
             ).read_bytes()
         )
+        self.catalog = catalog
         pipeline = runner.pipeline_module.Pipeline(self.root, catalog)
         self.selected = []
         for api in preparation.ALLOWED_APIS:
@@ -161,8 +162,70 @@ class FinancialPitBatchTests(unittest.TestCase):
         self.assertEqual(selected, {"600002.SH", "000002.SZ", "920001.BJ"})
         self.assertEqual(
             result["source"]["selection"],
-            "latest_period_report_type_exchange_balanced_common_code_specific_leaves",
+            preparation.SELECTION_MODE,
         )
+
+    def test_prepare_does_not_require_cross_api_common_leaves(self):
+        root = self.base / "disjoint-authority"
+        pipeline = runner.pipeline_module.Pipeline(root, self.catalog)
+        for api_number, api in enumerate(preparation.ALLOWED_APIS):
+            for code_number in range(2):
+                pipeline.enqueue(
+                    api,
+                    {
+                        "ts_code": f"{api_number + 1}{code_number + 1:05d}.SZ",
+                        "period": "20260630",
+                        "report_type": "1",
+                    },
+                    priority=26,
+                    epoch="20260910",
+                )
+        pipeline.db.commit()
+        pipeline.close()
+
+        manifest = self.base / "disjoint-batch.json"
+        result = preparation.prepare(root, manifest, "20260910", jobs_per_api=2)
+        self.assertEqual(
+            result["api_counts"],
+            {"balancesheet_vip": 2, "cashflow_vip": 2, "income_vip": 2},
+        )
+        identities = {
+            api: {
+                row["job"]["params"]["ts_code"]
+                for row in result["records"]
+                if row["job"]["api_name"] == api
+            }
+            for api in preparation.ALLOWED_APIS
+        }
+        self.assertEqual(len(set.union(*identities.values())), 6)
+        self.assertEqual(len(set.intersection(*identities.values())), 0)
+
+    def test_prepare_keeps_available_api_work_when_another_is_empty(self):
+        root = self.base / "partial-authority"
+        pipeline = runner.pipeline_module.Pipeline(root, self.catalog)
+        for api in preparation.ALLOWED_APIS[:2]:
+            pipeline.enqueue(
+                api,
+                {
+                    "ts_code": "600001.SH",
+                    "period": "20260630",
+                    "report_type": "1",
+                },
+                priority=26,
+                epoch="20260910",
+            )
+        pipeline.db.commit()
+        pipeline.close()
+
+        manifest = self.base / "partial-batch.json"
+        result = preparation.prepare(root, manifest, "20260910", jobs_per_api=2)
+        self.assertEqual(
+            result["api_counts"], {"balancesheet_vip": 1, "income_vip": 1}
+        )
+        self.assertEqual(len(result["records"]), 2)
+        runner_plan = runner.run_batch(manifest, preparation.sha(manifest))
+        self.assertEqual(runner_plan["status"], "plan_only")
+        self.assertEqual(runner_plan["verified_jobs"], 2)
 
     def test_execute_is_api_fair_exact_bounded_and_does_not_publish(self):
         calls = []
