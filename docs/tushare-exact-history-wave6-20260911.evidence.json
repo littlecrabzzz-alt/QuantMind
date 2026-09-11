@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-11T01:08:14Z",
+  "status": "verified_authority_only_unpublished_with_preserved_partial_failure",
+  "authority": {
+    "role": "cloud_formal_writer",
+    "root": "/root/data/disk/quantmind/project/data/tushare",
+    "fixed_input_release": "data-512b55ad56927ba2924e95bd0904ac35df963b4243d2df5b51f2a9a04b54cbca",
+    "current_release_switched": false,
+    "release_published": false
+  },
+  "closure": {
+    "path": "validation/exact-history-wave6-20260911/closure-v2.json",
+    "sha256": "c34cf0600884488cade46237a20d0a7e9672fc93798d18938ad8352227843f60",
+    "supersedes": "validation/exact-history-wave6-20260911/closure.json",
+    "validation_errors": [],
+    "unique_manifest_tasks": 1366,
+    "unique_durable_upstream_attempts": 1131,
+    "actual_upstream_requests_range": [
+      1131,
+      1132
+    ],
+    "possible_uncommitted_upstream_responses": 1,
+    "http_200_unique_durable": 1131,
+    "http_429_unique_durable": 0,
+    "rows_from_unique_durable_attempts": 1251369,
+    "unique_references_verified": {
+      "objects": 1131,
+      "observations": 1131,
+      "parquet": 1129
+    },
+    "physical_bytes_verified": {
+      "objects": 209761228,
+      "observations": 1001525,
+      "parquet": 87576636
+    }
+  },
+  "batches": {
+    "npr_batch_4": {
+      "manifest_sha256": "bb16210853ce74833bd49f54139f4d6c58f6770b6a3fb34d06f5d13e8685215e",
+      "durable_attempts": 4,
+      "rows": 1500,
+      "states": {
+        "empty": 1,
+        "split_pending": 3
+      }
+    },
+    "dividend_batch_6": {
+      "manifest_sha256": "0677b6bdc3372212843ce6ba01b962e5abd11d401294426025f57249148f2746",
+      "durable_attempts": 360,
+      "rows": 18715,
+      "states": {
+        "done": 360
+      }
+    },
+    "anns_d_batch_5": {
+      "manifest_sha256": "5e05a63c1e0a3548b20c80c688b79c5b3ff21e4e738c444a8541fa1f661b214b",
+      "durable_attempts": 180,
+      "rows": 922599,
+      "states": {
+        "done": 3,
+        "empty": 1,
+        "split_pending": 176,
+        "pending": 180
+      }
+    },
+    "fund_price_batch_7_partial": {
+      "manifest_sha256": "4c2caa09b2c43fb7210d420ce215e5484fee9021d6635d1bf3b3867237c5d5a5",
+      "durable_at_failure": 227,
+      "durable_after_batch_8": 305,
+      "later_completed_by_batch_8": 78,
+      "remaining_unattempted": 55,
+      "rows_after_batch_8": 181891
+    },
+    "fund_price_batch_8": {
+      "manifest_sha256": "c2064e74e0a10a3235667df2c6a87ae8bfe95cb0bad67cb38a770ab68f7041d0",
+      "durable_attempts": 360,
+      "rows": 173496,
+      "states": {
+        "done": 360
+      }
+    }
+  },
+  "failure_boundary": {
+    "error": "sqlite3.OperationalError: database is locked at response checkpoint commit",
+    "cause_observed": "a concurrent read-only audit process held the SQLite database",
+    "possible_uncommitted_upstream_response_count": 1,
+    "recovery": "batch 8 froze only tasks that were still pristine after the failure; batch 7 was not rerun",
+    "manifest_overlap_tasks": 78,
+    "durable_attempt_replayed": false,
+    "strict_upstream_dedup_claimed": false
+  },
+  "regular_queue_shutdown_boundary": {
+    "celery_task_id": "0b912542-b2e0-408e-b7c6-184597271bec",
+    "scope": "regular_tushare_acquire_not_exact_batch",
+    "state_after_restart": "REVOKED",
+    "result": "expired",
+    "worker_stop_exit_code": 137,
+    "cause": "the task was accepted after consumer cancellation and the worker stop timeout elapsed before it naturally completed",
+    "strict_request_dedup_claimed": false,
+    "continuation": "idempotent pending work remains eligible for later scheduled tasks"
+  },
+  "rate_policy": {
+    "mode": "tiered_v1",
+    "account_ceiling_rpm": 500,
+    "http_429": 0,
+    "cyq_perf_daily_cap": 200000,
+    "reported_points": 10100,
+    "points_expiry_date": "2026-12-05",
+    "expected_points_after_expiry": 8100,
+    "secrets_included": false
+  },
+  "boundaries": {
+    "history_complete": false,
+    "historical_versions_complete": false,
+    "pit_verified": false,
+    "rrg_status": "blocked_data",
+    "trading_authorized": false
+  }
+}

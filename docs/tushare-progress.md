@@ -777,3 +777,12 @@
 - Mac标准LaunchAgent第156次运行下载10080个文件、完整校验748694项，exit0、stderr 0字节，原子追平同一release和manifest SHA。生产镜像在`--network none`、socket/DNS双重阻断、两个Token变量为空和只读挂载下，`fund_daily@20160426`、`dividend@SH600416`、`anns_d@20120201..20120215`及`npr`均返回5行，上游调用0；NPR 20080316—20080324窄窗真实返回0行，保持为空而未补值或重拉。
 - 发布报告继续保留账户500rpm、`cyq_perf`每日200000次硬账本、10100积分及2026-12-05后预计8100积分事实，并在到期前85天产生可观察提醒；证据不含Token或订单信息。API、专用worker和Beat均healthy、restart0、OOM false；云盘可用231380914176字节，高于100GiB硬线。
 - 全库任务继续推进，08:36快照为91794 done、81304 empty、3875074 pending、3997 split_pending。完整历史、历史修订和PIT仍未闭合；RRG P0仍缺带`known_at`、修订版本与来源证据的中信一级行业分类及历史成员，因此保持`blocked_data`。整机快照timer继续disabled/inactive，待扩盘和峰值headroom验证后再恢复。机器证据为`docs/tushare-fixed-release-wave45-20260911.evidence.json`。
+
+## 2026-09-11 09:08 第六次历史波次与两个新精确runner生产验收
+
+- 第六波在固定版`data-512b55ad…`上冻结1366个唯一任务，得到1131个持久化上游尝试、全部HTTP 200、1251369行；1131个object和observation、1129个Parquet逐实体哈希通过。NPR第4批4次、分红第6批360次、公告第5批180次完成；基金行情第7批在227次持久化后遇到SQLite锁，第8批只冻结当时仍未尝试的78个重叠任务和282个新任务，没有重放第7批的持久化请求。
+- 基金行情第7批失败点可能已有1个上游响应到达但未提交checkpoint，因此权威请求数保守记为1131—1132，不宣称严格上游去重。失败闭包原样保留，最终v2闭包SHA为`c34cf0600884488cade46237a20d0a7e9672fc93798d18938ad8352227843f60`。
+- 停机过程中常规任务`0b912542…`在取消consumer后竞态进入worker；30秒停止超时导致worker exit137，Celery重启后记录`REVOKED/expired`。它不属于精确批次，未完成幂等工作继续由常规调度处理；这个边界不用于证明常规请求严格去重。后续不再强停：`07c68005…`自然成功，下一任务`ea0cbd4b…`继续运行。
+- `index_daily`和`fina_mainbz`精确prepare/runner/test已在master的`abb1a626`上线，本地和云端各31项测试、Ruff、格式与编译均通过。生产首批各360次、合计720次HTTP 200、0次429；`index_daily`得到354 done/6 empty和56994行，`fina_mainbz`在固定的1996—1997报告期请求窗内得到360个显式empty。
+- `fina_mainbz`空响应只固定本次公司、类型和报告期请求事实，不证明供应商历史为空；公告时间、`known_at`、修订和PIT均未验证，因此暂不盲目扩展更老空窗。两个新runner的720个object、720个observation和354个Parquet物理闭包通过，closure SHA为`be4bf19d6c11f03e9e3bd0237097b6291f70a767006884437d02bfea40e1618e`。
+- 新结果仍只在authority，等待09:21:15 CST后的正常原子发布和Mac单向镜像。API、专用worker与Beat均healthy、restart0、OOM false；authority约109344540319字节，云盘可用230902153216字节，高于100GiB硬线。历史、历史修订和PIT仍未完成，RRG继续`blocked_data`。机器证据为`docs/tushare-exact-history-wave6-20260911.evidence.json`和`docs/tushare-index-fina-exact-production-20260911.evidence.json`。

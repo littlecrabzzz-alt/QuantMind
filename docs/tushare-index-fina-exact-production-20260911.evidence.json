@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-11T01:08:14Z",
+  "status": "verified_authority_only_unpublished",
+  "git": {
+    "branch": "master",
+    "head": "abb1a626d739513679b80eb756cc7f771244094e",
+    "runner_commits": [
+      "24dd5061",
+      "a7774c51",
+      "abb1a626"
+    ]
+  },
+  "implementation": {
+    "index_daily": {
+      "prepare": "scripts/prepare_tushare_index_daily_batch.py",
+      "runner": "scripts/run_tushare_index_daily_batch.py",
+      "test": "scripts/test_tushare_index_daily_batch.py"
+    },
+    "fina_mainbz": {
+      "prepare": "scripts/prepare_tushare_fina_mainbz_batch.py",
+      "runner": "scripts/run_tushare_fina_mainbz_batch.py",
+      "test": "scripts/test_tushare_fina_mainbz_batch.py"
+    },
+    "default_mode": "plan_only",
+    "plan_only_access_flags_false": true
+  },
+  "validation": {
+    "local_python_tests_passed": 31,
+    "cloud_python_tests_passed": 31,
+    "ruff_check": "passed",
+    "ruff_format_check": "passed",
+    "compile": "passed"
+  },
+  "authority": {
+    "role": "cloud_formal_writer",
+    "root": "/root/data/disk/quantmind/project/data/tushare",
+    "fixed_input_release": "data-512b55ad56927ba2924e95bd0904ac35df963b4243d2df5b51f2a9a04b54cbca",
+    "release_published": false,
+    "current_release_switched": false
+  },
+  "production_batches": {
+    "index_daily_batch_1": {
+      "manifest_sha256": "637b518132b7963ff3e3f682c3d40072f195edab48902819884a3a6770cc4ae4",
+      "task_set_sha256": "63227b3e193fbfcb36d3279188075f2d44065b9c1dc3cac17a0219c4cb8390db",
+      "tasks": 360,
+      "upstream_calls": 360,
+      "elapsed_seconds": 44.536,
+      "http_200": 360,
+      "http_429": 0,
+      "rows": 56994,
+      "states": {
+        "done": 354,
+        "empty": 6
+      },
+      "selection": {
+        "unique_index_codes": 360,
+        "suffix_counts": {
+          "SH": 189,
+          "CSI": 171
+        },
+        "start_date_min": "20260101",
+        "end_date_max": "20260901"
+      },
+      "receipt_sha256": "e2100d7356deb3e4240328dfb07596dfa472b061b0c09eea6f49878b89f60846"
+    },
+    "fina_mainbz_batch_1": {
+      "manifest_sha256": "257ba9209bcc74586779de86cf4808e045aecd1d20444ef7f3c48d87b52009d6",
+      "task_set_sha256": "93893b77114dd0e61c30d5dd96955821d2976b283e399751e09eab38c501722a",
+      "tasks": 360,
+      "upstream_calls": 360,
+      "elapsed_seconds": 45.147,
+      "http_200": 360,
+      "http_429": 0,
+      "rows": 0,
+      "states": {
+        "empty": 360
+      },
+      "selection": {
+        "companies": 120,
+        "market_counts": {
+          "SH": 120,
+          "SZ": 120,
+          "BJ": 120
+        },
+        "type_counts": {
+          "P": 120,
+          "D": 120,
+          "I": 120
+        },
+        "request_report_period_start": "19960101..19970101",
+        "request_report_period_end": "19961231..19971231"
+      },
+      "receipt_sha256": "6bb69f2973b790d9232be021f43ac61634ff0c0d1c9d115f9d8d0a331de7906a"
+    }
+  },
+  "closure": {
+    "path": "validation/exact-new-runners-20260911/closure.json",
+    "sha256": "be4bf19d6c11f03e9e3bd0237097b6291f70a767006884437d02bfea40e1618e",
+    "upstream_calls": 720,
+    "http_200": 720,
+    "http_429": 0,
+    "rows": 56994,
+    "unique_references_verified": {
+      "objects": 720,
+      "observations": 720,
+      "parquet": 354
+    },
+    "physical_bytes_verified": {
+      "objects": 6346210,
+      "observations": 645512,
+      "parquet": 7642254
+    },
+    "validation_errors": []
+  },
+  "regular_scheduler_after_exact_window": {
+    "completed_task": {
+      "id": "07c68005-c957-4acb-a5fd-82ae8ed34c7a",
+      "state": "SUCCESS",
+      "elapsed_seconds": 199.883,
+      "publication": "deferred",
+      "next_publication_due_at": "2026-09-11T09:21:15+08:00"
+    },
+    "next_task": {
+      "id": "ea0cbd4b-38b2-41c0-9faf-9e41c1379aee",
+      "state_at_observation": "STARTED"
+    },
+    "worker_healthy": true,
+    "beat_healthy": true,
+    "api_healthy": true,
+    "restart_count": 0,
+    "oom_killed": false
+  },
+  "storage": {
+    "authority_bytes": 109344540319,
+    "cloud_free_bytes": 230902153216,
+    "hard_reserve_bytes": 107374182400
+  },
+  "rate_policy": {
+    "mode": "tiered_v1",
+    "account_ceiling_rpm": 500,
+    "index_daily_rpm": 500,
+    "fina_mainbz_rpm": 500,
+    "reported_points": 10100,
+    "points_expiry_date": "2026-12-05",
+    "expected_points_after_expiry": 8100,
+    "cyq_perf_daily_cap": 200000,
+    "secrets_included": false
+  },
+  "boundaries": {
+    "fina_mainbz_empty_proves_absence": false,
+    "history_complete": false,
+    "historical_versions_complete": false,
+    "pit_verified": false,
+    "rrg_status": "blocked_data",
+    "trading_authorized": false
+  }
+}
