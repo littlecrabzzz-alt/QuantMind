@@ -966,3 +966,9 @@
 
 - 基金精确批次preparer新增`--days-per-api`的1至180边界，默认180日期/360任务保持不变；指定150日期时生成`fund_daily`与`fund_adj`各150项、合计300项。manifest验证仍要求固定日历、pristine任务身份、两API同日期集合、平衡计数和哈希一致。
 - 财务preparer已有`--jobs-per-api`，不重复实现。Python3.10专项6项、Ruff与diff check通过；未写authority、未读取凭据或调用上游。冷却后恢复基金精确窗口时将用150日期/300请求及原90秒截止。机器证据为`docs/tushare-fund-price-gray-window-20260911.evidence.json`。
+
+### 2026-09-11 fund_share exact batch 12 at 300-request gray tier
+
+- 冷却只读检查确认两次跨API `ReadTimeout`之后新增transport error、HTTP 429、rate-limited和uncertain均为0，并有一笔更晚的`income_vip` HTTP 200；相关gate均ready。普通active任务自然结束并完成连续两轮空闲后，冻结`fund_share`沪深各150项、共300个pristine历史叶，日期覆盖2021-03-03至2021-07-31；manifest、任务、配置、preparer和helper均哈希固定，plan-only为0调用/0写入。
+- 61.851秒完成300次HTTP 200：205 done、95 empty，保留53225行。300个object、300个observation和205个Parquet共805个唯一引用、5368151字节，逐文件SHA256通过，不确定调用0。该干净窗口证明300请求恢复档可用，但速度慢于此前基金份额批次，因此暂不提回360。
+- Worker与Beat恢复healthy，云盘距100 GiB硬线还有114963718144字节。805项等待后续正常固定版和Mac镜像；完整份额历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-share-batch12-20260911.evidence.json`。
