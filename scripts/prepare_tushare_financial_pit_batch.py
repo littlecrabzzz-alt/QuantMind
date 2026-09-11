@@ -162,8 +162,8 @@ def _balanced_selection(keys, limit):
 
 
 def prepare(root, output, epoch, jobs_per_api=MAX_JOBS_PER_API):
-    if not re.fullmatch(r"[0-9]{8}", epoch):
-        raise ValueError("Epoch must be YYYYMMDD")
+    if not re.fullmatch(r"(?:[0-9]{8}|history)", epoch):
+        raise ValueError("Epoch must be YYYYMMDD or history")
     if type(jobs_per_api) is not int or not 1 <= jobs_per_api <= MAX_JOBS_PER_API:
         raise ValueError("jobs_per_api must be between 1 and 120")
     root, output = Path(root).resolve(), Path(output).resolve()

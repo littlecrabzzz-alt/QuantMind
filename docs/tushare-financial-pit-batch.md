@@ -14,13 +14,15 @@
 
 ## 有界执行
 
-`prepare_tushare_financial_pit_batch.py` 只读现有 `pipeline.sqlite`，从三项 API 的共同 pending 叶任务中选择相同的最新报告期、报表类型和股票集合。每项最多 120 个，整个批次最多 360 个；它不生成新任务、不读取凭据、不调用上游。
+`prepare_tushare_financial_pit_batch.py` 只读现有 `pipeline.sqlite`。它优先选择三项 API 共同的 pending 股票叶；共同叶不足时，各 API 独立按最新报告期、报表类型和沪深京轮转补足配额，一个 API 暂时不足不会阻塞其余 API。每项最多 120 个，整个批次最多 360 个；它不生成新任务、不读取凭据、不调用上游。
+
+`--epoch` 只接受规划器实际使用的八位日期或字面值 `history`。日期 epoch 用于近期重刷；`history` 用于稳定历史队列。两者沿用同一跨 epoch logical-key 去重，不用任意标签制造重复任务。
 
 ```bash
 python3 scripts/prepare_tushare_financial_pit_batch.py \
   --root /data/tushare \
   --output /tmp/tushare-financial-pit-batch.json \
-  --epoch 20260910 \
+  --epoch history \
   --jobs-per-api 120
 ```
 

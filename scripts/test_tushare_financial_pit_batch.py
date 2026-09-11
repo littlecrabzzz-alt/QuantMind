@@ -238,6 +238,46 @@ class FinancialPitBatchTests(unittest.TestCase):
         self.assertEqual(runner_plan["status"], "plan_only")
         self.assertEqual(runner_plan["verified_jobs"], 2)
 
+    def test_prepare_selects_full_history_batch_and_keeps_cross_epoch_dedup(self):
+        root = self.base / "history-authority"
+        pipeline = runner.pipeline_module.Pipeline(root, self.catalog)
+        for api in preparation.ALLOWED_APIS:
+            for number in range(121):
+                params = {
+                    "ts_code": f"{number + 1:06d}.SZ",
+                    "period": "20191231",
+                    "report_type": "1",
+                }
+                pipeline.enqueue(api, params, priority=45, epoch="history")
+                if number == 0:
+                    pipeline.enqueue(api, params, priority=25, epoch="20260910")
+        pipeline.db.commit()
+        pipeline.close()
+
+        manifest = self.base / "history-batch.json"
+        result = preparation.prepare(root, manifest, "history", jobs_per_api=120)
+        self.assertEqual(
+            result["api_counts"],
+            {"balancesheet_vip": 120, "cashflow_vip": 120, "income_vip": 120},
+        )
+        self.assertEqual(len(result["records"]), 360)
+        self.assertEqual({row["epoch"] for row in result["records"]}, {"history"})
+        self.assertNotIn(
+            "000001.SZ",
+            {row["job"]["params"]["ts_code"] for row in result["records"]},
+        )
+        plan = runner.run_batch(manifest, preparation.sha(manifest))
+        self.assertEqual(plan["status"], "plan_only")
+        self.assertEqual(plan["verified_jobs"], 360)
+
+    def test_prepare_rejects_unknown_epoch_labels(self):
+        for epoch in ("recent", "HISTORY", "2026091", "202609100"):
+            with self.subTest(epoch=epoch):
+                with self.assertRaisesRegex(ValueError, "YYYYMMDD or history"):
+                    preparation.prepare(
+                        self.root, self.base / "invalid.json", epoch, jobs_per_api=1
+                    )
+
     def test_execute_is_api_fair_exact_bounded_and_does_not_publish(self):
         calls = []
 
