@@ -210,10 +210,14 @@ def apply(project, downloaded):
             raise OSError(ctypes.get_errno(), 'Atomic local QuantDB exchange failed')
         staged.rename(backup)
         write_json(receipt, {'status': 'files_applied', 'snapshot': str(downloaded), 'backup': str(backup)})
-        snapshot.run('docker', 'start', 'quantmind-dev')
-        result = snapshot.output('docker', 'exec', 'quantmind-dev', 'python', '-c', DERIVED)
-        # Restart clears all pre-existing database/file-reader caches.
-        snapshot.run('docker', 'restart', '--time', '60', 'quantmind-dev')
+        # Keep the API stopped until files, PG and Qlib agree: no new training
+        # request can enter between the data exchange and cache completion.
+        result = snapshot.output(
+            'env', 'QM_LOCAL_PROJECT=' + str(project), 'QM_LOCAL_STATE=' + str(local),
+            'docker', 'compose', '--project-name', 'quantmind-dev',
+            '--env-file', str(project / '.env.local'), '-f', str(project / 'docker-compose.yml'),
+            '-f', str(project / 'deploy/compose.local-dev.yml'), '--project-directory', str(project),
+            'run', '--rm', '--no-deps', '-T', '--entrypoint', 'python', 'quantmind', '-c', DERIVED)
         write_json(receipt, {'status': 'applied', 'snapshot': str(downloaded), 'backup': str(backup), 'validation': result})
         print('Applied local QuantDB:', result, flush=True)
     finally:
