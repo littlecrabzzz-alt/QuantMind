@@ -991,3 +991,14 @@
 - Mac标准LaunchAgent第195轮下载8312个增量文件，完整验证832233项、stderr 0、exit 0后原子切换。固定版验收器对四份manifest中的1077个终态叶形成的3121个唯一引用、28848540字节全部通过：manifest缺失0、元数据错误0、本地物理错误0。
 - 生产镜像在`--network none`、socket/DNS阻断、空Token和只读镜像条件下读取`index_daily`、`fund_daily`、`fund_adj`、`fund_share`及三张财务表各3行，上游调用0。云盘可用221457752064字节，距100 GiB硬线还有114083569664字节；API、Worker、Beat healthy。
 - 基金行情14的24项和财务19的219项继续保持pending，其中两笔ReadTimeout仍单独记为不确定调用，不因固定发布而改写。常规exact窗口保持300请求/90秒；完整历史、修订、`known_at`、PIT成员、RRG可交易状态和PCF仍未闭合。机器证据为`docs/tushare-fixed-release-35e-four-batches-20260911.evidence.json`。
+
+### 2026-09-11 fund price exact batch 15 at 300-request gray tier
+
+- 标准无revoke排空后，按新固定版、SSE日历、配置、preparer、runner及任务集合哈希冻结150个交易日×`fund_daily/fund_adj`共300个pristine叶，日期覆盖2009-12-10至2011-01-18。batch14中4个从未尝试的尾叶自然进入新窗口；已有ReadTimeout的任务被taint规则排除，没有重放。plan-only为0 authority、0凭据、0上游、0写入和0发布。
+- 65.917秒完成300次HTTP 200，全部done并保留27850行。300个object、300个observation和300个Parquet共900个唯一引用、5424741字节，逐文件SHA256通过；不确定调用0，未发布或切换CURRENT。Worker和Beat恢复healthy，云盘距100 GiB硬线还有114002284544字节。常规exact窗口继续保持300请求/90秒；900项等待正常固定版和Mac镜像。机器证据为`docs/tushare-fund-price-batch15-20260911.evidence.json`。
+
+### 2026-09-11 financial batch 19 pristine recovery
+
+- `0bfd32fe`新增财务exact恢复清单：只从原manifest选择当前仍pending且attempt_count=0的任务，固定来源清单和任务集合SHA；已有attempt的pending默认拒绝或显式排除，执行端在独占锁内、读取凭据或调用上游前再次核对pristine状态。Mac和生产Python3.10各13项专项测试通过，编译和diff check通过；两个现有运行环境均无Ruff，未临时联网安装。
+- 从batch19原清单派生145项income/balance与73项cashflow两个不重叠子清单。前者20.399秒、后者10.228秒完成；合计218次HTTP 200，新增212 done、6 empty，零不确定调用。原batch19现在为353 done、6 empty、1 pending；唯一pending仍是先前cashflow ReadTimeout，保持隔离且未自动重放。
+- 359个终态叶对应359个object、359个observation和353个Parquet，共1071个唯一引用、14250009字节，物理SHA256全部通过。首次闭包断言把合法空响应误按`sample_ok`统计，只读诊断确认实际标签为`empty_unverified`后修正；没有重放或修改authority数据库。Worker与Beat恢复healthy，1071项等待正常固定版发布及Mac镜像。机器证据为`docs/tushare-financial-pit-batch19-recovery-20260911.evidence.json`。
