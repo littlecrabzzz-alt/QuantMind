@@ -43,7 +43,7 @@ services:
       ENABLE_REAL_TRADING: "false"
       ENABLE_TDX_PUSH: "false"
       QM_NODE_ROLE: authority
-    command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q ${QLIB_CELERY_QUEUE:-qlib_backtest_srv} --loglevel=info --concurrency=1
+    command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q market_sync,${QLIB_CELERY_QUEUE:-qlib_backtest_srv} --loglevel=info --concurrency=1
   tushare-worker:
     extends:
       file: docker-compose.yml

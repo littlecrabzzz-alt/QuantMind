@@ -140,7 +140,7 @@ def run_market_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
                                   skip_qlib=not with_qlib,
                                   progress_cb=celery_progress_cb(job_id))
             failed = bool((data.get("parquet") or {}).get("errors")) or any(
-                isinstance(value, dict) and value.get("status") == "error"
+                isinstance(value, dict) and value.get("status") in {"error", "partial", "failed"}
                 for value in data.values()
             )
             result.update(result=data, job_id=job_id,
@@ -187,7 +187,7 @@ def run_market_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
 
 
 def dispatch_due_syncs() -> dict[str, Any]:
-    """检查所有市场定时配置，到点且今天未跑过的派发同步任务。"""
+    """检查所有市场定时配置，到点或错过时间且今天未派发的同步任务。"""
     from backend.services.engine.qlib_app.celery_config import celery_app
 
     now = datetime.now()
@@ -199,7 +199,7 @@ def dispatch_due_syncs() -> dict[str, Any]:
         cfg = get_schedule(market)
         if not cfg.get("enabled"):
             continue
-        if cfg.get("time") != now_hm:
+        if cfg.get("time") > now_hm:
             continue
         if _last_run_today(market, date_str):
             continue
@@ -207,7 +207,7 @@ def dispatch_due_syncs() -> dict[str, Any]:
         celery_app.send_task(
             "engine.tasks.run_market_scheduled_sync",
             args=[market, cfg],
-            queue="qlib_backtest_srv",
+            queue="market_sync",
         )
         dispatched.append(market)
         logger.info("[SyncSchedule] %s 到点 %s，已派发同步任务", MARKETS[market], now_hm)

@@ -147,3 +147,41 @@ def test_ashare_updates_pg_and_reports_upstream_failures(monkeypatch, with_qlib,
     jobs.acquire_lock.return_value = False
     assert run_market_sync("A", {})["status"] == "skipped"
     source.run_daily_sync.assert_not_called()
+
+
+def test_late_dispatch_catches_up_on_market_queue(monkeypatch, stub_redis):
+    import sys
+    from datetime import datetime
+    from types import ModuleType
+    from unittest.mock import Mock
+    from backend.services.engine.tasks import market_sync_scheduler as scheduler
+    class Late(datetime):
+        @classmethod
+        def now(cls):
+            return cls(2026, 9, 11, 8, 0)
+    app_module = ModuleType('backend.services.engine.qlib_app.celery_config')
+    app_module.celery_app = Mock()
+    monkeypatch.setitem(sys.modules, app_module.__name__, app_module)
+    monkeypatch.setattr(scheduler, 'datetime', Late)
+    monkeypatch.setattr(scheduler, 'MARKETS', {'A': 'QuantDB'})
+    scheduler.save_schedule('A', {'enabled': True, 'time': '03:00'})
+    assert scheduler.dispatch_due_syncs()['dispatched'] == ['A']
+    assert app_module.celery_app.send_task.call_args.kwargs['queue'] == 'market_sync'
+    assert scheduler.dispatch_due_syncs()['dispatched'] == []
+
+
+def test_pg_partial_is_not_completed(monkeypatch):
+    import sys
+    from types import ModuleType
+    from unittest.mock import Mock
+    from backend.services.engine.tasks.market_sync_scheduler import run_market_sync
+    source = ModuleType('backend.scripts.quantdb_daily_sync')
+    source.run_daily_sync = Mock(return_value={'pg_fill': {'status': 'partial'}})
+    jobs = ModuleType('backend.shared.quantdb_sync_jobs')
+    for name in ('release_lock', 'celery_progress_cb', 'upsert_job', '_now_iso'):
+        setattr(jobs, name, Mock())
+    jobs.acquire_lock = Mock(return_value=True)
+    jobs.new_celery_job = Mock(return_value={'job_id': 'fixture'})
+    monkeypatch.setitem(sys.modules, source.__name__, source)
+    monkeypatch.setitem(sys.modules, jobs.__name__, jobs)
+    assert run_market_sync('A', {})['status'] == 'partial'

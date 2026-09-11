@@ -1080,7 +1080,7 @@ def dispatch_market_sync() -> dict[str, Any]:
         return {"status": "failed", "error": str(e)}
 
 
-@celery_app.task(name="engine.tasks.run_market_scheduled_sync")
+@celery_app.task(name="engine.tasks.run_market_scheduled_sync", acks_late=False, reject_on_worker_lost=False)
 def run_market_scheduled_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
     """执行某市场的定时同步（由 dispatch_market_sync 派发）。"""
     try:

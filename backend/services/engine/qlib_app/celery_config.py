@@ -144,6 +144,7 @@ if os.getenv("MARKET_SYNC_SCHEDULE_ENABLED", "true").lower() == "true":
     beat_schedule["market-sync-dispatch"] = {
         "task": "engine.tasks.dispatch_market_sync",
         "schedule": crontab(minute="*", hour="*"),
+        "options": {"queue": "market_sync", "expires": 120},
     }
 
 # Strategy Lab daily scan — runs after the data sync settles (Day 16)
