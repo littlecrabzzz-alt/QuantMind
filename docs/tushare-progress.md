@@ -861,3 +861,8 @@
 
 - 在`data-5f796b5046adfec0d3cb98bff41b00c098a87b090b9df7a1aeeb40202b0d2019`固定版、配置、候选清单、任务清单、preparer和helper全部哈希冻结后，plan-only验证240个pristine `history`任务且上游调用为0。保守240次窗口在31.561秒完成，全部HTTP 200，得到217 done、23 empty和34859行，覆盖240个`.CSI`指数代码。
 - 240个object、240个observation和217个Parquet共697个唯一引用、8191869字节，逐文件SHA256通过。批次没有发布或切换`CURRENT`；Worker与Beat恢复healthy。云盘可用224923148288字节，距100 GiB硬线还有117548965888字节。697项等待后续正常固定版发布和Mac镜像闭环；完整历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-index-daily-batch4-20260911.evidence.json`。
+
+### 2026-09-11 fund price exact batch 11
+
+- 根据并行只读审计，优先继续直接服务RRG价格与复权输入的`fund_daily+fund_adj`。在固定版、SSE开市日、配置、preparer、helper及360个任务ID全部哈希冻结后，plan-only为0调用/0写入；真实批次覆盖2012-10-10至2013-07-10的180个共同交易日，两接口各180次，44.157秒内360次均HTTP 200且全部done，保留100642行。
+- 360个object、360个observation和360个Parquet共1080个唯一引用、14633170字节，逐文件SHA256通过；不确定调用0，未发布或切换`CURRENT`。Worker与Beat恢复healthy。云盘可用224954359808字节，距100 GiB硬线还有117580177408字节。1080项等待正常固定版和Mac镜像闭环；RRG的历史分类/成员`known_at`、修订、可交易状态、PCF和完整生命周期仍保持`blocked_data`。机器证据为`docs/tushare-fund-price-batch11-20260911.evidence.json`。
