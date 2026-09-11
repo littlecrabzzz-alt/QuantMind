@@ -912,3 +912,5 @@
 
 - 基金行情12、财务17、指数6和基金份额10共1440项已在authority闭环，合计1284 done、156 empty、4164个唯一物理引用和46566579字节。只读导出再次逐文件验证SHA256；可重建的详细引用清单为754981字节、SHA256 `2ba7e8182c160cc7349d1c501ad56ec54d008dc3a5064d083e3cbb0e02216fac`，四份持久manifest及任务集合哈希已写入机器证据。
 - `CURRENT`仍为`data-473bf47c…`，正常发布在2026-09-11 16:53:51 CST后到期。Worker和Beat healthy；发布前不再插入精确批次。尚需正常原子发布、Mac完整镜像、4164引用成员与本地SHA复核，以及断网/空Token/只读挂载离线读回，才能把这四批从“权威端已闭环”提升为“本地固定版可用”。机器证据为`docs/tushare-post-473bf-four-batches-publish-gate-20260911.evidence.json`。
+
+- 新增`scripts/verify_tushare_exact_release.py`作为持久验收入口。以旧固定版`473bf…`做负对照时，准确报告4164项均未进manifest、元数据错误0、本地物理错误0并以exit 2拒绝通过；Python编译通过。Mac未安装Ruff，生产镜像静态检查留到发布窗口后执行，避免此时重建服务影响正常publisher。
