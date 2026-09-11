@@ -12,7 +12,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 NODE = "celery@aaaaaaaaaaaa"
 
-FAKE = r'''#!PYTHON
+FAKE = r"""#!PYTHON
 import json, os, pathlib, sys
 p = pathlib.Path(os.environ["FAKE_STATE"])
 s = json.loads(p.read_text())
@@ -56,7 +56,7 @@ p.write_text(json.dumps(s))
 if out:
     print(out)
 raise SystemExit(rc)
-'''
+"""
 
 
 class Drain(unittest.TestCase):

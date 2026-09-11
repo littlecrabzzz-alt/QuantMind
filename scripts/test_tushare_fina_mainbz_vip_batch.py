@@ -23,7 +23,9 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.root = self.base / "authority"
         catalog = json.loads(
-            (Path(__file__).resolve().parents[1] / "config/tushare-catalog.json").read_bytes()
+            (
+                Path(__file__).resolve().parents[1] / "config/tushare-catalog.json"
+            ).read_bytes()
         )
         pipeline = runner.pipeline_module.Pipeline(self.root, catalog)
         self.tasks = []
@@ -62,7 +64,9 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
         release.mkdir(parents=True)
         (release / "manifest.json").write_bytes(release_bytes)
         (self.root / "CURRENT.json").write_bytes(
-            json_bytes({"manifest_sha256": self.release_sha, "release_id": self.release_id})
+            json_bytes(
+                {"manifest_sha256": self.release_sha, "release_id": self.release_id}
+            )
         )
         self.output = self.base / "batch.json"
         preparation.prepare(
@@ -88,7 +92,9 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
                 self.output,
                 self.manifest_sha,
                 expected_task_ids_sha256=self.manifest["all_task_ids_sha256"],
-                expected_config_sha256=self.manifest["source"]["authority_config_sha256"],
+                expected_config_sha256=self.manifest["source"][
+                    "authority_config_sha256"
+                ],
                 expected_helper_sha256=runner.helper_sha256(),
                 expected_preparation_sha256=runner.preparation_sha256(),
                 expected_release_id=self.release_id,
@@ -115,7 +121,9 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
         )
         self.assertEqual(copy.read_bytes(), self.output.read_bytes())
         self.assertEqual((self.root / "pipeline.sqlite").read_bytes(), before)
-        self.assertEqual(self.manifest["selected"]["type_counts"], {"D": 2, "I": 2, "P": 2})
+        self.assertEqual(
+            self.manifest["selected"]["type_counts"], {"D": 2, "I": 2, "P": 2}
+        )
         self.assertEqual(self.manifest["selected"]["quarter_count"], 2)
         self.assertTrue(self.manifest["selected"]["complete_pdi_per_quarter"])
         self.assertEqual(self.manifest["selected"]["report_period_min"], "20240930")
@@ -182,12 +190,15 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
             self.assertEqual(json.loads(saved)["status"], "possibly_truncated")
             self.assertEqual(
                 db.execute(
-                    "SELECT COUNT(*) FROM partition_splits WHERE parent_id=?", (task_id,)
+                    "SELECT COUNT(*) FROM partition_splits WHERE parent_id=?",
+                    (task_id,),
                 ).fetchone()[0],
                 0,
             )
             self.assertEqual(
-                db.execute("SELECT state FROM jobs WHERE id=?", (self.unrelated,)).fetchone()[0],
+                db.execute(
+                    "SELECT state FROM jobs WHERE id=?", (self.unrelated,)
+                ).fetchone()[0],
                 "pending",
             )
         finally:
@@ -195,7 +206,9 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
 
     def test_execute_rejects_changed_eligible_inventory(self):
         catalog = json.loads(
-            (Path(__file__).resolve().parents[1] / "config/tushare-catalog.json").read_bytes()
+            (
+                Path(__file__).resolve().parents[1] / "config/tushare-catalog.json"
+            ).read_bytes()
         )
         pipeline = runner.pipeline_module.Pipeline(self.root, catalog)
         pipeline.enqueue(

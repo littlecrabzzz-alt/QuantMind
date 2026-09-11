@@ -279,7 +279,9 @@ def run_batch(
                 guards.enter_context(
                     patch(
                         target,
-                        side_effect=AssertionError("Offline fina_mainbz_vip batch plan"),
+                        side_effect=AssertionError(
+                            "Offline fina_mainbz_vip batch plan"
+                        ),
                     )
                 )
             verified = preparation.verify_manifest(manifest, manifest_sha256)

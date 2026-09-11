@@ -264,8 +264,7 @@ def verify_manifest(path, manifest_sha256):
         or source.get("state") != "pending"
         or source.get("tries") != 0
         or source.get("attempts") != 0
-        or source.get("selection")
-        != "quarter_desc_complete_pdi_pristine_tasks"
+        or source.get("selection") != "quarter_desc_complete_pdi_pristine_tasks"
         or source.get("preparation_sha256") != preparation_sha256()
         or not RELEASE_RE.fullmatch(str(source.get("release_id", "")))
         or source["release_id"]
