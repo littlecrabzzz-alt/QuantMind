@@ -5,7 +5,7 @@
   "official_category_url": "https://tushare.pro/document/2?doc_id=290",
   "official_category_html_sha256": "18e4557232524672da08f47d89eef2a384919103de24680c37021e9641000d80",
   "counts": {
-    "regular_500": 147,
+    "regular_500": 148,
     "special_300": 3,
     "uncertain": 5
   },
@@ -56,6 +56,7 @@
       "fina_audit",
       "fina_indicator_vip",
       "fina_mainbz",
+      "fina_mainbz_vip",
       "forecast_vip",
       "ft_limit",
       "fund_adj",
@@ -1409,6 +1410,35 @@
       "rpm_at_10100": 500,
       "rpm_after_2026_12_05_at_8100": 500,
       "reason": "Documented points-based leaf outside category291; no independent/explicit override in the frozen candidate set, and all introductory points levels fit 8100. Apply general 5000-plus table conditionally.",
+      "requires_live_permission_and_existing_gates": true,
+      "next_points_expiry": "2027-09-08",
+      "source_html_sha256": "d9eb10fb4eeae03dd76f00c5239348b0a0952ca254d2f23551f21878b9fc8a07",
+      "source_url": "https://tushare.pro/document/2?doc_id=81",
+      "category_labels": [
+        "股票数据",
+        "财务数据",
+        "主营业务构成"
+      ],
+      "source_policy_line_sha256": [
+        "2c9c521f7bd2ec17d6bfef3e9b7b98a69d6f755389845e59c1c9e7ed267d3fc3",
+        "938b44a0fd5e90a69f74abadfa57054dcbf154f78d3b861acac7b06cf4ec1dbe"
+      ]
+    },
+    "fina_mainbz_vip": {
+      "api_name": "fina_mainbz_vip",
+      "source_doc_id": "81",
+      "official_category_path": [
+        "14",
+        "16",
+        "81"
+      ],
+      "mentioned_points": [
+        5000
+      ],
+      "rate_class": "regular_500",
+      "rpm_at_10100": 500,
+      "rpm_after_2026_12_05_at_8100": 500,
+      "reason": "The endpoint page documents a 5000-point access threshold. At the reported 10100 points and expected 8100 after 2026-12-05, the general 5000-plus regular rate remains 500rpm, subject to live permission and shared gates.",
       "requires_live_permission_and_existing_gates": true,
       "next_points_expiry": "2027-09-08",
       "source_html_sha256": "d9eb10fb4eeae03dd76f00c5239348b0a0952ca254d2f23551f21878b9fc8a07",
@@ -4548,8 +4578,8 @@
     "yc_cb": "independent_unverified"
   },
   "constraints": [
-    "No runtime policy changed. Regular500 remains subject to live entitlement, account/API gates and observed cooldowns.",
-    "Only the frozen 155 candidates are refined; purchased, independent, explicit overrides and earlier unknowns are preserved.",
+    "Runtime policy now includes fina_mainbz_vip in Regular500. All Regular500 calls remain subject to live entitlement, account/API gates and observed cooldowns.",
+    "Only the frozen 156 candidates are refined; purchased, independent, explicit overrides and earlier unknowns are preserved.",
     "8100 is conditional on the user-declared tranche dates and no other balance change. Expiry clock/timezone/renewal not inspected.",
     "Special300 eligibility requires review when the 10000 tier ends; null at8100 means no rate authorization from this audit, not necessarily no supplier access.",
     "Official category and leaf statements are dated evidence, not permanent API rights."

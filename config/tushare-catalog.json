@@ -1631,7 +1631,8 @@
       "url": "https://tushare.pro/document/2?doc_id=81",
       "html_sha256": "d9eb10fb4eeae03dd76f00c5239348b0a0952ca254d2f23551f21878b9fc8a07",
       "api_names": [
-        "fina_mainbz"
+        "fina_mainbz",
+        "fina_mainbz_vip"
       ],
       "input_fields": [
         "ts_code",

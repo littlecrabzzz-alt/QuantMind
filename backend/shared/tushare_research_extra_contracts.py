@@ -158,6 +158,23 @@ RESEARCH_EXTRA_CONTRACTS["fina_mainbz"].update(
     history_scope_note="Known scope uses fixed calendar-year windows per stock/type; unknown scope uses an unfiltered stock/type discovery request, whose 100-row saturation cannot prove complete history.",
     units={"bz_sales": "CNY", "bz_profit": "CNY", "bz_cost": "CNY"},
 )
+
+# The VIP endpoint is intentionally runtime-only.  It is planned by the exact
+# quarterly batch tool, not by the stock/window research-extra planner above.
+FINA_MAINBZ_VIP_CONTRACT = {
+    **RESEARCH_EXTRA_CONTRACTS["fina_mainbz"],
+    "input_fields": ["period", "type"],
+    "minimum_points": 5000,
+    "dependencies": [],
+    "split": False,
+    "row_cap_verified": True,
+    "catalog_api": "fina_mainbz_vip",
+    "dataset_identity": "fina_mainbz",
+    "parameter_note": "Exact period=quarter end and type=P product, D region, I industry. The VIP endpoint returns all companies for that request; do not add ts_code, start_date, end_date, offset, page or limit.",
+    "pagination_gap": "The reviewed input table documents no offset/page/limit. A 100-row response for one period/type is a terminal saturated request and remains an explicit completeness gap.",
+    "history_scope_note": "Official earliest history is unspecified. Exact quarterly requests do not prove earlier periods complete.",
+    "revision_note": "Output end_date is report period. No announcement timestamp is supplied, so known_at and PIT availability remain unverified.",
+}
 RESEARCH_EXTRA_CONTRACTS["disclosure_date"].update(
     split_axis="exact_report_period_or_announcement_date",
     date_field="end_date",

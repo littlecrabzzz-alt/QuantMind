@@ -25,7 +25,7 @@ PAGE_RPM = {
 }
 # Explicit category audit, never the complement of the registered API set.
 # docs/tushare-general-rate-refinement.json SHA256
-# f0e1b6adca065edf6a77eecd9f72029308872fe9f7055603e83b45584af53bbe
+# 4ce2c4d26aa3ca5ed77fd1ee624439bc8223aaad7914b895c1bb93f15be1d7eb
 REGULAR_APIS = frozenset(
     [
         "adj_factor",
@@ -73,6 +73,7 @@ REGULAR_APIS = frozenset(
         "fina_audit",
         "fina_indicator_vip",
         "fina_mainbz",
+        "fina_mainbz_vip",
         "forecast_vip",
         "ft_limit",
         "fund_adj",
