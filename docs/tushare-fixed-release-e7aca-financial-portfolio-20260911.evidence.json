@@ -1,0 +1,107 @@
+{
+  "boundary": "This proves that the exact financial batch 14 and fund_portfolio batch 2 artifacts are present and hash-correct in the named fixed release and its Mac mirror. It does not claim full history, point-in-time completeness, or that fund portfolio equals daily ETF holdings.",
+  "credential_hygiene": {
+    "account_fact_retained_elsewhere": "Current 10100 points; 2000 points expire 2026-12-05; expiry reminder remains required.",
+    "secrets_in_report": false,
+    "token_variables_empty_during_readback": true
+  },
+  "exact_batch_membership": {
+    "all_files_sha256_verified": true,
+    "batches": {
+      "financial_batch_14": {
+        "attempts": 360,
+        "jobs": 360,
+        "task_ids_sha256": "cc2de6ade89de75a85dd4024e121af0f0f222d78b6bba33c45bf6305a4690035"
+      },
+      "fund_portfolio_batch_2": {
+        "attempts": 320,
+        "jobs": 320,
+        "task_ids_sha256": "3a5bb1329b912b3df2939e233a37a53eb6cc9141efd28a9c8151d8837f5d47c3"
+      }
+    },
+    "bytes_by_kind": {
+      "objects": 4034924,
+      "observations": 1222164,
+      "parquet": 14688603
+    },
+    "financial_closure_sha256": "35ccda7f1b47d008cd1bde2cf65bd53fc999271136992d9be2811350b91befda",
+    "fund_portfolio_closure_sha256": "01d7bc10d5b828d348d717324030405d15d35bbe19dd4df9e86e7014e1af6e29",
+    "manifest_metadata_mismatches": 0,
+    "physical_missing_or_mismatched": 0,
+    "references_by_kind": {
+      "objects": 680,
+      "observations": 680,
+      "parquet": 572
+    },
+    "source": "authority SQLite exact attempt references exported during a safe writer drain; worker and Beat restored immediately afterward",
+    "total_bytes": 19945691,
+    "unique_references": 1932
+  },
+  "known_open_gaps": [
+    "Financial history and revisions remain incomplete across the persisted date epochs.",
+    "fund_portfolio has 15674 never-attempted request signatures after batch 2.",
+    "Seven fund_portfolio quality signatures retain complete response and Parquet artifacts with null-value quality flags.",
+    "Six fund_portfolio blocked signatures retain saturated responses of at least 2000 rows and require a provable partition plan; the original requests must not be replayed.",
+    "RRG forward-only inputs remain blocked_data for the 20260831 signal because historical membership and ETF observation continuity are not proved."
+  ],
+  "mac_mirror": {
+    "approx_allocated_kib": 99416852,
+    "direction": "cloud_to_mac_only",
+    "downloaded_files": 7038,
+    "files_verified": 792104,
+    "release_id": "data-e7aca25eb25f6b0618925124fb73c084380859148d6cb0dc647687b33485943e",
+    "root": "~/Library/Application Support/QuantMind/tushare",
+    "root_mount_for_readback": "read_only",
+    "status": "verified"
+  },
+  "observed_at": "2026-09-11T06:04:02Z",
+  "offline_readback": {
+    "network": "docker --network none plus socket connect and DNS guards",
+    "reads": [
+      {
+        "api": "fund_portfolio",
+        "columns": 15,
+        "rows": 3,
+        "upstream_calls": 0
+      },
+      {
+        "api": "income_vip",
+        "columns": 100,
+        "rows": 3,
+        "upstream_calls": 0
+      },
+      {
+        "api": "balancesheet_vip",
+        "columns": 164,
+        "rows": 3,
+        "upstream_calls": 0
+      },
+      {
+        "api": "cashflow_vip",
+        "columns": 103,
+        "rows": 3,
+        "upstream_calls": 0
+      }
+    ],
+    "release_id": "data-e7aca25eb25f6b0618925124fb73c084380859148d6cb0dc647687b33485943e",
+    "root_mount": "read_only",
+    "runtime": "quantmind-oss:latest",
+    "token_variables_empty": true
+  },
+  "release": {
+    "datasets": 105523,
+    "files": 792104,
+    "manifest_bytes": 307137814,
+    "manifest_sha256_actual": "e7aca25eb25f6b0618925124fb73c084380859148d6cb0dc647687b33485943e",
+    "manifest_sha256_pointer": "e7aca25eb25f6b0618925124fb73c084380859148d6cb0dc647687b33485943e",
+    "release_id": "data-e7aca25eb25f6b0618925124fb73c084380859148d6cb0dc647687b33485943e",
+    "retained_observations_included": true
+  },
+  "schema_version": 1,
+  "services_after_verification": {
+    "celery_beat": "healthy",
+    "quantmind": "healthy",
+    "tushare_worker": "healthy"
+  },
+  "status": "fixed_release_batch_membership_and_offline_reads_passed"
+}
