@@ -1176,3 +1176,11 @@
 - 从不可变observation重建两批480个响应和1235个物理引用（480 object、480 observation、275 Parquet），合计3784023字节；云端逐文件SHA、a447 manifest收录和元数据全部通过。
 - Mac标准LaunchAgent第225轮下载4085个增量文件、完整验证869194个文件，stderr0、exit0并于03:48:35 CST原子切换；独立核验1235个引用缺失0、元数据错误0、物理错误0。生产reader在network none、空Token和只读挂载下读取`fund_portfolio`3行15列，上游0。
 - Worker和Beat保持healthy、restart0、OOM false，普通采集继续；云盘距100GiB硬线还有410330341376字节。两批现可在本地脱离Tushare读取；完整持仓、每日PCF、历史修订、盘中`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fixed-release-a447-fund-portfolio13-14-20260912.evidence.json`。
+
+### 2026-09-12 基金持仓第15批
+
+- Beat先停，普通任务`16e37e7f-fcbf-48c5-ab42-d48a57fcff39`在warm shutdown中用263.610秒自然完成；DB3队列、unacked、Celery active/reserved和`pipeline.lock`随后全部清零，没有中断最新任务。从11128个可用语义请求中冻结240个`current_v2`历史叶，与第7至14批任务ID及请求签名全部零重叠；plan-only确认0 authority、0凭据、0上游、0写入和0发布。
+- 生产容器62.594秒完成240次HTTP 200：137 done、103 empty、1812行、不确定调用0，吞吐230.054次/分钟，低于接口保守240 rpm与账户500 rpm门。独立审计逐项核对job、attempt、result和observation链，并验证617个唯一物理引用、1239913字节的大小与SHA256。
+- Worker和Beat恢复healthy、restart0、OOM false，普通采集继续；恢复命令因Compose依赖检测重建了Postgres容器，但复用了`quantmind_postgres-data`持久卷，`pg_isready`、API health及其余服务均通过。后续恢复改用不触发依赖重建的窄启动方式。云盘距100GiB硬线还有410158260224字节。
+- `CURRENT`仍为a447，第15批等待04:42:57 CST后的正常固定发布和Mac单向镜像。完整持仓、每日PCF、历史修订、盘中`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fund-portfolio-batch15-20260912.evidence.json`。
+- 当前机器清单口径是263个目录义务、244个已实现接口；此前227是能提取接口名和字段的文档页数，不再作为注册接口数。下一数据族优先级为`index_daily`/`index_weight`，其次补齐`fund_share`，然后推进已购文本权益的结构化元数据；约120万正文附件按现有均值粗估可能需要约2.4TB，必须随云盘容量分层推进。
