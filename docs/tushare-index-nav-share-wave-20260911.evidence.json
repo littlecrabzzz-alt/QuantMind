@@ -1,0 +1,209 @@
+{
+  "aggregate": {
+    "elapsed_seconds": 138.141,
+    "http_200": 1080,
+    "http_429": 0,
+    "rows": 391935,
+    "total_unique_physical_bytes": 53879750,
+    "unique_physical_bytes": {
+      "objects": 26256325,
+      "observations": 923728,
+      "parquet": 26699697
+    },
+    "unique_references": {
+      "objects": 1080,
+      "observations": 1080,
+      "parquet": 849
+    },
+    "upstream_calls": 1080
+  },
+  "authority_closure": {
+    "immutable_permissions": "0444 files, 0555 directory",
+    "manifest_and_receipt_files": 6,
+    "path": "validation/exact-index-fund-wave-20260911T1100/closure.json",
+    "sha256": "f5a026bfae854ba5f12abb5684bf22f8e4d253b9e5488ce300235b242ec04c9d"
+  },
+  "boundaries": {
+    "historical_versions_complete": false,
+    "history_complete": false,
+    "known_at_verified": false,
+    "order_information_included": false,
+    "pit_verified": false,
+    "rrg_status": "blocked_data",
+    "secrets_included": false,
+    "upstream_response_bodies_included": false
+  },
+  "fixed_input": {
+    "current_pointer_sha256": "b40ec7d272c461199b5d55758bfc00d9328222a11994f89a07d64e318846519e",
+    "manifest_sha256": "00177d548289255711d171ddd8ffc86332f5078951ccb8a618792c82a0528288",
+    "release_id": "data-00177d548289255711d171ddd8ffc86332f5078951ccb8a618792c82a0528288",
+    "switched_during_wave": false
+  },
+  "git": {
+    "branch": "master",
+    "head_before_evidence_commit": "f8362076ebff6544ccfcf68a2efe86b84f02907a"
+  },
+  "nonblocking_gaps": [
+    "fund_nav_and_fund_share_plan_schema_omit_would_write",
+    "financial_pit_batch_needs_replan",
+    "document_originals_capacity_deferred"
+  ],
+  "observed_at": "2026-09-11T03:10:15Z",
+  "permissions_and_rate": {
+    "account_rpm": 500,
+    "batch_max_requests": 360,
+    "batch_max_seconds": 90,
+    "expected_points_after_2026_12_05": 8100,
+    "official_rate_document": "https://tushare.pro/document/1?doc_id=290",
+    "points_expiry_notice_date": "2026-12-05",
+    "reported_points": 10100
+  },
+  "plan_only": {
+    "fund_nav": {
+      "would_access_authority": false,
+      "would_access_credentials": false,
+      "would_call_upstream": false,
+      "would_publish": false,
+      "would_write_field": "omitted_by_legacy_runner"
+    },
+    "fund_share": {
+      "would_access_authority": false,
+      "would_access_credentials": false,
+      "would_call_upstream": false,
+      "would_publish": false,
+      "would_write_field": "omitted_by_legacy_runner"
+    },
+    "index_daily": {
+      "would_access_authority": false,
+      "would_access_credentials": false,
+      "would_call_upstream": false,
+      "would_publish": false,
+      "would_write": false
+    }
+  },
+  "production_batches": [
+    {
+      "elapsed_seconds": 44.372,
+      "http_statuses": {
+        "200": 360
+      },
+      "manifest_sha256": "98157c33c9ba33ef79deb5b578718a27d6a5b3d84e991b5e6442f50282e121e8",
+      "name": "index_daily_batch_3",
+      "physical_bytes": {
+        "objects": 4687332,
+        "observations": 316331,
+        "parquet": 5731795
+      },
+      "receipt_file_sha256": "54676f3bf973cce93c662b088c1f87608ac635329bae20e73e693fe9de15dcea",
+      "receipt_id": "6cc7c3a8f18520fb9b14b2abe14a046b5b2387eac3fc0b79450e75ae49dc0059",
+      "references": {
+        "objects": 360,
+        "observations": 360,
+        "parquet": 281
+      },
+      "result_statuses": {
+        "empty_unverified": 79,
+        "sample_ok": 281
+      },
+      "rows": 45152,
+      "states": {
+        "done": 281,
+        "empty": 79
+      },
+      "task_ids_sha256": "52935abdb30dd4cabb2b1971d6617f75daece424dfa94645d7d137dc7d68c1d9",
+      "upstream_calls": 360
+    },
+    {
+      "elapsed_seconds": 48.922,
+      "http_statuses": {
+        "200": 360
+      },
+      "manifest_sha256": "96808f417497748df6b4e45a71657fdce39cff311d503d3be3d54d09bee3b2b5",
+      "name": "fund_nav_batch_9",
+      "physical_bytes": {
+        "objects": 18014563,
+        "observations": 319917,
+        "parquet": 15307826
+      },
+      "receipt_file_sha256": "0d23d7eaaace98edf6e782961097749ff53deb77415d79ca03f8bb93ec5858e9",
+      "receipt_id": "176238221240e83e4c67e4c5470661d02072be87f8f657f2ca600165f8e1df54",
+      "references": {
+        "objects": 360,
+        "observations": 360,
+        "parquet": 320
+      },
+      "result_statuses": {
+        "empty_unverified": 40,
+        "possibly_truncated": 113,
+        "sample_ok": 207
+      },
+      "rows": 245455,
+      "states": {
+        "done": 207,
+        "empty": 40,
+        "split_pending": 113
+      },
+      "task_ids_sha256": "5cc59b1867a8a2a79b5e4f55fb6b0bb3d44098602c07323b8ae2b8c684065ef4",
+      "upstream_calls": 360
+    },
+    {
+      "elapsed_seconds": 44.847,
+      "http_statuses": {
+        "200": 360
+      },
+      "manifest_sha256": "2a5974b15431e6ea8498ce35ae9fb69903a2a4c6efe67d2fa8d5397b4e5bfe51",
+      "name": "fund_share_batch_8",
+      "physical_bytes": {
+        "objects": 3554430,
+        "observations": 287480,
+        "parquet": 5660076
+      },
+      "receipt_file_sha256": "30832c8f5134159f9d8e764dcc8a6eb25a521e58fca627a4b31b956012e8dcee",
+      "receipt_id": "fd282d96c8e70d9b779d0350c4dc1c596e0698c73e036f91365c145463fb1ea2",
+      "references": {
+        "objects": 360,
+        "observations": 360,
+        "parquet": 248
+      },
+      "result_statuses": {
+        "empty_unverified": 112,
+        "sample_ok": 248
+      },
+      "rows": 101328,
+      "states": {
+        "done": 248,
+        "empty": 112
+      },
+      "task_ids_sha256": "12a51cbdd7b826329540a3285cfd5d32af6b07e178898518d5985deef3f9773e",
+      "upstream_calls": 360
+    }
+  ],
+  "publication": {
+    "included_in_fixed_release": false,
+    "mac_mirror_included": false,
+    "next_step": "wait for normal publish-only and standard Mac mirror; then verify offline reads"
+  },
+  "runtime_after": {
+    "api": "healthy",
+    "celery_beat": "healthy",
+    "disk_free_bytes": 228470714368,
+    "hard_reserve_bytes": 107374182400,
+    "oom_killed": false,
+    "restart_count": 0,
+    "tushare_worker": "healthy"
+  },
+  "safe_service_window": {
+    "api_health_http": 200,
+    "beat_stopped_first": true,
+    "exact_consumer_cancelled": true,
+    "forced_worker_kills": 0,
+    "revoked_tasks": 0,
+    "services_restored_healthy": true,
+    "stable_idle_inspections": 2,
+    "worker_oom_killed": false,
+    "worker_restart_count": 0,
+    "worker_stop_timeout_seconds": 300
+  },
+  "schema_version": 1,
+  "status": "verified_authority_exact_wave_waiting_fixed_release"
+}

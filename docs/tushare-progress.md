@@ -804,3 +804,10 @@
 - Mac第164轮标准镜像在10:49:38 CST下载7439个缺失文件并原子追平同一固定版；双端manifest SHA/字节一致，本轮4363个引用在Mac全部通过物理校验。在`--network none`、Token为空和镜像只读条件下，`index_daily`与`fund_daily`各读取3行且`upstream_calls=0`。
 - 禁网验收同时发现`fina_mainbz_vip`虽有299个Parquet进入固定版，但公共reader未注册该runtime-only合同而返回`Unknown dataset`。`38c579a9`把VIP合同加入store并复用`dataset_identity=fina_mainbz`，11项相关测试通过；云端与Mac随后均在同样禁网条件下读取3行、0上游调用。只重启主API加载reader，采集worker和Beat保持运行。
 - API、专用worker和Beat均healthy、restart0、OOM false，云盘可用228590608384字节，高于100GiB硬线。董秘问答首批仍等待下一次固定发布；原始文档worker继续等扩盘/headroom验证。完整历史、修订、known_at和PIT未闭合，RRG继续`blocked_data`。机器证据为`docs/tushare-index-fund-exact-wave-20260911.evidence.json`与`docs/tushare-irm-qa-production-20260911.evidence.json`。
+
+## 2026-09-11 11:10 指数日线、基金净值与基金份额精确波次
+
+- 安全排空专用队列后，以固定版`data-00177d548289255711d171ddd8ffc86332f5078951ccb8a618792c82a0528288`冻结三份各360项的精确清单。三份plan-only均确认不访问authority、凭据、上游和发布，`index_daily`还显式给出`would_write=false`；旧`fund_nav`/`fund_share`通用runner缺少该展示字段，作为非阻塞schema缺口保留。
+- `index_daily`第3批44.372秒完成360次，281 done/79 empty、45152行；`fund_nav`第9批48.922秒完成360次，207 done/40 empty/113 split_pending、245455行；`fund_share`第8批44.847秒完成360次，248 done/112 empty、101328行。
+- 三批合计1080次HTTP 200、零429、391935行。逐实体核验1080个object、1080个observation和849个Parquet的SHA与大小，错误0；唯一物理文件共53879750字节。authority闭包`validation/exact-index-fund-wave-20260911T1100/closure.json` SHA256为`f5a026bfae854ba5f12abb5684bf22f8e4d253b9e5488ce300235b242ec04c9d`。
+- worker、Beat与API恢复healthy，restart0、OOM false；云盘可用228470714368字节，高于100GiB硬线。本波与董秘问答首批等待正常publish-only及Mac单向镜像；完整历史、修订、known_at和PIT仍未闭合，RRG继续`blocked_data`。机器证据为`docs/tushare-index-nav-share-wave-20260911.evidence.json`。
