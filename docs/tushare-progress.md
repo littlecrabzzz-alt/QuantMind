@@ -907,3 +907,8 @@
 
 - 发布窗口前只执行一批：冻结360个`fund_share` pristine历史叶，沪深各180项，日期覆盖2022-01-28至2022-07-26；manifest、任务清单、配置、preparer和helper均哈希固定，plan-only明确为0 authority、0凭据、0上游、0写入和0发布。45.227秒完成360次HTTP 200，235 done、125 empty，保留87115行。
 - 360个object、360个observation和235个Parquet共955个唯一引用、8336997字节，逐文件SHA256通过；不确定调用0，未发布或切换`CURRENT`。Worker与Beat恢复healthy。云盘可用224030081024字节，距100 GiB硬线还有116655898624字节。955项与另外三批post-`473bf`结果等待17:07后正常固定版发布和Mac镜像闭环；完整份额历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-share-batch10-20260911.evidence.json`。
+
+### 2026-09-11 post-473bf four-batch publication gate
+
+- 基金行情12、财务17、指数6和基金份额10共1440项已在authority闭环，合计1284 done、156 empty、4164个唯一物理引用和46566579字节。只读导出再次逐文件验证SHA256；可重建的详细引用清单为754981字节、SHA256 `2ba7e8182c160cc7349d1c501ad56ec54d008dc3a5064d083e3cbb0e02216fac`，四份持久manifest及任务集合哈希已写入机器证据。
+- `CURRENT`仍为`data-473bf47c…`，正常发布在2026-09-11 17:07:11 CST后到期。Worker和Beat healthy；发布前不再插入精确批次。尚需正常原子发布、Mac完整镜像、4164引用成员与本地SHA复核，以及断网/空Token/只读挂载离线读回，才能把这四批从“权威端已闭环”提升为“本地固定版可用”。机器证据为`docs/tushare-post-473bf-four-batches-publish-gate-20260911.evidence.json`。
