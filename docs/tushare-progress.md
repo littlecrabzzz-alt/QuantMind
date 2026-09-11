@@ -1020,3 +1020,9 @@
 - 正常publisher任务`bd37f156-1024-4017-8190-6bf74c51d670`以Celery SUCCESS、0上游请求、150.557秒完成publish-only，原子生成`data-266bb56dfb9fbf5c8f55d623d7258f1c8c51d096d1a8af117f2779679257c2c2`。336067672字节manifest含113637个dataset和837205个文件，实算SHA256与release ID一致并包含retained observations。
 - Mac标准LaunchAgent第199轮下载4971个增量文件、完整验证837205项、stderr 0、exit 0后原子切换。固定版验收器对基金行情15、财务19的218项恢复任务和指数日线8共2414个唯一引用、22883575字节全部通过：manifest缺失0、元数据错误0、本地物理错误0。
 - 生产镜像在`--network none`、socket/DNS阻断、Token为空和只读Mac镜像挂载下读取`index_daily`、`fund_daily`、`fund_adj`、`fund_share`及三张财务表各3行，上游调用0。云盘可用220808863744字节，距100 GiB硬线还有113434681344字节；API、Worker、Beat healthy。三项工作单元现已可在本地脱离Tushare读取；完整历史、修订、`known_at`、PIT成员、RRG可交易状态和PCF仍未闭合。机器证据为`docs/tushare-fixed-release-266b-three-work-units-20260911.evidence.json`。
+
+### 2026-09-11 financial exact batch 20 at 300-request gray tier
+
+- 固定版266b闭环后，经无revoke流程排空，冻结`income_vip`、`balancesheet_vip`、`cashflow_vip`各100个pristine叶。300项均为pending、tries 0、attempt 0，报告期2026-06-30、report_type 1，共用100个公司代码键，并与财务19及其恢复清单零任务重叠；生产一次性容器plan-only为0 authority、0凭据、0上游、0写入和0发布。
+- 75.148秒完成300次HTTP 200：每个API均98 done/2 empty，合计294 done、6 empty、545行、零不确定调用。300个object、300个observation和294个Parquet共894个唯一引用、11815432字节，逐文件SHA256通过。
+- 首次host Python执行因使用主机路径而被配置根目录保护在锁、凭据、上游和写入前拒绝；随后使用生产compose容器的`/data/tushare`及全部固定哈希执行成功。Worker与Beat恢复healthy，云盘距100 GiB硬线还有113359052800字节；`CURRENT`仍为266b。894项等待正常固定版和Mac镜像；完整财务历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-financial-pit-batch20-20260911.evidence.json`。
