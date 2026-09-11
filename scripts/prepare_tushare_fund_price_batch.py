@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freeze 180 common open-day tasks for fund_daily and fund_adj."""
+"""Freeze a bounded set of common open-day tasks for fund_daily and fund_adj."""
 
 from __future__ import annotations
 
@@ -26,7 +26,6 @@ ALLOWED_APIS = ("fund_daily", "fund_adj")
 GROUP = "rrg"
 EXCHANGE = "SSE"
 DAYS_PER_API = 180
-MAX_BATCH_JOBS = len(ALLOWED_APIS) * DAYS_PER_API
 RELEASE_RE = re.compile(r"data-([a-f0-9]{64})")
 PARQUET_RE = re.compile(r"parquet/([a-f0-9]{64})\.parquet")
 
@@ -248,7 +247,7 @@ def verify_manifest(path, manifest_sha256):
         or source.get("selection")
         != "latest_common_pristine_tasks_on_fixed_sse_open_dates"
         or type(source.get("eligible_open_dates")) is not int
-        or source["eligible_open_dates"] < DAYS_PER_API
+        or source["eligible_open_dates"] < 1
         or not RELEASE_RE.fullmatch(str(source.get("release_id", "")))
         or RELEASE_RE.fullmatch(source["release_id"]).group(1)
         != source.get("release_manifest_sha256")
@@ -301,7 +300,8 @@ def verify_manifest(path, manifest_sha256):
         set(selected or {})
         != {"trade_dates", "trade_dates_sha256", "min_trade_date", "max_trade_date"}
         or not isinstance(trade_dates, list)
-        or len(trade_dates) != DAYS_PER_API
+        or not 1 <= len(trade_dates) <= DAYS_PER_API
+        or source["eligible_open_dates"] < len(trade_dates)
         or any(not isinstance(day, str) for day in trade_dates)
         or trade_dates != sorted(set(trade_dates), reverse=True)
         or any(day not in calendar["open_dates"] for day in trade_dates)
@@ -309,7 +309,7 @@ def verify_manifest(path, manifest_sha256):
         or selected.get("min_trade_date") != min(trade_dates)
         or selected.get("max_trade_date") != max(trade_dates)
         or not isinstance(records, list)
-        or len(records) != MAX_BATCH_JOBS
+        or len(records) != len(ALLOWED_APIS) * len(trade_dates)
     ):
         raise ValueError("Invalid selected trade dates")
     pairs = [_validate_record(record) for record in records]
@@ -317,7 +317,7 @@ def verify_manifest(path, manifest_sha256):
     dates_by_api = defaultdict(set)
     for api, day in pairs:
         dates_by_api[api].add(day)
-    expected_counts = dict(sorted((api, DAYS_PER_API) for api in ALLOWED_APIS))
+    expected_counts = dict(sorted((api, len(trade_dates)) for api in ALLOWED_APIS))
     if (
         manifest.get("api_counts") != expected_counts
         or dict(sorted(counts.items())) != expected_counts
@@ -345,7 +345,9 @@ def _record(row):
     }
 
 
-def prepare(root, output, release_id, release_manifest_sha256):
+def prepare(root, output, release_id, release_manifest_sha256, days_per_api=DAYS_PER_API):
+    if type(days_per_api) is not int or not 1 <= days_per_api <= DAYS_PER_API:
+        raise ValueError(f"days_per_api must be between 1 and {DAYS_PER_API}")
     root, requested_output = Path(root).resolve(), Path(output)
     if (
         requested_output.exists()
@@ -423,8 +425,8 @@ def prepare(root, output, release_id, release_manifest_sha256):
         for day in set(calendar["open_dates"])
         if all(chosen(api, day) is not None for api in ALLOWED_APIS)
     ]
-    selected_dates = sorted(eligible, reverse=True)[:DAYS_PER_API]
-    if len(selected_dates) != DAYS_PER_API:
+    selected_dates = sorted(eligible, reverse=True)[:days_per_api]
+    if len(selected_dates) != days_per_api:
         raise ValueError("Insufficient common pristine tasks on fixed open dates")
     records = [chosen(api, day) for day in selected_dates for api in ALLOWED_APIS]
     task_ids = sorted(record["task_id"] for record in records)
@@ -449,7 +451,7 @@ def prepare(root, output, release_id, release_manifest_sha256):
             "min_trade_date": min(selected_dates),
             "max_trade_date": max(selected_dates),
         },
-        "api_counts": dict(sorted((api, DAYS_PER_API) for api in ALLOWED_APIS)),
+        "api_counts": dict(sorted((api, days_per_api) for api in ALLOWED_APIS)),
         "all_task_ids_sha256": digest(json_bytes(task_ids)),
         "records": records,
     }
@@ -465,9 +467,14 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--release-id", required=True)
     parser.add_argument("--release-manifest-sha256", required=True)
+    parser.add_argument("--days-per-api", type=int, default=DAYS_PER_API)
     args = parser.parse_args()
     result = prepare(
-        args.root, args.output, args.release_id, args.release_manifest_sha256
+        args.root,
+        args.output,
+        args.release_id,
+        args.release_manifest_sha256,
+        args.days_per_api,
     )
     print(
         json.dumps(

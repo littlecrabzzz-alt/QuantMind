@@ -961,3 +961,8 @@
 - `income_vip`、`balancesheet_vip`、`cashflow_vip`各冻结120个pristine叶，manifest、任务、配置、preparer和runner均哈希固定。首次本地编排从错误模块导入preparer哈希，在plan-only和上游调用前因`ImportError`退出；修正后复用同一冻结manifest并通过0调用/0写入的plan-only。
 - 90秒硬截止在142次尝试后生效：141次HTTP 200，保留256行；141个object、141个observation和141个Parquet共423个唯一引用、5659515字节，逐文件SHA256通过。218项从未调用并保持pending；另1个`cashflow_vip`请求`ReadTimeout`且`response_complete=false`，记为1个不确定调用并保持pending。
 - 这是连续第二个不同API窗口出现一次`ReadTimeout`。新的exact窗口暂缓，待冷却后只读门快照确认没有新增transport error再恢复；普通Tushare Worker与Beat已恢复healthy，其他积压继续推进。云盘距100 GiB硬线还有114979741696字节。423项等待后续正常固定版和Mac镜像；完整财务历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-financial-pit-batch19-20260911.evidence.json`。
+
+### 2026-09-11 fund price 300-request gray window
+
+- 基金精确批次preparer新增`--days-per-api`的1至180边界，默认180日期/360任务保持不变；指定150日期时生成`fund_daily`与`fund_adj`各150项、合计300项。manifest验证仍要求固定日历、pristine任务身份、两API同日期集合、平衡计数和哈希一致。
+- 财务preparer已有`--jobs-per-api`，不重复实现。Python3.10专项6项、Ruff与diff check通过；未写authority、未读取凭据或调用上游。冷却后恢复基金精确窗口时将用150日期/300请求及原90秒截止。机器证据为`docs/tushare-fund-price-gray-window-20260911.evidence.json`。

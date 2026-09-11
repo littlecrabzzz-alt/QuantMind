@@ -163,9 +163,13 @@ class FundPriceBatchTest(unittest.TestCase):
             ),
         )
 
-    def _prepare(self):
+    def _prepare(self, days_per_api=preparation.DAYS_PER_API):
         return preparation.prepare(
-            self.root, self.output, self.release_id, self.release_sha
+            self.root,
+            self.output,
+            self.release_id,
+            self.release_sha,
+            days_per_api,
         )
 
     def test_prepare_selects_latest_180_common_pristine_open_dates(self):
@@ -187,6 +191,15 @@ class FundPriceBatchTest(unittest.TestCase):
             dict.fromkeys(sorted(preparation.ALLOWED_APIS), 180),
         )
         self.assertTrue(all(record["tries"] == 0 for record in manifest["records"]))
+
+    def test_prepare_supports_300_request_gray_window(self):
+        manifest = self._prepare(150)
+        self.assertEqual(len(manifest["selected"]["trade_dates"]), 150)
+        self.assertEqual(len(manifest["records"]), 300)
+        self.assertEqual(
+            manifest["api_counts"],
+            dict.fromkeys(sorted(preparation.ALLOWED_APIS), 150),
+        )
 
     def test_plan_only_does_not_need_authority_credentials_network_or_writes(self):
         manifest = self._prepare()
