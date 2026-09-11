@@ -1163,3 +1163,9 @@
 - 生产容器66.574秒完成240次HTTP 200：122 done、118 empty、4912行、不确定调用0，吞吐216.301次/分钟，低于接口保守240 rpm与账户500 rpm门。独立审计逐项核对job、attempt、result和observation链，并验证602个唯一物理引用、1568175字节的大小与SHA256。
 - Worker和Beat恢复healthy、restart0、OOM false，普通采集继续；云盘距100GiB硬线还有411031371776字节。首次把preparer输出指向authority被保护逻辑在锁、凭据、上游和数据写入前拒绝，校验并清理零字节stdout占位后改用独立临时挂载完成。
 - `CURRENT`仍为a21e，第13批尚未进入固定发布和Mac镜像。完整持仓、每日PCF、历史修订、盘中`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fund-portfolio-batch13-20260912.evidence.json`。
+
+### 2026-09-12 基金持仓第14批
+
+- Beat先停、普通任务在Worker warm shutdown中自然完成且未撤销；冻结240个`current_v2`历史叶，与第7至13批任务ID和请求签名均零重叠。生产容器64.977秒完成240次HTTP 200：153 done、87 empty、8615行、不确定调用0，吞吐221.617次/分钟。
+- 独立审计逐项核对job、attempt、result和observation链，并验证633个唯一物理引用、2215848字节的大小与SHA256。Worker和Beat恢复healthy、restart0、OOM false，普通采集继续；云盘距100GiB硬线还有411020533760字节。
+- 首次execute因并行只读审计持共享锁，在凭据、上游和写入前安全退出；锁释放后同一冻结清单成功。`CURRENT`仍为a21e，第14批尚未进入固定发布和Mac镜像。完整持仓、每日PCF、历史修订、盘中`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fund-portfolio-batch14-20260912.evidence.json`。
