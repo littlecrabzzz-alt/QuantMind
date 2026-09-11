@@ -949,3 +949,9 @@
 - 正常publisher任务`9f913ccc-b455-4491-a4c1-aad7b3fc250b`以Celery SUCCESS、上游请求0完成，174.804秒原子发布`data-8f6c6d8256db0794b65e737aac9a490075d0d17152b05ab76a9af59e369e95f2`；327170247字节manifest含111201个dataset、823920个文件，SHA256与CURRENT一致并包含retained observations。
 - Mac LaunchAgent第191轮下载9003个增量文件，完整验证823920项、stderr 0、exit 0后原子切换。固定版验收器对基金行情13、财务18和基金份额11的3102个唯一引用、31204974字节全部通过：manifest缺失0、元数据错误0、本地物理错误0。
 - 生产镜像在`--network none`、socket/DNS阻断、空Token和只读镜像条件下读取`index_daily`、`fund_daily`、`fund_adj`、`fund_share`及三张财务表各3行，上游调用0。云盘可用222423474176字节，距100 GiB硬线还有115049291776字节；API、Worker和Beat healthy。三批已从“权威端闭环”提升为“本地固定版离线可用”。完整历史、修订、`known_at`、PIT成员、RRG可交易状态和PCF仍未闭合。机器证据为`docs/tushare-fixed-release-8f6-three-batches-20260911.evidence.json`。
+
+### 2026-09-11 fund price exact batch 14 partial closure
+
+- 固定2010-07-19至2011-04-18的180个共同SSE开市日，`fund_daily`和`fund_adj`各180项；固定版、配置、日历、preparer、helper和任务清单均哈希冻结，plan-only为0调用/0写入。90秒硬截止在337次尝试后生效：336次HTTP 200并保留41652行，另1次`ReadTimeout`且`response_complete=false`，计为1个不确定调用。
+- 336个object、336个observation和336个Parquet共1008个唯一引用、7380294字节，逐文件SHA256通过。23项从未调用并保持pending；超时项也保持pending。用原manifest续跑时，执行前pristine保护按预期拒绝混合已完成/已尝试任务，没有再次调用上游，也没有绕过保护。
+- Worker与Beat恢复healthy，云盘距100 GiB硬线还有114999058432字节。账户上限仍为500 RPM，90秒硬截止不变；下一次基金行情精确窗口先降至最多300请求，待干净窗口再决定是否提速。已完成的1008项等待后续正常固定版和Mac镜像，24项保留在普通积压中；完整历史、修订、可交易状态、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-price-batch14-20260911.evidence.json`。
