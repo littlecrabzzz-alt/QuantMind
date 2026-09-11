@@ -1,0 +1,9 @@
+# Tushare fund_share batch 14 at the 360-request gray tier
+
+- The second no-revoke drain waited 310.118 seconds for an ordinary acquisition to finish. It did not interrupt the task; Beat stayed stopped, publication was deferred, and the exact window started only after two stable idle inspections.
+- Preparation took 2.80 seconds and selected 360 pristine, cross-epoch unique `fund_share` signatures from 22107 eligible candidates. SH and SZ each contributed 180 dates, covering 2020-04-06 through 2020-10-03. Plan-only made zero authority, credential, upstream, write or publish access.
+- Execution rechecked pristine tasks and semantic peers inside the exclusive lock before reading credentials. All 360 calls returned HTTP 200 in 45.939 seconds: 252 done, 108 empty, 72080 retained rows and zero uncertain calls. The request window reached 470.19 calls/minute while remaining under the 500 rpm account gate and 90-second deadline.
+- The first closure command mistakenly retained the prior batch's 300-call assertion and stopped before database or archive access. The corrected validator did not replay the batch and verified 360 objects, 360 observations and 252 Parquet files: 972 unique references, 7121596 bytes and no SHA256 error.
+- Worker and Beat are healthy on image `e769f66c…`; the cloud volume remains 112487546880 bytes above the 100 GiB hard reserve. `CURRENT` stays eef6 and no fixed release was produced.
+
+The clean 300-request and 360-request windows support promoting regular exact batches from the temporary 300 hold back to 360, while retaining the 500 rpm account gate, per-API lower caps, 90-second deadline, daily quotas and fail-closed permission rules. The 972 references await the next normal fixed release and Mac mirror. Machine evidence: `docs/tushare-fund-share-batch14-20260911.evidence.json`.

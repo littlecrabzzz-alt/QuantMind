@@ -1061,3 +1061,10 @@
 - 39.957秒完成300次HTTP 200：203 done、97 empty、50097行、不确定调用0，窗口吞吐450.48次/分钟。300个object、300个observation和203个Parquet共803个唯一引用、5103843字节，逐文件SHA256通过；`CURRENT`仍为eef6。
 - `quantmind-oss:latest`已切为镜像`e769f66c…`、revision `92fb4680`。Tushare Worker与Beat强制重建后healthy，容器中三份脚本哈希与评审版本一致；生产Python3.10按实际只读挂载和禁网合同运行13项专项测试，1.298秒全部通过。
 - 冷缓存完整构建过慢而在产物生成前停止，改为从已知生产基底复制三份评审脚本的薄镜像；两次不完整镜像检查及一次本地shell展开的只读健康探针均已修正，未调用Tushare、未写authority、未影响运行服务。云盘距100 GiB硬线还有112493588480字节。803项等待下一正常固定版和Mac镜像；完整份额历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-share-batch13-20260911.evidence.json`。
+
+### 2026-09-11 fund_share第14批360请求灰度闭环
+
+- 第二次无revoke排空等待普通采集自然运行310.118秒；它延后发布，连续两轮idle后才开始exact。准备器2.80秒从22107个pristine、跨epoch语义唯一候选中冻结360项，沪深各180项，日期覆盖2020-04-06至2020-10-03；plan-only保持0 authority、0凭据、0上游、0写入、0发布。
+- 45.939秒完成360次HTTP 200：252 done、108 empty、72080行、不确定调用0，窗口吞吐470.19次/分钟，处于账户500次/分钟和90秒硬截止内。360个object、360个observation和252个Parquet共972个唯一引用、7121596字节，逐文件SHA256通过。
+- 首次闭包误留上一批300次断言，在数据库和归档访问前拒绝；修正为360后仅验证既有结果，没有重跑或改写authority。Worker与Beat在`e769f66c…`镜像上healthy，云盘距100 GiB硬线还有112487546880字节，`CURRENT`仍为eef6。
+- 连续干净的300和360请求窗口支持常规exact从临时300项恢复到360项，同时保留账户500 rpm、API低限覆盖、90秒截止、日总量和权限拒绝门。972项等待下一正常固定版和Mac镜像；完整份额历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-share-batch14-20260911.evidence.json`。
