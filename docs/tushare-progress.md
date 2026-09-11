@@ -1047,3 +1047,10 @@
 - 财务20、指数日线9和基金行情16共900个终态任务（892 done、8 empty）。共享锁、query-only导出器在普通采集完成后实算全部云端文件SHA256，形成2692个唯一引用（900 object、900 observation、892 Parquet）、26546285字节；库存489254字节，SHA256为`d3c4b59f5dfd676a59a7b22aeb4963e674822453a9ffff507feb9d816bdfd29d`。
 - root-only路径拒绝直接`scp`；改用只读`sudo cat`流式复制后字节数和哈希一致。Mac仍在266b，持久验收器按预期exit 2：2692项全部未进入旧manifest，元数据错误0、本地物理错误0，证明未把云端新写入误报为本地可用。
 - Worker和Beat恢复healthy，云盘距100 GiB硬线还有113368154112字节。下一次正常publisher在2026-09-11 21:13:10 CST后到期；发布闭环前不再插入exact批次。下一步是正常发布、Mac固定镜像、2692项正对照和断网空Token只读验收。机器证据为`docs/tushare-post-266b-three-batches-publish-gate-20260911.evidence.json`。
+
+### 2026-09-11 固定版eef6后三批本地闭环
+
+- 正常publisher任务`5c775349-74b9-4467-911f-f2d04e1f2f8a`以Celery SUCCESS、0上游请求、189.313秒完成publish-only，原子生成`data-eef6e8bac0e0e7aa10ab5b8d6893529cbfeec85b3568dc0184181d653b3508d0`。340194663字节manifest含114858个dataset和844934个文件，实算SHA256与release ID一致并包含retained observations。
+- Mac标准LaunchAgent第203轮下载7728个增量文件、完整验证844934项、stderr 0、exit 0后原子切换。固定版验收器对财务20、指数日线9和基金行情16的2692个唯一引用、26546285字节全部通过：manifest缺失0、元数据错误0、本地物理错误0。
+- 生产镜像在`--network none`、socket/DNS阻断、Token为空和只读Mac镜像挂载下读取`index_daily`、`fund_daily`、`fund_adj`、`fund_share`及三张财务表各3行，上游调用0。首次命令遗漏backend挂载而在import阶段失败，修正为实际部署挂载后通过，未发生数据访问或上游调用。
+- 云盘可用219879940096字节，距100 GiB硬线还有112505757696字节；API、Worker、Beat healthy。三批数据现已可在本地脱离Tushare读取；完整历史、修订、`known_at`、PIT成员、RRG可交易状态和PCF仍未闭合。机器证据为`docs/tushare-fixed-release-eef6-three-batches-20260911.evidence.json`。
