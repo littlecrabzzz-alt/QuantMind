@@ -978,3 +978,9 @@
 - 下一发布窗口前经无revoke流程排空，冻结300个`index_daily` pristine历史叶，覆盖300个唯一`.CSI`代码、请求范围2026-01-01至2026-09-01；固定版、合格库存、任务、配置、preparer和helper均哈希固定，plan-only为0调用/0写入。
 - 40.970秒完成300次HTTP 200：285 done、15 empty，保留45760行。300个object、300个observation和285个Parquet共885个唯一引用、10440580字节，逐文件SHA256通过，不确定调用0。连同基金份额12，这证明300请求恢复档已在两个常规接口上干净通过；同一发布周期不提回360。
 - Worker与Beat恢复healthy，云盘距100 GiB硬线还有114905575424字节。885项等待后续正常固定版和Mac镜像；完整指数历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-index-daily-batch7-20260911.evidence.json`。
+
+### 2026-09-11 post-8f6 four-batch publication gate
+
+- 四份exact manifest共1320项，只导出1077个终态叶：967 done、110 empty、243 pending。终态叶形成1077个object、1077个observation和967个Parquet，共3121个唯一引用、28848540字节；authority只读清单逐文件复算SHA256通过，清单566267字节、SHA256 `e00ea401166333c145f3a4f87c6e6e5b7d78a8d5ebccd87b8438166005a8d3ec`。
+- 243个pending继续显式保留，其中基金行情14为24项、财务19为219项，包含两笔分别记录的`ReadTimeout`。基金份额12和指数日线7已在300请求恢复档完整结束、零不确定调用。Mac仍为`data-8f6c6d82…`；发布前负对照准确报告3121项均未进manifest，元数据错误0、本地物理错误0、exit 2。
+- 正常发布在2026-09-11 19:04:17 CST后到期，发布前不再插入exact批次。API、Worker和Beat healthy，云盘距100 GiB硬线还有114905370624字节。下一步为正常发布、Mac标准镜像、3121项精确成员与SHA校验，以及断网、空Token、只读挂载的生产镜像读回。机器证据为`docs/tushare-post-8f6-four-batches-publish-gate-20260911.evidence.json`。
