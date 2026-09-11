@@ -1,0 +1,8 @@
+# Tushare ea64 fixed release and next exact window gate
+
+- Normal task `733b8d23-a07f-44f0-bdc9-892163885fa1` completed as `publish_only` with zero supplier requests and switched CURRENT to `data-ea64e385f4c89cce910ed2caff9367688ca9cf288144d441ce04c7e3222ddcee`. The 390,501,037-byte manifest SHA matches its release identity and contains 892,674 files and 123,674 datasets.
+- Independent cloud closure found all 6,343 references and 90,141,292 bytes from index daily batches 14-16 and index weight batches 10-12 in the fixed manifest, with zero missing, metadata or physical SHA errors.
+- Mac LaunchAgent run 236 downloaded 8,710 files, verified all 892,674 files and switched at 07:08:11 CST with exit code zero and empty stderr. Targeted local SHA verification passed for the same 6,343 references. Socket/DNS-blocked reads returned three rows for both `index_daily` and `index_weight`, with empty token variables and zero upstream calls.
+- Publication took 303.855 seconds. It succeeded without worker restart or OOM, but this duration remains an observable publication-time risk as the manifest grows.
+- Read-only preparation froze 360-item selections for index daily batch 17 and index weight batch 13. Both were pinned to the prior eb6b release while the normal writer held the lock; they are not executable artifacts. The next drained window must verify the new CURRENT, live pristine states, historical overlap and index-weight descendants before creating current-release execution manifests.
+- Worker and Beat remain healthy. Cloud free space is 417,624,281,088 bytes, leaving 310,250,098,688 bytes above the 100 GiB reserve.

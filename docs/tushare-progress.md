@@ -1216,3 +1216,11 @@
 - The batches closed 2,160 HTTP-200 responses in 274.699 seconds (471.789 observed RPM), retaining 601,159 rows. States are 1,919 `sample_ok`, 137 `empty_unverified` and 104 `possibly_truncated`; the latter created 208 pristine pending children.
 - Independent read-only closure verified 6,343 object/observation/Parquet references and 90,141,292 bytes by size and SHA. Worker and Beat were restored exactly and are healthy.
 - Fixed release inclusion and Mac offline readback remain the next acceptance gates. Complete history, revisions, known-at/PIT semantics and RRG classification remain explicit gaps.
+
+## 2026-09-12 07:11 ea64 fixed release and Mac closure
+
+- Normal `publish_only` task `733b8d23…` completed with zero supplier requests and atomically published `data-ea64e385f4c89cce910ed2caff9367688ca9cf288144d441ce04c7e3222ddcee`. Its 390,501,037-byte manifest SHA matches the release identity and contains 892,674 files and 123,674 datasets.
+- Independent cloud verification found all 6,343 references and 90,141,292 bytes from index daily batches 14-16 and index weight batches 10-12 in the fixed manifest, with zero missing, metadata or physical SHA errors. The immutable closure is `validation/fixed-release-20260912/ea64-six-batch-closure.json`.
+- Mac LaunchAgent run 236 downloaded 8,710 files, verified all 892,674 files and switched CURRENT at 07:08:11 with exit code zero and empty stderr. A second targeted local pass verified the same 6,343 references; socket/DNS-blocked reads returned `index_daily` 3x17 and `index_weight` 3x11 with empty token variables and zero upstream calls.
+- The successful publication took 303.855 seconds, so growing-manifest publication time remains an explicit operational risk. Worker and Beat remain healthy with restart0/OOM false. Cloud has 417,624,281,088 bytes free, 310,250,098,688 bytes above the 100 GiB reserve.
+- Read-only preparation froze 360-item selections for index daily batch 17 and index weight batch 13 against the prior eb6b release. They are selection evidence only: the next drained window must repin the new CURRENT and revalidate live pristine state, historical overlap and weight descendants before execution. Complete history, revisions, `known_at`, PIT semantics and RRG classification remain open.
