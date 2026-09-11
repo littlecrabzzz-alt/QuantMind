@@ -819,3 +819,11 @@
 - Mac LaunchAgent第168轮exit0、stderr0并追平同一release，客户端报告778375个发行引用；独立重算本轮4049个文件全部通过，镜像约93GiB。手动`kickstart -k`可能中断了一个已预填文件但尚未记日志的在途自动客户端，因此第168轮`downloaded_files=0`不用于证明无传输；以后运行中不使用`-k`。
 - Mac生产镜像容器在`--network none`、socket/DNS阻断、两个Token变量为空和只读挂载下，对`index_daily`、`fund_nav`、`fund_share`、沪深董秘问答各读取3行，上游调用0。`bdd0fd98`同时补齐共享基金exact plan的`would_write=false`，Mac和云端各10项测试通过，无需重启。
 - API、专用worker和Beat均healthy、restart0、OOM false；云盘可用228029927424字节，高于100GiB硬线。完整历史、修订、known_at和PIT仍未闭合，RRG继续`blocked_data`；整机快照timer和原始文档worker继续等扩盘/headroom复核。机器证据为`docs/tushare-fixed-release-82ece8a-wave.evidence.json`。
+
+## 2026-09-11 12:20 指数权重、基金行情与董秘问答第二波
+
+- 在固定版`data-82ece8a2297797f1f2508f4a782d897164d910a650b45c06df87ae8c24bb1838`下冻结并执行`index_weight`第6批、`fund_daily+fund_adj`第10批和沪深董秘问答第2批，共1080个任务、1080次上游调用、1123137行。基金360项全部done；指数权重316 done/9 empty/35 split_pending；董秘问答157 done/12 empty/191 split_pending。`split_pending`仍是必须继续处理的防截断义务，不能计为历史完整。
+- 指数权重在第359次请求响应落盘后，因并行只读审计在DELETE journal数据库上持有共享锁而于SQLite提交失败。358个已提交请求没有重放；第359项从HTTP200、50行的孤立object、observation和Parquet按三重内容哈希恢复SQLite引用，新增上游调用0；确认未调用的第360项用单项哈希固定清单执行1次完成。失败、恢复和尾项收据均不可覆盖留档。
+- 三批的1080个attempt、1080个object、1080个observation和1059个Parquet逐实体SHA通过；物理证据共718607021字节。authority闭包`validation/release-82ece8a-exact-wave2-closure-20260911.json` SHA256为`8d1acfd1bfc65b89744bdb84d7da5a25c4045fec763352afaba3565dd0acc99e`，固定版未发布或切换，等待正常publish-only和Mac单向镜像。
+- 只读RRG审计确认继续扩`ci_index_member`、申万`index_member_all`、东方财富或同花顺成员不能解除中信历史成员PIT缺口。后续只沿现有bridge记录从首次抓取开始的forward-only vintage，并按`etf_basic.index_code`定向补`fund_portfolio`和`index_weight`；2022—2026历史放行仍需官方中信调整档案的`known_at`、revision/撤回和来源哈希。RRG保持`blocked_data`。
+- 财务PIT冻结器已改为优先选择三表共同叶，再按API独立填满剩余预算；一个API候选不足不再阻塞另外两个API。指数权重plan同时补齐`would_write=false`。13项专项测试和编译检查在Mac通过，待master提交、云端部署和真实批次验收。
