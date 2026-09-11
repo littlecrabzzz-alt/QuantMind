@@ -811,3 +811,11 @@
 - `index_daily`第3批44.372秒完成360次，281 done/79 empty、45152行；`fund_nav`第9批48.922秒完成360次，207 done/40 empty/113 split_pending、245455行；`fund_share`第8批44.847秒完成360次，248 done/112 empty、101328行。
 - 三批合计1080次HTTP 200、零429、391935行。逐实体核验1080个object、1080个observation和849个Parquet的SHA与大小，错误0；唯一物理文件共53879750字节。authority闭包`validation/exact-index-fund-wave-20260911T1100/closure.json` SHA256为`f5a026bfae854ba5f12abb5684bf22f8e4d253b9e5488ce300235b242ec04c9d`。
 - worker、Beat与API恢复healthy，restart0、OOM false；排空过程未调用revoke，恢复时Redis中一个超过110秒有效期的旧排队消息被Celery按`revoked/expired`丢弃，未运行、未调用上游或写入部分结果。云盘可用228470714368字节，高于100GiB硬线。本波与董秘问答首批等待正常publish-only及Mac单向镜像；完整历史、修订、known_at和PIT仍未闭合，RRG继续`blocked_data`。机器证据为`docs/tushare-index-nav-share-wave-20260911.evidence.json`。
+
+## 2026-09-11 11:56 董秘问答与指数/基金波次固定发布
+
+- 11:37:45 CST正常`publish_only`原子发布`data-82ece8a2297797f1f2508f4a782d897164d910a650b45c06df87ae8c24bb1838`；301007830字节manifest实算SHA与release ID一致。四份冻结清单的1440个任务通过权威终态结果连接到1440 object、1440 observation和1169 Parquet，4049个唯一引用、743244226字节均进入发行映射，元数据、大小和物理SHA错误0。authority闭包SHA为`d0ba398fb7bdfe8dda0c7e1b57d4076b62e3157d75d77edeff76b073a91f8346`。
+- 最初Python正则扫描因CPU回溯慢而只读终止，未写部分闭包；`jq --stream`在14.5秒完成同一完整清单扫描。发行manifest不嵌入pipeline task_id，闭包采用“冻结清单→终态result→内容寻址文件→release文件映射”的可复算成员关系。
+- Mac LaunchAgent第168轮exit0、stderr0并追平同一release，客户端报告778375个发行引用；独立重算本轮4049个文件全部通过，镜像约93GiB。手动`kickstart -k`可能中断了一个已预填文件但尚未记日志的在途自动客户端，因此第168轮`downloaded_files=0`不用于证明无传输；以后运行中不使用`-k`。
+- Mac生产镜像容器在`--network none`、socket/DNS阻断、两个Token变量为空和只读挂载下，对`index_daily`、`fund_nav`、`fund_share`、沪深董秘问答各读取3行，上游调用0。`bdd0fd98`同时补齐共享基金exact plan的`would_write=false`，Mac和云端各10项测试通过，无需重启。
+- API、专用worker和Beat均healthy、restart0、OOM false；云盘可用228029927424字节，高于100GiB硬线。完整历史、修订、known_at和PIT仍未闭合，RRG继续`blocked_data`；整机快照timer和原始文档worker继续等扩盘/headroom复核。机器证据为`docs/tushare-fixed-release-82ece8a-wave.evidence.json`。

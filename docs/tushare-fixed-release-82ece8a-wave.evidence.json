@@ -1,0 +1,222 @@
+{
+  "boundaries": {
+    "historical_versions_complete": false,
+    "history_complete": false,
+    "known_at_verified": false,
+    "order_information_included": false,
+    "pit_verified": false,
+    "rrg_status": "blocked_data",
+    "secrets_included": false,
+    "upstream_response_bodies_included": false
+  },
+  "cloud_fixed_release": {
+    "authority_closure_path": "validation/release-82ece8a-exact-wave-closure-20260911.json",
+    "authority_closure_sha256": "d0ba398fb7bdfe8dda0c7e1b57d4076b62e3157d75d77edeff76b073a91f8346",
+    "manifest_bytes": 301007830,
+    "manifest_sha256": "82ece8a2297797f1f2508f4a782d897164d910a650b45c06df87ae8c24bb1838",
+    "membership_proof": "frozen task manifests -> authority terminal results -> content-addressed files -> exact release files metadata",
+    "metadata_errors": 0,
+    "missing_references": 0,
+    "physical_bytes_verified": {
+      "objects": 498183923,
+      "observations": 1241634,
+      "parquet": 243818669
+    },
+    "physical_sha_errors": 0,
+    "publish_mode": "publish_only",
+    "published_at_cst": "2026-09-11T11:37:45+08:00",
+    "release_id": "data-82ece8a2297797f1f2508f4a782d897164d910a650b45c06df87ae8c24bb1838",
+    "source_tasks_verified": 1440,
+    "total_physical_bytes_verified": 743244226,
+    "unique_references": {
+      "objects": 1440,
+      "observations": 1440,
+      "parquet": 1169
+    }
+  },
+  "git": {
+    "branch": "master",
+    "head_before_evidence_commit": "bdd0fd987f13c82c949eb571ea24bb8f369703d9"
+  },
+  "included_batches": [
+    {
+      "name": "irm_qa_batch_1",
+      "physical_bytes": {
+        "objects": 471927598,
+        "observations": 317906,
+        "parquet": 217118972
+      },
+      "references": {
+        "objects": 360,
+        "observations": 360,
+        "parquet": 320
+      },
+      "rows": 857441,
+      "source_manifest": "validation/irm-qa-batch-20260911/batch-1-manifest.json",
+      "source_manifest_sha256": "39b13ed25c19b7f81095882cc3a8dfcba0ea7c85b899af8cd71cb9dba429f4b6",
+      "states": {
+        "done": 133,
+        "empty": 40,
+        "split_pending": 187
+      },
+      "tasks": 360
+    },
+    {
+      "name": "index_daily_batch_3",
+      "physical_bytes": {
+        "objects": 4687332,
+        "observations": 316331,
+        "parquet": 5731795
+      },
+      "references": {
+        "objects": 360,
+        "observations": 360,
+        "parquet": 281
+      },
+      "rows": 45152,
+      "source_manifest": "validation/exact-index-fund-wave-20260911T1100/index_daily_batch_3-manifest.json",
+      "source_manifest_sha256": "98157c33c9ba33ef79deb5b578718a27d6a5b3d84e991b5e6442f50282e121e8",
+      "states": {
+        "done": 281,
+        "empty": 79
+      },
+      "tasks": 360
+    },
+    {
+      "name": "fund_nav_batch_9",
+      "physical_bytes": {
+        "objects": 18014563,
+        "observations": 319917,
+        "parquet": 15307826
+      },
+      "references": {
+        "objects": 360,
+        "observations": 360,
+        "parquet": 320
+      },
+      "rows": 245455,
+      "source_manifest": "validation/exact-index-fund-wave-20260911T1100/fund_nav_batch_9-manifest.json",
+      "source_manifest_sha256": "96808f417497748df6b4e45a71657fdce39cff311d503d3be3d54d09bee3b2b5",
+      "states": {
+        "done": 207,
+        "empty": 40,
+        "split_pending": 113
+      },
+      "tasks": 360
+    },
+    {
+      "name": "fund_share_batch_8",
+      "physical_bytes": {
+        "objects": 3554430,
+        "observations": 287480,
+        "parquet": 5660076
+      },
+      "references": {
+        "objects": 360,
+        "observations": 360,
+        "parquet": 248
+      },
+      "rows": 101328,
+      "source_manifest": "validation/exact-index-fund-wave-20260911T1100/fund_share_batch_8-manifest.json",
+      "source_manifest_sha256": "2a5974b15431e6ea8498ce35ae9fb69903a2a4c6efe67d2fa8d5397b4e5bfe51",
+      "states": {
+        "done": 248,
+        "empty": 112
+      },
+      "tasks": 360
+    }
+  ],
+  "mac_mirror": {
+    "client_reported_downloaded_files": 0,
+    "current_pointer_sha256": "afb9fee16bbd17cb71ce416b7ebc55be69f29f692e3826652fe906c7e0a2dccd",
+    "file_references_reported": 778375,
+    "last_exit_code": 0,
+    "launch_agent_runs": 168,
+    "local_closure_sha256": "3846b6c6534bdfaad830bd5ed48a8ab15d7117a8993e456ca0fb5e740c2abbe6",
+    "manifest_bytes": 301007830,
+    "manifest_sha256": "82ece8a2297797f1f2508f4a782d897164d910a650b45c06df87ae8c24bb1838",
+    "mirror_size_gib_approx": 93,
+    "missing": 0,
+    "physical_bytes": {
+      "objects": 498183923,
+      "observations": 1241634,
+      "parquet": 243818669
+    },
+    "references": {
+      "objects": 1440,
+      "observations": 1440,
+      "parquet": 1169
+    },
+    "release_id": "data-82ece8a2297797f1f2508f4a782d897164d910a650b45c06df87ae8c24bb1838",
+    "sha_errors": 0,
+    "size_errors": 0,
+    "source_tasks_verified": 1440,
+    "stderr_bytes": 0,
+    "total_physical_bytes": 743244226
+  },
+  "nonblocking_observations": [
+    {
+      "detail": "Run 168 reported zero downloads. A launchctl kickstart -k may have interrupted an already-running scheduled client after it had populated content-addressed files but before logging. Final CURRENT, full client verification and independent 4049-file SHA verification passed; future manual runs should inspect state and avoid -k when already running.",
+      "scope": "mac_mirror_manual_kick",
+      "status": "operational_note"
+    },
+    {
+      "detail": "An initial read-only Python regex scan was terminated after high CPU and no writes; jq --stream completed the full manifest scan in 14.5 seconds and the immutable closure was then written.",
+      "scope": "release_verifier",
+      "status": "tooling_adjusted"
+    },
+    {
+      "detail": "Common pending statement leaves remain insufficient for the existing exact batch preparation.",
+      "scope": "financial_pit_exact_batch",
+      "status": "needs_replan"
+    },
+    {
+      "detail": "Document worker remains stopped until storage expansion and peak-headroom validation.",
+      "scope": "document_originals",
+      "status": "capacity_deferred"
+    }
+  ],
+  "observed_at": "2026-09-11T03:56:24Z",
+  "offline_read": {
+    "credentials": "TUSHARE_TOKEN and TUSHARE_API_TOKEN empty",
+    "mirror_mount": "read_only",
+    "network": "docker --network none plus socket connect and DNS guards",
+    "queries": {
+      "fund_nav": 3,
+      "fund_share": 3,
+      "index_daily": 3,
+      "irm_qa_sh": 3,
+      "irm_qa_sz": 3
+    },
+    "release_pinned": true,
+    "runtime_image": "quantmind-oss:latest",
+    "upstream_calls": 0
+  },
+  "permissions_and_rate": {
+    "account_rpm": 500,
+    "cyq_perf_daily_cap": 200000,
+    "expected_points_after_2026_12_05": 8100,
+    "official_rate_document": "https://tushare.pro/document/1?doc_id=290",
+    "points_expiry_notice_date": "2026-12-05",
+    "reported_points": 10100
+  },
+  "plan_schema_fix": {
+    "change": "fund_nav shared exact runner now exposes would_write=false; fund_share inherits it",
+    "cloud_tests": 10,
+    "commit": "bdd0fd98",
+    "mac_tests": 10,
+    "service_restart_required": false
+  },
+  "runtime_after": {
+    "api": "healthy",
+    "api_health_http": 200,
+    "celery_beat": "healthy",
+    "cloud_disk_free_bytes": 228029927424,
+    "hard_reserve_bytes": 107374182400,
+    "oom_killed": false,
+    "restart_count": 0,
+    "tushare_worker": "healthy"
+  },
+  "schema_version": 1,
+  "status": "verified_fixed_release_mac_mirror_and_offline_read"
+}
