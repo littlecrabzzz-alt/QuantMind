@@ -1,0 +1,184 @@
+{
+  "boundary": "Both batches are exact, hash-pinned authority writes. They are not part of a fixed release until a later normal publish-only cycle and verified Mac mirror complete.",
+  "capacity_after_batches": {
+    "available_bytes": 225743339520,
+    "filesystem_bytes": 528239599616,
+    "gate_passed": true,
+    "hard_reserve_bytes": 107374182400,
+    "headroom_above_reserve_bytes": 118369157120,
+    "used_bytes": 275635937280
+  },
+  "combined": {
+    "http_200": 600,
+    "objects": 600,
+    "observations": 600,
+    "parquet_files": 501,
+    "physical_bytes": 16688120,
+    "physical_sha256_verified": true,
+    "rows": 12468,
+    "uncertain_upstream_calls": 0,
+    "unique_physical_references": 1701,
+    "upstream_calls": 600
+  },
+  "credential_hygiene": {
+    "account_fact_retained": "Current 10100 points; 2000 points expire 2026-12-05; expiry reminder remains required.",
+    "secrets_in_report": false
+  },
+  "execution_model": {
+    "authority_writers_serialized": true,
+    "parallel_read_only_audits": true,
+    "reason": "The production SQLite authority has one writer and both API families share the 500 rpm account window.",
+    "safe_drain": "Beat stopped first; the current task completed naturally; the exact consumer was cancelled; active and reserved were empty twice; the worker then stopped without revoke or kill."
+  },
+  "financial_batch_15": {
+    "archive_bytes": {
+      "closure": 1117,
+      "manifest": 811611,
+      "plan": 699,
+      "prepare": 619,
+      "receipt": 1477
+    },
+    "archive_paths": {
+      "closure": "validation/financial-pit-batch-20260911/batch-15-closure.json",
+      "manifest": "validation/financial-pit-batch-20260911/batch-15-manifest.json",
+      "plan": "validation/financial-pit-batch-20260911/batch-15-plan.json",
+      "prepare": "validation/financial-pit-batch-20260911/batch-15-prepare.json",
+      "receipt": "validation/financial-pit-batch-20260911/batch-15-receipt.json"
+    },
+    "archive_sha256": {
+      "closure": "f36b2910188f5ed6487341e2dbfdfae68fe8565f4c7c667b9f166c28f4e6c69c",
+      "manifest": "2960c50e5047c0cbe94b1a8c9572a222d0824b5b1429fa137afc4a6b7162a9cf",
+      "plan": "50114e28b615176a1dac334a103c4f32116c44ba87349015bfd15999c4ee8db7",
+      "prepare": "8f75f9b1f3bc93a8b93ec11190cf105537944cf4a753f35005bd8b89f572d5f2",
+      "receipt": "874236b2db0176ec8411c5dad512641e272079562e2c4ce8cf537b89b0e6fafd"
+    },
+    "closure": {
+      "api_counts": {
+        "balancesheet_vip": 120,
+        "cashflow_vip": 120,
+        "income_vip": 120
+      },
+      "attempts": 360,
+      "batch": "batch-15",
+      "boundary": "This exact task closure does not prove supplier history completeness or PIT availability.",
+      "closure_id": "938a0fbe75cf6691d4126c7429ef36419c15db280a7f0ffe4df3c2ae36a2acef",
+      "current_release_switched": false,
+      "elapsed_seconds": 49.599,
+      "http_status_counts": {
+        "200": 360
+      },
+      "jobs": 360,
+      "manifest_sha256": "2960c50e5047c0cbe94b1a8c9572a222d0824b5b1429fa137afc4a6b7162a9cf",
+      "objects": 360,
+      "observations": 360,
+      "parquet_files": 351,
+      "physical_bytes": 14086535,
+      "physical_sha256_verified": true,
+      "receipt_sha256": "874236b2db0176ec8411c5dad512641e272079562e2c4ce8cf537b89b0e6fafd",
+      "release_id_at_prepare": "data-e7aca25eb25f6b0618925124fb73c084380859148d6cb0dc647687b33485943e",
+      "release_published": false,
+      "rows": 705,
+      "schema_version": 1,
+      "states": {
+        "done": 351,
+        "empty": 9
+      },
+      "status": "exact_batch_closed",
+      "task_ids_sha256": "46c73a818b3addacada557871f0fc2e9360cb1f453363cf4eec83e928518447f",
+      "uncertain_upstream_calls": 0,
+      "unique_physical_references": 1071,
+      "upstream_calls": 360
+    }
+  },
+  "fixed_release_at_prepare": {
+    "changed_by_batches": false,
+    "release_id": "data-e7aca25eb25f6b0618925124fb73c084380859148d6cb0dc647687b33485943e"
+  },
+  "fund_portfolio_batch_4": {
+    "archive_bytes": {
+      "closure": 1284,
+      "manifest": 217557,
+      "plan": 55638,
+      "prepare": 912,
+      "receipt": 55997
+    },
+    "archive_paths": {
+      "closure": "validation/fund-portfolio-batch-20260911/batch-4-closure.json",
+      "manifest": "validation/fund-portfolio-batch-20260911/batch-4-manifest.json",
+      "plan": "validation/fund-portfolio-batch-20260911/batch-4-plan.json",
+      "prepare": "validation/fund-portfolio-batch-20260911/batch-4-prepare.json",
+      "receipt": "validation/fund-portfolio-batch-20260911/batch-4-receipt.json"
+    },
+    "archive_sha256": {
+      "closure": "51eeb202862cb4a9729b731a7d5b743534ab8d00022b271774f0173027577827",
+      "manifest": "bffe50344e9cadfadfd42d28fc9a511724b3b2950a1cb8f3d2ad2220ab710f3c",
+      "plan": "ffe654a7b9d39a1e4ceefa4a92083f9d6864e1f7546ce05ef528fbda555ec2b3",
+      "prepare": "83fae7c2810b1e9006f3cbc276dad23dc53cfbea8ef8e97c412d6ac352bd0dce",
+      "receipt": "894ba99ad922748523e87f9f72bc23d19affcb8cfcf06a73ff1989c4f5d08b85"
+    },
+    "closure": {
+      "api_name": "fund_portfolio",
+      "attempts": 240,
+      "batch": "batch-4",
+      "boundary": "Periodic holdings do not prove complete ETF exposure, daily PCF, historical publication time, revisions, or PIT completeness.",
+      "closure_id": "2fa8b5a8842726430f9c9925c7fe32be93e96fc8f26f85170a4794df2871f48e",
+      "current_release_switched": false,
+      "elapsed_seconds": 62.301,
+      "eligible_jobs_at_prepare": 13862,
+      "history_complete": false,
+      "http_status_counts": {
+        "200": 240
+      },
+      "jobs": 240,
+      "manifest_sha256": "bffe50344e9cadfadfd42d28fc9a511724b3b2950a1cb8f3d2ad2220ab710f3c",
+      "objects": 240,
+      "observations": 240,
+      "parquet_files": 150,
+      "physical_bytes": 2601585,
+      "physical_sha256_verified": true,
+      "pit_verified": false,
+      "receipt_sha256": "894ba99ad922748523e87f9f72bc23d19affcb8cfcf06a73ff1989c4f5d08b85",
+      "release_id_at_prepare": "data-e7aca25eb25f6b0618925124fb73c084380859148d6cb0dc647687b33485943e",
+      "release_published": false,
+      "request_signatures_sha256": "d4b5604e8c30c42bc89df94e390afd30490acf45a641ebb11bd492338521c557",
+      "rows": 11763,
+      "schema_version": 1,
+      "states": {
+        "done": 150,
+        "empty": 90
+      },
+      "status": "exact_batch_closed",
+      "task_ids_sha256": "75e4e5125141a9c16d53cb57522b0c1525a3097f13b0e304f69c5db2babcc8d5",
+      "uncertain_upstream_calls": 0,
+      "unique_physical_references": 630,
+      "upstream_calls": 240
+    }
+  },
+  "next_actions": [
+    "Wait for the normal publish-only cycle, mirror the resulting fixed release to Mac, and verify the 1701 exact references by size and SHA256 before offline readback.",
+    "Continue financial epoch 20260909 and the remaining pristine fund_portfolio signatures in later bounded windows.",
+    "Prepare an index_daily exact batch next; do not run it concurrently with another authority writer.",
+    "Keep the document worker stopped until actual disk expansion and peak headroom validation; structured acquisition continues."
+  ],
+  "non_blocking_events": [
+    {
+      "cause": "The first operator output path was inside the authority root, which the preparer rejects; the manifest was then frozen in container /tmp and archived only after closure.",
+      "stage": "financial_prepare",
+      "status": "failed_closed_zero_calls"
+    },
+    {
+      "cause": "The first operator helper hash covered only the wrapper file; plan-only rejected it. The combined helper hash from the runner was then pinned before execute.",
+      "stage": "fund_portfolio_plan",
+      "status": "failed_closed_zero_calls"
+    }
+  ],
+  "observed_at": "2026-09-11T06:27:59Z",
+  "schema_version": 1,
+  "services_after_restore": {
+    "celery_beat": "healthy",
+    "document_worker": "intentionally_stopped_pending_expansion_and_peak_headroom_validation",
+    "quantmind": "healthy",
+    "tushare_worker": "healthy"
+  },
+  "status": "two_exact_batches_closed_waiting_normal_publication"
+}
