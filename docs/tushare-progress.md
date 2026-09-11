@@ -1149,3 +1149,10 @@
 - 标准Mac LaunchAgent空闲时以非强制方式启动第221轮，下载4918个增量文件、完整验证后exit0、stderr0，并于02:43:53 CST原子切换。query-only清单从live jobs/attempts重建第11/12批480个终态任务（299 done、181 empty），1259个唯一引用、5617730字节；Mac manifest缺失0、元数据错误0、本地物理错误0。
 - 生产镜像在`--network none`、socket/DNS阻断、空Token和只读镜像下读取`fund_portfolio`3行15列，上游调用0。首次64MiB tmpfs不足触发DuckDB临时目录上限，保持同一隔离合同改为1GiB后通过，没有改写authority或镜像。
 - Worker与Beat恢复healthy、restart0、OOM false，普通任务已继续。云盘距100GiB硬线还有411239403520字节。两批现已可在本地脱离Tushare读取；完整持仓、每日PCF、历史修订、盘中`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fixed-release-a21e-fund-portfolio11-12-20260912.evidence.json`。
+
+### 2026-09-12 RRG中信成员PIT证据门
+
+- master提交`f439102f`新增固定发布、离线、新输出目录的中信一级成员证据对账器；产物捆绑声明证据源并原子发布，跨节点验真必须提供包外根manifest SHA256。
+- 两轮独立复核发现并修复跨行业区间冲突漏检、任意来源权威性升级、绝对路径、错误后的半成品、根manifest自签升级、Parquet行级与报告边界升级。最终16项测试、Ruff、编译和diff检查通过；重签后2/2行级升级与18/18报告边界升级均被拒绝。
+- 对Mac固定版a21e的真实负向控制读取6740条`ci_index_member`，0上游调用；没有权威公告包时对账0条、历史`known_at`验证0条，并发现11组源区间重叠，结果保持`blocked_data`与`rrg_ready=false`。没有访问凭据、改写QuantDB或修改RRG case。
+- 下一步需要取得并核验中信权威公告及修订链，当前`in_date`、`out_date`和抓取时间仍不能作为历史可知时间。机器证据为`docs/tushare-rrg-member-pit-reconciler-20260912.evidence.json`。
