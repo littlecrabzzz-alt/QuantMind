@@ -914,3 +914,5 @@
 - `CURRENT`仍为`data-473bf47c…`，正常发布在2026-09-11 16:53:51 CST后到期。Worker和Beat healthy；发布前不再插入精确批次。尚需正常原子发布、Mac完整镜像、4164引用成员与本地SHA复核，以及断网/空Token/只读挂载离线读回，才能把这四批从“权威端已闭环”提升为“本地固定版可用”。机器证据为`docs/tushare-post-473bf-four-batches-publish-gate-20260911.evidence.json`。
 
 - 新增`scripts/verify_tushare_exact_release.py`作为持久验收入口。以旧固定版`473bf…`做负对照时，准确报告4164项均未进manifest、元数据错误0、本地物理错误0并以exit 2拒绝通过；Python编译通过。Mac未安装Ruff，生产镜像静态检查留到发布窗口后执行，避免此时重建服务影响正常publisher。
+
+- 同一验收器已在云端现有生产镜像中以`--network none`、空Token、只读代码和只读authority挂载运行；Python3.10编译通过，旧固定版负对照仍为4164缺失、元数据错误0、物理错误0、exit 2、上游调用0。首次`py_compile`试图在只读源码下写`__pycache__`而失败，改用容器`/tmp`字节码目录后通过，未改数据或服务。
