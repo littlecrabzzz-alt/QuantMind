@@ -377,6 +377,10 @@ class ScheduledPull(unittest.TestCase):
             self.assertTrue(original.is_symlink())
             self.assertEqual((original / "sentinel").read_text(), "original data")
             self.assertEqual(fixed.read_text(), "snapshot-fixed")
+            import plistlib
+            definition = plistlib.loads((root / "Library/LaunchAgents/com.quantmind.snapshot-pull.plist").read_bytes())
+            self.assertIn("/usr/local/bin", definition["EnvironmentVariables"]["PATH"].split(":"))
+
 
 
 @unittest.skipUnless(os.getenv("QM_TEST_LOCAL_DOCKER") == "1", "explicit local Docker smoke test")

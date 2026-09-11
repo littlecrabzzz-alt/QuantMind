@@ -253,7 +253,7 @@ def install_mac_pull():
         "ProgramArguments": [sys.executable, str(runtime / "scripts/dual_node_snapshot.py"),
                              "pull", "--root", str(destination), "--only-new", "--quantdb-project", str(PROJECT)],
         "WorkingDirectory": str(runtime), "RunAtLoad": True, "StartInterval": 3600,
-        "EnvironmentVariables": {"PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"},
+        "EnvironmentVariables": {"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"},
         "StandardOutPath": str(logs / "snapshot-pull.out.log"),
         "StandardErrorPath": str(logs / "snapshot-pull.err.log"),
     }
