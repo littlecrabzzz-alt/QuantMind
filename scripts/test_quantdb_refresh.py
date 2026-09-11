@@ -13,6 +13,25 @@ import dual_node_snapshot as snapshot
 
 
 class QuantDBRefresh(unittest.TestCase):
+
+    def test_host_cache_exchange_keeps_previous_generation_and_checks_mount(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            local = Path(tmp)
+            live = local / "db/qlib_data"
+            staged = local / "db/.quantdb-qlib-test"
+            live.mkdir(parents=True)
+            staged.mkdir()
+            (live / "day").write_text("old")
+            (staged / "day").write_text("new")
+            self.assertEqual(refresh.local_cache_path(local, "/app/db/qlib_data"), live)
+            refresh.publish_local_directory(staged, live)
+            self.assertEqual((live / "day").read_text(), "new")
+            self.assertEqual((staged / "day").read_text(), "old")
+            for path in ("/root/authority/cache", "/data/../../cache"):
+                with self.assertRaises(RuntimeError):
+                    refresh.local_cache_path(local, path)
+
+
     def test_docker_desktop_mount_alias_is_accepted_but_authority_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
@@ -168,6 +187,26 @@ class QuantDBRefresh(unittest.TestCase):
             self.assertEqual(result.read_text(), "keep")
             self.assertEqual(events[-1], "start")
             self.assertFalse((root / "logs/local-dev.lock").exists())
+            cache = local / "db/qlib_data"
+            cache.mkdir(parents=True)
+            (cache / "day").write_text("old")
+            pending = local / "db/.quantdb-qlib-test"
+            pending.mkdir()
+            (pending / "day").write_text("new")
+            validation = {"qlib_staged": "/app/db/.quantdb-qlib-test",
+                          "qlib_live": "/app/db/qlib_data", "latest_date": "20260911"}
+            with (
+                patch.object(refresh, "require_local_idle", return_value=["quantmind-dev"]),
+                patch.object(snapshot, "run", side_effect=run),
+                patch.object(snapshot, "output", return_value=json.dumps(validation)),
+            ):
+                refresh.apply(root, downloaded)
+            receipt = json.loads((root / ".local-dev/QUANTDB_SYNC.json").read_text())
+            self.assertEqual(receipt["status"], "applied")
+            self.assertEqual((cache / "day").read_text(), "new")
+            self.assertEqual((Path(receipt["qlib_backup"]) / "day").read_text(), "old")
+            self.assertEqual(result.read_text(), "keep")
+            self.assertEqual(events, ["stop", "start", "stop", "start"])
 
     def test_local_edits_block_but_identical_retries_and_unique_results_survive(self):
         with tempfile.TemporaryDirectory() as tmp:

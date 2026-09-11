@@ -145,24 +145,48 @@ def require_local_idle(project):
 DERIVED = '''
 import json
 from datetime import timedelta
-from backend.scripts.quantdb_daily_sync import _pg_latest_trade_date, fill_pg_from_parquet, update_qlib_cache
+from backend.scripts.quantdb_daily_sync import _pg_latest_trade_date, fill_pg_from_parquet
 latest = _pg_latest_trade_date()
 assert latest is not None, 'Refusing an unexpected empty local market database'
 result = fill_pg_from_parquet(start_date=latest + timedelta(days=1))
 assert result.get('status') in ('ok', 'skipped'), result
-qlib = update_qlib_cache()
-assert qlib.get('status') == 'ok', qlib
-from backend.services.engine.data_platform.quantdb_hub import QuantDBDataHub
+from backend.services.engine.qlib_data_builder import ensure_qlib_cache
+from backend.shared.qlib_paths import resolve_qlib_provider_uri
+import uuid
 from pathlib import Path
 import os
 root = Path(os.environ.get('QM_QUANTDB_DATA_DIR', '/data/quantdb'))
 newest = max(p.name[3:] for p in (root / '1_kline_data/daily_forward').glob('dt=*'))
 assert _pg_latest_trade_date().strftime('%Y%m%d') == newest
-from backend.shared.qlib_paths import resolve_qlib_provider_uri
-calendar = (Path(resolve_qlib_provider_uri('CN')) / 'calendars/day.txt').read_text().splitlines()[-1]
+live = Path(resolve_qlib_provider_uri('CN'))
+staged = live.parent / ('.quantdb-qlib-' + uuid.uuid4().hex)
+ensure_qlib_cache(quantdb_dir=root, qlib_dir=staged)
+calendar = (staged / 'calendars/day.txt').read_text().splitlines()[-1]
 assert calendar.replace('-', '') == newest, (calendar, newest)
-print(json.dumps({'latest_date': newest, 'pg': result, 'qlib_calendar': calendar}))
+print(json.dumps({'latest_date': newest, 'pg': result, 'qlib_calendar': calendar, 'qlib_live': str(live), 'qlib_staged': str(staged)}))
 '''
+
+
+def publish_local_directory(staged, live):
+    # Docker Desktop does not implement Linux directory exchange on Mac mounts.
+    # Publish on the host, where the same APFS atomic operation works.
+    if not live.exists():
+        staged.rename(live)
+        return
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.renamex_np(os.fsencode(staged), os.fsencode(live), 2) != 0:
+        raise OSError(ctypes.get_errno(), 'Atomic local data exchange failed')
+
+
+def local_cache_path(local, container_path):
+    path = Path(container_path)
+    for mount, relative in (('/data', 'data'), ('/app/db', 'db')):
+        if path.is_relative_to(mount):
+            target = local / relative / path.relative_to(mount)
+            snapshot.require(target.resolve().is_relative_to((local / relative).resolve()),
+                             'Qlib cache escaped local sandbox')
+            return target
+    raise RuntimeError('Unexpected Qlib cache mount: ' + container_path)
 
 
 def apply(project, downloaded):
@@ -205,9 +229,7 @@ def apply(project, downloaded):
                              'Staged local checksum mismatch')
         backup = state / ('quantdb-before-' + datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S') + '-' + uuid.uuid4().hex[:6])
         # Same atomic directory exchange used by Qlib publication; old files survive.
-        libc = ctypes.CDLL(None, use_errno=True)
-        if libc.renamex_np(os.fsencode(staged), os.fsencode(live), 2) != 0:
-            raise OSError(ctypes.get_errno(), 'Atomic local QuantDB exchange failed')
+        publish_local_directory(staged, live)
         staged.rename(backup)
         write_json(receipt, {'status': 'files_applied', 'snapshot': str(downloaded), 'backup': str(backup)})
         # Keep the API stopped until files, PG and Qlib agree: no new training
@@ -218,7 +240,17 @@ def apply(project, downloaded):
             '--env-file', str(project / '.env.local'), '-f', str(project / 'docker-compose.yml'),
             '-f', str(project / 'deploy/compose.local-dev.yml'), '--project-directory', str(project),
             'run', '--rm', '--no-deps', '-T', '--entrypoint', 'python', 'quantmind', '-c', DERIVED)
-        write_json(receipt, {'status': 'applied', 'snapshot': str(downloaded), 'backup': str(backup), 'validation': result})
+        validation = json.loads(result.splitlines()[-1])
+        qlib_staged = local_cache_path(local, validation['qlib_staged'])
+        qlib_live = local_cache_path(local, validation['qlib_live'])
+        snapshot.require(qlib_staged.name.startswith('.quantdb-qlib-') and
+                         qlib_staged.parent == qlib_live.parent, 'Unexpected staged Qlib path')
+        publish_local_directory(qlib_staged, qlib_live)
+        qlib_backup = state / ('qlib-before-' + uuid.uuid4().hex)
+        if qlib_staged.exists():
+            qlib_staged.rename(qlib_backup)
+        write_json(receipt, {'status': 'applied', 'snapshot': str(downloaded), 'backup': str(backup),
+                             'qlib_backup': str(qlib_backup), 'validation': validation})
         print('Applied local QuantDB:', result, flush=True)
     finally:
         try:
