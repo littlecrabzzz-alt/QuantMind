@@ -937,3 +937,9 @@
 
 - 发布窗口前最后一批冻结360个`fund_share` pristine历史叶，沪深各180项，日期覆盖2021-07-31至2022-01-27；manifest、任务清单、配置、preparer和helper均哈希固定，plan-only明确为0 authority、0凭据、0上游、0写入和0发布。45.118秒完成360次HTTP 200，242 done、118 empty，保留78241行。
 - 360个object、360个observation和242个Parquet共962个唯一引用、7627403字节，逐文件SHA256通过；不确定调用0，未发布或切换`CURRENT`。Worker和Beat恢复healthy。云盘可用223317663744字节，距100 GiB硬线还有115943481344字节。962项将与基金行情13、财务18一起等待下次正常固定版和Mac镜像闭环；完整份额历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-share-batch11-20260911.evidence.json`。
+
+### 2026-09-11 post-79a2 three-batch publication gate
+
+- 基金行情13、财务18和基金份额11共1080项已在authority闭环：942 done、138 empty，形成3102个唯一引用和31204974字节。只读精确清单逐文件复算SHA256通过；清单562108字节、SHA256 `4454d6ac5983cf5d3b7b5cb9223db6fd4d56d5cf35d161edd0beb719e6c4b1b0`。
+- Mac仍处于`data-79a2e1d0…`。持久验收器的发布前负对照准确报告3102项全部未进入manifest，manifest元数据错误0、本地物理错误0并以exit 2拒绝通过。正常发布在2026-09-11 17:58:23 CST后到期，发布前不再插入精确批次。
+- API、Worker和Beat healthy，云盘距100 GiB硬线仍有115943481344字节。临时导出脚本第一次替换遗漏换行，Python在打开authority数据库前即解析失败；修正并在本地编译后完成只读导出和全量物理哈希验证，没有写authority或调用上游。下一步为正常发布、Mac标准镜像、3102项精确成员与SHA校验，以及断网、空Token、只读挂载的生产镜像读回。机器证据为`docs/tushare-post-79a2-three-batches-publish-gate-20260911.evidence.json`。
