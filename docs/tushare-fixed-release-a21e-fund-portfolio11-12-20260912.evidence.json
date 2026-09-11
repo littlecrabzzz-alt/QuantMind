@@ -1,0 +1,150 @@
+{
+  "boundary": "Batches 11 and 12 are now immutable and locally readable without Tushare. Complete holdings history, daily PCF, supplier revisions, intraday known_at, PIT membership and authoritative ETF-industry mapping remain open.",
+  "capacity": {
+    "available_bytes": 518613585920,
+    "filesystem_bytes": 845309321216,
+    "gate_passed": true,
+    "hard_reserve_bytes": 107374182400,
+    "headroom_above_reserve_bytes": 411239403520,
+    "used_bytes": 286929354752
+  },
+  "credential_hygiene": {
+    "account_fact_retained": "10100 points now; the 2000-point tranche expires 2026-12-05 and expected total becomes 8100; retain an observable reminder.",
+    "independent_rights_expire": "2027-09-08",
+    "secrets_in_report": false
+  },
+  "exact_terminal_refs": {
+    "authority_sha256_verified": true,
+    "batches": [
+      {
+        "batch": "fund_portfolio_batch_11",
+        "jobs": 240,
+        "manifest_sha256": "8de1df68494d0812f39bd006621d139e7a24262d699b992dc693e139ee42f406",
+        "physical_bytes": 2124838,
+        "references": 624,
+        "rows": 8328,
+        "states": {
+          "done": 144,
+          "empty": 96
+        },
+        "task_ids_sha256": "155e7b05e12e522020873bf0d9f38cb1a080e84136f0e9f116425e4ebd0f42a5"
+      },
+      {
+        "batch": "fund_portfolio_batch_12",
+        "jobs": 240,
+        "manifest_sha256": "62df9a2367ec38ad9ba0ed0a0735212b76131b80363f4269c72d857fd98007ee",
+        "physical_bytes": 3492892,
+        "references": 635,
+        "rows": 18234,
+        "states": {
+          "done": 155,
+          "empty": 85
+        },
+        "task_ids_sha256": "95d3ed9bbc02e16cac995434dd45cbfa667258c40e9b50b52dd35e72e87238e4"
+      }
+    ],
+    "inventory_bytes": 226862,
+    "inventory_path": "validation/fund-portfolio-batch-20260912/post-b0c6-fund-portfolio11-12-exact-refs.json",
+    "inventory_sha256": "a3f64ef321f0b91d832cac7e16610651e047825216d11d9275f247f3b752a2e5",
+    "jobs": 480,
+    "mac_verification": {
+      "local_physical_errors": 0,
+      "manifest_metadata_errors": 0,
+      "missing_from_manifest": 0,
+      "report_bytes": 746,
+      "report_sha256": "3c0e50897d7d40c39fa7d855b415242a8eb37eb25360e508f1e1c6f4aea53878",
+      "status": "passed",
+      "verified_bytes": 5617730,
+      "verified_references": 1259
+    },
+    "physical_bytes": 5617730,
+    "references_by_kind": {
+      "object": 480,
+      "observation": 480,
+      "parquet": 299
+    },
+    "states": {
+      "done": 299,
+      "empty": 181
+    },
+    "unique_references": 1259
+  },
+  "git_head_before_evidence_commit": "91a9c3f8bb9ca17e0746b5941a72d5c09c38f822",
+  "mirror": {
+    "coverage": {
+      "blocked": 1135,
+      "deferred_legacy_period_plan": 9802,
+      "done": 110322,
+      "empty": 91140,
+      "pending": 4545261,
+      "permission_blocked": 2329,
+      "quality": 399,
+      "resolved": 1883,
+      "split_pending": 4862
+    },
+    "downloaded_files": 4918,
+    "files": 865108,
+    "launchagent_exit_code": 0,
+    "launchagent_run": 221,
+    "manifest_bytes": 352814226,
+    "manifest_sha256": "a21e55cc09b36a8021cd8a90d014b41023b1c8eb2c0c1e6da2f839708f840823",
+    "release_id": "data-a21e55cc09b36a8021cd8a90d014b41023b1c8eb2c0c1e6da2f839708f840823",
+    "status": "verified",
+    "stderr_bytes": 0,
+    "switched_at": "2026-09-12T02:43:53+08:00"
+  },
+  "non_blocking_events": [
+    {
+      "detail": "The first no-network read hit the 57.5 MiB DuckDB temporary-directory limit before returning rows. Repeating the same read-only and empty-token contract with a 1 GiB tmpfs passed; authority and mirror contents were unchanged.",
+      "stage": "offline_duckdb_tmpfs",
+      "status": "retried_with_bounded_1g_tmpfs"
+    },
+    {
+      "detail": "The standard LaunchAgent was idle after publication and was started without force-kill. Run 221 completed full verification and retained its 900-second schedule.",
+      "stage": "mirror_start",
+      "status": "standard_client_completed"
+    }
+  ],
+  "observed_at": "2026-09-11T18:52:53Z",
+  "offline_readback": {
+    "api": "fund_portfolio",
+    "columns": 15,
+    "image": "quantmind-oss:latest",
+    "mirror_mount": "read_only",
+    "network": "none_plus_socket_dns_guards",
+    "release_id": "data-a21e55cc09b36a8021cd8a90d014b41023b1c8eb2c0c1e6da2f839708f840823",
+    "report_bytes": 310,
+    "report_sha256": "a44df7299c9537d52238beae7923722774cc1adfa945a5704766a49806152ff2",
+    "rows": 3,
+    "status": "offline_fixed_release_reads_passed",
+    "token_variables_empty": true,
+    "upstream_calls": 0
+  },
+  "publication": {
+    "celery_state": "SUCCESS",
+    "datasets": 117767,
+    "files": 865108,
+    "last_success_at": "2026-09-12T02:37:18+08:00",
+    "manifest_bytes": 352814226,
+    "manifest_sha256": "a21e55cc09b36a8021cd8a90d014b41023b1c8eb2c0c1e6da2f839708f840823",
+    "mode": "publish_only",
+    "next_due_at": "2026-09-12T03:37:18+08:00",
+    "performed": true,
+    "publish_elapsed_seconds": 190.63879353180528,
+    "release_id": "data-a21e55cc09b36a8021cd8a90d014b41023b1c8eb2c0c1e6da2f839708f840823",
+    "requests": 0,
+    "retained_observations_included": true,
+    "status": "published",
+    "task_id": "a30491ba-e8b5-49cc-a9c9-24b40f2137ea",
+    "upstream_calls": 0
+  },
+  "schema_version": 1,
+  "services": {
+    "celery_beat": "healthy",
+    "normal_pipeline_resumed_task_id": "e05d0d00-6a57-40a1-8dbb-2f555f0eecb6",
+    "tushare_worker": "healthy",
+    "worker_oom": false,
+    "worker_restart_count": 0
+  },
+  "status": "fixed_release_a21e_fund_portfolio_11_12_local_closed"
+}

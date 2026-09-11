@@ -1141,3 +1141,11 @@
 - 生产容器62.89秒完成240次HTTP 200：155 done、85 empty、18234行、不确定调用0，吞吐228.971次/分钟，低于该接口保守240 rpm和90秒硬限。独立只读审计确认每项恰有一次attempt，635个唯一物理引用（240 object、240 observation、155 Parquet）、3492892字节逐文件SHA256通过，并与第7至11批任务及请求签名零重叠。
 - 首次宿主机路径执行被authority-root保护在锁、凭据、上游和写入前拒绝；随后使用既有cloud-compose生产挂载和同一冻结清单成功。Worker与Beat恢复healthy、restart0、OOM false，普通任务已继续。
 - 云盘距100GiB硬线还有412020506624字节；`CURRENT`仍为b0c6，第11/12批等待02:32:21 CST后的正常发布和Mac单向镜像。完整持仓、每日PCF、历史修订、盘中`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fund-portfolio-batch12-20260912.evidence.json`。
+
+
+### 2026-09-12 固定版a21e基金持仓11/12本地闭环
+
+- 到期后的正常publisher任务`a30491ba-e8b5-49cc-a9c9-24b40f2137ea`以Celery SUCCESS、0上游请求、190.639秒完成publish-only，原子生成`data-a21e55cc09b36a8021cd8a90d014b41023b1c8eb2c0c1e6da2f839708f840823`；352814226字节manifest含117767个dataset和865108个文件，并保留observations。
+- 标准Mac LaunchAgent空闲时以非强制方式启动第221轮，下载4918个增量文件、完整验证后exit0、stderr0，并于02:43:53 CST原子切换。query-only清单从live jobs/attempts重建第11/12批480个终态任务（299 done、181 empty），1259个唯一引用、5617730字节；Mac manifest缺失0、元数据错误0、本地物理错误0。
+- 生产镜像在`--network none`、socket/DNS阻断、空Token和只读镜像下读取`fund_portfolio`3行15列，上游调用0。首次64MiB tmpfs不足触发DuckDB临时目录上限，保持同一隔离合同改为1GiB后通过，没有改写authority或镜像。
+- Worker与Beat恢复healthy、restart0、OOM false，普通任务已继续。云盘距100GiB硬线还有411239403520字节。两批现已可在本地脱离Tushare读取；完整持仓、每日PCF、历史修订、盘中`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fixed-release-a21e-fund-portfolio11-12-20260912.evidence.json`。

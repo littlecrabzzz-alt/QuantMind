@@ -1,0 +1,9 @@
+# Tushare fixed release a21e and fund_portfolio batches 11-12
+
+- Normal publisher task `a30491ba-e8b5-49cc-a9c9-24b40f2137ea` completed with Celery SUCCESS, zero upstream requests and 190.639 seconds of publish-only work. It atomically produced `data-a21e55cc09b36a8021cd8a90d014b41023b1c8eb2c0c1e6da2f839708f840823`: a 352,814,226-byte manifest with 117,767 datasets, 865,108 files and retained observations.
+- The standard Mac LaunchAgent was idle and was started without force-kill. Run 221 downloaded 4,918 incremental files, verified the full release, emitted zero stderr, exited 0 and atomically switched `CURRENT` at 02:43:53 CST.
+- A query-only export rebuilt batches 11-12 from live jobs and attempts: 480 jobs (299 done, 181 empty), 1,259 unique references and 5,617,730 bytes. The 226,862-byte inventory SHA is `a3f64ef3…`; independent Mac verification found zero missing entries, metadata errors or physical size/SHA errors.
+- The production image read `fund_portfolio` from the Mac mirror with networking disabled, socket/DNS guards, both token variables empty, the mirror read-only and a bounded 1 GiB tmpfs. It returned three rows and 15 columns with zero upstream calls. A first 64 MiB tmpfs run hit DuckDB's temporary-directory cap and changed no authority or mirror data.
+- Worker and Beat were restored healthy with restart count 0 and OOM false; normal task `e05d0d00-6a57-40a1-8dbb-2f555f0eecb6` was received. Cloud free space is 518,613,585,920 bytes, leaving 411,239,403,520 bytes above the 100 GiB reserve.
+
+Batches 11-12 are now locally available without Tushare. Complete holdings, daily PCF, source revisions, intraday `known_at`, PIT membership and authoritative ETF-industry mapping remain open. Machine evidence: `docs/tushare-fixed-release-a21e-fund-portfolio11-12-20260912.evidence.json`.
