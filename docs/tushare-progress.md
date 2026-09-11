@@ -1210,3 +1210,9 @@
 - The six-batch inventory has 6,267 references and 91,464,651 bytes. Old 76b excluded all references as expected; new eb6b included and physically verified all references with zero metadata, missing or SHA errors.
 - Mac LaunchAgent run 232 automatically downloaded 8,183 files, verified 883,963 files and switched CURRENT at 05:58:34. Local exact verification passed and socket/DNS-blocked reads returned `index_daily` 3x17 and `index_weight` 3x11 with empty token variables and zero upstream calls.
 - Worker and Beat were restored with their existing containers and are healthy. The next priority remains index daily/weight continuation plus the 210 pristine index-weight descendants; empty, PIT and RRG mapping gaps remain explicit.
+## 2026-09-12 06:23 index_daily 14-16 / index_weight 10-12 exact window
+
+- Six pristine exact batches ran serially against fixed release `data-eb6bf9a06e48821b8dccf7765846c2f87593aa3560c60ebbdef57a0529d9e1bd`: `index_daily` 14-16 and `index_weight` 10-12. All were zero-overlap with prior exact manifests.
+- The batches closed 2,160 HTTP-200 responses in 274.699 seconds (471.789 observed RPM), retaining 601,159 rows. States are 1,919 `sample_ok`, 137 `empty_unverified` and 104 `possibly_truncated`; the latter created 208 pristine pending children.
+- Independent read-only closure verified 6,343 object/observation/Parquet references and 90,141,292 bytes by size and SHA. Worker and Beat were restored exactly and are healthy.
+- Fixed release inclusion and Mac offline readback remain the next acceptance gates. Complete history, revisions, known-at/PIT semantics and RRG classification remain explicit gaps.
