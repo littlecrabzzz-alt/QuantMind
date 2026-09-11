@@ -984,3 +984,10 @@
 - 四份exact manifest共1320项，只导出1077个终态叶：967 done、110 empty、243 pending。终态叶形成1077个object、1077个observation和967个Parquet，共3121个唯一引用、28848540字节；authority只读清单逐文件复算SHA256通过，清单566267字节、SHA256 `e00ea401166333c145f3a4f87c6e6e5b7d78a8d5ebccd87b8438166005a8d3ec`。
 - 243个pending继续显式保留，其中基金行情14为24项、财务19为219项，包含两笔分别记录的`ReadTimeout`。基金份额12和指数日线7已在300请求恢复档完整结束、零不确定调用。Mac仍为`data-8f6c6d82…`；发布前负对照准确报告3121项均未进manifest，元数据错误0、本地物理错误0、exit 2。
 - 正常发布在2026-09-11 19:04:17 CST后到期，发布前不再插入exact批次。API、Worker和Beat healthy，云盘距100 GiB硬线还有114905370624字节。下一步为正常发布、Mac标准镜像、3121项精确成员与SHA校验，以及断网、空Token、只读挂载的生产镜像读回。机器证据为`docs/tushare-post-8f6-four-batches-publish-gate-20260911.evidence.json`。
+
+### 2026-09-11 post-8f6 four-batch fixed-release closure
+
+- 正常publisher任务`ee1b7011-13cf-4919-bf16-d28b187787e3`以Celery SUCCESS、上游请求0完成，190.792秒原子发布`data-35e0779328370f69b74d06208f4755d53eb71c1efa57d209197c56d6e1ca1421`；331919013字节manifest含112542个dataset、832233个文件，实算SHA256与CURRENT一致并包含retained observations。
+- Mac标准LaunchAgent第195轮下载8312个增量文件，完整验证832233项、stderr 0、exit 0后原子切换。固定版验收器对四份manifest中的1077个终态叶形成的3121个唯一引用、28848540字节全部通过：manifest缺失0、元数据错误0、本地物理错误0。
+- 生产镜像在`--network none`、socket/DNS阻断、空Token和只读镜像条件下读取`index_daily`、`fund_daily`、`fund_adj`、`fund_share`及三张财务表各3行，上游调用0。云盘可用221457752064字节，距100 GiB硬线还有114083569664字节；API、Worker、Beat healthy。
+- 基金行情14的24项和财务19的219项继续保持pending，其中两笔ReadTimeout仍单独记为不确定调用，不因固定发布而改写。常规exact窗口保持300请求/90秒；完整历史、修订、`known_at`、PIT成员、RRG可交易状态和PCF仍未闭合。机器证据为`docs/tushare-fixed-release-35e-four-batches-20260911.evidence.json`。
