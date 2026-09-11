@@ -1124,3 +1124,11 @@
 - Mac标准LaunchAgent第217轮下载3632个增量文件，完整验证后exit 0、stderr 0并原子切换。基金持仓批次7至10的2655个唯一引用、13907170字节全部通过：manifest缺失0、元数据错误0、本地物理错误0。
 - 生产镜像在`--network none`、socket/DNS阻断、空Token、只读镜像条件下读取`fund_portfolio`3行15列，上游调用0。唯一`possibly_truncated`阻塞响应的authority结果为2001行，旧摘要写成2000行已更正；没有重放，也不计完整覆盖。
 - Worker与Beat通过无revoke流程恢复healthy，普通采集任务已继续；API、general worker、研究worker均healthy。云盘可用519452131328字节，距100GiB硬线还有412077948928字节。四批现已可在本地脱离Tushare读取；完整持仓、每日PCF、历史盘中`known_at`、修订、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fixed-release-b0c6-fund-portfolio7-10-20260912.evidence.json`。
+
+
+### 2026-09-12 fund_portfolio第11批精确闭环
+
+- 固定版b0c6闭环后，无revoke排空并冻结240个`current_v2`、pristine、leaf-only、跨epoch语义唯一历史请求，覆盖240只基金、period边界2019-12-31至2023-09-30；准备时仍有12088个合格请求。固定版、任务、请求签名、配置、准备器和helper哈希全部冻结，plan-only为0 authority、0凭据、0上游、0写入、0发布。
+- 63.583秒完成240次HTTP 200：144 done、96 empty、8328行、不确定调用0，吞吐226.476次/分钟，低于该接口保守240 rpm及90秒硬限。独立只读审计确认每项恰有一次attempt，624个唯一物理引用（240 object、240 observation、144 Parquet）、2124838字节逐文件SHA256通过，并与第7至10批任务及请求签名零重叠。
+- 五个归档最初落入前一日期目录，按精确文件名移至空的20260912目录后重新完成文件、身份、集合、跨文件和live SQLite复核，没有重写数据。恢复时两条已确认过期的自动采集消息被worker按revoked/expired丢弃；第二次审计排空后Worker与Beat恢复healthy、restart0、OOM false，普通任务已继续。
+- 云盘距100GiB硬线还有412043436032字节；`CURRENT`仍为b0c6，本批尚未发布或同步进Mac固定镜像。完整持仓、每日PCF、历史修订、盘中`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fund-portfolio-batch11-20260912.evidence.json`。

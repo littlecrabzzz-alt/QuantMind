@@ -1,0 +1,179 @@
+{
+  "archive_files": [
+    {
+      "bytes": 1222,
+      "name": "batch-11-closure.json",
+      "sha256": "20f8d88941eae472cd0385ad53b600fa2b7cf4a557807fb270eaf3e078cf823a"
+    },
+    {
+      "bytes": 217557,
+      "name": "batch-11-manifest.json",
+      "sha256": "8de1df68494d0812f39bd006621d139e7a24262d699b992dc693e139ee42f406"
+    },
+    {
+      "bytes": 55638,
+      "name": "batch-11-plan.json",
+      "sha256": "73d07a6350f626fc50082e7c70cd0b57310647b7b16a649e8b85ccd65855a5c8"
+    },
+    {
+      "bytes": 1252,
+      "name": "batch-11-prepare.json",
+      "sha256": "e3362c144ca60a5b566a7a7f607f15654fce65b17b073f2978e88062560540fd"
+    },
+    {
+      "bytes": 55997,
+      "name": "batch-11-receipt.json",
+      "sha256": "254de76fddf4b7e41599b9afa1cc636a4a2505a6fd1b1bce0f99a7585861cc0c"
+    }
+  ],
+  "batch": {
+    "archive_dir": "validation/fund-portfolio-batch-20260912",
+    "attempt_statuses": {
+      "empty_unverified": 96,
+      "sample_ok": 144
+    },
+    "attempts_per_task": {
+      "1": 240
+    },
+    "availability_period_max": "2023-09-30",
+    "availability_period_min": "2019-12-31",
+    "closure_id": "2207e193c6cb63e3df482a70770772cd6e0509fe50207bcc15d0f25f3e1adf24",
+    "contract_version": "current_v2",
+    "elapsed_seconds": 63.583,
+    "eligible_jobs_before_freeze": 12088,
+    "eligible_variants_before_freeze": 24176,
+    "http_statuses": {
+      "200": 240
+    },
+    "jobs": 240,
+    "name": "fund_portfolio_batch_11",
+    "observed_rpm": 226.4756,
+    "overlap_with_batches_7_10": {
+      "request_signatures": 0,
+      "task_ids": 0
+    },
+    "receipt_id": "26eb524c663bbc021eded722f09a0190aa2d6b26c53355f85e3ab9e474f4e694",
+    "request_signatures_sha256": "ab2242f4df4ff10d972f1b163c9ce592852f36d432aaec2412ac150de9e15610",
+    "rows": 8328,
+    "states": {
+      "done": 144,
+      "empty": 96
+    },
+    "task_ids_sha256": "155e7b05e12e522020873bf0d9f38cb1a080e84136f0e9f116425e4ebd0f42a5",
+    "tries": {
+      "1": 240
+    },
+    "uncertain_calls": 0,
+    "unique_funds": 240,
+    "unique_request_signatures": 240,
+    "unique_task_ids": 240,
+    "upstream_calls": 240
+  },
+  "capacity": {
+    "available_bytes": 519417618432,
+    "filesystem_bytes": 845309321216,
+    "gate_passed": true,
+    "hard_reserve_bytes": 107374182400,
+    "headroom_above_reserve_bytes": 412043436032,
+    "used_bytes": 286125322240
+  },
+  "credential_hygiene": {
+    "account_fact_retained": "10100 points now; the 2000-point tranche expires 2026-12-05 and expected total becomes 8100; retain an observable reminder.",
+    "independent_rights_expire": "2027-09-08",
+    "secrets_in_report": false
+  },
+  "frozen_inputs": {
+    "config_sha256": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a",
+    "helper_sha256": "4972b99732916a9d351144a019a33a264615b4d1ad3ae1854b38ad0e3bd0b260",
+    "manifest_sha256": "8de1df68494d0812f39bd006621d139e7a24262d699b992dc693e139ee42f406",
+    "preparation_sha256": "ad996330d3382733143726a213c7946f361d9147904d052567442ab3d87902e6"
+  },
+  "git_head_before_evidence_commit": "efb0e175",
+  "independent_audit": {
+    "archive_regular_files": 5,
+    "cross_batch_overlap_errors": 0,
+    "database_closed": true,
+    "live_attempts": 240,
+    "live_tasks": 240,
+    "passed": true,
+    "physical_references_verified": 624,
+    "shared_lock_released": true
+  },
+  "next_priorities": [
+    "Historical industry membership versions with known_at for PIT RRG replay.",
+    "Executable A-share and ETF panel including PCF, suspension and limit semantics.",
+    "Full-history financial PIT panel.",
+    "Full-market factor_value history subject to its separate permission and saturation rules.",
+    "Historical and realtime minute data remain permission-blocked and should not be bulk retried."
+  ],
+  "non_blocking_events": [
+    {
+      "detail": "The five batch-11 archive files were first placed in the 20260911 directory. Exact regular files were moved to the empty 20260912 target, then all hashes and cross-file links were independently reverified.",
+      "stage": "archive_directory",
+      "status": "corrected_without_data_rewrite"
+    },
+    {
+      "detail": "Two queue messages were inspected before restore; both named engine.tasks.tushare_acquire and had expired at 01:48:19 and 01:50:19 CST. The restored worker discarded both as revoked/expired and queue length returned to zero.",
+      "stage": "expired_queue_messages",
+      "status": "verified_and_discarded_on_worker_restore"
+    },
+    {
+      "detail": "One shell command expanded status assertions on the Mac before SSH. Its compose start still ran on cloud; a separate quoted remote script then verified service health, queue length, restart count and OOM state.",
+      "stage": "remote_status_assertion",
+      "status": "reverified_remotely"
+    }
+  ],
+  "observed_at": "2026-09-11T18:03:37Z",
+  "physical_refs": {
+    "bytes": 2124838,
+    "live_sqlite_and_files_independently_verified": true,
+    "missing": 0,
+    "parquet_size_errors": 0,
+    "references_by_kind": {
+      "object": 240,
+      "observation": 240,
+      "parquet": 144
+    },
+    "sha256_errors": 0,
+    "unique_references": 624
+  },
+  "plan_only": {
+    "authority_access": false,
+    "credential_access": false,
+    "current_switch": false,
+    "publication": false,
+    "upstream_calls": 0,
+    "writes": 0
+  },
+  "rate_gate": {
+    "account_rpm": 500,
+    "api_rpm": 240,
+    "exact_batch_cap": 240,
+    "max_seconds": 90,
+    "passed": true,
+    "rate_policy": "tiered_v1",
+    "rate_review_required": true
+  },
+  "remaining_boundaries": [
+    "Batch 11 is authority-closed but not yet part of a published fixed release or the Mac mirror.",
+    "fund_portfolio is periodic disclosed holdings, not daily PCF or complete holdings.",
+    "Historical revisions, intraday known_at, PIT membership and authoritative ETF-industry mapping remain open."
+  ],
+  "schema_version": 1,
+  "services": {
+    "celery_beat": "healthy",
+    "normal_pipeline_resumed_task_id": "71c1256b-9fe3-4639-b2fa-007caa898b7a",
+    "queue_length_after_restore": 0,
+    "tushare_worker": "healthy",
+    "worker_oom": false,
+    "worker_restart_count": 0
+  },
+  "source_fixed_release": {
+    "batch_published": false,
+    "current_unchanged": true,
+    "mac_mirror_includes_batch11": false,
+    "manifest_sha256": "b0c60c5371a3daa77c3f0108c84f3cdef2f7ddca78650fd0a3d49ce92f784adb",
+    "release_id": "data-b0c60c5371a3daa77c3f0108c84f3cdef2f7ddca78650fd0a3d49ce92f784adb"
+  },
+  "status": "post_b0c6_fund_portfolio_batch11_authority_closed"
+}
