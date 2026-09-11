@@ -827,3 +827,10 @@
 - 三批的1080个attempt、1080个object、1080个observation和1059个Parquet逐实体SHA通过；物理证据共718607021字节。authority闭包`validation/release-82ece8a-exact-wave2-closure-20260911.json` SHA256为`8d1acfd1bfc65b89744bdb84d7da5a25c4045fec763352afaba3565dd0acc99e`，固定版未发布或切换，等待正常publish-only和Mac单向镜像。
 - 只读RRG审计确认继续扩`ci_index_member`、申万`index_member_all`、东方财富或同花顺成员不能解除中信历史成员PIT缺口。后续只沿现有bridge记录从首次抓取开始的forward-only vintage，并按`etf_basic.index_code`定向补`fund_portfolio`和`index_weight`；2022—2026历史放行仍需官方中信调整档案的`known_at`、revision/撤回和来源哈希。RRG保持`blocked_data`。
 - 财务PIT冻结器已改为优先选择三表共同叶，再按API独立填满剩余预算；一个API候选不足不再阻塞另外两个API。指数权重plan同时补齐`would_write=false`。13项专项测试和编译检查在Mac通过，待master提交、云端部署和真实批次验收。
+
+## 2026-09-11 12:30 财务PIT选择器生产闭环
+
+- `93e5d4ac`把财务PIT冻结器改为共同叶优先、三API独立补齐，`da6b5dea`再为runner增加准备器SHA固定、`would_write=false`和执行时强制校验；两端master与源码摘要对齐，Mac和生产容器各13项专项测试通过。脚本通过bind mount直接部署，无新增依赖或镜像重建。
+- 安全排空后在原先因共同叶不足而停止的`20260910` epoch重新冻结，得到`income_vip`、`balancesheet_vip`、`cashflow_vip`各2项。plan-only确认不访问authority、凭据、上游、不写入或发布，并固定manifest、任务集合、配置、runner及preparer五类SHA。
+- 真实批次6次调用在1.082秒内完成，全部HTTP 200且为精确空响应；6个任务进入empty，6个object和6个observation物理SHA通过，无Parquet，未切换CURRENT。闭包`validation/financial-pit-batch-20260911/batch-13-closure.json` SHA256为`c5217c697dc990ca9992335be42b1a80639897dffe4372d18e5c2cfde3d1517c`。
+- 这6个空响应只约束具体公司、报告期和报表API，不能外推为供应商历史为空、修订完整或PIT完整。worker与Beat已恢复；本批与12:20波次等待正常publish-only和Mac单向镜像。
