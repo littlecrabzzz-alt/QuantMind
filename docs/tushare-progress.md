@@ -834,3 +834,12 @@
 - 安全排空后在原先因共同叶不足而停止的`20260910` epoch重新冻结，得到`income_vip`、`balancesheet_vip`、`cashflow_vip`各2项。plan-only确认不访问authority、凭据、上游、不写入或发布，并固定manifest、任务集合、配置、runner及preparer五类SHA。
 - 真实批次6次调用在1.082秒内完成，全部HTTP 200且为精确空响应；6个任务进入empty，6个object和6个observation物理SHA通过，无Parquet，未切换CURRENT。闭包`validation/financial-pit-batch-20260911/batch-13-closure.json` SHA256为`c5217c697dc990ca9992335be42b1a80639897dffe4372d18e5c2cfde3d1517c`。
 - 这6个空响应只约束具体公司、报告期和报表API，不能外推为供应商历史为空、修订完整或PIT完整。worker与Beat已恢复；本批与12:20波次等待正常publish-only和Mac单向镜像。
+
+## 2026-09-11 13:35 财务历史、基金持仓与RRG前向边界
+
+- `075e8f2c`新增`fund_portfolio`默认plan-only精确批次，`3bce873b`修复财务准备器跨epoch筛选并关闭runner只读SQLite连接，`63ced924`加入RRG固定观察前向vintage，`ee850c89`让基金持仓按真实上游请求签名跨两代合同去重；Mac、GitHub和云端master均已对齐。相关18项基金批次测试、9项财务测试和10项RRG bridge测试通过。
+- 新固定版`data-476b325b6cf6eb83994abdfdb2249a4d40645b24ec1bcc8bfd1789f052a849a7`已由正常发布周期生成并同步到Mac。304011057字节manifest独立重算SHA与release ID一致，含104497个dataset和785065个文件引用，`retained_observations_included=true`。Mac在只读挂载、`--network none`和Token为空条件下成功读取指数权重、基金行情/复权、沪深董秘问答及三张财务表，各3行、0次上游访问。
+- 生产authority不存在字面值`history`的财务任务；历史财务叶仍分布在`20260909/10/11`日期epoch。字面`history`准备以0调用停止后，改用最早`20260909`冻结三API各120项。48.771秒完成360次HTTP 200，结果345 done/15 empty、733行；360个object、360个observation和345个Parquet逐实体SHA通过，共13990760字节。闭包`validation/financial-pit-batch-20260911/batch-14-closure.json` SHA256为`35ccda7f1b47d008cd1bde2cf65bd53fc999271136992d9be2811350b91befda`。
+- `fund_portfolio`的76181个任务只对应38090个`api_name+params+fields`请求签名；其中14531个签名已有done、7552 empty、7 quality、6 blocked，15994个从未尝试。精确runner显式接受已观察的legacy/current两代合同，只从未尝试的history叶中按current合同优先选择，所有已有attempt或非pending签名均不重放。首批冻结320个唯一签名；账户滑窗使第一个90秒窗口在限速等待阶段停止，已精确提交292次、28项从未调用。新尾清单与28个未尝试task ID完全一致，7.432秒补完；总计320次HTTP 200、227 done/93 empty、33749行，320个object/observation和227个Parquet逐实体SHA通过，共5954931字节，确定性不明调用为0。最终闭包`validation/fund-portfolio-batch-20260911/batch-2-final-closure.json` SHA256为`01d7bc10d5b828d348d717324030405d15d35bbe19dd4df9e86e7014e1af6e29`。
+- RRG bridge只把固定观察转换成从Asia/Shanghai观察日次日开始的forward-only候选，并按当前值连续episode处理A-B-A与消失后重现；`retained_observations_included`非严格true时拒绝。真实固定版因中信成员存在empty、ETF基础存在quality而无法证明观察连续性，20260831信号日可用成员和ETF映射均为0，继续`blocked_data`。基金持仓是周期披露，不代表完整ETF日频暴露或PCF；13个既有quality/blocked请求签名后续从已保存原始对象做本地恢复，不用重复调用上游掩盖缺口。
+- Worker与Beat已恢复。财务第14批和基金持仓首批仍在authority，等待下一次正常publish-only及Mac单向镜像；完整历史、历史修订、known_at和PIT仍未闭合。机器证据为`docs/tushare-financial-pit-batch14-20260911.evidence.json`、`docs/tushare-fund-portfolio-production-20260911.evidence.json`和`docs/tushare-release-476b-offline-20260911.evidence.json`。
