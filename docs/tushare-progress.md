@@ -1184,3 +1184,10 @@
 - Worker和Beat恢复healthy、restart0、OOM false，普通采集继续；恢复命令因Compose依赖检测重建了Postgres容器，但复用了`quantmind_postgres-data`持久卷，`pg_isready`、API health及其余服务均通过。后续恢复改用不触发依赖重建的窄启动方式。云盘距100GiB硬线还有410158260224字节。
 - `CURRENT`仍为a447，第15批等待04:42:57 CST后的正常固定发布和Mac单向镜像。完整持仓、每日PCF、历史修订、盘中`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fund-portfolio-batch15-20260912.evidence.json`。
 - 当前机器清单口径是263个目录义务、244个已实现接口；此前227是能提取接口名和字段的文档页数，不再作为注册接口数。下一数据族优先级为`index_daily`/`index_weight`，其次补齐`fund_share`，然后推进已购文本权益的结构化元数据；约120万正文附件按现有均值粗估可能需要约2.4TB，必须随云盘容量分层推进。
+
+### 2026-09-12 指数日线第10批与基金份额第15批
+
+- 在两次普通采集均自然排空、Beat先停且无revoke后，从a447固定版和live authority分别冻结360个`index_daily`历史任务及360个`fund_share`历史任务。指数日线覆盖360个指数（CSI 202、SH 158），范围2025-01-01至2026-09-01；基金份额沪深各180，范围2019-10-08至2020-04-04。两批plan-only均为0 authority、0凭据、0上游、0写入、0发布，并分别与既有指数批次1、2、4至9及基金份额批次1至7、9至14任务和请求零重叠。
+- `index_daily`用44.385秒完成360次HTTP 200：355 done、5 empty、77598行，批次平均486.651 rpm，低于500 rpm；独立审计验证1075个唯一物理引用、17723680字节的大小与SHA256。`fund_share`用44.875秒完成360次HTTP 200：253 done、107 empty、65479行、不确定调用0；独立审计验证973个唯一物理引用、6563496字节的大小与SHA256。
+- 两次执行均未发布或切换CURRENT。恢复统一使用精确`docker start`，未再次触发依赖重建；Worker和Beat为healthy、restart0、OOM false，普通采集继续。云盘扣除100GiB硬保留后仍有410028138496字节。
+- 两批等待04:42:57 CST之后的正常publish-only和Mac固定版单向镜像。5个指数空结果及107个基金份额空结果继续标记`empty_unverified`；当前闭包不证明完整历史、修订、盘中`known_at`、PIT语义或RRG行业分类。机器证据为`docs/tushare-index-daily-batch10-20260912.evidence.json`和`docs/tushare-fund-share-batch15-20260912.evidence.json`。
