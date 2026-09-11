@@ -902,3 +902,8 @@
 
 - 前五批`index_daily`累计1680次调用全部HTTP 200、零429、零不确定调用，因此保持360次灰度档。固定版、配置、preparer、helper、候选库存和任务清单全部哈希冻结，plan-only明确为0 authority、0凭据、0上游、0写入和0发布。45.783秒完成360次HTTP 200，350 done、10 empty，覆盖360个`.CSI`指数代码并保留56218行。
 - 360个object、360个observation和350个Parquet共1070个唯一引用、12288701字节，逐文件SHA256通过；未发布或切换`CURRENT`。Worker与Beat恢复healthy。云盘可用224044765184字节，距100 GiB硬线还有116670582784字节。1070项等待正常固定版和Mac镜像闭环；完整指数历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-index-daily-batch6-20260911.evidence.json`。
+
+### 2026-09-11 fund_share exact batch 10
+
+- 发布窗口前只执行一批：冻结360个`fund_share` pristine历史叶，沪深各180项，日期覆盖2022-01-28至2022-07-26；manifest、任务清单、配置、preparer和helper均哈希固定，plan-only明确为0 authority、0凭据、0上游、0写入和0发布。45.227秒完成360次HTTP 200，235 done、125 empty，保留87115行。
+- 360个object、360个observation和235个Parquet共955个唯一引用、8336997字节，逐文件SHA256通过；不确定调用0，未发布或切换`CURRENT`。Worker与Beat恢复healthy。云盘可用224030081024字节，距100 GiB硬线还有116655898624字节。955项与另外三批post-`473bf`结果等待17:07后正常固定版发布和Mac镜像闭环；完整份额历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-share-batch10-20260911.evidence.json`。
