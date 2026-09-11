@@ -14,3 +14,11 @@ Fund portfolio batch 4 pinned 240 current-v2, pristine history signatures from 1
 The two batches made 600 certain upstream calls, retained 12468 rows and produced 1701 unique physical references totalling 16688120 bytes. They did not publish or switch `CURRENT`. The worker and Beat were restored healthy. Free disk after closure was 225743339520 bytes, leaving 118369157120 bytes above the 100 GiB reserve. The document worker remains stopped until actual expansion and peak-headroom validation; this does not block structured acquisition.
 
 Next: let the normal publish-only cycle include these artifacts, mirror the new fixed release to Mac, prove all 1701 references by manifest membership, size and SHA256, and rerun offline no-token reads. Continue the oldest financial epoch and remaining pristine fund portfolio signatures in later bounded windows; prepare `index_daily` next. Machine evidence: `docs/tushare-financial-portfolio-batches15-4-20260911.evidence.json`.
+
+## Fixed release closure
+
+- Normal publish-only created `data-5f796b5046adfec0d3cb98bff41b00c098a87b090b9df7a1aeeb40202b0d2019`: 106454 datasets, 799038 files, 312082232-byte manifest, retained observations included.
+- The standard Mac LaunchAgent downloaded 6933 physical files, verified all 799038 manifest entries, exited 0, and atomically switched local `CURRENT` to the same release.
+- All 1701 references from financial batch 15 and fund portfolio batch 4 were independently checked against manifest metadata and local size/SHA256: 600 objects, 600 observations, 501 Parquet files, 16688120 bytes, zero errors.
+- A production-image container with no network, empty Token variables, and read-only mirror mount read three rows each from `fund_portfolio`, `income_vip`, `balancesheet_vip`, and `cashflow_vip`; upstream calls remained zero.
+- Machine evidence: `docs/tushare-fixed-release-5f796b-financial-portfolio-20260911.evidence.json`.
