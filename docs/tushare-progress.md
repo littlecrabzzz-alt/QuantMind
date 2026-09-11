@@ -866,3 +866,8 @@
 
 - 根据并行只读审计，优先继续直接服务RRG价格与复权输入的`fund_daily+fund_adj`。在固定版、SSE开市日、配置、preparer、helper及360个任务ID全部哈希冻结后，plan-only为0调用/0写入；真实批次覆盖2012-10-10至2013-07-10的180个共同交易日，两接口各180次，44.157秒内360次均HTTP 200且全部done，保留100642行。
 - 360个object、360个observation和360个Parquet共1080个唯一引用、14633170字节，逐文件SHA256通过；不确定调用0，未发布或切换`CURRENT`。Worker与Beat恢复healthy。云盘可用224954359808字节，距100 GiB硬线还有117580177408字节。1080项等待正常固定版和Mac镜像闭环；RRG的历史分类/成员`known_at`、修订、可交易状态、PCF和完整生命周期仍保持`blocked_data`。机器证据为`docs/tushare-fund-price-batch11-20260911.evidence.json`。
+
+### 2026-09-11 financial exact batch 16
+
+- 财务继续最早`20260909` epoch，`income_vip`、`balancesheet_vip`、`cashflow_vip`各冻结120个pristine叶；manifest、任务清单、配置、preparer和helper均哈希固定，plan-only为0调用/0写入。48.382秒完成360次HTTP 200，各API均112 done/8 empty，合计336 done、24 empty和696行。
+- 360个object、360个observation和336个Parquet共1056个唯一引用、13599035字节，逐文件SHA256通过；不确定调用0，未发布或切换`CURRENT`。Worker与Beat恢复healthy。云盘可用224876101632字节，距100 GiB硬线还有117501919232字节。1056项将与指数第4批、基金行情第11批一起等待正常固定版和Mac镜像闭环；完整财务历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-financial-pit-batch16-20260911.evidence.json`。
