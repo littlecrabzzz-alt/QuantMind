@@ -916,3 +916,9 @@
 - 新增`scripts/verify_tushare_exact_release.py`作为持久验收入口。以旧固定版`473bf…`做负对照时，准确报告4164项均未进manifest、元数据错误0、本地物理错误0并以exit 2拒绝通过；Python编译通过。Mac未安装Ruff，生产镜像静态检查留到发布窗口后执行，避免此时重建服务影响正常publisher。
 
 - 同一验收器已在云端现有生产镜像中以`--network none`、空Token、只读代码和只读authority挂载运行；Python3.10编译通过，旧固定版负对照仍为4164缺失、元数据错误0、物理错误0、exit 2、上游调用0。首次`py_compile`试图在只读源码下写`__pycache__`而失败，改用容器`/tmp`字节码目录后通过，未改数据或服务。
+
+### 2026-09-11 post-473bf four-batch fixed-release closure
+
+- 正常publisher任务`ebef55ba-534a-479b-94d6-fa53955b186a`以Celery SUCCESS、上游调用0完成，163.492秒原子发布`data-79a2e1d0f3bffec0cbf97998dba2df8f1423f6425da41e9e7b10ebd2ab0b5c14`；321075917字节manifest含109817个dataset、814916个文件，实算SHA256与CURRENT一致且包含retained observations。
+- Mac LaunchAgent第187轮下载7377个增量文件，完整验证814916项、stderr 0、exit 0后原子切换。固定版验收器对基金行情12、财务17、指数6和基金份额10的4164个唯一引用、46566579字节全部通过：manifest缺失0、元数据错误0、本地物理错误0。
+- 生产镜像在`--network none`、socket/DNS阻断、空Token和只读镜像条件下读取`index_daily`、`fund_daily`、`fund_adj`、`fund_share`及三张财务表各3行，上游调用0。云盘可用223389868032字节，距100 GiB硬线还有116015685632字节；API、Worker、Beat healthy。四批已从“权威端闭环”提升为“本地固定版离线可用”。完整历史、修订、`known_at`、PIT成员、RRG可交易状态和PCF仍未闭合。机器证据为`docs/tushare-fixed-release-79a2-four-batches-20260911.evidence.json`。
