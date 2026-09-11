@@ -932,3 +932,8 @@
 
 - 继续`20260909` epoch，`income_vip`、`balancesheet_vip`、`cashflow_vip`各冻结120个pristine叶；manifest、任务清单、配置、preparer和helper全部哈希固定，plan-only明确为0 authority、0凭据、0上游、0写入和0发布。50.342秒完成360次HTTP 200：income 113 done/7 empty、balance 114/6、cashflow 113/7，合计340 done、20 empty和704行。
 - 360个object、360个observation和340个Parquet共1060个唯一引用、13770642字节，逐文件SHA256通过；不确定调用0，未发布或切换`CURRENT`。Worker和Beat恢复healthy。云盘可用223331848192字节，距100 GiB硬线还有115957665792字节。1060项将与基金行情13一起等待正常固定版和Mac镜像闭环；完整财务历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-financial-pit-batch18-20260911.evidence.json`。
+
+### 2026-09-11 fund_share exact batch 11
+
+- 发布窗口前最后一批冻结360个`fund_share` pristine历史叶，沪深各180项，日期覆盖2021-07-31至2022-01-27；manifest、任务清单、配置、preparer和helper均哈希固定，plan-only明确为0 authority、0凭据、0上游、0写入和0发布。45.118秒完成360次HTTP 200，242 done、118 empty，保留78241行。
+- 360个object、360个observation和242个Parquet共962个唯一引用、7627403字节，逐文件SHA256通过；不确定调用0，未发布或切换`CURRENT`。Worker和Beat恢复healthy。云盘可用223317663744字节，距100 GiB硬线还有115943481344字节。962项将与基金行情13、财务18一起等待下次正常固定版和Mac镜像闭环；完整份额历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-share-batch11-20260911.evidence.json`。
