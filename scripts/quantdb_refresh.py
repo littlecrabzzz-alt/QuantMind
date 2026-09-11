@@ -69,10 +69,16 @@ def publish():
         project = snapshot.PROJECT
         before = records(project)
         snapshot.require(bool(before), 'QuantDB is empty')
-        rows = [{'path': name, 'bytes': stat[2], 'sha256': snapshot.digest(project / name)}
-                for name, stat in before.items()]
+        cache_file = base / 'source-cache.json'
+        cached = json.loads(cache_file.read_text()) if cache_file.exists() else {}
+        rows = []
+        for name, stat in before.items():
+            prior = cached.get(name, {})
+            digest = prior.get('sha256') if prior.get('stat') == list(stat) else None
+            rows.append({'path': name, 'bytes': stat[2], 'sha256': digest or snapshot.digest(project / name)})
         raw = ''.join(json.dumps(r, sort_keys=True) + '\n' for r in rows)
         snapshot.require(records(project) == before, 'QuantDB changed while hashing; retry')
+        write_json(cache_file, {r['path']: {'stat': before[r['path']], 'sha256': r['sha256']} for r in rows})
         previous = (base / 'latest').resolve()
         if (previous / 'COMPLETE').exists() and (previous / 'runtime-manifest.jsonl').read_text() == raw:
             print('QuantDB unchanged:', previous, flush=True)
