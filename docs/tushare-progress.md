@@ -786,3 +786,11 @@
 - `index_daily`和`fina_mainbz`精确prepare/runner/test已在master的`abb1a626`上线，本地和云端各31项测试、Ruff、格式与编译均通过。生产首批各360次、合计720次HTTP 200、0次429；`index_daily`得到354 done/6 empty和56994行，`fina_mainbz`在固定的1996—1997报告期请求窗内得到360个显式empty。
 - `fina_mainbz`空响应只固定本次公司、类型和报告期请求事实，不证明供应商历史为空；公告时间、`known_at`、修订和PIT均未验证，因此暂不盲目扩展更老空窗。两个新runner的720个object、720个observation和354个Parquet物理闭包通过，closure SHA为`be4bf19d6c11f03e9e3bd0237097b6291f70a767006884437d02bfea40e1618e`。
 - 新结果仍只在authority，等待09:21:15 CST后的正常原子发布和Mac单向镜像。API、专用worker与Beat均healthy、restart0、OOM false；authority约109344540319字节，云盘可用230902153216字节，高于100GiB硬线。历史、历史修订和PIT仍未完成，RRG继续`blocked_data`。机器证据为`docs/tushare-exact-history-wave6-20260911.evidence.json`和`docs/tushare-index-fina-exact-production-20260911.evidence.json`。
+
+## 2026-09-11 09:57 VIP主营业务全计划生产批次
+
+- `93c4abb7`把专用worker停机改为先停Beat、取消精确consumer、等待active/reserved连续两次为空后再正常停止，失败时退出75且不stop/revoke；云端宿主3项测试和真实排空通过。`00b0360f`、`865530f0`、`813fef4f`新增并上线`fina_mainbz_vip`合同、默认plan-only精确批次与1990Q1—2026Q2的146季度规划，P/D/I共438项，重复规划插入0项。
+- 四批依次覆盖2024Q1—2026Q2、2016Q3—2023Q4、2001Q3—2016Q2、1990Q1—2001Q2；30、90、180、138次调用分别耗时11.481、30.350、71.924、19.451秒。合计438次全部HTTP 200、0次429，返回1520320行；最终239 blocked、60 done、139 empty，已无未尝试VIP计划项。
+- 四批逐实体重算438个object、438个observation和299个非空Parquet的SHA与字节数，错误0；对应验证文件合计287123009字节。闭包SHA依次为`35c45154523d5e8f77812168fc457b2de78e3cf52a8e255ddc266a99786c7ff4`、`9945a40fc8a1a48ef22e7a0a3edf86863d60bb41d5c5a357d737c7d286c0df50`、`82951b4f3d0ac19c446c8ae311af09bf44f0ea807f6ec315ee0260dea6669a94`、`cf4674b64458ac974fb0b5e089a6d71acfae1ee88b9e4b67716f314cea6cca1b`。第三批首个闭包错误要求`empty_unverified`也有Parquet，原失败证据保留，v2语义修正后零错误。
+- 239项返回`has_more`或达到操作性饱和阈值。官方VIP输入只记录`period`和`type`，没有offset/page/limit，因此没有猜测分页；原始返回全部保留，等待供应商确认合法续页方式。空响应也不证明供应商全历史不存在，`history_complete=false`、历史修订、`known_at`和PIT仍未验证，RRG保持`blocked_data`。
+- 当前固定版`data-3eec661f…`已包含第六波和index/fina新runner结果；Mac LaunchAgent第161轮exit0并追平同一版本。VIP四批等待10:26:06 CST正常固定发布和随后15分钟单向镜像。API、专用worker和Beat已恢复healthy、restart0、OOM false，常规采集继续；云盘可用229843632128字节，高于100GiB硬线。机器证据为`docs/tushare-fina-mainbz-vip-production-20260911.evidence.json`。

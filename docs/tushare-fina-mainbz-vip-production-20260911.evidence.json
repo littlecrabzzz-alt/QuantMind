@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-11T01:57:10Z",
+  "status": "verified_authority_only_pending_fixed_publication",
+  "git": {
+    "branch": "master",
+    "head": "813fef4f30f26f1f53a946fec12c5e71f5792f80",
+    "commits": [
+      "93c4abb7",
+      "00b0360f",
+      "865530f0",
+      "813fef4f"
+    ]
+  },
+  "implementation": {
+    "api_name": "fina_mainbz_vip",
+    "prepare": "scripts/prepare_tushare_fina_mainbz_vip_batch.py",
+    "runner": "scripts/run_tushare_fina_mainbz_vip_batch.py",
+    "test": "scripts/test_tushare_fina_mainbz_vip_batch.py",
+    "planner": "backend/shared/tushare_research_extra_contracts.py",
+    "worker_drain": "scripts/tushare-worker-drain.sh",
+    "default_mode": "plan_only",
+    "plan_only_access_flags_false": true
+  },
+  "validation": {
+    "local_vip_tests_passed": 41,
+    "cloud_container_vip_tests_passed": 41,
+    "cloud_host_drain_tests_passed": 3,
+    "ruff_check": "passed",
+    "ruff_format_check": "passed",
+    "compile": "passed",
+    "cloud_container_drain_test_note": "The fake-command subprocess suite exceeded the container command timeout; the same three tests passed on the cloud host and the real drain completed safely."
+  },
+  "permissions_and_rate": {
+    "reported_points": 10100,
+    "expected_points_after_2026_12_05": 8100,
+    "points_expiry_notice_date": "2026-12-05",
+    "account_rpm": 500,
+    "api_rpm": 500,
+    "minimum_points": 5000,
+    "cyq_perf_daily_cap": 200000,
+    "official_api_document": "https://tushare.pro/document/2?doc_id=81",
+    "official_rate_document": "https://tushare.pro/document/1?doc_id=290",
+    "authority_config_sha256_after": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a"
+  },
+  "planning": {
+    "history_start": "19900101",
+    "history_end_observed": "20260630",
+    "quarters": 146,
+    "types": [
+      "D",
+      "I",
+      "P"
+    ],
+    "planned_jobs": 438,
+    "dedicated_replan_inserted": 0,
+    "eligible_pristine_after_batches": 0
+  },
+  "authority": {
+    "role": "cloud_formal_writer",
+    "root": "/root/data/disk/quantmind/project/data/tushare",
+    "fixed_input_release": "data-3eec661f165737b2e9eb1d31a2bee7f6097331fcaf37c2851234bbf6281bdc1c",
+    "release_published": false,
+    "current_release_switched": false,
+    "free_bytes_after_batches": 229843632128,
+    "hard_reserve_bytes": 107374182400
+  },
+  "production_batches": [
+    {
+      "batch": 1,
+      "report_period_min": "20240331",
+      "report_period_max": "20260630",
+      "requests": 30,
+      "elapsed_seconds": 11.481,
+      "rows": 154316,
+      "states": {
+        "blocked": 27,
+        "done": 3
+      },
+      "manifest_sha256": "cbed6cc764af1d2fcc97679e3e04f5fd14683c5e00e9c5944d6566e13bbb4701",
+      "receipt_file_sha256": "eba2bb20513cb8f406f894a2818ab240ab4aef733d370204afebae67119fd86c",
+      "closure_sha256": "35c45154523d5e8f77812168fc457b2de78e3cf52a8e255ddc266a99786c7ff4"
+    },
+    {
+      "batch": 2,
+      "report_period_min": "20160930",
+      "report_period_max": "20231231",
+      "requests": 90,
+      "elapsed_seconds": 30.35,
+      "rows": 479652,
+      "states": {
+        "blocked": 83,
+        "done": 7
+      },
+      "manifest_sha256": "dac726c39639b82331c02ac5bebef73ce75d9b7f14c1e466b86d8a049f5f9584",
+      "receipt_file_sha256": "8b95ee5f59c5d0d8ad99bfe0d5e2829e86fe63f4fc37c820bd5a6c6bc32c5781",
+      "closure_sha256": "9945a40fc8a1a48ef22e7a0a3edf86863d60bb41d5c5a357d737c7d286c0df50"
+    },
+    {
+      "batch": 3,
+      "report_period_min": "20010930",
+      "report_period_max": "20160630",
+      "requests": 180,
+      "elapsed_seconds": 71.924,
+      "rows": 866262,
+      "states": {
+        "blocked": 123,
+        "done": 42,
+        "empty": 15
+      },
+      "manifest_sha256": "e8f1401c19b51ecf180ef9515c9e42ea80b78ffbc989c522929469d33abd0c9f",
+      "receipt_file_sha256": "4c320d8e23d25e66078fbe51e6c5d63d27d4b93474bcaeeefe9330d383e69dc1",
+      "failed_closure_sha256": "55732115c7a0204989160c80289cf06d4fcb4e1cfce23b68652f561871c6ce81",
+      "closure_v2_sha256": "82951b4f3d0ac19c446c8ae311af09bf44f0ea807f6ec315ee0260dea6669a94"
+    },
+    {
+      "batch": 4,
+      "report_period_min": "19900331",
+      "report_period_max": "20010630",
+      "requests": 138,
+      "elapsed_seconds": 19.451,
+      "rows": 20090,
+      "states": {
+        "blocked": 6,
+        "done": 8,
+        "empty": 124
+      },
+      "manifest_sha256": "3ded1bd25d395fb215190c994123d94ad89cd079d353288b453d2ff08cb1e3ef",
+      "receipt_file_sha256": "e828f760e3f48cf8929ecd5d62ab02bd3662f1be67a85083cb076b8ecb2f4dae",
+      "closure_sha256": "cf4674b64458ac974fb0b5e089a6d71acfae1ee88b9e4b67716f314cea6cca1b"
+    }
+  ],
+  "aggregate": {
+    "upstream_calls": 438,
+    "http_200": 438,
+    "http_429": 0,
+    "elapsed_seconds": 133.206,
+    "rows": 1520320,
+    "job_states": {
+      "blocked": 239,
+      "done": 60,
+      "empty": 139
+    },
+    "unique_references_verified": {
+      "objects": 438,
+      "observations": 438,
+      "parquet": 299
+    },
+    "physical_bytes_verified": {
+      "objects": 133467248,
+      "observations": 380076,
+      "parquet": 153275685,
+      "total": 287123009
+    }
+  },
+  "publication_and_mirror": {
+    "current_fixed_release": "data-3eec661f165737b2e9eb1d31a2bee7f6097331fcaf37c2851234bbf6281bdc1c",
+    "current_manifest_bytes": 293576807,
+    "mac_mirror_release": "data-3eec661f165737b2e9eb1d31a2bee7f6097331fcaf37c2851234bbf6281bdc1c",
+    "mac_launch_agent_runs": 161,
+    "mac_launch_agent_last_exit": 0,
+    "vip_batches_in_current_fixed_release": false,
+    "next_normal_publication_due_at": "2026-09-11T10:26:06+08:00"
+  },
+  "runtime_after_batches": {
+    "api_health": "healthy",
+    "tushare_worker_health": "healthy",
+    "celery_beat_health": "healthy",
+    "restart_count": 0,
+    "oom_killed": false,
+    "regular_acquisition_resumed": true
+  },
+  "boundaries": {
+    "history_complete": false,
+    "historical_versions_complete": false,
+    "known_at_verified": false,
+    "pit_verified": false,
+    "rrg_status": "blocked_data",
+    "terminal_has_more_gaps": 239,
+    "documented_pagination_available": false,
+    "empty_response_proves_absence": false,
+    "secrets_included": false,
+    "upstream_response_bodies_included": false,
+    "order_information_included": false
+  }
+}
