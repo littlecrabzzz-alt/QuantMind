@@ -1088,3 +1088,10 @@
 - 清单固定f1e固定版、配置、准备器、组合runner、任务和请求签名哈希；plan-only为0 authority、0凭据、0上游、0写入、0发布。64.245秒完成240次HTTP 200：134 done、106 empty、3206行、不确定调用0。该接口维持保守240 rpm及`rate_review_required=true`，未套用常规360项提速。
 - 240个object、240个observation和134个Parquet共614个唯一引用、1408988字节，逐文件SHA256通过。Worker与Beat恢复healthy，云盘距100 GiB硬线还有111690616832字节，`CURRENT`仍为f1e。
 - 本批扩大可用于RRG ETF行业暴露候选的定期披露持仓输入，但不证明持仓完整、日度PCF、历史盘中`known_at`、修订、权威ETF行业映射或PIT闭合。614项等待下一正常固定版和Mac镜像。机器证据为`docs/tushare-fund-portfolio-batch5-20260911.evidence.json`。
+
+### 2026-09-11 fund_portfolio第6批精确闭环
+
+- 再次通过无revoke流程排空后，准备器40.91秒冻结240个current_v2、pristine、leaf-only、跨epoch语义唯一请求，覆盖240只基金，period边界2019-12-31至2024-12-31；与第5批任务和请求签名交集均为0。plan-only保持0 authority、0凭据、0上游、0写入和0发布。
+- 63.334秒完成240次HTTP 200：190 done、50 empty、26043行、不确定调用0；执行段吞吐227.37次/分钟，含容器编排墙钟为186.26次/分钟，均低于该接口保守240 rpm门槛。
+- 240个object、240个observation和190个Parquet共670个唯一引用、4656304字节，逐文件SHA256通过。Worker与Beat恢复healthy，云盘距100 GiB硬线还有111660396544字节，`CURRENT`仍为f1e。
+- 只读性能审查确认约41秒准备时间主要来自按任务ID全表扫描并逐行解析JSON；已有`(epoch, api_name)`表达式索引足以支持后续保持逐条合同验证语义的查询改写，当前不新增生产索引。670项等待下一正常固定版和Mac镜像；完整持仓、日度PCF、历史盘中`known_at`、修订、权威ETF行业映射和PIT仍未闭合。机器证据为`docs/tushare-fund-portfolio-batch6-20260911.evidence.json`。
