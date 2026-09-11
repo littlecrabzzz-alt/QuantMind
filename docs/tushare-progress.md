@@ -1008,3 +1008,9 @@
 - 下一发布窗口前经无revoke流程排空，冻结300个`index_daily` pristine历史叶，覆盖300个唯一`.CSI`代码、请求范围2026-01-01至2026-09-01；固定版、合格库存、任务、配置、preparer和helper均哈希冻结，plan-only为0调用/0写入。
 - 41.340秒完成300次HTTP 200：266 done、34 empty，保留42624行。300个object、300个observation和266个Parquet共866个唯一引用、8868340字节，逐文件SHA256通过，不确定调用0。Worker与Beat恢复healthy，云盘距100 GiB硬线还有113975836672字节。
 - 常规exact窗口继续保持300请求/90秒；866项等待正常固定版和Mac镜像。完整指数历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-index-daily-batch8-20260911.evidence.json`。
+
+### 2026-09-11 post-35e three-work-unit publication gate
+
+- 固定版`35e`之后的基金行情15、财务19恢复子清单和指数日线8共818个终态任务：778 done、40 empty。只读清单仅纳入这批新增项，显式排除`35e`已含的财务19初始141个终态叶；818个object、818个observation和778个Parquet共2414个唯一引用、22883575字节，authority逐文件SHA256通过。
+- 清单438599字节、SHA256 `1d8b67d91970866d573f9fef1e0337026947634b561ff62f80c8db6b1aeea05c`。Mac仍处于`data-35e0779…`；发布前负对照准确报告2414项全部缺失、manifest元数据错误0、本地物理错误0并以exit 2拒绝通过。
+- API、Worker和Beat healthy，云盘距100 GiB硬线还有113928650752字节。正常发布将在2026-09-11 20:08:52 CST后到期，发布闭环前不再插入exact批次。下一步为正常发布、Mac标准镜像、2414项精确成员与SHA校验，以及断网、空Token、只读挂载的生产镜像读回。机器证据为`docs/tushare-post-35e-three-work-units-publish-gate-20260911.evidence.json`。
