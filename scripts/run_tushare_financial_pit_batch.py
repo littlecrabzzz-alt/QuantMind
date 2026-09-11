@@ -115,6 +115,22 @@ def _verify_authority_jobs(pipeline, records):
             raise ValueError("Authority task identity does not match verified batch")
 
 
+def _verify_pristine_recovery_scope(pipeline, manifest):
+    source = manifest.get("source")
+    if not isinstance(source, dict) or source.get("selection") != (
+        "source_manifest_pending_attempt_count_zero"
+    ):
+        return
+    for record in manifest["records"]:
+        row = pipeline.db.execute(
+            "SELECT state,(SELECT COUNT(*) FROM attempts a WHERE a.job_id=j.id) "
+            "FROM jobs j WHERE id=?",
+            (record["task_id"],),
+        ).fetchone()
+        if row is None or row["state"] != "pending" or row[1] != 0:
+            raise ValueError("Recovery task is no longer pristine pending")
+
+
 def _execute(
     root,
     manifest,
@@ -155,6 +171,7 @@ def _execute(
         pipeline = pipeline_module.Pipeline(root, json.loads((REPO / "config/tushare-catalog.json").read_bytes()))
         try:
             _verify_authority_jobs(pipeline, verified["records"])
+            _verify_pristine_recovery_scope(pipeline, verified)
             task_ids = [record["task_id"] for record in verified["records"]]
             pipeline._install_exact_task_scope(task_ids)
             before_states = _state_counts(pipeline)

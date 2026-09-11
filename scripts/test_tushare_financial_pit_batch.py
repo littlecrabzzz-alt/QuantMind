@@ -12,6 +12,7 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import prepare_tushare_financial_pit_batch as preparation
+import prepare_tushare_financial_recovery_batch as recovery
 import run_tushare_financial_pit_batch as runner
 
 
@@ -51,6 +52,7 @@ class FinancialPitBatchTests(unittest.TestCase):
         )
         pipeline.db.commit()
         pipeline.close()
+        (self.root / "pipeline.lock").touch()
         (self.root / "ENABLED").write_text("enabled\n")
         self.config = {
             "rate_policy": "tiered_v1",
@@ -376,6 +378,150 @@ class FinancialPitBatchTests(unittest.TestCase):
             )
         finally:
             db.close()
+
+    def _mark_done_and_attempted(self):
+        done = self.verified["records"][0]
+        attempted = next(
+            row
+            for row in self.verified["records"]
+            if row["job"]["api_name"] == "cashflow_vip"
+        )
+        db = sqlite3.connect(self.root / "pipeline.sqlite")
+        try:
+            db.execute("UPDATE jobs SET state='done' WHERE id=?", (done["task_id"],))
+            db.execute("UPDATE jobs SET tries=1 WHERE id=?", (attempted["task_id"],))
+            db.execute(
+                "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+                (attempted["task_id"], 1, '{"status":"transport_error"}'),
+            )
+            db.commit()
+        finally:
+            db.close()
+        return done, attempted
+
+    def test_recovery_defaults_to_rejecting_pending_attempts(self):
+        self._mark_done_and_attempted()
+        output = self.base / "recovery-rejected.json"
+        with self.assertRaisesRegex(ValueError, "outside authority"):
+            recovery.prepare(
+                self.root,
+                self.manifest,
+                self.manifest_sha,
+                self.root / "forbidden.json",
+                apis=["income_vip"],
+            )
+        with self.assertRaisesRegex(ValueError, "explicit exclusion: 1"):
+            recovery.prepare(
+                self.root, self.manifest, self.manifest_sha, output
+            )
+        self.assertFalse(output.exists())
+
+    def test_recovery_filters_only_original_pristine_tasks_with_lineage(self):
+        done, attempted = self._mark_done_and_attempted()
+        output = self.base / "recovery.json"
+        database = self.root / "pipeline.sqlite"
+        database_sha = preparation.sha(database)
+        with (
+            patch(
+                "socket.socket.connect",
+                side_effect=AssertionError("generation must stay offline"),
+            ),
+            patch(
+                "socket.getaddrinfo",
+                side_effect=AssertionError("generation must stay offline"),
+            ),
+            patch(
+                "backend.shared.runtime_secrets.get_secret",
+                side_effect=AssertionError("generation must not read credentials"),
+            ),
+        ):
+            result = recovery.prepare(
+                self.root,
+                self.manifest,
+                self.manifest_sha,
+                output,
+                exclude_pending_with_attempts=True,
+            )
+        self.assertEqual(preparation.sha(database), database_sha)
+        selected = {row["task_id"] for row in result["records"]}
+        self.assertEqual(len(selected), 4)
+        self.assertNotIn(done["task_id"], selected)
+        self.assertNotIn(attempted["task_id"], selected)
+        self.assertEqual(result["source"]["source_manifest_sha256"], self.manifest_sha)
+        self.assertEqual(
+            result["all_task_ids_sha256"],
+            preparation.digest(preparation.json_bytes(sorted(selected))),
+        )
+        source_jobs = {
+            row["task_id"]: row["job"] for row in self.verified["records"]
+        }
+        self.assertTrue(
+            all(row["job"] == source_jobs[row["task_id"]] for row in result["records"])
+        )
+        plan = runner.run_batch(output, recovery.sha(output))
+        self.assertEqual(plan["status"], "plan_only")
+        self.assertEqual(plan["verified_jobs"], 4)
+        self.assertFalse(plan["would_access_authority"])
+        self.assertFalse(plan["would_access_credentials"])
+        self.assertFalse(plan["would_call_upstream"])
+
+    def test_recovery_api_filter_does_not_consider_unselected_attempts(self):
+        _done, _attempted = self._mark_done_and_attempted()
+        output = self.base / "income-recovery.json"
+        result = recovery.prepare(
+            self.root,
+            self.manifest,
+            self.manifest_sha,
+            output,
+            apis=["income_vip"],
+        )
+        self.assertEqual(result["api_counts"], {"income_vip": 1})
+        self.assertEqual(
+            {row["job"]["api_name"] for row in result["records"]}, {"income_vip"}
+        )
+
+    def test_execute_rejects_recovery_task_that_gained_an_attempt(self):
+        output = self.base / "stale-recovery.json"
+        result = recovery.prepare(
+            self.root,
+            self.manifest,
+            self.manifest_sha,
+            output,
+            apis=["income_vip"],
+        )
+        task_id = result["records"][0]["task_id"]
+        db = sqlite3.connect(self.root / "pipeline.sqlite")
+        try:
+            db.execute("UPDATE jobs SET tries=1 WHERE id=?", (task_id,))
+            db.execute(
+                "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+                (task_id, 1, '{}'),
+            )
+            db.commit()
+        finally:
+            db.close()
+        with (
+            patch.object(runner.pipeline_module, "ROOT", self.root),
+            patch.object(runner.pipeline_module, "authority", return_value=None),
+            patch.object(
+                runner.pipeline_module,
+                "get_secret",
+                side_effect=AssertionError("credential access must happen later"),
+            ),
+        ):
+            with self.assertRaisesRegex(ValueError, "no longer pristine pending"):
+                runner.run_batch(
+                    output,
+                    recovery.sha(output),
+                    expected_task_ids_sha256=result["all_task_ids_sha256"],
+                    expected_config_sha256=runner.sha(self.config_path),
+                    expected_helper_sha256=runner.helper_sha256(),
+                    expected_preparation_sha256=runner.preparation_sha256(),
+                    root=self.root,
+                    max_requests=1,
+                    max_seconds=1,
+                    execute=True,
+                )
 
 
 if __name__ == "__main__":
