@@ -150,6 +150,9 @@ latest = _pg_latest_trade_date()
 assert latest is not None, 'Refusing an unexpected empty local market database'
 result = fill_pg_from_parquet(start_date=latest + timedelta(days=1))
 assert result.get('status') in ('ok', 'skipped'), result
+from backend.scripts.market_snapshot.compute import refresh_snapshot
+market = refresh_snapshot()
+assert market.get('status') == 'ok', market
 from backend.services.engine.qlib_data_builder import ensure_qlib_cache
 from backend.shared.qlib_paths import resolve_qlib_provider_uri
 import uuid
@@ -163,7 +166,7 @@ staged = live.parent / ('.quantdb-qlib-' + uuid.uuid4().hex)
 ensure_qlib_cache(quantdb_dir=root, qlib_dir=staged)
 calendar = (staged / 'calendars/day.txt').read_text().splitlines()[-1]
 assert calendar.replace('-', '') == newest, (calendar, newest)
-print(json.dumps({'latest_date': newest, 'pg': result, 'qlib_calendar': calendar, 'qlib_live': str(live), 'qlib_staged': str(staged)}))
+print(json.dumps({'latest_date': newest, 'pg': result, 'qlib_calendar': calendar, 'qlib_live': str(live), 'qlib_staged': str(staged), 'market_snapshot': market}))
 '''
 
 
@@ -189,6 +192,22 @@ def local_cache_path(local, container_path):
     raise RuntimeError('Unexpected Qlib cache mount: ' + container_path)
 
 
+def refresh_market_view(project):
+    # This derivative can catch up independently after an older successful apply.
+    lockdir = project / 'logs/local-dev.lock'
+    lockdir.mkdir()
+    (lockdir / 'pid').write_text(str(os.getpid()))
+    try:
+        require_local_idle(project)
+        result = snapshot.output('docker', 'exec', 'quantmind-dev', 'python', '-c',
+            'import json; from backend.scripts.market_snapshot.compute import refresh_snapshot; '
+            'print(json.dumps(refresh_snapshot()))')
+        print('Market analysis updated:', result, flush=True)
+    finally:
+        (lockdir / 'pid').unlink(missing_ok=True)
+        lockdir.rmdir()
+
+
 def apply(project, downloaded):
     downloaded = downloaded.resolve()
     snapshot.require((downloaded / 'COMPLETE').is_file() and (downloaded / 'VERIFIED').is_file(),
@@ -199,6 +218,7 @@ def apply(project, downloaded):
     receipt = state / 'QUANTDB_SYNC.json'
     prior = json.loads(receipt.read_text()) if receipt.exists() else {}
     if prior.get('snapshot') == str(downloaded) and prior.get('status') == 'applied':
+        refresh_market_view(project)
         print('Local QuantDB already applied:', downloaded.name, flush=True)
         return
     lockdir = project / 'logs/local-dev.lock'

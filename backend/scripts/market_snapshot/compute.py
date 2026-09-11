@@ -477,10 +477,13 @@ def get_stock_money_flow(con, data_dir: Path, limit: int = 20) -> list[dict]:
     if "flow_net_amount" in hist.columns:
         hng = hist[hist["flow_net_amount"].notna() & (hist["flow_net_amount"] != 0)][["symbol", "_dt", "flow_net_amount"]]
         cc = hng.groupby(["_dt", "flow_net_amount"]).size().reset_index(name="n")
-        for row in cc[cc["n"] >= 25].itertuples(index=False):
-            dt = str(row._dt)
-            syms = set(hng[(hng["_dt"] == dt) & (hng["flow_net_amount"] == row.flow_net_amount)]["symbol"])
+        for dt, amount, _ in cc[cc["n"] >= 25].itertuples(index=False, name=None):
+            dt = str(dt)
+            syms = {_normalize_prefix(sym) for sym in hng[
+                (hng["_dt"] == dt) & (hng["flow_net_amount"] == amount)]["symbol"]}
             bad_by_dt.setdefault(dt, set()).update(syms)
+    # Match the full ranking's existing rejection of repeated placeholder values.
+    flow = flow[~flow["symbol"].isin(_detect_placeholder_symbols(flow))]
     prices = _load_prices(con, [today])
     names = _instrument_names(data_dir)
     flow = flow.merge(prices[["symbol", "close", "pct_change"]], on="symbol", how="left")
@@ -703,6 +706,69 @@ def build_tags_db(data_dir: Path, out_dir: Path, date: str, heatmap: dict | None
         shutil.copyfile(db_path, out_dir / "latest.db")
     print(f"[step] tags db -> {db_path} ({n} 条 + sector_mv {len(mv_rows)} 行)" + (" + latest.db" if copy_latest else " [回补]"))
     return db_path
+
+
+def _source_signature(data_dir):
+    """Detect same-day corrections without rereading the Parquet payloads."""
+    import hashlib
+    h = hashlib.sha256()
+    for relative in sorted(set(DATASET_DIRS.values())):
+        source = data_dir / relative
+        files = [source] if source.is_file() else sorted(source.rglob("*.parquet"))
+        for path in files:
+            stat = path.stat()
+            h.update(f"{path.relative_to(data_dir)}:{stat.st_size}:{stat.st_mtime_ns}\n".encode())
+    return h.hexdigest()
+
+
+def refresh_snapshot(data_dir=None, out_dir=None):
+    """Reuse the offline calculator; publish only a complete current generation."""
+    import fcntl
+    import subprocess
+    import tempfile
+
+    data_dir = Path(data_dir or os.getenv("QM_QUANTDB_DATA_DIR", "/data/quantdb"))
+    out_dir = Path(out_dir or os.getenv("QM_MARKET_SNAPSHOT_DIR", "/data/market-analysis"))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    latest = _latest_trade_date(data_dir)
+    if not latest:
+        raise RuntimeError("No QuantDB trading day for market snapshot")
+    day = f"{latest[:4]}-{latest[4:6]}-{latest[6:]}"
+    with (out_dir / ".refresh.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        signature = _source_signature(data_dir)
+        try:
+            current = json.loads((out_dir / "latest.json").read_text())
+            with sqlite3.connect(f"file:{out_dir / (day + '.db')}?mode=ro", uri=True) as db:
+                db_day = db.execute("SELECT value FROM meta WHERE key='trade_date'").fetchone()[0]
+            if current.get("trade_date") == day and db_day == day and current.get("source_signature") == signature:
+                return {"status": "ok", "trade_date": day, "unchanged": True}
+        except (OSError, ValueError, sqlite3.Error, TypeError):
+            pass
+        with tempfile.TemporaryDirectory(prefix=".building-", dir=out_dir) as tmp:
+            staged = Path(tmp)
+            proc = subprocess.run(
+                [sys.executable, str(Path(__file__).resolve()), "--data-dir", str(data_dir),
+                 "--out", str(staged), "--periods", "1d", "5d", "20d"],
+                capture_output=True, text=True, timeout=1800)
+            if proc.returncode or "[warn] query failed:" in proc.stderr:
+                raise RuntimeError("Market snapshot calculation failed: " + proc.stderr[-3000:])
+            result = json.loads((staged / "latest.json").read_text())
+            if (result.get("trade_date") != day or result.get("breadth", {}).get("trade_date") != day
+                    or not result.get("indices") or not result.get("heatmap", {}).get("shenwan")):
+                raise RuntimeError("Incomplete market snapshot: " + day)
+            with sqlite3.connect(f"file:{staged / 'latest.db'}?mode=ro", uri=True) as db:
+                if db.execute("SELECT value FROM meta WHERE key='trade_date'").fetchone()[0] != day:
+                    raise RuntimeError("Market tags date differs from prices")
+            if _source_signature(data_dir) != signature:
+                raise RuntimeError("QuantDB changed during market calculation; retry after acquisition")
+            result["source_signature"] = signature
+            for name in (day + ".json", "latest.json"):
+                (staged / name).write_text(json.dumps(result, ensure_ascii=False))
+            # Dated files first; latest JSON is the commit pointer for all readers.
+            for name in (day + ".db", day + ".json", "latest.db", "latest.json"):
+                os.replace(staged / name, out_dir / name)
+        return {"status": "ok", "trade_date": day, "unchanged": False}
 
 
 def main():

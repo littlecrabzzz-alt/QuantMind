@@ -125,7 +125,7 @@ def _l2_available_flow_cols(con: duckdb.DuckDBPyConnection, data_dir: Path) -> s
 def get_conn(data_dir: Optional[Path] = None) -> duckdb.DuckDBPyConnection:
     """创建内存 DuckDB 连接并把规范视图挂载好（Phase 0 入口）。"""
     data_dir = Path(data_dir) if data_dir else DEFAULT_DATA_DIR
-    con = duckdb.connect(":memory:")
+    con = duckdb.connect(":memory:", config={"memory_limit": "256MB", "threads": "1", "preserve_insertion_order": "false"})
     return create_views(con, data_dir)
 
 

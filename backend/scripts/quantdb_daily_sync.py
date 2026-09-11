@@ -1089,6 +1089,14 @@ def run_daily_sync(
         log.info("=== Phase 3: Update Qlib cache ===")
         result["qlib_cache"] = update_qlib_cache()
 
+    if not skip_snapshot and not dry_run:
+        try:
+            from backend.scripts.market_snapshot.compute import refresh_snapshot
+            result["market_snapshot"] = refresh_snapshot(QUANTDB_DATA_DIR)
+        except Exception as exc:
+            log.warning("Market snapshot failed: %s", exc)
+            result["market_snapshot"] = {"status": "error", "reason": str(exc)}
+
     # Phase 4 is legacy-only.  New training/inference reads the three raw
     # QuantDB factor sources and must never materialise model_features_*.parquet.
     # Keep an explicit break-glass flag solely for historical parquet models.

@@ -50,13 +50,20 @@ def _load(date: Optional[str]) -> Optional[dict[str, Any]]:
     if not p:
         return None
     try:
-        return json.loads(Path(p).read_text(encoding="utf-8"))
+        result = json.loads(Path(p).read_text(encoding="utf-8"))
+        if not date:
+            raw = Path(os.getenv("QM_QUANTDB_DATA_DIR", str(_DEFAULT_ROOT.parent / "quantdb")))
+            newest = max((d.name[3:] for d in (raw / "1_kline_data/daily_unadjusted").glob("dt=*")
+                          if d.is_dir()), default="")
+            if newest and str(result.get("trade_date", "")).replace("-", "") < newest:
+                return None  # Explicit historical requests still use their fixed date.
+        return result
     except Exception:
         return None
 
 
 def has_snapshot(date: Optional[str] = None) -> bool:
-    return _snapshot_json_path(date) is not None
+    return _load(date) is not None
 
 
 def available_dates() -> list[str]:
@@ -81,6 +88,11 @@ def full(date: Optional[str] = None) -> Optional[dict]:
 
 def _open_tags_db(date: Optional[str]):
     root = _root()
+    if not date:
+        snap = _load(None)
+        if not snap:
+            return None
+        date = snap.get("trade_date")
     name = f"{date}.db" if date and re.fullmatch(r"\d{4}-\d{2}-\d{2}", date) else "latest.db"
     p = root / name
     if not p.exists():
