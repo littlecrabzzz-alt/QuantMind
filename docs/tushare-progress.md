@@ -1074,3 +1074,10 @@
 - 两批共660个终态任务：455 done、205 empty。无revoke排空后，独占锁、query-only导出器逐文件复算SHA，形成1775个唯一引用（660 object、660 observation、455 Parquet）、12225439字节；库存320162字节，SHA256为`7c7e91138926186566fad96f147950fc482f5f745b1cd210a1dd2cab7bc72fab`。
 - Mac仍在eef6，持久验收器按预期exit 2：1775项全部不在旧manifest中，元数据错误0、本地物理错误0。首次包装脚本使用zsh只读变量`status`导致退出码记录失败，改用`verify_rc`后通过预期负对照；另一次只读容量诊断使用相对SQLite URI而在打开数据库前失败，改用绝对URI完成。两者均未修改数据。
 - Worker与Beat恢复healthy，云盘距100 GiB硬线还有112483012608字节。正常publisher在2026-09-11 22:19:26 CST后到期；下一步为正常发布、Mac固定镜像、1775项正向校验及禁网空Token只读验收。机器证据为`docs/tushare-post-eef6-fund-share13-14-publish-gate-20260911.evidence.json`。
+
+### 2026-09-11 固定版f1e基金份额13/14本地闭环
+
+- 首个post-due Celery任务`3eb9775b-0752-42c5-b873-7490fe858fcc`以SUCCESS、0上游请求、187.175秒完成正常publish-only，原子生成`data-f1e286712d763e8ce95127c79581bc9eb9d2f83d7c369e81babccc5806734cff`。344370817字节manifest含115651个dataset和851048个文件，实算SHA256与release ID一致。
+- Mac标准LaunchAgent第207轮下载6113个增量文件、完整验证851048项、stderr 0、exit 0后原子切换。固定版验收器对基金份额13/14的1775个唯一引用、12225439字节全部通过：manifest缺失0、元数据错误0、本地物理错误0。
+- 生产镜像在只读镜像、空Token、Docker禁网和socket/DNS阻断下通过固定版store读取`fund_share` 3行9列，上游调用0。独立审计复算10个归档、manifest/task/receipt哈希、两个吞吐值和跨批重叠，task、语义及市场日期交集均为0，未发现实质问题。
+- 一次只读SSH连接关闭和一次本地shell将远端release变量展开为空均通过有限重试修正，未改authority或镜像。Worker、Beat、API healthy，云盘距100 GiB硬线还有111709761536字节。两批现已可在本地脱离Tushare读取；完整份额历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fixed-release-f1e-fund-share13-14-20260911.evidence.json`。
