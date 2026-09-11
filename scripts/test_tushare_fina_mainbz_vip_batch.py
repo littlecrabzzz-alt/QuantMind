@@ -1,6 +1,7 @@
 """Exact fina_mainbz_vip batches preserve quarter, type and terminal-cap gaps."""
 
 import json
+from datetime import date
 from pathlib import Path
 import sqlite3
 from types import SimpleNamespace
@@ -12,6 +13,11 @@ import httpx
 
 from backend.shared.tushare_intake import digest, json_bytes
 from backend.shared.tushare_pipeline import contract_for
+from backend.shared.tushare_registry import PLANNERS
+from backend.shared.tushare_research_extra_contracts import (
+    fina_mainbz_vip_prerequisites,
+    iter_fina_mainbz_vip_jobs,
+)
 from scripts import prepare_tushare_fina_mainbz_vip_batch as preparation
 from scripts import run_tushare_fina_mainbz_vip_batch as runner
 
@@ -112,6 +118,43 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
         self.assertEqual(spec["input_fields"], ["period", "type"])
         self.assertFalse(spec["split"])
         self.assertNotIn("pagination", spec)
+        self.assertEqual(spec["group"], preparation.API)
+        self.assertIs(PLANNERS[preparation.API], iter_fina_mainbz_vip_jobs)
+
+    def test_planner_generates_complete_quarters_and_preserves_gaps(self):
+        jobs = list(
+            iter_fina_mainbz_vip_jobs(
+                {"fina_mainbz_vip_history_start": "20240101"}, date(2025, 2, 1)
+            )
+        )
+        self.assertEqual(len(jobs), 12)
+        self.assertTrue(all(job["epoch"] == "history" for job in jobs))
+        self.assertEqual(
+            {job["params"]["period"] for job in jobs},
+            {"20240331", "20240630", "20240930", "20241231"},
+        )
+        for period in {job["params"]["period"] for job in jobs}:
+            self.assertEqual(
+                {
+                    job["params"]["type"]
+                    for job in jobs
+                    if job["params"]["period"] == period
+                },
+                set(preparation.TYPES),
+            )
+        gaps = fina_mainbz_vip_prerequisites(
+            config={"fina_mainbz_vip_history_start": "20240101"}
+        )
+        self.assertEqual(
+            {gap["reason"] for gap in gaps},
+            {
+                "configured_scope_does_not_prove_earlier_history_absent",
+                "pagination_gap",
+                "pit_unverified",
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "must be configured"):
+            list(iter_fina_mainbz_vip_jobs({}, date(2025, 2, 1)))
 
     def test_prepare_is_read_only_pristine_and_complete_pdi(self):
         before = (self.root / "pipeline.sqlite").read_bytes()

@@ -73,7 +73,10 @@ from backend.shared.tushare_equity_event_contracts import (
     equity_event_prerequisites,
 )
 from backend.shared.tushare_futures_extra_contracts import futures_extra_prerequisites
-from backend.shared.tushare_research_extra_contracts import research_extra_prerequisites
+from backend.shared.tushare_research_extra_contracts import (
+    fina_mainbz_vip_prerequisites,
+    research_extra_prerequisites,
+)
 from backend.shared.tushare_etf_basket_contracts import etf_basket_prerequisites
 from backend.shared.tushare_credit_extra_contracts import (
     credit_identifiers,
@@ -1652,6 +1655,7 @@ class Pipeline:
             "credit_extra": credit_extra_prerequisites,
             "futures_extra": futures_extra_prerequisites,
             "research_extra": research_extra_prerequisites,
+            "fina_mainbz_vip": fina_mainbz_vip_prerequisites,
         }[family]
         # Validate the complete list before recording any of this family's gaps.
         gaps = prerequisites(identifiers, config=config)
@@ -1823,6 +1827,12 @@ class Pipeline:
                 "research_extra",
                 lambda cfg, ids: self.record_extra_planning_gaps(
                     "research_extra", cfg, ids
+                ),
+            ),
+            (
+                "fina_mainbz_vip",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "fina_mainbz_vip", cfg, ids
                 ),
             ),
         ):

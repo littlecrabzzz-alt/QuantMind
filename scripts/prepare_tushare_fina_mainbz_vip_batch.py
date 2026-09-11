@@ -28,7 +28,7 @@ from backend.shared.tushare_rate_policy import (  # noqa: E402
 API = "fina_mainbz_vip"
 EXPECTED_API_RPM = 500
 EXPECTED_ACCOUNT_RPM = 500
-GROUP = "research_extra"
+GROUP = API
 EPOCH = "history"
 TYPES = ("P", "D", "I")
 MAX_BATCH_PERIODS = 120

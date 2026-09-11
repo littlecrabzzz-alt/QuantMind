@@ -29,6 +29,7 @@ from backend.shared.tushare_futures_extra_contracts import (
 from backend.shared.tushare_research_extra_contracts import (
     FINA_MAINBZ_VIP_CONTRACT,
     RESEARCH_EXTRA_CONTRACTS,
+    iter_fina_mainbz_vip_jobs,
     iter_research_extra_jobs,
 )
 
@@ -866,7 +867,10 @@ EXTENDED_CONTRACTS = {
         api: {**spec, "group": "research_extra"}
         for api, spec in RESEARCH_EXTRA_CONTRACTS.items()
     },
-    "fina_mainbz_vip": {**FINA_MAINBZ_VIP_CONTRACT, "group": "research_extra"},
+    "fina_mainbz_vip": {
+        **FINA_MAINBZ_VIP_CONTRACT,
+        "group": "fina_mainbz_vip",
+    },
     **{
         api: {**spec, "group": "equity_event"}
         for api, spec in EQUITY_EVENT_CONTRACTS.items()
@@ -927,6 +931,7 @@ PLANNERS = {
     "equity_event": iter_equity_event_jobs,
     "futures_extra": iter_futures_extra_jobs,
     "research_extra": iter_research_extra_jobs,
+    "fina_mainbz_vip": iter_fina_mainbz_vip_jobs,
 }
 
 

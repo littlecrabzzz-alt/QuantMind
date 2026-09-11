@@ -11,6 +11,8 @@
   "enable_text": true,
   "enable_structured": true,
   "enable_market": true,
+  "enable_fina_mainbz_vip": false,
+  "fina_mainbz_vip_history_start": "19900101",
   "text_history_window": "month",
   "plan_jobs_per_tick": 500,
   "group_weights": {

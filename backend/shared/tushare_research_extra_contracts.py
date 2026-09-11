@@ -175,6 +175,63 @@ FINA_MAINBZ_VIP_CONTRACT = {
     "history_scope_note": "Official earliest history is unspecified. Exact quarterly requests do not prove earlier periods complete.",
     "revision_note": "Output end_date is report period. No announcement timestamp is supplied, so known_at and PIT availability remain unverified.",
 }
+
+
+def _fina_mainbz_vip_start(config):
+    value = config.get("fina_mainbz_vip_history_start", config.get("history_start"))
+    if value is None:
+        raise ValueError("fina_mainbz_vip_history_start must be configured")
+    return _parse(value)
+
+
+def fina_mainbz_vip_prerequisites(identifiers=None, config=None):
+    del identifiers
+    _fina_mainbz_vip_start(config or {})
+    return [
+        {
+            "api_name": "fina_mainbz_vip",
+            "dependencies": [],
+            "reason": "configured_scope_does_not_prove_earlier_history_absent",
+        },
+        {
+            "api_name": "fina_mainbz_vip",
+            "dependencies": [],
+            "reason": "pagination_gap",
+            "detail": FINA_MAINBZ_VIP_CONTRACT["pagination_gap"],
+        },
+        {
+            "api_name": "fina_mainbz_vip",
+            "dependencies": [],
+            "reason": "pit_unverified",
+            "detail": FINA_MAINBZ_VIP_CONTRACT["revision_note"],
+        },
+    ]
+
+
+def iter_fina_mainbz_vip_jobs(config, today, identifiers=None):
+    """Plan exact quarter/type requests without inventing paging dimensions."""
+    del identifiers
+    if isinstance(today, datetime):
+        today = today.date()
+    if not isinstance(today, date):
+        raise ValueError("today must be a date")
+    start = _fina_mainbz_vip_start(config)
+    if start > today:
+        raise ValueError("History start cannot be after today")
+    for year in range(today.year, start.year - 1, -1):
+        for month, day in ((12, 31), (9, 30), (6, 30), (3, 31)):
+            period = date(year, month, day)
+            if not start <= period <= today:
+                continue
+            for kind in ("P", "D", "I"):
+                yield _job(
+                    "fina_mainbz_vip",
+                    {"period": period.strftime("%Y%m%d"), "type": kind},
+                    "history",
+                    40,
+                )
+
+
 RESEARCH_EXTRA_CONTRACTS["disclosure_date"].update(
     split_axis="exact_report_period_or_announcement_date",
     date_field="end_date",

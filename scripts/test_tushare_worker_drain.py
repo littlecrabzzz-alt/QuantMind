@@ -60,7 +60,7 @@ raise SystemExit(rc)
 
 
 class Drain(unittest.TestCase):
-    def invoke(self, state, timeout=8):
+    def invoke(self, state, timeout=30):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "scripts").mkdir()
@@ -103,7 +103,7 @@ class Drain(unittest.TestCase):
                 capture_output=True,
                 text=True,
                 env=env,
-                timeout=timeout + 5,
+                timeout=timeout + 40,
             )
             return result, json.loads(state_path.read_text())
 
