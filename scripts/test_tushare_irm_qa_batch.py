@@ -129,6 +129,7 @@ class IrmQaBatchTest(unittest.TestCase):
         self.assertEqual(
             self.manifest["source"]["excluded_invalid_parameter_tasks"], 1
         )
+        self.assertEqual(self.manifest["source"]["excluded_prior_logical_keys"], 1)
         self.assertEqual(
             self.manifest["partition_counts"], {"child": 1, "unsplit": 3}
         )

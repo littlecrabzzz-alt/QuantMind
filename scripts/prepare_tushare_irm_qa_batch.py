@@ -225,6 +225,8 @@ def verify_manifest(path, manifest_sha256):
         or source["eligible_tasks"] < len(records)
         or type(source.get("excluded_invalid_parameter_tasks")) is not int
         or source["excluded_invalid_parameter_tasks"] < 0
+        or type(source.get("excluded_prior_logical_keys")) is not int
+        or source["excluded_prior_logical_keys"] < 0
         or type(source.get("skipped_logical_duplicates")) is not int
         or source["skipped_logical_duplicates"] < 0
         or not re.fullmatch(
@@ -252,6 +254,34 @@ def _record(row):
         "partition_child": bool(row["partition_child"]),
         "job": json.loads(row["job"]),
     }
+
+
+def _matching_logical_keys(db, sql, logical_keys):
+    matches = set()
+    values = sorted(set(logical_keys))
+    for offset in range(0, len(values), 800):
+        chunk = values[offset : offset + 800]
+        placeholders = ",".join("?" for _ in chunk)
+        matches.update(row[0] for row in db.execute(sql.format(placeholders), chunk))
+    return matches
+
+
+def _attempted_logical_keys(db, logical_keys):
+    return _matching_logical_keys(
+        db,
+        "SELECT DISTINCT j.logical_key FROM attempts a "
+        "JOIN jobs j ON j.id=a.job_id WHERE j.logical_key IN ({})",
+        logical_keys,
+    )
+
+
+def _terminal_logical_keys(db, logical_keys):
+    return _matching_logical_keys(
+        db,
+        "SELECT DISTINCT logical_key FROM jobs WHERE state<>'pending' "
+        "AND logical_key IN ({})",
+        logical_keys,
+    )
 
 
 def _selection_key(record):
@@ -298,27 +328,25 @@ def prepare(root, output, release_id, release_manifest_sha256, jobs=MAX_BATCH_JO
             placeholders = ",".join("?" for _ in ALLOWED_APIS)
             rows = db.execute(
                 "SELECT j.id,j.logical_key,j.epoch,j.job,j.priority,j.group_name,"
-                "j.state,j.tries,"
-                "(SELECT COUNT(*) FROM attempts a JOIN jobs prior "
-                "ON prior.id=a.job_id WHERE prior.logical_key=j.logical_key) attempts,"
+                "j.state,j.tries,0 attempts,"
                 "EXISTS(SELECT 1 FROM partition_children pc "
                 "WHERE pc.child_id=j.id) partition_child "
                 "FROM jobs j WHERE j.group_name=? AND j.state='pending' "
                 "AND j.epoch='history' "
-                "AND j.tries=0 AND NOT EXISTS(SELECT 1 FROM attempts a "
-                "JOIN jobs prior ON prior.id=a.job_id "
-                "WHERE prior.logical_key=j.logical_key) "
-                "AND NOT EXISTS(SELECT 1 FROM jobs prior_state "
-                "WHERE prior_state.logical_key=j.logical_key "
-                "AND prior_state.id<>j.id AND prior_state.state<>'pending') "
+                "AND j.tries=0 "
                 "AND json_extract(job,'$.api_name') IN ("
                 + placeholders
                 + ") ORDER BY j.id",
                 (GROUP, *ALLOWED_APIS),
             ).fetchall()
+            logical_keys = [row["logical_key"] for row in rows]
+            excluded = _attempted_logical_keys(db, logical_keys)
+            excluded.update(_terminal_logical_keys(db, logical_keys))
         finally:
             db.close()
-    inventory = [_record(row) for row in rows]
+    inventory = [
+        _record(row) for row in rows if row["logical_key"] not in excluded
+    ]
     eligible = [
         record for record in inventory if _axis(record["job"].get("params")) is not None
     ]
@@ -373,6 +401,7 @@ def prepare(root, output, release_id, release_manifest_sha256, jobs=MAX_BATCH_JO
             "selection": "balanced_api_axis_history_leaves_without_prior_attempts",
             "eligible_tasks": len(eligible),
             "excluded_invalid_parameter_tasks": len(inventory) - len(eligible),
+            "excluded_prior_logical_keys": len(excluded),
             "skipped_logical_duplicates": len(eligible)
             - len({record["logical_key"] for record in eligible}),
         },

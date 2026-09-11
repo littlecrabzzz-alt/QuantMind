@@ -71,11 +71,15 @@ def _verify_release(root, verified):
 
 
 def _verify_authority_jobs(pipeline, records):
+    logical_keys = [record["logical_key"] for record in records]
+    if preparation._attempted_logical_keys(
+        pipeline.db, logical_keys
+    ) or preparation._terminal_logical_keys(pipeline.db, logical_keys):
+        raise ValueError("Logical request was attempted or completed after preparation")
     for expected in records:
         saved = pipeline.db.execute(
             "SELECT id,logical_key,epoch,job,priority,group_name,state,tries,"
-            "(SELECT COUNT(*) FROM attempts a JOIN jobs prior ON prior.id=a.job_id "
-            "WHERE prior.logical_key=jobs.logical_key) attempts,"
+            "0 attempts,"
             "EXISTS(SELECT 1 FROM partition_children pc "
             "WHERE pc.child_id=jobs.id) partition_child "
             "FROM jobs WHERE id=?",
@@ -97,15 +101,6 @@ def _verify_authority_jobs(pipeline, records):
         }
         if actual != expected:
             raise ValueError("Authority task no longer matches the pristine manifest")
-        terminal_sibling = pipeline.db.execute(
-            "SELECT 1 FROM jobs WHERE logical_key=? AND id<>? "
-            "AND state<>'pending' LIMIT 1",
-            (expected["logical_key"], expected["task_id"]),
-        ).fetchone()
-        if terminal_sibling is not None:
-            raise ValueError(
-                "Logical request gained a terminal sibling after preparation"
-            )
 
 
 def _execute(
