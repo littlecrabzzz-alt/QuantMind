@@ -1,0 +1,11 @@
+# Tushare fund_share batch 13 and cloud code deployment
+
+- The standard no-revoke drain stopped Beat, let the ordinary acquisition finish naturally, confirmed two stable idle inspections and stopped the Tushare Worker. No task was revoked or killed.
+- The new preparer selected 300 pristine `fund_share` requests from 22407 eligible semantic signatures in 3.32 seconds. It chose SH and SZ equally, covered 2020-10-03 through 2021-03-02, and pinned `pending`, tries 0, attempts 0, the eligible inventory and cross-epoch semantic deduplication.
+- Plan-only verified the manifest, task inventory, authority config, preparer and combined runner hash while making zero authority, credential, upstream, write and publish access. Execution repeated the pristine and semantic-peer checks inside the exclusive lock before credential access.
+- All 300 calls returned HTTP 200 in 39.957 seconds: 203 done and 97 empty, with 50097 retained rows and zero uncertain calls. The measured request window was 450.48 calls/minute under the 500 rpm account gate. SHA256 verification passed for 300 objects, 300 observations and 203 Parquet files: 803 unique references and 5103843 bytes.
+- `quantmind-oss:latest` now resolves to image `e769f66c…`, revision `92fb4680`. The Tushare Worker and Beat were force-recreated on that image and are healthy; their three mounted script hashes match the reviewed version. The production Python 3.10 contract had already passed all 13 focused tests in 1.298 seconds with actual read-only mounts and no network.
+- A cold full build, two incomplete validation invocations and one local-shell-expanded read-only health probe are retained as non-blocking corrections in the machine evidence. None accessed Tushare, changed the authority database or affected a running service. The deployed thin image derives from the unchanged production base and contains only the three reviewed scripts; normal bind mounts remain the runtime source contract.
+- The cloud volume has 219867770880 bytes free, 112493588480 bytes above the 100 GiB hard reserve. `CURRENT` remains eef6 and the batch produced no fixed release.
+
+The 803 references wait for the next normal fixed release and Mac mirror. Complete fund-share history, revisions, `known_at` and PIT coverage remain open. Machine evidence: `docs/tushare-fund-share-batch13-20260911.evidence.json`.

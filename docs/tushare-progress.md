@@ -1054,3 +1054,10 @@
 - Mac标准LaunchAgent第203轮下载7728个增量文件、完整验证844934项、stderr 0、exit 0后原子切换。固定版验收器对财务20、指数日线9和基金行情16的2692个唯一引用、26546285字节全部通过：manifest缺失0、元数据错误0、本地物理错误0。
 - 生产镜像在`--network none`、socket/DNS阻断、Token为空和只读Mac镜像挂载下读取`index_daily`、`fund_daily`、`fund_adj`、`fund_share`及三张财务表各3行，上游调用0。首次命令遗漏backend挂载而在import阶段失败，修正为实际部署挂载后通过，未发生数据访问或上游调用。
 - 云盘可用219879940096字节，距100 GiB硬线还有112505757696字节；API、Worker、Beat healthy。三批数据现已可在本地脱离Tushare读取；完整历史、修订、`known_at`、PIT成员、RRG可交易状态和PCF仍未闭合。机器证据为`docs/tushare-fixed-release-eef6-three-batches-20260911.evidence.json`。
+
+### 2026-09-11 fund_share第13批与云端代码部署
+
+- 无revoke排空后，新准备器3.32秒从22407个跨epoch语义唯一且pristine的候选中冻结300项，沪深各150项、日期覆盖2020-10-03至2021-03-02。清单固定pending、tries 0、attempts 0、合格库存及源码哈希；执行端在独占锁内、凭据读取前复核所有任务和语义peer。Plan-only为0 authority、0凭据、0上游、0写入、0发布。
+- 39.957秒完成300次HTTP 200：203 done、97 empty、50097行、不确定调用0，窗口吞吐450.48次/分钟。300个object、300个observation和203个Parquet共803个唯一引用、5103843字节，逐文件SHA256通过；`CURRENT`仍为eef6。
+- `quantmind-oss:latest`已切为镜像`e769f66c…`、revision `92fb4680`。Tushare Worker与Beat强制重建后healthy，容器中三份脚本哈希与评审版本一致；生产Python3.10按实际只读挂载和禁网合同运行13项专项测试，1.298秒全部通过。
+- 冷缓存完整构建过慢而在产物生成前停止，改为从已知生产基底复制三份评审脚本的薄镜像；两次不完整镜像检查及一次本地shell展开的只读健康探针均已修正，未调用Tushare、未写authority、未影响运行服务。云盘距100 GiB硬线还有112493588480字节。803项等待下一正常固定版和Mac镜像；完整份额历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-share-batch13-20260911.evidence.json`。
