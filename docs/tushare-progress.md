@@ -972,3 +972,9 @@
 - 冷却只读检查确认两次跨API `ReadTimeout`之后新增transport error、HTTP 429、rate-limited和uncertain均为0，并有一笔更晚的`income_vip` HTTP 200；相关gate均ready。普通active任务自然结束并完成连续两轮空闲后，冻结`fund_share`沪深各150项、共300个pristine历史叶，日期覆盖2021-03-03至2021-07-31；manifest、任务、配置、preparer和helper均哈希固定，plan-only为0调用/0写入。
 - 61.851秒完成300次HTTP 200：205 done、95 empty，保留53225行。300个object、300个observation和205个Parquet共805个唯一引用、5368151字节，逐文件SHA256通过，不确定调用0。该干净窗口证明300请求恢复档可用，但速度慢于此前基金份额批次，因此暂不提回360。
 - Worker与Beat恢复healthy，云盘距100 GiB硬线还有114963718144字节。805项等待后续正常固定版和Mac镜像；完整份额历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-share-batch12-20260911.evidence.json`。
+
+### 2026-09-11 index_daily exact batch 7 at 300-request gray tier
+
+- 下一发布窗口前经无revoke流程排空，冻结300个`index_daily` pristine历史叶，覆盖300个唯一`.CSI`代码、请求范围2026-01-01至2026-09-01；固定版、合格库存、任务、配置、preparer和helper均哈希固定，plan-only为0调用/0写入。
+- 40.970秒完成300次HTTP 200：285 done、15 empty，保留45760行。300个object、300个observation和285个Parquet共885个唯一引用、10440580字节，逐文件SHA256通过，不确定调用0。连同基金份额12，这证明300请求恢复档已在两个常规接口上干净通过；同一发布周期不提回360。
+- Worker与Beat恢复healthy，云盘距100 GiB硬线还有114905575424字节。885项等待后续正常固定版和Mac镜像；完整指数历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-index-daily-batch7-20260911.evidence.json`。
