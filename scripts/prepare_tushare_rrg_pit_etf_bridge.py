@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import ExitStack
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import math
@@ -14,6 +14,7 @@ import re
 import socket
 import sys
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
@@ -22,11 +23,14 @@ from backend.shared.tushare_store import read_dataset  # noqa: E402
 
 OUTPUTS = {
     "industry_members": "data/quantdb/2_base_sector/sector_concept/sector_members.parquet",
+    "industry_member_vintages": "sources/citic-member-forward-vintages.parquet",
     "etf_universe": "sources/etf-universe.parquet",
+    "etf_index_mapping": "sources/etf-index-mapping-candidates.parquet",
     "etf_prices": "data/quantdb/4_bond_etf/etf_kline/tushare-execution-point.parquet",
     "etf_holdings": "data/quantdb/4_bond_etf/etf_pcf/etf_components.parquet",
     "etf_pcf": "data/quantdb/4_bond_etf/etf_pcf/etf_pcf.parquet",
 }
+OBSERVATION_TIMEZONE = ZoneInfo("Asia/Shanghai")
 GAPS = [
     "ci_index_member has effective dates but no verified publication/known_at time; current observations cannot be backfilled as historical knowledge",
     "CITIC classification versions, methodology and revisions still require authoritative historical evidence",
@@ -35,6 +39,10 @@ GAPS = [
     "fund_portfolio is a partial periodic stock disclosure; its rows are not a complete daily ETF exposure or PCF",
     "The single-point holding search is bounded to 550 days; no result in that window does not prove earlier disclosures absent",
     "PCF trade_date is applicability, while publication time and historical revisions remain unverified",
+    "Without a signal timestamp, fixed observations are usable only from the next "
+    "Asia/Shanghai calendar day; this does not prove earlier publication or historical availability",
+    "A value episode extends backward only across retained same-scope snapshots when "
+    "all API coverage is done; otherwise it starts at the selected row observation",
 ]
 
 
@@ -53,6 +61,226 @@ def date8(value, label, *, optional=False):
         raise ValueError(f"Invalid {label}")
     datetime.strptime(value, "%Y%m%d")
     return value
+
+
+def instant(value, label):
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError(f"Invalid {label}") from exc
+    else:
+        raise ValueError(f"Invalid {label}")
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"Invalid {label}")
+    return parsed.astimezone(timezone.utc)
+
+
+def checked_fixed_file(root, manifest, relative):
+    expected = manifest.get("files", {}).get(relative)
+    path = root / relative
+    resolved_root = root.resolve()
+    if (
+        not isinstance(expected, dict)
+        or not isinstance(expected.get("bytes"), int)
+        or not re.fullmatch(r"[a-f0-9]{64}", str(expected.get("sha256", "")))
+        or path.is_symlink()
+        or not path.is_file()
+        or resolved_root not in path.resolve().parents
+        or path.stat().st_size != expected["bytes"]
+        or sha(path) != expected["sha256"]
+    ):
+        raise ValueError("Fixed provenance file is missing or invalid")
+    return path, expected["sha256"]
+
+
+def row_key(row, fields):
+    return tuple(row.get(field) for field in fields)
+
+
+def fixed_observation_episodes(
+    root,
+    manifest,
+    api_name,
+    current_rows,
+    current_key_fields,
+    entity_fields,
+    value_fields,
+):
+    """Return the current value's retained-observation episode provenance."""
+    import pyarrow.parquet as pq
+
+    if not current_rows:
+        return {}
+    current = {row_key(row, current_key_fields): row for row in current_rows}
+    if len(current) != len(current_rows) or any(
+        row_key(row, entity_fields)[0] in (None, "") for row in current_rows
+    ):
+        raise ValueError("Fixed source identity is missing")
+    wanted_entities = {row_key(row, entity_fields) for row in current_rows}
+    paths = sorted(
+        {
+            row.get("path")
+            for row in manifest.get("datasets", [])
+            if row.get("api_name") == api_name
+        }
+    )
+    if not paths:
+        raise ValueError("Fixed vintage partitions are unavailable")
+    observations = {}
+    snapshots = {}
+
+    def observation_metadata(observation, observed_at):
+        if observation in observations:
+            metadata = observations[observation]
+            if metadata["observed_at"] != observed_at:
+                raise ValueError("Fixed observation provenance is inconsistent")
+            return metadata
+        relative = "observations/" + observation
+        path, observation_sha = checked_fixed_file(root, manifest, relative)
+        payload = json.loads(path.read_bytes())
+        request = payload.get("request")
+        object_sha = payload.get("object_sha256")
+        if (
+            not isinstance(request, dict)
+            or request.get("api_name") != api_name
+            or not isinstance(request.get("params"), dict)
+            or not re.fullmatch(r"[a-f0-9]{64}", str(object_sha or ""))
+            or instant(payload.get("fetched_at"), "observation fetched_at")
+            != observed_at
+        ):
+            raise ValueError("Fixed observation provenance is inconsistent")
+        _, stored_object_sha = checked_fixed_file(
+            root, manifest, f"objects/{object_sha}.json"
+        )
+        if stored_object_sha != object_sha:
+            raise ValueError("Fixed object content address is inconsistent")
+        scope = json.dumps(
+            {"fields": request.get("fields"), "params": request["params"]},
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        metadata = {
+            "observed_at": observed_at,
+            "scope": scope,
+            "source_object_sha256": object_sha,
+            "source_observation": observation,
+            "source_observation_sha256": observation_sha,
+        }
+        observations[observation] = metadata
+        return metadata
+
+    columns = list(
+        dict.fromkeys(
+            (*entity_fields, *value_fields, "_fetched_at", "_observation")
+        )
+    )
+    for relative in paths:
+        if not isinstance(relative, str) or not re.fullmatch(
+            r"parquet/[a-f0-9]{64}\.parquet", relative
+        ):
+            raise ValueError("Fixed vintage partition is invalid")
+        path, _ = checked_fixed_file(root, manifest, relative)
+        table = pq.read_table(path, columns=columns)
+        for row in table.to_pylist():
+            observed_at = instant(row.get("_fetched_at"), "fixed observation time")
+            observation = row.get("_observation")
+            if (
+                not isinstance(observation, str)
+                or Path(observation).name != observation
+            ):
+                raise ValueError("Fixed observation reference is invalid")
+            observation_metadata(observation, observed_at)
+            snapshot = snapshots.setdefault(observation, {})
+            entity = row_key(row, entity_fields)
+            if entity not in wanted_entities:
+                continue
+            snapshot.setdefault(entity, set()).add(row_key(row, value_fields))
+
+    coverage = [
+        row
+        for row in manifest.get("coverage_by_api", [])
+        if row.get("api_name") == api_name
+    ]
+    continuity_provable = bool(coverage) and all(
+        row.get("state") == "done" for row in coverage
+    )
+    result = {}
+    for identity, current_row in current.items():
+        entity = row_key(current_row, entity_fields)
+        value = row_key(current_row, value_fields)
+        selected_name = current_row.get("_observation")
+        selected_at = instant(
+            current_row.get("_fetched_at"), "selected fixed observation time"
+        )
+        if not isinstance(selected_name, str) or selected_name not in observations:
+            raise ValueError("Selected current row is missing retained provenance")
+        selected = observation_metadata(selected_name, selected_at)
+        if snapshots.get(selected_name, {}).get(entity) != {value}:
+            raise ValueError("Selected current row is ambiguous in retained snapshot")
+        episode = selected
+        if continuity_provable:
+            sequence = sorted(
+                (
+                    metadata
+                    for name, metadata in observations.items()
+                    if metadata["scope"] == selected["scope"]
+                    and (
+                        metadata["observed_at"], metadata["source_observation"]
+                    )
+                    <= (selected_at, selected_name)
+                ),
+                key=lambda row: (row["observed_at"], row["source_observation"]),
+            )
+            selected_position = next(
+                index
+                for index, metadata in enumerate(sequence)
+                if metadata["source_observation"] == selected_name
+            )
+            for prior in reversed(sequence[:selected_position]):
+                values = snapshots.get(prior["source_observation"], {}).get(entity)
+                if values != {value}:
+                    break
+                episode = prior
+
+        observed_at = episode["observed_at"]
+        observation_local_date = observed_at.astimezone(
+            OBSERVATION_TIMEZONE
+        ).strftime("%Y%m%d")
+        selected_local_date = selected_at.astimezone(OBSERVATION_TIMEZONE).strftime(
+            "%Y%m%d"
+        )
+        result[identity] = {
+            "episode_start_observation_at": observed_at.isoformat(),
+            "observation_local_date": observation_local_date,
+            "forward_valid_from": (
+                datetime.strptime(observation_local_date, "%Y%m%d")
+                + timedelta(days=1)
+            ).strftime("%Y%m%d"),
+            "selected_fixed_observation_at": selected_at.isoformat(),
+            "selected_observation_local_date": selected_local_date,
+            "selected_forward_valid_from": (
+                datetime.strptime(selected_local_date, "%Y%m%d")
+                + timedelta(days=1)
+            ).strftime("%Y%m%d"),
+            "source_object_sha256": episode["source_object_sha256"],
+            "source_observation": episode["source_observation"],
+            "source_observation_sha256": episode[
+                "source_observation_sha256"
+            ],
+            "selected_source_object_sha256": selected[
+                "source_object_sha256"
+            ],
+            "selected_source_observation": selected["source_observation"],
+            "selected_source_observation_sha256": selected[
+                "source_observation_sha256"
+            ],
+            "episode_continuity_proven": continuity_provable,
+        }
+    return result
 
 
 def distinct(rows, keys, label):
@@ -129,6 +357,87 @@ def membership_inputs(rows, signal_date):
     return output
 
 
+MEMBER_VINTAGE_KEY = (
+    "l1_code",
+    "l2_code",
+    "l3_code",
+    "ts_code",
+    "in_date",
+    "out_date",
+)
+ETF_INDEX_MAPPING_KEY = ("ts_code", "index_code", "index_name")
+ETF_ENTITY_KEY = ("ts_code",)
+ETF_INDEX_VALUE_KEY = ("index_code", "index_name")
+
+
+def membership_vintages(rows, provenance, signal_date, release_id):
+    output = []
+    for row in rows:
+        start = date8(row.get("in_date"), "member in_date")
+        end = date8(row.get("out_date"), "member out_date", optional=True)
+        identity = row_key(row, MEMBER_VINTAGE_KEY)
+        source = provenance[identity]
+        forward = (
+            source["forward_valid_from"] <= signal_date
+            and source["selected_forward_valid_from"] <= signal_date
+        )
+        output.append(
+            {
+                "SectorCode": row.get("l1_code"),
+                "Symbol": row.get("ts_code"),
+                "effective_from": start,
+                "effective_to": end,
+                "episode_start_observation_at": source[
+                    "episode_start_observation_at"
+                ],
+                "observation_local_date": source["observation_local_date"],
+                "forward_valid_from": source["forward_valid_from"],
+                "selected_fixed_observation_at": source[
+                    "selected_fixed_observation_at"
+                ],
+                "selected_observation_local_date": source[
+                    "selected_observation_local_date"
+                ],
+                "selected_forward_valid_from": source[
+                    "selected_forward_valid_from"
+                ],
+                "forward_usable_for_signal": forward
+                and start <= signal_date
+                and (end is None or signal_date < end),
+                "known_at_basis": "fixed_release_observation",
+                "source_release_id": release_id,
+                "source_object_sha256": source["source_object_sha256"],
+                "source_observation": source["source_observation"],
+                "source_observation_sha256": source[
+                    "source_observation_sha256"
+                ],
+                "selected_source_object_sha256": source[
+                    "selected_source_object_sha256"
+                ],
+                "selected_source_observation": source[
+                    "selected_source_observation"
+                ],
+                "selected_source_observation_sha256": source[
+                    "selected_source_observation_sha256"
+                ],
+                "episode_continuity_proven": source[
+                    "episode_continuity_proven"
+                ],
+                "historical_known_at_verified": False,
+                "historical_mapping_verified": False,
+            }
+        )
+    output.sort(
+        key=lambda row: (
+            row["SectorCode"],
+            row["Symbol"],
+            row["effective_from"],
+            row["episode_start_observation_at"],
+        )
+    )
+    return output
+
+
 def candidate_universe(etf_basic, fund_basic, execution_date):
     etfs = distinct(etf_basic, ("ts_code",), "ETF")
     funds = distinct(fund_basic, ("ts_code",), "fund")
@@ -169,6 +478,62 @@ def candidate_universe(etf_basic, fund_basic, execution_date):
             }
         )
     return output, candidates, unsupported
+
+
+def etf_index_mapping_candidates(rows, provenance, signal_date, release_id):
+    output = []
+    for row in rows:
+        if not row.get("index_code"):
+            continue
+        source = provenance[row_key(row, ETF_INDEX_MAPPING_KEY)]
+        output.append(
+            {
+                "EtfCode": row.get("ts_code"),
+                "source_etf_code": row.get("source_ts_code"),
+                "index_code": row.get("index_code"),
+                "index_name": row.get("index_name"),
+                "episode_start_observation_at": source[
+                    "episode_start_observation_at"
+                ],
+                "observation_local_date": source["observation_local_date"],
+                "forward_valid_from": source["forward_valid_from"],
+                "selected_fixed_observation_at": source[
+                    "selected_fixed_observation_at"
+                ],
+                "selected_observation_local_date": source[
+                    "selected_observation_local_date"
+                ],
+                "selected_forward_valid_from": source[
+                    "selected_forward_valid_from"
+                ],
+                "forward_usable_for_signal": (
+                    source["forward_valid_from"] <= signal_date
+                    and source["selected_forward_valid_from"] <= signal_date
+                ),
+                "mapping_basis": "etf_basic.index_code_current_observation",
+                "source_release_id": release_id,
+                "source_object_sha256": source["source_object_sha256"],
+                "source_observation": source["source_observation"],
+                "source_observation_sha256": source[
+                    "source_observation_sha256"
+                ],
+                "selected_source_object_sha256": source[
+                    "selected_source_object_sha256"
+                ],
+                "selected_source_observation": source[
+                    "selected_source_observation"
+                ],
+                "selected_source_observation_sha256": source[
+                    "selected_source_observation_sha256"
+                ],
+                "episode_continuity_proven": source[
+                    "episode_continuity_proven"
+                ],
+                "historical_mapping_verified": False,
+            }
+        )
+    output.sort(key=lambda row: (row["EtfCode"], row["index_code"]))
+    return output
 
 
 def finite(value, *, positive=False):
@@ -298,6 +663,8 @@ def _prepare(root, release_id, signal_date, execution_date, output):
     signal_date = date8(signal_date, "signal date")
     execution_date = date8(execution_date, "execution date")
     manifest = manifest_at(root, release_id)
+    if manifest.get("retained_observations_included") is not True:
+        raise ValueError("Fixed release must include retained observations")
     available = {row["api_name"] for row in manifest["datasets"]}
     queries = []
 
@@ -353,11 +720,38 @@ def _prepare(root, release_id, signal_date, execution_date, output):
         limit=100,
     )
     next_session(calendar, signal_date, execution_date)
-    members = membership_inputs(read("ci_index_member", limit=100000), signal_date)
+    member_rows = read("ci_index_member", limit=100000)
+    members = membership_inputs(member_rows, signal_date)
+    member_provenance = fixed_observation_episodes(
+        root,
+        manifest,
+        "ci_index_member",
+        member_rows,
+        MEMBER_VINTAGE_KEY,
+        MEMBER_VINTAGE_KEY,
+        (),
+    )
+    member_vintages = membership_vintages(
+        member_rows, member_provenance, signal_date, release_id
+    )
+    etf_rows = read("etf_basic", limit=10000)
+    etf_mapping_rows = [row for row in etf_rows if row.get("index_code")]
+    etf_provenance = fixed_observation_episodes(
+        root,
+        manifest,
+        "etf_basic",
+        etf_mapping_rows,
+        ETF_INDEX_MAPPING_KEY,
+        ETF_ENTITY_KEY,
+        ETF_INDEX_VALUE_KEY,
+    )
     universe, candidates, unsupported = candidate_universe(
-        read("etf_basic", limit=10000),
+        etf_rows,
         read("fund_basic", limit=100000),
         execution_date,
+    )
+    etf_index_mapping = etf_index_mapping_candidates(
+        etf_mapping_rows, etf_provenance, signal_date, release_id
     )
     candidate_codes = sorted(candidates)
     prices, valid_price_codes = etf_price_inputs(
@@ -443,6 +837,10 @@ def _prepare(root, release_id, signal_date, execution_date, output):
                 row["interval_contains_signal_candidate"] for row in members
             ),
             "known_at_rows": 0,
+            "forward_vintage_rows": len(member_vintages),
+            "forward_usable_on_signal_rows": sum(
+                row["forward_usable_for_signal"] for row in member_vintages
+            ),
             "pit_ready": False,
         },
         "etf": {
@@ -455,13 +853,24 @@ def _prepare(root, release_id, signal_date, execution_date, output):
             "unsupported_exchange_codes": sorted(unsupported),
             "latest_pre_signal_disclosure_codes": len(holding_periods),
             "exact_execution_pcf_codes": len(pcf_codes),
+            "current_index_mapping_candidates": len(etf_index_mapping),
+            "forward_usable_index_mapping_candidates": sum(
+                row["forward_usable_for_signal"] for row in etf_index_mapping
+            ),
             "historical_universe_verified": False,
+            "historical_mapping_verified": False,
             "industry_mapping_verified": False,
             "tradability_verified": False,
             "complete_exposure_verified": False,
         },
         "structures": {
             "industry_members": "prepared_with_null_known_at_semantic_block",
+            "industry_member_vintages": (
+                "prepared_forward_only_from_current_value_episode"
+            ),
+            "etf_index_mapping": (
+                "prepared_current_observation_forward_only_not_historical"
+            ),
             "etf_prices": "prepared_exact_execution_rows_no_fill",
             "etf_holdings": "prepared_latest_strictly_pre_signal_disclosure_partial_only",
             "etf_pcf": "prepared_exact_execution_rows_publication_time_unverified",
@@ -501,6 +910,32 @@ def _prepare(root, release_id, signal_date, execution_date, output):
                 ("known_at_verified", pa.bool_()),
             ]
         ),
+        "industry_member_vintages": pa.schema(
+            [
+                ("SectorCode", pa.string()),
+                ("Symbol", pa.string()),
+                ("effective_from", pa.string()),
+                ("effective_to", pa.string()),
+                ("episode_start_observation_at", pa.string()),
+                ("observation_local_date", pa.string()),
+                ("forward_valid_from", pa.string()),
+                ("selected_fixed_observation_at", pa.string()),
+                ("selected_observation_local_date", pa.string()),
+                ("selected_forward_valid_from", pa.string()),
+                ("forward_usable_for_signal", pa.bool_()),
+                ("known_at_basis", pa.string()),
+                ("source_release_id", pa.string()),
+                ("source_object_sha256", pa.string()),
+                ("source_observation", pa.string()),
+                ("source_observation_sha256", pa.string()),
+                ("selected_source_object_sha256", pa.string()),
+                ("selected_source_observation", pa.string()),
+                ("selected_source_observation_sha256", pa.string()),
+                ("episode_continuity_proven", pa.bool_()),
+                ("historical_known_at_verified", pa.bool_()),
+                ("historical_mapping_verified", pa.bool_()),
+            ]
+        ),
         "etf_universe": pa.schema(
             [
                 ("EtfCode", pa.string()),
@@ -515,6 +950,31 @@ def _prepare(root, release_id, signal_date, execution_date, output):
                 ("historical_universe_verified", pa.bool_()),
                 ("industry_mapping_verified", pa.bool_()),
                 ("source_observation", pa.string()),
+            ]
+        ),
+        "etf_index_mapping": pa.schema(
+            [
+                ("EtfCode", pa.string()),
+                ("source_etf_code", pa.string()),
+                ("index_code", pa.string()),
+                ("index_name", pa.string()),
+                ("episode_start_observation_at", pa.string()),
+                ("observation_local_date", pa.string()),
+                ("forward_valid_from", pa.string()),
+                ("selected_fixed_observation_at", pa.string()),
+                ("selected_observation_local_date", pa.string()),
+                ("selected_forward_valid_from", pa.string()),
+                ("forward_usable_for_signal", pa.bool_()),
+                ("mapping_basis", pa.string()),
+                ("source_release_id", pa.string()),
+                ("source_object_sha256", pa.string()),
+                ("source_observation", pa.string()),
+                ("source_observation_sha256", pa.string()),
+                ("selected_source_object_sha256", pa.string()),
+                ("selected_source_observation", pa.string()),
+                ("selected_source_observation_sha256", pa.string()),
+                ("episode_continuity_proven", pa.bool_()),
+                ("historical_mapping_verified", pa.bool_()),
             ]
         ),
         "etf_prices": pa.schema(
@@ -567,7 +1027,9 @@ def _prepare(root, release_id, signal_date, execution_date, output):
     }
     rows = {
         "industry_members": members,
+        "industry_member_vintages": member_vintages,
         "etf_universe": universe,
+        "etf_index_mapping": etf_index_mapping,
         "etf_prices": prices,
         "etf_holdings": holdings,
         "etf_pcf": pcf,
