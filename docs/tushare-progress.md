@@ -1040,3 +1040,10 @@
 - 真实执行45.987秒完成300次请求，全部HTTP 200并进入done，共保留23128行，不确定调用0。300个object、300个observation和300个Parquet构成900个唯一物理引用、4813161字节，逐文件SHA256通过。
 - 主机准备器因缺少`pyarrow`在导入阶段失败，尚未访问authority、凭据或上游；改用生产镜像后完成。服务恢复后的首次人工Celery探针用了旧模块名，只影响探针客户端；按容器实际app重试后3个节点均pong，Worker与Beat为healthy。
 - 云盘距100 GiB硬线还有113327689728字节，`CURRENT`仍为266b。900项等待正常固定版和Mac镜像；完整基金历史、修订、可交易性、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-price-batch16-20260911.evidence.json`。
+
+
+### 2026-09-11 固定版266b后三批发布闸门
+
+- 财务20、指数日线9和基金行情16共900个终态任务（892 done、8 empty）。共享锁、query-only导出器在普通采集完成后实算全部云端文件SHA256，形成2692个唯一引用（900 object、900 observation、892 Parquet）、26546285字节；库存489254字节，SHA256为`d3c4b59f5dfd676a59a7b22aeb4963e674822453a9ffff507feb9d816bdfd29d`。
+- root-only路径拒绝直接`scp`；改用只读`sudo cat`流式复制后字节数和哈希一致。Mac仍在266b，持久验收器按预期exit 2：2692项全部未进入旧manifest，元数据错误0、本地物理错误0，证明未把云端新写入误报为本地可用。
+- Worker和Beat恢复healthy，云盘距100 GiB硬线还有113368154112字节。下一次正常publisher在2026-09-11 21:13:10 CST后到期；发布闭环前不再插入exact批次。下一步是正常发布、Mac固定镜像、2692项正对照和断网空Token只读验收。机器证据为`docs/tushare-post-266b-three-batches-publish-gate-20260911.evidence.json`。
