@@ -955,3 +955,9 @@
 - 固定2010-07-19至2011-04-18的180个共同SSE开市日，`fund_daily`和`fund_adj`各180项；固定版、配置、日历、preparer、helper和任务清单均哈希冻结，plan-only为0调用/0写入。90秒硬截止在337次尝试后生效：336次HTTP 200并保留41652行，另1次`ReadTimeout`且`response_complete=false`，计为1个不确定调用。
 - 336个object、336个observation和336个Parquet共1008个唯一引用、7380294字节，逐文件SHA256通过。23项从未调用并保持pending；超时项也保持pending。用原manifest续跑时，执行前pristine保护按预期拒绝混合已完成/已尝试任务，没有再次调用上游，也没有绕过保护。
 - Worker与Beat恢复healthy，云盘距100 GiB硬线还有114999058432字节。账户上限仍为500 RPM，90秒硬截止不变；下一次基金行情精确窗口先降至最多300请求，待干净窗口再决定是否提速。已完成的1008项等待后续正常固定版和Mac镜像，24项保留在普通积压中；完整历史、修订、可交易状态、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-price-batch14-20260911.evidence.json`。
+
+### 2026-09-11 financial exact batch 19 partial closure
+
+- `income_vip`、`balancesheet_vip`、`cashflow_vip`各冻结120个pristine叶，manifest、任务、配置、preparer和runner均哈希固定。首次本地编排从错误模块导入preparer哈希，在plan-only和上游调用前因`ImportError`退出；修正后复用同一冻结manifest并通过0调用/0写入的plan-only。
+- 90秒硬截止在142次尝试后生效：141次HTTP 200，保留256行；141个object、141个observation和141个Parquet共423个唯一引用、5659515字节，逐文件SHA256通过。218项从未调用并保持pending；另1个`cashflow_vip`请求`ReadTimeout`且`response_complete=false`，记为1个不确定调用并保持pending。
+- 这是连续第二个不同API窗口出现一次`ReadTimeout`。新的exact窗口暂缓，待冷却后只读门快照确认没有新增transport error再恢复；普通Tushare Worker与Beat已恢复healthy，其他积压继续推进。云盘距100 GiB硬线还有114979741696字节。423项等待后续正常固定版和Mac镜像；完整财务历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-financial-pit-batch19-20260911.evidence.json`。
