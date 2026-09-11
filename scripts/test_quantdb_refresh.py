@@ -13,6 +13,31 @@ import dual_node_snapshot as snapshot
 
 
 class QuantDBRefresh(unittest.TestCase):
+    def test_docker_desktop_mount_alias_is_accepted_but_authority_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            data = project / ".local-dev/project/data"
+            data.mkdir(parents=True)
+
+            def output(*args):
+                if args[1] == "context":
+                    return "unix:///var/run/docker.sock"
+                if args[1] == "info":
+                    return "Docker Desktop"
+                if args[1] == "ps":
+                    return "quantmind-dev"
+                return json.dumps([{"Source": source, "Destination": "/data"}])
+
+            with (
+                patch.object(snapshot, "output", side_effect=output),
+                patch.object(refresh.sys, "platform", "darwin"),
+            ):
+                source = "/host_mnt" + str(data.resolve())
+                self.assertEqual(refresh.require_local_idle(project), ["quantmind-dev"])
+                source = "/host_mnt/tmp/authority"
+                with self.assertRaisesRegex(RuntimeError, "escaped isolation"):
+                    refresh.require_local_idle(project)
+
     def test_signal_interrupt_runs_cleanup(self):
         import subprocess
         import sys

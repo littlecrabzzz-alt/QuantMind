@@ -15,6 +15,7 @@ import uuid
 
 import dual_node_snapshot as snapshot
 from dual_node_inventory import stat_key
+from dual_node_check import sandbox_mount_path
 
 
 def records(project):
@@ -136,7 +137,7 @@ def require_local_idle(project):
     snapshot.require('quantmind-dev' in running, 'Local backend stopped; downloaded version retained for next start')
     mounts = json.loads(snapshot.output('docker', 'inspect', 'quantmind-dev', '--format', '{{json .Mounts}}'))
     expected = (project / '.local-dev/project/data').resolve()
-    snapshot.require(any(m['Destination'] == '/data' and Path(m['Source']).resolve() == expected for m in mounts),
+    snapshot.require(any(m['Destination'] == '/data' and sandbox_mount_path(m['Source'], project) == expected for m in mounts),
                      'Unexpected local data mount')
     return [name for name in ('quantmind-dev-celery', 'quantmind-dev-research-worker', 'quantmind-dev') if name in running]
 

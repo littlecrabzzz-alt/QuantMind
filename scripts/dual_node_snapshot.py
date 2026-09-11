@@ -240,7 +240,7 @@ def install_mac_pull():
             original.rename(destination)
             original.symlink_to(destination)
     for name in ("scripts/dual_node_snapshot.py", "scripts/dual_node_inventory.py",
-                 "scripts/dual_node_sync.py", "scripts/quantdb_refresh.py", "deploy/dual-node.env"):
+                 "scripts/dual_node_sync.py", "scripts/dual_node_check.py", "scripts/quantdb_refresh.py", "deploy/dual-node.env"):
         target = runtime / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(PROJECT / name, target)
