@@ -162,6 +162,8 @@ class QuantDBRefresh(unittest.TestCase):
             events = []
 
             def run(*args, **kwargs):
+                if args[0] == "cp":
+                    events.append("copy")
                 if args[0] == "docker":
                     events.append(args[1])
                     return
@@ -187,6 +189,7 @@ class QuantDBRefresh(unittest.TestCase):
             self.assertEqual(result.read_text(), "keep")
             self.assertEqual(events[-1], "start")
             self.assertFalse((root / "logs/local-dev.lock").exists())
+            original_backup = receipt["backup"]
             cache = local / "db/qlib_data"
             cache.mkdir(parents=True)
             (cache / "day").write_text("old")
@@ -203,10 +206,12 @@ class QuantDBRefresh(unittest.TestCase):
                 refresh.apply(root, downloaded)
             receipt = json.loads((root / ".local-dev/QUANTDB_SYNC.json").read_text())
             self.assertEqual(receipt["status"], "applied")
+            self.assertEqual(receipt["backup"], original_backup)
+            self.assertEqual((Path(original_backup) / "day.parquet").read_text(), "old")
             self.assertEqual((cache / "day").read_text(), "new")
             self.assertEqual((Path(receipt["qlib_backup"]) / "day").read_text(), "old")
             self.assertEqual(result.read_text(), "keep")
-            self.assertEqual(events, ["stop", "start", "stop", "start"])
+            self.assertEqual(events, ["stop", "copy", "start", "stop", "start"])
 
     def test_local_edits_block_but_identical_retries_and_unique_results_survive(self):
         with tempfile.TemporaryDirectory() as tmp:

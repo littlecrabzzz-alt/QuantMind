@@ -214,24 +214,27 @@ def apply(project, downloaded):
         local = state / 'project'
         snapshot.run('docker', 'stop', '--time', '60', *stopped)
         check_local_changes(local, baseline, incoming)
-        live = local / 'data/quantdb'
-        staged = local / 'data' / ('.quantdb-refresh-' + uuid.uuid4().hex)
-        snapshot.run('cp', '-cR', str(live), str(staged))  # APFS clone, including local catalogs.
-        rsync = '/opt/homebrew/bin/rsync' if Path('/opt/homebrew/bin/rsync').exists() else 'rsync'
-        snapshot.run(rsync, '-a', '--checksum', '--no-owner', '--no-group',
-                     str(downloaded / 'project/data/quantdb') + '/', str(staged) + '/')
-        new_names = {r['path'] for r in incoming}
-        for row in baseline:
-            if row['path'] not in new_names:
-                (staged / Path(row['path']).relative_to('data/quantdb')).unlink(missing_ok=True)
-        for row in incoming:
-            snapshot.require(snapshot.digest(staged / Path(row['path']).relative_to('data/quantdb')) == row['sha256'],
-                             'Staged local checksum mismatch')
-        backup = state / ('quantdb-before-' + datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S') + '-' + uuid.uuid4().hex[:6])
-        # Same atomic directory exchange used by Qlib publication; old files survive.
-        publish_local_directory(staged, live)
-        staged.rename(backup)
-        write_json(receipt, {'status': 'files_applied', 'snapshot': str(downloaded), 'backup': str(backup)})
+        if prior.get('snapshot') == str(downloaded) and prior.get('status') == 'files_applied':
+            backup = Path(prior['backup'])
+        else:
+            live = local / 'data/quantdb'
+            staged = local / 'data' / ('.quantdb-refresh-' + uuid.uuid4().hex)
+            snapshot.run('cp', '-cR', str(live), str(staged))  # APFS clone, including local catalogs.
+            rsync = '/opt/homebrew/bin/rsync' if Path('/opt/homebrew/bin/rsync').exists() else 'rsync'
+            snapshot.run(rsync, '-a', '--checksum', '--no-owner', '--no-group',
+                         str(downloaded / 'project/data/quantdb') + '/', str(staged) + '/')
+            new_names = {r['path'] for r in incoming}
+            for row in baseline:
+                if row['path'] not in new_names:
+                    (staged / Path(row['path']).relative_to('data/quantdb')).unlink(missing_ok=True)
+            for row in incoming:
+                snapshot.require(snapshot.digest(staged / Path(row['path']).relative_to('data/quantdb')) == row['sha256'],
+                                 'Staged local checksum mismatch')
+            backup = state / ('quantdb-before-' + datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S') + '-' + uuid.uuid4().hex[:6])
+            # Same atomic directory exchange used by Qlib publication; old files survive.
+            publish_local_directory(staged, live)
+            staged.rename(backup)
+            write_json(receipt, {'status': 'files_applied', 'snapshot': str(downloaded), 'backup': str(backup)})
         # Keep the API stopped until files, PG and Qlib agree: no new training
         # request can enter between the data exchange and cache completion.
         result = snapshot.output(
