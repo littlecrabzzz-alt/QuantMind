@@ -881,3 +881,9 @@
 
 - 冻结360个`fund_share` pristine历史叶，沪深各180项，日期覆盖2022-07-27至2023-01-22；manifest、任务清单、配置、preparer和helper均哈希固定，plan-only为0调用/0写入。46.203秒完成360次HTTP 200，246 done、114 empty，保留98699行。
 - 360个object、360个observation和246个Parquet共966个唯一引用、9308267字节，逐文件SHA256通过；不确定调用0，未发布或切换`CURRENT`。Worker与Beat恢复healthy。云盘可用224830201856字节，距100 GiB硬线还有117456019456字节。966项与其他`5f796b`后续批次一起等待正常固定版和Mac镜像闭环；完整份额历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-share-batch9-20260911.evidence.json`。
+
+### 2026-09-11 post-5f796b five-batch fixed-release closure
+
+- 正常任务`2aa9e7c8-9edb-4752-a364-2a7149f2708b`用172.032秒完成publish-only，原子生成`data-473bf47cb69cb6848bb90e8361572e116ac9db7d29bf2e347af0b88469ad6bf7`。316391184字节manifest含108110个dataset和807538个文件，并包含retained observations。Mac标准LaunchAgent下载8499个物理文件、完整验证807538项、exit 0后原子切换到同一固定版。
+- `5f796b`后的五个精确批次共1680个任务、4854个唯一引用：1680个object、1680个observation和1494个Parquet，总计57970481字节。authority哈希、manifest元数据、Mac文件大小和Mac SHA256错误均为0。生产镜像在`--network none`、空Token和只读镜像挂载下读取`index_daily`、`fund_daily`、`fund_adj`、`fund_share`及三张财务表各3行，上游调用0。
+- API、Worker和Beat均healthy。云盘可用224113618944字节，距100 GiB硬线还有116739436544字节。本闭包确认指数第4-5批、基金行情第11批、财务第16批和基金份额第9批已可在本地脱离Tushare读取；完整历史、修订、`known_at`、PIT成员、RRG可交易状态和PCF仍未闭合。机器证据为`docs/tushare-fixed-release-473bf-five-batches-20260911.evidence.json`。
