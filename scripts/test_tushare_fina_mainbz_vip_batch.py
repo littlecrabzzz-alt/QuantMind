@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import httpx
 
+from backend.shared import tushare_store
 from backend.shared.tushare_intake import digest, json_bytes
 from backend.shared.tushare_pipeline import contract_for
 from backend.shared.tushare_registry import PLANNERS
@@ -120,6 +121,13 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
         self.assertNotIn("pagination", spec)
         self.assertEqual(spec["group"], preparation.API)
         self.assertIs(PLANNERS[preparation.API], iter_fina_mainbz_vip_jobs)
+        self.assertEqual(
+            tushare_store.KEYS[preparation.API],
+            tushare_store.KEYS["fina_mainbz"],
+        )
+        self.assertEqual(
+            tushare_store.IDENTITIES[preparation.API], "fina_mainbz"
+        )
 
     def test_planner_generates_complete_quarters_and_preserves_gaps(self):
         jobs = list(

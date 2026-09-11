@@ -45,7 +45,10 @@ from backend.shared.tushare_other_contracts import OTHER_CONTRACTS
 from backend.shared.tushare_supplement_contracts import SUPPLEMENT_CONTRACTS
 from backend.shared.tushare_equity_event_contracts import EQUITY_EVENT_CONTRACTS
 from backend.shared.tushare_futures_extra_contracts import FUTURES_EXTRA_CONTRACTS
-from backend.shared.tushare_research_extra_contracts import RESEARCH_EXTRA_CONTRACTS
+from backend.shared.tushare_research_extra_contracts import (
+    FINA_MAINBZ_VIP_CONTRACT,
+    RESEARCH_EXTRA_CONTRACTS,
+)
 from backend.shared.tushare_pipeline import manifest_at
 from backend.shared.tushare_structured_contracts import STRUCTURED_CONTRACTS
 from backend.shared.tushare_text_contracts import TEXT_CONTRACTS
@@ -85,6 +88,7 @@ CONTRACTS = {
     **EQUITY_EVENT_CONTRACTS,
     **FUTURES_EXTRA_CONTRACTS,
     **RESEARCH_EXTRA_CONTRACTS,
+    "fina_mainbz_vip": FINA_MAINBZ_VIP_CONTRACT,
 }
 IDENTITIES = {}
 for _api, _contract in CONTRACTS.items():
