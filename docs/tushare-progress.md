@@ -1095,3 +1095,16 @@
 - 63.334秒完成240次HTTP 200：190 done、50 empty、26043行、不确定调用0；执行段吞吐227.37次/分钟，含容器编排墙钟为186.26次/分钟，均低于该接口保守240 rpm门槛。
 - 240个object、240个observation和190个Parquet共670个唯一引用、4656304字节，逐文件SHA256通过。Worker与Beat恢复healthy，云盘距100 GiB硬线还有111660396544字节，`CURRENT`仍为f1e。
 - 只读性能审查确认约41秒准备时间主要来自按任务ID全表扫描并逐行解析JSON；已有`(epoch, api_name)`表达式索引足以支持后续保持逐条合同验证语义的查询改写，当前不新增生产索引。670项等待下一正常固定版和Mac镜像；完整持仓、日度PCF、历史盘中`known_at`、修订、权威ETF行业映射和PIT仍未闭合。机器证据为`docs/tushare-fund-portfolio-batch6-20260911.evidence.json`。
+
+### 2026-09-11 固定版f1e后fund_portfolio第5/6批发布闸门
+
+- 无revoke排空后，独占锁、query-only导出器从live jobs/attempts重建两批480个终态任务（324 done、156 empty）的精确引用，逐文件复算SHA；形成1284个唯一引用（480 object、480 observation、324 Parquet）、6065292字节，库存231530字节、SHA256 `68778b1721292e579645435409d7ca9c17d1ecc561d32cfe96ad02096b4fed3a`。两批任务、请求签名和物理引用交集均为0。
+- 独立只读审计在authority锁内复查每个任务恰有一次attempt、job/attempt结果一致、HTTP与状态/行数，并重算全部1284个文件SHA，未发现问题。
+- Mac仍为f1e，固定版验收器按预期exit 2：1284项全部不在旧manifest，元数据错误0、本地物理错误0。Worker和Beat恢复healthy；正常publisher将在2026-09-11 23:23:47 CST后到期，不提前绕过间隔门。完整持仓、日度PCF、历史盘中`known_at`、修订、权威ETF行业映射和PIT仍未闭合。机器证据为`docs/tushare-post-f1e-fund-portfolio5-6-publish-gate-20260911.evidence.json`。
+
+### 2026-09-12 固定版4ebc基金持仓5/6本地闭环
+
+- QuantDB恢复和扩盘完成后，正常publisher任务`8d0c1ca6-2f8d-4d9d-9d52-3fdd634400bf`以Celery SUCCESS、上游请求0完成，236.278秒原子发布`data-4ebc1a70135cb6e08fd718d6aea19e4480d293da3e0fe39e82b9c22f1e3b0b22`；347517836字节manifest含116286个dataset和856556个文件。
+- Mac标准LaunchAgent第214轮下载5507个增量文件，完整验证后exit 0并切换固定版。基金持仓批次5/6的1284个唯一引用、6065292字节全部进入manifest，元数据错误0、本地物理错误0。
+- 生产基础镜像在`--network none`、socket/DNS阻断、空Token和只读镜像条件下读取`fund_portfolio`3行15列，上游调用0。云盘扩容后可用520229150720字节，距100 GiB硬线还有412854968320字节；general worker、研究worker、Tushare worker、Beat均healthy，整项目快照timer已恢复。
+- 两批已从权威端闭环提升为本地固定版离线可用。完整基金持仓历史、每日PCF、上游修订、`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fixed-release-4ebc-fund-portfolio5-6-20260912.evidence.json`。
