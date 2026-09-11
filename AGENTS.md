@@ -15,8 +15,9 @@ Mac 和云端都可以改代码、做研究。**正式业务数据由云端维�
 | 主工作树源码、`coordination/`、共享配置 | Syncthing 双向同步，包含未提交文件 | 同一文件同一时刻由一人/一端负责；不要把未提交当成未上线的保护 |
 | `.git`、分支和提交历史 | 不由 Syncthing 同步 | 用 Git push/fetch 传递提交；主工作树换端后用 `handoff` 核对并显式对齐元数据 |
 | 独立 worktree | 不自动双向同步 | 在另一端取得提交后建立自己的 worktree；不能复制 worktree 的 `.git` 路径文件 |
-| 云端 PostgreSQL、Redis、QuantDB、Qlib、模型和结果 | 云端持续写入；通过完整快照单向提供本地副本 | 不用文件同步工具复制运行中的数据库，不把 Mac 的旧数据覆盖到云端 |
-| Mac `.local-dev/project` 和 `quantmind-dev_*` 数据库卷 | 独立沙盒，不参与双向同步 | 本地测试可写；基础数据固定于 `.local-dev/SNAPSHOT_ID`，本地新增结果保存在本地 |
+| 云端 PostgreSQL、Redis、模型和结果 | 云端持续写入；通过完整快照单向提供本地副本 | 不用文件同步工具复制运行中的数据库，不把 Mac 的旧数据覆盖到云端 |
+| QuantDB 基础数据 | 复用快照校验，每小时从云端发布/拉取限定 Parquet 版本；本地空闲时应用并补齐行情表和 Qlib | 以 `.local-dev/QUANTDB_SYNC.json` 的 `applied` 和实际数据日期验收；本地修改冲突、活动任务或失败时保留数据并报错，下轮重试 |
+| Mac `.local-dev/project` 和 `quantmind-dev_*` 数据库卷 | 独立沙盒，不参与双向同步 | 本地测试可写；完整库基线记录于 `.local-dev/SNAPSHOT_ID`；QuantDB 更新另记 `QUANTDB_SYNC.json`，本地新增结果保留 |
 | Mac Tushare 镜像 | 云端发布固定版本后，Mac 独立定时下载并校验 | 按 `release_id` 只读使用；不是 QuantDB 的替代品，不自动导入本地 PostgreSQL/沙盒 |
 | 依赖、镜像、虚拟环境、构建产物 | 不双向同步 | 按平台安装/构建；Mac 当前后端镜像为 amd64，在 Apple Silicon 上有架构转换开销 |
 
@@ -97,10 +98,12 @@ sudo -n bash scripts/dual-node.sh cloud-compose ps
 
 ## 数据如何更新，什么时候会落后
 
-- **QuantDB/完整数据库快照**：云端现有 A 股作业计划每天北京时间 03:00 同步 QuantDB、写 PostgreSQL 并更新 Qlib；完整快照计划 07:00 创建。Mac 每 3600 秒检查并下载已完成版本，目录是 `~/Library/Application Support/QuantMind/cloud-snapshots`，项目 `logs/cloud-snapshots` 指向它。
+- **QuantDB 日常更新**：云端 A 股配置每天北京时间 03:00 采集，错过时间可当日补派；市场同步走现有 worker 的独立队列，失败任务不会无限重投。Mac 原 `com.quantmind.snapshot-pull` 每 3600 秒先发布/拉取限定 QuantDB Parquet，再在沙盒空闲时应用；复用文件哈希、增量传输和既有 PG/Qlib 入口，不依赖完整快照成功，也不停止云端整套服务。手动同一路径为 `python3 scripts/quantdb_refresh.py refresh`。
+- **应用与保护**：本地已有行情修改发生冲突则拒绝覆盖；旧 QuantDB 留在 `.local-dev/quantdb-before-*`，只向本地行情表补新增日期，不恢复或覆盖业务库。任务运行或后端未启动时保留下载、延后应用。研究固定输入目录保持原样；查看 `.local-dev/QUANTDB_SYNC.json`、应用真实最新日与代表标的数据，不能用下载成功替代验收。旧版保留，空间不足时先报告，不自动删除本地成果。
+- **完整数据库快照**：仍是独立恢复基线，包含业务数据库等；整项目快照容量不足时可以暂停，但不能连带关闭上述 QuantDB 日常更新。下载区仍为 `~/Library/Application Support/QuantMind/cloud-snapshots`，其中 `quantdb/` 保存限定基础数据版本。
 - **忙时不会强行做完整快照**：存在活动任务时退出 75、保留旧版，当前计划等下一次 07:00 再试，没有保证当天一定出新快照的补跑机制。Mac 拉取成功可能只是确认“仍是旧的已校验版本”；检查快照 ID 与日期，不能只看任务已安装或退出码为 0。
 - **Tushare**：云端持续采集并按既有节奏发布固定版本，Mac 每 900 秒校验下载到 `~/Library/Application Support/QuantMind/tushare`。下载区更新 `CURRENT.json` 后，正在进行的研究仍应使用原先固定的 `release_id`。镜像成功不代表所有历史、权限、字段或时间点数据已经齐全；读取和安装说明见 [Tushare 镜像说明](docs/tushare-mirror-installation.md)。
-- **下载与切换输入是两件事**：新下载不自动修改 `.local-dev/SNAPSHOT_ID`、沙盒数据库或研究模板。需要换沙盒基线时先保存本地成果、结束任务并停沙盒，再按恢复流程重建；当前没有一键合并/无损升级两套数据库的入口，不要为了通过 `init` 的检查随手删除旧卷。
+- **完整快照的下载与切换输入是两件事**：完整快照下载不自动修改 `.local-dev/SNAPSHOT_ID`、沙盒数据库或研究模板。需要换沙盒基线时先保存本地成果、结束任务并停沙盒，再按恢复流程重建；当前没有一键合并/无损升级两套数据库的入口，不要为了通过 `init` 的检查随手删除旧卷。
 - **手动刷新**：只拉已发布完整快照用 `python3 scripts/dual_node_snapshot.py pull`；`bash scripts/dual-node.sh snapshot-refresh` 还会在云端创建完整快照，需要协调停写窗口。Mac 离线/休眠时无法拉取，云端作业继续；恢复后再补拉。定时客户端是独立安装副本，修改客户端代码后须按对应安装说明更新，Git 同步不会自动升级它。
 
 ## 交接、合并和发布：按这个顺序完成

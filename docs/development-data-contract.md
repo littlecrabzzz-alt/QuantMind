@@ -101,13 +101,15 @@ Mac 全栈沙盒首次执行 `scripts/local-dev.sh init`：它从 `logs/cloud-sn
 
 ## QuantDB 定期更新与本地下载
 
-复用现有链路：云端 Celery 市场 A 配置每天北京时间 03:00 同步 QuantDB Parquet，再增量 upsert PostgreSQL，并更新 Qlib；显式保存 enabled=true、with_qlib=true。A 股旧独立 beat 调度已移除，不能靠 DAILY_SYNC_ENABLED 判断已开启。任务进度复用管理台 Redis 作业记录；上游错误记为 partial/failed，不宣称全量成功。
+2026-09-11 修正规则：QuantDB 日常更新不能依赖包含全项目业务数据的完整快照。此前仅安装拉取但未应用沙盒，随后完整快照停用，导致本地长期停在 09-04；安装任务或退出码 0 均不能作为数据追平证据。
 
-云端 `quantmind-snapshot.timer` 每天北京时间 07:00 调用现有完整快照脚本，包含 `data/quantdb`、数据库 dump、Qlib 和其他运行数据。无研究任务时才暂停写入者；新增的 Tushare worker 也纳入停写/恢复，以免它的后台开发采集破坏完整快照一致性。这不把 Tushare 当成 QuantDB 替代源。活动任务导致退出 75、磁盘少于 100 GiB 导致失败时，保留旧快照与 systemd 日志，次日再试；不在重启后补跑错过的维护窗口。
+复用 `scripts/dual_node_snapshot.py` 的增量传输、不可变版本、SHA256 和发布校验；`scripts/quantdb_refresh.py` 仅编排 QuantDB Parquet 发布、下载和本地应用。云端保存于 `/root/data/disk/quantmind/quantdb-snapshots`，只发布校验通过的固定版本，不复制 Tushare、数据库卷或研究结果，不停止云端全栈；与 A 股采集共用锁，源文件变化就拒绝发布。100 GiB 云端恢复余量仍保留。
 
-Mac `com.quantmind.snapshot-pull` 每 3600 秒检查云端完整版本。新版本通过 SSH/rsync 续传并逐文件 SHA256 校验，成功才写本地 COMPLETE/VERIFIED 和更新 latest；已验证同版直接跳过传输，失败保留旧 latest。下载区移至 `~/Library/Application Support/QuantMind/cloud-snapshots`，原 `logs/cloud-snapshots` 是指向该目录的软链接，避免 macOS 后台 Documents 权限问题，不增加第二份数据副本。安装客户端只复制现有三份脚本和不含凭据的拓扑配置；代码更新后重新安装，数据拉取不承担代码发布。
+云端现有 A 股任务每天 03:00 更新 Parquet、PG 和 Qlib；错过时间可当日补派，市场队列复用现有 worker，超时失败不无限重投。Mac 原 `com.quantmind.snapshot-pull` 每 3600 秒先执行限定 QuantDB 更新，再检查完整快照；代码变更后必须重装客户端：`python3 scripts/dual_node_snapshot.py install-mac-pull`。手动更新走同一路径 `python3 scripts/quantdb_refresh.py refresh`，不另建守护进程。
 
-快照之间复用未变文件，不自动删除历史；数据库 dump 和变化文件仍会占新增空间，保留至少 100 GiB 云端恢复余量。定时下载不修改 `.local-dev/SNAPSHOT_ID`、沙盒文件或数据库卷，也不从 Mac 回灌。查看/安装命令见部署记录。
+下载至原快照池的 `quantdb/`。沙盒空闲时，核对本地文件相对上次基线是否有修改；冲突则保留双方并失败，不静默覆盖。用 APFS 副本准备新目录、逐文件校验并原子交换，旧目录保存在 `.local-dev/quantdb-before-*`；本地业务库、实验、模型、队列和固定研究输入不被替换，仅向本地行情表补新增日期并更新派生 Qlib。活动任务、未启动后端、断网、失败或冲突须明确报告；下轮重试，不能标记已应用。保留旧版，不自动删历史。
+
+完整数据库基线仍由 `.local-dev/SNAPSHOT_ID` 标识；QuantDB 单独以 `.local-dev/QUANTDB_SYNC.json` 标识 `files_applied` 或 `applied`，只有实际行情表与 Qlib 日期检查通过才记为 `applied`。研究报告记录采用的 QuantDB 版本；运行中固定输入不自动切换。验收必须检查上游/云端/本地实际数据截止日和代表标的值，而非仅文件传完。
 
 
 ## Qlib 构建的内存与发布边界

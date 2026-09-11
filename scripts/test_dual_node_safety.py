@@ -367,7 +367,7 @@ class ScheduledPull(unittest.TestCase):
             (project / ".local-dev").mkdir()
             fixed = project / ".local-dev/SNAPSHOT_ID"
             fixed.write_text("snapshot-fixed")
-            for name in ("scripts/dual_node_snapshot.py", "scripts/dual_node_inventory.py", "scripts/dual_node_sync.py", "deploy/dual-node.env"):
+            for name in ("scripts/dual_node_snapshot.py", "scripts/dual_node_inventory.py", "scripts/dual_node_sync.py", "scripts/quantdb_refresh.py", "deploy/dual-node.env"):
                 path = project / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("fixture")

@@ -167,12 +167,13 @@ def cloud_snapshot():
         print(published)
 
 
-def pull_snapshot(base=None, only_new=False):
+def pull_snapshot(base=None, only_new=False, remote_base="snapshots"):
+    require(remote_base in {"snapshots", "quantdb-snapshots"}, "Invalid snapshot collection")
     ssh = SETTINGS["QM_SSH_TARGET"]
     remote_path = output("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", ssh,
-                         "sudo -n realpath -e " + REMOTE + "/snapshots/latest")
+                         "sudo -n realpath -e " + REMOTE + "/" + remote_base + "/latest")
     path = Path(remote_path)
-    require(str(path.parent) == REMOTE + "/snapshots" and path.name.startswith("snapshot-"), "Invalid snapshot path")
+    require(str(path.parent) == REMOTE + "/" + remote_base and path.name.startswith("snapshot-"), "Invalid snapshot path")
     run("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", ssh, "sudo -n test -f " + remote_path + "/COMPLETE")
     base = base or PROJECT / "logs/cloud-snapshots"
     base.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -234,7 +235,7 @@ def install_mac_pull():
             original.rename(destination)
             original.symlink_to(destination)
     for name in ("scripts/dual_node_snapshot.py", "scripts/dual_node_inventory.py",
-                 "scripts/dual_node_sync.py", "deploy/dual-node.env"):
+                 "scripts/dual_node_sync.py", "scripts/quantdb_refresh.py", "deploy/dual-node.env"):
         target = runtime / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(PROJECT / name, target)
@@ -245,7 +246,7 @@ def install_mac_pull():
     definition = {
         "Label": label,
         "ProgramArguments": [sys.executable, str(runtime / "scripts/dual_node_snapshot.py"),
-                             "pull", "--root", str(destination), "--only-new"],
+                             "pull", "--root", str(destination), "--only-new", "--quantdb-project", str(PROJECT)],
         "WorkingDirectory": str(runtime), "RunAtLoad": True, "StartInterval": 3600,
         "EnvironmentVariables": {"PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"},
         "StandardOutPath": str(logs / "snapshot-pull.out.log"),
@@ -280,6 +281,7 @@ if __name__ == "__main__":
     parser.add_argument("action", choices=("create", "pull", "install-mac-pull"))
     parser.add_argument("--root", type=Path)
     parser.add_argument("--only-new", action="store_true")
+    parser.add_argument("--quantdb-project", type=Path)
     args = parser.parse_args()
     try:
         if args.action == "create":
@@ -287,6 +289,9 @@ if __name__ == "__main__":
         elif args.action == "install-mac-pull":
             install_mac_pull()
         else:
+            if args.quantdb_project:
+                from quantdb_refresh import refresh
+                refresh(args.quantdb_project, args.root / "quantdb")
             pull_snapshot(args.root, args.only_new)
     except BusyError as exc:
         print(str(exc), flush=True)
