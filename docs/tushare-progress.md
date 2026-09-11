@@ -1198,3 +1198,9 @@
 - 从live终态重建基金持仓15、指数日线10、基金份额15共960个任务（745 done、215 empty）、144889行和2665个唯一物理引用（960 object、960 observation、745 Parquet），合计25527089字节。旧a447对照缺失2665项；新76b0在云端和Mac均为2665/2665，manifest元数据和逐文件大小/SHA错误均为0。
 - 主任务使用已安装LaunchAgent的同一ProgramArguments手动运行标准镜像，下载6584个增量文件并完整验证875779项，于05:01:22 CST切换Mac CURRENT。05:00:22的LaunchAgent第229轮因同一镜像锁返回`already_running`，因此不把下载归因于自动轮询。
 - Mac在空Token、socket/DNS阻断下分别读取`fund_portfolio`、`index_daily`和`fund_share`各3行，列数15、17、9，上游调用0。Worker和Beat随后以精确容器启动恢复healthy、restart0、OOM false，普通管线继续。本轮三批现可在本地脱离Tushare读取；完整历史、修订、盘中`known_at`、PIT语义和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fixed-release-76b0-round-20260912.evidence.json`。
+## 2026-09-12 05:32 index_daily 11-13 / index_weight 7-9 exact window
+
+- Beat was stopped first and the in-flight ordinary task drained naturally. Six exact batches then ran serially against fixed release `data-76b031903c08e660d869cb8ef8218dab6cca8bd23cc8811adcf55adbdd8d0898`; no exact batch published or switched `CURRENT.json`.
+- The six batches closed 2,160 HTTP-200 responses in 266.873 seconds (485.624 observed RPM), retaining 590,235 rows. States are 1,842 `sample_ok`, 213 `empty_unverified` and 105 `possibly_truncated`; the latter created 210 pristine pending child tasks.
+- Independent read-only closure verified 6,267 object/observation/Parquet references and 91,464,651 bytes by size and SHA. Worker and Beat were restored exactly; the expired queued tick was naturally discarded and a fresh normal task started.
+- Fixed release inclusion and Mac offline readback remain the next acceptance gates. Empty responses, split descendants, complete history, revisions, known-at/PIT semantics and RRG classification remain explicit gaps.
