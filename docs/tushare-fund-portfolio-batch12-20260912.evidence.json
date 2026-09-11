@@ -1,0 +1,171 @@
+{
+  "archive_files": [
+    {
+      "bytes": 1222,
+      "name": "batch-12-closure.json",
+      "sha256": "3b5bc7d141fb6c83a3ed5e93dc18154edf6e4be47e50d3e62dad299e8492132b"
+    },
+    {
+      "bytes": 217557,
+      "name": "batch-12-manifest.json",
+      "sha256": "62df9a2367ec38ad9ba0ed0a0735212b76131b80363f4269c72d857fd98007ee"
+    },
+    {
+      "bytes": 55638,
+      "name": "batch-12-plan.json",
+      "sha256": "4cea91148d43c4d4ed512d027291e0df66fc44297b38eb064b582afc253dd36b"
+    },
+    {
+      "bytes": 1252,
+      "name": "batch-12-prepare.json",
+      "sha256": "4de111d5978f29b6e119b9e396d2903a7a9484c96398159edead3b6814efe61f"
+    },
+    {
+      "bytes": 55996,
+      "name": "batch-12-receipt.json",
+      "sha256": "fa7fed3636a74ca975a8cf014c40fc1567ab4a443979b5c56b1653aa42d89ddc"
+    }
+  ],
+  "batch": {
+    "archive_dir": "validation/fund-portfolio-batch-20260912",
+    "attempt_statuses": {
+      "empty_unverified": 85,
+      "sample_ok": 155
+    },
+    "attempts_per_task": {
+      "1": 240
+    },
+    "availability_kind": "period_only",
+    "availability_period_max": "2023-06-30",
+    "availability_period_min": "2019-12-31",
+    "closure_id": "0f8e4126b2245e686c78dddea8419cf34238d1261f8cd40340328f0109d82e90",
+    "contract_version": "current_v2",
+    "elapsed_seconds": 62.89,
+    "eligible_jobs_before_freeze": 11848,
+    "eligible_variants_before_freeze": 23696,
+    "http_statuses": {
+      "200": 240
+    },
+    "jobs": 240,
+    "name": "fund_portfolio_batch_12",
+    "observed_rpm": 228.9712,
+    "overlap_with_batches_7_11": {
+      "request_signatures": 0,
+      "task_ids": 0
+    },
+    "receipt_id": "c2138e2c16dc59b4f04107a8b81cde13da04b825c647894df995cfbbd58e5b83",
+    "request_signatures_sha256": "b819d76763514799d0bb48cb91ea26d9cfaa7f7582544f6b544a0e677537e94d",
+    "rows": 18234,
+    "states": {
+      "done": 155,
+      "empty": 85
+    },
+    "task_ids_sha256": "95d3ed9bbc02e16cac995434dd45cbfa667258c40e9b50b52dd35e72e87238e4",
+    "tries": {
+      "1": 240
+    },
+    "uncertain_calls": 0,
+    "unique_funds": 240,
+    "unique_request_signatures": 240,
+    "unique_task_ids": 240,
+    "upstream_calls": 240
+  },
+  "capacity": {
+    "available_bytes": 519394689024,
+    "filesystem_bytes": 845309321216,
+    "gate_passed": true,
+    "hard_reserve_bytes": 107374182400,
+    "headroom_above_reserve_bytes": 412020506624,
+    "used_bytes": 286148251648
+  },
+  "credential_hygiene": {
+    "account_fact_retained": "10100 points now; the 2000-point tranche expires 2026-12-05 and expected total becomes 8100; retain an observable reminder.",
+    "independent_rights_expire": "2027-09-08",
+    "secrets_in_report": false
+  },
+  "frozen_inputs": {
+    "config_sha256": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a",
+    "eligible_request_signatures_sha256": "5a238ee005f313dc398fc1ce219002332740a64b88e08cf21256792e3fc83dbd",
+    "eligible_task_ids_sha256": "388de67f6604c8e324ba893484496876fce1f8e27dc887533e7b0201e3854cb5",
+    "helper_sha256": "4972b99732916a9d351144a019a33a264615b4d1ad3ae1854b38ad0e3bd0b260",
+    "manifest_sha256": "62df9a2367ec38ad9ba0ed0a0735212b76131b80363f4269c72d857fd98007ee",
+    "preparation_source_sha256": "ad996330d3382733143726a213c7946f361d9147904d052567442ab3d87902e6"
+  },
+  "git_head_before_evidence_commit": "49f78bbdd28b1dfea9df6ab6272af08f94993712",
+  "independent_audit": {
+    "archive_regular_files": 5,
+    "cross_batch_overlap_errors": 0,
+    "database_closed": true,
+    "live_attempts": 240,
+    "live_tasks": 240,
+    "passed": true,
+    "physical_references_verified": 635,
+    "shared_lock_released": true
+  },
+  "non_blocking_events": [
+    {
+      "detail": "A host-path execution attempt was rejected because the runner accepts only the configured production-container authority root. The reviewed cloud-compose container path then executed the unchanged frozen manifest.",
+      "stage": "host_execute_root_guard",
+      "status": "rejected_before_lock_credentials_upstream_or_write"
+    },
+    {
+      "detail": "After the no-revoke drain, the remaining queue item was proven to be an expired engine.tasks.tushare_acquire message and the single queue key was deleted before the exact run.",
+      "stage": "expired_queue_cleanup",
+      "status": "deleted_after_exact_validation"
+    }
+  ],
+  "observed_at": "2026-09-11T18:21:51Z",
+  "physical_refs": {
+    "bytes": 3492892,
+    "live_sqlite_and_files_independently_verified": true,
+    "missing": 0,
+    "parquet_size_errors": 0,
+    "references_by_kind": {
+      "object": 240,
+      "observation": 240,
+      "parquet": 155
+    },
+    "sha256_errors": 0,
+    "unique_references": 635
+  },
+  "plan_only": {
+    "authority_access": false,
+    "credential_access": false,
+    "current_switch": false,
+    "publication": false,
+    "upstream_calls": 0,
+    "writes": 0
+  },
+  "rate_gate": {
+    "account_rpm": 500,
+    "api_rpm": 240,
+    "exact_batch_cap": 240,
+    "max_seconds": 90,
+    "passed": true,
+    "rate_policy": "tiered_v1",
+    "rate_review_required": true
+  },
+  "remaining_boundaries": [
+    "Batch 12 is authority-closed but not yet part of a published fixed release or the Mac mirror.",
+    "fund_portfolio is periodic disclosed holdings, not daily PCF or complete holdings.",
+    "Historical revisions, intraday known_at, PIT membership and authoritative ETF-industry mapping remain open."
+  ],
+  "schema_version": 1,
+  "services": {
+    "celery_beat": "healthy",
+    "normal_pipeline_resumed_task_id": "f2c97045-ddde-43e4-80ad-0f9b7166051c",
+    "queue_length_immediately_after_restore": 0,
+    "tushare_worker": "healthy",
+    "worker_oom": false,
+    "worker_restart_count": 0
+  },
+  "source_fixed_release": {
+    "batch_published": false,
+    "current_unchanged": true,
+    "mac_mirror_includes_batch12": false,
+    "manifest_sha256": "b0c60c5371a3daa77c3f0108c84f3cdef2f7ddca78650fd0a3d49ce92f784adb",
+    "next_normal_publish_due_at": "2026-09-12T02:32:21+08:00",
+    "release_id": "data-b0c60c5371a3daa77c3f0108c84f3cdef2f7ddca78650fd0a3d49ce92f784adb"
+  },
+  "status": "post_b0c6_fund_portfolio_batch12_authority_closed"
+}

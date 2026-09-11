@@ -1133,3 +1133,11 @@
 - 五个归档最初落入前一日期目录，按精确文件名移至空的20260912目录后重新完成文件、身份、集合、跨文件和live SQLite复核，没有重写数据。恢复时两条已确认过期的自动采集消息被worker按revoked/expired丢弃；第二次审计排空后Worker与Beat恢复healthy、restart0、OOM false，普通任务已继续。
 - 云盘距100GiB硬线还有412043436032字节；`CURRENT`仍为b0c6，本批尚未发布或同步进Mac固定镜像。完整持仓、每日PCF、历史修订、盘中`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fund-portfolio-batch11-20260912.evidence.json`。
 - 证据提交`90616b97`已推送GitHub master并按Mac源对齐云端工作树；云端HEAD和源码摘要匹配。云端`origin/master`远程跟踪引用因20秒有界fetch超时仍旧，作为非阻塞元数据问题保留，运行代码不受影响。
+
+
+### 2026-09-12 fund_portfolio第12批精确闭环
+
+- 无revoke排空等待普通任务自然结束，精确确认并清理一条已过期的自动采集消息后，从11848个跨epoch、跨合同语义唯一的pristine请求中冻结240项，覆盖240只基金、period边界2019-12-31至2023-06-30。固定版、任务、请求签名、配置、准备器和helper哈希全部冻结，plan-only为0 authority、0凭据、0上游、0写入、0发布。
+- 生产容器62.89秒完成240次HTTP 200：155 done、85 empty、18234行、不确定调用0，吞吐228.971次/分钟，低于该接口保守240 rpm和90秒硬限。独立只读审计确认每项恰有一次attempt，635个唯一物理引用（240 object、240 observation、155 Parquet）、3492892字节逐文件SHA256通过，并与第7至11批任务及请求签名零重叠。
+- 首次宿主机路径执行被authority-root保护在锁、凭据、上游和写入前拒绝；随后使用既有cloud-compose生产挂载和同一冻结清单成功。Worker与Beat恢复healthy、restart0、OOM false，普通任务已继续。
+- 云盘距100GiB硬线还有412020506624字节；`CURRENT`仍为b0c6，第11/12批等待02:32:21 CST后的正常发布和Mac单向镜像。完整持仓、每日PCF、历史修订、盘中`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fund-portfolio-batch12-20260912.evidence.json`。
