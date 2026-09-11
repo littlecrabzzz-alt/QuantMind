@@ -1002,3 +1002,9 @@
 - `0bfd32fe`新增财务exact恢复清单：只从原manifest选择当前仍pending且attempt_count=0的任务，固定来源清单和任务集合SHA；已有attempt的pending默认拒绝或显式排除，执行端在独占锁内、读取凭据或调用上游前再次核对pristine状态。Mac和生产Python3.10各13项专项测试通过，编译和diff check通过；两个现有运行环境均无Ruff，未临时联网安装。
 - 从batch19原清单派生145项income/balance与73项cashflow两个不重叠子清单。前者20.399秒、后者10.228秒完成；合计218次HTTP 200，新增212 done、6 empty，零不确定调用。原batch19现在为353 done、6 empty、1 pending；唯一pending仍是先前cashflow ReadTimeout，保持隔离且未自动重放。
 - 359个终态叶对应359个object、359个observation和353个Parquet，共1071个唯一引用、14250009字节，物理SHA256全部通过。首次闭包断言把合法空响应误按`sample_ok`统计，只读诊断确认实际标签为`empty_unverified`后修正；没有重放或修改authority数据库。Worker与Beat恢复healthy，1071项等待正常固定版发布及Mac镜像。机器证据为`docs/tushare-financial-pit-batch19-recovery-20260911.evidence.json`。
+
+### 2026-09-11 index_daily exact batch 8 at 300-request gray tier
+
+- 下一发布窗口前经无revoke流程排空，冻结300个`index_daily` pristine历史叶，覆盖300个唯一`.CSI`代码、请求范围2026-01-01至2026-09-01；固定版、合格库存、任务、配置、preparer和helper均哈希冻结，plan-only为0调用/0写入。
+- 41.340秒完成300次HTTP 200：266 done、34 empty，保留42624行。300个object、300个observation和266个Parquet共866个唯一引用、8868340字节，逐文件SHA256通过，不确定调用0。Worker与Beat恢复healthy，云盘距100 GiB硬线还有113975836672字节。
+- 常规exact窗口继续保持300请求/90秒；866项等待正常固定版和Mac镜像。完整指数历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-index-daily-batch8-20260911.evidence.json`。
