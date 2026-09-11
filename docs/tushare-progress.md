@@ -887,3 +887,8 @@
 - 正常任务`2aa9e7c8-9edb-4752-a364-2a7149f2708b`用172.032秒完成publish-only，原子生成`data-473bf47cb69cb6848bb90e8361572e116ac9db7d29bf2e347af0b88469ad6bf7`。316391184字节manifest含108110个dataset和807538个文件，并包含retained observations。Mac标准LaunchAgent下载8499个物理文件、完整验证807538项、exit 0后原子切换到同一固定版。
 - `5f796b`后的五个精确批次共1680个任务、4854个唯一引用：1680个object、1680个observation和1494个Parquet，总计57970481字节。authority哈希、manifest元数据、Mac文件大小和Mac SHA256错误均为0。生产镜像在`--network none`、空Token和只读镜像挂载下读取`index_daily`、`fund_daily`、`fund_adj`、`fund_share`及三张财务表各3行，上游调用0。
 - API、Worker和Beat均healthy。云盘可用224113618944字节，距100 GiB硬线还有116739436544字节。本闭包确认指数第4-5批、基金行情第11批、财务第16批和基金份额第9批已可在本地脱离Tushare读取；完整历史、修订、`known_at`、PIT成员、RRG可交易状态和PCF仍未闭合。机器证据为`docs/tushare-fixed-release-473bf-five-batches-20260911.evidence.json`。
+
+### 2026-09-11 fund price exact batch 12
+
+- 固定2012-01-10至2012-10-09的180个共同SSE开市日，`fund_daily`与`fund_adj`各180项；固定版、日历、配置、preparer、helper和360个任务ID全部哈希冻结，plan-only为0调用/0写入。44.271秒完成360次HTTP 200，全部done并保留81121行。
+- 360个object、360个observation和360个Parquet共1080个唯一引用、12239245字节，逐文件SHA256通过；不确定调用0，未发布或切换`CURRENT`。Worker与Beat恢复healthy。云盘可用224086990848字节，距100 GiB硬线还有116712808448字节。1080项等待后续正常固定版和Mac镜像闭环；RRG历史分类/成员`known_at`、修订、可交易状态、PCF和完整生命周期仍保持`blocked_data`。机器证据为`docs/tushare-fund-price-batch12-20260911.evidence.json`。
