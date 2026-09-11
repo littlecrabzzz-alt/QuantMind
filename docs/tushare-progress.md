@@ -911,4 +911,4 @@
 ### 2026-09-11 post-473bf four-batch publication gate
 
 - 基金行情12、财务17、指数6和基金份额10共1440项已在authority闭环，合计1284 done、156 empty、4164个唯一物理引用和46566579字节。只读导出再次逐文件验证SHA256；可重建的详细引用清单为754981字节、SHA256 `2ba7e8182c160cc7349d1c501ad56ec54d008dc3a5064d083e3cbb0e02216fac`，四份持久manifest及任务集合哈希已写入机器证据。
-- `CURRENT`仍为`data-473bf47c…`，正常发布在2026-09-11 17:07:11 CST后到期。Worker和Beat healthy；发布前不再插入精确批次。尚需正常原子发布、Mac完整镜像、4164引用成员与本地SHA复核，以及断网/空Token/只读挂载离线读回，才能把这四批从“权威端已闭环”提升为“本地固定版可用”。机器证据为`docs/tushare-post-473bf-four-batches-publish-gate-20260911.evidence.json`。
+- `CURRENT`仍为`data-473bf47c…`，正常发布在2026-09-11 16:53:51 CST后到期。Worker和Beat healthy；发布前不再插入精确批次。尚需正常原子发布、Mac完整镜像、4164引用成员与本地SHA复核，以及断网/空Token/只读挂载离线读回，才能把这四批从“权威端已闭环”提升为“本地固定版可用”。机器证据为`docs/tushare-post-473bf-four-batches-publish-gate-20260911.evidence.json`。
