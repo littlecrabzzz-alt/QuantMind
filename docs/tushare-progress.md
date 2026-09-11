@@ -1169,3 +1169,10 @@
 - Beat先停、普通任务在Worker warm shutdown中自然完成且未撤销；冻结240个`current_v2`历史叶，与第7至13批任务ID和请求签名均零重叠。生产容器64.977秒完成240次HTTP 200：153 done、87 empty、8615行、不确定调用0，吞吐221.617次/分钟。
 - 独立审计逐项核对job、attempt、result和observation链，并验证633个唯一物理引用、2215848字节的大小与SHA256。Worker和Beat恢复healthy、restart0、OOM false，普通采集继续；云盘距100GiB硬线还有411020533760字节。
 - 首次execute因并行只读审计持共享锁，在凭据、上游和写入前安全退出；锁释放后同一冻结清单成功。`CURRENT`仍为a21e，第14批尚未进入固定发布和Mac镜像。完整持仓、每日PCF、历史修订、盘中`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fund-portfolio-batch14-20260912.evidence.json`。
+
+### 2026-09-12 固定版a447基金持仓13/14本地闭环
+
+- 正常publisher任务`d4ae2b37-1e72-4eed-8eb1-e243f1b06771`以Celery SUCCESS、publish-only和0上游调用，在226.209秒后原子生成`data-a4475b3a…`。366014060字节manifest含118258个唯一dataset、869194个文件并保留observations，独立校验无路径、元数据或内容地址错误。
+- 从不可变observation重建两批480个响应和1235个物理引用（480 object、480 observation、275 Parquet），合计3784023字节；云端逐文件SHA、a447 manifest收录和元数据全部通过。
+- Mac标准LaunchAgent第225轮下载4085个增量文件、完整验证869194个文件，stderr0、exit0并于03:48:35 CST原子切换；独立核验1235个引用缺失0、元数据错误0、物理错误0。生产reader在network none、空Token和只读挂载下读取`fund_portfolio`3行15列，上游0。
+- Worker和Beat保持healthy、restart0、OOM false，普通采集继续；云盘距100GiB硬线还有410330341376字节。两批现可在本地脱离Tushare读取；完整持仓、每日PCF、历史修订、盘中`known_at`、PIT成员和权威ETF行业映射仍未闭合。机器证据为`docs/tushare-fixed-release-a447-fund-portfolio13-14-20260912.evidence.json`。
