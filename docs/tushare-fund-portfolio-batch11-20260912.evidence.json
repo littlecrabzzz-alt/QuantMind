@@ -88,6 +88,16 @@
     "manifest_sha256": "8de1df68494d0812f39bd006621d139e7a24262d699b992dc693e139ee42f406",
     "preparation_sha256": "ad996330d3382733143726a213c7946f361d9147904d052567442ab3d87902e6"
   },
+  "git_deployment": {
+    "cloud_head_after_handoff": "90616b9760ef0ae9fa00d5e5894d1d0c18af55cf",
+    "cloud_origin_fetch": "timed_out_after_20_seconds",
+    "cloud_origin_note": "The cloud working tree is aligned from the reviewed Mac source and runs at the evidence commit. The stale remote-tracking ref is non-authoritative metadata; GitHub master was verified from the Mac push.",
+    "cloud_origin_tracking_ref": "65b8cb098ac16fc5308c00a4942127b69c0eb018",
+    "cloud_source_digest": "f1cd8c11c8e827ade6d31fe2f98baeea73f3619766812155a2038600ccefa181",
+    "evidence_commit": "90616b9760ef0ae9fa00d5e5894d1d0c18af55cf",
+    "mac_head": "90616b9760ef0ae9fa00d5e5894d1d0c18af55cf",
+    "mac_origin_master": "90616b9760ef0ae9fa00d5e5894d1d0c18af55cf"
+  },
   "git_head_before_evidence_commit": "efb0e175",
   "independent_audit": {
     "archive_regular_files": 5,
