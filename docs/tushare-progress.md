@@ -943,3 +943,9 @@
 - 基金行情13、财务18和基金份额11共1080项已在authority闭环：942 done、138 empty，形成3102个唯一引用和31204974字节。只读精确清单逐文件复算SHA256通过；清单562108字节、SHA256 `4454d6ac5983cf5d3b7b5cb9223db6fd4d56d5cf35d161edd0beb719e6c4b1b0`。
 - Mac仍处于`data-79a2e1d0…`。持久验收器的发布前负对照准确报告3102项全部未进入manifest，manifest元数据错误0、本地物理错误0并以exit 2拒绝通过。正常发布在2026-09-11 17:58:23 CST后到期，发布前不再插入精确批次。
 - API、Worker和Beat healthy，云盘距100 GiB硬线仍有115943481344字节。临时导出脚本第一次替换遗漏换行，Python在打开authority数据库前即解析失败；修正并在本地编译后完成只读导出和全量物理哈希验证，没有写authority或调用上游。下一步为正常发布、Mac标准镜像、3102项精确成员与SHA校验，以及断网、空Token、只读挂载的生产镜像读回。机器证据为`docs/tushare-post-79a2-three-batches-publish-gate-20260911.evidence.json`。
+
+### 2026-09-11 post-79a2 three-batch fixed-release closure
+
+- 正常publisher任务`9f913ccc-b455-4491-a4c1-aad7b3fc250b`以Celery SUCCESS、上游请求0完成，174.804秒原子发布`data-8f6c6d8256db0794b65e737aac9a490075d0d17152b05ab76a9af59e369e95f2`；327170247字节manifest含111201个dataset、823920个文件，SHA256与CURRENT一致并包含retained observations。
+- Mac LaunchAgent第191轮下载9003个增量文件，完整验证823920项、stderr 0、exit 0后原子切换。固定版验收器对基金行情13、财务18和基金份额11的3102个唯一引用、31204974字节全部通过：manifest缺失0、元数据错误0、本地物理错误0。
+- 生产镜像在`--network none`、socket/DNS阻断、空Token和只读镜像条件下读取`index_daily`、`fund_daily`、`fund_adj`、`fund_share`及三张财务表各3行，上游调用0。云盘可用222423474176字节，距100 GiB硬线还有115049291776字节；API、Worker和Beat healthy。三批已从“权威端闭环”提升为“本地固定版离线可用”。完整历史、修订、`known_at`、PIT成员、RRG可交易状态和PCF仍未闭合。机器证据为`docs/tushare-fixed-release-8f6-three-batches-20260911.evidence.json`。
