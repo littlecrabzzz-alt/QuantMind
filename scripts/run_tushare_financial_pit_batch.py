@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
-from contextlib import contextmanager, ExitStack
+from contextlib import closing, contextmanager, ExitStack
 import fcntl
 import json
 import os
@@ -140,7 +140,9 @@ def _execute(
     with os.fdopen(descriptor, "a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         database = _regular(root / "pipeline.sqlite", "pipeline database")
-        with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as db:
+        with closing(
+            sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)
+        ) as db:
             if db.execute("PRAGMA user_version").fetchone()[0] != 6:
                 raise ValueError("Authority pipeline schema must already be version 6")
         verified = preparation.verify_manifest(manifest, manifest_sha256)

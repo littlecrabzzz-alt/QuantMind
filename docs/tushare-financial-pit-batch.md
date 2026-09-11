@@ -16,7 +16,7 @@
 
 `prepare_tushare_financial_pit_batch.py` 只读现有 `pipeline.sqlite`。它优先选择三项 API 共同的 pending 股票叶；共同叶不足时，各 API 独立按最新报告期、报表类型和沪深京轮转补足配额，一个 API 暂时不足不会阻塞其余 API。每项最多 120 个，整个批次最多 360 个；它不生成新任务、不读取凭据、不调用上游。
 
-`--epoch` 只接受规划器实际使用的八位日期或字面值 `history`。日期 epoch 用于近期重刷；`history` 用于稳定历史队列。两者沿用同一跨 epoch logical-key 去重，不用任意标签制造重复任务。
+`--epoch` 只接受规划器实际使用的八位日期或字面值 `history`。日期 epoch 用于近期重刷；`history` 用于稳定历史队列。`history` 可以选择同 logical key 仍只是其他日期 epoch `pending` 且从未尝试的叶任务，避免日期 pending 副本把整个历史批次排空；其他 epoch 一旦有过 attempt 或进入非 pending 状态，同 logical key 不再重复入批。日期 epoch 继续在多个未尝试 pending 副本间保留最早日期，并同样避开已尝试或已进入非 pending 状态的历史任务。
 
 ```bash
 python3 scripts/prepare_tushare_financial_pit_batch.py \
@@ -55,4 +55,4 @@ python3 scripts/prepare_tushare_financial_pit_batch.py \
 
 第九组在固定版 `data-d5d918ce4bc2cfd3ef6e58c5caeefa29c7d9f9715cd5b8cd0d03d4d07cab64de` 发布并镜像完成后重新冻结，固定 `002336.SZ` 至 `002455.SZ` 的120个共同股票，共360项，起始状态全部为 `pending/attempts=0`。48.788秒完成360次调用：`income_vip` 114 `done`/6 `empty`，`balancesheet_vip` 116/4，`cashflow_vip` 114/6，批内0个`pending`。清单 SHA256 为 `9bf0c0e42721cc4d360969b7755354eef93ab959372aa5ce901ac60c22bd2cd8`，任务集合 SHA256 为 `e10f001866142f7dc06c38dee60d66542b693bd022d2cc97148996faca30f481`，收据 SHA256 为 `71f6fbf7665c6d6628ac803abfff5ecb51e1b60c9da4b7688ab3d0984976636c`。九批累计固定3,240项、调用3,241次、2,999 `done`、241 `empty`；这些股票均是按代码排序取得的深市样本，只扩大2026年半年报三表闭环，不代表A股横截面、历史版本或PIT完整。
 
-后续准备器改为在最新报告期和报表类型内按沪、深、京轮询选择，某市场不足时再由其他市场补齐；同时按确定性任务ID查询其他epoch的同一logical key，已在其他epoch终态的请求不再进入清单，多个pending副本只保留最早epoch。旧清单仍可plan-only验证。该策略改善横截面代表性和跨日幂等，但仍是尽力平衡，不能把120只样本解释为全市场代表性样本。
+后续准备器改为在最新报告期和报表类型内按沪、深、京轮询选择，某市场不足时再由其他市场补齐；同时按确定性任务ID查询其他epoch的同一logical key，已在其他epoch尝试或进入非pending状态的请求不再进入清单。日期epoch之间的多pending副本仍只保留最早日期；`history` 不再因为未尝试的日期pending副本而得到0调用清单。旧清单仍可plan-only验证。该策略改善横截面代表性和跨日幂等，但仍是尽力平衡，不能把120只样本解释为全市场代表性样本。

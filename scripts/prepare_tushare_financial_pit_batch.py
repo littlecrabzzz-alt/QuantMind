@@ -122,10 +122,18 @@ def _cross_epoch_duplicates(db, candidates, epoch):
         for start in range(0, len(ids), SQLITE_PARAMETER_BATCH):
             batch = ids[start : start + SQLITE_PARAMETER_BATCH]
             placeholders = ",".join("?" for _ in batch)
-            for task_id, state in db.execute(
-                f"SELECT id,state FROM jobs WHERE id IN ({placeholders})", batch
+            for task_id, state, attempted in db.execute(
+                "SELECT j.id,j.state,EXISTS(SELECT 1 FROM attempts a "
+                "WHERE a.job_id=j.id) FROM jobs j WHERE j.id IN ("
+                + placeholders
+                + ")",
+                batch,
             ):
-                if state != "pending" or other_epoch < epoch:
+                if (
+                    attempted
+                    or state != "pending"
+                    or (epoch != "history" and other_epoch < epoch)
+                ):
                     excluded.add(task_ids[task_id])
     return excluded
 

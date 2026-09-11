@@ -238,7 +238,7 @@ class FinancialPitBatchTests(unittest.TestCase):
         self.assertEqual(runner_plan["status"], "plan_only")
         self.assertEqual(runner_plan["verified_jobs"], 2)
 
-    def test_prepare_selects_full_history_batch_and_keeps_cross_epoch_dedup(self):
+    def test_history_uses_date_pending_but_skips_date_terminal_duplicate(self):
         root = self.base / "history-authority"
         pipeline = runner.pipeline_module.Pipeline(root, self.catalog)
         for api in preparation.ALLOWED_APIS:
@@ -251,6 +251,13 @@ class FinancialPitBatchTests(unittest.TestCase):
                 pipeline.enqueue(api, params, priority=45, epoch="history")
                 if number == 0:
                     pipeline.enqueue(api, params, priority=25, epoch="20260910")
+                elif number == 1:
+                    duplicate = pipeline.enqueue(
+                        api, params, priority=25, epoch="20260910"
+                    )
+                    pipeline.db.execute(
+                        "UPDATE jobs SET state='done' WHERE id=?", (duplicate,)
+                    )
         pipeline.db.commit()
         pipeline.close()
 
@@ -262,13 +269,53 @@ class FinancialPitBatchTests(unittest.TestCase):
         )
         self.assertEqual(len(result["records"]), 360)
         self.assertEqual({row["epoch"] for row in result["records"]}, {"history"})
-        self.assertNotIn(
-            "000001.SZ",
-            {row["job"]["params"]["ts_code"] for row in result["records"]},
-        )
+        codes = {row["job"]["params"]["ts_code"] for row in result["records"]}
+        self.assertIn("000001.SZ", codes)
+        self.assertNotIn("000002.SZ", codes)
+        self.assertIn("000121.SZ", codes)
         plan = runner.run_batch(manifest, preparation.sha(manifest))
         self.assertEqual(plan["status"], "plan_only")
         self.assertEqual(plan["verified_jobs"], 360)
+
+    def test_date_epoch_skips_retriable_history_task_after_an_attempt(self):
+        root = self.base / "history-attempt-authority"
+        pipeline = runner.pipeline_module.Pipeline(root, self.catalog)
+        for api in preparation.ALLOWED_APIS:
+            duplicate_params = {
+                "ts_code": "000001.SZ",
+                "period": "20260630",
+                "report_type": "1",
+            }
+            pipeline.enqueue(api, duplicate_params, priority=25, epoch="20260910")
+            history_task = pipeline.enqueue(
+                api, duplicate_params, priority=45, epoch="history"
+            )
+            pipeline.db.execute(
+                "UPDATE jobs SET tries=1 WHERE id=?", (history_task,)
+            )
+            pipeline.db.execute(
+                "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+                (history_task, 1, "{}"),
+            )
+            pipeline.enqueue(
+                api,
+                {
+                    "ts_code": "000002.SZ",
+                    "period": "20260630",
+                    "report_type": "1",
+                },
+                priority=25,
+                epoch="20260910",
+            )
+        pipeline.db.commit()
+        pipeline.close()
+
+        manifest = self.base / "date-after-history-attempt.json"
+        result = preparation.prepare(root, manifest, "20260910", jobs_per_api=1)
+        self.assertEqual(
+            {row["job"]["params"]["ts_code"] for row in result["records"]},
+            {"000002.SZ"},
+        )
 
     def test_prepare_rejects_unknown_epoch_labels(self):
         for epoch in ("recent", "HISTORY", "2026091", "202609100"):
