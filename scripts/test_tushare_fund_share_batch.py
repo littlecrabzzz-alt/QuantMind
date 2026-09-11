@@ -72,6 +72,78 @@ class FundShareBatchTests(unittest.TestCase):
         self.manifest_sha = preparation.sha(self.manifest)
         self.verified = preparation.verify_manifest(self.manifest, self.manifest_sha)
 
+    def assert_execute_rejected_before_secret(self, message):
+        with (
+            patch.object(runner.pipeline_module, "ROOT", self.root),
+            patch.object(runner.pipeline_module, "authority", return_value=None),
+            patch.object(runner.pipeline_module, "get_secret") as secret,
+            self.assertRaisesRegex(ValueError, message),
+        ):
+            runner.run_batch(
+                self.manifest,
+                self.manifest_sha,
+                expected_task_ids_sha256=self.verified["all_task_ids_sha256"],
+                expected_config_sha256=runner.sha(self.config_path),
+                expected_helper_sha256=runner.helper_sha256(),
+                expected_preparation_sha256=runner.preparation_sha256(),
+                root=self.root,
+                execute=True,
+            )
+        secret.assert_not_called()
+
+    def history_record(self, market, day):
+        with closing(sqlite3.connect(self.root / "pipeline.sqlite")) as db:
+            row = db.execute(
+                "SELECT id,logical_key,job FROM jobs WHERE epoch=? AND "
+                "json_extract(job,'$.api_name')=? AND "
+                "json_extract(job,'$.params.market')=? AND "
+                "json_extract(job,'$.params.trade_date')=?",
+                (preparation.EPOCH, preparation.API, market, day),
+            ).fetchone()
+        return {"task_id": row[0], "logical_key": row[1], "job": json.loads(row[2])}
+
+    def add_attempt(self, task_id):
+        with closing(sqlite3.connect(self.root / "pipeline.sqlite")) as db:
+            with db:
+                db.execute(
+                    "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+                    (task_id, 1, "{}"),
+                )
+
+    def add_semantic_variant(
+        self, record, *, epoch, state="pending", tries=0, attempted=False
+    ):
+        job = json.loads(json.dumps(record["job"]))
+        job["required_fields"].append("fd_share")
+        logical_key = preparation.digest(preparation.json_bytes(job))
+        task_id = preparation.digest(preparation.json_bytes([logical_key, epoch]))
+        with closing(sqlite3.connect(self.root / "pipeline.sqlite")) as db:
+            with db:
+                db.execute(
+                    "INSERT INTO jobs(id,logical_key,epoch,job,priority,state,"
+                    "tries,retry_after,result,expanded,group_name) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        task_id,
+                        logical_key,
+                        epoch,
+                        json.dumps(job, sort_keys=True),
+                        45,
+                        state,
+                        tries,
+                        0,
+                        "{}" if state != "pending" else None,
+                        0,
+                        preparation.GROUP,
+                    ),
+                )
+                if attempted:
+                    db.execute(
+                        "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+                        (task_id, 1, "{}"),
+                    )
+        return task_id
+
     def test_prepare_is_read_only_recent_first_market_fair_and_history_only(self):
         before = (self.root / "pipeline.sqlite").read_bytes()
         records = self.verified["records"]
@@ -80,7 +152,9 @@ class FundShareBatchTests(unittest.TestCase):
             {item["trade_date"] for item in params},
             {"20260902", "20260903", "20260904"},
         )
-        self.assertEqual(self.verified["source"]["pending_jobs"], 8)
+        self.assertEqual(self.verified["source"]["eligible_jobs"], 8)
+        self.assertEqual(self.verified["source"]["tries"], 0)
+        self.assertEqual(self.verified["source"]["attempts"], 0)
         self.assertEqual(self.verified["selected"]["market_counts"], {"SH": 3, "SZ": 3})
         self.assertEqual({record["epoch"] for record in records}, {preparation.EPOCH})
         second = self.base / "second.json"
@@ -116,9 +190,111 @@ class FundShareBatchTests(unittest.TestCase):
 
     def test_previous_oldest_first_manifest_remains_verifiable(self):
         value = json.loads(self.manifest.read_bytes())
-        value["source"]["selection"] = "oldest_pending_rounds_interleaved_by_market"
+        value["source"] = {
+            "api_name": preparation.API,
+            "group_name": preparation.GROUP,
+            "epoch": preparation.EPOCH,
+            "state": "pending",
+            "selection": "oldest_pending_rounds_interleaved_by_market",
+            "pending_jobs": value["source"]["eligible_jobs"],
+        }
         self.manifest.write_bytes(runner.json_bytes(value))
         preparation.verify_manifest(self.manifest, preparation.sha(self.manifest))
+        runner._execution_preparation(self.root).verify_manifest(
+            self.manifest, preparation.sha(self.manifest)
+        )
+
+    def test_prepare_excludes_attempted_and_cross_epoch_terminal_semantics(self):
+        attempted = self.history_record("SH", "20260904")
+        terminal_peer = self.history_record("SZ", "20260904")
+        attempted_peer = self.history_record("SZ", "20260903")
+        tried = self.history_record("SH", "20260903")
+        self.add_attempt(attempted["task_id"])
+        self.add_semantic_variant(
+            terminal_peer, epoch="20260910", state="done", tries=1
+        )
+        self.add_semantic_variant(
+            attempted_peer, epoch="20260910", attempted=True
+        )
+        with closing(sqlite3.connect(self.root / "pipeline.sqlite")) as db:
+            with db:
+                db.execute(
+                    "UPDATE jobs SET tries=1 WHERE id=?", (tried["task_id"],)
+                )
+        output = self.base / "pristine.json"
+        result = preparation.prepare(self.root, output, jobs=4)
+        selected = {record["task_id"] for record in result["records"]}
+        self.assertNotIn(attempted["task_id"], selected)
+        self.assertNotIn(tried["task_id"], selected)
+        self.assertEqual(result["source"]["eligible_jobs"], 4)
+        with closing(sqlite3.connect(self.root / "pipeline.sqlite")) as db:
+            for record in result["records"]:
+                self.assertEqual(
+                    db.execute(
+                        "SELECT state,tries,(SELECT COUNT(*) FROM attempts "
+                        "WHERE job_id=jobs.id) FROM jobs WHERE id=?",
+                        (record["task_id"],),
+                    ).fetchone(),
+                    ("pending", 0, 0),
+                )
+            self.assertFalse(
+                any(
+                    record["logical_key"] == terminal_peer["logical_key"]
+                    for record in result["records"]
+                )
+            )
+            self.assertFalse(
+                any(
+                    record["logical_key"] == attempted_peer["logical_key"]
+                    for record in result["records"]
+                )
+            )
+
+    def test_manifest_rejects_weakened_pristine_contract(self):
+        original = json.loads(self.manifest.read_bytes())
+        for key, weakened in (("attempts", 1), ("attempts", False), ("tries", False)):
+            with self.subTest(key=key, weakened=weakened):
+                value = json.loads(json.dumps(original))
+                value["source"][key] = weakened
+                path = self.base / f"weakened-{key}-{weakened}.json"
+                path.write_bytes(runner.json_bytes(value))
+                with self.assertRaisesRegex(ValueError, "Invalid batch source"):
+                    preparation.verify_manifest(path, preparation.sha(path))
+
+    def test_prepare_blocks_same_epoch_terminal_semantic_variant(self):
+        record = self.verified["records"][0]
+        self.add_semantic_variant(
+            record, epoch=preparation.EPOCH, state="done", tries=1
+        )
+        output = self.base / "same-epoch-terminal.json"
+        result = preparation.prepare(self.root, output, jobs=6)
+        self.assertFalse(
+            any(
+                preparation._request_signature(item["job"])
+                == preparation._request_signature(record["job"])
+                for item in result["records"]
+            )
+        )
+
+    def test_prepare_selects_one_same_epoch_pristine_semantic_variant(self):
+        record = self.verified["records"][0]
+        self.add_semantic_variant(record, epoch=preparation.EPOCH)
+        output = self.base / "same-epoch-pristine.json"
+        result = preparation.prepare(self.root, output, jobs=6)
+        signatures = [
+            preparation._request_signature(item["job"]) for item in result["records"]
+        ]
+        self.assertEqual(len(signatures), len(set(signatures)))
+        target_signature = preparation._request_signature(record["job"])
+        self.assertEqual(
+            [
+                item["task_id"]
+                for item in result["records"]
+                if preparation._request_signature(item["job"]) == target_signature
+            ],
+            [record["task_id"]],
+        )
+        self.assertEqual(result["source"]["eligible_jobs"], 8)
 
     def test_execute_is_exact_bounded_hash_pinned_and_does_not_publish(self):
         calls = []
@@ -236,6 +412,23 @@ class FundShareBatchTests(unittest.TestCase):
                     execute=True,
                 )
         secret.assert_not_called()
+
+    def test_execute_rejects_attempt_added_after_manifest_freeze(self):
+        task_id = self.verified["records"][0]["task_id"]
+        self.add_attempt(task_id)
+        self.assert_execute_rejected_before_secret("no longer pristine")
+
+    def test_execute_rejects_cross_epoch_peer_changed_after_manifest_freeze(self):
+        record = self.verified["records"][0]
+        self.add_semantic_variant(record, epoch="20260910", attempted=True)
+        self.assert_execute_rejected_before_secret("semantic peer")
+
+    def test_execute_rejects_same_epoch_terminal_semantic_peer(self):
+        record = self.verified["records"][0]
+        self.add_semantic_variant(
+            record, epoch=preparation.EPOCH, state="done", tries=1
+        )
+        self.assert_execute_rejected_before_secret("semantic peer")
 
 
 if __name__ == "__main__":
