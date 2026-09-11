@@ -1068,3 +1068,9 @@
 - 45.939秒完成360次HTTP 200：252 done、108 empty、72080行、不确定调用0，窗口吞吐470.19次/分钟，处于账户500次/分钟和90秒硬截止内。360个object、360个observation和252个Parquet共972个唯一引用、7121596字节，逐文件SHA256通过。
 - 首次闭包误留上一批300次断言，在数据库和归档访问前拒绝；修正为360后仅验证既有结果，没有重跑或改写authority。Worker与Beat在`e769f66c…`镜像上healthy，云盘距100 GiB硬线还有112487546880字节，`CURRENT`仍为eef6。
 - 连续干净的300和360请求窗口支持常规exact从临时300项恢复到360项，同时保留账户500 rpm、API低限覆盖、90秒截止、日总量和权限拒绝门。972项等待下一正常固定版和Mac镜像；完整份额历史、修订、`known_at`和PIT仍未闭合。机器证据为`docs/tushare-fund-share-batch14-20260911.evidence.json`。
+
+### 2026-09-11 固定版eef6后基金份额13/14发布闸门
+
+- 两批共660个终态任务：455 done、205 empty。无revoke排空后，独占锁、query-only导出器逐文件复算SHA，形成1775个唯一引用（660 object、660 observation、455 Parquet）、12225439字节；库存320162字节，SHA256为`7c7e91138926186566fad96f147950fc482f5f745b1cd210a1dd2cab7bc72fab`。
+- Mac仍在eef6，持久验收器按预期exit 2：1775项全部不在旧manifest中，元数据错误0、本地物理错误0。首次包装脚本使用zsh只读变量`status`导致退出码记录失败，改用`verify_rc`后通过预期负对照；另一次只读容量诊断使用相对SQLite URI而在打开数据库前失败，改用绝对URI完成。两者均未修改数据。
+- Worker与Beat恢复healthy，云盘距100 GiB硬线还有112483012608字节。正常publisher在2026-09-11 22:19:26 CST后到期；下一步为正常发布、Mac固定镜像、1775项正向校验及禁网空Token只读验收。机器证据为`docs/tushare-post-eef6-fund-share13-14-publish-gate-20260911.evidence.json`。
