@@ -108,6 +108,25 @@ class DiscoveryTiming(unittest.TestCase):
         self.assertEqual(actual["stocks"], ["000001.SH", "000001.SZ"])
         self.assertEqual(self.p.identifier_timing["bypassed"], 2)
 
+    def test_request_aware_same_body_preserves_observation_variants(self):
+        sha = self.body(["123039.SZ"])
+        observations = self.root / "observations"
+        observations.mkdir()
+        for kind in ("STK", "ETF"):
+            name = kind.lower() + ".json"
+            (observations / name).write_bytes(
+                module.json_bytes({"request": {"params": {"ts_type": kind}}})
+            )
+            self.result("stk_auction", sha, observation=name)
+
+        actual = self.p.identifiers()
+        self.assertEqual(actual["realtime_stocks"], ["123039.SZ"])
+        self.assertEqual(actual["realtime_etfs"], ["123039.SZ"])
+        self.assertEqual(
+            self.p.identifier_timing,
+            {"results": 2, "duplicate_bodies": 0, "bypassed": 2, "body_reads": 2},
+        )
+
     def test_no_cross_call_cache_and_old_history_retained(self):
         old = self.body(["T600018.SH"])
         self.result("stock_basic", old)
@@ -120,6 +139,27 @@ class DiscoveryTiming(unittest.TestCase):
         (self.root / "objects" / (old + ".json")).unlink()
         with self.assertRaises(FileNotFoundError):
             self.p.identifiers()
+
+    def test_exact_job_attempt_duplicate_keeps_union_metrics(self):
+        sha = self.body(["600000.SH"])
+        saved = {
+            "api_name": "stock_basic",
+            "object_sha256": sha,
+            "status": "sample_ok",
+            "observation": "same.json",
+        }
+        raw = json.dumps(saved)
+        job_id = self.p.enqueue("stock_basic", {"list_status": "L"})
+        self.p.db.execute("UPDATE jobs SET result=? WHERE id=?", (raw, job_id))
+        self.p.db.execute("INSERT INTO attempts VALUES(?,?,?)", (job_id, 1, raw))
+        self.p.db.commit()
+
+        actual = self.p.identifiers()
+        self.assertEqual(actual["stocks"], ["600000.SH"])
+        self.assertEqual(
+            self.p.identifier_timing,
+            {"results": 1, "duplicate_bodies": 0, "bypassed": 0, "body_reads": 1},
+        )
 
     def test_missing_duplicate_file_not_hidden_and_errors_do_not_require_body(self):
         sha = self.body(["600000.SH"])
@@ -138,6 +178,33 @@ class DiscoveryTiming(unittest.TestCase):
         self.p.db.execute("DELETE FROM attempts")
         self.result("stock_basic", "0" * 64, "permission_denied")
         self.assertEqual(self.p.identifiers()["stocks"], [])
+
+    def test_replaced_duplicate_object_is_re_read(self):
+        sha = self.body(["600000.SH"])
+        self.result("stock_basic", sha)
+        self.result("stock_basic", sha)
+        replacement = module.json_bytes(
+            {"data": {"fields": ["ts_code", "value"], "items": [["000001.SZ", 1]]}}
+        )
+        path = self.root / "objects" / (sha + ".json")
+        original = self.p.records
+        calls = 0
+
+        def replacing(saved, *, fields=None):
+            nonlocal calls
+            rows = original(saved, fields=fields)
+            calls += 1
+            if calls == 1:
+                temporary = path.with_suffix(".replacement")
+                temporary.write_bytes(replacement)
+                temporary.replace(path)
+            return rows
+
+        with patch.object(self.p, "records", side_effect=replacing):
+            with self.assertRaisesRegex(
+                ValueError, "Identifier object changed during discovery"
+            ):
+                self.p.identifiers()
 
     def test_duplicate_wide_body_readcount_benchmark(self):
         data = module.json_bytes(

@@ -1272,26 +1272,60 @@ class Pipeline:
             source_apis = STOCK_IDENTIFIER_SOURCE_APIS
         else:
             raise ValueError("Unsupported identifier source projection")
-        placeholders = ",".join("?" for _ in source_apis)
-        seen = set()
+        # Body-only discovery depends on these four small result keys. Requests
+        # whose observation changes meaning keep the complete legacy traversal.
+        request_aware_apis = tuple(
+            api for api in source_apis
+            if api in ("ths_hot", "dc_hot")
+            or bool(contract_for(api).get("request_identity_fields"))
+        )
+        body_only_apis = tuple(
+            api for api in source_apis if api not in request_aware_apis
+        )
         discovery = {"results": 0, "duplicate_bodies": 0, "bypassed": 0, "body_reads": 0}
         self.identifier_timing = discovery
-        for row in self.db.execute(
-            "SELECT result FROM jobs WHERE result IS NOT NULL AND json_extract(job,'$.api_name') IN ("
-            + placeholders
-            + ") UNION SELECT result FROM attempts WHERE json_extract(result,'$.api_name') IN ("
-            + placeholders
-            + ")",
-            source_apis + source_apis,
-        ):
-            saved = json.loads(row[0])
-            discovery["results"] += 1
+
+        def evidence():
+            if body_only_apis:
+                placeholders = ",".join("?" for _ in body_only_apis)
+                query = (
+                    "WITH evidence(result) AS ("
+                    "SELECT result FROM jobs WHERE result IS NOT NULL "
+                    "AND json_extract(job,'$.api_name') IN (" + placeholders + ") "
+                    "UNION ALL SELECT result FROM attempts "
+                    "WHERE json_extract(result,'$.api_name') IN (" + placeholders + ")) "
+                    "SELECT json_extract(result,'$.api_name') AS api_name,"
+                    "json_extract(result,'$.object_sha256') AS object_sha256,"
+                    "json_type(result,'$.object_sha256') AS object_sha256_type,"
+                    "json_extract(result,'$.status') AS status,"
+                    "json_extract(result,'$.response_format') AS response_format,"
+                    "COUNT(DISTINCT result) AS occurrences FROM evidence GROUP BY 1,2,3,4,5"
+                )
+                for row in self.db.execute(query, body_only_apis + body_only_apis):
+                    saved = {
+                        "api_name": row["api_name"],
+                        "status": row["status"],
+                        "response_format": row["response_format"],
+                    }
+                    if row["object_sha256_type"] is not None:
+                        saved["object_sha256"] = row["object_sha256"]
+                    yield saved, row["occurrences"], False
+            if request_aware_apis:
+                placeholders = ",".join("?" for _ in request_aware_apis)
+                for row in self.db.execute(
+                    "SELECT result FROM jobs WHERE result IS NOT NULL "
+                    "AND json_extract(job,'$.api_name') IN (" + placeholders + ") "
+                    "UNION SELECT result FROM attempts "
+                    "WHERE json_extract(result,'$.api_name') IN (" + placeholders + ")",
+                    request_aware_apis + request_aware_apis,
+                ):
+                    yield json.loads(row[0]), 1, True
+
+        for saved, occurrences, bypass in evidence():
+            if type(occurrences) is not int or occurrences < 1:
+                raise ValueError("Invalid identifier evidence count")
+            discovery["results"] += occurrences
             api, sha = saved.get("api_name"), saved.get("object_sha256")
-            # Request-aware discovery must opt in separately. Current hot-list
-            # market labels live in immutable requests, not necessarily the body.
-            bypass = api in ("ths_hot", "dc_hot") or bool(
-                contract_for(api).get("request_identity_fields")
-            )
             eligible = (
                 sha
                 and saved.get("status")
@@ -1304,25 +1338,21 @@ class Pipeline:
                 )
                 and saved.get("response_format") != "non_json"
             )
+            before_identity = None
             if eligible and not bypass:
                 stat = (self.root / "objects" / (sha + ".json")).stat()
-                key = (
-                    api,
-                    sha,
-                    saved.get("status"),
-                    saved.get("response_format"),
+                before_identity = (
                     stat.st_dev,
                     stat.st_ino,
                     stat.st_size,
                     stat.st_mtime_ns,
                     stat.st_ctime_ns,
                 )
-                if key in seen:
-                    discovery["duplicate_bodies"] += 1
-                    continue
-                seen.add(key)
-            discovery["bypassed"] += int(bypass)
+            discovery["bypassed"] += occurrences if bypass else 0
             discovery["body_reads"] += int(bool(eligible))
+            if not eligible:
+                for _ in range(occurrences - 1):
+                    self.records(saved, fields=discovery_fields)
             realtime_params = {}
             if api == "stk_auction":
                 observed = json.loads((self.root / "observations" / saved["observation"]).read_bytes())
@@ -1434,6 +1464,20 @@ class Pipeline:
                     result[families[saved["api_name"]]].add(code)
                     if saved["api_name"] == "etf_basic":
                         result["etfs"].add(code)
+            if before_identity is not None:
+                # One stable read replaces repeated stats. Mutation or deletion
+                # during the read is corruption, so fail instead of hiding it.
+                stat = (self.root / "objects" / (sha + ".json")).stat()
+                after_identity = (
+                    stat.st_dev,
+                    stat.st_ino,
+                    stat.st_size,
+                    stat.st_mtime_ns,
+                    stat.st_ctime_ns,
+                )
+                if before_identity != after_identity:
+                    raise ValueError("Identifier object changed during discovery")
+                discovery["duplicate_bodies"] += occurrences - 1
         # Retain historical/T stock identities and securities discovered in any
         # saved event response, including saturated attempts and retired codes.
         result["trading_event_securities"].update(result["stocks"])
