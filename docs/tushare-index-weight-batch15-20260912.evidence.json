@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "status": "index_weight_batch_15_exact_execution_closed_waiting_fixed_release",
+  "observed_at": "2026-09-12T13:13:00+08:00",
+  "batch": {
+    "api_name": "index_weight",
+    "batch": 15,
+    "jobs": 360,
+    "indexes": 212,
+    "suffix_counts": {
+      "CSI": 124,
+      "SH": 236
+    },
+    "request_start_min": "20130501",
+    "request_end_max": "20251231",
+    "upstream_calls": 360,
+    "http_statuses": {
+      "200": 360
+    },
+    "elapsed_seconds": 45.5,
+    "observed_rpm": 474.725,
+    "states": {
+      "done": 288,
+      "empty": 39,
+      "split_pending": 33
+    },
+    "statuses": {
+      "sample_ok": 288,
+      "empty_unverified": 39,
+      "possibly_truncated": 33
+    },
+    "rows": 106865
+  },
+  "splits": {
+    "parents": 33,
+    "children": 66,
+    "children_pristine_pending": true,
+    "same_index_and_exact_date_bisection": true,
+    "historical_overlap": {
+      "task_ids": 0,
+      "logical_keys": 0,
+      "requests": 0
+    },
+    "child_task_ids_sha256": "f17c801e422492bc89a4112269bdfd41dcad21e09e9edb3ed4a0850a03a5ecf1",
+    "child_logical_keys_sha256": "25c7ae98ad282e19b3a88702e8ad004fd097425b161b6321397701e2430bbe01",
+    "child_request_signatures_sha256": "473977bfa8d87fb82af506b772f2f9ed63ec84949fe990b5b18cc5bb1006bc46"
+  },
+  "pins": {
+    "release_id_at_prepare": "data-385ae0c51e70c3615059de7bb87535e4fc0c616c996ee9284df108c7dfa36a6f",
+    "release_manifest_sha256": "385ae0c51e70c3615059de7bb87535e4fc0c616c996ee9284df108c7dfa36a6f",
+    "config_sha256": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a",
+    "preparation_sha256": "a98093c6a4c7fb0f3bcde084f232fb1e8556a45cc384c3883a292bf265dce1fe",
+    "helper_sha256": "15cbd291f304558fa673298439e6298c8ceff20a864f6570e1820ec481e71299",
+    "manifest_sha256": "9957e0d51faf9ee93885df8ba6310a92b4faddc2ef1980b0d60aae8dc8510e9c",
+    "prepare_sha256": "8aa4062f230955cf83c8e57edc1542c93a71cc57a1ba4b6a547993efbfa40878",
+    "plan_sha256": "5a297791d2a1fefb8aa61575e0bfddaf8622dc9c72fa67bc2c4923f86fcc3233",
+    "receipt_sha256": "3c8bffe62e469d8303c260870586a28883fba71ffdcc465c6a50437e34d17297",
+    "receipt_id": "0eaec0e8ee00cf927e3b5cf2f2662ef7418eca21ef4d620d4b1acc97370a44ac",
+    "closure_sha256": "d58c153f2b6dbc1272c7a54c1696491344ceafb7e4bc3016f98905d106b1339b",
+    "history_inventory_sha256": "52933af0c3502586dbdffeef039795f8a2500cb1d9f54709a0145ea8622bb44e",
+    "descendant_inventory_sha256": "75e8f1cf5be4ef9f8ce632424421b215001af064ac81965eb6a724654446d144"
+  },
+  "archive": {
+    "authority_path": "validation/index-weight-batch-20260912/batch-15-*",
+    "artifacts": {
+      "manifest": "9957e0d51faf9ee93885df8ba6310a92b4faddc2ef1980b0d60aae8dc8510e9c",
+      "prepare": "8aa4062f230955cf83c8e57edc1542c93a71cc57a1ba4b6a547993efbfa40878",
+      "plan": "5a297791d2a1fefb8aa61575e0bfddaf8622dc9c72fa67bc2c4923f86fcc3233",
+      "receipt": "3c8bffe62e469d8303c260870586a28883fba71ffdcc465c6a50437e34d17297",
+      "closure": "d58c153f2b6dbc1272c7a54c1696491344ceafb7e4bc3016f98905d106b1339b"
+    },
+    "physical": {
+      "objects": {
+        "unique": 360,
+        "bytes": 4894492,
+        "sha256_verified": true
+      },
+      "observations": {
+        "unique": 360,
+        "bytes": 311417,
+        "sha256_verified": true
+      },
+      "parquet": {
+        "unique": 321,
+        "bytes": 6268849,
+        "sha256_verified": true
+      },
+      "total_unique_references": 1041,
+      "total_bytes": 11474758,
+      "errors": 0
+    }
+  },
+  "capacity": {
+    "filesystem_size": "788G",
+    "used": "437G",
+    "available": "314G",
+    "use_percent": 59
+  },
+  "services_after_restore": {
+    "worker": "healthy",
+    "document_worker": "healthy",
+    "beat": "healthy",
+    "restart_count": 0,
+    "oom": false,
+    "normal_pipeline_resumed": true,
+    "fresh_normal_task_id": "c1970c83-e3df-4d4f-ba6a-3f4480ac515a"
+  },
+  "operational_notes": [
+    "Beat stopped first. Normal task 18063e04 completed naturally in 249.374 seconds before worker exit; no revoke or kill occurred.",
+    "The first prepare operator command failed because /usr/bin/time is absent in the production image. The preparer never started, no authority or upstream access occurred, and its zero-byte temporary stdout was removed.",
+    "Plan-only confirmed zero authority, credential, upstream, write and publish access.",
+    "The exact execution did not publish or switch CURRENT. Beat restart dispatched the next normal acquisition task."
+  ],
+  "boundary": {
+    "current_release_switched": false,
+    "release_published": false,
+    "statement": "This batch proves retained responses and exact split children for its selected monthly requests. Fixed-release inclusion, Mac mirror availability, empty-result confirmation, complete history, revisions, known_at/PIT semantics and RRG industry mapping remain open."
+  },
+  "credential_hygiene": {
+    "secrets_in_git_or_report": false
+  }
+}
