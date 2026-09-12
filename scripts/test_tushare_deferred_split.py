@@ -121,12 +121,14 @@ class DeferredSplit(unittest.TestCase):
         self.p.db.commit()
         self.reopen()
 
-        def slow_discovery():
+        def slow_discovery(*, _source_apis=None):
+            self.assertEqual(_source_apis, module.STOCK_IDENTIFIER_SOURCE_APIS)
             self.now += 71
             return {"stocks": ["600036.SH", "000001.SZ"]}
 
         with patch.object(self.p, "identifiers", side_effect=slow_discovery):
             resumed = self.run_once(
+                requests=0,
                 respond=lambda r: self.fail("resumed parent must not call HTTP")
             )
         self.assertEqual(resumed["requests"], 0)
@@ -184,7 +186,7 @@ class DeferredSplit(unittest.TestCase):
         with patch.object(
             self.p, "identifiers", return_value={"stocks": ["600036.SH"]}
         ):
-            one = self.run_once(respond=lambda r: self.fail("no HTTP"))
+            one = self.run_once(requests=0, respond=lambda r: self.fail("no HTTP"))
             self.assertEqual(one["partition_work"]["job_id"], first["id"])
             self.assertIn(
                 "partition_deferred", json.loads(self.stored(second)["result"])
@@ -193,13 +195,69 @@ class DeferredSplit(unittest.TestCase):
             with patch.object(
                 self.p, "identifiers", return_value={"stocks": ["600036.SH"]}
             ):
-                two = self.run_once(respond=lambda r: self.fail("no HTTP"))
+                two = self.run_once(requests=0, respond=lambda r: self.fail("no HTTP"))
         self.assertEqual(two["partition_work"]["job_id"], second["id"])
         self.assertEqual(len(self.attempts()), 2)
         with patch.object(
             self.p, "identifiers", side_effect=AssertionError("no repeated fanout")
         ):
             self.run_once(requests=0, respond=lambda r: self.fail("no HTTP"))
+
+    def test_fast_stock_projection_uses_remaining_deadline_for_acquisition(self):
+        parent, _ = self.parent()
+        self.run_once()
+        parent_attempt = self.attempts()
+        self.calls.clear()
+        with patch.object(
+            self.p, "identifiers", return_value={"stocks": ["000001.SZ"]}
+        ) as discovery:
+            report = self.run_once(requests=1)
+        self.assertEqual(report["requests"], 1)
+        self.assertEqual(report["partition_work"]["discovery_family"], "stocks")
+        discovery.assert_called_once_with(
+            _source_apis=module.STOCK_IDENTIFIER_SOURCE_APIS
+        )
+        self.assertEqual(len(self.attempts()), len(parent_attempt) + 1)
+        self.assertTrue(self.calls)
+        self.assertTrue(all("ts_code" in params for params in self.calls))
+        self.assertNotIn({"trade_date": "20260904"}, self.calls)
+        self.assertEqual(self.stored(parent)["tries"], 1)
+
+    def test_stock_projection_overrun_does_not_dispatch_after_deadline(self):
+        self.parent()
+        self.run_once()
+        self.calls.clear()
+
+        def slow(*, _source_apis=None):
+            self.assertEqual(_source_apis, module.STOCK_IDENTIFIER_SOURCE_APIS)
+            self.now += 91
+            return {"stocks": ["000001.SZ"]}
+
+        with patch.object(self.p, "identifiers", side_effect=slow):
+            report = self.run_once(requests=1)
+        self.assertEqual(report["requests"], 0)
+        self.assertGreater(report["elapsed_seconds"], 90)
+        self.assertEqual(self.calls, [])
+        self.assertEqual(report["partition_work"]["discovery_family"], "stocks")
+
+    def test_nonstock_partition_keeps_full_discovery_isolation(self):
+        with (
+            patch.object(
+                self.p,
+                "resume_identifier_split",
+                return_value={
+                    "status": "partitioned",
+                    "discovery_family": "funds",
+                    "upstream_calls": 0,
+                },
+            ),
+            patch.object(
+                self.p, "next_job", side_effect=AssertionError("must stay isolated")
+            ),
+        ):
+            report = self.run_once(requests=1, respond=lambda r: self.fail("no HTTP"))
+        self.assertEqual(report["requests"], 0)
+        self.assertEqual(report["partition_work"]["discovery_family"], "funds")
 
     def test_failure_after_child_inserts_rolls_back_and_restart_retries_local_work(
         self,
@@ -217,7 +275,7 @@ class DeferredSplit(unittest.TestCase):
             ),
         ):
             with self.assertRaises(RuntimeError):
-                self.run_once(respond=lambda r: self.fail("no HTTP"))
+                self.run_once(requests=0, respond=lambda r: self.fail("no HTTP"))
         self.assertEqual(self.stored(row), before)
         self.assertEqual(
             self.p.db.execute("SELECT count(*) FROM jobs").fetchone()[0], 1
@@ -227,7 +285,7 @@ class DeferredSplit(unittest.TestCase):
         with patch.object(
             self.p, "identifiers", return_value={"stocks": ["000001.SZ"]}
         ):
-            self.run_once(respond=lambda r: self.fail("no HTTP"))
+            self.run_once(requests=0, respond=lambda r: self.fail("no HTTP"))
         self.assertEqual(len(self.children(row)), 3)
         self.assertEqual(self.attempts(), attempts)
 
@@ -315,7 +373,7 @@ class DeferredSplit(unittest.TestCase):
         with patch.object(
             self.p, "identifiers", return_value={"stocks": ["000001.SZ"]}
         ):
-            self.run_once(respond=lambda r: self.fail("no HTTP"))
+            self.run_once(requests=0, respond=lambda r: self.fail("no HTTP"))
         self.assertEqual(len(self.children(row)), 3)
         self.assertEqual(self.stored(row)["state"], "blocked")
         self.assertEqual(self.attempts(), attempts)
@@ -332,7 +390,7 @@ class DeferredSplit(unittest.TestCase):
         self.p.db.commit()
         before = self.stored(row)
         with self.assertRaisesRegex(ValueError, "Unsupported deferred"):
-            self.run_once(respond=lambda r: self.fail("no HTTP"))
+            self.run_once(requests=0, respond=lambda r: self.fail("no HTTP"))
         self.assertEqual(self.stored(row), before)
         result["partition_deferred"]["version"] = 1
         self.p.db.execute(

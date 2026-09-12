@@ -102,6 +102,10 @@ from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
 from backend.shared.tushare_rrg_contracts import RRG_CONTRACTS
 
+STOCK_IDENTIFIER_SOURCE_APIS = (
+    "stock_basic",
+    *sorted(SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS),
+)
 ROOT = Path("/data/tushare")
 CONTRACTS = {
     api: (spec["row_cap"], spec["required_fields"])
@@ -1158,7 +1162,7 @@ class Pipeline:
                         )
         self.db.commit()
 
-    def identifiers(self):
+    def identifiers(self, *, _source_apis=None):
         bond_source_apis = ("cb_daily", "cb_issue", "cb_call", "cb_rate", "cb_price_chg", "cb_share")
         factor_records = {}
         reward_period_records = {}
@@ -1257,7 +1261,13 @@ class Pipeline:
                 "country",
             )
         )
-        placeholders = ",".join("?" for _ in families)
+        if _source_apis is None:
+            source_apis = tuple(families)
+        elif tuple(_source_apis) == STOCK_IDENTIFIER_SOURCE_APIS:
+            source_apis = STOCK_IDENTIFIER_SOURCE_APIS
+        else:
+            raise ValueError("Unsupported identifier source projection")
+        placeholders = ",".join("?" for _ in source_apis)
         seen = set()
         discovery = {"results": 0, "duplicate_bodies": 0, "bypassed": 0, "body_reads": 0}
         self.identifier_timing = discovery
@@ -1267,7 +1277,7 @@ class Pipeline:
             + ") UNION SELECT result FROM attempts WHERE json_extract(result,'$.api_name') IN ("
             + placeholders
             + ")",
-            tuple(families) + tuple(families),
+            source_apis + source_apis,
         ):
             saved = json.loads(row[0])
             discovery["results"] += 1
@@ -2462,9 +2472,12 @@ class Pipeline:
                     )
                 )
 
-            discovered = {
-                code for code in self.identifiers().get(family, []) if usable(code)
-            }
+            identifiers = (
+                self.identifiers(_source_apis=STOCK_IDENTIFIER_SOURCE_APIS)
+                if family == "stocks"
+                else self.identifiers()
+            )
+            discovered = {code for code in identifiers.get(family, []) if usable(code)}
             saved = result if result is not None else json.loads(row["result"] or "{}")
             observed = (
                 {
@@ -2910,6 +2923,14 @@ class Pipeline:
             "job_id": row["id"],
             "split": split,
             "legacy_parent_recovered": recovered_legacy,
+            "discovery_family": (
+                contract_for(job["api_name"]).get("saturation_fallback")
+                or (
+                    ECO_CAL_OBSERVED_FANOUT.get("family")
+                    if job["api_name"] == "eco_cal"
+                    else None
+                )
+            ),
             "upstream_calls": 0,
         }
 
@@ -2950,14 +2971,18 @@ class Pipeline:
             None if task_scope else self.resume_identifier_split(deadline, config)
         )
         if partition_work is not None:
-            # One expensive local fanout is the entire run. Never combine a full
-            # discovery scan with another acquisition batch in the same task.
-            return {
-                "requests": 0,
-                "elapsed_seconds": round(time.monotonic() - started, 3),
-                "partition_work": partition_work,
-                **self.status(),
-            }
+            # Full discovery remains isolated. The narrow stocks projection may
+            # use only the unspent original deadline for unrelated acquisition.
+            if (
+                partition_work.get("discovery_family") != "stocks"
+                or time.monotonic() >= deadline
+            ):
+                return {
+                    "requests": 0,
+                    "elapsed_seconds": round(time.monotonic() - started, 3),
+                    "partition_work": partition_work,
+                    **self.status(),
+                }
         if not task_scope:
             self.reconcile_partitions(deadline=deadline)
         completed = 0
@@ -3178,6 +3203,8 @@ class Pipeline:
             "elapsed_seconds": round(time.monotonic() - started, 3),
             **self.status(),
         }
+        if partition_work is not None:
+            report["partition_work"] = partition_work
         if task_scope:
             report.update(exact_task_scope=True, scoped_jobs=scoped_jobs)
         return report

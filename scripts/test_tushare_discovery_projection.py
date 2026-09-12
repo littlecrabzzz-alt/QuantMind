@@ -15,7 +15,11 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from backend.shared.tushare_pipeline import Pipeline, json_bytes
+from backend.shared.tushare_pipeline import (
+    Pipeline,
+    STOCK_IDENTIFIER_SOURCE_APIS,
+    json_bytes,
+)
 
 
 class ProjectionTest(unittest.TestCase):
@@ -133,6 +137,67 @@ class ProjectionTest(unittest.TestCase):
         self.assertEqual(json_bytes(updated), json_bytes(self.baseline()))
         self.assertIn("T600018.SH", updated["technical_stocks"])
         self.assertIn("600018.SH", updated["technical_stocks"])
+
+    def test_stock_projection_reads_every_stock_source_and_only_those_sources(self):
+        stock_cases = list(
+            zip(
+                STOCK_IDENTIFIER_SOURCE_APIS,
+                ("T600018.SH", "000001.SZ", "600000.SH", "830001.BJ"),
+                strict=True,
+            )
+        )
+        # Keep stock_basic as a jobs-only retained result; the other stock
+        # sources are attempt-only, including a retired T identity.
+        api, code = stock_cases.pop(0)
+        saved = self.body(["ts_code"], [[code]], api)
+        job_id = self.p.enqueue(api, {"list_status": "L"}, 1, "history")
+        self.p.db.execute(
+            "UPDATE jobs SET state='done',result=? WHERE id=?",
+            (json.dumps(saved), job_id),
+        )
+        self.p.db.commit()
+        for api, code in tuple(stock_cases) + (
+            ("daily", "999999.SZ"),
+            ("etf_basic", "510300.SH"),
+        ):
+            self.save(self.body(["ts_code"], [[code]], api))
+        # stock_basic also accepts the generic index_code fallback.
+        self.save(self.body(["index_code"], [["300001.SZ"]], "stock_basic"))
+        # Two distinct retained results reference one immutable body. Both SQL
+        # rows remain visible while the existing same-call body dedup reads once.
+        duplicate = self.body(["ts_code"], [["600519.SH"]], "stock_basic")
+        for number in range(2):
+            self.p.db.execute(
+                "INSERT INTO attempts VALUES(?,?,?)",
+                (
+                    "duplicate-" + str(number),
+                    1,
+                    json.dumps({**duplicate, "observation": str(number)}),
+                ),
+            )
+        self.p.db.commit()
+        expected = self.p.identifiers()["stocks"]
+        with patch.object(self.p, "records", wraps=self.p.records) as reads:
+            projected = self.p.identifiers(
+                _source_apis=STOCK_IDENTIFIER_SOURCE_APIS
+            )["stocks"]
+        self.assertEqual(projected, expected)
+        self.assertEqual(
+            projected,
+            [
+                "000001.SZ",
+                "300001.SZ",
+                "600000.SH",
+                "600519.SH",
+                "830001.BJ",
+                "T600018.SH",
+            ],
+        )
+        self.assertEqual(reads.call_count, len(STOCK_IDENTIFIER_SOURCE_APIS) + 2)
+        self.assertEqual(self.p.identifier_timing["results"], 7)
+        self.assertEqual(self.p.identifier_timing["duplicate_bodies"], 1)
+        with self.assertRaisesRegex(ValueError, "Unsupported identifier"):
+            self.p.identifiers(_source_apis=("stock_basic",))
 
     def test_projection_inventory_covers_static_record_accesses(self):
         tree = ast.parse(textwrap.dedent(inspect.getsource(Pipeline.identifiers)))

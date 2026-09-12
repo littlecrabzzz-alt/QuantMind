@@ -251,8 +251,11 @@ class ObservedFanout(unittest.TestCase):
                 max_seconds=2,
                 pause=0,
             )
-            self.assertEqual(resumed["requests"], 0)
-        self.assertEqual(seen, [{"trade_date": "20260904"}])
+            self.assertEqual(resumed["requests"], 1)
+            self.assertEqual(resumed["partition_work"]["discovery_family"], "stocks")
+        self.assertEqual(seen[0], {"trade_date": "20260904"})
+        self.assertEqual(len(seen), 2)
+        self.assertIn("ts_code", seen[1])
         self.assertEqual(
             {x["ts_code"] for x in self.children(row)}, {"600036.SH", "830001.BJ"}
         )
