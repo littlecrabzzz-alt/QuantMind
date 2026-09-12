@@ -1,0 +1,79 @@
+{
+  "code": {
+    "commit": "25d815080fc847f99ac3ed636f316674582664eb",
+    "tests": {
+      "document_unittests": {"passed": 65, "status": "passed"},
+      "compileall": "passed",
+      "diff_check": "passed",
+      "ruff": "passed"
+    }
+  },
+  "credential_hygiene": {"secrets_in_git_or_report": false},
+  "failure": {
+    "container_oom": false,
+    "container_restart_count": 0,
+    "first_fresh_task_id": "a1b0398e-82ea-4902-85f5-c7b5fec3eff9",
+    "hard_limit_seconds": 110,
+    "observed_at": "2026-09-12T12:35:45+08:00",
+    "result": "TimeLimitExceeded",
+    "root_cause": "The 90-second work loop was followed by a full-table status GROUP BY over the 1.8 GiB documents database; the status query alone took about 29 seconds on the live queue."
+  },
+  "migration": {
+    "document_database_bytes_before": 1818324992,
+    "elapsed_seconds": 25.258,
+    "index": "document_status_counts(download_status,parse_status)",
+    "new_schema_version": 3,
+    "old_schema_version": 2,
+    "query_plan": "SCAN documents USING COVERING INDEX document_status_counts",
+    "status_summary_seconds_after": 0.119,
+    "status_summary_seconds_before": 28.959
+  },
+  "operational_contract": {
+    "authority": "lzy-vm:/root/data/disk/quantmind/project/data/tushare",
+    "beat_stopped_first": true,
+    "document_worker_stopped_during_migration": true,
+    "normal_task_drained_naturally": true,
+    "normal_task_id": "97bfe69f-c75e-41aa-8405-0a8bb47cf755",
+    "normal_task_seconds": 255.892,
+    "revoke_or_kill_used": false
+  },
+  "production_acceptance": {
+    "celery_status": "SUCCESS",
+    "disk": {
+      "free_bytes": 337107091456,
+      "hard_reserve_bytes": 107374182400,
+      "status": "healthy"
+    },
+    "document_counts_after": {
+      "downloaded_parse_pending": 1,
+      "downloaded_parsed": 20490,
+      "pending": 1218679,
+      "retry": 5
+    },
+    "document_counts_before": {
+      "downloaded_parse_pending": 1,
+      "downloaded_parsed": 20456,
+      "pending": 1218717,
+      "retry": 7
+    },
+    "elapsed_seconds": 90.613,
+    "phase_counts": {"download": 40, "parse": 37},
+    "processed": 77,
+    "task_id": "f1e48302-4823-487a-89e3-01681bd1c968",
+    "updated_at": "2026-09-12T12:46:36+08:00"
+  },
+  "schema_version": 1,
+  "services_after_acceptance": {
+    "beat": "healthy",
+    "document_worker": "healthy",
+    "normal_worker": "healthy",
+    "oom": false,
+    "restart_count": 0
+  },
+  "stale_queue_recovery": {
+    "expired_messages_discarded_by_celery": 536,
+    "expired_task_execution_claimed": false,
+    "note": "The stopped worker had accumulated expiring dispatch messages. Celery discarded them according to the existing 110-second task expiry before accepting a fresh dispatch."
+  },
+  "status": "document_worker_recovered_and_real_throughput_accepted"
+}
