@@ -280,7 +280,8 @@ def prepare(root, output=None, jobs=MAX_BATCH_JOBS):
             "EXISTS(SELECT 1 FROM partition_children c WHERE c.child_id=j.id) split_leaf "
             "FROM jobs j INDEXED BY jobs_partition_lookup "
             "WHERE j.epoch=? AND json_extract(j.job,'$.api_name')=? "
-            "AND j.state='pending'",
+            "AND j.state='pending' AND j.tries=0 AND j.result IS NULL "
+            "AND NOT EXISTS(SELECT 1 FROM attempts a WHERE a.job_id=j.id)",
             (HISTORY_EPOCH, API),
         )
         for row in rows:

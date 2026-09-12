@@ -100,7 +100,9 @@ def _attempt_counts(pipeline):
 def _verify_authority_jobs(pipeline, records, api_name):
     for expected in records:
         saved = pipeline.db.execute(
-            "SELECT id,logical_key,epoch,job,priority,group_name,state FROM jobs WHERE id=?",
+            "SELECT id,logical_key,epoch,job,priority,group_name,state,tries,result,"
+            "(SELECT COUNT(*) FROM attempts a WHERE a.job_id=jobs.id) attempts "
+            "FROM jobs WHERE id=?",
             (expected["task_id"],),
         ).fetchone()
         if saved is None:
@@ -117,6 +119,8 @@ def _verify_authority_jobs(pipeline, records, api_name):
             raise ValueError("Authority task identity does not match verified batch")
         if saved["state"] != "pending":
             raise ValueError(f"Verified {api_name} task is no longer pending")
+        if saved["tries"] != 0 or saved["result"] is not None or saved["attempts"] != 0:
+            raise ValueError(f"Verified {api_name} task is no longer pristine")
 
 
 def _execute(

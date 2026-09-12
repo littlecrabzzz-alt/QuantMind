@@ -173,6 +173,19 @@ class FundNavBatchTests(unittest.TestCase):
                 expected_preparation_sha256="0" * 64,
             )
 
+    def test_prepare_excludes_pending_tasks_with_prior_attempts(self):
+        stale = self.verified["records"][0]["task_id"]
+        with closing(sqlite3.connect(self.root / "pipeline.sqlite")) as db:
+            with db:
+                db.execute("UPDATE jobs SET tries=1,result=? WHERE id=?", ("{}", stale))
+                db.execute(
+                    "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+                    (stale, 1, "{}"),
+                )
+        output = self.base / "fresh.json"
+        fresh = preparation.prepare(self.root, output, jobs=4)
+        self.assertNotIn(stale, {row["task_id"] for row in fresh["records"]})
+
     def test_execute_is_exact_bounded_and_does_not_publish(self):
         calls = []
 
@@ -233,6 +246,35 @@ class FundNavBatchTests(unittest.TestCase):
             patch.object(runner.pipeline_module, "get_secret") as secret,
         ):
             with self.assertRaisesRegex(ValueError, "no longer pending"):
+                runner.run_batch(
+                    self.manifest,
+                    self.manifest_sha,
+                    expected_task_ids_sha256=self.verified["all_task_ids_sha256"],
+                    expected_config_sha256=runner.sha(self.config_path),
+                    expected_helper_sha256=runner.helper_sha256(),
+                    expected_preparation_sha256=runner.preparation_sha256(),
+                    root=self.root,
+                    execute=True,
+                )
+        secret.assert_not_called()
+
+    def test_execute_rejects_a_non_pristine_pending_task_before_credentials(self):
+        task_id = self.verified["records"][0]["task_id"]
+        with closing(sqlite3.connect(self.root / "pipeline.sqlite")) as db:
+            with db:
+                db.execute(
+                    "UPDATE jobs SET tries=1,result=? WHERE id=?", ("{}", task_id)
+                )
+                db.execute(
+                    "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+                    (task_id, 1, "{}"),
+                )
+        with (
+            patch.object(runner.pipeline_module, "ROOT", self.root),
+            patch.object(runner.pipeline_module, "authority", return_value=None),
+            patch.object(runner.pipeline_module, "get_secret") as secret,
+        ):
+            with self.assertRaisesRegex(ValueError, "no longer pristine"):
                 runner.run_batch(
                     self.manifest,
                     self.manifest_sha,
