@@ -75,7 +75,8 @@ class RateEvidenceTests(unittest.TestCase):
             proc = subprocess.run(command, capture_output=True, text=True, timeout=20)
             self.assertEqual(proc.returncode, 0, proc.stderr)
             result = json.loads(output.read_bytes())
-            self.assertEqual(result['registered_count'], 243)
+            self.assertEqual(result['registered_count'], 244)
+            self.assertIn('fina_mainbz_vip', result['apis'])
             self.assertIsNone(result['apis']['factor_value']['documented_rpm'])
             self.assertTrue(result['read_only_audit'])
 
