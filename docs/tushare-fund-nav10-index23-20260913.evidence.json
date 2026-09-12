@@ -1,0 +1,255 @@
+{
+  "boundaries": {
+    "empty_response_completeness": false,
+    "historical_versions_complete": false,
+    "history_complete": false,
+    "known_at_verified": false,
+    "pit_verified": false,
+    "rrg_status": "blocked_data"
+  },
+  "code_guard": {
+    "change": "fund_nav preparation now selects only pending tasks with tries=0, result NULL and no attempts; execution rechecks all four conditions before reading credentials",
+    "commit": "30a86dc1c4759100b162de7b0b78ea41bae6a461",
+    "cloud_production_image_tests_passed": 6,
+    "local_python310_tests_passed": 6,
+    "ruff_check": "passed",
+    "ruff_format_check": "passed"
+  },
+  "combined": {
+    "elapsed_seconds": 90.566,
+    "exact_refs_sha256": "a599498ca78af33cc87e47e06d75584caaff55c426350f49663207d8b65ba7a6",
+    "observed_execution_rpm": 477.0,
+    "physical_bytes": 51735732,
+    "references_by_kind": {
+      "object": 720,
+      "observation": 720,
+      "parquet": 660
+    },
+    "upstream_calls": 720,
+    "unique_references": 2100
+  },
+  "credential_hygiene": {
+    "account_fact_retained": "10100 points now; the 2000-point tranche expires 2026-12-05, expected total becomes 8100, and the observable reminder remains active.",
+    "independent_rights_expire": "2027-09-08",
+    "secrets_in_git_or_report": false,
+    "upstream_response_bodies_in_git_or_report": false
+  },
+  "fixed_input": {
+    "release_id": "data-beb5348fce0777b49d3b2a392567521e24b2fa1bfac13876be1bfeafd795c3f1",
+    "release_manifest_sha256": "beb5348fce0777b49d3b2a392567521e24b2fa1bfac13876be1bfeafd795c3f1",
+    "switched_during_window": false
+  },
+  "fund_nav_batch_10": {
+    "admission": {
+      "admission_sha256": "41cadbc51058e83a995f1ecd05a582d38b84885f1a6ae8aacc1db5150382ad9f",
+      "attempts": {
+        "0": 360
+      },
+      "historical_manifest_count": 9,
+      "historical_manifest_inventory_sha256": "0deee8f574577a71ce63bff3156cb819b1aed8882d3c00be93de977a542a982f",
+      "historical_records": 3240,
+      "historical_unique": {
+        "canonical_request": 3240,
+        "full_job": 3240,
+        "logical": 3240,
+        "task": 3240
+      },
+      "overlap": {
+        "canonical_request": 0,
+        "full_job": 0,
+        "logical": 0,
+        "task": 0
+      },
+      "result_nonnull": 0,
+      "selected_funds": 246,
+      "selection_counts": {
+        "pending_history_root": 132,
+        "pending_split_leaf": 228
+      },
+      "states": {
+        "pending": 360
+      },
+      "tries": {
+        "0": 360
+      }
+    },
+    "archive": "validation/fund-nav-batch-20260913/batch-10",
+    "closure": {
+      "closure_sha256": "14e7c9e42778e23d93c0393526db3e5022fbb3ad5e0760d8a82c819891f3eeaf",
+      "inventory_sha256": "cd861efb002657c6b9ba034119b937503a27df1552af22b4f87199620170664f",
+      "physical_bytes": 34104211,
+      "references_by_kind": {
+        "object": 360,
+        "observation": 360,
+        "parquet": 318
+      },
+      "rows": 248674,
+      "unique_references": 1038
+    },
+    "execution": {
+      "elapsed_seconds": 45.982,
+      "observed_rpm": 469.749,
+      "receipt_id": "cb396cb7c2c308a0a064df545425e5b565805eec3d8af0f48c2b7ef7cb4b6859",
+      "receipt_sha256": "502db682e5dca7c8e99569e0cff7d13c874704eba6074e4592815d19d4a91194",
+      "result_statuses": {
+        "empty_unverified": 42,
+        "possibly_truncated": 130,
+        "sample_ok": 188
+      },
+      "states": {
+        "done": 188,
+        "empty": 42,
+        "split_pending": 130
+      },
+      "upstream_calls": 360
+    },
+    "manifest_sha256": "c20d8144bce5744a13a78280db8109d90a192a178fe651b983f40085f53ae2e7",
+    "plan_only_all_would_false": true,
+    "task_ids_sha256": "0462048a8107e3b5b709e0b3712e7e9ec9863dd9a59de4a4f245bd0e4369ed6e"
+  },
+  "git_head_before_evidence_commit": "30a86dc1c4759100b162de7b0b78ea41bae6a461",
+  "index_daily_batch_23": {
+    "admission": {
+      "admission_sha256": "507127849801197674a8f6229da8bf690712e7f054284f205853956b2f6000f9",
+      "attempts": {
+        "0": 360
+      },
+      "excluded_suffixes": {
+        "CFX": 0,
+        "SI": 0,
+        "SW": 0
+      },
+      "historical_manifest_count": 22,
+      "historical_manifest_inventory_sha256": "98332ad2403a37368a6065fb9d7d2ec6ec6cce6b6b07f110b38ce956a8995a5e",
+      "historical_records": 7620,
+      "historical_unique": {
+        "canonical_request": 7620,
+        "full_job": 7620,
+        "logical": 7620,
+        "task": 7620
+      },
+      "overlap": {
+        "canonical_request": 0,
+        "full_job": 0,
+        "logical": 0,
+        "task": 0
+      },
+      "result_nonnull": 0,
+      "states": {
+        "pending": 360
+      },
+      "suffixes": {
+        "CSI": 360
+      },
+      "tries": {
+        "0": 360
+      },
+      "unique_index_codes": 360
+    },
+    "archive": "validation/index-daily-batch-20260913/batch-23",
+    "closure": {
+      "closure_sha256": "9963f79d4a477934421b0f489be56c6cb98f5b6666ed716cc8bdebc9ce05df18",
+      "inventory_sha256": "ba19de2856f252ec293045bb1809a782bb4ef80403e88d987b5899012ca7d877",
+      "physical_bytes": 17631521,
+      "references_by_kind": {
+        "object": 360,
+        "observation": 360,
+        "parquet": 342
+      },
+      "rows": 82871,
+      "unique_references": 1062
+    },
+    "execution": {
+      "elapsed_seconds": 44.584,
+      "observed_rpm": 484.479,
+      "receipt_id": "295cbe4f530f06f9217df431ab4d4c6526d4560cd40fc291556be312f1b171fc",
+      "receipt_sha256": "64f50b4dbdfa856ebf87480125643dbdb12159626614158580c98fdbe6c7a1b8",
+      "result_statuses": {
+        "empty_unverified": 18,
+        "sample_ok": 342
+      },
+      "states": {
+        "done": 342,
+        "empty": 18
+      },
+      "upstream_calls": 360
+    },
+    "manifest_sha256": "0d49378a6ac16a48436fc84c3eda67932ced2c538dd812645956825efb5d9bef",
+    "plan_only_all_would_false": true,
+    "task_ids_sha256": "36e47f02582a2ebbaab0a0a00af71fba85fc2768202b2004b54dc846b64b4eff"
+  },
+  "negative_control": {
+    "archive": "validation/pending-release-20260913/fund-nav10-index23",
+    "current_release_missing_references": 2100,
+    "local_physical_errors": 0,
+    "manifest_metadata_errors": 0,
+    "report_sha256": "fe005f8d01733c88060a15dd5f3715a70b9127c4c85964befaf9f9165c87d8fb",
+    "status": "expected_failure_before_publication"
+  },
+  "non_blocking_events": [
+    {
+      "detail": "The parallel read-only admissions each made one nonblocking shared-lock attempt while the ordinary acquisition held the writer lock. Both stopped without reading credentials, calling upstream or creating a candidate; fresh admissions passed after the ordinary task drained.",
+      "stage": "parallel_candidate_audit",
+      "status": "busy_then_recovered_in_controlled_window"
+    },
+    {
+      "detail": "The first fund_nav manifest wrapper expanded an awk positional parameter under set -u and stopped after the manifest was created but before plan-only or upstream access. The same manifest bytes were hashed without awk and then accepted.",
+      "stage": "fund_nav_manifest_hash_wrapper",
+      "status": "corrected_without_replanning_or_upstream_access"
+    },
+    {
+      "detail": "An adjacent fund_nav empty-review runner test stopped because its fixture retry was not yet due. The changed exact-batch test suite passed all six cases; the time-gated failure is retained as a separate nonblocking test issue.",
+      "stage": "adjacent_test",
+      "status": "unrelated_time_gate_recorded"
+    },
+    {
+      "detail": "The first production-image unit-test invocation omitted the repository config mount and all six fixtures failed before setup. Repeating with the read-only config mount passed all six tests.",
+      "stage": "production_image_test_mount",
+      "status": "corrected_and_passed"
+    },
+    {
+      "detail": "GNU cp warned that -n is nonportable. Each new archive directory was proven absent first, all files were copied once, made read-only and hashed after the transfer.",
+      "stage": "authority_archive",
+      "status": "warning_only_hashes_verified"
+    }
+  ],
+  "observed_at": "2026-09-13T01:02:39+08:00",
+  "publication": {
+    "included_in_current_release": false,
+    "mac_mirror_included": false,
+    "next_due_at": 1789234213,
+    "pending": true
+  },
+  "rate_gate": {
+    "account_rpm": 500,
+    "api_rpm": 500,
+    "max_requests_per_batch": 360,
+    "max_seconds_per_batch": 90,
+    "policy": "tiered_v1"
+  },
+  "schema_version": 1,
+  "service_window": {
+    "beat_stopped_at": "2026-09-13T00:54:09+08:00",
+    "beat_started_at": "2026-09-13T01:01:38+08:00",
+    "forced_worker_kills": 0,
+    "operator_revoked_tasks": 0,
+    "quantdb_stopped": false,
+    "services_after": {
+      "celery_beat": "healthy",
+      "document_worker": "healthy",
+      "quantmind": "healthy",
+      "quantmind_db": "healthy",
+      "tushare_worker": "healthy"
+    },
+    "worker_stopped_at": "2026-09-13T00:54:30+08:00",
+    "worker_started_at": "2026-09-13T01:01:32+08:00"
+  },
+  "status": "fund_nav10_and_index_daily23_authority_closed_waiting_fixed_release",
+  "storage": {
+    "available_bytes": 326870327296,
+    "filesystem_bytes": 845309321216,
+    "hard_reserve_bytes": 107374182400,
+    "headroom_above_reserve_bytes": 219496144896,
+    "used_bytes": 478672613376
+  }
+}

@@ -1432,3 +1432,14 @@ Mac标准LaunchAgent第276轮下载6063个新增文件，全量校验983029项�
 首次只读离线命令误用CURRENT文本指针且未挂载当前backend源码，在读取数据前失败；空报告已由通过的重跑原子替换。create-only归档传输忽略两个macOS provenance扩展头后，authority再次逐文件SHA确认六份JSON一致。总证据文件首次tar命令误剥单层路径、因此云端未创建文件，缺失SHA检查拒绝后改用noclobber单文件创建。五个服务均running/healthy，QuantDB从未停止；云盘可用326995460096字节，距100GiB保留线219621277696字节。证据位于docs/tushare-fixed-release-beb5-four-batches-20260913.evidence.json、docs/tushare-fixed-release-after-960e-four-batches-20260913及authority validation/fixed-release-20260913/beb5-four-batches。
 
 四批待发布清单现已闭合并可在Mac离线消费。完整历史、供应商修订、空响应完整性、known_at/PIT、RRG及交易结论继续开放；下一成熟候选为fund_nav第10批和index_daily第23批，执行前仍需重新冻结固定版并完成历史零重叠准入。总目标保持active。
+
+
+## 2026-09-13 fund_nav第10批与index_daily第23批权威端闭包
+
+旧fund_nav精确入口已加固：prepare只选择pending/tries0/result NULL/attempts0，execute在取凭据前持锁复核同一四项。专门测试本地Python3.10及云端生产镜像各6项通过，Ruff/格式通过；代码提交30a86dc1已push并完成双端handoff。相邻空值复核runner有1项因fixture重试尚未到期失败，未进入本次调用链，作为非阻塞测试事件保留。
+
+并行只读准入各仅尝试一次共享锁，恰逢普通任务持写锁后按约束退出，无候选、凭据、上游或写入。受控窗口先停Beat，普通任务b4e9e70f用288.418秒自然完成后worker退出；无revoke/kill，API、文档worker与QuantDB持续运行。fresh fund_nav第10批冻结228个拆分叶和132个历史根、共246只基金，360项均pending/tries0/attempts0/result NULL；与前9份唯一manifest/3240任务四层零重叠，plan-only五项false。45.982秒完成360请求，188 done、42 empty、130 split_pending、248674行；1038引用/34104211字节物理SHA及Parquet行数通过。
+
+同一窗口fresh index_daily第23批固定360个CSI指数任务，排除CFX/SI/SW，全部pristine；与前22份唯一manifest/7620任务四层零重叠，plan-only五项false。44.584秒完成360请求，342 done、18 empty、82871行；1062引用/17631521字节通过。两批合计720请求/90.566秒、2100唯一引用/51735732字节，跨批重复0。当前beb5固定版负对照缺全部2100项，证明仍待正常发布，不提前声明Mac可用。
+
+完整材料create-only归档于validation/fund-nav-batch-20260913/batch-10、validation/index-daily-batch-20260913/batch-23及validation/pending-release-20260913/fund-nav10-index23。worker/Beat已恢复，五个服务healthy/restart0/OOM false，QuantDB从未停止；云盘可用326870327296字节，距100GiB线219496144896字节。下一正常发布点为01:30:13，发布后需对同一2100项做云端精确验证、Mac标准镜像、本地精确验证及空Token禁网读取。完整历史、空响应完整性、供应商修订、known_at/PIT和RRG结论继续开放，总目标active。
