@@ -1392,3 +1392,12 @@ Mac标准LaunchAgent空闲时以不带-k的kickstart进入第271轮，下载4444
 Mac标准LaunchAgent空闲时以不带-k的kickstart进入第273轮，下载2704个增量文件、全量验证976965项、exit0且stderr为空并原子追平。同一1006引用在Mac再次全部通过，云/Mac报告逐字节一致。生产镜像在network none、空Token、只读Mac镜像及socket/DNS/secret阻断下读取index_daily 3行17列，上游调用0，确认该批存量不再依赖Tushare Pro。
 
 五个服务保持运行，QuantDB未停止；云盘可用327990231040字节，距100 GiB保留线仍有220616048640字节。74个空响应仍不证明历史完整；供应商修订、known_at/PIT、完整指数范围和RRG结论继续开放。机器证据：`docs/tushare-index-daily21-20260912.evidence.json`，闭包记录：`coordination/tushare-data/20260912T153100Z-fixed-release-960e-index-daily21.md`。下一受控窗口正式冻结并执行top10股东第2批，候选只读快照不冒充生产准入。
+
+
+## 2026-09-12 top10股东第2批权威端闭包
+
+固定版本证据已提交为master7c12279b并完成双端handoff；首次预检恰逢Syncthing扫描，idle后同一交接通过。受控窗口停止Beat、让普通Tushare worker自然退出0，主服务、文档worker和QuantDB持续运行。正式preparer在共享锁内固定960e版本并冻结180个完整兄弟对/360个pristine history任务；两接口各180，SH/SZ/BJ各120任务，范围20070101..20071231。task、logical、canonical request和pair哈希与只读候选全部一致，manifest只因固定版来源变化而改变；与batch1四层重叠均0，plan-only五个would字段均false。
+
+真实精确scope在44.713秒内完成360次上游调用，实算483.081rpm：top10_holders与top10_floatholders各113 done/67 empty，共7955行，不发布、不切CURRENT。主闭包逐任务验证唯一attempt、HTTP200、raw、observation、Parquet行数和SHA；独立复核再次验证946引用/3098139字节，360 object、360 observation、226 parquet，错误0。当前960e固定版负对照缺全部946项，证明本批尚未发布，等待下一正常publisher、云端精确验证、Mac标准镜像、本地精确验证及禁网读取。
+
+归档位于validation/top10-holders-batch-20260912/batch-2，机器证据docs/tushare-top10-holders-batch2-20260912.evidence.json。一个仅涉及/tmp属主的错误用户假设被安全拒绝；独立复核脚本两次SCP握手重置后有界重试成功，均未影响authority。worker和Beat已恢复，五个服务running、restart0、OOM false，云盘距100GiB保留线仍有220591845376字节。完整持股历史、修订、空响应完整性、known_at/PIT及RRG结论继续开放。
