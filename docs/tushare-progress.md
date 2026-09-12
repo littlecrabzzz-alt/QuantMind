@@ -1303,3 +1303,5 @@
 云端/Mac仍为ce43326f固定版。上一阶段883引用加本轮669+856引用，严格去重后2408引用/111599826字节已create-only归档为validation/source-semantics-20260912/pending-release-inventory.json，SHA ffd8f57870f871df8c288b7b31fb33cf130aefd37591d21062c8b808dd99b8d8；等待正常publisher及Mac镜像后逐项验收，不能宣称已进入ce43。本地QuantDB已applied至2026-09-11，Qlib日历同日。
 
 并行publisher pool2候选63499b79已在隔离worktree提交、142测试通过，未合并部署；约1.711倍仅为文件_save微基准，需完整document_index阶段比较后决定。下一轮先闭合待发布清单，再审范围请求与cyq_chips每日配额范围；完整历史、修订、known_at/PIT、单日index_weight完整性告警和RRG分类继续开放。机器证据：docs/tushare-source-semantics-20260912.evidence.json。
+
+补记：pool2候选独立复审通过，104项相关测试及25项专项测试通过（重叠集合），跨wave失败离线探针确认全事务回滚。候选仍未部署，完整document_index阶段收益尚待验证。审查记录：coordination/tushare-data/20260912T070522Z-document-index-pool2-independent-review.md。

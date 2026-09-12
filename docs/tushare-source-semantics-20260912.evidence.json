@@ -318,6 +318,15 @@
     "publisher_candidate": {
       "branch": "codex/tushare-document-index-pool2",
       "commit": "63499b79da07c8f0db28f2021b5ee74bcb6df309",
+      "independent_review": {
+        "cross_wave_failure_probe": "passed",
+        "deployment_gate": "whole document_index stage benchmark still pending",
+        "focused_tests": 25,
+        "record": "coordination/tushare-data/20260912T070522Z-document-index-pool2-independent-review.md",
+        "related_tests": 104,
+        "sets_overlap": true,
+        "status": "passed_no_blocking_findings"
+      },
       "performance_boundary": "pure_save microbenchmark does not establish whole document_index speedup; require full-stage evidence before adoption",
       "status": "isolated_review_candidate_not_deployed",
       "tests": 142,
