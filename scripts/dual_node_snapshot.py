@@ -87,13 +87,21 @@ def copy_runtime_delta(source, target, copied, cache, expected_stats):
         if path not in cache or cache[path][0] != current_stat
         or copied.get(path) != cache[path][1]
     ]
+    removed = copied.keys() - expected_stats.keys()
+    started_at = time.monotonic()
     if changed:
         run("rsync", "-a", "--ignore-times", "--from0", "--files-from=-",
             str(source) + "/", str(target) + "/",
             input=b"\0".join(p.encode() for p in changed) + b"\0")
     # Only unpublished staging files are removed, never the live tree or latest.
-    for removed in copied.keys() - expected_stats.keys():
-        (target / removed).unlink()
+    for path in removed:
+        (target / path).unlink()
+    return {
+        "changed_files": len(changed),
+        "changed_logical_bytes": sum(expected_stats[path][2] for path in changed),
+        "removed_files": len(removed),
+        "elapsed_seconds": round(time.monotonic() - started_at, 3),
+    }
 
 
 def finish_snapshot(target):
@@ -162,7 +170,10 @@ def cloud_snapshot():
                                           "qm-ide-run-", "rdagent-")) for n in active_now),
                     "Research job appeared during quiesce; snapshot aborted")
             expected_stats = runtime_stats(PROJECT)
-            copy_runtime_delta(PROJECT, target / "project", copied, cache, expected_stats)
+            delta = copy_runtime_delta(
+                PROJECT, target / "project", copied, cache, expected_stats
+            )
+            print(json.dumps({"phase": "runtime_delta", **delta}), flush=True)
             # Capture database and cold volumes without compression in the outage.
             with (target / "postgres.dump").open("wb") as stream:
                 run("docker", "exec", "quantmind-db", "sh", "-c",

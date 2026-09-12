@@ -268,9 +268,14 @@ class SnapshotSafety(unittest.TestCase):
             list(inv.inventory(live,cache))
             old=(live/'data/input').stat(); (live/'data/input').write_text('new')
             os.utime(live/'data/input',ns=(old.st_atime_ns,old.st_mtime_ns))
-            snapshot.copy_runtime_delta(live,stage,copied,cache,snapshot.runtime_stats(live))
+            report = snapshot.copy_runtime_delta(
+                live,stage,copied,cache,snapshot.runtime_stats(live)
+            )
             self.assertEqual(list(inv.inventory(stage)),list(inv.inventory(live)))
             self.assertEqual((previous/'data/input').read_text(),'old')
+            self.assertEqual(report['changed_files'],1)
+            self.assertEqual(report['changed_logical_bytes'],3)
+            self.assertEqual(report['removed_files'],1)
 
     def test_stat_delta_copies_new_and_hidden_changes_without_hashing_live(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -294,9 +299,12 @@ class SnapshotSafety(unittest.TestCase):
             with patch.object(
                 snapshot,'inventory',side_effect=AssertionError('content hash during delta')
             ):
-                snapshot.copy_runtime_delta(live,stage,copied,cache,expected)
+                report = snapshot.copy_runtime_delta(live,stage,copied,cache,expected)
             self.assertEqual(list(inv.inventory(stage)),list(inv.inventory(live)))
             self.assertEqual(snapshot.runtime_stats(live),expected)
+            self.assertEqual(report['changed_files'],2)
+            self.assertEqual(report['changed_logical_bytes'],8)
+            self.assertEqual(report['removed_files'],1)
 
     def test_validation_failure_never_publishes_complete(self):
         with tempfile.TemporaryDirectory() as directory:
