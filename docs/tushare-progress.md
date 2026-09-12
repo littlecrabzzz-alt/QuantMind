@@ -1327,3 +1327,16 @@ master560ccefd/13dce280/d61e93d6已push、双端源码与Git对齐。复用原AP
 root68测试通过6.700秒、独立29项通过（集合重叠），Ruff/check-format/diff通过。在途80ea2ff8正常planning_only完成360.318秒后普通worker自然退出0；耗时主要为identifier discovery295.255秒，非锁死。相关服务恢复healthy，文档worker启动时刻04:44:58Z未变、QuantDB未停止。恢复后e6356033完成360请求，采集循环66.392秒/整轮69.914秒，perf计数增长104→107，chips仍为activation_guard。下一自然日真实chipsHTTP尚未发生，须后续补验。机器证据：docs/tushare-cyq-daily-quota-20260912.evidence.json；authority validation/cyq-daily-quota-20260912保留baseline、activation、复核、恢复运行和执行脚本。
 
 全范围审计维持263目录基线非范围上限、244注册接口，ce43时点194接口有数据/50无数据文件（含权限拒绝及空响应），不能把注册当全历史完整。尚未注册的可读发现项p_list/p_get与其它待核目录分别保留；兼容别名/SDK派生/写操作不冒充新数据接口。两个有权限依据但只有空响应的风险接口按非重复范围补证：stk_alert(20260316..20260316)、stk_high_shock(20260312)，共2HTTP、0.226秒，均完整空响应、empty_unverified/tries1。保留官方样例日期矛盾source_consistency_gap，不据此启用或证明历史/PIT；本轮证据在de494发布之后产生，等待下一正常发布。
+
+
+## 2026-09-12 de494 固定版本云端/Mac/禁网验收闭合
+
+普通publisher35d5d515按既有节奏成功发布data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0：0上游请求，整轮398.4866秒；manifest435868564字节、953909文件、132671数据项。云端独立复核3449指定引用/130422296字节，manifest身份与物理SHA均通过，无缺失、metadata或文件错误。
+
+Mac定时客户端264从空闲手动kickstart（不带-k、不打断传输），新增下载23423文件，包含839附件、3176文档状态、749解析件、7604原始响应、7604观测、3451Parquet；15:49:55CST校验后原子切换CURRENT，客户端退出0。复用已有exact verifier再核3449引用，同样全部通过。禁网/空Token/只读数据挂载的容器读取新增index20中SZ399438在20241231的close2010.8402、精确observation62d1ed79a0284c38850736607eab3146，另从cyq_chips、moneyflow_dc、forecast_vip各读3行，上游调用0。as_of仅为本次观察时间，不证明历史PIT。
+
+机器证据docs/tushare-fixed-release-de494-20260912.evidence.json；本地/tmp/quantmind-fixed-de494-evidence与云端validation/fixed-release-de494-20260912保留Mac闭包、镜像收据、禁网输出和执行脚本。先前3449待发布清单现已闭合；risk2的4新引用/2124字节仍等待下一正常发布及Mac，不提前纳入本版。配额、正常采集、QuantDB日线与文档下载继续运行；全历史/修订/known_at/PIT/RRG等完整目标仍活跃。
+
+规划优化补记：isolated候选3127facd按小键聚合发现结果，179项管线、13项计时、5项投影测试通过（集合不相加），但原100000结果/1对象夹具的约2倍收益不代表生产。改用5000唯一对象+15重复（约0.3%）的完整identifiers基准，候选0.207180/0.206190秒比原0.188504/0.183579秒慢10%–12%，四次输出SHA一致；因此拒绝合并/部署。基准与纠正记录保留，后续先做真实子阶段计时再选改动，不以微基准数字代替实际吞吐。
+
+下一接口准备：opt_daily在ce43已有18个数据叶，均15000行/possibly_truncated；问题是饱和分片，不是零数据。固定opt_basic与opt_daily同时证明HO2609-C-2500.CFX在20260911有效且存在行情，候选为单合约单日1请求；尚未上游调用/入队/启用。执行前先核当前固定版本及权威端已有任务，若已采集则复用，若已有pending则继续原任务，不用无索引logical_key全库扫描做重复检查。完整历史、全市场日完整性与PIT继续false。候选记录coordination/tushare-data/20260912T075159Z-opt-daily-fixed-row-sample-candidate.json。

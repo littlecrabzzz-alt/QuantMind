@@ -1,0 +1,338 @@
+{
+  "authority_mac_evidence_directory": "validation/fixed-release-de494-20260912",
+  "boundaries": [
+    "3449 refs cover selected acceptance windows, not all history or every ordinary acquisition",
+    "risk2 4 refs/2124 bytes were acquired after this release and await next normal publication and Mac",
+    "historical known_at/PIT, complete history/revision coverage and RRG remain separate open requirements",
+    "Mac fixed sandbox input unchanged; full recovery snapshot distinct from QuantDB and Tushare updates"
+  ],
+  "cloud_exact": {
+    "boundary": "This proves the 3449 selected raw objects, observations and parquet files are included with exact manifest metadata and physical size/SHA256 in the named immutable cloud release. It does not prove complete supplier history, revisions, PIT semantics, RRG readiness or Mac availability; Mac verification is owned by the root task.",
+    "checks": {
+      "authority_physical_sha256_complete": true,
+      "current_matches_release": true,
+      "inventory_metadata_schema_complete": true,
+      "inventory_physical_bytes_match_pin": true,
+      "inventory_reference_count_matches_pin": true,
+      "inventory_sha256_matches_pin": true,
+      "manifest_metadata_complete": true,
+      "release_identity_matches_manifest_sha256": true,
+      "retained_observations_included": true,
+      "verification_passed": true
+    },
+    "inventory": {
+      "baseline_release": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+      "bytes": 739490,
+      "deduplicated_references": 0,
+      "path": "validation/cyq-range-empty-20260912/pending-release-inventory.json",
+      "physical_bytes": 130422296,
+      "references_by_kind": {
+        "object": 1348,
+        "observation": 1348,
+        "parquet": 753
+      },
+      "sha256": "5ed55cb16f4c3c390a327adba26168a320fbb1d828d207176c3c561e38a92236",
+      "source_references": 3449,
+      "sources": [
+        {
+          "bytes": 514764,
+          "path": "validation/source-semantics-20260912/pending-release-inventory.json",
+          "references": 2408,
+          "sha256": "ffd8f57870f871df8c288b7b31fb33cf130aefd37591d21062c8b808dd99b8d8"
+        },
+        {
+          "bytes": 224323,
+          "path": "validation/index-daily-batch-20260912/batch-20-inventory.json",
+          "references": 1039,
+          "sha256": "6840958c9c3798a77e98b1f4a2ae521861d52805544fb3e41273313ede848fba"
+        },
+        {
+          "bytes": 786,
+          "path": "validation/cyq-range-empty-20260912/inventory.json",
+          "references": 2,
+          "sha256": "e09c568800b59b0499cb2b2223efd6330d2195c64af81128ac8c25fcae487634"
+        }
+      ],
+      "unique_references": 3449
+    },
+    "observed_at": "2026-09-12T07:33:16.192741+00:00",
+    "release": {
+      "current_release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+      "manifest_bytes": 435868564,
+      "manifest_datasets": 132671,
+      "manifest_files": 953909,
+      "manifest_path": "releases/data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0/manifest.json",
+      "manifest_sha256": "de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+      "release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+      "retained_observations_included": true
+    },
+    "schema_version": 1,
+    "status": "cloud_fixed_release_exact_refs_closed_mac_pending",
+    "verification": {
+      "current_release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+      "expected_by_kind": {
+        "object": 1348,
+        "observation": 1348,
+        "parquet": 753
+      },
+      "expected_bytes": 130422296,
+      "expected_references": 3449,
+      "local_physical_errors": 0,
+      "manifest_datasets": 132671,
+      "manifest_files": 953909,
+      "manifest_metadata_errors": 0,
+      "missing_from_manifest": 0,
+      "release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+      "release_manifest_sha256": "de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+      "retained_observations_included": true,
+      "samples": {
+        "metadata": [],
+        "missing": [],
+        "physical": []
+      },
+      "schema_version": 1,
+      "status": "passed",
+      "verified_bytes": 130422296,
+      "verified_references": 3449
+    },
+    "verifier": {
+      "credentials_read": false,
+      "live_database_opened": false,
+      "network_calls": 0,
+      "path": "/root/code/QuantMind/scripts/verify_tushare_exact_release.py",
+      "sha256": "e2113593f1e5ade390ccdb8e28c41418ae3a2f07a8b18a1b5ede0f160079b6fc"
+    }
+  },
+  "code_mounts": "backend and catalog only; no runtime.env or .env mounted",
+  "data_mount": "read_only",
+  "docker_network": "none",
+  "docker_platform": "linux/amd64",
+  "files": {
+    "cloud-exact-closure.json": {
+      "bytes": 3926,
+      "sha256": "9f26892badb76ce7c10225e17d8844bb03a4c019634bddf78ea69391a9d32c46"
+    },
+    "mac-exact-closure.json": {
+      "bytes": 819,
+      "sha256": "f159dcab582aab356a9a3c2471a83bb2533a9f209ae6e2b90df82ccfd289a45d"
+    },
+    "mac-mirror-receipt.json": {
+      "bytes": 939,
+      "sha256": "03df42956492f55bd3ea518792977002c4550aa58388d2a2a9ba47ad7f1d3b69"
+    },
+    "normal-publication.json": {
+      "bytes": 3118,
+      "sha256": "296d54dbb9474ab5deb442d0cef4b4cfc310f1db6649b941338adb9d63cd89bf"
+    },
+    "offline-read.json": {
+      "bytes": 1191,
+      "sha256": "3edece05351c77316c7570d1e3e5aa273eacc8ceaef27ff5c3a039ada98ed59e"
+    }
+  },
+  "mac_exact": {
+    "current_release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+    "expected_by_kind": {
+      "object": 1348,
+      "observation": 1348,
+      "parquet": 753
+    },
+    "expected_bytes": 130422296,
+    "expected_references": 3449,
+    "local_physical_errors": 0,
+    "manifest_datasets": 132671,
+    "manifest_files": 953909,
+    "manifest_metadata_errors": 0,
+    "missing_from_manifest": 0,
+    "release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+    "release_manifest_sha256": "de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+    "retained_observations_included": true,
+    "samples": {
+      "metadata": [],
+      "missing": [],
+      "physical": []
+    },
+    "schema_version": 1,
+    "status": "passed",
+    "verified_bytes": 130422296,
+    "verified_references": 3449
+  },
+  "mac_mirror": {
+    "current_mtime": "2026-09-12T07:49:55.988748+00:00",
+    "expected_run": 264,
+    "launch_mode": "manual_kickstart_from_idle_without_k",
+    "launchagent": "com.quantmind.tushare-mirror",
+    "mirror_status_sha256": "270b7e550d188643420ab617b75129c89733b0b1e505267f1e7a5db1c9ee9824",
+    "pointer": {
+      "manifest_sha256": "de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+      "release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0"
+    },
+    "status": {
+      "coverage": {
+        "blocked": 15305,
+        "deferred_legacy_period_plan": 9802,
+        "done": 123893,
+        "empty": 100940,
+        "pending": 5443223,
+        "permission_blocked": 3493,
+        "quality": 442,
+        "resolved": 2010,
+        "split_pending": 5928
+      },
+      "downloaded_files": 23423,
+      "files": 953909,
+      "release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+      "status": "verified"
+    }
+  },
+  "normal_publication": {
+    "publication": {
+      "current_release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+      "interval_seconds": 3600,
+      "last_success_at": 1789198352,
+      "mirror_status": "not_checked",
+      "mode": "publish_only",
+      "next_due_at": 1789201952,
+      "pending": false,
+      "performed": true,
+      "status": "published"
+    },
+    "requests": 0,
+    "state": "SUCCESS",
+    "task_id": "35d5d515-16ec-47d8-8997-9ec21c05660a",
+    "timing": {
+      "completed_stages": [
+        "open",
+        "publication_check",
+        "publish_lock",
+        "publish",
+        "close"
+      ],
+      "failed_stage": null,
+      "included_stages": {
+        "reconciliation": "acquire"
+      },
+      "publish": {
+        "completed_stages": [
+          "read_current",
+          "scan_gaps",
+          "scan_attempts_and_stat",
+          "schema_metadata",
+          "archive_inventory_before",
+          "document_index",
+          "metadata_inventory",
+          "coverage_and_closure",
+          "compare_previous",
+          "retain_previous",
+          "archive_inventory_after",
+          "serialize_manifest",
+          "write_manifest"
+        ],
+        "failed_stage": null,
+        "retention": {
+          "completed_stages": [
+            "reuse_stat",
+            "expected_files",
+            "lock_wait",
+            "archive_open",
+            "archive_record",
+            "known_archives"
+          ],
+          "failed_stage": null,
+          "reused_predecessor": true,
+          "stage_seconds": {
+            "archive_open": 0.0055314358323812485,
+            "archive_record": 2.207449246197939,
+            "expected_files": 29.934934629127383,
+            "known_archives": 0.023455340415239334,
+            "lock_wait": 0.003421090543270111,
+            "reuse_stat": 0.003503084182739258
+          },
+          "total_elapsed_seconds": 32.19284334778786
+        },
+        "serialization": {
+          "bytes": 435868564,
+          "chunk_generation_seconds": 22.716105446219444,
+          "chunks": 248,
+          "eager_chunks": true,
+          "largest_chunk_bytes": 7926844,
+          "total_seconds": 23.854220639914274
+        },
+        "stage_seconds": {
+          "archive_inventory_after": 0.9820801559835672,
+          "archive_inventory_before": 0.559670215472579,
+          "compare_previous": 8.24370676279068,
+          "coverage_and_closure": 92.39511290192604,
+          "document_index": 113.04007349722087,
+          "metadata_inventory": 7.889566633850336,
+          "read_current": 24.16551783680916,
+          "retain_previous": 32.19758506678045,
+          "scan_attempts_and_stat": 15.877989571541548,
+          "scan_gaps": 36.149262584745884,
+          "schema_metadata": 0.03806634433567524,
+          "serialize_manifest": 53.59135637246072,
+          "write_manifest": 0.016250725835561752
+        },
+        "total_elapsed_seconds": 385.15135432593524
+      },
+      "stage_seconds": {
+        "close": 0.031027503311634064,
+        "open": 0.0008381977677345276,
+        "publication_check": 0.4010779168456793,
+        "publish": 398.01144184730947,
+        "publish_lock": 0.00015852786600589752
+      },
+      "total_elapsed_seconds": 398.44765582866967
+    },
+    "updated_at": "2026-09-12T07:32:32.161782+00:00"
+  },
+  "offline_read": {
+    "boundaries": [
+      "as_of is observation time, not historical known_at or PIT proof",
+      "fixed release reads do not establish full supplier history coverage"
+    ],
+    "network_guards": [
+      "docker_network_none",
+      "socket.connect",
+      "socket.create_connection",
+      "socket.getaddrinfo"
+    ],
+    "reads": [
+      {
+        "api_name": "index_daily",
+        "as_of": "2026-09-12T07:09:15.952501+00:00",
+        "close": 2010.8402,
+        "code": "SZ399438",
+        "columns": 17,
+        "observation": "62d1ed79a0284c38850736607eab3146.json",
+        "rows": 1,
+        "source_parquet": "parquet/00995a4be41ce1cd76218e7f929692ed66cea127fc3a21de48feeeeab133f40d.parquet",
+        "trade_date": "20241231"
+      },
+      {
+        "api_name": "cyq_chips",
+        "columns": 10,
+        "rows": 3
+      },
+      {
+        "api_name": "moneyflow_dc",
+        "columns": 21,
+        "rows": 3
+      },
+      {
+        "api_name": "forecast_vip",
+        "columns": 18,
+        "rows": 3
+      }
+    ],
+    "release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+    "schema_version": 1,
+    "status": "offline_new_index_window_and_fixed_samples_passed",
+    "token_variables_empty": true,
+    "upstream_calls": 0
+  },
+  "release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+  "runtime_image": "sha256:086d446ad5a0640f9d93bd0a423db2110a7e7f74115b26600ba0c048114f98f6",
+  "schema_version": 1,
+  "status": "cloud_mac_exact_refs_and_offline_reads_passed",
+  "verification_code_commit": "fee4428e41a433c58ec66b5c8223736e10c4aaff"
+}

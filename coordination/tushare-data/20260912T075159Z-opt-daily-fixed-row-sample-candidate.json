@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-12T07:51:59Z",
+  "status": "preparation_only_not_authorized_for_execution",
+  "scope": "one exact opt_daily contract-date sample",
+  "evidence": {
+    "fixed_release": {
+      "release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+      "manifest_bytes": 421257077,
+      "manifest_sha256": "ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+      "finding_correction": "The fixed release does contain 18 opt_daily dataset entries. Every inspected entry has quality_state possibly_truncated and 15000 rows, so it has actual data but no complete all-market day.",
+      "candidate_code_occurrences_in_manifest": 0,
+      "candidate_logical_key_occurrences_in_manifest": 0,
+      "candidate_task_id_occurrences_in_manifest": 0
+    },
+    "opt_basic_identity": {
+      "parquet": "parquet/278eab7f81922ebf4b52ad7900d1bd21731bad79ac49edd93eab56c48c4810c8.parquet",
+      "parquet_bytes": 657700,
+      "parquet_sha256": "278eab7f81922ebf4b52ad7900d1bd21731bad79ac49edd93eab56c48c4810c8",
+      "observation": "observations/94c825c8d73f4115b4810dcdf8ec27d9.json",
+      "observation_bytes": 952,
+      "observation_sha256": "837e95fb2db494af9486349f57081de227257a8b4cba88d087e57ea5d73c2730",
+      "source_ts_code": "HO2609-C-2500.CFX",
+      "exchange": "CFFEX",
+      "name": "上证50指数期权2609认购2500",
+      "call_put": "C",
+      "list_date": "20260323",
+      "maturity_date": "20260918",
+      "delist_date": "20260918",
+      "fetched_at": "2026-09-11T19:50:59.064856+00:00",
+      "history_complete": false,
+      "pit_verified": false
+    },
+    "opt_daily_nonempty_row": {
+      "parquet": "parquet/2b1e19ef0d654fc902245b2e8ef6a60d4f611e3f6a9fa8ed35943725750f2f8d.parquet",
+      "parquet_bytes": 883157,
+      "parquet_sha256": "2b1e19ef0d654fc902245b2e8ef6a60d4f611e3f6a9fa8ed35943725750f2f8d",
+      "observation": "observations/a346370c87b24f39b29313db9759b8ff.json",
+      "observation_bytes": 852,
+      "observation_sha256": "eb1bec9781d92161dad87c02443ae182041cdd8dfe9bdd1bb450aa1492c4724e",
+      "parent_request": {
+        "api_name": "opt_daily",
+        "params": {
+          "trade_date": "20260911"
+        }
+      },
+      "parent_result": {
+        "http_status": 200,
+        "response_complete": true,
+        "row_count": 15000,
+        "supplier_has_more": true,
+        "status": "possibly_truncated"
+      },
+      "selected_row_count": 1,
+      "selected_source_ts_code": "HO2609-C-2500.CFX",
+      "selected_trade_date": "20260911",
+      "selected_exchange": "CFFEX",
+      "fetched_at": "2026-09-11T19:51:45.792938+00:00"
+    },
+    "official_primary_document": {
+      "url": "https://tushare.pro/document/2?doc_id=159",
+      "archived_html_sha256": "98b5f131d3f2e0888337aa8c3a42a102bc94401076a517b982e48e8d111a8d83",
+      "api_name": "opt_daily",
+      "minimum_points": 2000,
+      "single_call_max_rows": 15000,
+      "documented_inputs": [
+        "ts_code",
+        "trade_date",
+        "start_date",
+        "end_date",
+        "exchange"
+      ],
+      "input_rule": "ts_code or a time parameter is required; the page permits looping by date or code",
+      "documented_rpm": null
+    },
+    "repository_pins": {
+      "backend/shared/tushare_other_contracts.py": "1d841065a415ceb7869ce4d79f72704c06fd74677b13a42e69c7f060e32bf39b",
+      "backend/shared/tushare_registry.py": "17cd7c97752859f783684b1ba93dc4fe138a256a76981cdddfcbbe370039a788",
+      "config/tushare-catalog.json": "f15ffc774000e3bd4b049b130e264a4399e080f100cd73012252250a69cc460b",
+      "config/tushare-coverage-ledger.json": "8c0e376af13bcb60d1a6eb7e5f835c010316dc686b19e4c898bd8afafcbc5b6b",
+      "docs/tushare-other-intake.md": "9271c3de14147676bc809337d5f2b3d5662cf5d918e3302cdc0b6c7cb62d21fc",
+      "coordination/tushare-data/20260912T072800Z-full-scope-gap-audit.json": "21b3d2bbad8c5b091e9f25bf238980338191caed1a9193ea82c860c2c471bc36"
+    }
+  },
+  "candidate": {
+    "api_name": "opt_daily",
+    "group_name": "other",
+    "epoch": "capability-opt-daily-fixed-row-sample-20260912",
+    "priority": 10,
+    "params": {
+      "ts_code": "HO2609-C-2500.CFX",
+      "trade_date": "20260911"
+    },
+    "fields": "amount,close,exchange,high,low,oi,open,pre_close,pre_settle,settle,trade_date,ts_code,vol",
+    "row_cap": 15000,
+    "required_fields": [
+      "ts_code",
+      "trade_date"
+    ],
+    "nullable_fields": [
+      "exchange",
+      "pre_settle",
+      "pre_close",
+      "open",
+      "high",
+      "low",
+      "close",
+      "settle",
+      "vol",
+      "amount",
+      "oi"
+    ],
+    "positive_fields": [],
+    "logical_key": "65cb953e7ffa7350dbbfec0a3c896fbc9ec29863f3491623a7916fdc5e4a0f6d",
+    "task_id_for_candidate_epoch": "1a19f7cd61271ffbfaa08476c742fab3e3fbf0d9cb31396d64e94cafe7ee6c93",
+    "max_upstream_calls": 1,
+    "max_seconds": 30,
+    "publish": false
+  },
+  "execution_gate_for_later_window": {
+    "pipeline_only": true,
+    "raw_http_forbidden": true,
+    "exact_live_duplicate_check_required": true,
+    "duplicate_check": "Before any enqueue or call, query the authority by logical_key and compare the full canonical job across every epoch. If an equivalent task already has an attempt, do not call again. If an equivalent pending tries=0 task exists, select that exact existing task rather than creating a second task. The fixed-release absence does not prove the live queue is still absent.",
+    "required_pins": [
+      "CURRENT",
+      "pipeline config SHA-256",
+      "runner/helper SHA-256",
+      "canonical job and selected task ID"
+    ],
+    "rate_policy": "Use the deployed account and api gates. The reviewed repository contract is conservatively 50 requests/minute; the leaf page does not publish an RPM, so this preparation does not raise it.",
+    "success_checks": [
+      "HTTP 200 and response_complete true",
+      "all returned rows have source ts_code HO2609-C-2500.CFX and trade_date 20260911",
+      "all explicitly requested fields are present",
+      "the natural key source_ts_code plus trade_date is unique",
+      "immutable object, observation, and any parquet file pass byte and SHA-256 verification",
+      "the evidence enters a later normal fixed release and passes exact-reference verification"
+    ],
+    "failure_or_empty_handling": "Retain the immutable response and its exact status. Empty remains empty_unverified. A mismatched code/date, schema gap, cap result, API error, rate limit, or permission denial blocks fanout claims and does not trigger automatic enablement or a retry storm."
+  },
+  "permission_and_semantic_caveats": {
+    "current_points": 10100,
+    "expected_points_after_2026_12_05": 8100,
+    "points_threshold_supported_now_and_after_expiry": true,
+    "account_access_guaranteed_by_points": false,
+    "independent_permission_required_by_document": false,
+    "observed_prior_access": true,
+    "permission_status_in_static_contract": "unprobed",
+    "date_is_within_observed_contract_life": true,
+    "trade_date_is_not_known_at": true,
+    "history_complete": false,
+    "historical_versions_complete": false,
+    "pit_verified": false,
+    "option_universe_complete": false,
+    "all_market_parent_complete": false,
+    "source_identifier_rule": "Send the supplier code HO2609-C-2500.CFX. Do not send the normalized local identifier OPT:HO2609-C-2500.CFX.",
+    "sample_scope_rule": "One known nonempty contract-date result can validate the code fanout path but cannot establish full option-universe, date-range, revision, delisting, or point-in-time coverage."
+  },
+  "non_actions": [
+    "No upstream request was executed.",
+    "No live authority database or credential was read.",
+    "No job was enqueued.",
+    "No configuration, service, registry, contract, or release was changed."
+  ]
+}
