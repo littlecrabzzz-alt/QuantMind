@@ -1,0 +1,14 @@
+# Stocks fanout projection deployment window
+- Owner: root; Mac integrator; candidate 567fb294c9891564181ebe61e56650ec0cbcc94d, base 9aa62a32.
+- Files: backend/shared/tushare_pipeline.py and three targeted test files. Candidate isolated and independently reviewed; 24 focused, 118 adjacent, 176 pipeline tests passed; Ruff/compile/diff passed.
+- Window: stop Beat, signal normal Tushare worker for natural warm drain, preserve active task and immutable evidence, merge candidate, align source/Git, restart exact existing worker and Beat. Document worker and QuantDB remain running; no task revoke or force termination.
+- Acceptance: projected stocks fanout preserves parent capture and original deadline, uses remaining time for real acquisition. Other families retain full discovery isolation. Existing account/API gates and daily quota remain unchanged.
+- Baseline archived create-only at validation/stocks-fanout-20260912/baseline.json, SHA 639886e6c8e1b0f819d8fd9d3559ab17f82bdaef68a9ca6d11b14f0f491b7b2e.
+- Full 15-minute planning scan and non-stocks fanout remain separate performance work; descendant batch 4 still awaits ordinary fixed publication and Mac mirror.
+
+- Window released: master69a35f21 pushed/aligned; worker started05:56:26Z, Beat05:55:35Z, all three Tushare services healthy. Natural drain798c1d89 completed264.399s with exit0. Document worker and QuantDB remained running.
+- Production acceptance: e6677976 and eb36edc8 each360 HTTP200; 720 attempts/175597 rows/1755 references/93103125 bytes independently SHA verified. Parent capture and one-attempt identity preserved; same6268-child moneyflow fanout improved from257.348s/0 requests to77.012s/360 requests. Rate policy unchanged; two-task max rolling60s360.
+- Detailed evidence: docs/tushare-stocks-fanout-production-20260912.evidence.json; immutable cloud receipts/inventories at validation/stocks-fanout-20260912/. Reuse two-runs-inventory.json for next fixed release, together with validation/index-weight-descendant-batch-20260912/batch-4-inventory.json. No re-fetch needed for these retained artifacts.
+- Nonblocking operational facts: first handoff waited for Beat startup health; verifier corrected missing row_count on API errors and its mid-run watermark using immutable observation times before any archival. Separate API/schema-gap audit is pending; planning-cache proposal remains unimplemented because cache invalidation and hit rate are unproven.
+
+- First-run gap audit complete: 11 deterministic shape errors across fut_index_daily and fund_factor_pro/idx_factor_pro/cb_factor_pro; two cyq_chips supplier-no-data; one known research_report.file_name gap. No permission/rate/auth error. Next code priority is these four historical request shapes with official-contract verification and isolated identity/coverage tests; audit did not alter states or re-fetch.

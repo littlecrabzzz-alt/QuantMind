@@ -1270,3 +1270,12 @@
 2026-09-12 13:40 CST：Beat先停，普通任务5935776c用257.359秒自然完成后worker退出，无revoke/kill；独立只读审计重建629个可用完整兄弟对并确认所选180对/360叶与18份历史manifest在task/logical/request三层零重叠。精确窗口50.832秒完成360次HTTP 200、279962行：180 empty、89 split pending、91 blocked；91个blocked全部为单日仍possibly_truncated，已无法按日期继续二分，是覆盖未证明边界而非权限、限流或网络失败。89个可拆叶生成178个pristine子任务。闭包验证900个唯一引用/25757763字节全部SHA通过，六份材料不可覆盖归档。worker、文档worker和Beat恢复且restart0、OOM false；本批等待固定发布与Mac镜像，单日饱和、空结果、完整历史、修订、known_at/PIT语义及RRG分类仍开放。机器证据为docs/tushare-index-weight-descendant-batch4-20260912.evidence.json。
 
 2026-09-12 13:44 CST：后代第4批91个单日饱和响应完成只读语义审计：1000–3575行，重复自然键、跨请求日期/指数及无效权重均0，权重合计99.810–100.049；has_more全false但count全0，均不足以证明成员完整。官方doc96未公开行数上限或成分筛选/分页，现有1000只是未验证告警阈值，未修改blocked或盲目重拉。900个物理引用/25757763字节清单和逐请求审计已不可覆盖归档，准备下一固定版验收；并行转查普通任务约257秒、requests=0、6268个identifier_fanout子任务的全局重复扫描瓶颈。证据：docs/tushare-index-weight-single-day-audit-20260912.evidence.json。
+
+
+2026-09-12 14:01 CST：`69a35f21`已合入master、push并完成双端内容/Git对齐，云端普通worker加载股票代码来源投影。仅stocks拆分读取stock_basic及三类证券借贷来源，保留历史attempt、退市/T代码、观察到的成员和原deadline；预算有余量时继续同轮普通采集，非stocks保留全量扫描隔离。24专项、118相邻、176pipeline测试通过，独立复审24项、Ruff、编译和diff检查通过。Beat先停，798c1d89任务264.399秒自然完成后worker退出0；没有revoke或强杀，文档worker、QuantDB及完整恢复快照继续运行。
+
+连续两轮生产任务e6677976/eb36edc8分别用86.047/77.012秒完成360请求；其中moneyflow_dc同样拆出6268个代码子任务，从基线257.348秒/0请求变为77.012秒/360请求。合计720 HTTP200、125个API、175597行；包括297 sample_ok、380 empty_unverified、16 possibly_truncated、25 api_error、2 schema_gap，不把HTTP200当数据完整。独立只读验收逐项对齐720条attempt和1755个物理引用/93103125字节，SHA错误0，两个父请求tries和attempt均仍为1、原始捕获身份未变。两轮窗口内滚动60秒最大360请求，包含任务内全部工作实算264.935rpm；账户500rpm、cyq_perf每日200000和2026-12-05积分到期提醒仍生效。证据create-only归档于validation/stocks-fanout-20260912；机器记录docs/tushare-stocks-fanout-production-20260912.evidence.json。
+
+本轮代码/生产吞吐已验收；两轮新增数据与index_weight后代第4批仍待正常固定发布、Mac精确SHA及离线读取闭合。当前两端固定版仍85ff。15分钟全量规划扫描约267秒属于另一已记录瓶颈，暂不降低发现范围或规划频率；独立审计未发现能保持完整语义的简单去重优化。Mac完整恢复快照13:55检查约167.69GiB，27秒增长153.8MiB，尚待COMPLETE/VERIFIED；QuantDB应用记录和Qlib日历仍为2026-09-11，云盘可用312.82GiB。
+
+首轮异常只读复审：13个api_error均为HTTP200/业务码50101，无权限/限速/认证拒绝。11个确定性参数合同缺口为fut_index_daily仅trade_date缺ts_code（2项），fund_factor_pro/idx_factor_pro/cb_factor_pro仅start_date/end_date缺ts_code或trade_date（各3项）；同job历史尝试已重复相同错误，列为下一修复优先项，须先核官方请求合同及身份/覆盖测试。另2个cyq_chips为标的/日期无数据；research_report单项101行/10列缺file_name，复用已有known_field_gap。未改状态、伪造empty或重拉上游。

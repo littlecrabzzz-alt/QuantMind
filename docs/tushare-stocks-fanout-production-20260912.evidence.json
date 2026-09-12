@@ -1,0 +1,391 @@
+{
+  "archives": {
+    "attempt-watermark.json": {
+      "bytes": 167,
+      "path": "validation/stocks-fanout-20260912/attempt-watermark.json",
+      "sha256": "0f03b9d28d9556bb9f0c4a88f97347e21e5705cc7b62735a2b82a5a82143b5c3"
+    },
+    "baseline.json": {
+      "bytes": 12903,
+      "path": "validation/stocks-fanout-20260912/baseline.json",
+      "sha256": "639886e6c8e1b0f819d8fd9d3559ab17f82bdaef68a9ca6d11b14f0f491b7b2e"
+    },
+    "first-production-inventory.json": {
+      "bytes": 189666,
+      "path": "validation/stocks-fanout-20260912/first-production-inventory.json",
+      "sha256": "7bcc7d23f76c5813217005ce1fc7ddc983464a3a3e3a9d3c4cafb128a3e7fde7"
+    },
+    "first-production-receipt.json": {
+      "bytes": 89857,
+      "path": "validation/stocks-fanout-20260912/first-production-receipt.json",
+      "sha256": "d35bf7a1850ba4e3e7d671121cd60331c963bcb0f9828b37f8fb1d9d559e0446"
+    },
+    "parents-before.json": {
+      "bytes": 2374,
+      "path": "validation/stocks-fanout-20260912/parents-before.json",
+      "sha256": "556b416712c0708855a4205131357d9f04035df5d5e234feb1c15729d9fcea48"
+    },
+    "second-production-inventory.json": {
+      "bytes": 184830,
+      "path": "validation/stocks-fanout-20260912/second-production-inventory.json",
+      "sha256": "e4300d86f6a730d3fe521fd19dac3de36bbbe22d7a8795e8eea47fa159ef4edf"
+    },
+    "second-production-receipt.json": {
+      "bytes": 89874,
+      "path": "validation/stocks-fanout-20260912/second-production-receipt.json",
+      "sha256": "4f1ff774ddfaefb72a1990419434c5c168f5764a283e0139b050643bdc34f3ec"
+    },
+    "two-runs-inventory.json": {
+      "bytes": 374424,
+      "path": "validation/stocks-fanout-20260912/two-runs-inventory.json",
+      "sha256": "ed746d1f55f654b502f27217ed80ccd9824dd977efed30af39a19698f41d2018"
+    },
+    "two-runs-summary.json": {
+      "bytes": 1382,
+      "path": "validation/stocks-fanout-20260912/two-runs-summary.json",
+      "sha256": "0811b4ef8a93f12357259f7856dedec0301cfab5d7e0c61677fcd20e1f2b36ea"
+    }
+  },
+  "baseline": {
+    "result": {
+      "elapsed_seconds": 253.973,
+      "partition_work": {
+        "job_id": "250facf35856ceda4ad083432fd2798e459fd430c771de83790e04577368c3c1",
+        "legacy_parent_recovered": false,
+        "split": {
+          "children": 6268,
+          "method": "identifier_fanout",
+          "parent_observed_added_count": 357,
+          "universe_complete": false
+        },
+        "status": "partitioned",
+        "upstream_calls": 0
+      },
+      "requests": 0,
+      "status": null,
+      "timing": {
+        "completed_stages": [
+          "open",
+          "publication_check",
+          "planning_check",
+          "archive",
+          "acquire",
+          "document_registration",
+          "close"
+        ],
+        "failed_stage": null,
+        "included_stages": {
+          "reconciliation": "acquire"
+        },
+        "stage_seconds": {
+          "acquire": 254.5936028957367,
+          "archive": 0.22448070719838142,
+          "close": 0.0003573838621377945,
+          "document_registration": 1.8970863074064255,
+          "open": 0.0008706636726856232,
+          "planning_check": 0.00023701786994934082,
+          "publication_check": 0.6270661447197199
+        },
+        "total_elapsed_seconds": 257.3479783125222
+      },
+      "updated_at": "2026-09-12T05:35:37.264426+00:00"
+    },
+    "state": "SUCCESS",
+    "task_id": "5935776c-93ea-4dcf-b0b9-3a58449f8146"
+  },
+  "change": {
+    "existing_identifier_mapping_and_parent_observations_preserved": true,
+    "nonstocks_full_discovery_isolation_retained": true,
+    "rate_and_daily_quota_changes": false,
+    "stocks_can_acquire_within_original_remaining_deadline": true,
+    "stocks_sources": [
+      "stock_basic",
+      "slb_len_mm",
+      "slb_sec",
+      "slb_sec_detail"
+    ]
+  },
+  "code": {
+    "candidate_commit": "567fb294c9891564181ebe61e56650ec0cbcc94d",
+    "independent_review": "no P1/P2 findings; production contract_for check corrected mistaken reviewer timing assumption about finance APIs",
+    "master_commit": "69a35f21dd8f0e9e94f82eca2676799483065c06",
+    "source_sha256": "b097f2fdb2cbf5abed973ce882cf81b1177143c92745034c88d8f738281c8914",
+    "tests": {
+      "adjacent": 118,
+      "compile": "passed",
+      "diff_check": "passed",
+      "focused": 24,
+      "independent_focused": 24,
+      "pipeline": 176,
+      "ruff": "passed"
+    }
+  },
+  "credential_hygiene": {
+    "tokens_or_orders_in_evidence": false
+  },
+  "deployment": {
+    "beat_started_at": "2026-09-12T05:55:35.174953063Z",
+    "beat_stopped_first": true,
+    "document_worker_running_since": "2026-09-12T04:44:58.161153655Z",
+    "forced_task_termination": false,
+    "handoff_head": "69a35f21dd8f0e9e94f82eca2676799483065c06",
+    "handoff_source_digest": "c94761f6aa8164c6dd50388ab92f3cf4ba4974c29b8ce6890e1058b2d4e856fc",
+    "normal_task_drained": "798c1d89-9650-4c6d-bb0c-60d343f188c6",
+    "normal_task_success_at": "2026-09-12T13:54:57.242+08:00",
+    "normal_task_success_seconds": 264.39943624287844,
+    "quantdb_stopped": false,
+    "services_after": "normal worker, document worker and Beat healthy; restart0 and no OOM",
+    "worker_exit_code": 0,
+    "worker_started_at": "2026-09-12T05:56:26.654891394Z"
+  },
+  "first_run_gap_audit": {
+    "api_error_http_status": 200,
+    "deterministic_request_shape_gaps": {
+      "cb_factor_pro": {
+        "count": 3,
+        "reason": "start_date/end_date-only requests require ts_code or trade_date"
+      },
+      "fund_factor_pro": {
+        "count": 3,
+        "reason": "start_date/end_date-only requests require ts_code or trade_date"
+      },
+      "fut_index_daily": {
+        "count": 2,
+        "reason": "trade_date-only requests require ts_code"
+      },
+      "idx_factor_pro": {
+        "count": 3,
+        "reason": "start_date/end_date-only requests require ts_code or trade_date"
+      }
+    },
+    "known_field_gap": {
+      "api": "research_report",
+      "count": 1,
+      "missing": "file_name",
+      "returned_fields": 10,
+      "returned_rows": 101
+    },
+    "matching_previous_attempts_repeat_same_request_shape_errors": true,
+    "next_priority": "Verify official minimum request contracts, fix four invalid historical plan shapes in an isolated candidate with identity/coverage tests, then deploy without blindly retrying unchanged invalid requests.",
+    "permission_rate_or_authentication_failures": 0,
+    "raw_messages_or_credentials_retained_in_report": false,
+    "scope": "first accepted task only; 13 api_error and 1 schema_gap",
+    "supplier_business_code": 50101,
+    "supplier_no_data": {
+      "api": "cyq_chips",
+      "count": 2,
+      "empty_response_semantics_not_yet_mapped": true
+    }
+  },
+  "nonblocking_events": [
+    "Initial sync hashes differed while source files were arriving; waited for matching hashes without overwriting shared files.",
+    "First handoff saw Beat health=starting after restart; retried after health passed.",
+    "Celery naturally discarded one expired periodic message; no explicit revoke was issued.",
+    "Read-only verifier initially assumed every API error has row_count, then discovered its watermark was sampled after 29 requests. It exited before archival, preserved missing row counts as null and used immutable fetch timestamps over a bounded earlier range. All 360 attempts then independently matched each accepted task."
+  ],
+  "parallel_sync_check": {
+    "checked_at": "2026-09-12T13:55:23+08:00",
+    "cloud_free_bytes": 335885029376,
+    "complete_or_verified": false,
+    "full_snapshot_bytes_kib": 175831820,
+    "full_snapshot_latest": "snapshot-20260908T134413970428Z",
+    "growth_kib_over_27_seconds": 157444,
+    "qlib_calendar": "2026-09-11",
+    "quantdb_application_status": "applied",
+    "quantdb_recorded_date": "20260911"
+  },
+  "production": {
+    "assessment_counts": {
+      "api_error": 25,
+      "empty_unverified": 380,
+      "possibly_truncated": 16,
+      "sample_ok": 297,
+      "schema_gap": 2
+    },
+    "current_release_id": "data-85ffcb29fa67c2b08699d1e53425bd8d9a6349039856e6490161507fc91dca99",
+    "distinct_api_count": 125,
+    "max_observed_requests_in_60_seconds": 360,
+    "observed_window_scope": "two accepted tasks only, not all-day activity",
+    "physical_bytes": 93103125,
+    "publication_status": "pending_next_normal_fixed_release",
+    "rate_policy": {
+      "account_ceiling": 500,
+      "cyq_perf_daily_cap": 200000,
+      "daily_timezone": "Asia/Shanghai",
+      "entitlement": {
+        "days_until_expiry": 84,
+        "effective_points_conservative": 10100,
+        "expected_points_after_expiry": 8100,
+        "independent_permissions_expiry": "2027-09-08",
+        "notice": "expires_within_90_days",
+        "points_expiry_date": "2026-12-05",
+        "reported_points": 10100
+      },
+      "mode": "tiered_v1",
+      "permission_grant": false,
+      "rollout_account_rpm": 500
+    },
+    "requests": 720,
+    "requests_per_minute_including_task_work": 264.9354475227321,
+    "retained_rows": 175597,
+    "schema_version": 1,
+    "sha_errors": 0,
+    "status": "passed",
+    "task_elapsed_seconds_sum": 163.05858805961907,
+    "tasks": [
+      "e6677976-f3fd-421a-ad0c-f04fbbd538a9",
+      "eb36edc8-8622-4f44-8c84-6123c76004b6"
+    ],
+    "unique_references": 1755
+  },
+  "remaining": [
+    "Four deterministic historical request-shape gaps need follow-up: fut_index_daily, fund_factor_pro, idx_factor_pro, cb_factor_pro. First-run cyq_chips no-data and research_report.file_name remain separate known gaps.",
+    "Two accepted runs and index_weight descendant batch 4 await next normal fixed publication and Mac SHA/offline read acceptance.",
+    "15-minute planning scan still decodes about 78637 object bodies and takes about267 seconds; no low-risk semantic-equivalent small fix was found, so planning cadence and coverage were not reduced.",
+    "Full history, empty-response confirmation, uncertain single-day caps, revisions, known_at/PIT and RRG classification coverage remain open."
+  ],
+  "runs": [
+    {
+      "closure": {
+        "assessment_counts": {
+          "api_error": 13,
+          "empty_unverified": 179,
+          "possibly_truncated": 10,
+          "sample_ok": 157,
+          "schema_gap": 1
+        },
+        "attempts": 360,
+        "first_request_at": "2026-09-12T05:56:51.800756+00:00",
+        "http_statuses": {
+          "200": 360
+        },
+        "last_response_at": "2026-09-12T05:57:55.922611+00:00",
+        "parent_attempts": 1,
+        "parent_capture_identity_preserved": true,
+        "parent_recaptured": false,
+        "parent_tries_after": 1,
+        "parent_tries_before": 1,
+        "physical_bytes": 57508765,
+        "retained_rows": 110702,
+        "sha_errors": 0,
+        "unique_references": 888
+      },
+      "result": {
+        "elapsed_seconds": 82.108,
+        "partition_work": {
+          "discovery_family": "stocks",
+          "job_id": "ad72368135bb2a3be33d5a9177ee5a28eaccff5baeda1f94f9dcbd399170c34c",
+          "legacy_parent_recovered": false,
+          "split": {
+            "children": 5919,
+            "method": "identifier_fanout",
+            "parent_observed_added_count": 8,
+            "universe_complete": false
+          },
+          "status": "partitioned",
+          "upstream_calls": 0
+        },
+        "requests": 360,
+        "timing": {
+          "completed_stages": [
+            "open",
+            "publication_check",
+            "planning_check",
+            "archive",
+            "acquire",
+            "document_registration",
+            "close"
+          ],
+          "failed_stage": null,
+          "included_stages": {
+            "reconciliation": "acquire"
+          },
+          "stage_seconds": {
+            "acquire": 83.65467445738614,
+            "archive": 0.4263578038662672,
+            "close": 0.0004047006368637085,
+            "document_registration": 1.2511701006442308,
+            "open": 0.00106118805706501,
+            "planning_check": 0.0005178861320018768,
+            "publication_check": 0.7001341786235571
+          },
+          "total_elapsed_seconds": 86.0466996319592
+        },
+        "updated_at": "2026-09-12T05:57:58.590503+00:00"
+      },
+      "task_id": "e6677976-f3fd-421a-ad0c-f04fbbd538a9"
+    },
+    {
+      "closure": {
+        "assessment_counts": {
+          "api_error": 12,
+          "empty_unverified": 201,
+          "possibly_truncated": 6,
+          "sample_ok": 140,
+          "schema_gap": 1
+        },
+        "attempts": 360,
+        "first_request_at": "2026-09-12T05:58:09.187958+00:00",
+        "http_statuses": {
+          "200": 360
+        },
+        "last_response_at": "2026-09-12T05:59:06.640489+00:00",
+        "parent_attempts": 1,
+        "parent_capture_identity_preserved": true,
+        "parent_recaptured": false,
+        "parent_tries_after": 1,
+        "parent_tries_before": 1,
+        "physical_bytes": 35594360,
+        "retained_rows": 64895,
+        "sha_errors": 0,
+        "unique_references": 867
+      },
+      "result": {
+        "elapsed_seconds": 67.601,
+        "partition_work": {
+          "discovery_family": "stocks",
+          "job_id": "6a3bb67bc7d564c9968567aa0608f6d2c1ac5f96b5d6d535931e21baf8006b23",
+          "legacy_parent_recovered": false,
+          "split": {
+            "children": 6268,
+            "method": "identifier_fanout",
+            "parent_observed_added_count": 357,
+            "universe_complete": false
+          },
+          "status": "partitioned",
+          "upstream_calls": 0
+        },
+        "requests": 360,
+        "timing": {
+          "completed_stages": [
+            "open",
+            "publication_check",
+            "planning_check",
+            "archive",
+            "acquire",
+            "document_registration",
+            "close"
+          ],
+          "failed_stage": null,
+          "included_stages": {
+            "reconciliation": "acquire"
+          },
+          "stage_seconds": {
+            "acquire": 75.02402784489095,
+            "archive": 0.03592388518154621,
+            "close": 0.0003950558602809906,
+            "document_registration": 1.570080179721117,
+            "open": 0.0008725151419639587,
+            "planning_check": 0.00023402459919452667,
+            "publication_check": 0.37550219893455505
+          },
+          "total_elapsed_seconds": 77.01188842765987
+        },
+        "updated_at": "2026-09-12T05:59:15.614998+00:00"
+      },
+      "task_id": "eb36edc8-8622-4f44-8c84-6123c76004b6"
+    }
+  ],
+  "schema_version": 1,
+  "status": "code_deployed_and_two_real_runs_verified"
+}
