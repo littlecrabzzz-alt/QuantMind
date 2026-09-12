@@ -403,7 +403,7 @@ LangGraph 的 `interrupt()` 是保存状态并等待用户决定的断点；恢�
 
 ## 17. 2026-09-12 Agent 产品实现与下一步
 
-本次在 `codex/research-agent-product` 独立 worktree 实现第一条真实产品链路。引擎使用 **Deep Agents 0.7.13 + LangGraph 1.2.11**，单独 Python 3.11 服务镜像，原主服务依赖不升级。实际运行验证使用 GLM-5.3-Flash；GLM-5.3 的框架兼容证据见前次记录。部署、案例编号和限制见[产品验收记录](research-agent-product-validation-20260912.md)。
+本次在 `codex/research-agent-product` 独立 worktree 实现第一条真实产品链路。引擎使用 **Deep Agents 0.7.13 + LangGraph 1.2.11**，单独 Python 3.11 服务镜像，原主服务依赖不升级。实际运行验证使用 GLM-5.3-Flash；GLM-5.3 的框架兼容证据见前次记录。已提交并发布至本地/云端服务；案例编号、发布核对和限制见[产品验收记录](research-agent-product-validation-20260912.md)。
 
 ### 已实现并做短流程验收
 

@@ -1,0 +1,10 @@
+# Research Agent product release complete
+
+- Owner: research-agent-product task. Commits 2f4a541e / c2af0fbc; integrated main 1f54c1d4, pushed and both nodes aligned. Final documentation-only commit follows.
+- Deep Agents/LangGraph sidecar, discussion/approved plan, actual tools/files, messages/interrupt, factor/strategy/backtest outcomes now available. Public API authentication and existing business-user mapping preserved.
+- Isolated real GLM workflow: factor and strategy candidates registered, one actual fixed backtest independently reconciled; code job killed in about0.8 seconds; model interruption and continued conversation verified. 7 Agent +3 gateway/account regressions, TypeScript, Ruff, shell syntax passed.
+- Local quantmind-dev and new quantmind-dev-research-agent loaded; cloud quantmind and new quantmind-research-agent loaded, main services healthy. Existing research worker and acquisition services were not restarted. No user research was started. Cloud SDK reply verified using44tokens, no business case created.
+- Cloud web published with existing web-publish entry; index hash matches local build. User Mac was locked, so the user's existing browser session was not inspected; browser acceptance used isolated3301 before release.
+- Plan17, operations and docs/research-agent-product-validation-20260912.md record current scope and gaps. Native Agent does not yet expose networking/PDF, factor evolution, arbitrary-strategy formal validation or simulation tools; no hours-long soak or injected429/crash matrix has passed.
+- Evidence: /Users/lizeyu/.local/share/quantmind/validation/research-agent-product-20260912. Includes standalone isolated PG dump, exact workspaces, CSV/ledger verification, model interruption and service probes. Local/cloud prior draft backups retained. No test DB or artifacts re-ingested into cloud/local business authority.
+- Release window complete. Preserve other research/watch/RRG/Tushare edits in main. Temporary acceptance services and build proxy are being stopped; production Agent services remain online and idle.

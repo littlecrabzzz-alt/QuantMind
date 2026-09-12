@@ -91,4 +91,3 @@
 - `backend/shared/tushare_pipeline.py`：`api_error` 重试至 blocked、`empty_unverified` 终止逻辑。
 - `backend/shared/tushare_text_contracts.py`：`research_report` required/extra 字段合同。
 - `backend/shared/tushare_legacy_connect_contracts.py`：三个已接入 legacy Connect 合同与 planner。
-
