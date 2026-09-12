@@ -1,0 +1,1276 @@
+{
+  "schema_version": 1,
+  "status": "request_contract_production_verified_ce43_mac_offline_closed_history_continues",
+  "code_commit": "69a7c4737760202f4e26c6546378f08e42904225",
+  "scope": [
+    "fut_index_daily",
+    "idx_factor_pro",
+    "fund_factor_pro",
+    "cb_factor_pro"
+  ],
+  "changes": [
+    "Factor history now uses calendar-day trade_date requests across configured range; code-bound valid historical requests retained.",
+    "Futures index requests use 56 documented codes union observed identifiers and bounded dates.",
+    "Reject legacy malformed jobs before account/API scheduler and daily quota reservations; transactionally retain blocked evidence without changing attempts/results.",
+    "Changed contract metadata invalidates planning policies and replays configured coverage."
+  ],
+  "verification": {
+    "targeted_tests": 71,
+    "pipeline_tests": 176,
+    "final_optional_date_regression_tests": 34,
+    "independent_review_tests": 39,
+    "ruff": "passed",
+    "compile": "passed",
+    "diff_check": "passed",
+    "test_totals_overlap": true
+  },
+  "deployment": {
+    "commits": [
+      "1b01bbdb",
+      "00659e8e",
+      "69a7c473"
+    ],
+    "natural_drain_task": "1c322e84-d042-4e4f-b56d-629c4c684f35",
+    "natural_drain_seconds": 83.15645115077496,
+    "old_worker_exit": 0,
+    "worker_started_at": "2026-09-12T06:17:23.73162644Z",
+    "beat_started_at": "2026-09-12T06:16:07.433664264Z",
+    "document_worker_uninterrupted": true,
+    "quantdb_services_not_stopped": true,
+    "handoff_status": "passed",
+    "handoff_source_digest": "1d70760fd3454a0d39ce1c8e2ba8cc01206394cb487969d5ee1ed41b0a886aeb"
+  },
+  "first_production_run": {
+    "celery_state": "SUCCESS",
+    "closure": {
+      "api_counts": {
+        "bak_basic": 2,
+        "bak_daily": 1,
+        "bc_bestotcqt": 1,
+        "block_trade": 1,
+        "bond_blk": 1,
+        "bond_blk_detail": 1,
+        "cb_rate": 1,
+        "cb_share": 1,
+        "cyq_chips": 1,
+        "cyq_perf": 1,
+        "daily_info": 2,
+        "dc_daily": 2,
+        "dc_hot": 1,
+        "dc_index": 2,
+        "dc_member": 2,
+        "disclosure_date": 1,
+        "etf_limit": 4,
+        "etf_sh_cons": 1,
+        "etf_share_size": 5,
+        "etf_sz_cons": 2,
+        "factor_value": 1,
+        "fina_mainbz": 1,
+        "ft_limit": 1,
+        "fund_adj": 4,
+        "fund_daily": 4,
+        "fund_div": 1,
+        "fund_manager": 1,
+        "fund_portfolio": 4,
+        "fut_holding": 1,
+        "fut_weekly_detail": 1,
+        "fut_weekly_monthly": 1,
+        "fx_daily": 1,
+        "ggt_daily": 1,
+        "ggt_top10": 1,
+        "hk_tradecal": 1,
+        "hsgt_top10": 1,
+        "idx_anns": 1,
+        "index_dailybasic": 1,
+        "limit_list_d": 4,
+        "margin_detail": 1,
+        "margin_secs": 1,
+        "monetary_policy": 1,
+        "moneyflow": 1,
+        "moneyflow_dc": 4,
+        "moneyflow_hsgt": 1,
+        "moneyflow_ths": 5,
+        "namechange": 1,
+        "news": 1,
+        "npr": 1,
+        "opt_basic": 1,
+        "opt_daily": 1,
+        "report_rc": 1,
+        "sge_daily": 1,
+        "share_float": 1,
+        "st": 1,
+        "stk_factor_pro": 1,
+        "stk_holdernumber": 1,
+        "stk_holdertrade": 1,
+        "stk_limit": 1,
+        "stk_managers": 2,
+        "stk_rewards": 2,
+        "stk_shock": 1,
+        "stk_surv": 1,
+        "stock_hsgt": 2,
+        "stock_st": 2,
+        "suspend_d": 1,
+        "tdx_index": 1,
+        "tdx_member": 1,
+        "ths_daily": 1,
+        "ths_hot": 1,
+        "ths_member": 1,
+        "top10_cb_holders": 1,
+        "top10_floatholders": 1,
+        "top_inst": 1,
+        "top_list": 2,
+        "us_tradecal": 1,
+        "weekly": 1
+      },
+      "assessment_counts": {
+        "api_error": 1,
+        "empty_unverified": 59,
+        "possibly_truncated": 3,
+        "sample_ok": 51
+      },
+      "attempts": 114,
+      "first_request_at": "2026-09-12T06:17:39.463790+00:00",
+      "http_statuses": {
+        "200": 114
+      },
+      "last_response_at": "2026-09-12T06:19:00.587780+00:00",
+      "physical_bytes": 8631049,
+      "retained_rows": 39929,
+      "sha_errors": 0,
+      "unique_references": 282
+    },
+    "code_commit": "69a7c4737760202f4e26c6546378f08e42904225",
+    "result": {
+      "elapsed_seconds": 90.3,
+      "invalid_requests_blocked": 14033,
+      "partition_work": {
+        "discovery_family": "stocks",
+        "job_id": "059afd007906012e9e37617b8d860fba9b93a7dfabdf632d0e418e836a8ca3fd",
+        "legacy_parent_recovered": false,
+        "split": {
+          "children": 6013,
+          "method": "identifier_fanout",
+          "parent_observed_added_count": 101,
+          "universe_complete": false
+        },
+        "status": "partitioned",
+        "upstream_calls": 0
+      },
+      "planning_cadence": {
+        "config_fingerprint": "69ac7af25b07bc463c75a0026456e64897d453f23bba219469d47baa9418cd49",
+        "due": false,
+        "interval_seconds": 900,
+        "last_success_at": 1789193055,
+        "next_due_at": 1789193955,
+        "performed": false,
+        "reason": "interval_not_due",
+        "status": "deferred"
+      },
+      "publication": {
+        "current_release_id": "data-85ffcb29fa67c2b08699d1e53425bd8d9a6349039856e6490161507fc91dca99",
+        "interval_seconds": 3600,
+        "last_success_at": 1789190268,
+        "mirror_status": "not_checked",
+        "mode": "acquire_only",
+        "next_due_at": 1789193868,
+        "pending": true,
+        "performed": false,
+        "status": "deferred"
+      },
+      "requests": 114,
+      "timing": {
+        "completed_stages": [
+          "open",
+          "publication_check",
+          "planning_check",
+          "archive",
+          "acquire",
+          "document_registration",
+          "close"
+        ],
+        "failed_stage": null,
+        "included_stages": {
+          "reconciliation": "acquire"
+        },
+        "stage_seconds": {
+          "acquire": 90.91177658364177,
+          "archive": 0.1384496819227934,
+          "close": 0.00042746588587760925,
+          "document_registration": 1.5609852392226458,
+          "open": 0.0008991658687591553,
+          "planning_check": 0.00044082850217819214,
+          "publication_check": 0.6538836900144815
+        },
+        "total_elapsed_seconds": 93.27841302379966
+      },
+      "updated_at": "2026-09-12T06:19:02.848526+00:00"
+    },
+    "schema_version": 1,
+    "status": "passed",
+    "task_end": "2026-09-12T06:19:02.848526+00:00",
+    "task_id": "24fe4221-77f8-4041-b84a-64ffb6c3cbcf",
+    "task_start": "2026-09-12T06:17:29.381"
+  },
+  "remaining_gaps": [
+    "Post-ce43 second production inventory waits for next normal fixed publisher and Mac mirror.",
+    "Full historical coverage, revisions and PIT/known_at completeness remain unproven; corrected streams are still sweeping.",
+    "91 single-day index_weight response completeness alarms remain blocked.",
+    "cyq_chips supplier no-data and research_report file_name remain recorded source gaps."
+  ],
+  "secret_handling": "No tokens or order identifiers in this report.",
+  "operational_observations": {
+    "transient_sqlite_lock": {
+      "task_id": "650a0640-855e-479d-82b5-3e12d9226ba4",
+      "at": "2026-09-12T06:25:01Z",
+      "stage": "pipeline.initialize commit",
+      "error": "database is locked",
+      "likely_contributor": "read-only audit scanned pending job JSON for about 20 seconds while the rollback-journal writer attempted commit; lock holder not conclusively attributed",
+      "mitigation": "Audit connection closed; subsequent audit constrained to short indexed fetchall and connection close before file reads; no service restart or database mode change.",
+      "next_task_id": "8c51c650-94b4-468a-810d-ff36a3890329",
+      "recovery_status": "Next normal task SUCCESS264.388s with initialize and planning complete; no restart."
+    }
+  },
+  "publication": {
+    "celery_state": "SUCCESS",
+    "planning_cadence": {
+      "interval_seconds": 900,
+      "performed": false,
+      "status": "not_checked"
+    },
+    "publication": {
+      "current_release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+      "interval_seconds": 3600,
+      "last_success_at": 1789194280,
+      "mirror_status": "not_checked",
+      "mode": "publish_only",
+      "next_due_at": 1789197880,
+      "pending": false,
+      "performed": true,
+      "status": "published"
+    },
+    "requests": 0,
+    "task_id": "23d8b20d-27ef-4abd-8a51-1dbb981096b2",
+    "timing": {
+      "completed_stages": [
+        "open",
+        "publication_check",
+        "publish_lock",
+        "publish",
+        "close"
+      ],
+      "failed_stage": null,
+      "included_stages": {
+        "reconciliation": "acquire"
+      },
+      "publish": {
+        "completed_stages": [
+          "read_current",
+          "scan_gaps",
+          "scan_attempts_and_stat",
+          "schema_metadata",
+          "archive_inventory_before",
+          "document_index",
+          "metadata_inventory",
+          "coverage_and_closure",
+          "compare_previous",
+          "retain_previous",
+          "archive_inventory_after",
+          "serialize_manifest",
+          "write_manifest"
+        ],
+        "failed_stage": null,
+        "retention": {
+          "completed_stages": [
+            "reuse_stat",
+            "expected_files",
+            "lock_wait",
+            "archive_open",
+            "archive_record",
+            "known_archives"
+          ],
+          "failed_stage": null,
+          "reused_predecessor": true,
+          "stage_seconds": {
+            "archive_open": 0.0015208255499601364,
+            "archive_record": 2.0688820853829384,
+            "expected_files": 24.15192898735404,
+            "known_archives": 0.042838333174586296,
+            "lock_wait": 0.00031535327434539795,
+            "reuse_stat": 0.0034672487527132034
+          },
+          "total_elapsed_seconds": 26.27955431304872
+        },
+        "serialization": {
+          "bytes": 421257077,
+          "chunk_generation_seconds": 16.209053365513682,
+          "chunks": 240,
+          "eager_chunks": true,
+          "largest_chunk_bytes": 9744021,
+          "total_seconds": 18.099969889968634
+        },
+        "stage_seconds": {
+          "archive_inventory_after": 1.005125429481268,
+          "archive_inventory_before": 0.5296180956065655,
+          "compare_previous": 7.949613455682993,
+          "coverage_and_closure": 92.92548011988401,
+          "document_index": 121.37280722334981,
+          "metadata_inventory": 8.067190943285823,
+          "read_current": 12.047460718080401,
+          "retain_previous": 26.295326005667448,
+          "scan_attempts_and_stat": 13.257709734141827,
+          "scan_gaps": 7.109477527439594,
+          "schema_metadata": 0.05225732922554016,
+          "serialize_manifest": 39.93515793979168,
+          "write_manifest": 0.08635411784052849
+        },
+        "total_elapsed_seconds": 330.6563172005117
+      },
+      "stage_seconds": {
+        "close": 0.29836165718734264,
+        "open": 0.0008774138987064362,
+        "publication_check": 0.3958031628280878,
+        "publish": 337.2943366598338,
+        "publish_lock": 0.00014588423073291779
+      },
+      "total_elapsed_seconds": 337.9976785928011
+    },
+    "updated_at": "2026-09-12T06:24:40.856774+00:00"
+  },
+  "cloud_fixed_release_closure": {
+    "prior-pending-cloud-release-closure.json": {
+      "boundaries": {
+        "authority_data_access": "read_only",
+        "authority_mutation": "create_only:validation/request-contract-repair-20260912/prior-pending-cloud-release-closure.json",
+        "mac_mirror_started_by_this_verifier": false,
+        "tushare_pro_token": "empty",
+        "tushare_token": "empty",
+        "upstream_calls": 0,
+        "verifier": "scripts/verify_tushare_exact_release.py",
+        "verifier_network": "disabled"
+      },
+      "created_at": "2026-09-12T06:28:03.217864+00:00",
+      "created_at_epoch": 1789194483,
+      "inventory": {
+        "by_kind": {
+          "object": 1080,
+          "observation": 1080,
+          "parquet": 495
+        },
+        "file_bytes": 567240,
+        "locator": "validation/request-contract-repair-20260912/prior-pending-inventory.json",
+        "physical_bytes": 118860888,
+        "references": 2655,
+        "sha256": "5391d9afcbe36e4153048408e95198147ed9fc4165411ebd04a2f045382fd517"
+      },
+      "publisher": {
+        "celery_state": "SUCCESS",
+        "date_done": "2026-09-12T14:24:41.035257+08:00",
+        "elapsed_seconds": 338.1836936082691,
+        "publication": {
+          "last_success_at": 1789194280,
+          "mode": "publish_only",
+          "next_due_at": 1789197880,
+          "pending": false,
+          "performed": true,
+          "status": "published"
+        },
+        "requests": 0,
+        "task_id": "23d8b20d-27ef-4abd-8a51-1dbb981096b2",
+        "task_status": "publish_only"
+      },
+      "release": {
+        "manifest_bytes": 421257077,
+        "manifest_datasets": 129220,
+        "manifest_files": 930485,
+        "manifest_locator": "releases/data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6/manifest.json",
+        "manifest_sha256": "ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+        "release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+        "retained_observations_included": true
+      },
+      "schema_version": 1,
+      "status": "passed",
+      "verification": {
+        "current_release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+        "expected_by_kind": {
+          "object": 1080,
+          "observation": 1080,
+          "parquet": 495
+        },
+        "expected_bytes": 118860888,
+        "expected_references": 2655,
+        "local_physical_errors": 0,
+        "manifest_datasets": 129220,
+        "manifest_files": 930485,
+        "manifest_metadata_errors": 0,
+        "missing_from_manifest": 0,
+        "release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+        "release_manifest_sha256": "ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+        "retained_observations_included": true,
+        "samples": {
+          "metadata": [],
+          "missing": [],
+          "physical": []
+        },
+        "schema_version": 1,
+        "status": "passed",
+        "verified_bytes": 118860888,
+        "verified_references": 2655
+      }
+    },
+    "first-production-cloud-release-closure.json": {
+      "boundaries": {
+        "authority_data_access": "read_only",
+        "authority_mutation": "create_only:validation/request-contract-repair-20260912/first-production-cloud-release-closure.json",
+        "mac_mirror_started_by_this_verifier": false,
+        "tushare_pro_token": "empty",
+        "tushare_token": "empty",
+        "upstream_calls": 0,
+        "verifier": "scripts/verify_tushare_exact_release.py",
+        "verifier_network": "disabled"
+      },
+      "created_at": "2026-09-12T06:28:07.047063+00:00",
+      "created_at_epoch": 1789194487,
+      "inventory": {
+        "by_kind": {
+          "object": 114,
+          "observation": 114,
+          "parquet": 54
+        },
+        "file_bytes": 60276,
+        "locator": "validation/request-contract-repair-20260912/first-production-inventory.json",
+        "physical_bytes": 8631049,
+        "references": 282,
+        "sha256": "2d15c598bd140697b9ec6019a3d3bbdfcd2f0cefac5fe5911657c77b443e4420"
+      },
+      "publisher": {
+        "celery_state": "SUCCESS",
+        "date_done": "2026-09-12T14:24:41.035257+08:00",
+        "elapsed_seconds": 338.1836936082691,
+        "publication": {
+          "last_success_at": 1789194280,
+          "mode": "publish_only",
+          "next_due_at": 1789197880,
+          "pending": false,
+          "performed": true,
+          "status": "published"
+        },
+        "requests": 0,
+        "task_id": "23d8b20d-27ef-4abd-8a51-1dbb981096b2",
+        "task_status": "publish_only"
+      },
+      "release": {
+        "manifest_bytes": 421257077,
+        "manifest_datasets": 129220,
+        "manifest_files": 930485,
+        "manifest_locator": "releases/data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6/manifest.json",
+        "manifest_sha256": "ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+        "release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+        "retained_observations_included": true
+      },
+      "schema_version": 1,
+      "status": "passed",
+      "verification": {
+        "current_release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+        "expected_by_kind": {
+          "object": 114,
+          "observation": 114,
+          "parquet": 54
+        },
+        "expected_bytes": 8631049,
+        "expected_references": 282,
+        "local_physical_errors": 0,
+        "manifest_datasets": 129220,
+        "manifest_files": 930485,
+        "manifest_metadata_errors": 0,
+        "missing_from_manifest": 0,
+        "release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+        "release_manifest_sha256": "ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+        "retained_observations_included": true,
+        "samples": {
+          "metadata": [],
+          "missing": [],
+          "physical": []
+        },
+        "schema_version": 1,
+        "status": "passed",
+        "verified_bytes": 8631049,
+        "verified_references": 282
+      }
+    }
+  },
+  "archives": {
+    "first-production-receipt.json": {
+      "path": "validation/request-contract-repair-20260912/first-production-receipt.json",
+      "bytes": 31381,
+      "sha256": "4c1fdd3b00b03ba507e9b8353cdfc4703b3e86abf165ea81b2b93c66edb5c33f"
+    },
+    "publisher-receipt.json": {
+      "path": "validation/request-contract-repair-20260912/publisher-receipt.json",
+      "bytes": 3236,
+      "sha256": "a1e9910cd3d8035a72aac36dbbbabaadef459275440c8e575a39de745f3af8bc"
+    },
+    "prior-pending-inventory.json": {
+      "path": "validation/request-contract-repair-20260912/prior-pending-inventory.json",
+      "bytes": 567240,
+      "sha256": "5391d9afcbe36e4153048408e95198147ed9fc4165411ebd04a2f045382fd517"
+    },
+    "first-production-inventory.json": {
+      "path": "validation/request-contract-repair-20260912/first-production-inventory.json",
+      "bytes": 60276,
+      "sha256": "2d15c598bd140697b9ec6019a3d3bbdfcd2f0cefac5fe5911657c77b443e4420"
+    },
+    "prior-pending-cloud-release-closure.json": {
+      "path": "validation/request-contract-repair-20260912/prior-pending-cloud-release-closure.json",
+      "bytes": 2742,
+      "sha256": "65c1aa504b49a80ea0ecb064659eb9783b011e087ca0a71e9e9e23f17b6b9951"
+    },
+    "first-production-cloud-release-closure.json": {
+      "path": "validation/request-contract-repair-20260912/first-production-cloud-release-closure.json",
+      "bytes": 2732,
+      "sha256": "71ad0394b3f41a8d5b228a287d47d5118388c4cf0448f33ab623e061a154166f"
+    },
+    "planner-recovery-receipt.json": {
+      "path": "validation/request-contract-repair-20260912/planner-recovery-receipt.json",
+      "bytes": 20760,
+      "sha256": "5023a353d68a987a6af990f656364f1c9a3bb900da9d8905db2b5c2bc82be828"
+    },
+    "second-production-receipt.json": {
+      "path": "validation/request-contract-repair-20260912/second-production-receipt.json",
+      "bytes": 90405,
+      "sha256": "409b3a06abea14059bdc98c789c9e174384a44415f06d68836cdd4cd7f2f8fc7"
+    },
+    "second-production-inventory.json": {
+      "path": "validation/request-contract-repair-20260912/second-production-inventory.json",
+      "bytes": 188531,
+      "sha256": "7c0a9237ace74ed53146fd15b7c5c99c0108709fef11d9eb74f44aaaa59e7ceb"
+    },
+    "before-deploy.json": {
+      "path": "validation/request-contract-repair-20260912/before-deploy.json",
+      "bytes": 63814,
+      "sha256": "835262274187b5b7da6fdf4cd3d4ff6dbfde9e978a1130713f5cbcd8d138b573"
+    },
+    "post-deploy-contract-audit.json": {
+      "path": "validation/request-contract-repair-20260912/post-deploy-contract-audit.json",
+      "bytes": 24913,
+      "sha256": "d06776c59da881ca60f8bad43441cda727265d155e3a9be913da32d3f5dab0f6"
+    },
+    "corrected-eleven-requests-audit.json": {
+      "path": "validation/request-contract-repair-20260912/corrected-eleven-requests-audit.json",
+      "bytes": 8243,
+      "sha256": "f53bb71fb7ac248991efe9d0a8820a507104218cefd256291f105d57647d7620"
+    },
+    "prior-pending-mac-release-closure.json": {
+      "path": "validation/request-contract-repair-20260912/prior-pending-mac-release-closure.json",
+      "bytes": 752,
+      "sha256": "934fd52139427486415f96b22b4af68f780251074a18b00b79068544c5b87d7b"
+    },
+    "first-production-mac-release-closure.json": {
+      "path": "validation/request-contract-repair-20260912/first-production-mac-release-closure.json",
+      "bytes": 743,
+      "sha256": "dc9eb37289c43a07208d8b1417331416d6d368a79214233fc2a33d21c09c1772"
+    },
+    "ce43-offline-read.json": {
+      "path": "validation/request-contract-repair-20260912/ce43-offline-read.json",
+      "bytes": 466,
+      "sha256": "ba799a3e10f71f9b927f1ae90ec71c805fea865e86301a796f5dc8f0c8d73d0b"
+    },
+    "mac-mirror-runtime-receipt.json": {
+      "path": "validation/request-contract-repair-20260912/mac-mirror-runtime-receipt.json",
+      "bytes": 1075,
+      "sha256": "a5da7b51bea3d2415638420936147f6c91146753b56de3630a42045618703f6c"
+    }
+  },
+  "planning_recovery": {
+    "task_id": "8c51c650-94b4-468a-810d-ff36a3890329",
+    "status": "SUCCESS",
+    "requests": 0,
+    "timing": {
+      "total_elapsed_seconds": 264.3816643562168,
+      "stage_seconds": {
+        "close": 0.0006759446114301682,
+        "initialize": 6.73257165402174,
+        "open": 0.0014374200254678726,
+        "planning": 257.22913352772593,
+        "planning_check": 0.00023014657199382782,
+        "planning_checkpoint": 0.0030028633773326874,
+        "publication_check": 0.4088220354169607
+      },
+      "failed_stage": null
+    },
+    "planning_cadence": {
+      "config_fingerprint": "69ac7af25b07bc463c75a0026456e64897d453f23bba219469d47baa9418cd49",
+      "due": true,
+      "interval_seconds": 900,
+      "last_success_at": 1789194638,
+      "next_due_at": 1789195538,
+      "performed": true,
+      "reason": "interval_due",
+      "status": "planned"
+    },
+    "four_streams": {
+      "history:cross_asset_extra": {
+        "anchor": "20260912",
+        "discovery_refresh_pending": false,
+        "done": false,
+        "existing_jobs": 249,
+        "new_jobs": 251,
+        "planned": 542,
+        "reset_reason": "policy_or_legacy_change",
+        "skipped_recent": 42,
+        "stop_reason": "job_budget"
+      },
+      "history:futures_extra": {
+        "anchor": "20260912",
+        "discovery_refresh_pending": false,
+        "done": false,
+        "existing_jobs": 429,
+        "new_jobs": 71,
+        "planned": 802,
+        "reset_reason": "policy_or_legacy_change",
+        "skipped_recent": 302,
+        "stop_reason": "job_budget"
+      },
+      "recent:cross_asset_extra": {
+        "anchor": "20260912",
+        "discovery_refresh_pending": false,
+        "done": true,
+        "existing_jobs": 42,
+        "new_jobs": 0,
+        "planned": 42,
+        "reset_reason": "policy_or_legacy_change",
+        "skipped_recent": 0,
+        "stop_reason": "stream_end"
+      },
+      "recent:futures_extra": {
+        "anchor": "20260912",
+        "discovery_refresh_pending": false,
+        "done": true,
+        "existing_jobs": 246,
+        "new_jobs": 56,
+        "planned": 302,
+        "reset_reason": "policy_or_legacy_change",
+        "skipped_recent": 0,
+        "stop_reason": "stream_end"
+      }
+    }
+  },
+  "second_production_run": {
+    "celery_state": "SUCCESS",
+    "closure": {
+      "api_counts": {
+        "adj_factor": 1,
+        "anns_d": 2,
+        "bak_basic": 6,
+        "bak_daily": 2,
+        "balancesheet_vip": 1,
+        "bc_bestotcqt": 2,
+        "block_trade": 2,
+        "bond_blk": 2,
+        "bond_blk_detail": 2,
+        "cashflow_vip": 1,
+        "cb_factor_pro": 3,
+        "cb_rate": 1,
+        "cb_rating": 2,
+        "cb_share": 1,
+        "cctv_news": 2,
+        "cyq_chips": 2,
+        "cyq_perf": 2,
+        "daily": 1,
+        "daily_basic": 1,
+        "daily_info": 6,
+        "dc_daily": 6,
+        "dc_hot": 1,
+        "dc_index": 4,
+        "dc_member": 6,
+        "disclosure_date": 2,
+        "dividend": 2,
+        "etf_limit": 3,
+        "etf_sh_cons": 6,
+        "etf_share_size": 15,
+        "etf_sz_cons": 6,
+        "express_vip": 1,
+        "factor_value": 1,
+        "fina_audit": 3,
+        "fina_indicator_vip": 1,
+        "fina_mainbz": 3,
+        "forecast_vip": 1,
+        "ft_limit": 2,
+        "fund_adj": 9,
+        "fund_daily": 8,
+        "fund_div": 1,
+        "fund_factor_pro": 3,
+        "fund_manager": 1,
+        "fund_nav": 2,
+        "fund_portfolio": 19,
+        "fund_share": 2,
+        "fut_daily_adj": 2,
+        "fut_holding": 2,
+        "fut_index_daily": 2,
+        "fut_weekly_detail": 2,
+        "fut_weekly_monthly": 2,
+        "fx_daily": 3,
+        "ggt_daily": 4,
+        "ggt_top10": 4,
+        "hk_tradecal": 1,
+        "hsgt_top10": 6,
+        "idx_anns": 1,
+        "idx_factor_pro": 3,
+        "income_vip": 1,
+        "index_daily": 1,
+        "index_dailybasic": 1,
+        "index_member_all": 2,
+        "index_monthly": 2,
+        "index_weekly": 2,
+        "index_weight": 2,
+        "irm_qa_sh": 1,
+        "irm_qa_sz": 1,
+        "kpl_concept_cons": 2,
+        "kpl_list": 2,
+        "limit_list_d": 12,
+        "major_news": 1,
+        "margin_detail": 2,
+        "margin_secs": 2,
+        "monetary_policy": 1,
+        "moneyflow": 1,
+        "moneyflow_dc": 16,
+        "moneyflow_hsgt": 4,
+        "moneyflow_ths": 15,
+        "monthly": 2,
+        "namechange": 1,
+        "news": 1,
+        "npr": 1,
+        "opt_basic": 3,
+        "opt_daily": 3,
+        "pledge_detail": 3,
+        "pledge_stat": 3,
+        "repo_daily": 2,
+        "report_rc": 2,
+        "repurchase": 2,
+        "research_report": 2,
+        "sge_daily": 3,
+        "share_float": 2,
+        "st": 4,
+        "stk_factor": 3,
+        "stk_factor_pro": 3,
+        "stk_holdernumber": 2,
+        "stk_holdertrade": 1,
+        "stk_managers": 6,
+        "stk_rewards": 6,
+        "stk_shock": 4,
+        "stk_surv": 2,
+        "stk_week_month_adj": 1,
+        "stk_weekly_monthly": 1,
+        "stock_hsgt": 6,
+        "stock_st": 4,
+        "tdx_daily": 2,
+        "tdx_index": 2,
+        "tdx_member": 2,
+        "ths_daily": 4,
+        "ths_hot": 1,
+        "ths_member": 4,
+        "top10_cb_holders": 2,
+        "top10_floatholders": 1,
+        "top10_holders": 2,
+        "top_inst": 6,
+        "top_list": 6,
+        "us_tradecal": 1,
+        "weekly": 1
+      },
+      "assessment_counts": {
+        "api_error": 2,
+        "empty_unverified": 195,
+        "possibly_truncated": 10,
+        "sample_ok": 152,
+        "schema_gap": 1
+      },
+      "attempts": 360,
+      "first_request_at": "2026-09-12T06:30:55.419300+00:00",
+      "http_statuses": {
+        "200": 360
+      },
+      "last_response_at": "2026-09-12T06:31:59.436395+00:00",
+      "physical_bytes": 50427758,
+      "retained_rows": 114937,
+      "sha_errors": 0,
+      "unique_references": 883
+    },
+    "code_commit": "69a7c4737760202f4e26c6546378f08e42904225",
+    "result": {
+      "elapsed_seconds": 80.066,
+      "invalid_requests_blocked": 4,
+      "partition_work": {
+        "discovery_family": "stocks",
+        "job_id": "ede6e73365b918b18cf454b885c7a2439b1847aba9dbe5e25f4f4870f07e5e34",
+        "legacy_parent_recovered": false,
+        "split": {
+          "children": 6269,
+          "method": "identifier_fanout",
+          "parent_observed_added_count": 357,
+          "universe_complete": false
+        },
+        "status": "partitioned",
+        "upstream_calls": 0
+      },
+      "planning_cadence": {
+        "config_fingerprint": "69ac7af25b07bc463c75a0026456e64897d453f23bba219469d47baa9418cd49",
+        "due": false,
+        "interval_seconds": 900,
+        "last_success_at": 1789194638,
+        "next_due_at": 1789195538,
+        "performed": false,
+        "reason": "interval_not_due",
+        "status": "deferred"
+      },
+      "publication": {
+        "current_release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+        "interval_seconds": 3600,
+        "last_success_at": 1789194280,
+        "mirror_status": "not_checked",
+        "mode": "acquire_only",
+        "next_due_at": 1789197880,
+        "pending": true,
+        "performed": false,
+        "status": "deferred"
+      },
+      "requests": 360,
+      "timing": {
+        "completed_stages": [
+          "open",
+          "publication_check",
+          "planning_check",
+          "archive",
+          "acquire",
+          "document_registration",
+          "close"
+        ],
+        "failed_stage": null,
+        "included_stages": {
+          "reconciliation": "acquire"
+        },
+        "stage_seconds": {
+          "acquire": 87.91470526345074,
+          "archive": 0.14230581186711788,
+          "close": 0.0005371123552322388,
+          "document_registration": 1.8187788184732199,
+          "open": 0.0009677466005086899,
+          "planning_check": 0.00026172399520874023,
+          "publication_check": 0.4197204429656267
+        },
+        "total_elapsed_seconds": 90.30194468796253
+      },
+      "updated_at": "2026-09-12T06:32:09.271369+00:00"
+    },
+    "schema_version": 1,
+    "status": "passed",
+    "task_end": "2026-09-12T06:32:09.271369+00:00",
+    "task_id": "25ba19f1-d13f-4a55-97c1-c80c53e01c35",
+    "task_start": "2026-09-12T06:30:38.967"
+  },
+  "legacy_invalid_jobs_blocked_total": 14037,
+  "next_release_pending": {
+    "inventory": "validation/request-contract-repair-20260912/second-production-inventory.json",
+    "references": 883,
+    "bytes": 50427758,
+    "reason": "Collected after ce43 manifest publication; scheduled normal publisher next_due_at1789197880.",
+    "must_verify_on_cloud_and_mac": true
+  },
+  "mirror_transfer": {
+    "schema_version": 1,
+    "status": "passed",
+    "observed_at": "2026-09-12T06:42:21.310211+00:00",
+    "current": {
+      "manifest_sha256": "ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+      "release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6"
+    },
+    "current_switched_at": "2026-09-12T06:41:13.308371+00:00",
+    "launch_agent_run": 261,
+    "launch_agent_exit_code": 0,
+    "stderr_bytes": 0,
+    "mirror_result": {
+      "status": "verified",
+      "release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+      "downloaded_files": 12995,
+      "files": 930485,
+      "coverage": {
+        "blocked": 15298,
+        "deferred_legacy_period_plan": 9802,
+        "done": 120554,
+        "empty": 96798,
+        "pending": 5306644,
+        "permission_blocked": 3493,
+        "quality": 422,
+        "resolved": 1955,
+        "split_pending": 5891
+      }
+    },
+    "incremental_expected_bytes": 1136747373,
+    "local_exact_verification_preceded_current_switch": true,
+    "source_data_immutable_between_verification_and_switch": true
+  },
+  "before_invalid_pending_by_api": {
+    "fut_index_daily": 13112,
+    "idx_factor_pro": 308,
+    "fund_factor_pro": 309,
+    "cb_factor_pro": 308
+  },
+  "next_work": {
+    "priority_1": "Offline classify retained cyq_chips supplier no-data responses before API-specific retry semantics changes.",
+    "priority_2": "Offline classify research_report.file_name field gaps; retain existing normalized data and quality evidence.",
+    "performance": "Full identifier planning and publication document_index remain separately measured bottlenecks.",
+    "coordination_note": "coordination/tushare-data/20260912T063026Z-next-gap-readonly-cyq.md"
+  },
+  "corrected-eleven-requests-audit": {
+    "api_counts": {
+      "cb_factor_pro": 3,
+      "fund_factor_pro": 3,
+      "fut_index_daily": 2,
+      "idx_factor_pro": 3
+    },
+    "assessment_counts": {
+      "empty_unverified": 10,
+      "sample_ok": 1
+    },
+    "db_closed_before_file_reads": true,
+    "db_indexed_fetch_seconds": 0.00071675144135952,
+    "history_complete": false,
+    "invalid_shapes": 0,
+    "note": "Response success and preserved bytes do not prove historical coverage; empty responses remain unverified.",
+    "requests": [
+      {
+        "api_name": "fund_factor_pro",
+        "attempt": 1,
+        "attempt_rowid": 230259,
+        "business_code": 0,
+        "fetched_at": "2026-09-12T06:30:58.541139+00:00",
+        "http_status": 200,
+        "job_id": "a4d1060ee16faba2da55fc65e8b23deea48596399dd2ac9e854dd42f3585b006",
+        "object_sha256": "6532c156bf7f4ff9f1b1efb40f81f8643514ba234587410439f6e69ff7a227c6",
+        "observation_sha256": "cea7918296a0ce3646eca2ee6acfc713effa2f11f01f7ed5cf0db002a201708d",
+        "params": {
+          "trade_date": "19900101"
+        },
+        "references_verified": 2,
+        "requested_at": "2026-09-12T06:30:58.482281+00:00",
+        "rows": 0,
+        "status": "empty_unverified"
+      },
+      {
+        "api_name": "idx_factor_pro",
+        "attempt": 1,
+        "attempt_rowid": 230289,
+        "business_code": 0,
+        "fetched_at": "2026-09-12T06:31:04.060076+00:00",
+        "http_status": 200,
+        "job_id": "ef6350ee3b15b4dc4d392356036792ff7cb78650eb9ca5bcde500476667452b6",
+        "object_sha256": "0d2d5b4922b90068cb6cd84fc7c9a937776b7623bcd11d9b40f67718334f66c6",
+        "observation_sha256": "7296f17dbcdda2634eeb8566be5eda37aca05720ad410cfb8c1d283daee22abb",
+        "params": {
+          "trade_date": "19900101"
+        },
+        "references_verified": 2,
+        "requested_at": "2026-09-12T06:31:04.002862+00:00",
+        "rows": 0,
+        "status": "empty_unverified"
+      },
+      {
+        "api_name": "fut_index_daily",
+        "attempt": 1,
+        "attempt_rowid": 230310,
+        "business_code": 0,
+        "fetched_at": "2026-09-12T06:31:08.291055+00:00",
+        "http_status": 200,
+        "job_id": "076c99196b00f0464f184d69ee01a0c99e09a7059132bc11279c2672d76fff26",
+        "object_sha256": "d7cb051f042297c9f5106e503e5788866349167c6dff82629ba456ad2b98a171",
+        "observation_sha256": "ac08774ad797c6716456c96e8c3a90279e92f8c7408dc5e9aba2f759a9cdaa83",
+        "params": {
+          "end_date": "20260912",
+          "start_date": "20260906",
+          "ts_code": "A.NH"
+        },
+        "references_verified": 3,
+        "requested_at": "2026-09-12T06:31:08.251604+00:00",
+        "rows": 5,
+        "status": "sample_ok"
+      },
+      {
+        "api_name": "cb_factor_pro",
+        "attempt": 1,
+        "attempt_rowid": 230319,
+        "business_code": 0,
+        "fetched_at": "2026-09-12T06:31:12.217133+00:00",
+        "http_status": 200,
+        "job_id": "ea83a81e5242f21e26fa8015657d819b52b23aa6eef9633993211fc1531e5aa4",
+        "object_sha256": "e7eb902d5cf144b35c00f3b227fa6608179106de728edb164a4a8893dc5cd002",
+        "observation_sha256": "17410dca1bb36e78e3042bab1d406f86d9dfe81dc393dd6fd47df14413c65990",
+        "params": {
+          "trade_date": "19900101"
+        },
+        "references_verified": 2,
+        "requested_at": "2026-09-12T06:31:12.160300+00:00",
+        "rows": 0,
+        "status": "empty_unverified"
+      },
+      {
+        "api_name": "fund_factor_pro",
+        "attempt": 1,
+        "attempt_rowid": 230379,
+        "business_code": 0,
+        "fetched_at": "2026-09-12T06:31:21.988010+00:00",
+        "http_status": 200,
+        "job_id": "aba6b9e9ea7050f4d4d5fef1f22117cb36b5c4225b91e1168231109407192f53",
+        "object_sha256": "41bebef5a9249f3419a243184e1f62b62a9e800c2354304a1c524f474fefee5d",
+        "observation_sha256": "9a3ff117f8c39d33a6bf4f301a76ae9c68d9865e8792c584319d45c9388b5596",
+        "params": {
+          "trade_date": "19900102"
+        },
+        "references_verified": 2,
+        "requested_at": "2026-09-12T06:31:21.919913+00:00",
+        "rows": 0,
+        "status": "empty_unverified"
+      },
+      {
+        "api_name": "idx_factor_pro",
+        "attempt": 1,
+        "attempt_rowid": 230409,
+        "business_code": 0,
+        "fetched_at": "2026-09-12T06:31:28.845488+00:00",
+        "http_status": 200,
+        "job_id": "526809b345031a8e2c67fef280f099e622460636bcdd2b5ee6d210aad6927e36",
+        "object_sha256": "72ffee6dd2a164b603deba3669041189d0507d6667eb851f51e0b1e558df803f",
+        "observation_sha256": "d827bf0fcaf52e1c3fb11fb5100d3c6f5878cba4f7ff1f3ea41981170c205f26",
+        "params": {
+          "trade_date": "19900102"
+        },
+        "references_verified": 2,
+        "requested_at": "2026-09-12T06:31:28.770128+00:00",
+        "rows": 0,
+        "status": "empty_unverified"
+      },
+      {
+        "api_name": "cb_factor_pro",
+        "attempt": 1,
+        "attempt_rowid": 230439,
+        "business_code": 0,
+        "fetched_at": "2026-09-12T06:31:33.446532+00:00",
+        "http_status": 200,
+        "job_id": "bd21bdeb3790d27deeef3c11a496d44ec2cfed3a8ac6be0dfd736079fa897be3",
+        "object_sha256": "f2e84c58a66229f662fcbaf22446263ae138d2ec486863f97f5745f74dec3977",
+        "observation_sha256": "352328d1ff6a97ac8496ca0c3ae95a120157934c68b0e3b69a0c66c50bdfc021",
+        "params": {
+          "trade_date": "19900102"
+        },
+        "references_verified": 2,
+        "requested_at": "2026-09-12T06:31:33.356805+00:00",
+        "rows": 0,
+        "status": "empty_unverified"
+      },
+      {
+        "api_name": "fut_index_daily",
+        "attempt": 1,
+        "attempt_rowid": 230490,
+        "business_code": 0,
+        "fetched_at": "2026-09-12T06:31:43.167782+00:00",
+        "http_status": 200,
+        "job_id": "be693b0362e5a2f240c42efa6e2a39f9d83df47b1dbf820336256e8de5fadcc0",
+        "object_sha256": "2679c32d6ac586f36ddc12a3c20c51d26aded540ea29d68f9f8bd56806898ab4",
+        "observation_sha256": "7f0459461cf12c61d06f9cc219544a2c2ed9278e132676c67e0ee76ab3173097",
+        "params": {
+          "end_date": "19901231",
+          "start_date": "19900101",
+          "ts_code": "A.NH"
+        },
+        "references_verified": 2,
+        "requested_at": "2026-09-12T06:31:43.130315+00:00",
+        "rows": 0,
+        "status": "empty_unverified"
+      },
+      {
+        "api_name": "fund_factor_pro",
+        "attempt": 1,
+        "attempt_rowid": 230499,
+        "business_code": 0,
+        "fetched_at": "2026-09-12T06:31:44.559027+00:00",
+        "http_status": 200,
+        "job_id": "06e1c25b01eb339e54344d313a6405468a72115d1e1c0276c5db97d5fabb0d50",
+        "object_sha256": "f136556e8820a84d34e9ab571744a14a391daa77a5bad7a833c50f86c65e391b",
+        "observation_sha256": "4ddbd79d5965e06001d211c9c4f32fb51734a24273494fa452314f4c29b50aba",
+        "params": {
+          "trade_date": "19900103"
+        },
+        "references_verified": 2,
+        "requested_at": "2026-09-12T06:31:44.503845+00:00",
+        "rows": 0,
+        "status": "empty_unverified"
+      },
+      {
+        "api_name": "idx_factor_pro",
+        "attempt": 1,
+        "attempt_rowid": 230529,
+        "business_code": 0,
+        "fetched_at": "2026-09-12T06:31:49.302083+00:00",
+        "http_status": 200,
+        "job_id": "ccd64768054c19da8fbd8a68e57b9808be308332c46bb0dbefe301cf54325aff",
+        "object_sha256": "dd942051d7f3890142a966dc792e1e0c0c982d98916ea3c3d2ce0ec91e52e3e5",
+        "observation_sha256": "e3a3e59a5aa948e6e6eee233810dc978ac26fcb66b1bc3e561b0eaa2db644546",
+        "params": {
+          "trade_date": "19900103"
+        },
+        "references_verified": 2,
+        "requested_at": "2026-09-12T06:31:49.214253+00:00",
+        "rows": 0,
+        "status": "empty_unverified"
+      },
+      {
+        "api_name": "cb_factor_pro",
+        "attempt": 1,
+        "attempt_rowid": 230559,
+        "business_code": 0,
+        "fetched_at": "2026-09-12T06:31:54.074647+00:00",
+        "http_status": 200,
+        "job_id": "d7ac90448f1ead7dc25d6d5dc00ca9bc2ecd83e48cbd1ddb69058df08e289381",
+        "object_sha256": "aba4d16a0acf64798b35f3545d9e0a956cda88362a0d558802c3e62709f45ce8",
+        "observation_sha256": "a8fa2342139827a38a2dd101acab194ff253ca5e401233b98c344e30cf277b03",
+        "params": {
+          "trade_date": "19900103"
+        },
+        "references_verified": 2,
+        "requested_at": "2026-09-12T06:31:54.013805+00:00",
+        "rows": 0,
+        "status": "empty_unverified"
+      }
+    ],
+    "rows": 5,
+    "schema_version": 1,
+    "sha_errors": 0,
+    "status": "passed",
+    "target_requests": 11,
+    "task_id": "25ba19f1-d13f-4a55-97c1-c80c53e01c35"
+  },
+  "mac_fixed_release_closure": {
+    "prior-pending-mac-release-closure.json": {
+      "current_release_id": "data-85ffcb29fa67c2b08699d1e53425bd8d9a6349039856e6490161507fc91dca99",
+      "expected_by_kind": {
+        "object": 1080,
+        "observation": 1080,
+        "parquet": 495
+      },
+      "expected_bytes": 118860888,
+      "expected_references": 2655,
+      "local_physical_errors": 0,
+      "manifest_datasets": 129220,
+      "manifest_files": 930485,
+      "manifest_metadata_errors": 0,
+      "missing_from_manifest": 0,
+      "release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+      "release_manifest_sha256": "ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+      "retained_observations_included": true,
+      "samples": {
+        "metadata": [],
+        "missing": [],
+        "physical": []
+      },
+      "schema_version": 1,
+      "status": "passed",
+      "verified_bytes": 118860888,
+      "verified_references": 2655
+    },
+    "first-production-mac-release-closure.json": {
+      "current_release_id": "data-85ffcb29fa67c2b08699d1e53425bd8d9a6349039856e6490161507fc91dca99",
+      "expected_by_kind": {
+        "object": 114,
+        "observation": 114,
+        "parquet": 54
+      },
+      "expected_bytes": 8631049,
+      "expected_references": 282,
+      "local_physical_errors": 0,
+      "manifest_datasets": 129220,
+      "manifest_files": 930485,
+      "manifest_metadata_errors": 0,
+      "missing_from_manifest": 0,
+      "release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+      "release_manifest_sha256": "ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+      "retained_observations_included": true,
+      "samples": {
+        "metadata": [],
+        "missing": [],
+        "physical": []
+      },
+      "schema_version": 1,
+      "status": "passed",
+      "verified_bytes": 8631049,
+      "verified_references": 282
+    }
+  },
+  "offline_read": {
+    "network_guards": [
+      "docker_network_none",
+      "socket.connect",
+      "socket.create_connection",
+      "socket.getaddrinfo"
+    ],
+    "reads": [
+      {
+        "api_name": "index_weight",
+        "columns": 11,
+        "rows": 3
+      },
+      {
+        "api_name": "moneyflow_dc",
+        "columns": 21,
+        "rows": 3
+      },
+      {
+        "api_name": "forecast_vip",
+        "columns": 18,
+        "rows": 3
+      }
+    ],
+    "release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+    "schema_version": 1,
+    "status": "offline_fixed_release_reads_passed",
+    "token_variables_empty": true,
+    "upstream_calls": 0
+  },
+  "legacy_and_post_deploy_audit": {
+    "status": "passed_with_per_request_physical_mapping_pending",
+    "observed_at": "2026-09-12T06:40:15.692040+00:00",
+    "claims": {
+      "new_legal_history_response_observed": true,
+      "no_invalid_target_request_after_watermark": true,
+      "no_old_selected_request_after_watermark": true,
+      "old_selected_attempts_unchanged": true,
+      "old_selected_jobs_changed_only_to_blocked": true,
+      "policy_reset_observed": true
+    },
+    "boundaries": [
+      "empty_unverified is retained evidence, not proof that the supplier has no rows for that date.",
+      "history planning reset is verified but the two history streams remain in bounded progress and are not complete.",
+      "This audit did not access credentials, call Tushare, publish a release, or change pipeline state or services."
+    ],
+    "source": {
+      "baseline": {
+        "attempt_rowid_watermark": 230123,
+        "bytes": 63814,
+        "relative_path": "validation/request-contract-repair-20260912/before-deploy.json",
+        "sha256": "835262274187b5b7da6fdf4cd3d4ff6dbfde9e978a1130713f5cbcd8d138b573"
+      },
+      "live_snapshot_max_attempt_rowid": 231317,
+      "second_production_receipt": {
+        "bytes": 90405,
+        "relative_path": "validation/request-contract-repair-20260912/second-production-receipt.json",
+        "sha256": "409b3a06abea14059bdc98c789c9e174384a44415f06d68836cdd4cd7f2f8fc7",
+        "task_id": "25ba19f1-d13f-4a55-97c1-c80c53e01c35"
+      }
+    },
+    "original_pending_physical_check_closed_by": "corrected-eleven-requests-audit.json"
+  },
+  "final_services": {
+    "ordinary_worker": "healthy",
+    "document_worker": "healthy",
+    "beat": "healthy",
+    "all_restart_counts": 0,
+    "all_oom_killed": false,
+    "cloud_free_bytes": 333920260096
+  }
+}

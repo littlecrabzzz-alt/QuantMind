@@ -1279,3 +1279,14 @@
 本轮代码/生产吞吐已验收；两轮新增数据与index_weight后代第4批仍待正常固定发布、Mac精确SHA及离线读取闭合。当前两端固定版仍85ff。15分钟全量规划扫描约267秒属于另一已记录瓶颈，暂不降低发现范围或规划频率；独立审计未发现能保持完整语义的简单去重优化。Mac完整恢复快照13:55检查约167.69GiB，27秒增长153.8MiB，尚待COMPLETE/VERIFIED；QuantDB应用记录和Qlib日历仍为2026-09-11，云盘可用312.82GiB。
 
 首轮异常只读复审：13个api_error均为HTTP200/业务码50101，无权限/限速/认证拒绝。11个确定性参数合同缺口为fut_index_daily仅trade_date缺ts_code（2项），fund_factor_pro/idx_factor_pro/cb_factor_pro仅start_date/end_date缺ts_code或trade_date（各3项）；同job历史尝试已重复相同错误，列为下一修复优先项，须先核官方请求合同及身份/覆盖测试。另2个cyq_chips为标的/日期无数据；research_report单项101行/10列缺file_name，复用已有known_field_gap。未改状态、伪造empty或重拉上游。
+
+
+2026-09-12 14:43 CST：`1b01bbdb/00659e8e/69a7c473`已合入master、push、双端内容/Git对齐并部署普通worker。修复`fut_index_daily`缺代码、`idx_factor_pro/fund_factor_pro/cb_factor_pro`历史只带日期范围的无效请求；历史因子改按配置范围逐日生成，期货指数用官方56代码并保留观察到的历史代码。共享guard在分钟调度预约、每日配额、Token和HTTP之前校验；旧任务只事务性变blocked并留capability，原job参数/result/attempt/对象不改。71定向、176 pipeline、最终34项日期边界回归及39项独立复审通过（集合重叠，不相加），Ruff/编译/diff检查通过。
+
+首轮24fe4221用93.278秒完成114 HTTP200、39929行，并零上游拦截14033旧请求；后续25ba19f1用90.302秒完成360 HTTP200、114937行，再拦截4项，累计14037。两轮分别282引用/8631049字节、883引用/50427758字节逐SHA通过。12旧任务除state外11列相等，45条旧attempt/result逐字节不变，12个capability均upstream_calls=0/coverage_proven=false。抽查水位后的33次目标API请求全部形状合法；第二轮11项又以索引查询0.000717秒后立即关库，独立核对job/attempt/params与object/observation/parquet，HTTP200和business code0、SHA错误0。9个1990年因子请求及1个期货历史范围为空，保留empty_unverified；近期A.NH返回5行，不把空结果或样本当完整历史。
+
+真实规划任务8c51c650在264.388秒完成，四个recent/history流均因policy_or_legacy_change从offset0重扫；本次跨资产历史新增251、期货历史71、期货近期56任务，两历史流仍未完成。此前650a0640在initialize commit出现一次database locked，可能与我方约20秒全表只读审计持共享锁重叠；审计连接已退出，后续改短PK/rowid查询并在文件校验前关闭。没有因此重启服务或修改数据库模式，后续多轮SUCCESS，明确记录为一次运维审计干扰而非Tushare权限问题。
+
+正常publisher23d8b20d以publish_only/0上游、338.184秒发布ce43326f固定版，manifest421257077字节、930485文件、129220数据集。上一轮stock fanout两批和index_weight后代4共2655引用/118860888字节，以及本轮首批282引用/8631049字节，在云端和Mac全部收录且逐SHA零错误。Mac标准LaunchAgent第261轮已在运行，未使用-k重启；下载12995个增量文件（1136747373字节），完整校验930485项、exit0、stderr空，并于14:41:13原子切换CURRENT。空Token、Docker network none和socket/DNS阻断下，index_weight、moneyflow_dc、forecast_vip各读3行，上游调用0。普通/文档worker和Beat保持healthy、restart0、OOM false，云盘可用333920260096字节。
+
+本轮生产合同与ce43本地读链路已验收。发布之后取得的第二轮883引用/50427758字节仍待下一正常固定发布和Mac闭包，清单已create-only归档，不能归入ce43。本地QuantDB仍已应用至2026-09-11；独立完整恢复快照继续传输、不改沙盒研究输入。后续优先按只读审计记录核cyq_chips错误精确签名，再处理research_report.file_name字段缺口；完整历史、修订、known_at/PIT、91个单日index_weight完整性告警与RRG分类继续开放。机器证据：`docs/tushare-request-contract-repair-20260912.evidence.json`；下一阶段记录：`coordination/tushare-data/20260912T063026Z-next-gap-readonly-cyq.md`。
