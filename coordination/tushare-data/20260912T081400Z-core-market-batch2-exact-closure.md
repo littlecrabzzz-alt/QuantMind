@@ -1,0 +1,12 @@
+# Core market batch 2 exact closure
+
+- Authority batch manifest: `validation/core-market-batch-20260912/batch-2-manifest.json`, 335369 bytes, SHA256 `50d5a25cba53d30b89c90b2bbcf206c3354ca8d5269ecdbf7290b190e6fc1c77`.
+- Exact task inventory: 360 tasks / 60 SSE open dates from 20250523 through 20250815 / 6 APIs; task-ID inventory SHA256 `4b92ab39b4efcbd61c13f958264a9c7eb1b9b24bff954d8a50af5a9848a5560f`.
+- Bounded execution receipt observed at execution: 330 upstream calls in 90.282 seconds under the 360-call / 90-second hard limits. The fixed `de494...` release and authority config were unchanged; no publication was forced.
+- Independent exact-PK closure after the window: 329 `done`, 1 `blocked`, 30 `pending`; 330 tasks have exactly one attempt and 30 have zero attempts. The per-API result is 55 done for `daily`, `adj_factor`, `stk_limit`, `suspend_d`, and `moneyflow`; `daily_basic` is 54 done, 1 blocked, 5 pending. Every other API has 5 pending.
+- The single block is `daily_basic(trade_date=20250530)`, task `ef9d10fc88a3db8c2656cdf71fc306db7e789e406df704263b5c8b886be40840`: upstream returned HTTP 200 / `sample_ok` / 5384 rows, then normalization ended with `TimeoutError`. Its immutable raw object and observation both remain valid and were retained; no parquet was claimed.
+- For all 330 attempts, jobs and attempts match byte-for-byte; HTTP/status/count/field/date/request identity, observation and object SHA chains were checked. For all 329 done tasks, parquet path/name/SHA/bytes, row count, requested field prefix, provenance columns and exact trade date were checked.
+- Expected next normal-release inventory: 989 refs, 279619347 bytes, canonical refs SHA256 `c07f88f81656522a23a061de17569347de89d1a1c458a3775a6f55ba9b864356`. Inventory file SHA256 `d7c41b56a0244887a25387fd6f740bea5fa9943e38252651b214eb5d9d0de0c8`.
+- Authority closure SHA256 `4c7b9667733fa01b03a036c775046e87614e27e8bee754665182d96e3b59408f`; verifier source SHA256 `5639ccc7caa428368bdf835f10223c5eaf3650b1b7e0962ccb72fb4697c1c5df`.
+- Repository copies are under `docs/tushare-core-market-batch2-20260912/`. These copies contain task identifiers, dates, file paths and hashes only; they contain no token, order, account portfolio, or raw market row values.
+- This closes only the bounded batch execution and immutable artifacts. Publication, Mac mirror, full history and PIT remain false until separately verified. The 30 pending tasks were deliberately left to ordinary scheduling; no retry or state rewrite was performed.
