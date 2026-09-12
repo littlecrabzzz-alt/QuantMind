@@ -1383,3 +1383,12 @@ Mac标准LaunchAgent空闲时以不带-k的kickstart进入第271轮，下载4444
 宿主路径首次执行被authority-root guard在凭据/上游前拒绝；生产容器按plan自动读取全部SHA后执行。360次HTTP用50.309秒，286 done/74 empty、67735行，实算429.347rpm，低于接口/账户500rpm及90秒硬截止。独立闭包逐任务核唯一attempt/result、HTTP200、raw、observation、Parquet行数，再复核1006引用/15520675字节，360 object、360 observation、286 parquet，SHA错误0。九份材料create-only归档于validation/index-daily-batch-20260912/batch-21-*。worker和Beat恢复为原容器，五个服务running、restart0、OOM false，QuantDB从未停止。该批仍待正常publisher、云/Mac精确闭包及禁网读取，不能宣称已本地化。
 
 并行只读审核得到top10第2批稳定快照候选：180完整兄弟对/360任务，两个API各180，20070101..20071231，SH/SZ/BJ各60对，全部pending/tries0/attempts0，与batch1三层重叠0，plan-only五项false。因为初次锁命令stdout不可用，后续重建虽来自worker/Beat停止期间的只读事务，也不冒充持锁生产manifest；下一受控窗口须由正式preparer冻结并比对候选hash后才能执行。记录：`coordination/tushare-data/20260912T151801Z-top10-holders-batch2-readonly-audit.md`。index21机器证据：`docs/tushare-index-daily21-20260912.evidence.json`。
+
+
+## 2026-09-12 960e固定版闭合index_daily第21批
+
+正常publisher任务58f73731以publish_only、0上游调用、337.704秒发布data-960e25bc；manifest447388279字节，包含976965文件、135299数据集并保留observations。第21批1006个指定引用/15520675字节在云端缺失0、metadata错误0、物理SHA错误0。
+
+Mac标准LaunchAgent空闲时以不带-k的kickstart进入第273轮，下载2704个增量文件、全量验证976965项、exit0且stderr为空并原子追平。同一1006引用在Mac再次全部通过，云/Mac报告逐字节一致。生产镜像在network none、空Token、只读Mac镜像及socket/DNS/secret阻断下读取index_daily 3行17列，上游调用0，确认该批存量不再依赖Tushare Pro。
+
+五个服务保持运行，QuantDB未停止；云盘可用327990231040字节，距100 GiB保留线仍有220616048640字节。74个空响应仍不证明历史完整；供应商修订、known_at/PIT、完整指数范围和RRG结论继续开放。机器证据：`docs/tushare-index-daily21-20260912.evidence.json`，闭包记录：`coordination/tushare-data/20260912T153100Z-fixed-release-960e-index-daily21.md`。下一受控窗口正式冻结并执行top10股东第2批，候选只读快照不冒充生产准入。

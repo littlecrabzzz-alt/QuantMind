@@ -1,0 +1,1 @@
+{"mirror_read_only": true, "network": "container_none_plus_socket_and_dns_guards", "reads": [{"api_name": "index_daily", "columns": 17, "rows": 3}], "release_id": "data-960e25bcaa9e3205892094fdf54e9ec8ae20a25ef3593e30ab48624f7c3b193b", "schema_version": 1, "status": "passed", "token_variables_empty": true, "upstream_calls": 0}
