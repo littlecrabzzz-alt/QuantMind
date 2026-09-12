@@ -1,0 +1,9 @@
+# Portfolio read contracts deployed, data still disabled
+
+- Integrated to `master` as `cd027ebc` plus privacy fix `9a1ae83a`; coordination head at deployment was `5f6a93032662985ae616e332aa22598bdcdaed78` and was pushed to `origin/master`.
+- Mac/cloud handoff passed at exact head `5f6a9303`, source digest `53a07836b78e05aacb23df16484d39dd83a23a849f1e0b836e5b81fd95ab68e7`. Cloud source and Git metadata matched before restart.
+- Cloud container verification ran the portfolio, Tushare data router and QuantBot suites: 25 tests passed. Cloud loaded registry contains only private read APIs `p_list` and `p_get`; `p_save` and `p_delete` remain absent.
+- Deployment restarted only `quantmind`, `quantmind-tushare-worker` and `quantmind-celery-beat` after ordinary acquisition warm shutdown. `quantmind-tushare-document-worker`, QuantDB/database and unrelated workers were not stopped. The three restarted services became healthy; the document worker remained healthy.
+- Runtime privacy acceptance: the loaded shared reader gate returns generic HTTP 404 `Dataset unavailable` for `p_list`; the same gate covers `p_get`, dataset/coverage enumeration and QuantBot. Account-local fixed-release reads remain available only through the local Python reader.
+- Mac LaunchAgent installation was refreshed without changing its 900-second schedule. Installed `tushare_portfolio_read_contracts.py` SHA256 `dffb23a598549325ece89362a17803770fdac4cee35b46ed172c1b2daf7c5e96` and installed mirror SHA256 `6170f85c546669fd766f0c0bc9f7843c2ba324a2c7850752e3969af74534305d` exactly match the repository.
+- Production config still has portfolio reads disabled. No account list, portfolio name, holding, token or upstream request was accessed during deployment. Actual data capture must use the separately reviewed bounded private helper and must not put private manifests or result rows in Git/log output.
