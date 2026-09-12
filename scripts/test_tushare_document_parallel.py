@@ -282,7 +282,7 @@ class ParallelDocuments(unittest.TestCase):
         self.assertEqual(
             db.execute("SELECT count(*) FROM document_attempts").fetchone()[0], 1
         )
-        self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 2)
+        self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 3)
         self.assertEqual(
             db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 2
         )
@@ -416,6 +416,40 @@ class ParallelDocuments(unittest.TestCase):
         )
         db.close()
         reader.close()
+
+    def test_document_counts_use_covering_status_index(self):
+        self.seed(4)
+        db = docs._document_db(self.root)
+        ids = [row[0] for row in db.execute("SELECT id FROM documents ORDER BY id")]
+        db.execute(
+            "UPDATE documents SET download_status='downloaded',parse_status='parsed' "
+            "WHERE id=?",
+            (ids[0],),
+        )
+        db.execute(
+            "UPDATE documents SET download_status='downloaded',parse_status='no_text' "
+            "WHERE id=?",
+            (ids[1],),
+        )
+        db.commit()
+        self.assertEqual(
+            docs._document_counts(db),
+            [
+                {"download_status": "downloaded", "parse_status": "no_text", "documents": 1},
+                {"download_status": "downloaded", "parse_status": "parsed", "documents": 1},
+                {"download_status": "pending", "parse_status": "not_attempted", "documents": 2},
+            ],
+        )
+        self.assertTrue(
+            any(
+                "USING COVERING INDEX document_status_counts" in row[3]
+                for row in db.execute(
+                    "EXPLAIN QUERY PLAN SELECT download_status,parse_status,count(*) "
+                    "FROM documents GROUP BY download_status,parse_status"
+                )
+            )
+        )
+        db.close()
 
     def test_claim_commit_lock_rolls_back_and_next_run_recovers(self):
         self.seed(1)

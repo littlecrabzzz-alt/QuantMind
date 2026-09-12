@@ -517,7 +517,7 @@ def _document_db(root, *, timeout=10, deadline=None):
     try:
         db.row_factory = sqlite3.Row
         version = db.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (0, 1, 2):
+        if version not in (0, 1, 2, 3):
             db.close()
             raise ValueError("Unsupported document queue schema version")
         if version == 0:
@@ -547,6 +547,17 @@ def _document_db(root, *, timeout=10, deadline=None):
                 CREATE INDEX IF NOT EXISTS document_reference_reuse
                     ON document_refs(api_name,record_sha256,field,source_url,document_id);
                 PRAGMA user_version=2;
+                COMMIT;
+            """)
+        if db.execute("PRAGMA user_version").fetchone()[0] == 2:
+            # Status reports run after the worker budget. Keep their grouping
+            # index-only so a large document queue still returns before the
+            # Celery hard limit.
+            db.executescript("""
+                BEGIN IMMEDIATE;
+                CREATE INDEX IF NOT EXISTS document_status_counts
+                    ON documents(download_status,parse_status);
+                PRAGMA user_version=3;
                 COMMIT;
             """)
     except BaseException:
@@ -1254,7 +1265,8 @@ def _document_counts(db):
     return [
         dict(row)
         for row in db.execute(
-            "SELECT download_status,parse_status,count(*) AS documents FROM documents GROUP BY download_status,parse_status"
+            "SELECT download_status,parse_status,count(*) AS documents "
+            "FROM documents GROUP BY download_status,parse_status"
         )
     ]
 

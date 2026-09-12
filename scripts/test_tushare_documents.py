@@ -630,11 +630,16 @@ class DocumentQueue(unittest.TestCase):
         db.execute("PRAGMA user_version=1")
         db.close()
         db = docs._document_db(self.root)
-        self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 2)
+        self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 3)
         self.assertEqual(db.execute("SELECT count(*) FROM documents").fetchone()[0], 1)
         self.assertTrue(
             db.execute(
                 "SELECT name FROM sqlite_master WHERE name='document_reference_reuse'"
+            ).fetchone()
+        )
+        self.assertTrue(
+            db.execute(
+                "SELECT name FROM sqlite_master WHERE name='document_status_counts'"
             ).fetchone()
         )
         db.close()

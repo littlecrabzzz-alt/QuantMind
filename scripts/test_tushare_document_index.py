@@ -223,7 +223,7 @@ class DocumentIndex(unittest.TestCase):
         self.assertEqual(page["items"], old["mappings"][1:2])
         self.assertEqual(page["next_offset"], 2)
         self.index()
-        self.assertEqual(self.db.execute("PRAGMA user_version").fetchone()[0], 2)
+        self.assertEqual(self.db.execute("PRAGMA user_version").fetchone()[0], 3)
         self.assertEqual(
             docs.document_inventory(self.root)["mappings"], old["mappings"]
         )
