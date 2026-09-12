@@ -160,6 +160,7 @@ FIELD_METADATA = {
 }
 FIELDS = {api: list(fields) for api, fields in FIELD_METADATA.items()}
 INPUT_FIELDS = {api: "ts_code trade_date start_date end_date".split() for api in FIELDS}
+_FACTOR_PRO_APIS = ("idx_factor_pro", "fund_factor_pro", "cb_factor_pro")
 SOURCE_HTML_SHA256 = {
     "idx_factor_pro": "ec9e96b24e5ebf464e1a7a06d9e2c1db2cfd341102d733d05a1092928f542451",
     "fund_factor_pro": "394c4e91872ea44fba0aff983a4b9c5a5e39a66def0c220b1fc181e7ac6d17b2",
@@ -258,7 +259,7 @@ for _api, (_doc, _cap, _points, _family) in _DOCS.items():
         namespace_note="Source identifiers are dataset-scoped; never infer an A-share identity from ts_code alone.",
     )
     CROSS_ASSET_EXTRA_CONTRACTS[_api] = _spec
-for _api in ("idx_factor_pro", "fund_factor_pro", "cb_factor_pro"):
+for _api in _FACTOR_PRO_APIS:
     CROSS_ASSET_EXTRA_CONTRACTS[_api].update(
         documented_rate_tiers=[
             {"minimum_points": 5000, "rpm": 30},
@@ -272,6 +273,8 @@ for _api in ("idx_factor_pro", "fund_factor_pro", "cb_factor_pro"):
         unit_note="vol lots; amount ten-thousand currency units (currency not explicitly labelled)."
         if _api == "cb_factor_pro"
         else "vol lots; amount thousand currency units (currency not explicitly labelled). Signed indicators and null warm-up values are valid.",
+        parameter_note="Official inputs are individually optional, but live code 50101 rejects a bare start_date/end_date range and requires ts_code or trade_date. Code-bound ranges remain legal; the planner uses exact trade_date for all-market coverage.",
+        planning_note="Enumerate every configured calendar date as one all-market trade_date request in the stable history epoch. This preserves the complete requested date envelope without depending on a current or supposedly complete identifier universe.",
     )
 CROSS_ASSET_EXTRA_CONTRACTS["cb_factor_pro"]["adjustment_note"] += (
     " Prose mentions qfq/hfq but no such output columns are listed: support beyond the official table is unverified."
@@ -409,6 +412,8 @@ def validate_cross_asset_request(api, params):
         raise ValueError("Undocumented request")
     if "ts_code" in params:
         _code(api, params["ts_code"])
+    if api in _FACTOR_PRO_APIS and not ({"ts_code", "trade_date"} & params.keys()):
+        raise ValueError("Factor request requires ts_code or trade_date")
     for k in ("trade_date", "start_date", "end_date"):
         if k in params:
             _parse(params[k])
@@ -480,7 +485,7 @@ def cross_asset_extra_prerequisites(identifiers=None, enabled_apis=None, config=
 
 
 def iter_cross_asset_extra_jobs(config, today, identifiers=None):
-    """Bulk recent days first, then lazy fair monthly history. No guessed paging."""
+    """Bulk recent days first, then lazy fair history. No guessed paging."""
     if isinstance(today, datetime):
         today = today.date()
     if not isinstance(today, date):
@@ -492,8 +497,8 @@ def iter_cross_asset_extra_jobs(config, today, identifiers=None):
     end = today - timedelta(days=1)
     recent = end - timedelta(days=6)
 
-    def windows(begin, stop, daily):
-        if daily:
+    def windows(api, begin, stop, daily):
+        if daily or api in _FACTOR_PRO_APIS:
             while begin <= stop:
                 yield {"trade_date": begin.strftime("%Y%m%d")}
                 begin += timedelta(days=1)
@@ -512,7 +517,7 @@ def iter_cross_asset_extra_jobs(config, today, identifiers=None):
                 return
             begin = start if history else max(start or recent, recent)
             stop = recent - timedelta(days=1) if history else end
-            for params in windows(begin, stop, not history):
+            for params in windows(api, begin, stop, not history):
                 yield {
                     "api_name": api,
                     "params": params,

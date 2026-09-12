@@ -122,7 +122,7 @@ class Contracts(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate_cross_asset_request(api, params)
 
-    def test_monthly_history_recent_full_coverage_leap_and_fairness(self):
+    def test_history_recent_full_coverage_leap_and_fairness(self):
         jobs = list(
             iter_cross_asset_extra_jobs(
                 {"history_start": "20240220"}, date(2024, 3, 10)
@@ -133,6 +133,8 @@ class Contracts(unittest.TestCase):
         self.assertEqual(len(recent), 42)
         self.assertEqual(jobs[:42], recent)
         self.assertEqual(len({j["api_name"] for j in history[:6]}), 6)
+        self.assertEqual(len(history), 42)
+        factor_apis = {"idx_factor_pro", "fund_factor_pro", "cb_factor_pro"}
         for api in C:
             days = []
             for job in jobs:
@@ -141,6 +143,8 @@ class Contracts(unittest.TestCase):
                 self.assertEqual(job["fields"].split(","), FIELDS[api])
                 validate_cross_asset_request(api, job["params"])
                 p = job["params"]
+                if api in factor_apis:
+                    self.assertEqual(set(p), {"trade_date"})
                 left = date.fromisoformat(
                     "-".join(
                         [
@@ -159,6 +163,40 @@ class Contracts(unittest.TestCase):
                 sorted(days), [date(2024, 2, 20) + timedelta(days=i) for i in range(19)]
             )
             self.assertEqual(len(days), len(set(days)))
+
+    def test_factor_request_minimum_and_planning_contract(self):
+        codes = {
+            "idx_factor_pro": "801010.SI",
+            "fund_factor_pro": "1500011.SZ",
+            "cb_factor_pro": "T123456.SZ",
+        }
+        for api, code in codes.items():
+            for params in (
+                {},
+                {"start_date": "20240101"},
+                {
+                    "start_date": "20240101",
+                    "end_date": "20240131",
+                },
+            ):
+                with (
+                    self.subTest(api=api, params=params),
+                    self.assertRaisesRegex(
+                        ValueError, "requires ts_code or trade_date"
+                    ),
+                ):
+                    validate_cross_asset_request(api, params)
+            validate_cross_asset_request(api, {"trade_date": "20240102"})
+            validate_cross_asset_request(
+                api,
+                {
+                    "ts_code": code,
+                    "start_date": "20240101",
+                    "end_date": "20240131",
+                },
+            )
+            self.assertIn("live code 50101", C[api]["parameter_note"])
+            self.assertIn("every configured calendar date", C[api]["planning_note"])
 
     def test_no_unknown_start_invented_and_older_scope_not_clipped(self):
         config = {"cross_asset_extra_apis": ["index_global"]}
