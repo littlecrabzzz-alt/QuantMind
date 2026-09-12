@@ -20,6 +20,7 @@ import httpx
 
 DOC_ROOT = "https://tushare.pro/document/2"
 API_ROOT = "https://api.tushare.pro"
+CYQ_CHIPS_EMPTY_MESSAGE = "指定数据不存在，请确认参数！"
 
 
 def utc_now():
@@ -248,6 +249,31 @@ def assess_response(
     }
 
 
+def _cyq_chips_supplier_empty(job, payload):
+    if (
+        job.get("api_name") != "cyq_chips"
+        or not isinstance(payload, dict)
+        or type(payload.get("code")) is not int
+        or payload["code"] != 50101
+        or payload.get("msg") != CYQ_CHIPS_EMPTY_MESSAGE
+        or "data" not in payload
+        or payload["data"] is not None
+    ):
+        return False
+    params = job.get("params")
+    if not isinstance(params, dict) or set(params) != {"ts_code", "trade_date"}:
+        return False
+    if not isinstance(params["ts_code"], str) or not re.fullmatch(
+        r"T?[0-9]{6}\.(?:SH|SZ|BJ)", params["ts_code"]
+    ):
+        return False
+    try:
+        datetime.strptime(params["trade_date"], "%Y%m%d")
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
 def validate_request_shape(job):
     """Enforce the four observed minimum contracts for every acquisition caller."""
     api = job["api_name"]
@@ -346,6 +372,16 @@ def capture_sample(client, token, job, root: Path):
             job.get("nullable_fields", ()),
             job.get("positive_fields", ()),
         )
+        if response.status_code == 200 and _cyq_chips_supplier_empty(job, payload):
+            assessment = {
+                "status": "empty_unverified",
+                "code": 50101,
+                "row_count": 0,
+                "supplier_empty_hint": True,
+                "coverage_proven": False,
+                "history_complete": False,
+                "pit_verified": False,
+            }
     requested = request["fields"]
     requested = requested.split(",") if isinstance(requested, str) else []
     requested = [field.strip() for field in requested]
@@ -353,6 +389,7 @@ def capture_sample(client, token, job, root: Path):
     # Presence is independent of null values and never proves undocumented fields.
     if (
         "row_count" in assessment
+        and isinstance(payload.get("data"), dict)
         and requested
         and all(re.fullmatch(r"[A-Za-z0-9_]+", f) for f in requested)
     ):

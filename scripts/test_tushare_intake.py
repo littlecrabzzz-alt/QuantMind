@@ -145,6 +145,100 @@ class IntakeAcceptance(unittest.TestCase):
         self.assertEqual(result["status"], "sample_ok")
         self.assertFalse(result["supplier_has_more"])
 
+    def test_cyq_chips_exact_supplier_empty_is_narrow_and_archived(self):
+        empty = {
+            "code": 50101,
+            "msg": "指定数据不存在，请确认参数！",
+            "data": None,
+        }
+
+        def capture(api="cyq_chips", params=None, payload=empty, http_status=200):
+            job = {
+                "api_name": api,
+                "params": params
+                if params is not None
+                else {"ts_code": "600001.SH", "trade_date": "20260904"},
+                "fields": "ts_code,trade_date,price,percent",
+                "required_fields": ["ts_code", "trade_date", "price", "percent"],
+                "row_cap": 6000,
+            }
+            root = Path(directory)
+            with httpx.Client(
+                transport=httpx.MockTransport(
+                    lambda _: httpx.Response(http_status, json=payload)
+                )
+            ) as client:
+                return capture_sample(client, "synthetic-test-token", job, root), root
+
+        with tempfile.TemporaryDirectory() as directory:
+            for code in ("600001.SH", "T600001.SH", "830001.BJ"):
+                result, root = capture(
+                    params={"ts_code": code, "trade_date": "20240229"}
+                )
+                self.assertEqual(result["status"], "empty_unverified")
+                self.assertEqual(result["code"], 50101)
+                self.assertEqual(result["row_count"], 0)
+                self.assertTrue(result["supplier_empty_hint"])
+                self.assertFalse(result["coverage_proven"])
+                self.assertFalse(result["history_complete"])
+                self.assertFalse(result["pit_verified"])
+                observation = json.loads(
+                    (root / "observations" / result["observation"]).read_bytes()
+                )
+                self.assertEqual(observation["assessment"]["code"], 50101)
+                raw = json.loads(
+                    (
+                        root / "objects" / (result["object_sha256"] + ".json")
+                    ).read_bytes()
+                )
+                self.assertEqual(raw, empty)
+
+            negative_cases = (
+                ("nearby message", "cyq_chips", None, {**empty, "msg": "指定数据不存在，请检查参数！"}, 200, "api_error"),
+                ("nearby code", "cyq_chips", None, {**empty, "code": 50102}, 200, "api_error"),
+                ("missing data", "cyq_chips", None, {"code": 50101, "msg": empty["msg"]}, 200, "api_error"),
+                ("another api", "cyq_perf", None, empty, 200, "api_error"),
+                ("http 429", "cyq_chips", None, empty, 429, "rate_limited"),
+                ("http 500", "cyq_chips", None, empty, 500, "transport_error"),
+                ("real rows", "cyq_chips", None, {**empty, "data": {"fields": ["ts_code"], "items": [["600001.SH"]]}}, 200, "api_error"),
+                ("permission", "cyq_chips", None, {"code": 2002, "msg": "无权限", "data": None}, 200, "permission_denied"),
+                ("missing date", "cyq_chips", {"ts_code": "600001.SH"}, empty, 200, "api_error"),
+                ("range shape", "cyq_chips", {"ts_code": "600001.SH", "start_date": "20260904", "end_date": "20260904"}, empty, 200, "api_error"),
+                ("bad code", "cyq_chips", {"ts_code": "SH600001", "trade_date": "20260904"}, empty, 200, "api_error"),
+                ("non-string code", "cyq_chips", {"ts_code": 600001, "trade_date": "20260904"}, empty, 200, "api_error"),
+                ("bad date", "cyq_chips", {"ts_code": "600001.SH", "trade_date": "20260229"}, empty, 200, "api_error"),
+            )
+            for name, api, params, payload, status, expected in negative_cases:
+                with self.subTest(name=name):
+                    result, _ = capture(api, params, payload, status)
+                    self.assertEqual(result["status"], expected)
+                    self.assertNotIn("supplier_empty_hint", result)
+
+            success, _ = capture(
+                payload={
+                    "code": 0,
+                    "data": {
+                        "fields": ["ts_code", "trade_date", "price", "percent"],
+                        "items": [["600001.SH", "20260904", 10.0, 1.0]],
+                    },
+                }
+            )
+            self.assertEqual(success["status"], "sample_ok")
+            self.assertNotIn("supplier_empty_hint", success)
+            normal_empty, _ = capture(
+                payload={
+                    "code": 0,
+                    "data": {
+                        "fields": ["ts_code", "trade_date", "price", "percent"],
+                        "items": [],
+                    },
+                }
+            )
+            self.assertEqual(normal_empty["status"], "empty_unverified")
+            self.assertNotIn("supplier_empty_hint", normal_empty)
+            invalid, _ = capture(payload=[])
+            self.assertEqual(invalid["status"], "invalid_response")
+
     def test_observations_preserve_revisions_and_mirror_integrity(self):
         responses = [
             {
