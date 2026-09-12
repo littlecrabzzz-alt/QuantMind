@@ -116,6 +116,13 @@ async def tushare_data_proxy(request: Request, user: dict | None = Depends(get_o
     return await _proxy(request, user)
 
 
+@router.api_route("/api/v1/research-agent/{p:path}", methods=["GET", "POST", "OPTIONS"], include_in_schema=False)
+async def research_agent_proxy(request: Request, user: dict | None = Depends(get_optional_user)):
+    if request.method != "OPTIONS" and (not user or not user.get("user_id")):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return await _proxy(request, user)
+
+
 # 终极捕获规则：匹配所有策略、回测、推理相关的已知路径
 @router.api_route(
     "/api/v1/strategies/{p:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"], include_in_schema=False

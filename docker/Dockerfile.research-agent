@@ -1,0 +1,8 @@
+FROM python:3.11-slim
+WORKDIR /app
+COPY scripts/requirements-deepagents-validation.lock scripts/requirements-research-agent.txt /app/scripts/
+RUN pip install --no-cache-dir -r /app/scripts/requirements-research-agent.txt
+COPY backend/services/research_agent /app/backend/services/research_agent
+COPY scripts/research_workbench_v2.sql /app/scripts/research_workbench_v2.sql
+ENV PYTHONPATH=/app PYTHONDONTWRITEBYTECODE=1 LANGSMITH_TRACING=false LANGCHAIN_TRACING_V2=false
+CMD ["python", "-m", "uvicorn", "backend.services.research_agent.app:app", "--host", "0.0.0.0", "--port", "8100", "--workers", "1", "--no-access-log"]

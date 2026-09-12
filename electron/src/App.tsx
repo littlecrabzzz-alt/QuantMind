@@ -35,6 +35,7 @@ import { preloadAiIdeResources } from './features/auth/utils/lazyLoad';
 import './styles/global.css';
 import './styles/mac-theme.css';
 import './styles/ai-strategy-theme.css';
+const ResearchBacktestCenter = lazy(() => import('./pages/NewBacktestCenterPage').then(m => ({ default: m.NewBacktestCenterPage })));
 
 const UserCenterPage = lazy(() => import('./features/user-center/pages/UserCenterPage'));
 const StrategyComparisonPage = lazy(() => import('./features/strategy-comparison/pages/StrategyComparisonPage'));
@@ -662,6 +663,7 @@ export default function App() {
                       </ProtectedRoute>
                     }
                   />
+                  <Route path="/backtest" element={<ProtectedRoute><ResearchBacktestCenter /></ProtectedRoute>} />
                   <Route
                     path="/alpha-research"
                     element={

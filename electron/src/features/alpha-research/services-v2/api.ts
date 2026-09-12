@@ -166,6 +166,7 @@ function normalizeAgentFactor(raw: any): Factor {
     round: meta.round ?? 0,
     direction: meta.direction ?? raw?.category ?? '',
     createdAt: raw?.created_at ?? '',
+    metadata: meta,
   };
 }
 

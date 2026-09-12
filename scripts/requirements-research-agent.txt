@@ -1,0 +1,7 @@
+-r requirements-deepagents-validation.lock
+fastapi==0.135.1
+uvicorn==0.41.0
+docker==7.1.0
+starlette==1.6.0
+annotated-doc==0.0.5
+click==8.5.0

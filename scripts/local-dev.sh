@@ -157,6 +157,8 @@ stop_local() {
     research_node=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["node_id"])' "$QM_LOCAL_STATE/data/research/settings.json")
     research_children=$(docker ps --filter "label=quantmind.research.node=$research_node" --format '{{.Names}}')
     [ -z "$research_children" ] || fail "Active isolated research computation: $research_children; cancel or finish it before switching backends."
+    research_children=$(docker ps --filter "label=quantmind.agent.node=$research_node" --format '{{.Names}}')
+    [ -z "$research_children" ] || fail "Active Agent computation: $research_children; stop it from its research topic before switching backends."
   fi
   children=$(docker ps --filter network=quantmind-dev_quantmind-net --format '{{.Names}}')
   while IFS= read -r name; do
@@ -165,7 +167,7 @@ stop_local() {
         fail "Active sandbox child job: $name; finish or stop that job before switching backends." ;;
     esac
   done <<< "$children"
-  "${COMPOSE[@]}" down
+  "${COMPOSE[@]}" --profile research-agent down
   echo 'Local sandbox stopped; all data volumes retained.'
   start_tunnel || fail 'Local stop succeeded; cloud tunnel could not be loaded.'
   for _ in {1..10}; do healthy 8000 && healthy 18080 && break; sleep 1; done
@@ -177,6 +179,18 @@ require_mac
 case "${1:-help}" in
   init) lock_operation; initialize ;;
   start) lock_operation; start_local "${2:-core}" ;;
+  start-agent)
+    lock_operation
+    [ "$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' quantmind-dev | grep '^QM_NODE_ROLE=')" = QM_NODE_ROLE=sandbox ] || fail 'Start the local core sandbox first.'
+    [ -f "$QM_LOCAL_STATE/data/research/settings.json" ] || fail 'Prepare the research snapshot first.'
+    "${COMPOSE[@]}" build research-agent
+    "${COMPOSE[@]}" up -d --no-deps research-agent
+    ;;
+  restart-agent)
+    lock_operation
+    [ "$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' quantmind-dev-research-agent | grep '^QM_NODE_ROLE=')" = QM_NODE_ROLE=sandbox ] || fail 'Expected isolated Agent service.'
+    "${COMPOSE[@]}" restart research-agent
+    ;;
   restart-research-worker|restart-backend)
     lock_operation
     service=research-worker; container=quantmind-dev-research-worker
@@ -189,5 +203,5 @@ case "${1:-help}" in
     echo "snapshot=$(cat "$STATE/SNAPSHOT_ID" 2>/dev/null || echo uninitialized)"
     "${COMPOSE[@]}" ps
     ;;
-  *) echo 'Usage: scripts/local-dev.sh {init|start [core|full|research]|restart-research-worker|restart-backend|stop|status}'; exit 2 ;;
+  *) echo 'Usage: scripts/local-dev.sh {init|start [core|full|research]|start-agent|restart-agent|restart-research-worker|restart-backend|stop|status}'; exit 2 ;;
 esac

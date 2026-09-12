@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import ResearchWorkbench from './ResearchWorkbench';
 import { MiningDashboardPage } from '../pages-v2/MiningDashboardPage';
 import { FactorLibraryPage } from '../pages-v2/FactorLibraryPage';
@@ -11,7 +12,14 @@ import { TaskProvider } from '../context-v2/TaskContext';
 
 // Inner component to access context
 const AppContent: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState<PageId>('home');
+  const location = useLocation(), navigate = useNavigate();
+  const requested = new URLSearchParams(location.search).get('page');
+  const currentPage: PageId = ['library', 'backtest', 'mining_dashboard', 'settings'].includes(requested || '') ? requested as PageId : 'home';
+  const setCurrentPage = (page: PageId) => {
+    const params = new URLSearchParams(location.search);
+    params.set('page', page); params.delete('factor');
+    navigate({ pathname: location.pathname, search: params.toString() });
+  };
 
   return (
     <>

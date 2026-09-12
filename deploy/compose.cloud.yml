@@ -1,5 +1,16 @@
 # Always use scripts/dual-node.sh cloud-compose; paths are SSD-only.
 services:
+  research-agent:
+    container_name: quantmind-research-agent
+    environment:
+      QM_NODE_ROLE: authority
+      HOST_RUNTIME_PATH: /root/data/disk/quantmind/project
+    volumes:
+      - ./data:/data
+      - ./backend/services/research_agent:/app/backend/services/research_agent:ro
+      - ./scripts/research_workbench_v2.sql:/app/scripts/research_workbench_v2.sql:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/data/disk/quantmind/secrets/glm-research-api.json:/run/secrets/research-llm.json:ro
   db:
     ports: !reset []
     mem_limit: 1g

@@ -1,10 +1,59 @@
 # 研究工作台运行说明
 
-实现范围与设计见 [持续研究 Plan](continuous-research-and-strategy-plan.md)。当前入口为“课题 → 讨论 → 计划版本 → 明确确认 → 执行”。新问题、材料或已有结果都可建立课题，不要求已有策略。**可执行工具**目前仍为冻结八因子模板上的受控研究：策略更改特征子集或模型参数；方法研究计算受限因果公式并与原模型作增量比较。任意论文算法、外部数据下载和模拟交易不在本版本自动执行范围内。
+2026-09-12 起主入口使用 **Deep Agents / LangGraph 研究 Agent**；完整目标与缺口统一在[持续研究 Plan 第 17 节](continuous-research-and-strategy-plan.md#17-2026-09-12-agent-产品实现与下一步)。后文“旧版固定实验”说明保留用于历史课题，不代表新 Agent 的能力边界。
 
-## 当前实现索引
+## Agent 入口与操作
 
-以下为 2026-09-09 源码核对结果。此文记录现有实现，待开发优先级统一在 Plan 第 5 节维护。
+打开 `/#/alpha-research`，选择“策略链路”或“新因子与方法”起点，编辑问题、对象及限制，点击“建立课题并讨论”。只建立会话，不会执行计算。Agent 会检查现有输入，讨论或提交计划；不是每个问题都会立即生成可执行计划。
+
+右侧分为“计划与决定 / 过程 / 文件 / 成果”。确认当前计划和允许操作，勾选后才运行；每次窗口至多 8 小时。缺少实际数据或工具时先讨论解决缺口，不能用已有模板强行代替课题。
+
+普通消息会在当前模型回合结束后处理，后台代码作业可继续运行。需要立即改变方向用“打断并发送”；“打断执行”停止模型响应和本课题实际计算。页面先显示“正在确认停止”，仅在作业状态核验后显示停止。打断撤销旧窗口，继续执行需要重新查看并确认计划；讨论不需要再次批准。
+
+文件页能查看代码、文本/JSON、常用图片和下载文件；材料按钮上传小文件后把路径放入消息框，用户发送后才交给 Agent 讨论。成果页打开真实因子、AI-IDE 策略草稿、平台回测详情，且可以返回来源课题。未计算指标显示“未计算”，候选不会显示为已验证。
+
+## Agent 代码与持久化
+
+| 层 | 入口 | 职责 |
+| --- | --- | --- |
+| UI | `AgentWorkspace.tsx`、`researchAgent.ts` | 课题、审批、持续消息、动作、文件与成果 |
+| 认证入口 | `api/routers/engine_proxy.py` → `engine/routers/research_agent.py` | 必须是已认证账户；内部签名身份转发、用户/租户/节点归属检查 |
+| Agent 服务 | `services/research_agent/app.py`、`runtime.py` | 原生 Agent、工具、检查点、消息接续、停止、429/5xx 退避 |
+| 状态 | `services/research_agent/store.py` | 复用 `research_drafts`，`engine=deepagents`；原生 checkpoint 表由框架维护 |
+| 代码作业 | `services/research_agent/sandbox.py` | 标准 BaseSandbox 适配，Docker 实际进程、绝对截止、工作区文件隔离 |
+| 平台工具 | `engine/routers/research_agent.py` | 现有因子/策略持久化与固定训练回测、独立账务复算 |
+
+工作区：节点数据目录 `data/research/agent/<课题ID>/workspace`。固定回测原件沿用 `data/research/cases/<课题ID>/experiments/<作业ID>`。引用和哈希入库；本地验收数据不回灌云端。模型密钥只读挂载，工具代码容器不持有密钥、Docker socket 或网络。内部 Agent 服务不向宿主发布端口。
+
+主服务使用原有 Python 环境，Agent 单独镜像使用 `scripts/requirements-research-agent.txt` 及冻结框架依赖；不能把这些依赖直接 pip 安装进旧主服务。一个节点的 PG advisory lock 只允许一个 Agent 进程。上限 4 个模型回合、每课题一个后台作业；不同课题的慢核验独立推进，短期还没有统一资源排队与磁盘配额。
+
+## Agent 启动与恢复
+
+先按后文“准备与启动”建立节点专属 `data/research/settings.json`、冻结输入及私有模型配置；已有模板不重新覆盖。单独服务启动时幂等创建业务表/原生检查点表，保留旧研究数据。正式库首次执行前应按现有迁移规范留备份。
+
+```bash
+# Mac 主工作树：本地 core 已在线、相关任务空闲
+bash scripts/local-dev.sh start-agent
+# 修改 Agent 代码后的单独重启
+bash scripts/local-dev.sh restart-agent
+# 主网关纯 Python 改动，确认任务空闲后加载
+bash scripts/local-dev.sh restart-backend
+
+# 云端按独占发布窗口操作；不会启动业务 Beat 或旧研究队列
+sudo -n bash scripts/dual-node.sh cloud-compose build research-agent
+sudo -n bash scripts/dual-node.sh cloud-compose up -d --no-deps research-agent
+sudo -n bash scripts/dual-node.sh cloud-compose restart quantmind
+```
+
+`start-agent` 使用独立 Docker 镜像；Mac 的 `stop` 将包含 Agent 服务，保留数据卷。关闭浏览器不会停止 Agent。Mac 睡眠或 Docker 退出不能维持本地运行；云端启动仍须独立验证节点和模型连接。页面通过能力接口确认当前节点，不凭浏览器所在电脑判断数据目的地。
+
+服务重启后：等待中的后台作业按原名观察；响应不明的模型回合停止并等待用户决定，不自动重放可能产生副作用的工具。原生检查点中的未返回工具调用被标为中断，接续先核对现有文件、作业及成果。429/5xx 使用有上限退避，超过批准窗口停止；未确认用量保持未知。
+
+短验收证据与尚未验证的故障场景见[产品验收记录](research-agent-product-validation-20260912.md)。当前实现不包含自动联网、任意策略正式执行器、自动模拟交易或数小时可靠性承诺。
+
+## 旧版固定实验：历史实现索引
+
+以下为 2026-09-09 旧版实现，入口折叠在新工作台下方。不要以此表代替上方 Agent 状态。
 
 | 职责 | 代码入口 | 实际行为 |
 | --- | --- | --- |

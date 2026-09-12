@@ -16,7 +16,7 @@ class DraftStore:
         if db is None:
             async with get_session(read_only=not lock) as session:
                 return await self.get(owner, node, ident, session, lock)
-        query = "SELECT * FROM research_drafts WHERE tenant_id=:tenant AND user_id=:user AND node_id=:node"
+        query = "SELECT * FROM research_drafts WHERE tenant_id=:tenant AND user_id=:user AND node_id=:node AND COALESCE(state->>'engine','legacy') != 'deepagents'"
         params = {"tenant": owner[0], "user": owner[1], "node": node}
         if ident:
             query += " AND draft_id=:id"

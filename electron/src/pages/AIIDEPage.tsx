@@ -1919,6 +1919,7 @@ const AIIDEPage: React.FC = () => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                {searchParams.get('research') && <a className="text-primary text-sm block p-2 mb-2" href={`#/alpha-research?research=${encodeURIComponent(searchParams.get('research')!)}`}>返回来源研究课题 · 策略草稿需另行验证</a>}
                     {isLoadingFiles && activeTab === 'local' ? (
                         <div className="space-y-2">
                             {[1, 2, 3, 4, 5].map((i) => (

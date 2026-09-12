@@ -40,6 +40,15 @@ export const FactorLibraryPage: React.FC<{ onNavigate?: (page: string) => void }
   const [factors, setFactors] = useState<Factor[]>([]);
   const [filteredFactors, setFilteredFactors] = useState<Factor[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.hash.split('?')[1] || '').get('factor');
+    if (!id) return;
+    let cancelled = false;
+    void getFactorDetail(id).then(response => {
+      if (!cancelled && response.success && response.data?.factor) setSelectedFactor(response.data.factor);
+    }).catch(() => { if (!cancelled) setError('无法打开该因子，请确认当前账户和节点。'); });
+    return () => { cancelled = true; };
+  }, []);
   const [qualityFilter, setQualityFilter] = useState<FactorQuality | 'all'>('all');
   const [marketFilter, setMarketFilter] = useState<string>('all');
   const [universeFilter, setUniverseFilter] = useState<string>('all');
@@ -96,6 +105,7 @@ export const FactorLibraryPage: React.FC<{ onNavigate?: (page: string) => void }
             round: f.round || 0,
             direction: String(f.direction ?? ''),
             createdAt: f.createdAt || new Date().toISOString(),
+            metadata: f.metadata,
             // Extra fields from API
             backtestResults: f.backtestResults,
             factorFormulation: f.factorFormulation,
@@ -177,7 +187,7 @@ export const FactorLibraryPage: React.FC<{ onNavigate?: (page: string) => void }
     total: factors.length,
     high: factors.filter((f) => f.quality === 'high').length,
     medium: factors.filter((f) => f.quality === 'medium').length,
-    low: factors.filter((f) => f.quality === 'low').length,
+    low: factors.filter((f) => f.quality === 'low' && f.metadata?.validation_status !== 'unvalidated_candidate').length,
   };
 
   return (
@@ -402,7 +412,7 @@ export const FactorLibraryPage: React.FC<{ onNavigate?: (page: string) => void }
                   <CardTitle className="text-base">{factor.factorName}</CardTitle>
                   <div className="flex items-center gap-2 mt-2">
                     <Badge className={getQualityBadgeClass(factor.quality)}>
-                      {factor.quality === 'high' ? '高' : factor.quality === 'medium' ? '中' : '低'}
+                      {factor.metadata?.validation_status === 'unvalidated_candidate' ? '待验证' : factor.quality === 'high' ? '高' : factor.quality === 'medium' ? '中' : '低'}
                     </Badge>
                     {factor.market && (
                       <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${MARKET_COLORS[factor.market] || 'bg-secondary text-muted-foreground'}`}>
@@ -439,19 +449,19 @@ export const FactorLibraryPage: React.FC<{ onNavigate?: (page: string) => void }
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="text-muted-foreground">IC: </span>
-                  <span className="font-mono font-medium">{formatNumber(factor.ic, 4)}</span>
+                  <span className="font-mono font-medium">{factor.metadata?.validation_status === 'unvalidated_candidate' ? '待验证' : formatNumber(factor.ic, 4)}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">RankIC: </span>
-                  <span className="font-mono font-medium">{formatNumber(factor.rankIc, 4)}</span>
+                  <span className="font-mono font-medium">{factor.metadata?.validation_status === 'unvalidated_candidate' ? '待验证' : formatNumber(factor.rankIc, 4)}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">ICIR: </span>
-                  <span className="font-mono font-medium">{formatNumber(factor.icir, 3)}</span>
+                  <span className="font-mono font-medium">{factor.metadata?.validation_status === 'unvalidated_candidate' ? '待验证' : formatNumber(factor.icir, 3)}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">RankICIR: </span>
-                  <span className="font-mono font-medium">{formatNumber(factor.rankIcir, 3)}</span>
+                  <span className="font-mono font-medium">{factor.metadata?.validation_status === 'unvalidated_candidate' ? '待验证' : formatNumber(factor.rankIcir, 3)}</span>
                 </div>
               </div>
               {/* Action buttons */}
@@ -520,7 +530,7 @@ export const FactorLibraryPage: React.FC<{ onNavigate?: (page: string) => void }
                   </CardTitle>
                   <div className="flex items-center gap-2 mt-2">
                     <Badge className={getQualityBadgeClass(selectedFactor.quality || 'medium')}>
-                      {selectedFactor.quality === 'high'
+                      {selectedFactor.metadata?.validation_status === 'unvalidated_candidate' ? '待验证候选' : selectedFactor.quality === 'high'
                         ? '高质量'
                         : selectedFactor.quality === 'medium'
                         ? '中等质量'
@@ -551,6 +561,7 @@ export const FactorLibraryPage: React.FC<{ onNavigate?: (page: string) => void }
                 <h4 className="text-sm font-medium mb-2">因子描述</h4>
                 <p className="text-sm text-muted-foreground">
                   {selectedFactor.factorDescription || selectedFactor.factor_description || '无描述'}
+                  {selectedFactor.metadata?.research_id && <a className="block text-primary mt-2" href={`#/alpha-research?research=${selectedFactor.metadata.research_id}`}>返回来源课题 · {selectedFactor.metadata.validation_status === 'unvalidated_candidate' ? '待验证候选' : '研究成果'}</a>}
                 </p>
               </div>
 
