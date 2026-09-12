@@ -1,0 +1,157 @@
+{
+  "boundary": "This closes fixed-release and Mac-local availability for index_daily batch 19 and index_weight descendant batch 1. It does not claim complete index history, supplier revisions, known_at/PIT semantics, sibling-pair atomicity, empty-result completeness, or closure of the 360 new grandchildren.",
+  "credential_hygiene": {
+    "secrets_in_git_or_report": false,
+    "token_variables_empty_during_offline_read": true
+  },
+  "exact_round": {
+    "batches": [
+      {
+        "jobs": 360,
+        "name": "index_daily_batch_19",
+        "physical_bytes": 19916437,
+        "references": 1075,
+        "rows": 85171,
+        "states": {
+          "done": 355,
+          "empty": 5
+        }
+      },
+      {
+        "jobs": 360,
+        "name": "index_weight_descendant_batch_1",
+        "new_grandchildren": 360,
+        "physical_bytes": 26636330,
+        "references": 900,
+        "rows": 289938,
+        "states": {
+          "empty": 180,
+          "split_pending": 180
+        }
+      }
+    ],
+    "jobs": 720,
+    "physical_bytes": 46552767,
+    "references": 1975,
+    "references_by_kind": {
+      "object": 720,
+      "observation": 720,
+      "parquet": 535
+    },
+    "rows": 375109,
+    "upstream_calls": 720
+  },
+  "fixed_release": {
+    "datasets": 126008,
+    "files": 906518,
+    "manifest_bytes": 397554805,
+    "manifest_sha256": "77bb1b4c3c2cff71de2d74ccf0678e8c4b8bd997d54235b4d8c0d13534bbeee8",
+    "release_id": "data-77bb1b4c3c2cff71de2d74ccf0678e8c4b8bd997d54235b4d8c0d13534bbeee8",
+    "retained_observations_included": true
+  },
+  "mac_mirror": {
+    "current_pointer_sha256": "baa78aecfbfb525ac009ee5927ca721b94d431c0cf208afffe228198ac1ae402",
+    "downloaded_files": 4127,
+    "files": 906518,
+    "launch_agent_run": 251,
+    "last_exit_code": 0,
+    "mirror_status_sha256": "5a44bfd7b9b797526eaed8ab4b60fd12e0d7749dcb7567cab5bbe7e8ce32c2bb",
+    "status": "verified",
+    "switched_at": "2026-09-12T11:16:46+08:00"
+  },
+  "non_blocking_events": [
+    {
+      "detail": "LaunchAgent run 250 safely retained the 3861 pointer after the 397,554,805-byte manifest exceeded the old 180-second absolute transfer timeout. Commit 8fee86a3 raised only that absolute bound to 900 seconds while retaining rsync's 45-second inactivity timeout, staging and atomic pointer semantics. Thirteen mirror transfer/install tests passed; the installed client hash matched source. Run 251 crossed the old limit and completed with exit code zero.",
+      "stage": "mac_manifest_transfer",
+      "status": "fixed_and_real_path_verified"
+    },
+    {
+      "detail": "The first cloud report archive command redirected verifier output to Mac /tmp. The exact-reference inventory was already created with exclusive semantics; the report was then transferred through stdin and created separately with O_EXCL. No existing authority file was overwritten.",
+      "stage": "cloud_validation_archive",
+      "status": "corrected"
+    },
+    {
+      "detail": "The independent full recovery snapshot pull remains active and does not block the verified Tushare fixed-release mirror.",
+      "stage": "full_snapshot_pull",
+      "status": "background_running"
+    }
+  ],
+  "observed_at": "2026-09-12T11:19:45+08:00",
+  "offline_readback": {
+    "network_guards": [
+      "socket",
+      "create_connection",
+      "getaddrinfo"
+    ],
+    "reads": [
+      {
+        "api_name": "index_daily",
+        "columns": 17,
+        "rows": 3,
+        "upstream_calls": 0
+      },
+      {
+        "api_name": "index_weight",
+        "columns": 11,
+        "rows": 3,
+        "upstream_calls": 0
+      }
+    ],
+    "report_bytes": 362,
+    "report_sha256": "b848f556c5710a8e0ef8cf3716c39bab460d1c4f1aaecbbdef42ff3108131bd5",
+    "status": "passed"
+  },
+  "publication": {
+    "elapsed_seconds": 268.9754989501089,
+    "mode": "publish_only",
+    "next_due_at": 1789185686,
+    "requests": 0,
+    "status": "published",
+    "task_id": "5ff83922-3b7e-4d18-ba9c-3002ea240e98",
+    "upstream_calls": 0
+  },
+  "schema_version": 1,
+  "services": {
+    "beat": "healthy",
+    "normal_queue_length": 0,
+    "worker": "healthy",
+    "worker_oom": false,
+    "worker_restart_count": 0
+  },
+  "status": "fixed_release_and_mac_exact_closure_passed",
+  "storage": {
+    "available_bytes": 337605636096,
+    "hard_reserve_bytes": 107374182400,
+    "headroom_above_reserve_bytes": 230231453696
+  },
+  "verification": {
+    "authority_artifacts": {
+      "cloud_report": {
+        "bytes": 748,
+        "path": "validation/fixed-release-20260912/77bb-index-round-cloud-verify.json",
+        "sha256": "a3180354dda0aecd956feadf112a8fed6d1ef459176fb9cb9100c7f74c8a069b"
+      },
+      "inventory": {
+        "bytes": 356096,
+        "path": "validation/fixed-release-20260912/77bb-index-round-exact-refs.json",
+        "sha256": "9dd833f71c91e9290a23bf916082c9f7a208ab18c608ae823b3a909cc7c0b930"
+      }
+    },
+    "cloud": {
+      "manifest_metadata_errors": 0,
+      "missing_from_manifest": 0,
+      "physical_errors": 0,
+      "report_sha256": "a3180354dda0aecd956feadf112a8fed6d1ef459176fb9cb9100c7f74c8a069b",
+      "verified_bytes": 46552767,
+      "verified_references": 1975
+    },
+    "mac": {
+      "manifest_metadata_errors": 0,
+      "missing_from_manifest": 0,
+      "physical_errors": 0,
+      "report_sha256": "a3180354dda0aecd956feadf112a8fed6d1ef459176fb9cb9100c7f74c8a069b",
+      "verified_bytes": 46552767,
+      "verified_references": 1975
+    }
+  }
+}
