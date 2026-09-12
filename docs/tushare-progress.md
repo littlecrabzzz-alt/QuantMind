@@ -1241,3 +1241,5 @@
 - `CURRENT`仍为d6d30c，第18/14批等待下次正常固定发布和Mac镜像。44个空响应、33个拆分父任务、完整历史、修订、`known_at`、PIT语义和RRG行业分类仍是显式缺口。机器证据为`docs/tushare-d6d30c-index-daily18-weight14-20260912.evidence.json`。
 - 恢复普通pipeline后，index daily 19预选和index weight后代live审计因连续写锁未取得一致快照；所有非阻塞尝试均在读SQLite和创建文件前退出，没有候选或半成品。现有`run_tushare_rrg_descendant_batch.py`合同限定为ETF限购数据，不能用于`index_weight`；下一代码优先项是专用index-weight descendant manifest/preparer，然后在下一排空窗口选择完整sibling pair，先减少已知遗漏再继续root batch 15。
 - Mac完整恢复快照LaunchAgent已在2.64 TiB可用空间下拉取`snapshot-20260911T230002081103Z`的未发布目录；它与已验证的d6d30c Tushare镜像独立，全量SHA通过前本地`latest`仍指向旧恢复快照。
+
+2026-09-12 10:04 CST：正常调度任务`400ce5d2…`用378.887秒完成0请求`publish_only`，原子发布`data-3861558a…`；manifest 395562427字节、902390文件、125323数据集，自身SHA与release ID一致。Mac第246轮新增6316文件、完整校验后退出0并切同版。云端和Mac分别逐SHA闭合`index_daily`第18批1075引用/17227996字节与`index_weight`第14批1041引用/11653430字节，缺失/元数据/物理错误均0。两批合计720请求、195306行、90.36秒，实算478.087649 rpm。完整恢复快照继续后台拉取且不阻塞Tushare；下一步先补齐并测试`index_weight`完整兄弟对后代合同，再在新排空窗口准备下一批。证据：`docs/tushare-fixed-release-3861-index-daily18-weight14-20260912.evidence.json`。
