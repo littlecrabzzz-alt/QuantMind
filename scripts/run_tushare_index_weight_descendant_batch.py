@@ -139,15 +139,19 @@ def _verify_live(pipeline, verified):
     history, ht, hl, hr = preparation.history_inventory(pipeline.root)
     if history != verified["source"]["history_inventory"]:
         raise ValueError("Historical batch inventory changed after preparation")
+    logical_keys = [row["logical_key"] for row in verified["records"]]
+    placeholders = ",".join("?" for _ in logical_keys)
+    prior = pipeline.db.execute(
+        "SELECT 1 FROM jobs j "
+        f"WHERE j.logical_key IN ({placeholders}) "
+        "AND EXISTS (SELECT 1 FROM attempts a WHERE a.job_id=j.id) LIMIT 1",
+        logical_keys,
+    ).fetchone()
+    if prior is not None:
+        raise ValueError("Selected logical request gained an attempt")
     for row in verified["records"]:
         if row["task_id"] in ht or row["logical_key"] in hl or row["request_signature_sha256"] in hr:
             raise ValueError("Selected sibling pair now overlaps batch history")
-        prior = pipeline.db.execute(
-            "SELECT 1 FROM attempts a JOIN jobs j ON j.id=a.job_id WHERE j.logical_key=? LIMIT 1",
-            (row["logical_key"],),
-        ).fetchone()
-        if prior is not None:
-            raise ValueError("Selected logical request gained an attempt")
     return pairs
 
 

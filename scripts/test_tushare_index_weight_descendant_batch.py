@@ -361,6 +361,26 @@ class IndexWeightDescendantBatchTests(unittest.TestCase):
         }
         self.assertEqual(after, before)
 
+    def test_live_attempt_overlap_uses_one_batched_jobs_scan(self):
+        manifest = self.prepare()
+        pipeline = runner.pipeline_module.Pipeline(
+            self.authority,
+            json.loads((ROOT / "config/tushare-catalog.json").read_bytes()),
+        )
+        statements = []
+        try:
+            pipeline.db.set_trace_callback(statements.append)
+            runner._verify_live(pipeline, manifest)
+        finally:
+            pipeline.close()
+        scans = [
+            statement
+            for statement in statements
+            if "WHERE j.logical_key IN (" in statement
+        ]
+        self.assertEqual(len(scans), 1)
+        self.assertIn("EXISTS (SELECT 1 FROM attempts", scans[0])
+
     def test_execute_rejects_every_identity_or_live_drift_before_http(self):
         manifest = self.prepare()
         calls = 0
