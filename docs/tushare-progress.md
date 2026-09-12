@@ -1351,3 +1351,10 @@ Mac定时客户端264从空闲手动kickstart（不带-k、不打断传输），
 同一稳定窗口按现有成熟入口冻结首批180个完整top10_holders/top10_floatholders兄弟对，共360个history任务，SH/SZ/BJ各120任务、均为20071231、pristine且与历史零重叠。44.852秒完成360次上游调用：两接口各112 done/68 empty，合计8037行，无pending或blocked。独立闭包逐任务核对身份、唯一attempt、raw、observation和Parquet行数，944个唯一引用/3168798字节全部SHA通过；df2d负对照明确缺全部944项，因此本批仍是authority-only，等待17:43后的下一正常发布和Mac闭环，不强制发布。机器证据：docs/tushare-top10-holders-batch1-20260912.evidence.json。
 
 所有服务已恢复healthy、restart0、OOM false，master/origin及云端handoff均为249c1f59，双端源摘要一致；完整恢复快照仍为snapshot-20260911T230002081103Z且pending_pull=false。下一步并行审核现有index_daily成熟入口的新一批候选，并在下一固定版严格闭合top10首批；完整历史、修订、known_at/PIT、空结果完整性和RRG结论仍开放。
+
+
+## 2026-09-12 index_daily第21批有界准备审计
+
+只读准备审计确认历史批次1至20共6900个任务，task identity、logical key和request signature三层历史集合均无内部重叠，且该通道历史未混入`.CFX/.SI/.SW`。预备器发现共享pipeline writer lock忙，30秒后只重试一次仍忙，随后退出；没有生成候选manifest、读取凭据、调用上游、写authority/config、操作服务或Git。磁盘当时可用329997246464字节，较100 GiB保留线多222623064064字节，容量不是阻塞原因。
+
+因此第21批尚未准入，也不声称已证明360个pristine任务或plan-only五项全false。待共享锁自然空闲后，继续使用现有prepare/run入口，先做具体候选的后缀排除、三层零重叠、pending/tries0与plan-only验收；该调度锁仅作为非阻塞运维记录，不解释为Tushare权限或数据覆盖结论。记录：`coordination/tushare-data/20260912T091645Z-index-daily21-headroom-audit.md`。
