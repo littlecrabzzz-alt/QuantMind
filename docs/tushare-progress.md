@@ -1239,3 +1239,5 @@
 - 无revoke排空并自然丢弃一条过期消息后，index daily 18按d6d30c重新冻结，相对ea64候选替换一个任务。它用45.027秒完成360次HTTP 200：355 done、5 empty、86414行。Index weight 14经fresh gate确认360个父任务、4680个历史根任务/请求及868个递归子任务零重叠，用45.333秒完成360次HTTP 200：288 done、39 empty、33 split pending、108892行，新66个子任务均为pristine。
 - 两批串行且中间冷却72秒，合计720次调用/90.36秒，观测478.088 rpm，低于账户500 rpm门。独立闭包验证2116个物理引用、28881426字节全部SHA通过。Worker和Beat按原容器恢复healthy、restart0、无OOM。
 - `CURRENT`仍为d6d30c，第18/14批等待下次正常固定发布和Mac镜像。44个空响应、33个拆分父任务、完整历史、修订、`known_at`、PIT语义和RRG行业分类仍是显式缺口。机器证据为`docs/tushare-d6d30c-index-daily18-weight14-20260912.evidence.json`。
+- 恢复普通pipeline后，index daily 19预选和index weight后代live审计因连续写锁未取得一致快照；所有非阻塞尝试均在读SQLite和创建文件前退出，没有候选或半成品。现有`run_tushare_rrg_descendant_batch.py`合同限定为ETF限购数据，不能用于`index_weight`；下一代码优先项是专用index-weight descendant manifest/preparer，然后在下一排空窗口选择完整sibling pair，先减少已知遗漏再继续root batch 15。
+- Mac完整恢复快照LaunchAgent已在2.64 TiB可用空间下拉取`snapshot-20260911T230002081103Z`的未发布目录；它与已验证的d6d30c Tushare镜像独立，全量SHA通过前本地`latest`仍指向旧恢复快照。
