@@ -12,10 +12,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from backend.shared.tushare_futures_extra_contracts import (  # noqa: E402
     FIELDS,
+    FUT_INDEX_DAILY_DOCUMENTED_CODES,
     FUTURES_EXTRA_CONTRACTS as CONTRACTS,
     INPUT_FIELDS,
     futures_extra_prerequisites,
     iter_futures_extra_jobs as jobs,
+    validate_futures_index_request,
 )
 
 
@@ -74,6 +76,16 @@ class FuturesExtra(unittest.TestCase):
         self.assertIsNone(CONTRACTS["fut_weekly_monthly"]["minimum_points"])
         self.assertFalse(CONTRACTS["fut_index_daily"]["row_cap_verified"])
         self.assertFalse(CONTRACTS["fut_trade_cal"]["row_cap_verified"])
+        self.assertEqual(len(FUT_INDEX_DAILY_DOCUMENTED_CODES), 56)
+        self.assertEqual(len(set(FUT_INDEX_DAILY_DOCUMENTED_CODES)), 56)
+        self.assertIn("CU.NH", FUT_INDEX_DAILY_DOCUMENTED_CODES)
+        self.assertEqual(
+            CONTRACTS["fut_index_daily"]["dependencies"], ["futures_indexes"]
+        )
+        self.assertEqual(
+            CONTRACTS["fut_index_daily"]["documented_codes"],
+            list(FUT_INDEX_DAILY_DOCUMENTED_CODES),
+        )
         self.assertEqual(sum(map(len, FIELDS.values())), 85)
 
     def test_offline_valid_parameters_recent_before_history(self):
@@ -110,6 +122,10 @@ class FuturesExtra(unittest.TestCase):
                 self.assertNotIn("ts_code", p)
             if j["api_name"] == "fut_weekly_monthly":
                 self.assertIn(p["freq"], ("week", "month"))
+            if j["api_name"] == "fut_index_daily":
+                self.assertEqual(set(p), {"ts_code", "start_date", "end_date"})
+                self.assertRegex(p["ts_code"], r"^[A-Za-z][A-Za-z0-9]*\.NH$")
+                validate_futures_index_request(p)
 
     def test_daily_and_exchange_calendar_cover_holidays_and_leap_day(self):
         begin, today = date(2024, 2, 27), date(2024, 3, 12)
@@ -125,6 +141,7 @@ class FuturesExtra(unittest.TestCase):
         )
         for api in apis:
             dates = []
+            dates_by_code = {}
             for j in planned:
                 if j["api_name"] != api:
                     continue
@@ -138,10 +155,25 @@ class FuturesExtra(unittest.TestCase):
                     )
                     self.assertNotIn("is_open", p)
                     self.assertNotIn("exchange", p)
+                elif api == "fut_index_daily":
+                    covered = days(
+                        datetime.strptime(p["start_date"], "%Y%m%d").date(),
+                        datetime.strptime(p["end_date"], "%Y%m%d").date(),
+                    )
+                    dates_by_code.setdefault(p["ts_code"], []).extend(covered)
+                    self.assertEqual(p["start_date"][:4], p["end_date"][:4])
                 else:
                     dates.append(p["trade_date"])
-            self.assertEqual(set(dates), days(begin, today))
-            self.assertEqual(len(dates), len(set(dates)))
+            if api == "fut_index_daily":
+                self.assertEqual(
+                    set(dates_by_code), set(FUT_INDEX_DAILY_DOCUMENTED_CODES)
+                )
+                for covered in dates_by_code.values():
+                    self.assertEqual(set(covered), days(begin, today))
+                    self.assertEqual(len(covered), len(set(covered)))
+            else:
+                self.assertEqual(set(dates), days(begin, today))
+                self.assertEqual(len(dates), len(set(dates)))
         self.assertIn("GFEX", CONTRACTS["fut_trade_cal"]["discovery_gap"])
         self.assertIn("night", CONTRACTS["fut_trade_cal"]["session_note"])
         self.assertNotIn("SSE", json.dumps(planned))
@@ -242,6 +274,9 @@ class FuturesExtra(unittest.TestCase):
                 for g in discoveries
             )
         )
+        index_gap = next(g for g in discoveries if g["api_name"] == "fut_index_daily")
+        self.assertEqual(index_gap["documented_codes"], 56)
+        self.assertEqual(index_gap["eligible_codes"], 56)
         self.assertTrue(
             any(
                 g["reason"] == "configured_scope_does_not_prove_earlier_history_absent"
@@ -282,7 +317,7 @@ class FuturesExtra(unittest.TestCase):
         )
         self.assertEqual(
             min(
-                j["params"]["trade_date"]
+                j["params"]["start_date"]
                 for j in planned
                 if j["api_name"] == "fut_index_daily"
             ),
@@ -302,6 +337,94 @@ class FuturesExtra(unittest.TestCase):
                 )
             ),
             [],
+        )
+
+    def test_fut_index_daily_uses_documented_and_observed_codes_with_ranges(self):
+        config = {
+            "futures_extra_apis": ["fut_index_daily"],
+            "history_start": "20250101",
+            "planning_epoch": "fixture",
+        }
+        identifiers = {"futures_indexes": ["CU.NH", "OLD1.NH"]}
+        planned = list(jobs(config, date(2026, 9, 9), identifiers))
+        expected_codes = set(FUT_INDEX_DAILY_DOCUMENTED_CODES) | {"OLD1.NH"}
+        self.assertEqual({j["params"]["ts_code"] for j in planned}, expected_codes)
+        self.assertTrue(all("trade_date" not in j["params"] for j in planned))
+        self.assertTrue(
+            all(
+                set(j["params"]) == {"ts_code", "start_date", "end_date"}
+                for j in planned
+            )
+        )
+        identities = {
+            (j["params"]["ts_code"], j["params"]["start_date"], j["params"]["end_date"])
+            for j in planned
+        }
+        self.assertEqual(len(identities), len(planned))
+        self.assertTrue(any(j["params"]["ts_code"] == "OLD1.NH" for j in planned))
+        self.assertTrue(any(j["epoch"] == "history" for j in planned))
+        for bad in ("CU.SHF", "1CU.NH", "CU.NH/"):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                next(jobs(config, date(2026, 9, 9), {"futures_indexes": [bad]}))
+
+    def test_fut_index_unknown_history_keeps_recent_legal_scope_and_gap(self):
+        config = {"futures_extra_apis": ["fut_index_daily"]}
+        planned = list(jobs(config, date(2026, 9, 9)))
+        self.assertEqual(len(planned), len(FUT_INDEX_DAILY_DOCUMENTED_CODES))
+        self.assertTrue(all(j["epoch"] != "history" for j in planned))
+        self.assertTrue(
+            all(
+                j["params"]["start_date"] == "20260903"
+                and j["params"]["end_date"] == "20260909"
+                for j in planned
+            )
+        )
+        gaps = futures_extra_prerequisites(config=config)
+        self.assertTrue(
+            any(
+                gap["api_name"] == "fut_index_daily"
+                and gap["reason"] == "unknown_history_start_requires_scope"
+                for gap in gaps
+            )
+        )
+        self.assertTrue(
+            any(
+                gap["api_name"] == "fut_index_daily"
+                and gap["reason"] == "saturation_discovery_unverified"
+                and not gap["universe_complete"]
+                for gap in gaps
+            )
+        )
+
+    def test_fut_index_request_validator_rejects_unbounded_or_mixed_axes(self):
+        for params in (
+            {"trade_date": "20260909"},
+            {"ts_code": "CU.SHF", "trade_date": "20260909"},
+            {"ts_code": "CU.NH"},
+            {"ts_code": "CU.NH", "start_date": "20260901"},
+            {
+                "ts_code": "CU.NH",
+                "trade_date": "20260909",
+                "start_date": "20260901",
+                "end_date": "20260909",
+            },
+            {
+                "ts_code": "CU.NH",
+                "start_date": "20260909",
+                "end_date": "20260901",
+            },
+            {"ts_code": "CU.NH", "trade_date": "20260230"},
+            {"ts_code": "CU.NH", "trade_date": "20260909", "offset": 0},
+        ):
+            with self.subTest(params=params), self.assertRaises(ValueError):
+                validate_futures_index_request(params)
+        validate_futures_index_request({"ts_code": "CU.NH", "trade_date": "20260909"})
+        validate_futures_index_request(
+            {
+                "ts_code": "CU.NH",
+                "start_date": "20260101",
+                "end_date": "20261231",
+            }
         )
 
 

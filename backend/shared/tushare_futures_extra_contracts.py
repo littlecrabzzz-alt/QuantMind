@@ -28,6 +28,18 @@ INPUT_FIELDS = {
     "fut_weekly_detail": "week prd start_week end_week exchange fields".split(),
     "ft_limit": "ts_code trade_date start_date end_date cont exchange".split(),
 }
+
+# Complete code table printed on the reviewed doc 468 page. It bootstraps legal
+# requests but remains a dated documentation snapshot, never a universe proof.
+FUT_INDEX_DAILY_DOCUMENTED_CODES = tuple(
+    code + ".NH"
+    for code in """
+    NHAI NHCI NHECI NHFI NHII NHMI NHNFI NHPMI
+    A AG AL AP AU BB BU C CF CS CU CY ER FB FG FU HC I J JD JM JR
+    L LR M ME NI P PB PP RB RM RO RS RU SC SF SM SN SP SR TA TC V
+    WR WS Y ZN
+    """.split()
+)
 # doc, row cap (operational alarm when undocumented), points, keys, earliest scope floor
 _DOCS = {
     "fut_trade_cal": (467, 1000, 2000, ("exchange", "cal_date"), None),
@@ -129,9 +141,12 @@ FUTURES_EXTRA_CONTRACTS["fut_holding"].update(
     null_note="Missing vol/long/short ranking values are absent measures, not zero positions. Product and contract ranking rows must remain distinct.",
 )
 FUTURES_EXTRA_CONTRACTS["fut_index_daily"].update(
+    dependencies=["futures_indexes"],
     saturation_fallback="futures_indexes",
     saturation_param="ts_code",
-    discovery_gap="The document lists legacy .NH index codes but is not a verified current or historical master. Daily unfiltered requests discover symbols; retain observed retired/renamed indexes.",
+    documented_codes=list(FUT_INDEX_DAILY_DOCUMENTED_CODES),
+    parameter_note="Every planned request pairs one documented or observed .NH code with start_date/end_date. The page marks ts_code optional, but its only concrete example supplies CU.NH and a date range; do not emit date-only requests.",
+    discovery_gap="The page's .NH code table is a documentation snapshot, not a verified current or historical master. Union it with valid codes observed in retained fut_index_daily responses, including retired or renamed indexes, without claiming completeness.",
     unit_note="Index point levels; vol is contracts and amount is thousand CNY, unlike the ten-thousand CNY futures-bar amount.",
 )
 FUTURES_EXTRA_CONTRACTS["fut_weekly_detail"].update(
@@ -215,6 +230,28 @@ def _identifiers(identifiers, enabled):
     return result
 
 
+def validate_futures_index_request(params):
+    """Validate the bounded request shape used for fut_index_daily only."""
+    if not isinstance(params, dict) or params.keys() - set(
+        INPUT_FIELDS["fut_index_daily"]
+    ):
+        raise ValueError("Undocumented fut_index_daily request")
+    code = params.get("ts_code")
+    if not isinstance(code, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9]*\.NH", code):
+        raise ValueError("fut_index_daily requires a legal .NH ts_code")
+    point = "trade_date" in params
+    ranged = "start_date" in params or "end_date" in params
+    if point == ranged:
+        raise ValueError("fut_index_daily requires one reviewed date axis")
+    if point:
+        _parse(params["trade_date"])
+        return
+    if not {"start_date", "end_date"} <= params.keys():
+        raise ValueError("fut_index_daily requires a complete date range")
+    if _parse(params["start_date"]) > _parse(params["end_date"]):
+        raise ValueError("Reversed fut_index_daily date window")
+
+
 def futures_extra_prerequisites(identifiers=None, enabled_apis=None, config=None):
     config = dict(config or {})
     if enabled_apis is not None:
@@ -227,15 +264,21 @@ def futures_extra_prerequisites(identifiers=None, enabled_apis=None, config=None
         spec = FUTURES_EXTRA_CONTRACTS[api]
         family = spec.get("saturation_fallback")
         if family:
-            gaps.append(
-                {
-                    "api_name": api,
-                    "dependencies": [family],
-                    "reason": "saturation_discovery_unverified",
-                    "observed_codes": len(ids[family]),
-                    "universe_complete": False,
-                }
-            )
+            gap = {
+                "api_name": api,
+                "dependencies": [family],
+                "reason": "saturation_discovery_unverified",
+                "observed_codes": len(ids[family]),
+                "universe_complete": False,
+            }
+            if api == "fut_index_daily":
+                gap.update(
+                    documented_codes=len(FUT_INDEX_DAILY_DOCUMENTED_CODES),
+                    eligible_codes=len(
+                        set(FUT_INDEX_DAILY_DOCUMENTED_CODES) | set(ids[family])
+                    ),
+                )
+            gaps.append(gap)
         if spec["history_gap"]:
             gaps.append(
                 {
@@ -292,6 +335,31 @@ def _windows(api, begin, end):
             day += timedelta(days=1)
 
 
+def _fut_index_windows(begin, end, codes):
+    """Bound one legal .NH index request to one calendar year."""
+    for year in range(begin.year, end.year + 1):
+        left = max(begin, date(year, 1, 1))
+        right = min(end, date(year, 12, 31))
+        for code in codes:
+            params = {
+                "ts_code": code,
+                "start_date": left.strftime("%Y%m%d"),
+                "end_date": right.strftime("%Y%m%d"),
+            }
+            validate_futures_index_request(params)
+            yield params
+
+
+def _request_windows(api, begin, end, identifiers):
+    if api == "fut_index_daily":
+        codes = sorted(
+            set(FUT_INDEX_DAILY_DOCUMENTED_CODES)
+            | set(identifiers.get("futures_indexes", ()))
+        )
+        return _fut_index_windows(begin, end, codes)
+    return _windows(api, begin, end)
+
+
 def iter_futures_extra_jobs(config, today, identifiers=None):
     """Recent work first, then round-robin lazy history across all enabled APIs.
 
@@ -305,7 +373,7 @@ def iter_futures_extra_jobs(config, today, identifiers=None):
     if not isinstance(today, date):
         raise ValueError("today must be a date")
     enabled = _enabled(config)
-    _identifiers(identifiers if identifiers is not None else {}, enabled)
+    ids = _identifiers(identifiers if identifiers is not None else {}, enabled)
     starts = _starts(config, enabled)
     if any(start and start > today for start in starts.values()):
         raise ValueError("History start cannot be after today")
@@ -323,10 +391,12 @@ def iter_futures_extra_jobs(config, today, identifiers=None):
             )
         elif api == "fut_weekly_detail":
             recent = date(max(start.year if start else 2010, today.year - 1), 1, 1)
-        for params in _windows(api, recent, ceiling):
+        for params in _request_windows(api, recent, ceiling, ids):
             yield {"api_name": api, "params": params, "priority": 20, "epoch": epoch}
         if start and start < recent:
-            histories[api] = iter(_windows(api, start, recent - timedelta(days=1)))
+            histories[api] = iter(
+                _request_windows(api, start, recent - timedelta(days=1), ids)
+            )
     while histories:
         for api in tuple(histories):
             params = next(histories[api], None)
