@@ -1365,3 +1365,12 @@ Mac定时客户端264从空闲手动kickstart（不带-k、不打断传输），
 固定版覆盖审计器现同时读取manifest的API级capability和retained gap assessment，仍完全离线、只读且不访问authority。50个已注册/已规划但没有发布数据集的接口准确分为：37个已有permission_denied证据、11个已有api_error证据、2个可调用但只有空响应；unclassified为0。此前34/14/2只按direct capability分组，把3个gap内拒权和11个API错误笼统放入“无直接capability”，是报表口径问题，不是原始响应丢失。
 
 既有raw复审已确认11个api_error均为供应商40101接口名拒绝；固定manifest未嵌消息文本，因此机器报表保持诚实的api_error粒度。`stk_alert`有4个空观察，`stk_high_shock`有2个，均不构成数据集、完整历史、事件不存在、修订或PIT证据。当前48个拒权/API错误接口不重复探测；`stk_alert`至多保留一次新的窄范围过滤语义探针，`stk_high_shock`须先获得新的权威非空日期/代码。v2报告SHA为bf20745992cfa78c426aa400032ae37f54f3f199596d259b91ac6a63d5c4d3b9，记录：`coordination/tushare-data/20260912T092136Z-df2d-coverage-evidence-classification.md`。
+
+
+## 2026-09-12 8b3e固定版闭合top10股东首批
+
+正常publisher任务22cb2814以publish_only、0上游调用、383.078秒发布data-8b3e0b4a；446611290字节manifest含974260文件和135013数据集。top10_holders/top10_floatholders首批180个兄弟对的944个引用/3168798字节在云端缺失0、manifest元数据错误0、物理SHA错误0。authority验证材料create-only归档于validation/fixed-release-20260912/8b3e-top10-holders1。
+
+Mac标准LaunchAgent空闲时以不带-k的kickstart进入第271轮，下载4444个增量文件、完整验证974260项、exit0、stderr0并原子切换同一8b3e固定版。本地同944引用再次全通过，云/Mac验证报告逐字节一致，SHA为f48f1f18d2648cb51c6455f7c7b8bc679ae59a35b5f23cebb48ba5a3a7eccfe6。生产镜像在network none、socket/DNS/secret阻断、空Token、只读镜像下读取两个top10接口各3行15列，上游0，确认该批存量不依赖Tushare Pro。
+
+五个服务保持running、restart0、OOM false，QuantDB未停止；云盘可用329013694464字节，距100 GiB保留线仍有221639512064字节。首批只闭合20071231的180对，不证明完整股东历史、空响应完整、供应商修订、intraday known_at、PIT持股、后续期间或RRG/策略结论。机器证据：`docs/tushare-fixed-release-8b3e-top10-holders1-20260912.evidence.json`。
