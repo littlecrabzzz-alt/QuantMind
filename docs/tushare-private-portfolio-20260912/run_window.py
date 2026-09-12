@@ -12,7 +12,10 @@ import sys
 from datetime import datetime, timezone
 from uuid import uuid4
 
-REPO = Path(__file__).resolve().parents[2]
+if "QUANTMIND_REPO" in os.environ:
+    REPO = Path(os.environ["QUANTMIND_REPO"]).resolve()
+else:
+    REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 
 from scripts import tushare_portfolio_read_batch as batch  # noqa: E402
