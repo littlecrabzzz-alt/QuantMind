@@ -1231,3 +1231,11 @@
 - `index_weight` batch 13 passed a same-lock gate with 360 pristine tasks, zero overlap against 4,320 historical tasks/requests and zero overlap with 802 recursive descendants. It completed 360 HTTP-200 calls in 55.345 seconds as 290 done, 37 empty and 33 split pending, retaining 112,316 rows and creating 66 unique pristine children.
 - Independent closure verified all 2,121 object/observation/Parquet files and 27,581,177 bytes by size and SHA, with observation-object links intact. The batches did not publish or switch CURRENT. Worker and Beat were restored exactly and are healthy with restart0/OOM false.
 - Cloud has 347,601,272,832 bytes free, 240,227,090,432 bytes above the 100 GiB reserve. Both batches wait for the next normal fixed release and Mac mirror; empty responses, descendants, complete history, revisions, `known_at`, PIT semantics and RRG classification remain open. Machine evidence is `docs/tushare-index-daily17-weight13-20260912.evidence.json`.
+
+## 2026-09-12 08:52 d6d30c固定版与index_daily 18 / index_weight 14
+
+- 恢复快照在`finally`中恢复主业务服务后完成冻结副本校验，正式发布`snapshot-20260911T230002081103Z`。长暂停的主因是停写窗口内重新哈希已变化的多GiB热文件；逾期Tushare发布期间仅将冻结快照校验降为idle I/O优先级，未停止快照或改变验证语义。
+- 正常`publish_only`以0上游0请求、519.247秒发布`data-d6d30c910a1636d67ceeae9896f36708403f2809b5cc24039128cf82e18c9f71`；391919058字节manifest含896073个文件和124355个dataset。Mac LaunchAgent下载3398个增量文件并完整校验后原子切换；index daily 17与index weight 13的2121个引用、27581177字节在云端和Mac均逐文件通过。
+- 无revoke排空并自然丢弃一条过期消息后，index daily 18按d6d30c重新冻结，相对ea64候选替换一个任务。它用45.027秒完成360次HTTP 200：355 done、5 empty、86414行。Index weight 14经fresh gate确认360个父任务、4680个历史根任务/请求及868个递归子任务零重叠，用45.333秒完成360次HTTP 200：288 done、39 empty、33 split pending、108892行，新66个子任务均为pristine。
+- 两批串行且中间冷却72秒，合计720次调用/90.36秒，观测478.088 rpm，低于账户500 rpm门。独立闭包验证2116个物理引用、28881426字节全部SHA通过。Worker和Beat按原容器恢复healthy、restart0、无OOM。
+- `CURRENT`仍为d6d30c，第18/14批等待下次正常固定发布和Mac镜像。44个空响应、33个拆分父任务、完整历史、修订、`known_at`、PIT语义和RRG行业分类仍是显式缺口。机器证据为`docs/tushare-d6d30c-index-daily18-weight14-20260912.evidence.json`。

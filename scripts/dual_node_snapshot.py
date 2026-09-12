@@ -12,13 +12,14 @@ import hashlib
 import json
 import os
 import plistlib
+import stat
 import sys
 from pathlib import Path
 import shutil
 import signal
 import subprocess
 
-from dual_node_inventory import inventory, runtime_roots
+from dual_node_inventory import inventory, runtime_path, runtime_roots, stat_key
 from dual_node_sync import PROJECT, topology
 
 SETTINGS = topology()
@@ -65,15 +66,33 @@ def publish_link(base, target):
     os.replace(temporary, base / "latest")
 
 
-def copy_runtime_delta(source, target, copied, expected):
-    expected_by_path = {r["path"]: r for r in expected}
-    changed = [p for p, r in expected_by_path.items() if copied.get(p) != r]
+def runtime_stats(project):
+    records = {}
+    for root in runtime_roots(project):
+        for path in sorted(root.rglob("*")):
+            relative = path.relative_to(project)
+            if not runtime_path(relative):
+                continue
+            info = path.lstat()
+            if stat.S_ISLNK(info.st_mode):
+                raise RuntimeError(f"Review runtime symlink before migration: {relative}")
+            if stat.S_ISREG(info.st_mode):
+                records[relative.as_posix()] = stat_key(info)
+    return records
+
+
+def copy_runtime_delta(source, target, copied, cache, expected_stats):
+    changed = [
+        path for path, current_stat in expected_stats.items()
+        if path not in cache or cache[path][0] != current_stat
+        or copied.get(path) != cache[path][1]
+    ]
     if changed:
         run("rsync", "-a", "--ignore-times", "--from0", "--files-from=-",
             str(source) + "/", str(target) + "/",
             input=b"\0".join(p.encode() for p in changed) + b"\0")
     # Only unpublished staging files are removed, never the live tree or latest.
-    for removed in copied.keys() - expected_by_path.keys():
+    for removed in copied.keys() - expected_stats.keys():
         (target / removed).unlink()
 
 
@@ -114,8 +133,8 @@ def cloud_snapshot():
             # Only link to an earlier IMMUTABLE snapshot, never to the live data tree.
             copy += ["--link-dest=" + str(previous / "project")]
         run(*copy, *sources, str(target / "project") + "/")
-        # Hash while the application is online. Only unchanged inode/stat entries
-        # are reused once writers stop; the finished copy is independently hashed.
+        # Hash while the application is online. The stat cache identifies files
+        # that need no delta copy; the finished copy is independently hashed.
         copied = {r["path"]: r for r in inventory(target / "project")}
         cache = {}
         list(inventory(PROJECT, cache=cache, tolerate_changes=True))
@@ -142,22 +161,27 @@ def cloud_snapshot():
             require(not any(n.startswith(("qm-train-", "qm-agent-", "qm-frozen-",
                                           "qm-ide-run-", "rdagent-")) for n in active_now),
                     "Research job appeared during quiesce; snapshot aborted")
-            expected = list(inventory(PROJECT, cache=cache))
-            copy_runtime_delta(PROJECT, target / "project", copied, expected)
-            (target / "runtime-manifest.jsonl").write_text(
-                "".join(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n" for r in expected))
+            expected_stats = runtime_stats(PROJECT)
+            copy_runtime_delta(PROJECT, target / "project", copied, cache, expected_stats)
             # Capture database and cold volumes without compression in the outage.
             with (target / "postgres.dump").open("wb") as stream:
                 run("docker", "exec", "quantmind-db", "sh", "-c",
                     'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -Z0 --no-owner', stdout=stream)
             for volume in ("redis-data", "qwenpaw-data", "qwenpaw-secrets", "qwenpaw-backups", "qwenpaw-shared"):
                 run("tar", "-cf", str(target / (volume + ".tar")), "-C", REMOTE + "/volumes/" + volume, ".")
+            # Reject an untracked writer instead of publishing a mixed-time copy.
+            require(runtime_stats(PROJECT) == expected_stats,
+                    "Runtime changed during quiesced copy; unpublished staging retained")
         finally:
             if stopped:
                 ordered = (["quantmind-redis"] if "quantmind-redis" in stopped else [])
                 ordered += [name for name in stopped if name != "quantmind-redis"]
                 run("docker", "start", *ordered)
             print(json.dumps({"phase": "writers_restored", "pause_seconds": round(time.monotonic() - started_at, 2)}), flush=True)
+        # Content hashing and manifest generation happen after writers are restored.
+        expected = list(inventory(target / "project"))
+        (target / "runtime-manifest.jsonl").write_text(
+            "".join(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n" for r in expected))
         # Independent full validation and compression touch only the frozen copy.
         # Never publish COMPLETE/latest until both have succeeded.
         finish_snapshot(target)

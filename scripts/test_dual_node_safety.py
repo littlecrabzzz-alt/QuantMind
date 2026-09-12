@@ -264,11 +264,39 @@ class SnapshotSafety(unittest.TestCase):
             os.link(previous/'data/input',stage/'data/input')
             (stage/'data/deleted').write_text('gone')
             copied={r['path']:r for r in inv.inventory(stage)}
+            cache={}
+            list(inv.inventory(live,cache))
             old=(live/'data/input').stat(); (live/'data/input').write_text('new')
             os.utime(live/'data/input',ns=(old.st_atime_ns,old.st_mtime_ns))
-            snapshot.copy_runtime_delta(live,stage,copied,list(inv.inventory(live)))
+            snapshot.copy_runtime_delta(live,stage,copied,cache,snapshot.runtime_stats(live))
             self.assertEqual(list(inv.inventory(stage)),list(inv.inventory(live)))
             self.assertEqual((previous/'data/input').read_text(),'old')
+
+    def test_stat_delta_copies_new_and_hidden_changes_without_hashing_live(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            live = root / 'live'
+            stage = root / 'stage'
+            for path in (live,stage):
+                (path / 'data').mkdir(parents=True)
+            source = live / 'data/input'
+            source.write_text('old')
+            shutil.copy2(source,stage / 'data/input')
+            (stage / 'data/deleted').write_text('gone')
+            copied = {r['path']:r for r in inv.inventory(stage)}
+            cache = {}
+            list(inv.inventory(live,cache))
+            old = source.stat()
+            source.write_text('new')
+            os.utime(source,ns=(old.st_atime_ns,old.st_mtime_ns))
+            (live / 'data/added').write_text('added')
+            expected = snapshot.runtime_stats(live)
+            with patch.object(
+                snapshot,'inventory',side_effect=AssertionError('content hash during delta')
+            ):
+                snapshot.copy_runtime_delta(live,stage,copied,cache,expected)
+            self.assertEqual(list(inv.inventory(stage)),list(inv.inventory(live)))
+            self.assertEqual(snapshot.runtime_stats(live),expected)
 
     def test_validation_failure_never_publishes_complete(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -279,7 +307,7 @@ class SnapshotSafety(unittest.TestCase):
             self.assertFalse((target/'COMPLETE').exists())
 
     def test_restore_precedes_final_validation_even_on_failure(self):
-        for fail in (False,True):
+        for fail in (None,'finish','race'):
             with tempfile.TemporaryDirectory() as directory:
                 root=Path(directory); project=root/'project'; (project/'data').mkdir(parents=True)
                 (project/'data/input').write_text('fixed input'); (root/'AUTHORITY').touch()
@@ -294,22 +322,46 @@ class SnapshotSafety(unittest.TestCase):
                         events.append(args[1])
                         if args[1]=='exec': kwargs['stdout'].write(b'fixture dump')
                     else: subprocess.run(args,check=True,**kwargs)
+                original_inventory=snapshot.inventory
+                def tracked_inventory(*args,_events=events,_original=original_inventory,**kwargs):
+                    _events.append('inventory')
+                    return _original(*args,**kwargs)
+                original_stats=snapshot.runtime_stats
+                stat_calls=[]
+                def tracked_stats(project,_calls=stat_calls,_fail=fail,_original=original_stats):
+                    result=_original(project)
+                    _calls.append(result)
+                    if _fail=='race' and len(_calls)==2:
+                        return {**result,'data/race':(0,0,0,0,0)}
+                    return result
                 original=snapshot.finish_snapshot
-                def finish(target):
-                    self.assertIn('start',events); events.append('finish')
-                    if fail: raise RuntimeError('verification failed')
-                    original(target)
+                def finish(target,_fail=fail,_events=events,_original=original):
+                    self.assertIn('start',_events)
+                    _events.append('finish')
+                    if _fail=='finish':
+                        raise RuntimeError('verification failed')
+                    _original(target)
                 with patch.object(snapshot,'PROJECT',project), patch.object(snapshot,'REMOTE',str(root)), \
                      patch.object(snapshot,'SETTINGS',{'QM_DISK_UUID':'fixture-uuid'}), \
                      patch.object(snapshot.os,'geteuid',return_value=0), \
                      patch.object(snapshot.shutil,'disk_usage',return_value=shutil._ntuple_diskusage(300*1024**3,0,300*1024**3)), \
                      patch.object(snapshot,'output',side_effect=output), patch.object(snapshot,'run',side_effect=run), \
+                     patch.object(snapshot,'inventory',side_effect=tracked_inventory), \
+                     patch.object(snapshot,'runtime_stats',side_effect=tracked_stats), \
                      patch.object(snapshot,'finish_snapshot',side_effect=finish), contextlib.redirect_stdout(io.StringIO()):
                     if fail:
-                        with self.assertRaisesRegex(RuntimeError,'verification failed'): snapshot.cloud_snapshot()
-                    else: snapshot.cloud_snapshot()
-                self.assertEqual((root/'snapshots/latest').is_symlink(),not fail)
-                self.assertLess(events.index('start'),events.index('finish'))
+                        message='Runtime changed during quiesced copy' if fail=='race' else 'verification failed'
+                        with self.assertRaisesRegex(RuntimeError,message):
+                            snapshot.cloud_snapshot()
+                    else:
+                        snapshot.cloud_snapshot()
+                self.assertEqual((root/'snapshots/latest').is_symlink(),fail is None)
+                self.assertIn('start',events)
+                if fail=='race':
+                    self.assertNotIn('finish',events)
+                else:
+                    self.assertLess(events.index('start'),events.index('finish'))
+                self.assertNotIn('inventory',events[events.index('stop'):events.index('start')])
 
 
 class ScheduledPull(unittest.TestCase):
