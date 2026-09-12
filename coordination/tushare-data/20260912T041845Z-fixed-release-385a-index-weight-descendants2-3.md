@@ -1,0 +1,7 @@
+# Fixed release 385a: index weight descendant batches 2 and 3
+
+- Normal task `acb364dc…` completed in 273.557 seconds as `publish_only`, made zero upstream requests and atomically published `data-385ae0c5…`. Its 401,323,613-byte manifest contains 910,451 files and 126,657 datasets with retained observations.
+- The combined immutable inventory has 1,800 unique references: 720 objects, 720 observations and 360 Parquet files totaling 52,551,653 bytes. Cloud verification passed with zero missing, metadata or physical checksum errors; create-only evidence is under `validation/fixed-release-20260912/385a-index-weight-descendants-2-3-*`.
+- Mac LaunchAgent run 254 downloaded 3,932 incremental files, fully verified 910,451 files, exited zero with empty stderr and switched CURRENT at 12:16:42 CST. A second targeted pass verified the same 1,800 references and bytes with all error counts zero.
+- With Tushare token variables empty and socket connect, create_connection and DNS resolution blocked, the installed client read three `index_weight` rows / four columns and reported zero upstream calls. Batches 2 and 3 are therefore locally readable without Tushare Pro.
+- Worker and Beat remain healthy with restart count zero and no OOM. The independent recovery snapshot transfer remains active and has not switched local `latest`. Complete history, 720 new grandchildren, empty-result confirmation, revisions, `known_at`, PIT semantics and RRG classification remain open.

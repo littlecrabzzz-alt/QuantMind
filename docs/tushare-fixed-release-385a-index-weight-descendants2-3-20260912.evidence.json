@@ -1,0 +1,81 @@
+{
+  "boundary": "This closes fixed-release and Mac-local availability for index_weight descendant batches 2 and 3. It does not claim complete index history, deeper descendant closure, empty-result completeness, revisions, known_at/PIT semantics, sibling-pair atomicity or RRG classification.",
+  "cloud_fixed_release": {
+    "archive": {
+      "cloud_verify_sha256": "22b0d403bedc1df1f167c8cf6372629f201ed652afedc8395360621c2fb72a93",
+      "inventory_file_sha256": "7e7ee67b111cd4b9d9ea22931a08fb631cbd6debb483a3598046810e3ac6dd1b",
+      "path": "validation/fixed-release-20260912/385a-index-weight-descendants-2-3-*"
+    },
+    "manifest_bytes": 401323613,
+    "manifest_datasets": 126657,
+    "manifest_files": 910451,
+    "release_id": "data-385ae0c51e70c3615059de7bb87535e4fc0c616c996ee9284df108c7dfa36a6f",
+    "release_manifest_sha256": "385ae0c51e70c3615059de7bb87535e4fc0c616c996ee9284df108c7dfa36a6f",
+    "retained_observations_included": true,
+    "verification": {
+      "expected_by_kind": {"object": 720, "observation": 720, "parquet": 360},
+      "manifest_metadata_errors": 0,
+      "missing_from_manifest": 0,
+      "physical_errors": 0,
+      "references": 1800,
+      "verified_bytes": 52551653
+    }
+  },
+  "credential_hygiene": {
+    "secrets_in_git_or_report": false,
+    "token_variables_empty_during_offline_read": true
+  },
+  "exact_round": {
+    "batches": [
+      {"batch": 2, "jobs": 360, "pairs": 180, "rows": 285105, "references": 900, "physical_bytes": 26188287},
+      {"batch": 3, "jobs": 360, "pairs": 180, "rows": 287004, "references": 900, "physical_bytes": 26363366}
+    ],
+    "inventory_sha256": "4130a81862a6678c94fcfb1c45ab35f800801c915ff5ea005c9cd63e746eeb15",
+    "jobs": 720,
+    "new_pristine_grandchildren": 720,
+    "physical_bytes": 52551653,
+    "references": 1800,
+    "rows": 572109
+  },
+  "mac_acceptance": {
+    "downloaded_files": 3932,
+    "launchagent_exit_code": 0,
+    "launchagent_run": 254,
+    "local_verify_sha256": "22b0d403bedc1df1f167c8cf6372629f201ed652afedc8395360621c2fb72a93",
+    "offline_read": {
+      "api_name": "index_weight",
+      "columns": 4,
+      "network_guards": ["socket.connect", "socket.create_connection", "socket.getaddrinfo"],
+      "report_sha256": "00f96b15009e7816ee7278190ef148b4a4ee739d91578f4bbd5908244c4c66ca",
+      "rows": 3,
+      "upstream_calls": 0
+    },
+    "stderr_empty": true,
+    "switched_at": "2026-09-12T12:16:42+08:00",
+    "verification": {"manifest_metadata_errors": 0, "missing_from_manifest": 0, "physical_errors": 0, "references": 1800, "verified_bytes": 52551653}
+  },
+  "normal_publisher": {
+    "elapsed_seconds": 273.5565984211862,
+    "mode": "publish_only",
+    "performed": true,
+    "status": "published",
+    "task_id": "acb364dc-dbb0-48ac-8af7-c32102ea4b4e",
+    "upstream_requests": 0
+  },
+  "observed_at": "2026-09-12T12:17:00+08:00",
+  "parallel_recovery_snapshot": {
+    "local_latest_switched": false,
+    "process_active": true,
+    "snapshot_id": "snapshot-20260911T230002081103Z",
+    "status": "background_transfer_in_progress"
+  },
+  "schema_version": 1,
+  "services": {
+    "beat": "healthy",
+    "cloud_available_bytes": 337260515328,
+    "oom": false,
+    "restart_count": 0,
+    "worker": "healthy"
+  },
+  "status": "fixed_release_385a_index_weight_descendants_2_3_mac_offline_accepted"
+}
