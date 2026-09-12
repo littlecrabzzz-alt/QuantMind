@@ -1340,3 +1340,14 @@ Mac定时客户端264从空闲手动kickstart（不带-k、不打断传输），
 规划优化补记：isolated候选3127facd按小键聚合发现结果，179项管线、13项计时、5项投影测试通过（集合不相加），但原100000结果/1对象夹具的约2倍收益不代表生产。改用5000唯一对象+15重复（约0.3%）的完整identifiers基准，候选0.207180/0.206190秒比原0.188504/0.183579秒慢10%–12%，四次输出SHA一致；因此拒绝合并/部署。基准与纠正记录保留，后续先做真实子阶段计时再选改动，不以微基准数字代替实际吞吐。
 
 下一接口准备：opt_daily在ce43已有18个数据叶，均15000行/possibly_truncated；问题是饱和分片，不是零数据。固定opt_basic与opt_daily同时证明HO2609-C-2500.CFX在20260911有效且存在行情，候选为单合约单日1请求；尚未上游调用/入队/启用。执行前先核当前固定版本及权威端已有任务，若已采集则复用，若已有pending则继续原任务，不用无索引logical_key全库扫描做重复检查。完整历史、全市场日完整性与PIT继续false。候选记录coordination/tushare-data/20260912T075159Z-opt-daily-fixed-row-sample-candidate.json。
+
+
+## 2026-09-12 df2d固定版、私有组合读取与top10股东首批
+
+正常任务31769420以publish_only、0上游调用、421.159秒原子发布data-df2dceada681d30b2d4c24c7df5877452c5d27f2479557b493378d7f4ec3f7ff；445090761字节manifest含969815文件/134789数据集并保留observations。risk2样本、opt_daily固定行及core-market第2批合并为996个唯一引用/279629009字节，云端manifest、metadata和物理SHA错误均0。Mac标准LaunchAgent第267轮自动启动，下载15905个增量文件、全量验证969815项、exit0且stderr空并原子追平；同996引用本地复核再次通过。空Token、只读镜像、Docker network none和socket/DNS阻断下，daily、daily_basic、adj_factor、stk_limit、suspend_d、moneyflow、opt_daily各读3行，上游0。机器证据：docs/tushare-fixed-release-df2d-risk-opt-core-20260912.evidence.json。
+
+账户私有读接口p_list/p_get保持生产缺省关闭。受控窗口先停止Beat、让两个已开始普通任务各自自然完成后worker退出，无revoke/kill；主服务、文档worker、quantmind-db/QuantDB全程运行。首个窗口脚本仅在/tmp仓库路径推导处失败，发生于配置、凭据、数据库和上游访问前，外层恢复后原配置SHA不变；修复0f1fc533通过容器导入检查。接受的20260912T090427Z快照只调用p_list一次，HTTP200并保留真实empty观察；同epoch成员计划0任务，p_get调用0。私有manifest/receipt及值只留authority的0700/0600目录，Git仅留计数/状态/哈希。配置按字节恢复为8ea3f3c、固定版未切换或发布。机器证据：docs/tushare-private-portfolio-20260912.evidence.json。
+
+同一稳定窗口按现有成熟入口冻结首批180个完整top10_holders/top10_floatholders兄弟对，共360个history任务，SH/SZ/BJ各120任务、均为20071231、pristine且与历史零重叠。44.852秒完成360次上游调用：两接口各112 done/68 empty，合计8037行，无pending或blocked。独立闭包逐任务核对身份、唯一attempt、raw、observation和Parquet行数，944个唯一引用/3168798字节全部SHA通过；df2d负对照明确缺全部944项，因此本批仍是authority-only，等待17:43后的下一正常发布和Mac闭环，不强制发布。机器证据：docs/tushare-top10-holders-batch1-20260912.evidence.json。
+
+所有服务已恢复healthy、restart0、OOM false，master/origin及云端handoff均为249c1f59，双端源摘要一致；完整恢复快照仍为snapshot-20260911T230002081103Z且pending_pull=false。下一步并行审核现有index_daily成熟入口的新一批候选，并在下一固定版严格闭合top10首批；完整历史、修订、known_at/PIT、空结果完整性和RRG结论仍开放。
