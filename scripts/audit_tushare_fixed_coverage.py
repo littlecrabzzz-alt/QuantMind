@@ -131,11 +131,9 @@ def main():
     output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps({
         "release_id": release_id,
-                "counts": result["counts"],
-                "missing_dataset_evidence_counts": result[
-                    "missing_dataset_evidence_counts"
-                ],
-                "registered_not_planned": len(result["registered_not_planned"]),
+        "counts": result["counts"],
+        "missing_dataset_evidence_counts": result["missing_dataset_evidence_counts"],
+        "registered_not_planned": len(result["registered_not_planned"]),
         "registered_planned_without_published_dataset": len(
             result["registered_planned_without_published_dataset"]
         ),
