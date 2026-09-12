@@ -1,0 +1,1086 @@
+{
+  "archives": {
+    "before-deploy.json": {
+      "bytes": 856,
+      "path": "validation/source-semantics-20260912/before-deploy.json",
+      "sha256": "9094e9080394400c0d16d55bd141ee90a7f3b41f753443078b0c2f57c99e684f"
+    },
+    "cyq-chips-blocked-signature-audit.json": {
+      "bytes": 826832,
+      "path": "validation/source-semantics-20260912/cyq-chips-blocked-signature-audit.json",
+      "sha256": "ecbabdd82e32fd803acd25bb7534b13f3e5504579d22eec3809a8f1c8521471f"
+    },
+    "document-index-save-benchmark.json": {
+      "bytes": 78185,
+      "path": "validation/source-semantics-20260912/document-index-save-benchmark.json",
+      "sha256": "0e4fef75d219ad2c6746a3d349075270ad5071df4a3e84dd616fb25dbbfedf4c"
+    },
+    "first-production-inventory.json": {
+      "bytes": 142754,
+      "path": "validation/source-semantics-20260912/first-production-inventory.json",
+      "sha256": "9fd8a7269b41b26fb0600caf95dd4f541cfc03ac13498e90bc40c0bf87d3b463"
+    },
+    "first-production-receipt.json": {
+      "bytes": 70276,
+      "path": "validation/source-semantics-20260912/first-production-receipt.json",
+      "sha256": "d374aaf1d1abcac112b6750de1c58d99983cf4d9e9558c8d0c07c97177a1cdfb"
+    },
+    "pending-release-inventory.json": {
+      "bytes": 514764,
+      "path": "validation/source-semantics-20260912/pending-release-inventory.json",
+      "sha256": "ffd8f57870f871df8c288b7b31fb33cf130aefd37591d21062c8b808dd99b8d8"
+    },
+    "post-deploy-cyq-audit.json": {
+      "bytes": 8800,
+      "path": "validation/source-semantics-20260912/post-deploy-cyq-audit.json",
+      "sha256": "495503b3c3fb46a7f2e029f786d91df42341b15b42264e1146eb7216d948d2c4"
+    },
+    "research-report-field-audit.json": {
+      "bytes": 317938,
+      "path": "validation/source-semantics-20260912/research-report-field-audit.json",
+      "sha256": "f918d6e73c1c7d0f8b5cc08c41eba8f68937bbc888e7bcd827639a93f7b14845"
+    },
+    "runtime-policy-receipt.json": {
+      "bytes": 4166,
+      "path": "validation/source-semantics-20260912/runtime-policy-receipt.json",
+      "sha256": "0acd2179bc0f74c74b69d66d04db1b88ce00d5888653d4e0f540c5a24ec45f83"
+    },
+    "second-production-inventory.json": {
+      "bytes": 182651,
+      "path": "validation/source-semantics-20260912/second-production-inventory.json",
+      "sha256": "ac5e76732e74e6993bf59888c46b24c1bb9598e1f33ee04a8e4775a4f8c4e056"
+    },
+    "second-production-receipt.json": {
+      "bytes": 88518,
+      "path": "validation/source-semantics-20260912/second-production-receipt.json",
+      "sha256": "00af911dfef47acdd84ed044b15381d2093b148d70984ce73b66ba48c50c6f62"
+    }
+  },
+  "baseline": {
+    "attempts_count": 525,
+    "db_closed_before_file_reads": true,
+    "indexed_read_seconds": 0.03415905684232712,
+    "jobs_count": 105,
+    "observed_at": "2026-09-12T06:45:17.352315+00:00",
+    "sha_errors": 0,
+    "signatures": {
+      "{\"code\": 50101, \"data_type\": \"NoneType\", \"msg\": \"指定数据不存在，请确认参数！\"}": 525
+    },
+    "tries_sum": 525
+  },
+  "boundaries": [
+    "Raw supplier code50101 and exact no-data response remain immutable.",
+    "Empty hints retain coverage_proven/history_complete/pit_verified false and unverified field coverage.",
+    "Legacy blocked jobs and attempts are not rewritten.",
+    "Other messages, parameters, HTTP statuses and APIs retain existing classification and retry semantics.",
+    "Full history, known_at/PIT, RRG classification and existing index_weight single-day completeness alarms remain open.",
+    "This new inventory and prior883 refs wait next normal publication and Mac mirror."
+  ],
+  "code_commit": "5a110c714ae569ebfd1152f064ea4066efd4ae20",
+  "code_scope": [
+    "cyq_chips exact supplier no-data classification",
+    "do not promote nonzero-code empty hint to available capability",
+    "tests updated for existing244 registered APIs including fina_mainbz_vip"
+  ],
+  "deployment": {
+    "beat_started_at": "2026-09-12T06:54:06.147637296Z",
+    "document_worker_started_at_unchanged": "2026-09-12T04:44:58.161153655Z",
+    "handoff": "passed",
+    "handoff_source_digest": "5a37e199045ab1ed2a09cd348e2e9924ae5fd70efde81f7c6b6990970788d959",
+    "natural_drain_seconds": 92.50158490985632,
+    "natural_drain_task": "22ee17f9-3e23-40aa-8747-ec0dab41fe60",
+    "old_worker_exit_code": 0,
+    "quantdb_not_stopped": true,
+    "worker_started_at": "2026-09-12T06:55:12.785456297Z"
+  },
+  "first_production_run": {
+    "celery_state": "SUCCESS",
+    "closure": {
+      "api_counts": {
+        "adj_factor": 1,
+        "anns_d": 1,
+        "bak_basic": 4,
+        "bak_daily": 2,
+        "balancesheet_vip": 1,
+        "bc_bestotcqt": 1,
+        "block_trade": 2,
+        "bond_blk": 2,
+        "bond_blk_detail": 2,
+        "cashflow_vip": 1,
+        "cb_factor_pro": 3,
+        "cb_rate": 1,
+        "cb_rating": 2,
+        "cb_share": 1,
+        "cctv_news": 1,
+        "cyq_chips": 2,
+        "cyq_perf": 2,
+        "daily": 1,
+        "daily_info": 5,
+        "dc_daily": 4,
+        "dc_hot": 1,
+        "dc_index": 3,
+        "dc_member": 5,
+        "disclosure_date": 2,
+        "dividend": 2,
+        "etf_limit": 2,
+        "etf_sh_cons": 4,
+        "etf_share_size": 12,
+        "etf_sz_cons": 5,
+        "factor_value": 1,
+        "fina_audit": 2,
+        "fina_mainbz": 2,
+        "ft_limit": 2,
+        "fund_adj": 8,
+        "fund_daily": 7,
+        "fund_div": 1,
+        "fund_factor_pro": 2,
+        "fund_manager": 1,
+        "fund_nav": 1,
+        "fund_portfolio": 13,
+        "fund_share": 1,
+        "fut_daily_adj": 2,
+        "fut_holding": 2,
+        "fut_index_daily": 1,
+        "fut_weekly_detail": 1,
+        "fut_weekly_monthly": 2,
+        "fx_daily": 3,
+        "ggt_daily": 3,
+        "ggt_top10": 3,
+        "hk_tradecal": 1,
+        "hsgt_top10": 4,
+        "idx_anns": 1,
+        "idx_factor_pro": 2,
+        "index_daily": 1,
+        "index_dailybasic": 1,
+        "index_member_all": 1,
+        "index_monthly": 1,
+        "index_weekly": 1,
+        "index_weight": 2,
+        "irm_qa_sh": 1,
+        "irm_qa_sz": 1,
+        "kpl_concept_cons": 1,
+        "kpl_list": 2,
+        "limit_list_d": 9,
+        "major_news": 1,
+        "margin_detail": 2,
+        "margin_secs": 2,
+        "monetary_policy": 1,
+        "moneyflow": 1,
+        "moneyflow_dc": 12,
+        "moneyflow_hsgt": 3,
+        "moneyflow_ths": 11,
+        "monthly": 1,
+        "namechange": 1,
+        "news": 1,
+        "npr": 1,
+        "opt_basic": 2,
+        "opt_daily": 2,
+        "pledge_detail": 2,
+        "pledge_stat": 1,
+        "repo_daily": 1,
+        "report_rc": 2,
+        "repurchase": 2,
+        "research_report": 1,
+        "sge_daily": 2,
+        "share_float": 2,
+        "st": 3,
+        "stk_factor": 1,
+        "stk_factor_pro": 2,
+        "stk_holdernumber": 1,
+        "stk_holdertrade": 1,
+        "stk_limit": 1,
+        "stk_managers": 5,
+        "stk_rewards": 4,
+        "stk_shock": 3,
+        "stk_surv": 2,
+        "stk_week_month_adj": 1,
+        "stk_weekly_monthly": 1,
+        "stock_hsgt": 5,
+        "stock_st": 3,
+        "suspend_d": 1,
+        "tdx_daily": 2,
+        "tdx_index": 1,
+        "tdx_member": 1,
+        "ths_daily": 3,
+        "ths_hot": 1,
+        "ths_member": 3,
+        "top10_cb_holders": 1,
+        "top10_floatholders": 1,
+        "top10_holders": 1,
+        "top_inst": 4,
+        "top_list": 5,
+        "us_tradecal": 1,
+        "weekly": 1
+      },
+      "assessment_counts": {
+        "empty_unverified": 156,
+        "possibly_truncated": 8,
+        "sample_ok": 110,
+        "schema_gap": 1
+      },
+      "attempts": 275,
+      "first_request_at": "2026-09-12T06:55:54.445203+00:00",
+      "http_statuses": {
+        "200": 275
+      },
+      "last_response_at": "2026-09-12T06:56:49.952599+00:00",
+      "physical_bytes": 30021295,
+      "retained_rows": 84082,
+      "sha_errors": 0,
+      "unique_references": 669
+    },
+    "code_commit": "5a110c714ae569ebfd1152f064ea4066efd4ae20",
+    "result": {
+      "elapsed_seconds": 90.026,
+      "invalid_requests_blocked": null,
+      "partition_work": {
+        "discovery_family": "stocks",
+        "job_id": "c71ef96956282496bb7e20712357838d80941d71baad395d8549c7a05202cda6",
+        "legacy_parent_recovered": false,
+        "split": {
+          "children": 6009,
+          "method": "identifier_fanout",
+          "parent_observed_added_count": 97,
+          "universe_complete": false
+        },
+        "status": "partitioned",
+        "upstream_calls": 0
+      },
+      "planning_cadence": {
+        "config_fingerprint": "69ac7af25b07bc463c75a0026456e64897d453f23bba219469d47baa9418cd49",
+        "due": false,
+        "interval_seconds": 900,
+        "last_success_at": 1789195894,
+        "next_due_at": 1789196794,
+        "performed": false,
+        "reason": "interval_not_due",
+        "status": "deferred"
+      },
+      "publication": {
+        "current_release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+        "interval_seconds": 3600,
+        "last_success_at": 1789194280,
+        "mirror_status": "not_checked",
+        "mode": "acquire_only",
+        "next_due_at": 1789197880,
+        "pending": true,
+        "performed": false,
+        "status": "deferred"
+      },
+      "requests": 275,
+      "timing": {
+        "completed_stages": [
+          "open",
+          "publication_check",
+          "planning_check",
+          "archive",
+          "acquire",
+          "document_registration",
+          "close"
+        ],
+        "failed_stage": null,
+        "included_stages": {
+          "reconciliation": "acquire"
+        },
+        "stage_seconds": {
+          "acquire": 90.69164637103677,
+          "archive": 0.017754793167114258,
+          "close": 0.00048182904720306396,
+          "document_registration": 1.6456324364989996,
+          "open": 0.0013972539454698563,
+          "planning_check": 0.0005426816642284393,
+          "publication_check": 0.46024031937122345
+        },
+        "total_elapsed_seconds": 92.83224587887526
+      },
+      "updated_at": "2026-09-12T06:56:52.106533+00:00"
+    },
+    "schema_version": 1,
+    "status": "passed",
+    "task_end": "2026-09-12T06:56:52.106533+00:00",
+    "task_id": "ee190ad6-e3d6-4e12-b583-26aae31c2f7b",
+    "task_start": "2026-09-12T06:55:19.062"
+  },
+  "local_quantdb": {
+    "latest_date": "20260911",
+    "qlib_calendar": "2026-09-11",
+    "status": "applied"
+  },
+  "next_steps": [
+    "Verify pending2408 references/111599826 bytes against next normal cloud fixed release and Mac mirror, then offline readback.",
+    "Review pool2 candidate independently and benchmark entire document_index on isolated fixed inputs before considering deployment.",
+    "Audit cyq_chips range-parameter errors separately; do not broaden no-data semantics without evidence.",
+    "Audit cyq_chips daily quota scope against official doc294; do not initialize unknown daily usage as zero.",
+    "Continue history and descendant work without claiming complete history/PIT/RRG readiness."
+  ],
+  "observed_at": "2026-09-12T07:04:55.865103+00:00",
+  "parallel_work": {
+    "publisher_candidate": {
+      "branch": "codex/tushare-document-index-pool2",
+      "commit": "63499b79da07c8f0db28f2021b5ee74bcb6df309",
+      "performance_boundary": "pure_save microbenchmark does not establish whole document_index speedup; require full-stage evidence before adoption",
+      "status": "isolated_review_candidate_not_deployed",
+      "tests": 142,
+      "worktree": "/private/tmp/quantmind-document-index-pool2"
+    },
+    "publisher_save_benchmark": "256 leaves,6 trials<256MiB;serial median0.9839s/pool2 median0.5752s with256fsync each;pure_save only, not whole publisher. Isolated equivalence candidate committed, not deployed.",
+    "research_report": "327 quality responses lack only file_name;36571 rows and327 normalized Parquet retained; no code/state changes."
+  },
+  "pending_fixed_release": {
+    "baseline_release": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+    "deduplicated_references": 0,
+    "physical_bytes": 111599826,
+    "schema_version": 1,
+    "source_reference_count": 2408,
+    "sources": [
+      {
+        "bytes": 188531,
+        "path": "validation/request-contract-repair-20260912/second-production-inventory.json",
+        "references": 883,
+        "sha256": "7c0a9237ace74ed53146fd15b7c5c99c0108709fef11d9eb74f44aaaa59e7ceb"
+      },
+      {
+        "bytes": 142754,
+        "path": "validation/source-semantics-20260912/first-production-inventory.json",
+        "references": 669,
+        "sha256": "9fd8a7269b41b26fb0600caf95dd4f541cfc03ac13498e90bc40c0bf87d3b463"
+      },
+      {
+        "bytes": 182651,
+        "path": "validation/source-semantics-20260912/second-production-inventory.json",
+        "references": 856,
+        "sha256": "ac5e76732e74e6993bf59888c46b24c1bb9598e1f33ee04a8e4775a4f8c4e056"
+      }
+    ],
+    "status": "pending_normal_publication_and_mac_verification",
+    "unique_references": 2408
+  },
+  "post_deploy_semantics_audit": {
+    "boundaries": [
+      "supplier_empty_hint stops repeat attempts for the exact request but does not prove historical coverage or global data absence.",
+      "A later genuine code=0 sample may refresh the available/sample_ok capability timestamp; supplier hints must not write availability.",
+      "This audit did not read credentials, call Tushare, mutate SQLite, publish a release, or operate services."
+    ],
+    "capability": {
+      "after": [
+        {
+          "checked_at": "2026-09-12T06:59:52.924823+00:00",
+          "reason": "sample_ok",
+          "scope": "cyq_chips:",
+          "status": "available"
+        }
+      ],
+      "before": [
+        {
+          "checked_at": "2026-09-12T06:52:52.872342+00:00",
+          "reason": "sample_ok",
+          "scope": "cyq_chips:",
+          "status": "available"
+        }
+      ],
+      "supplier_hint_did_not_set_reason": true,
+      "valid_real_data_availability_only": true
+    },
+    "code_commit": "5a110c714ae569ebfd1152f064ea4066efd4ae20",
+    "config": {
+      "after_sha256": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a",
+      "before_sha256": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a",
+      "unchanged": true
+    },
+    "database_read": {
+      "closed_before_file_io": true,
+      "elapsed_seconds": 0.114794,
+      "fetchall_then_close": true,
+      "mode": "read_only_query_only",
+      "plans": {
+        "attempts": [
+          {
+            "detail": "SEARCH attempts USING INDEX sqlite_autoindex_attempts_1 (job_id=?)",
+            "id": 3,
+            "notused": 0,
+            "parent": 0
+          }
+        ],
+        "jobs": [
+          {
+            "detail": "SEARCH jobs USING INDEX sqlite_autoindex_jobs_1 (id=?)",
+            "id": 3,
+            "notused": 0,
+            "parent": 0
+          }
+        ],
+        "post_watermark": [
+          {
+            "detail": "SEARCH a USING INTEGER PRIMARY KEY (rowid>?)",
+            "id": 4,
+            "notused": 0,
+            "parent": 0
+          },
+          {
+            "detail": "SEARCH j USING INDEX sqlite_autoindex_jobs_1 (id=?)",
+            "id": 6,
+            "notused": 0,
+            "parent": 0
+          }
+        ]
+      },
+      "progress_deadline_seconds": 2,
+      "snapshot_max_attempt_rowid": 234415
+    },
+    "legacy_blocked": {
+      "attempt_changed": [],
+      "attempt_extra": [],
+      "attempt_missing": [],
+      "attempt_rows_unchanged": true,
+      "attempts_expected": 525,
+      "attempts_found": 525,
+      "job_changes": [],
+      "jobs_all_fields_unchanged": true,
+      "jobs_expected": 105,
+      "jobs_found": 105
+    },
+    "observed_at": "2026-09-12T07:00:12.418737+00:00",
+    "post_watermark_cyq": {
+      "all_hint_objects_and_observations_verified": true,
+      "attempts": 7,
+      "business_code_counts": {
+        "0": 5,
+        "50101": 2
+      },
+      "first_attempts": 7,
+      "hint_first_attempts": 1,
+      "hint_historical_retries": 0,
+      "hint_terminal_empty": 1,
+      "hint_with_later_attempt": 0,
+      "historical_retries": 0,
+      "jobs": 7,
+      "physical_errors": [],
+      "records": [
+        {
+          "attempt": 1,
+          "attempt_rowid": 233502,
+          "business_code": 0,
+          "coverage_proven": null,
+          "epoch": "20260909",
+          "field_coverage": "complete_for_explicit_request",
+          "history_complete": false,
+          "http_status": 200,
+          "later_post_watermark_attempts_for_same_job": 0,
+          "object_sha256": "6e4781fbb48600def116692532779a9abcaa99751e24d4cbeed44cb9df8fb80e",
+          "object_verified": true,
+          "observation_sha256": "47e75b0aa645b44cb7336db5f16d9511e0bd85f8e5ace738bb2e05ccc5d3c55d",
+          "observation_verified": true,
+          "params": {
+            "trade_date": "20260903",
+            "ts_code": "000968.SZ"
+          },
+          "pit_verified": false,
+          "raw_hint_signature_match": false,
+          "request_class": "first_attempt",
+          "row_count": 92,
+          "state": "done",
+          "status": "sample_ok",
+          "supplier_empty_hint": false,
+          "task_id": "0d1d3e7e55b83835d91505b539cd4e76a33b4b96284417ed80fca11e3c7e2af3",
+          "tries": 1,
+          "valid_request_shape": true
+        },
+        {
+          "attempt": 1,
+          "attempt_rowid": 233652,
+          "business_code": 0,
+          "coverage_proven": null,
+          "epoch": "20260909",
+          "field_coverage": "complete_for_explicit_request",
+          "history_complete": false,
+          "http_status": 200,
+          "later_post_watermark_attempts_for_same_job": 0,
+          "object_sha256": "0c16a02812ca36424e9cddc01b8ecbf173bdcf3a5d6388e82e2735b172cbbe11",
+          "object_verified": true,
+          "observation_sha256": "220dd5b4c5574ac3f9115ba0c0f4e6294d8f05ca5dfd187a95692b267fbc67c8",
+          "observation_verified": true,
+          "params": {
+            "trade_date": "20260903",
+            "ts_code": "000969.SZ"
+          },
+          "pit_verified": false,
+          "raw_hint_signature_match": false,
+          "request_class": "first_attempt",
+          "row_count": 60,
+          "state": "done",
+          "status": "sample_ok",
+          "supplier_empty_hint": false,
+          "task_id": "9e0b30094e0d91eb6a956acbcacb4ebb8e5a792906e9a12a0873e0b86fe9cd7e",
+          "tries": 1,
+          "valid_request_shape": true
+        },
+        {
+          "attempt": 1,
+          "attempt_rowid": 233802,
+          "business_code": 0,
+          "coverage_proven": null,
+          "epoch": "20260909",
+          "field_coverage": "complete_for_explicit_request",
+          "history_complete": false,
+          "http_status": 200,
+          "later_post_watermark_attempts_for_same_job": 0,
+          "object_sha256": "6cb417fb91b7e1b972ba7e5edc5cad50546021fdec1043cae185e40db8ca7032",
+          "object_verified": true,
+          "observation_sha256": "05b80930aaab686e7c2e6a88c663f59040e3fd9408b68c00ec90a5ecbb79c374",
+          "observation_verified": true,
+          "params": {
+            "trade_date": "20260903",
+            "ts_code": "000970.SZ"
+          },
+          "pit_verified": false,
+          "raw_hint_signature_match": false,
+          "request_class": "first_attempt",
+          "row_count": 88,
+          "state": "done",
+          "status": "sample_ok",
+          "supplier_empty_hint": false,
+          "task_id": "7d5eb7524faa6a062cce2decd41b31b77f39e11d01006813dda434fc19e299aa",
+          "tries": 1,
+          "valid_request_shape": true
+        },
+        {
+          "attempt": 1,
+          "attempt_rowid": 233952,
+          "business_code": 50101,
+          "coverage_proven": null,
+          "epoch": "history",
+          "field_coverage": "unverified_default_or_invalid",
+          "history_complete": null,
+          "http_status": 200,
+          "later_post_watermark_attempts_for_same_job": 0,
+          "object_sha256": "f046f7ef83c10b3500384f83e3ed94db2a9069970ec38756a109114908eed6dc",
+          "object_verified": true,
+          "observation_sha256": "cc3bba3776df71cb208788095e6ecc80d9239484194e3987fe17248a1dea74a8",
+          "observation_verified": true,
+          "params": {
+            "end_date": "20180131",
+            "start_date": "20180101",
+            "ts_code": "000522.SZ"
+          },
+          "pit_verified": null,
+          "raw_hint_signature_match": true,
+          "request_class": "first_attempt",
+          "row_count": null,
+          "state": "pending",
+          "status": "api_error",
+          "supplier_empty_hint": false,
+          "task_id": "8d98620659ec90a01a39c40c0ee1aa353cdd18bfaf2a7564a1379c7047ea5209",
+          "tries": 1,
+          "valid_request_shape": false
+        },
+        {
+          "attempt": 1,
+          "attempt_rowid": 234102,
+          "business_code": 50101,
+          "coverage_proven": false,
+          "epoch": "20260909",
+          "field_coverage": "unverified_default_or_invalid",
+          "history_complete": false,
+          "http_status": 200,
+          "later_post_watermark_attempts_for_same_job": 0,
+          "object_sha256": "3953db57788266168eb75409b8abd1ee31c5918d095b252f5f64b06db35ae843",
+          "object_verified": true,
+          "observation_sha256": "21fd60c902e59858e0f17958c56c47de622fbe1d2ff127b0c6b5b59bb9cb4ed5",
+          "observation_verified": true,
+          "params": {
+            "trade_date": "20260903",
+            "ts_code": "000971.SZ"
+          },
+          "pit_verified": false,
+          "raw_hint_signature_match": true,
+          "request_class": "first_attempt",
+          "row_count": 0,
+          "state": "empty",
+          "status": "empty_unverified",
+          "supplier_empty_hint": true,
+          "task_id": "e525c3103e2f6f9d638b20091916d60c0b72ae7a7f65748529dd1d877124b865",
+          "tries": 1,
+          "valid_request_shape": true
+        },
+        {
+          "attempt": 1,
+          "attempt_rowid": 234252,
+          "business_code": 0,
+          "coverage_proven": null,
+          "epoch": "20260909",
+          "field_coverage": "complete_for_explicit_request",
+          "history_complete": false,
+          "http_status": 200,
+          "later_post_watermark_attempts_for_same_job": 0,
+          "object_sha256": "1a1112276598cc9fd15c9c42490ad1aa4a3f34a0694238c39c2a2419029a003a",
+          "object_verified": true,
+          "observation_sha256": "4310ec829553297f7058ec35b57e13d75e5d4f81d574a2a32d7642796b5cb44b",
+          "observation_verified": true,
+          "params": {
+            "trade_date": "20260903",
+            "ts_code": "000972.SZ"
+          },
+          "pit_verified": false,
+          "raw_hint_signature_match": false,
+          "request_class": "first_attempt",
+          "row_count": 174,
+          "state": "done",
+          "status": "sample_ok",
+          "supplier_empty_hint": false,
+          "task_id": "a27c05c849abf7a4846d804cc7dafed10e105c83f812201695c97ad465dd5cd2",
+          "tries": 1,
+          "valid_request_shape": true
+        },
+        {
+          "attempt": 1,
+          "attempt_rowid": 234402,
+          "business_code": 0,
+          "coverage_proven": null,
+          "epoch": "20260909",
+          "field_coverage": "complete_for_explicit_request",
+          "history_complete": false,
+          "http_status": 200,
+          "later_post_watermark_attempts_for_same_job": 0,
+          "object_sha256": "eabd1425be59df0cf50a1ab5308419aa5a460bc25f8f5467d3dbeba8f40bdfba",
+          "object_verified": true,
+          "observation_sha256": "7166c30164076849621e91837139689812f4a741a17f9c3227e8b6e34e69817e",
+          "observation_verified": true,
+          "params": {
+            "trade_date": "20260903",
+            "ts_code": "000973.SZ"
+          },
+          "pit_verified": false,
+          "raw_hint_signature_match": false,
+          "request_class": "first_attempt",
+          "row_count": 97,
+          "state": "done",
+          "status": "sample_ok",
+          "supplier_empty_hint": false,
+          "task_id": "a0632dc02cf026e9112a9c78666955fe708e2e399cf8ddcc4cefb29ce1e84059",
+          "tries": 1,
+          "valid_request_shape": true
+        }
+      ],
+      "status_counts": {
+        "api_error": 1,
+        "empty_unverified": 1,
+        "sample_ok": 5
+      },
+      "supplier_empty_hints": 1
+    },
+    "schema_version": 1,
+    "sources": {
+      "before-deploy.json": {
+        "bytes": 856,
+        "relative_path": "validation/source-semantics-20260912/before-deploy.json",
+        "sha256": "9094e9080394400c0d16d55bd141ee90a7f3b41f753443078b0c2f57c99e684f"
+      },
+      "cyq-chips-blocked-signature-audit.json": {
+        "bytes": 826832,
+        "relative_path": "validation/source-semantics-20260912/cyq-chips-blocked-signature-audit.json",
+        "sha256": "ecbabdd82e32fd803acd25bb7534b13f3e5504579d22eec3809a8f1c8521471f"
+      },
+      "first-production-inventory.json": {
+        "bytes": 142754,
+        "relative_path": "validation/source-semantics-20260912/first-production-inventory.json",
+        "sha256": "9fd8a7269b41b26fb0600caf95dd4f541cfc03ac13498e90bc40c0bf87d3b463"
+      },
+      "first-production-receipt.json": {
+        "bytes": 70276,
+        "relative_path": "validation/source-semantics-20260912/first-production-receipt.json",
+        "sha256": "d374aaf1d1abcac112b6750de1c58d99983cf4d9e9558c8d0c07c97177a1cdfb"
+      }
+    },
+    "status": "passed"
+  },
+  "production_totals": {
+    "acquisition_task_elapsed_seconds": 185.33762697689235,
+    "api_errors": 1,
+    "http_200": 627,
+    "physical_bytes_before_cross_run_dedup": 61172068,
+    "requests": 627,
+    "retained_rows": 180208,
+    "sha_errors": 0,
+    "unique_references_before_cross_run_dedup": 1525
+  },
+  "runtime_health": {
+    "beat": "healthy",
+    "document_worker": "healthy",
+    "oom": false,
+    "ordinary_worker": "healthy",
+    "restart_counts": 0
+  },
+  "runtime_rate_policy": {
+    "schema_version": 1,
+    "status": "passed",
+    "task_policy_receipts": [
+      {
+        "rate_policy": {
+          "account_ceiling": 500,
+          "cyq_perf_daily_cap": 200000,
+          "daily_quota_ledger": {
+            "day": "2026-09-12",
+            "limit": 200000,
+            "remaining": 199921,
+            "scope": "this_root_capture_sample_only",
+            "status": "ready",
+            "timezone": "Asia/Shanghai",
+            "used": 79
+          },
+          "daily_timezone": "Asia/Shanghai",
+          "entitlement": {
+            "days_until_expiry": 84,
+            "effective_points_conservative": 10100,
+            "expected_points_after_expiry": 8100,
+            "independent_days_until_expiry": 361,
+            "independent_notice_window_days": null,
+            "independent_permissions_expiry": "2027-09-08",
+            "notice": "expires_within_90_days",
+            "notices": [
+              {
+                "days": 84,
+                "expires": "2026-12-05",
+                "points": 2000,
+                "window_days": 90
+              }
+            ],
+            "point_tranches": [
+              {
+                "expires": "2027-09-08",
+                "points": 8000
+              },
+              {
+                "expires": "2026-12-05",
+                "points": 2000
+              },
+              {
+                "expires": null,
+                "points": 100
+              }
+            ],
+            "points_expiry_date": "2026-12-05",
+            "reported_points": 10100,
+            "source": "user_reported_not_supplier_verified"
+          },
+          "last_gate": {
+            "effective_account_rpm": 500,
+            "effective_min_interval_seconds": 0.25,
+            "last_api": "fund_portfolio",
+            "observed_quota_preserved": false,
+            "resolved_api_cap": {
+              "review_reason": "entitlement_or_leaf_requires_review",
+              "review_required": true,
+              "rpm": 240,
+              "source": "points_unspecified_leaf_conservative+config_ceiling"
+            }
+          },
+          "mode": "tiered_v1",
+          "permission_grant": false,
+          "rollout_account_rpm": 500
+        },
+        "task_id": "ee190ad6-e3d6-4e12-b583-26aae31c2f7b"
+      },
+      {
+        "rate_policy": {
+          "account_ceiling": 500,
+          "cyq_perf_daily_cap": 200000,
+          "daily_quota_ledger": {
+            "day": "2026-09-12",
+            "limit": 200000,
+            "remaining": 199919,
+            "scope": "this_root_capture_sample_only",
+            "status": "ready",
+            "timezone": "Asia/Shanghai",
+            "used": 81
+          },
+          "daily_timezone": "Asia/Shanghai",
+          "entitlement": {
+            "days_until_expiry": 84,
+            "effective_points_conservative": 10100,
+            "expected_points_after_expiry": 8100,
+            "independent_days_until_expiry": 361,
+            "independent_notice_window_days": null,
+            "independent_permissions_expiry": "2027-09-08",
+            "notice": "expires_within_90_days",
+            "notices": [
+              {
+                "days": 84,
+                "expires": "2026-12-05",
+                "points": 2000,
+                "window_days": 90
+              }
+            ],
+            "point_tranches": [
+              {
+                "expires": "2027-09-08",
+                "points": 8000
+              },
+              {
+                "expires": "2026-12-05",
+                "points": 2000
+              },
+              {
+                "expires": null,
+                "points": 100
+              }
+            ],
+            "points_expiry_date": "2026-12-05",
+            "reported_points": 10100,
+            "source": "user_reported_not_supplier_verified"
+          },
+          "last_gate": {
+            "effective_account_rpm": 500,
+            "effective_min_interval_seconds": 0.12,
+            "last_api": "fund_manager",
+            "observed_quota_preserved": false,
+            "resolved_api_cap": {
+              "review_reason": null,
+              "review_required": false,
+              "rpm": 500,
+              "source": "points_regular_allowlist_doc290"
+            }
+          },
+          "mode": "tiered_v1",
+          "permission_grant": false,
+          "rollout_account_rpm": 500
+        },
+        "task_id": "b6d2a0df-3dba-47f5-a0bd-8627fb856231"
+      }
+    ]
+  },
+  "schema_version": 1,
+  "second_production_run": {
+    "celery_state": "SUCCESS",
+    "closure": {
+      "api_counts": {
+        "adj_factor": 1,
+        "anns_d": 2,
+        "bak_basic": 6,
+        "bak_daily": 2,
+        "balancesheet_vip": 1,
+        "bc_bestotcqt": 2,
+        "block_trade": 3,
+        "bond_blk": 2,
+        "bond_blk_detail": 2,
+        "cb_factor_pro": 3,
+        "cb_rate": 2,
+        "cb_rating": 2,
+        "cb_share": 2,
+        "cctv_news": 1,
+        "cyq_chips": 2,
+        "cyq_perf": 2,
+        "daily_basic": 1,
+        "daily_info": 6,
+        "dc_daily": 6,
+        "dc_hot": 2,
+        "dc_index": 4,
+        "dc_member": 6,
+        "disclosure_date": 3,
+        "dividend": 1,
+        "etf_limit": 3,
+        "etf_sh_cons": 6,
+        "etf_share_size": 15,
+        "etf_sz_cons": 6,
+        "express_vip": 1,
+        "factor_value": 1,
+        "fina_audit": 2,
+        "fina_indicator_vip": 1,
+        "fina_mainbz": 2,
+        "forecast_vip": 1,
+        "ft_limit": 2,
+        "fund_adj": 10,
+        "fund_daily": 10,
+        "fund_div": 2,
+        "fund_factor_pro": 3,
+        "fund_manager": 2,
+        "fund_nav": 1,
+        "fund_portfolio": 15,
+        "fund_share": 1,
+        "fut_daily_adj": 2,
+        "fut_holding": 1,
+        "fut_index_daily": 2,
+        "fut_weekly_detail": 2,
+        "fut_weekly_monthly": 2,
+        "fx_daily": 2,
+        "ggt_daily": 4,
+        "ggt_top10": 4,
+        "hk_tradecal": 1,
+        "hsgt_top10": 6,
+        "idx_anns": 1,
+        "idx_factor_pro": 3,
+        "income_vip": 1,
+        "index_daily": 1,
+        "index_dailybasic": 2,
+        "index_member_all": 1,
+        "index_monthly": 2,
+        "index_weekly": 1,
+        "index_weight": 1,
+        "irm_qa_sh": 1,
+        "irm_qa_sz": 1,
+        "kpl_concept_cons": 2,
+        "kpl_list": 1,
+        "limit_list_d": 12,
+        "major_news": 1,
+        "margin_detail": 2,
+        "margin_secs": 2,
+        "monetary_policy": 1,
+        "moneyflow": 1,
+        "moneyflow_dc": 14,
+        "moneyflow_hsgt": 4,
+        "moneyflow_ths": 15,
+        "monthly": 1,
+        "namechange": 1,
+        "news": 1,
+        "npr": 2,
+        "opt_basic": 3,
+        "opt_daily": 3,
+        "pledge_detail": 2,
+        "pledge_stat": 3,
+        "repo_daily": 2,
+        "report_rc": 2,
+        "repurchase": 1,
+        "research_report": 2,
+        "sge_daily": 3,
+        "share_float": 1,
+        "st": 4,
+        "stk_factor": 3,
+        "stk_factor_pro": 3,
+        "stk_holdernumber": 2,
+        "stk_holdertrade": 2,
+        "stk_limit": 1,
+        "stk_managers": 6,
+        "stk_rewards": 6,
+        "stk_shock": 4,
+        "stk_surv": 2,
+        "stk_week_month_adj": 1,
+        "stk_weekly_monthly": 1,
+        "stock_hsgt": 6,
+        "stock_st": 4,
+        "suspend_d": 1,
+        "tdx_daily": 1,
+        "tdx_index": 2,
+        "tdx_member": 2,
+        "ths_daily": 4,
+        "ths_hot": 2,
+        "ths_member": 4,
+        "top10_cb_holders": 2,
+        "top10_floatholders": 2,
+        "top10_holders": 2,
+        "top_inst": 6,
+        "top_list": 6,
+        "us_tradecal": 1,
+        "weekly": 1
+      },
+      "assessment_counts": {
+        "api_error": 1,
+        "empty_unverified": 199,
+        "possibly_truncated": 5,
+        "sample_ok": 146,
+        "schema_gap": 1
+      },
+      "attempts": 352,
+      "first_request_at": "2026-09-12T06:57:28.028719+00:00",
+      "http_statuses": {
+        "200": 352
+      },
+      "last_response_at": "2026-09-12T06:58:22.646606+00:00",
+      "physical_bytes": 31150773,
+      "retained_rows": 96126,
+      "sha_errors": 0,
+      "unique_references": 856
+    },
+    "code_commit": "5a110c714ae569ebfd1152f064ea4066efd4ae20",
+    "result": {
+      "elapsed_seconds": 90.088,
+      "invalid_requests_blocked": null,
+      "partition_work": {
+        "discovery_family": "stocks",
+        "job_id": "89c8994a9d29247aaf73e298eeb62ff8dade7bef63b40160895e9a9f32e3970e",
+        "legacy_parent_recovered": false,
+        "split": {
+          "children": 6285,
+          "method": "identifier_fanout",
+          "parent_observed_added_count": 373,
+          "universe_complete": false
+        },
+        "status": "partitioned",
+        "upstream_calls": 0
+      },
+      "planning_cadence": {
+        "config_fingerprint": "69ac7af25b07bc463c75a0026456e64897d453f23bba219469d47baa9418cd49",
+        "due": false,
+        "interval_seconds": 900,
+        "last_success_at": 1789195894,
+        "next_due_at": 1789196794,
+        "performed": false,
+        "reason": "interval_not_due",
+        "status": "deferred"
+      },
+      "publication": {
+        "current_release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+        "interval_seconds": 3600,
+        "last_success_at": 1789194280,
+        "mirror_status": "not_checked",
+        "mode": "acquire_only",
+        "next_due_at": 1789197880,
+        "pending": true,
+        "performed": false,
+        "status": "deferred"
+      },
+      "requests": 352,
+      "timing": {
+        "completed_stages": [
+          "open",
+          "publication_check",
+          "planning_check",
+          "archive",
+          "acquire",
+          "document_registration",
+          "close"
+        ],
+        "failed_stage": null,
+        "included_stages": {
+          "reconciliation": "acquire"
+        },
+        "stage_seconds": {
+          "acquire": 90.61577665992081,
+          "archive": 0.0116347037255764,
+          "close": 0.0004357229918241501,
+          "document_registration": 1.4454124122858047,
+          "open": 0.0009365547448396683,
+          "planning_check": 0.00023700669407844543,
+          "publication_check": 0.4260487202554941
+        },
+        "total_elapsed_seconds": 92.5053810980171
+      },
+      "updated_at": "2026-09-12T06:58:24.626526+00:00"
+    },
+    "schema_version": 1,
+    "status": "passed",
+    "task_end": "2026-09-12T06:58:24.626526+00:00",
+    "task_id": "b6d2a0df-3dba-47f5-a0bd-8627fb856231",
+    "task_start": "2026-09-12T06:56:52.119"
+  },
+  "second_run_api_error": {
+    "api_name": "cyq_chips",
+    "attempt": 1,
+    "attempt_rowid": 233952,
+    "job_id": "8d98620659ec90a01a39c40c0ee1aa353cdd18bfaf2a7564a1379c7047ea5209",
+    "row_count": null,
+    "status": "api_error"
+  },
+  "status": "production_semantics_accepted_pending_next_fixed_release",
+  "verification": {
+    "base_pipeline_tests": 17,
+    "broad_pipeline_tests": 178,
+    "compile": "passed",
+    "diff_check": "passed",
+    "existing_stale_rate_count_failure": "243 vs244 reproduced on untouched fe460087 and assertion updated for pre-existing fina_mainbz_vip",
+    "independent_review_tests": 61,
+    "intake_tests": 7,
+    "overlapping_test_sets": true,
+    "rate_tests": 29,
+    "ruff": "passed",
+    "technical_pipeline_tests": 8
+  }
+}

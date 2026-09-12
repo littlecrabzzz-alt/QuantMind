@@ -1290,3 +1290,16 @@
 正常publisher23d8b20d以publish_only/0上游、338.184秒发布ce43326f固定版，manifest421257077字节、930485文件、129220数据集。上一轮stock fanout两批和index_weight后代4共2655引用/118860888字节，以及本轮首批282引用/8631049字节，在云端和Mac全部收录且逐SHA零错误。Mac标准LaunchAgent第261轮已在运行，未使用-k重启；下载12995个增量文件（1136747373字节），完整校验930485项、exit0、stderr空，并于14:41:13原子切换CURRENT。空Token、Docker network none和socket/DNS阻断下，index_weight、moneyflow_dc、forecast_vip各读3行，上游调用0。普通/文档worker和Beat保持healthy、restart0、OOM false，云盘可用333920260096字节。
 
 本轮生产合同与ce43本地读链路已验收。发布之后取得的第二轮883引用/50427758字节仍待下一正常固定发布和Mac闭包，清单已create-only归档，不能归入ce43。本地QuantDB仍已应用至2026-09-11；独立完整恢复快照继续传输、不改沙盒研究输入。后续优先按只读审计记录核cyq_chips错误精确签名，再处理research_report.file_name字段缺口；完整历史、修订、known_at/PIT、91个单日index_weight完整性告警与RRG分类继续开放。机器证据：`docs/tushare-request-contract-repair-20260912.evidence.json`；下一阶段记录：`coordination/tushare-data/20260912T063026Z-next-gap-readonly-cyq.md`。
+
+
+## 2026-09-12 15:07 CST cyq_chips 精确无数据语义生产验收
+
+`26fa924b/c8785ab0/faa1236f/daa4cf87/5a110c71` 已进入 master 并部署云端。只有 HTTP 200、cyq_chips、整数 code50101、精确消息「指定数据不存在，请确认参数！」、显式 data=null、合法 ts_code+trade_date 两键参数才记为 supplier_empty_hint/empty_unverified；保留原始响应和字段缺口，coverage/history/PIT 均为 false，不借此升级 capability。105 个旧 blocked job 全字段及 525 条旧 attempt/result 经短索引只读审计确认不变。
+
+普通 worker 经在途任务自然完成后恢复，文档 worker 和 QuantDB 保持运行。相关测试含178项管线测试及61项独立复审，集合重叠不相加；Ruff、编译、diff通过。既有 registry 已有244接口，本次仅修正旧测试243断言，没有新增 registry 项。两轮真实采集共627次HTTP200、180208行、1525引用/61172068字节，逐SHA错误0，任务总耗时185.338秒（含管线开销，不将其表述为500rpm实测）。第二轮唯一api_error为cyq_chips历史范围参数；独立稍后快照共7次cyq首次调用，其中5次sample_ok、1次精确hint停止重试为empty、1次范围请求保留pending。新语义已在真实响应上验收，但不外推为全局无数据。
+
+运行报告仍为tiered_v1，账户上限/灰度500rpm；cyq_perf每日200000配额账本ready。10100积分、2026-12-05后预计8100、提前90天提醒（本轮剩84天）和独立权限2027-09-08到期均保留；未记录Token或订单。研报327条quality响应仅缺file_name，其36571行和原始/观测/Parquet已留存，不重拉、不伪补字段。
+
+云端/Mac仍为ce43326f固定版。上一阶段883引用加本轮669+856引用，严格去重后2408引用/111599826字节已create-only归档为validation/source-semantics-20260912/pending-release-inventory.json，SHA ffd8f57870f871df8c288b7b31fb33cf130aefd37591d21062c8b808dd99b8d8；等待正常publisher及Mac镜像后逐项验收，不能宣称已进入ce43。本地QuantDB已applied至2026-09-11，Qlib日历同日。
+
+并行publisher pool2候选63499b79已在隔离worktree提交、142测试通过，未合并部署；约1.711倍仅为文件_save微基准，需完整document_index阶段比较后决定。下一轮先闭合待发布清单，再审范围请求与cyq_chips每日配额范围；完整历史、修订、known_at/PIT、单日index_weight完整性告警和RRG分类继续开放。机器证据：docs/tushare-source-semantics-20260912.evidence.json。
