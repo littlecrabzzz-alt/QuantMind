@@ -1,0 +1,213 @@
+{
+  "authority_snapshot": {
+    "config_sha256": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a",
+    "current": {
+      "manifest_sha256": "de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+      "release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0"
+    },
+    "current_pointer_sha256": "d47619bf57d327539914694cfdeb0724f7474cbdec02d953357f2a7c9a2ea0bc",
+    "manifest_bytes": 435868564,
+    "manifest_sha256": "de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0"
+  },
+  "errors": [],
+  "exact_pk_snapshot": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "rowid": 241054
+      }
+    ],
+    "connection_closed": true,
+    "epoch": "20260912",
+    "group_name": "other",
+    "logical_key": "65cb953e7ffa7350dbbfec0a3c896fbc9ec29863f3491623a7916fdc5e4a0f6d",
+    "priority": 21,
+    "query_scope": "exact task primary key only",
+    "shared_lock_elapsed_seconds": 0.00058,
+    "sqlite_mode": "mode=ro/query_only",
+    "state": "done",
+    "task_id": "4781e3570f46c97fd5afc0463a556eb1ee11f28845157d6d052a9f686f234f0b",
+    "tries": 1
+  },
+  "execution_artifacts": {
+    "receipt": {
+      "bytes": 482,
+      "path": "validation/opt-daily-fixed-row-sample-20260912-receipt.json",
+      "sha256": "c222f9d8a92ac4fb5cc08a3c9d891ba7f12605790990af5d26fb845d8ac1e0bd"
+    },
+    "report": {
+      "bytes": 3109,
+      "path": "validation/opt-daily-fixed-row-sample-20260912.json",
+      "sha256": "f71c869d18cb9bcf41d8914bc7208b499cf12003a575f29f6505885d44eae024"
+    }
+  },
+  "fixed_candidate_source_evidence": {
+    "all_in_de494_manifest": true,
+    "manifest_membership": {
+      "objects/0529579a5e0224ade554eaaaf49f495eadc205de27191aac765a67ff416912da.json": true,
+      "objects/568f10201535d3d57e6f3d0b70fce12b0bc7be9d55c7669d4281e5e8b8ec6916.json": true,
+      "observations/94c825c8d73f4115b4810dcdf8ec27d9.json": true,
+      "observations/a346370c87b24f39b29313db9759b8ff.json": true,
+      "parquet/278eab7f81922ebf4b52ad7900d1bd21731bad79ac49edd93eab56c48c4810c8.parquet": true,
+      "parquet/2b1e19ef0d654fc902245b2e8ef6a60d4f611e3f6a9fa8ed35943725750f2f8d.parquet": true
+    },
+    "observation_object_chains": true,
+    "physical_refs": [
+      {
+        "bytes": 2315837,
+        "path": "objects/0529579a5e0224ade554eaaaf49f495eadc205de27191aac765a67ff416912da.json",
+        "sha256": "0529579a5e0224ade554eaaaf49f495eadc205de27191aac765a67ff416912da"
+      },
+      {
+        "bytes": 1318476,
+        "path": "objects/568f10201535d3d57e6f3d0b70fce12b0bc7be9d55c7669d4281e5e8b8ec6916.json",
+        "sha256": "568f10201535d3d57e6f3d0b70fce12b0bc7be9d55c7669d4281e5e8b8ec6916"
+      },
+      {
+        "bytes": 952,
+        "path": "observations/94c825c8d73f4115b4810dcdf8ec27d9.json",
+        "sha256": "837e95fb2db494af9486349f57081de227257a8b4cba88d087e57ea5d73c2730"
+      },
+      {
+        "bytes": 852,
+        "path": "observations/a346370c87b24f39b29313db9759b8ff.json",
+        "sha256": "eb1bec9781d92161dad87c02443ae182041cdd8dfe9bdd1bb450aa1492c4724e"
+      },
+      {
+        "bytes": 657700,
+        "path": "parquet/278eab7f81922ebf4b52ad7900d1bd21731bad79ac49edd93eab56c48c4810c8.parquet",
+        "sha256": "278eab7f81922ebf4b52ad7900d1bd21731bad79ac49edd93eab56c48c4810c8"
+      },
+      {
+        "bytes": 883157,
+        "path": "parquet/2b1e19ef0d654fc902245b2e8ef6a60d4f611e3f6a9fa8ed35943725750f2f8d.parquet",
+        "sha256": "2b1e19ef0d654fc902245b2e8ef6a60d4f611e3f6a9fa8ed35943725750f2f8d"
+      }
+    ]
+  },
+  "generated_at": "2026-09-12T08:14:16.183184+00:00",
+  "non_actions": {
+    "configuration_changed": false,
+    "credentials_read": false,
+    "database_mutated": false,
+    "publication_triggered": false,
+    "services_changed": false,
+    "upstream_called": false
+  },
+  "physical_current_bytes": 7538,
+  "physical_current_refs": [
+    {
+      "bytes": 360,
+      "path": "objects/84af83808067f506a2aa666d0f94ee91da36d9d644b618cf4540cbc539cb41c6.json",
+      "sha256": "84af83808067f506a2aa666d0f94ee91da36d9d644b618cf4540cbc539cb41c6"
+    },
+    {
+      "bytes": 872,
+      "path": "observations/85945389cede483995bb324c63b2b16c.json",
+      "sha256": "2259c4e822f13d5933a6c718b0e406777d36917f0540ea5572d89baebea6287d"
+    },
+    {
+      "bytes": 6306,
+      "path": "parquet/3d4732fb8cf3682cd8467e34e21433ceebaea8d27abe60cdaa0904154c720baf.parquet",
+      "sha256": "3d4732fb8cf3682cd8467e34e21433ceebaea8d27abe60cdaa0904154c720baf"
+    }
+  ],
+  "publication_boundary": {
+    "absence_by_path": {
+      "objects/84af83808067f506a2aa666d0f94ee91da36d9d644b618cf4540cbc539cb41c6.json": true,
+      "observations/85945389cede483995bb324c63b2b16c.json": true,
+      "parquet/3d4732fb8cf3682cd8467e34e21433ceebaea8d27abe60cdaa0904154c720baf.parquet": true
+    },
+    "all_absent_from_de494_active_files": true,
+    "new_ref_bytes": 7538,
+    "new_ref_count": 3,
+    "pending_inventory": {
+      "bytes": 1573,
+      "path": "validation/opt-daily-fixed-row-sample-independent-20260912T081416183184Z/exact-refs-pending-next-release.json",
+      "sha256": "d8c72d2eb0ef02f9ecb66d3cdb9aca4a3b3e4f222753f5118ddd5b5cd41bd71f"
+    },
+    "publication_triggered": false
+  },
+  "result_contract": {
+    "http_status": 200,
+    "observation_assessment_equals_result_without_storage_keys": true,
+    "observation_object_chain": true,
+    "parquet_all_13_source_fields_exact": true,
+    "parquet_path_hash_equals_filename": true,
+    "parquet_row_exact": true,
+    "raw_fields": [
+      "amount",
+      "close",
+      "exchange",
+      "high",
+      "low",
+      "oi",
+      "open",
+      "pre_close",
+      "pre_settle",
+      "settle",
+      "trade_date",
+      "ts_code",
+      "vol"
+    ],
+    "raw_row": [
+      66.354,
+      360.6,
+      "CFFEX",
+      360.6,
+      348.6,
+      170.0,
+      351.6,
+      398.0,
+      399.4,
+      366.8,
+      "20260911",
+      "HO2609-C-2500.CFX",
+      18.0
+    ],
+    "request": {
+      "api_name": "opt_daily",
+      "fields": "amount,close,exchange,high,low,oi,open,pre_close,pre_settle,settle,trade_date,ts_code,vol",
+      "params": {
+        "trade_date": "20260911",
+        "ts_code": "HO2609-C-2500.CFX"
+      }
+    },
+    "response_complete": true,
+    "row_count": 1,
+    "status": "sample_ok",
+    "supplier_has_more": false
+  },
+  "reuse_claim": {
+    "actual_upstream_calls": 1,
+    "claim_no_equivalent_tasks_or_attempts_in_other_epochs": false,
+    "reason": "Independent closure intentionally queried only the selected exact PK; runner duplicate gate did not prove all-epoch absence.",
+    "reuse_without_http": false,
+    "selected_task_now_has_exactly_one_attempt": true,
+    "selected_task_was_existing_pristine_according_to_execution_report": true
+  },
+  "review_arrived_before_execution": false,
+  "review_timing": "post_execution",
+  "runner_review": {
+    "blockers": [
+      "Duplicate gate did not cover equivalent pre-watermark attempts or arbitrary epochs.",
+      "Source pins omitted de494 manifest hash, fixed source-artifact verification, and tushare_intake.py.",
+      "Pre-execution result validator did not prove full observation-object-assessment-result and Parquet chain.",
+      "No hard deadline; enqueue preceded token retrieval; report and receipt could diverge by directory."
+    ],
+    "classification": "not_reusable",
+    "reusable": false,
+    "review_timing": "post_execution",
+    "runner_sha256": "abffa078fbd6c8ea25519c0a0e6c62cad98edb5cba2c5a4f40e1e6b39a1e9f7a"
+  },
+  "schema_version": 1,
+  "scope_limits": {
+    "all_epoch_duplicate_absence_proven": false,
+    "historical_versions_complete": false,
+    "history_complete": false,
+    "option_universe_complete": false,
+    "pit_verified": false
+  },
+  "status": "independent_strict_closure_passed"
+}

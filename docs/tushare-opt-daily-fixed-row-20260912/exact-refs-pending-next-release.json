@@ -1,0 +1,40 @@
+{
+  "captured_after_manifest_sha256": "de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+  "captured_after_release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+  "generated_at": "2026-09-12T08:14:16.183184+00:00",
+  "history_complete": false,
+  "physical_bytes": 7538,
+  "pit_verified": false,
+  "publication_triggered": false,
+  "ref_count": 3,
+  "refs": [
+    {
+      "bytes": 360,
+      "path": "objects/84af83808067f506a2aa666d0f94ee91da36d9d644b618cf4540cbc539cb41c6.json",
+      "sha256": "84af83808067f506a2aa666d0f94ee91da36d9d644b618cf4540cbc539cb41c6"
+    },
+    {
+      "bytes": 872,
+      "path": "observations/85945389cede483995bb324c63b2b16c.json",
+      "sha256": "2259c4e822f13d5933a6c718b0e406777d36917f0540ea5572d89baebea6287d"
+    },
+    {
+      "bytes": 6306,
+      "path": "parquet/3d4732fb8cf3682cd8467e34e21433ceebaea8d27abe60cdaa0904154c720baf.parquet",
+      "sha256": "3d4732fb8cf3682cd8467e34e21433ceebaea8d27abe60cdaa0904154c720baf"
+    }
+  ],
+  "required_release_relation": "strictly_after_captured_release",
+  "schema_version": 1,
+  "source_execution_receipt": {
+    "bytes": 482,
+    "path": "validation/opt-daily-fixed-row-sample-20260912-receipt.json",
+    "sha256": "c222f9d8a92ac4fb5cc08a3c9d891ba7f12605790990af5d26fb845d8ac1e0bd"
+  },
+  "source_execution_report": {
+    "bytes": 3109,
+    "path": "validation/opt-daily-fixed-row-sample-20260912.json",
+    "sha256": "f71c869d18cb9bcf41d8914bc7208b499cf12003a575f29f6505885d44eae024"
+  },
+  "status": "pending_next_normal_publication"
+}
