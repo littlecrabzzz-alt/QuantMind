@@ -1,0 +1,7 @@
+# Index weight single-day and ordinary throughput audit
+
+- Root owns read-only descendant-4 diagnostics and release inventory; financial_next_batch checks official parameter/cap evidence; next_window_audit investigates normal acquisition throughput in an isolated candidate worktree.
+- All 91 saturated single-day responses passed object/observation/Parquet SHA and request identity checks. They contain 1000–3575 unique valid rows, exact requested dates/indexes, and weight sums 99.810–100.049. All have has_more=false but count=0; neither field nor near-100 weights is a verified membership total.
+- Official doc 96 lists monthly index weights and index/date parameters, with no published row cap, con_code filter or pagination. The code already marks its 1000-row alarm cap_verified=false. No cap increase, invented constituent partition, data-state rewrite or supplier retry was performed.
+- A create-only 900-reference inventory and detailed 91-request audit are archived under validation/index-weight-descendant-batch-20260912/batch-4-{inventory,single-day-audit}.json. The fixed-release gate remains pending until the ordinary publisher; current cloud/Mac are 85ff.
+- Latest normal run evidence shows 257.35 seconds, requests=0 and 6268 identifier-fanout children. The current implementation invokes full identifiers() per deferred parent before returning from the run; the parallel audit will establish a minimal safe optimization.

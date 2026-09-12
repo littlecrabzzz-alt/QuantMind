@@ -1268,3 +1268,5 @@
 
 
 2026-09-12 13:40 CST：Beat先停，普通任务5935776c用257.359秒自然完成后worker退出，无revoke/kill；独立只读审计重建629个可用完整兄弟对并确认所选180对/360叶与18份历史manifest在task/logical/request三层零重叠。精确窗口50.832秒完成360次HTTP 200、279962行：180 empty、89 split pending、91 blocked；91个blocked全部为单日仍possibly_truncated，已无法按日期继续二分，是覆盖未证明边界而非权限、限流或网络失败。89个可拆叶生成178个pristine子任务。闭包验证900个唯一引用/25757763字节全部SHA通过，六份材料不可覆盖归档。worker、文档worker和Beat恢复且restart0、OOM false；本批等待固定发布与Mac镜像，单日饱和、空结果、完整历史、修订、known_at/PIT语义及RRG分类仍开放。机器证据为docs/tushare-index-weight-descendant-batch4-20260912.evidence.json。
+
+2026-09-12 13:44 CST：后代第4批91个单日饱和响应完成只读语义审计：1000–3575行，重复自然键、跨请求日期/指数及无效权重均0，权重合计99.810–100.049；has_more全false但count全0，均不足以证明成员完整。官方doc96未公开行数上限或成分筛选/分页，现有1000只是未验证告警阈值，未修改blocked或盲目重拉。900个物理引用/25757763字节清单和逐请求审计已不可覆盖归档，准备下一固定版验收；并行转查普通任务约257秒、requests=0、6268个identifier_fanout子任务的全局重复扫描瓶颈。证据：docs/tushare-index-weight-single-day-audit-20260912.evidence.json。

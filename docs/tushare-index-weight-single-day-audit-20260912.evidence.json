@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "status": "single_day_saturation_audited_coverage_unproven",
+  "observed_at": "2026-09-12T13:44:00+08:00",
+  "api": "index_weight",
+  "batch": "descendant_4",
+  "single_day_requests": 91,
+  "rows_min": 1000,
+  "rows_max": 3575,
+  "duplicate_natural_keys": 0,
+  "out_of_request_rows": 0,
+  "invalid_weights": 0,
+  "weight_sum_min": 99.81,
+  "weight_sum_max": 100.049,
+  "supplier_has_more_false": 91,
+  "supplier_count_equals_rows": 0,
+  "supplier_count_observed": 0,
+  "official_source": "https://tushare.pro/document/2?doc_id=96",
+  "official_document_findings": {
+    "row_limit_published": false,
+    "con_code_input_documented": false,
+    "pagination_documented": false
+  },
+  "interpretation": "1000 is an unverified conservative alarm, not an observed supplier cap. Near-100 total weights and has_more=false are useful diagnostics, not proof of complete membership. count=0 despite nonempty rows cannot be used as the total. Existing blocked states remain unchanged.",
+  "archive": {
+    "inventory_path": "validation/index-weight-descendant-batch-20260912/batch-4-inventory.json",
+    "inventory_sha256": "19134b8e8fc43cdbe8f809aa7faf64be826dcc415d884144537c9722caf795dd",
+    "audit_path": "validation/index-weight-descendant-batch-20260912/batch-4-single-day-audit.json",
+    "audit_sha256": "aa582d95067d561962a4b56b0eefd8dd68aa32da054616e37745d5284dda008e",
+    "references": 900,
+    "bytes": 25757763,
+    "physical_sha_errors": 0
+  },
+  "boundaries": {
+    "upstream_calls": 0,
+    "authority_database_writes": 0,
+    "coverage_promoted": false,
+    "current_switched": false
+  },
+  "next_actions": [
+    "Verify fixed release inclusion after the next ordinary publish due at 14:17:48 CST, then Mac exact inventory and offline reads.",
+    "Investigate family-specific identifier discovery to remove repeated full-catalog scans from ordinary acquisition; retain existing universe and request identities.",
+    "Keep single-day saturation gap until supplier limit/pagination or independent constituent inventory is verified."
+  ]
+}
