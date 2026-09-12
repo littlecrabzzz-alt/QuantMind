@@ -210,6 +210,9 @@ class IntakeAcceptance(unittest.TestCase):
                 ("short date", "cyq_chips", {"ts_code": "600001.SH", "trade_date": "202611"}, empty, 200, "api_error"),
                 ("numeric date", "cyq_chips", {"ts_code": "600001.SH", "trade_date": 20260904}, empty, 200, "api_error"),
                 ("string code", "cyq_chips", None, {**empty, "code": "50101"}, 200, "api_error"),
+                ("boolean code", "cyq_chips", None, {**empty, "code": True}, 200, "api_error"),
+                ("data dict", "cyq_chips", None, {**empty, "data": {}}, 200, "api_error"),
+                ("extra param", "cyq_chips", {"ts_code": "600001.SH", "trade_date": "20260904", "unknown": "value"}, empty, 200, "api_error"),
             )
             for name, api, params, payload, status, expected in negative_cases:
                 with self.subTest(name=name):

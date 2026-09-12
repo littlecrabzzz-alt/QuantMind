@@ -88,6 +88,17 @@ class TechnicalExtraRuntime(unittest.TestCase):
         observation = json.loads((self.root / "observations" / result["observation"]).read_bytes())
         self.assertEqual(observation["assessment"]["code"], 50101)
         self.assertEqual(observation["request"]["params"], params)
+        self.assertEqual(result["field_coverage"], "unverified_default_or_invalid")
+        self.assertIsNone(result["requested_missing_fields"])
+        self.assertIsNone(result["unexpected_returned_fields"])
+
+        previous = ("cyq_chips:", "available", "earlier-observation", "sample_ok")
+        self.p.db.execute("INSERT INTO capability VALUES(?,?,?,?)", previous)
+        another = self.p.enqueue("cyq_chips", {**params, "trade_date": "20260904"}, 10, "history")
+        with httpx.Client(transport=httpx.MockTransport(respond), trust_env=False) as client:
+            self.p.run(client, "fixture", {}, max_requests=1, max_seconds=5, pause=0, task_ids=[another])
+        current = self.p.db.execute("SELECT * FROM capability WHERE scope='cyq_chips:'").fetchone()
+        self.assertEqual(tuple(current), previous)
 
     def test_nearby_supplier_error_keeps_original_retry_semantics(self):
         key = self.p.enqueue(
