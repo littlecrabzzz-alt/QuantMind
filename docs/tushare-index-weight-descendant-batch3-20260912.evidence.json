@@ -1,0 +1,63 @@
+{
+  "archive": {
+    "authority_path": "validation/index-weight-descendant-batch-20260912/batch-3-*",
+    "artifacts": {
+      "closure": "fd64e546744fe833019676deead3779023323cee07769024a3c2182643d916a6",
+      "inspect": "1cc0469ccd3a3be608f3efddc7ffa84a106eb3c7db523e904fbd4a3709d8f7d3",
+      "manifest": "0d29c5ff7b88173e5dd2615d82c09660f3f2649b617fcefafa07bb3b09a968ad",
+      "plan": "798b84900cf4dafd973d86749de98a15c4c13d742cf794471a94474ec3281cde",
+      "prepare": "4522ff8fbda09846cef31e4dd7e904e85b38fa26c1d040e1b9c01d9af905a0f0",
+      "receipt": "28fa9ac3689c050b28d658d7822b7c41bb353f0e30b591c2879b85f3cb8ceb65"
+    },
+    "physical_bytes": 26363366,
+    "physical_errors": 0,
+    "references": 900
+  },
+  "batch": {
+    "after_graph": {"edges": 720, "sha256": "4273367c36980a0cb93ad7c6024e6cd2b22278d77a009d4f9685a69e9f76b526", "tasks": 900},
+    "before_graph": {"edges": 360, "sha256": "5f15e352f4b7bfe17fafa2dd76dded527780f691e877ccefa491aaac371e39e2", "tasks": 540},
+    "elapsed_seconds": 45.982,
+    "http_statuses": {"200": 360},
+    "jobs": 360,
+    "new_grandchildren": 360,
+    "observed_rpm": 469.749,
+    "pairs": 180,
+    "rows": 287004,
+    "states": {"empty": 180, "split_pending": 180},
+    "statuses": {"empty_unverified": 180, "possibly_truncated": 180},
+    "upstream_calls": 360
+  },
+  "boundary": {
+    "coverage_complete_claimed": false,
+    "current_release_switched": false,
+    "release_published": false,
+    "sibling_pair_atomicity_claimed": false,
+    "statement": "This closes the selected leaves and validates their direct grandchildren only. Deeper descendants, complete history, revisions, known_at, PIT semantics and RRG classification remain open."
+  },
+  "credential_hygiene": {"secrets_in_git_or_report": false},
+  "observed_at": "2026-09-12T11:52:00+08:00",
+  "operational_notes": [
+    "Beat stopped first. Two already received normal tasks completed naturally before the exact window; no task was revoked or killed.",
+    "The first execute shell redirection was denied before the runner, credential access, upstream calls or authority writes. The same pinned manifest then executed in the production container.",
+    "The optimized authority inspection completed in 3.76 seconds on this batch."
+  ],
+  "open_issues": [
+    {"next_action": "Wait for normal publish-only, then mirror and exact-verify batches 2 and 3 on Mac.", "stage": "fixed_release_and_mac_mirror", "status": "pending"},
+    {"next_action": "Continue direct descendants in later drained windows.", "stage": "deeper_descendants", "status": "pending"}
+  ],
+  "pins": {
+    "all_parent_ids_sha256": "d2e57a43b8d1d3d5f6f2778cacbb78d0e8680b5684263875ddd01cb79550cff8",
+    "all_task_ids_sha256": "2a1ddd78c2b1d84295d1686fe8d65e28e1e22776af353b5f3d35e19c3b6d56e5",
+    "config_sha256": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a",
+    "helper_sha256": "95d536672f0cdd652b1f9062c67051b95ab7e38d365068bef5be02234d4d0105",
+    "history_inventory_sha256": "9e805921f456ecb1764e6f0c74fa568a5eb91fc7d12361f180fd8f3d0308c529",
+    "manifest_sha256": "0d29c5ff7b88173e5dd2615d82c09660f3f2649b617fcefafa07bb3b09a968ad",
+    "pair_set_sha256": "bdb3db531cb3116f216e4697d257567980a7e9a78f5546c85119be4c5d4648cf",
+    "preparer_sha256": "9de738dd4cf2c96b7ee7f51b7acf50518c6241e0df005b47714680074676a107",
+    "receipt_id": "baf71f38dac97f684e1ec049f93ec1977327f5dfe2dc4011b8edb7dea9c85614",
+    "source_release_id": "data-77bb1b4c3c2cff71de2d74ccf0678e8c4b8bd997d54235b4d8c0d13534bbeee8"
+  },
+  "schema_version": 1,
+  "services_after_restore": {"beat": "healthy", "normal_pipeline_resumed": true, "oom": false, "restart_count": 0, "worker": "healthy"},
+  "status": "index_weight_descendant_batch_3_exact_execution_closed_waiting_fixed_release"
+}
