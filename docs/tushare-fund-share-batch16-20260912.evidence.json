@@ -1,0 +1,76 @@
+{
+  "archive": {
+    "authority_path": "validation/fund-share-batch-20260912/batch-16-*",
+    "artifacts": {
+      "closure": "d4dc9cda44ca56de1504fba467c449a7afa6b58446a310393f515fec13e95d74",
+      "inspect": "e388e5a15b94a3b586b14679d63036572d4b0c68d6d9fb5459e4e143da9f9584",
+      "manifest": "667710bf473e135406728287de644a87b66e6f7f104cae1e531887fed802cdce",
+      "plan": "b3a054778fb34773fe9ad872b56c61c53bbdfd8329c894bba78dd27caac2f4cb",
+      "prepare": "16bc038e2aa305c58d5acdbae160842cfabab560bed24c9c33e37279231a7364",
+      "receipt": "3b8bb62159090915d283cd7c19e41ea9f192d2e6e7c089524befb86e3c385ebe"
+    },
+    "physical_bytes": 6092611,
+    "physical_errors": 0,
+    "references": 971
+  },
+  "batch": {
+    "api_name": "fund_share",
+    "batch": 16,
+    "elapsed_seconds": 44.282,
+    "http_statuses": {"200": 360},
+    "jobs": 360,
+    "market_counts": {"SH": 180, "SZ": 180},
+    "observed_rpm": 487.783,
+    "rows": 59951,
+    "states": {"done": 251, "empty": 109},
+    "statuses": {"empty_unverified": 109, "sample_ok": 251},
+    "trade_date_max": "20191003",
+    "trade_date_min": "20190406",
+    "uncertain_upstream_calls": 0,
+    "upstream_calls": 360
+  },
+  "boundary": {
+    "current_release_switched": false,
+    "release_published": false,
+    "statement": "This exact batch proves retained fund-share rows for the selected dates. Complete history, revisions, known_at, PIT coverage, fixed-release inclusion and Mac mirror availability remain open."
+  },
+  "capacity": {
+    "available_bytes_at_closure": 337236979712,
+    "hard_reserve_bytes": 107374182400,
+    "headroom_above_reserve_bytes": 229862797312
+  },
+  "credential_hygiene": {"secrets_in_git_or_report": false},
+  "historical_overlap": {
+    "historical_requests": 4920,
+    "logical_overlap": 0,
+    "manifests": 14,
+    "request_overlap": 0,
+    "task_overlap": 0
+  },
+  "observed_at": "2026-09-12T12:29:13+08:00",
+  "operational_notes": [
+    "Beat stopped first. The already active normal acquisition completed naturally before worker exit; no task was revoked or killed.",
+    "A queue-length precheck wrote a leading zero before the execution JSON in the operator capture. Only that non-JSON line was removed; the immutable receipt was archived unchanged.",
+    "The normal worker and Beat were restored with their existing containers."
+  ],
+  "pins": {
+    "config_sha256": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a",
+    "eligible_task_ids_sha256": "57f4d2128e454183fdfaa76951b7b3ee36b647491024c5d184b9b92100b4e470",
+    "helper_sha256": "2012cf690f572f4210475d12e65d9d0ddc297c9c34c6a52bb7c6ec5964f9c4ba",
+    "manifest_sha256": "667710bf473e135406728287de644a87b66e6f7f104cae1e531887fed802cdce",
+    "preparation_sha256": "3fd57d4392079775d17a123280da9eab707b13bd105a70bf7c341b935dc0d1f9",
+    "receipt_id": "ba90f21854796f3cde17e4dca6c9e1cfc3bd14375340f53947c61953bf8c4882",
+    "release_id_at_prepare": "data-385ae0c51e70c3615059de7bb87535e4fc0c616c996ee9284df108c7dfa36a6f",
+    "request_signatures_sha256": "3e95717584cdfc5992a06daefb65f7240db00a762f757a139bf9377e0fbe9c63",
+    "task_ids_sha256": "9f56c68ccc922dc925b84f5385ddd796f774760522edd7dbb768707380dcd4b0"
+  },
+  "schema_version": 1,
+  "services_after_restore": {
+    "beat": "healthy",
+    "normal_pipeline_resumed": true,
+    "oom": false,
+    "restart_count": 0,
+    "worker": "healthy"
+  },
+  "status": "fund_share_batch_16_exact_execution_closed_waiting_fixed_release"
+}
