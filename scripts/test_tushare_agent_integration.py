@@ -402,6 +402,15 @@ class AgentIntegration(unittest.TestCase):
         ):
             with self.assertRaises((HTTPException, ValueError)):
                 tushare_tool.execute(request, self.release, {**base, **changed})
+        for api_name in ("p_list", "p_get"):
+            with self.assertRaises(HTTPException) as private:
+                tushare_tool.execute(
+                    request,
+                    self.release,
+                    {**base, "api_name": api_name},
+                )
+            self.assertEqual(private.exception.status_code, 404)
+            self.assertEqual(private.exception.detail, "Dataset unavailable")
         self.assertEqual(
             self.client.post(
                 "/api/v1/quantbot/chat",

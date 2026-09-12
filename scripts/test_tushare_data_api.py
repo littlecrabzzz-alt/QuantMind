@@ -241,6 +241,33 @@ class DataAPITest(unittest.TestCase):
         self.assertEqual(self.query(limit=True).status_code, 422)
         self.assertEqual(self.query(url="https://example.com").status_code, 422)
 
+    def test_account_private_portfolios_are_not_enumerated_or_read(self):
+        self.manifest["datasets"].append(
+            {"api_name": "p_list", "path": self.parquet}
+        )
+        self.manifest["coverage_by_api"] = [
+            {"api_name": "fund_daily", "status": "sample_ok"},
+            {"api_name": "p_list", "status": "sample_ok"},
+            {"api_name": "p_get", "status": "sample_ok"},
+        ]
+        self.release = self.publish(self.manifest)
+
+        catalog = self.get("/datasets").json()
+        self.assertEqual(
+            [item["api_name"] for item in catalog["datasets"]], ["fund_daily"]
+        )
+        self.assertEqual(
+            [item["api_name"] for item in catalog["coverage"]], ["fund_daily"]
+        )
+        for response in (
+            self.get("/datasets/p_list/schema"),
+            self.get("/datasets/p_get/schema"),
+            self.query(api_name="p_list"),
+            self.query(api_name="p_get"),
+        ):
+            self.assertEqual(response.status_code, 404, response.text)
+            self.assertEqual(response.json(), {"detail": "Dataset unavailable"})
+
     def test_index_weight_uses_contract_code_field(self):
         sink = pa.BufferOutputStream()
         pq.write_table(

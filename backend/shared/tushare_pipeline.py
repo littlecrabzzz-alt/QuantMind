@@ -48,6 +48,7 @@ from backend.shared.tushare_registry import (
     market_sentiment_prerequisites,
     PORTFOLIO_READ_RUNTIME_CONTRACTS,
     portfolio_read_prerequisites,
+    portfolio_read_snapshot_epoch,
     EXTENDED_CONTRACTS,
     PLANNERS,
     APPEND_PLANNERS,
@@ -1500,13 +1501,16 @@ class Pipeline:
             pass
         return result
 
-    def portfolio_read_identifier(self):
-        """Return the latest durable successful unfiltered list observation."""
+    def portfolio_read_identifier(self, epoch):
+        """Return the durable successful unfiltered list observation for one epoch."""
+        if epoch is None:
+            return None
         row = self.db.execute(
-            "SELECT job,epoch,state,result FROM jobs INDEXED BY jobs_group_pending "
-            "WHERE state IN ('done','empty') AND group_name='portfolio_read' "
-            "AND json_extract(job,'$.api_name')='p_list' "
-            "ORDER BY rowid DESC LIMIT 1"
+            "SELECT job,epoch,state,result FROM jobs INDEXED BY jobs_partition_lookup "
+            "WHERE epoch=? AND json_extract(job,'$.api_name')='p_list' "
+            "AND group_name='portfolio_read' AND state IN ('done','empty') "
+            "ORDER BY rowid DESC LIMIT 1",
+            (epoch,),
         ).fetchone()
         if row is None:
             return None
@@ -1747,7 +1751,9 @@ class Pipeline:
         try:
             identifiers = self.identifiers()
             if config.get("enable_portfolio_read") is True:
-                identifiers["portfolio_read_list"] = self.portfolio_read_identifier()
+                identifiers["portfolio_read_list"] = self.portfolio_read_identifier(
+                    portfolio_read_snapshot_epoch(config, today)
+                )
         finally:
             if isinstance(self.identifier_timing, dict):
                 self.planning_timing["discovery"] = self.identifier_timing

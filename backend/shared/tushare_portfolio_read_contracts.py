@@ -116,7 +116,7 @@ def _enabled(config):
     return tuple(dict.fromkeys(selected))
 
 
-def _snapshot_epoch(config, today):
+def portfolio_read_snapshot_epoch(config, today):
     return _epoch(
         {"discovered_snapshot_epoch": config.get("portfolio_read_snapshot_epoch")},
         today,
@@ -214,7 +214,7 @@ def iter_portfolio_read_jobs(config, today, identifiers=None):
     if config.get("enable_portfolio_read") is not True:
         return
     enabled = _enabled(config)
-    epoch = _snapshot_epoch(config, today)
+    epoch = portfolio_read_snapshot_epoch(config, today)
     if epoch is None:
         return
     # Validate discovery before yielding anything; a caller cannot accidentally

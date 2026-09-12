@@ -382,6 +382,53 @@ class PortfolioReadRuntime(unittest.TestCase):
         self.assertEqual(schema["visibility"], "account_private")
         self.assertEqual(schema["default_code_field"], "source_ts_code")
 
+    def test_identifier_is_bound_to_requested_snapshot_epoch(self):
+        target_epoch = "snapshot-20260909T080000Z"
+        self.capture(
+            "p_list",
+            {},
+            [
+                {
+                    "id": 1,
+                    "name": "target",
+                    "desc": None,
+                    "create_time": None,
+                    "update_time": None,
+                }
+            ],
+            target_epoch,
+        )
+        self.capture(
+            "p_list",
+            {},
+            [
+                {
+                    "id": 2,
+                    "name": "other",
+                    "desc": None,
+                    "create_time": None,
+                    "update_time": None,
+                }
+            ],
+            "snapshot-20260909T090000Z",
+        )
+
+        observed = self.pipeline.portfolio_read_identifier(target_epoch)
+        self.assertEqual(observed["epoch"], target_epoch)
+        self.assertEqual(observed["rows"], [{"id": 1, "name": "target"}])
+        self.assertIsNone(
+            self.pipeline.portfolio_read_identifier("snapshot-20260909T100000Z")
+        )
+        plan = self.pipeline.db.execute(
+            "EXPLAIN QUERY PLAN SELECT job,epoch,state,result FROM jobs "
+            "INDEXED BY jobs_partition_lookup WHERE epoch=? "
+            "AND json_extract(job,'$.api_name')='p_list' "
+            "AND group_name='portfolio_read' AND state IN ('done','empty') "
+            "ORDER BY rowid DESC LIMIT 1",
+            (target_epoch,),
+        ).fetchall()
+        self.assertIn("jobs_partition_lookup", " ".join(row[3] for row in plan))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -60,6 +60,7 @@ from backend.shared.tushare_portfolio_read_contracts import (
     PORTFOLIO_READ_CONTRACTS,
     iter_portfolio_read_jobs,
     portfolio_read_prerequisites,
+    portfolio_read_snapshot_epoch,
 )
 
 PORTFOLIO_READ_RUNTIME_CONTRACTS = {

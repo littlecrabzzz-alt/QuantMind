@@ -28,6 +28,11 @@ router = APIRouter(
 )
 
 
+def _require_public_dataset(api_name):
+    if api_name in tushare_store.PORTFOLIO_READ_RUNTIME_CONTRACTS:
+        raise HTTPException(404, "Dataset unavailable")
+
+
 class DatasetQuery(BaseModel):
     model_config = ConfigDict(extra="forbid")
     release_id: str = Field(pattern=RELEASE)
@@ -319,6 +324,8 @@ def datasets(release_id: str = Query(pattern=RELEASE)):
         manifest = _manifest(release_id)
         grouped = {}
         for item in manifest["datasets"]:
+            if item["api_name"] in tushare_store.PORTFOLIO_READ_RUNTIME_CONTRACTS:
+                continue
             entry = grouped.setdefault(
                 item["api_name"],
                 {
@@ -335,7 +342,12 @@ def datasets(release_id: str = Query(pattern=RELEASE)):
             "history_complete": manifest.get("history_complete") is True,
             "historical_versions_complete": manifest.get("historical_versions_complete")
             is True,
-            "coverage": manifest.get("coverage_by_api", []),
+            "coverage": [
+                item
+                for item in manifest.get("coverage_by_api", [])
+                if item.get("api_name")
+                not in tushare_store.PORTFOLIO_READ_RUNTIME_CONTRACTS
+            ],
             "upstream_calls": 0,
         }
 
@@ -343,6 +355,7 @@ def datasets(release_id: str = Query(pattern=RELEASE)):
 @router.get("/datasets/{api_name}/schema")
 def schema(api_name: str, release_id: str = Query(pattern=RELEASE)):
     with _errors():
+        _require_public_dataset(api_name)
         _manifest(release_id)
         return tushare_store.dataset_schema(ROOT, release_id, api_name)
 
@@ -350,6 +363,7 @@ def schema(api_name: str, release_id: str = Query(pattern=RELEASE)):
 @router.post("/query")
 def query(body: DatasetQuery):
     with _errors():
+        _require_public_dataset(body.api_name)
         _manifest(body.release_id)
         table = tushare_store.read_dataset(ROOT, **body.model_dump())
         metadata = json.loads(table.schema.metadata[b"tushare"])
