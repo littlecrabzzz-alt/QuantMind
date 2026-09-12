@@ -1419,3 +1419,5 @@ Mac标准LaunchAgent空闲时以不带-k的kickstart进入第273轮，下载2704
 同一窗口内fund_share第17批冻结沪深各180个任务，日期20180908..20190306；44.415秒完成360请求，234 done/126 empty、55354行，486.322rpm。与前16个唯一manifest/5640任务四层重叠0；954引用/5662402字节逐SHA通过，960e负对照缺全部954项。首次闭包因复用index审计投影而在任务身份比较阶段拒绝，只留下固定输入副本；失败目录原样保留，修正审计在batch-17-v2通过。历史扫描把失败目录中的同一当前manifest按SHA去重，不冒充第17份历史。
 
 两个批次均未发布/切CURRENT。worker和Beat已恢复healthy，五个服务restart0、OOM false；云盘距100GiB保留线仍有220483780608字节。它们与top10第2、3批一起等待正常publisher、云/Mac精确验收和禁网读取。机器证据docs/tushare-index-daily22-20260913.evidence.json、docs/tushare-fund-share-batch17-20260913.evidence.json；协调记录coordination/tushare-data/20260913T000700Z-index-daily22-fund-share17.md。
+
+发布门补记：top10第2/3批、index_daily第22批、fund_share第17批四份清单合计3915引用，跨批逐路径重复0，合并后仍为3915项/29307118字节（1440 object、1440 observation、1035 parquet）。合并清单SHA dc694753ef483527c3251d9c9be0edc76c2772a20caea2a9fa6641e06a5c2f42已create-only保存到authority validation/pending-release-20260913/960e-four-batches和仓库docs/tushare-fixed-release-after-960e-four-batches-20260913。四份960e负对照均缺各批全部新引用；正常发布、云/Mac同集精确验证和禁网读取完成前不声明本地可用。

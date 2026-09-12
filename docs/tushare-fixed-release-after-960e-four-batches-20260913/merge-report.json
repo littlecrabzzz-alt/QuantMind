@@ -1,0 +1,1 @@
+{"by_kind":{"object":1440,"observation":1440,"parquet":1035},"cross_batch_repeated_references":0,"exact_refs_sha256":"dc694753ef483527c3251d9c9be0edc76c2772a20caea2a9fa6641e06a5c2f42","physical_bytes":29307118,"schema_version":1,"source_batches":4,"source_reference_sum":3915,"status":"passed","unique_references":3915}
