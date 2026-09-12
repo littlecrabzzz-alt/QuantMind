@@ -1,0 +1,7 @@
+# `index_daily` balanced selector review
+
+- Reviewed branch `origin/codex/tushare-index-daily-next-20260912` at `bb34cad7a97119ac3e84298d9215168fce607d52`; its offline tests and fixed `de494...` discovery evidence are valid.
+- The evidence corrects the planning boundary: `index_daily` has fixed nonempty SSE/SZSE/CSI inputs; CFFEX belongs to the futures family and is excluded. CICC has no fixed nonempty discovery evidence. CSI discovery contains a saturated 8000-row leaf, so even its 8011 observed codes are not universe-completeness proof.
+- The candidate adds a 502-line second selector plus a new intermediate authority-inventory contract, but it does not emit the manifest accepted by the existing exact runner. Executing it would require another exporter and runner/converter, while the existing `prepare_tushare_index_daily_batch.py` and `run_tushare_index_daily_batch.py` already freeze pristine history tasks, interleave index codes, enforce the reviewed 500 rpm gate and execute an exact task scope under 360 requests / 90 seconds without publication.
+- The candidate therefore remains an audit branch and is **not merged or deployed**. Root will reuse the existing executable helper after the next normal release, inspect its selected suffix distribution, and reject any `.CFX`, `.SI` or `.SW` task before execution. This keeps the corrected market evidence without adding a parallel planning path.
+- No production DB, token, upstream request, service or release was touched by this review.
