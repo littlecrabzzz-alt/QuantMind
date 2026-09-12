@@ -1,0 +1,166 @@
+{
+  "automatic_enablement_permitted": false,
+  "execution_requirements": [
+    "Run only after normal publisher and ordinary acquisition naturally drain.",
+    "Pin the deployed code content, authority pipeline-config.json SHA256 and CURRENT.json SHA256 immediately before execution.",
+    "Acquire the existing exclusive pipeline.lock; require schema version 6 and at least 100 GiB free.",
+    "Use Pipeline.enqueue plus Pipeline.run(task_ids=...) so current account/API gates, observed quota cooldown, capture_sample, normalization, attempts and immutable object/observation/Parquet archival all apply.",
+    "Use a 2-second timeout for the read-only SQLite schema introspection.",
+    "Narrow Pipeline.run final status aggregation to exact_task_scope primary keys; never scan production-wide job states for this receipt.",
+    "Do not use raw HTTP, do not modify config, do not publish, and do not automatically enable either API.",
+    "If a task identity already exists, require pending/tries=0/result=null and no attempts; otherwise stop.",
+    "If an API is permission-blocked, document the zero-call result and do not force it.",
+    "A nonempty response validates only this bounded observation; reconcile requested and returned dates before any later enablement."
+  ],
+  "history_complete": false,
+  "kind": "risk_event_official_sample_evidence_candidate",
+  "max_seconds": 45,
+  "max_upstream_calls": 2,
+  "official_contracts": {
+    "stk_alert": {
+      "document_note": "The current official result table contains start_date 2026-03-16. The page's code example and result dates are not internally consistent, so this is a probe seed only.",
+      "input_fields": [
+        "ts_code",
+        "trade_date",
+        "start_date",
+        "end_date"
+      ],
+      "minimum_points": 6000,
+      "pinned_source_html_sha256": "4babe517949452a955cea9b03aaf51709a811b4195fe81f1e123f2d3292a7eaf",
+      "requested_fields": [
+        "ts_code",
+        "name",
+        "start_date",
+        "end_date",
+        "type"
+      ],
+      "row_cap": 1000,
+      "source_url": "https://tushare.pro/document/2?doc_id=453"
+    },
+    "stk_high_shock": {
+      "document_note": "The current official code example uses trade_date 20260312, while the displayed rows have other dates. Treat filter semantics as unverified.",
+      "input_fields": [
+        "ts_code",
+        "trade_date",
+        "start_date",
+        "end_date"
+      ],
+      "minimum_points": 6000,
+      "pinned_source_html_sha256": "e5e868e438b31671adbbfd065b0fbcad2ba29908d0456093ad858adcdb5d8cf9",
+      "requested_fields": [
+        "ts_code",
+        "trade_date",
+        "name",
+        "trade_market",
+        "reason",
+        "period"
+      ],
+      "row_cap": 1000,
+      "source_url": "https://tushare.pro/document/2?doc_id=452"
+    }
+  },
+  "pit_verified": false,
+  "prepared_at": "2026-09-12T07:35:00Z",
+  "prepared_repo_head": "fda4655d085235bda19227ec0b3ebe2fdca4d921",
+  "prior_empty_evidence": {
+    "all_status": "empty_unverified",
+    "path": "config/tushare-coverage-ledger.json",
+    "probe_report_sha256": "03335b6da5338ef86f39a15db3f4dce80d2f9c3f0c05efd4e484fc4714d55f38",
+    "release_id": "data-cc8ed219d8021aefadf998ab5bb6604c7498981d89ede6122c0578f24040db55",
+    "stk_alert_scopes": [
+      {
+        "trade_date": "20260311"
+      },
+      {
+        "trade_date": "20260311",
+        "ts_code": "301373.SZ"
+      },
+      {
+        "end_date": "20260312",
+        "start_date": "20260310",
+        "ts_code": "301373.SZ"
+      }
+    ],
+    "stk_high_shock_scopes": [
+      {
+        "trade_date": "20260904"
+      }
+    ]
+  },
+  "publication_permitted": false,
+  "records": [
+    {
+      "epoch": "capability-risk2-official-sample-20260912",
+      "group_name": "risk_event",
+      "job": {
+        "api_name": "stk_alert",
+        "fields": "end_date,name,start_date,ts_code,type",
+        "nullable_fields": [
+          "name",
+          "end_date",
+          "type"
+        ],
+        "params": {
+          "end_date": "20260316",
+          "start_date": "20260316"
+        },
+        "positive_fields": [],
+        "required_fields": [
+          "ts_code",
+          "name",
+          "start_date",
+          "end_date",
+          "type"
+        ],
+        "row_cap": 1000
+      },
+      "logical_key": "04129af25ab0b0d3ec1b619a362b562aa4ced2d16d9be6597182b7360942fdba",
+      "not_duplicate_of_prior": "No prior request used the exact 20260316..20260316 range or an unscoped 20260316 start-date seed.",
+      "priority": -100,
+      "task_id": "c4ef2d954567137de1c1b5431359ae03d5d0a32376f8a3750f7a827a6d78e81d"
+    },
+    {
+      "epoch": "capability-risk2-official-sample-20260912",
+      "group_name": "risk_event",
+      "job": {
+        "api_name": "stk_high_shock",
+        "fields": "name,period,reason,trade_date,trade_market,ts_code",
+        "nullable_fields": [
+          "name",
+          "trade_market",
+          "reason",
+          "period"
+        ],
+        "params": {
+          "trade_date": "20260312"
+        },
+        "positive_fields": [],
+        "required_fields": [
+          "ts_code",
+          "trade_date",
+          "name",
+          "trade_market",
+          "reason",
+          "period"
+        ],
+        "row_cap": 1000
+      },
+      "logical_key": "d316e77a4198982d61bfbb1760e1eedc9597d1146b7c9bd0a860022637c9c5cb",
+      "not_duplicate_of_prior": "The prior exact request used trade_date 20260904, not 20260312.",
+      "priority": -100,
+      "task_id": "5c1f28116cbfff6104a8f2a997021e8b06f76b7b678398bdb540a58afbcd25dd"
+    }
+  ],
+  "schema_version": 1,
+  "source_code_sha256": {
+    "backend/shared/tushare_daily_quota.py": "b367310476d7adc077a41bf35903fd6f3779bbf4b5331c9a495b895aa68b6e75",
+    "backend/shared/tushare_intake.py": "3df49ffc9e4c5fd96aa8d24b6532c661f0aa2d69baa088b83fae410421edd301",
+    "backend/shared/tushare_pipeline.py": "e086d0b9bdce687149ff2b73f6ccbc4e05a137c9508bb90bab958944153eb518",
+    "backend/shared/tushare_rate_policy.py": "83b9e6adc23cb84431a118af652e7a4cf5c5cc25b3f787df1f89d06cc0495fa8",
+    "backend/shared/tushare_registry.py": "17cd7c97752859f783684b1ba93dc4fe138a256a76981cdddfcbbe370039a788",
+    "backend/shared/tushare_risk_event_contracts.py": "c0a5621cc6a93056747d30ae20e6117133ff4f5699495f46a28a1fcb3c40f8bb",
+    "config/tushare-catalog.json": "f15ffc774000e3bd4b049b130e264a4399e080f100cd73012252250a69cc460b"
+  },
+  "status": "plan_only_candidate",
+  "supersedes_manifest_sha256": "0b9f0fe197a70a90462aba30dc02da86ecbbba1d84a8bd59b1aa18eb725dc565"
+}

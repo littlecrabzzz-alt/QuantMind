@@ -1,0 +1,282 @@
+{
+  "activation": {
+    "activation": {
+      "activation_day": "2026-09-10",
+      "activation_days": {
+        "cyq_chips": "2026-09-12",
+        "cyq_perf": "2026-09-10"
+      },
+      "timezone": "Asia/Shanghai",
+      "upstream_calls": 0
+    },
+    "config_sha256": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a",
+    "credentials_read": false,
+    "current_preserved": true,
+    "existing_counters_preserved": true,
+    "gate": {
+      "next_at": 1789228800.0,
+      "scope": "api:cyq_chips"
+    },
+    "next_day_real_http_verified": false,
+    "observed_at": "2026-09-12T07:39:38.119683+00:00",
+    "policy": {
+      "account_ceiling": 500,
+      "cyq_chips_daily_cap": 200000,
+      "cyq_perf_daily_cap": 200000,
+      "daily_timezone": "Asia/Shanghai",
+      "entitlement": {
+        "days_until_expiry": 84,
+        "effective_points_conservative": 10100,
+        "expected_points_after_expiry": 8100,
+        "independent_days_until_expiry": 361,
+        "independent_notice_window_days": null,
+        "independent_permissions_expiry": "2027-09-08",
+        "notice": "expires_within_90_days",
+        "notices": [
+          {
+            "days": 84,
+            "expires": "2026-12-05",
+            "points": 2000,
+            "window_days": 90
+          }
+        ],
+        "point_tranches": [
+          {
+            "expires": "2027-09-08",
+            "points": 8000
+          },
+          {
+            "expires": "2026-12-05",
+            "points": 2000
+          },
+          {
+            "expires": null,
+            "points": 100
+          }
+        ],
+        "points_expiry_date": "2026-12-05",
+        "reported_points": 10100,
+        "source": "user_reported_not_supplier_verified"
+      },
+      "mode": "tiered_v1",
+      "permission_grant": false,
+      "rollout_account_rpm": 500
+    },
+    "quota": {
+      "apis": {
+        "cyq_chips": {
+          "day": "2026-09-12",
+          "limit": 200000,
+          "scope": "this_root_capture_sample_only",
+          "status": "activation_guard",
+          "timezone": "Asia/Shanghai",
+          "used": null
+        },
+        "cyq_perf": {
+          "day": "2026-09-12",
+          "limit": 200000,
+          "remaining": 199896,
+          "scope": "this_root_capture_sample_only",
+          "status": "ready",
+          "timezone": "Asia/Shanghai",
+          "used": 104
+        }
+      },
+      "day": "2026-09-12",
+      "limit": 200000,
+      "remaining": 199896,
+      "scope": "this_root_capture_sample_only",
+      "status": "ready",
+      "timezone": "Asia/Shanghai",
+      "used": 104
+    },
+    "reporting_scope": "one exact job; full status aggregation omitted",
+    "run": {
+      "acceptance_scope_jobs": 1,
+      "elapsed_seconds": 0.121,
+      "exact_task_scope": true,
+      "requests": 0,
+      "scoped_jobs": 1
+    },
+    "status": "activation_and_real_pipeline_guard_passed",
+    "target_id": "ce9bc5d78007693e1bb857f1e96836b30845b41ba8aa1ac406e83d85186b1b75",
+    "target_job_and_attempts_preserved": true,
+    "upstream_calls": 0
+  },
+  "archives": {
+    "20260912T074100Z-independent-closure.json": {
+      "bytes": 5868,
+      "sha256": "af79d7ed55de693ff4c12a06f1f02edda7a239a1c9c01a8a5aafc6d3293d2c35"
+    },
+    "activation-receipt.json": {
+      "bytes": 2828,
+      "sha256": "40002a5be2c0fc5280709cff21e39b373e125f53b0271ce616dbae169d9e2643"
+    },
+    "before-deploy.json": {
+      "bytes": 1559,
+      "sha256": "7aaad9364d690e428da6e882fcab664013a7fde743f1cb1932456b8616b458d8"
+    },
+    "resumed-normal-run.json": {
+      "bytes": 3448,
+      "sha256": "e8cd39263c81862be990da3da7e572eda6fd5f87e5f71cc4c4beeb4693b11e92"
+    }
+  },
+  "authority_validation_directory": "validation/cyq-daily-quota-20260912",
+  "boundaries": [
+    "daily counters apply only to this root capture path, not complete supplier/account usage",
+    "unknown deployment-day cyq_chips use is guarded until next Beijing midnight",
+    "next-day real cyq_chips HTTP is not yet verified",
+    "full history, revision, known_at/PIT and RRG readiness remain separate open gaps"
+  ],
+  "candidate_commits": [
+    "16d32fe610c60a599985e0a30f4bd6e84415971a",
+    "fab8e32a5ae1361731897e96452ee7c94d2d6c35",
+    "fda4655d085235bda19227ec0b3ebe2fdca4d921"
+  ],
+  "code_commit": "d61e93d62380afcc221369ebc317a138d0e8cc9a",
+  "deployment": {
+    "all_three_healthy": true,
+    "beat_started_at": "2026-09-12T07:40:02.656399877Z",
+    "document_worker_started_at_unchanged": "2026-09-12T04:44:58.161153655Z",
+    "handoff": "passed",
+    "ordinary_worker_started_at": "2026-09-12T07:40:43.233876518Z",
+    "quantdb_not_stopped": true,
+    "source_digest": "cb24d4c1d91f16c12468acc5a9b6922e1e643d3c0baa3b62efc469cda6d5f1fb",
+    "source_files": 6481
+  },
+  "resumed_normal_run": {
+    "elapsed_seconds": 66.392,
+    "publication": {
+      "current_release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+      "interval_seconds": 3600,
+      "last_success_at": 1789198352,
+      "mirror_status": "not_checked",
+      "mode": "acquire_only",
+      "next_due_at": 1789201952,
+      "pending": true,
+      "performed": false,
+      "status": "deferred"
+    },
+    "rate_policy": {
+      "account_ceiling": 500,
+      "cyq_chips_daily_cap": 200000,
+      "cyq_perf_daily_cap": 200000,
+      "daily_quota_ledger": {
+        "apis": {
+          "cyq_chips": {
+            "day": "2026-09-12",
+            "limit": 200000,
+            "scope": "this_root_capture_sample_only",
+            "status": "activation_guard",
+            "timezone": "Asia/Shanghai",
+            "used": null
+          },
+          "cyq_perf": {
+            "day": "2026-09-12",
+            "limit": 200000,
+            "remaining": 199893,
+            "scope": "this_root_capture_sample_only",
+            "status": "ready",
+            "timezone": "Asia/Shanghai",
+            "used": 107
+          }
+        },
+        "day": "2026-09-12",
+        "limit": 200000,
+        "remaining": 199893,
+        "scope": "this_root_capture_sample_only",
+        "status": "ready",
+        "timezone": "Asia/Shanghai",
+        "used": 107
+      },
+      "daily_timezone": "Asia/Shanghai",
+      "entitlement": {
+        "days_until_expiry": 84,
+        "effective_points_conservative": 10100,
+        "expected_points_after_expiry": 8100,
+        "independent_days_until_expiry": 361,
+        "independent_notice_window_days": null,
+        "independent_permissions_expiry": "2027-09-08",
+        "notice": "expires_within_90_days",
+        "notices": [
+          {
+            "days": 84,
+            "expires": "2026-12-05",
+            "points": 2000,
+            "window_days": 90
+          }
+        ],
+        "point_tranches": [
+          {
+            "expires": "2027-09-08",
+            "points": 8000
+          },
+          {
+            "expires": "2026-12-05",
+            "points": 2000
+          },
+          {
+            "expires": null,
+            "points": 100
+          }
+        ],
+        "points_expiry_date": "2026-12-05",
+        "reported_points": 10100,
+        "source": "user_reported_not_supplier_verified"
+      },
+      "last_gate": {
+        "effective_account_rpm": 500,
+        "effective_min_interval_seconds": 0.12,
+        "last_api": "fund_adj",
+        "observed_quota_preserved": false,
+        "resolved_api_cap": {
+          "review_reason": null,
+          "review_required": false,
+          "rpm": 500,
+          "source": "points_regular_allowlist_doc290"
+        }
+      },
+      "mode": "tiered_v1",
+      "permission_grant": false,
+      "rollout_account_rpm": 500
+    },
+    "requests": 360,
+    "state": "SUCCESS",
+    "task_id": "e6356033-2c54-44dd-8d7a-ed5f0321b77e",
+    "timing": {
+      "completed_stages": [
+        "open",
+        "publication_check",
+        "planning_check",
+        "archive",
+        "acquire",
+        "document_registration",
+        "close"
+      ],
+      "failed_stage": null,
+      "included_stages": {
+        "reconciliation": "acquire"
+      },
+      "stage_seconds": {
+        "acquire": 67.18088107556105,
+        "archive": 0.4164879731833935,
+        "close": 0.00044034048914909363,
+        "document_registration": 1.8405727241188288,
+        "open": 0.0008863192051649094,
+        "planning_check": 0.000383203849196434,
+        "publication_check": 0.46385401859879494
+      },
+      "total_elapsed_seconds": 69.9142903778702
+    },
+    "updated_at": "2026-09-12T07:41:59.259595+00:00"
+  },
+  "schema_version": 1,
+  "status": "deployed_and_first_resumed_run_accepted",
+  "tests": {
+    "independent_rate_tests_passed": 29,
+    "root_seconds": 6.7,
+    "root_tests_passed": 68,
+    "ruff_check_format_diff": "passed",
+    "test_sets_overlap": true
+  }
+}

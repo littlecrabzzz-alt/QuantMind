@@ -1,0 +1,330 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-12T07:28:00Z",
+  "mode": "offline_read_only_fixed_release_audit",
+  "scope_rule": "The 263-entry 2026-09-08 catalogue is a pinned baseline, not a maximum. Every later official discovery needs an explicit acquisition, alias, category, mutation, SDK-derived, invalid, or permission disposition.",
+  "evidence": {
+    "repo_head": "5c6af429bc65807117ff22913ecbb4fbcd010d90",
+    "integration_plan": {
+      "path": "docs/tushare-integration-plan.md",
+      "sha256": "34cae1acece538a62087309208ec8d01d3c1991ceab4554a17c581c6df538780"
+    },
+    "catalog": {
+      "path": "config/tushare-catalog.json",
+      "sha256": "f15ffc774000e3bd4b049b130e264a4399e080f100cd73012252250a69cc460b",
+      "entry_count": 263,
+      "fetched_at": "2026-09-08"
+    },
+    "coverage_ledger": {
+      "path": "config/tushare-coverage-ledger.json",
+      "sha256": "8c0e376af13bcb60d1a6eb7e5f835c010316dc686b19e4c898bd8afafcbc5b6b",
+      "catalog_entries": 263,
+      "discovered_entries": 25,
+      "unresolved_api_mentions": 3
+    },
+    "pipeline_example": {
+      "path": "config/tushare-pipeline.example.json",
+      "sha256": "61220569cab2bba55e2613b0d51fad14c7da278a695d1a09eed2d1c6c3f9802a"
+    },
+    "registry": {
+      "path": "backend/shared/tushare_registry.py",
+      "api_count": 244,
+      "planner_count": 35,
+      "append_planner_count": 4
+    },
+    "fixed_release": {
+      "release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+      "manifest_locator": "releases/data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6/manifest.json",
+      "manifest_bytes": 421257077,
+      "manifest_sha256": "ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+      "dataset_entries": 129220,
+      "dataset_api_count": 194,
+      "registry_api_coverage_count": 244,
+      "runtime_capability_api_count": 224,
+      "history_complete": false,
+      "historical_versions_complete": false,
+      "unimplemented_catalog_scope": true,
+      "rrg_status": "blocked_data"
+    },
+    "bounded_extraction": {
+      "method": "streamed selected manifest fields only; no leaf file rehash and no live database access",
+      "temporary_tsv_bytes": 13397333,
+      "temporary_tsv_sha256": "8bd0e30bc736a0d27a5d0875f0563e9e81ee33382de16dd0fc70bcdab48c5fd1"
+    }
+  },
+  "ledger_status_counts": {
+    "ingested_partial": 133,
+    "implementing": 65,
+    "review_required": 47,
+    "permission_blocked": 32,
+    "planned": 9,
+    "excluded_mutation": 2
+  },
+  "scope_dispositions": {
+    "true_unregistered_read_apis": [
+      "p_get",
+      "p_list"
+    ],
+    "excluded_account_mutations": [
+      "p_delete",
+      "p_save"
+    ],
+    "compatibility_aliases_not_new_acquisitions": {
+      "balancesheet": "balancesheet_vip",
+      "cashflow": "cashflow_vip",
+      "express": "express_vip",
+      "fina_indicator": "fina_indicator_vip",
+      "forecast": "forecast_vip",
+      "income": "income_vip"
+    },
+    "sdk_derived_not_raw_api": [
+      "pro_bar"
+    ],
+    "unresolved_invalid_provider_name": [
+      "ggt_monthly"
+    ],
+    "registered_zero_dataset_count": 50,
+    "registered_zero_dataset": [
+      "bo_cinema",
+      "bo_daily",
+      "bo_monthly",
+      "bo_weekly",
+      "cb_price_chg",
+      "etf_mins",
+      "factor_list",
+      "film_record",
+      "ft_mins",
+      "fund_sales_ratio",
+      "fund_sales_vol",
+      "hk_adjfactor",
+      "hk_balancesheet",
+      "hk_cashflow",
+      "hk_daily_adj",
+      "hk_fina_indicator",
+      "hk_income",
+      "hk_mins",
+      "idx_mins",
+      "opt_mins",
+      "rt_etf_k",
+      "rt_etf_min",
+      "rt_etf_min_daily",
+      "rt_etf_sz_iopv",
+      "rt_fut_min",
+      "rt_fut_min_daily",
+      "rt_idx_k",
+      "rt_idx_min",
+      "rt_idx_min_daily",
+      "rt_k",
+      "rt_sw_k",
+      "stk_account_old",
+      "stk_alert",
+      "stk_auction",
+      "stk_auction_c",
+      "stk_auction_o",
+      "stk_high_shock",
+      "stk_premarket",
+      "sw_mins",
+      "teleplay_record",
+      "tmt_twincome",
+      "tmt_twincomedetail",
+      "us_adjfactor",
+      "us_balancesheet",
+      "us_cashflow",
+      "us_daily",
+      "us_daily_adj",
+      "us_fina_indicator",
+      "us_income",
+      "yc_cb"
+    ],
+    "runtime_permission_denied_count": 34,
+    "runtime_permission_denied": [
+      "cb_price_chg",
+      "etf_mins",
+      "factor_list",
+      "ft_mins",
+      "hk_adjfactor",
+      "hk_balancesheet",
+      "hk_cashflow",
+      "hk_daily_adj",
+      "hk_fina_indicator",
+      "hk_income",
+      "hk_mins",
+      "idx_mins",
+      "opt_mins",
+      "rt_etf_k",
+      "rt_etf_min",
+      "rt_etf_min_daily",
+      "rt_etf_sz_iopv",
+      "rt_fut_min",
+      "rt_fut_min_daily",
+      "rt_idx_k",
+      "rt_idx_min",
+      "rt_idx_min_daily",
+      "rt_k",
+      "rt_sw_k",
+      "stk_auction",
+      "sw_mins",
+      "us_adjfactor",
+      "us_balancesheet",
+      "us_cashflow",
+      "us_daily",
+      "us_daily_adj",
+      "us_fina_indicator",
+      "us_income",
+      "yc_cb"
+    ],
+    "runtime_or_ledger_permission_blocked_union_count": 37,
+    "runtime_or_ledger_permission_blocked_union": [
+      "cb_price_chg",
+      "etf_mins",
+      "factor_list",
+      "ft_mins",
+      "hk_adjfactor",
+      "hk_balancesheet",
+      "hk_cashflow",
+      "hk_daily_adj",
+      "hk_fina_indicator",
+      "hk_income",
+      "hk_mins",
+      "idx_mins",
+      "opt_mins",
+      "rt_etf_k",
+      "rt_etf_min",
+      "rt_etf_min_daily",
+      "rt_etf_sz_iopv",
+      "rt_fut_min",
+      "rt_fut_min_daily",
+      "rt_idx_k",
+      "rt_idx_min",
+      "rt_idx_min_daily",
+      "rt_k",
+      "rt_sw_k",
+      "stk_auction",
+      "stk_auction_c",
+      "stk_auction_o",
+      "stk_premarket",
+      "sw_mins",
+      "us_adjfactor",
+      "us_balancesheet",
+      "us_cashflow",
+      "us_daily",
+      "us_daily_adj",
+      "us_fina_indicator",
+      "us_income",
+      "yc_cb"
+    ],
+    "registered_only_empty_and_no_runtime_capability": {
+      "stk_alert": 3,
+      "stk_high_shock": 1
+    }
+  },
+  "priority_actions": [
+    {
+      "rank": 1,
+      "apis": ["stk_alert", "stk_high_shock"],
+      "current_state": "registered and default-disabled; four tested partitions are empty; no denial and no dataset leaf",
+      "next_action": "Run one bounded entitlement/schema probe on the official nonempty example dates, validate returned-date filtering and fields, then enable exact-day history only if the response is nonempty and contract-consistent.",
+      "completion_gate": "nonempty immutable raw and Parquet evidence, exact fields, request/returned-date reconciliation, row-cap handling, explicit history/PIT gaps, and fixed-release verification",
+      "permission_support": "Threshold-supported: both official pages require 6000 points; 10100 now and expected 8100 after 2026-12-05 exceed it. Actual access still requires a probe.",
+      "evidence": ["docs/tushare-risk-event-intake.md", "config/tushare-coverage-ledger.json", "https://tushare.pro/document/2?doc_id=452", "https://tushare.pro/document/2?doc_id=453"]
+    },
+    {
+      "rank": 2,
+      "apis": ["opt_daily"],
+      "current_state": "18 datasets; empty=4289, pending=1204451, quality=1, split_pending=17; capability available but sample reason is empty_unverified",
+      "next_action": "Locate a documented nonempty option/date scope, prove option-universe fanout and exact-day saturation, then drain bounded exact batches.",
+      "completion_gate": "all planned legal partitions terminal, capped leaves resolved by documented ts_code fanout, fields complete, earliest actual row measured, history_complete remains false until the unspecified provider lower bound is resolved",
+      "permission_support": "Official minimum is 2000 points, supported now and after the known 2000-point tranche expires.",
+      "evidence": ["backend/shared/tushare_registry.py", "https://tushare.pro/document/2?doc_id=159"]
+    },
+    {
+      "rank": 3,
+      "apis": ["moneyflow_dc"],
+      "current_state": "5891 datasets; done=5768, empty=255, pending=613875, split_pending=123; available with possibly_truncated capability evidence",
+      "next_action": "Resolve capped leaves with exact date and stock fanout, then backfill from the documented 2023-09-11 bound while retaining revisions.",
+      "completion_gate": "no terminal saturation, all planned partitions terminal, row/amount units and fields verified, revisions retained",
+      "permission_support": "Official minimum is 5000 points, supported now and at expected 8100.",
+      "evidence": ["backend/shared/tushare_registry.py", "https://tushare.pro/document/2?doc_id=349"]
+    },
+    {
+      "rank": 4,
+      "apis": ["dc_member"],
+      "current_state": "2585 datasets; done=2145, empty=20, pending=453389, split_pending=439, blocked=1; available sample",
+      "next_action": "Close split descendants and historical/retired DC-board discovery from the documented 2024-12-20 scope; preserve source board and constituent identities.",
+      "completion_gate": "no capped unresolved day/board leaves, retired-board universe evidence, fixed release contains raw and Parquet, PIT remains blocked unless independent publication-time evidence exists",
+      "permission_support": "Official minimum is 6000 points, supported now and at expected 8100.",
+      "evidence": ["backend/shared/tushare_registry.py", "https://tushare.pro/document/2?doc_id=363"]
+    },
+    {
+      "rank": 5,
+      "apis": ["index_daily"],
+      "current_state": "6399 datasets; done=6399, empty=432, pending=143081; available sample; supplier cap and earliest history remain unverified in the registry contract",
+      "next_action": "Continue bounded exact symbol/date batches and enrich the historical contract before declaring complete.",
+      "completion_gate": "all configured index universes and dates terminal, cap behavior proven, earliest source row measured, no unresolved exact refs in the accepted fixed release",
+      "permission_support": "Official minimum is 2000 points, supported now and at expected 8100.",
+      "evidence": ["backend/shared/tushare_registry.py", "https://tushare.pro/document/2?doc_id=95"]
+    },
+    {
+      "rank": 6,
+      "apis": ["index_weight", "ci_index_member"],
+      "current_state": "index_weight: 5716 datasets, done=4366, empty=1705, pending=107701, split_pending=1259, blocked=91; ci_index_member: 295 datasets, done=295, empty=5, but oldest history, revisions, deletions, supplier cap and known_at are unverified",
+      "next_action": "Finish legal index_weight descendants and measure universe/history; keep CITIC membership as interval evidence only until authoritative publication/revision evidence exists.",
+      "completion_gate": "all exact refs terminal and fixed-release verified; historical universe and revisions evidenced; RRG PIT remains blocked unless known_at is independently proven",
+      "permission_support": "index_weight requires 2000 points and is supported. ci_index_member is observed available; the official page does not give a points threshold in the pinned contract, so points alone are not its authorization proof.",
+      "evidence": ["backend/shared/tushare_registry.py", "https://tushare.pro/document/2?doc_id=96", "https://tushare.pro/document/2?doc_id=373"]
+    },
+    {
+      "rank": 7,
+      "apis": ["top10_holders", "top10_floatholders"],
+      "current_state": "1084 datasets total; pending=256235, done=1084, empty=597; first source date and numerical supplier cap are unverified",
+      "next_action": "Drain per-stock report-period partitions, add an announcement-date/full-history revision sweep, and preserve distinct holder rows.",
+      "completion_gate": "all stocks and report periods terminal, late revisions covered, no capped terminal leaves, ann_date/end_date kept distinct, null hold_change semantics preserved",
+      "permission_support": "Both official pages require 2000 points; supported now and at expected 8100.",
+      "evidence": ["backend/shared/tushare_registry.py", "https://tushare.pro/document/2?doc_id=61", "https://tushare.pro/document/2?doc_id=62"]
+    },
+    {
+      "rank": 8,
+      "apis": ["news", "major_news", "cctv_news", "anns_d", "npr", "research_report", "irm_qa_sh", "irm_qa_sz", "monetary_policy"],
+      "current_state": "all nine have datasets and available capability observations, but backlogs, split leaves, source enumeration, empty scopes or schema gaps remain; research_report has quality=319 and schema_gap, anns_d split_pending=1201, major_news split_pending=453",
+      "next_action": "Use the purchased-right source contracts to close schemas and splits first, then complete source/date history and retained revisions.",
+      "completion_gate": "every purchased API has complete requested fields, documented source enumeration, terminal legal partitions, attachments where applicable, revisions retained and a fixed release; no PIT claim from fetch time",
+      "permission_support": "Supported by the separately purchased news, announcement, IR Q&A, policy, broker-report and monetary-policy rights through 2027-09-08; apply their API-specific rate tiers.",
+      "evidence": ["docs/tushare-text-intake.md", "config/tushare-pipeline.example.json"]
+    },
+    {
+      "rank": 9,
+      "apis": ["p_list", "p_get"],
+      "current_state": "the only two catalogued read APIs absent from the 244-API registry; planned and unverified",
+      "next_action": "Implement account-scoped snapshot contracts with redacted identifiers and a disabled-by-default bounded probe; keep p_save and p_delete excluded.",
+      "completion_gate": "registered read-only contracts, actual permission disposition, no account mutation, stable snapshot identity and retained revisions if the provider exposes changes",
+      "permission_support": "No published points threshold was found in the reviewed p_get page; 10100 points and the six independent rights do not establish access.",
+      "evidence": ["config/tushare-coverage-ledger.json", "https://tushare.pro/document/2?doc_id=446", "https://tushare.pro/document/2?doc_id=449"]
+    },
+    {
+      "rank": 10,
+      "apis": ["factor_list", "factor_value", "stk_mins", "etf_mins", "idx_mins", "opt_mins", "ft_mins", "hk_mins", "sw_mins", "rt_k", "rt_idx_k", "rt_etf_k", "rt_fut_min", "us_daily", "hk_daily_adj"],
+      "current_state": "factor_list and multiple minute/realtime/foreign interfaces have observed permission denial; factor_value has 712 datasets but only observed trial/sample access; stk_mins has one dataset and daily-quota conflict evidence",
+      "next_action": "Keep denied families out of automatic retries; re-probe only after an entitlement change. Continue factor_value only within verified observed scope and retain its daily/global quotas.",
+      "completion_gate": "new immutable entitlement evidence per API, distinct minute/realtime/factor contracts, no inference from siblings or points, daily ceilings enforced",
+      "permission_support": "Not established by 10100 points or the six purchased text rights. Separate factor, minute, realtime and foreign-market permissions must be verified independently.",
+      "evidence": ["config/tushare-coverage-ledger.json", "backend/shared/tushare_registry.py", "config/tushare-pipeline.example.json"]
+    }
+  ],
+  "recommended_next_actual_target": {
+    "apis": ["stk_alert", "stk_high_shock"],
+    "reason": "They are already coded but still contribute zero dataset leaves, the official pages now expose concrete nonempty example dates, and the published 6000-point threshold is below both the current 10100 and expected 8100 balance. A two-request bounded probe can distinguish stale empty evidence, filter semantics, and true account access before any broad backfill.",
+    "safe_initial_requests": [
+      {"api": "stk_alert", "official_example_scope": {"trade_date": "20260311"}},
+      {"api": "stk_high_shock", "official_example_scope": {"trade_date": "20260312"}}
+    ],
+    "warning": "Official examples are contract evidence, not local data. Do not mark history, completeness or PIT verified from a successful sample."
+  },
+  "non_actions": [
+    "Do not treat category pages or headings as callable APIs.",
+    "Do not register compatibility names as duplicate acquisitions.",
+    "Do not send p_save or p_delete.",
+    "Do not fabricate ggt_monthly from ggt_daily while the provider page/name remains invalid.",
+    "Do not infer independent factor, minute, realtime, Hong Kong or US permissions from the 10100-point balance.",
+    "Do not claim complete history, historical revisions or RRG point-in-time readiness from ce43."
+  ]
+}

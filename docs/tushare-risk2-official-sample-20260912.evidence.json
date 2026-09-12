@@ -1,0 +1,195 @@
+{
+  "archived_after_release": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+  "code_commit": "d61e93d62380afcc221369ebc317a138d0e8cc9a",
+  "execution": {
+    "actual_upstream_calls": 2,
+    "automatic_enablement_permitted": false,
+    "configuration_changed": false,
+    "elapsed_seconds": 0.226,
+    "history_complete": false,
+    "manifest_sha256": "209f61621761aadf5674a65e1bcb09523ecaee853ce31d6bb6318ddd2387c096",
+    "max_upstream_calls": 2,
+    "pit_verified": false,
+    "release_published": false,
+    "results": [
+      {
+        "api_name": "stk_alert",
+        "object_sha256": "a94bf19f7f50a29b8fd9fb7375e1d833da3a44384c17cb396f88ed5ebd8f21e0",
+        "observation": "b5c6e7f13f4f44ebacbd2c93f450ad27.json",
+        "observation_sha256": "83c695c72bab30453fb3a9b582d39f6da4fd85dcd744dbb5b8b9be0539ae9de8",
+        "params": {
+          "end_date": "20260316",
+          "start_date": "20260316"
+        },
+        "parquet": null,
+        "response_complete": true,
+        "row_count": 0,
+        "state": "empty",
+        "status": "empty_unverified",
+        "task_id": "c4ef2d954567137de1c1b5431359ae03d5d0a32376f8a3750f7a827a6d78e81d",
+        "tries": 1
+      },
+      {
+        "api_name": "stk_high_shock",
+        "object_sha256": "291edfa1908f0e6321e41f77ac80b4adda7927fd6ec41b2505a80e3182cbdc70",
+        "observation": "cab8b45a9f5440e98ee8a1f9a3f6d959.json",
+        "observation_sha256": "8cba54860d62e56658e933de612f9b30375dd505945275e3b45029bac471798b",
+        "params": {
+          "trade_date": "20260312"
+        },
+        "parquet": null,
+        "response_complete": true,
+        "row_count": 0,
+        "state": "empty",
+        "status": "empty_unverified",
+        "task_id": "5c1f28116cbfff6104a8f2a997021e8b06f76b7b678398bdb540a58afbcd25dd",
+        "tries": 1
+      }
+    ],
+    "schema_version": 1,
+    "status": "evidence_captured_no_activation"
+  },
+  "files": {
+    "closure.json": {
+      "bytes": 2095,
+      "sha256": "c2591b9770676320cb02da6c5a0a9fe4c38accd266444d0e865c2d1fa32ce729"
+    },
+    "inventory.json": {
+      "bytes": 1438,
+      "sha256": "f535ff4f0f8eb5301809968eeb43e2a719d3b2b50be1df81344fb67eb906283f"
+    },
+    "report.json": {
+      "bytes": 1415,
+      "sha256": "820ac50b20be6217a20525d25187c8634bbdb45123585db34c79fc4c02426114"
+    }
+  },
+  "independent_closure": {
+    "boundaries": {
+      "configuration_changed": false,
+      "empty_responses_do_not_prove_absence": true,
+      "enable_performed": false,
+      "historical_versions_complete": false,
+      "history_complete": false,
+      "new_probe_performed": false,
+      "pit_verified": false,
+      "source_consistency_gap_retained": true
+    },
+    "exact_references": {
+      "inventory_bytes": 1438,
+      "inventory_path": "validation/risk2-official-sample-20260912-exact-refs.json",
+      "inventory_sha256": "f535ff4f0f8eb5301809968eeb43e2a719d3b2b50be1df81344fb67eb906283f",
+      "physical_bytes": 2124,
+      "physical_sha256_verified": true,
+      "references_by_kind": {
+        "object": 2,
+        "observation": 2
+      },
+      "unique_references": 4
+    },
+    "observed_at": "2026-09-12T07:43:32.103239+00:00",
+    "publication": {
+      "current_manifest_sha256_verified": true,
+      "current_pointer_sha256": "d47619bf57d327539914694cfdeb0724f7474cbdec02d953357f2a7c9a2ea0bc",
+      "current_release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+      "references_present_in_current_release": 0,
+      "target": "next_normal_publication_after_current"
+    },
+    "receipt": {
+      "bytes": 363,
+      "path": "validation/risk2-official-sample-20260912-receipt.json",
+      "sha256": "34b5c6bc95c02113828ba83f38a08e1a951117a451431d3fd1cd2576fbcb3ef4"
+    },
+    "report": {
+      "actual_upstream_calls": 2,
+      "bytes": 1415,
+      "elapsed_seconds": 0.226,
+      "path": "validation/risk2-official-sample-20260912.json",
+      "sha256": "820ac50b20be6217a20525d25187c8634bbdb45123585db34c79fc4c02426114"
+    },
+    "schema_version": 1,
+    "status": "risk2_empty_evidence_verified_pending_normal_publication",
+    "tasks": [
+      {
+        "api_name": "stk_alert",
+        "attempts": 1,
+        "http_status": 200,
+        "params": {
+          "end_date": "20260316",
+          "start_date": "20260316"
+        },
+        "response_complete": true,
+        "row_count": 0,
+        "state": "empty",
+        "status": "empty_unverified",
+        "task_id": "c4ef2d954567137de1c1b5431359ae03d5d0a32376f8a3750f7a827a6d78e81d",
+        "tries": 1
+      },
+      {
+        "api_name": "stk_high_shock",
+        "attempts": 1,
+        "http_status": 200,
+        "params": {
+          "trade_date": "20260312"
+        },
+        "response_complete": true,
+        "row_count": 0,
+        "state": "empty",
+        "status": "empty_unverified",
+        "task_id": "5c1f28116cbfff6104a8f2a997021e8b06f76b7b678398bdb540a58afbcd25dd",
+        "tries": 1
+      }
+    ],
+    "totals": {
+      "attempts": 2,
+      "empty_unverified": 2,
+      "http_200": 2,
+      "response_complete": 2,
+      "rows": 0,
+      "tasks": 2
+    }
+  },
+  "pending_next_release_inventory": {
+    "captured_after_release_id": "data-de494289775ece674a54bb560ac3ecad37187af6ed1ef69f8590b78ddbbb3fb0",
+    "history_complete": false,
+    "kind": "tushare_exact_reference_inventory",
+    "physical_bytes": 2124,
+    "pit_verified": false,
+    "references_by_kind": {
+      "object": 2,
+      "observation": 2
+    },
+    "refs": {
+      "objects/291edfa1908f0e6321e41f77ac80b4adda7927fd6ec41b2505a80e3182cbdc70.json": {
+        "bytes": 207,
+        "kind": "object",
+        "sha256": "291edfa1908f0e6321e41f77ac80b4adda7927fd6ec41b2505a80e3182cbdc70"
+      },
+      "objects/a94bf19f7f50a29b8fd9fb7375e1d833da3a44384c17cb396f88ed5ebd8f21e0.json": {
+        "bytes": 192,
+        "kind": "object",
+        "sha256": "a94bf19f7f50a29b8fd9fb7375e1d833da3a44384c17cb396f88ed5ebd8f21e0"
+      },
+      "observations/b5c6e7f13f4f44ebacbd2c93f450ad27.json": {
+        "bytes": 856,
+        "kind": "observation",
+        "sha256": "83c695c72bab30453fb3a9b582d39f6da4fd85dcd744dbb5b8b9be0539ae9de8"
+      },
+      "observations/cab8b45a9f5440e98ee8a1f9a3f6d959.json": {
+        "bytes": 869,
+        "kind": "observation",
+        "sha256": "8cba54860d62e56658e933de612f9b30375dd505945275e3b45029bac471798b"
+      }
+    },
+    "required_release_relation": "strictly_after_captured_release",
+    "schema_version": 1,
+    "source_receipt": "validation/risk2-official-sample-20260912-receipt.json",
+    "source_receipt_sha256": "34b5c6bc95c02113828ba83f38a08e1a951117a451431d3fd1cd2576fbcb3ef4",
+    "source_report": "validation/risk2-official-sample-20260912.json",
+    "source_report_sha256": "820ac50b20be6217a20525d25187c8634bbdb45123585db34c79fc4c02426114",
+    "status": "pending_next_normal_publication",
+    "unique_references": 4
+  },
+  "publication_status": "wait_next_normal_publication_and_mac",
+  "schema_version": 1,
+  "status": "two_empty_responses_captured_and_independently_verified"
+}
