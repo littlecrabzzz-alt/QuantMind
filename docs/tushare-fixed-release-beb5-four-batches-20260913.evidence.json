@@ -1,0 +1,151 @@
+{
+  "authority_archive": "validation/fixed-release-20260913/beb5-four-batches",
+  "boundary": "This closes immutable cloud and Mac availability for the four exact batches after 960e without Tushare access. It does not prove complete history, empty-response completeness, supplier revisions, known_at or PIT membership, or an RRG/trading conclusion.",
+  "capacity": {
+    "available_bytes": 326995460096,
+    "filesystem_bytes": 845309321216,
+    "gate_passed": true,
+    "hard_reserve_bytes": 107374182400,
+    "headroom_above_reserve_bytes": 219621277696,
+    "used_bytes": 478547480576
+  },
+  "credential_hygiene": {
+    "account_fact_retained": "10100 points now; the 2000-point tranche expires 2026-12-05, expected total becomes 8100, and the observable reminder remains active.",
+    "independent_rights_expire": "2027-09-08",
+    "secrets_in_git_or_report": false
+  },
+  "exact_batches": {
+    "by_kind": {
+      "object": 1440,
+      "observation": 1440,
+      "parquet": 1035
+    },
+    "cloud_and_mac_reports_identical": true,
+    "cross_batch_repeated_references": 0,
+    "exact_refs_sha256": "dc694753ef483527c3251d9c9be0edc76c2772a20caea2a9fa6641e06a5c2f42",
+    "physical_bytes": 29307118,
+    "source_batches": [
+      {
+        "evidence": "docs/tushare-top10-holders-batch2-20260912.evidence.json",
+        "evidence_sha256": "06c85795535213ed4010b3c02b8f1185e1d9b1b47897aa3460bdc08a39ef6ee6",
+        "name": "top10_holders_batch_2",
+        "references": 946
+      },
+      {
+        "evidence": "docs/tushare-top10-holders-batch3-20260912.evidence.json",
+        "evidence_sha256": "7d69a6e9418d33f4f9a085f636753684cae73013640657ea1f2d75292177d0bd",
+        "name": "top10_holders_batch_3",
+        "references": 952
+      },
+      {
+        "evidence": "docs/tushare-index-daily22-20260913.evidence.json",
+        "evidence_sha256": "9eac1d22b94ca19f63b31f4f44564dc7d7851aec70eede356634b10789c57b2c",
+        "name": "index_daily_batch_22",
+        "references": 1063
+      },
+      {
+        "evidence": "docs/tushare-fund-share-batch17-20260913.evidence.json",
+        "evidence_sha256": "5da4558f238f34be16cff3be5f1e886952228b5f35fac4b3529f183ba23a4e8b",
+        "name": "fund_share_batch_17",
+        "references": 954
+      }
+    ],
+    "unique_references": 3915,
+    "verification_report_sha256": "1988becd17eb7e7edf796288f617787973ccf8313b91745dec63a80cc2bd1597",
+    "verified_bytes": 29307118,
+    "verified_references": 3915
+  },
+  "git_head_before_evidence_commit": "8a0d16c8bc2f40fc3c0f1675e9e8299360c994da",
+  "mirror": {
+    "coverage": {
+      "blocked": 15306,
+      "deferred_legacy_period_plan": 9802,
+      "done": 127492,
+      "empty": 104090,
+      "pending": 5589574,
+      "permission_blocked": 3493,
+      "quality": 455,
+      "resolved": 2041,
+      "split_pending": 5948
+    },
+    "downloaded_files": 6063,
+    "files": 983029,
+    "launchagent_exit_code": 0,
+    "launchagent_run": 276,
+    "release_id": "data-beb5348fce0777b49d3b2a392567521e24b2fa1bfac13876be1bfeafd795c3f1",
+    "status": "verified",
+    "stderr_bytes": 0
+  },
+  "non_blocking_events": [
+    {
+      "detail": "The first read-only offline command assumed a CURRENT text file and the image's bundled source tree. The mirror uses CURRENT.json and the current backend source must be mounted explicitly. It failed before reading data, produced an empty temporary report, and the accepted rerun replaced that report.",
+      "stage": "offline_read_command",
+      "status": "corrected_without_data_or_service_change"
+    },
+    {
+      "detail": "The create-only archive transfer reported two ignored macOS provenance extended-header keys. All six JSON files were then independently hashed on the authority and matched their local bytes.",
+      "stage": "authority_archive_transfer",
+      "status": "metadata_warning_verified"
+    },
+    {
+      "detail": "The first attempt to archive this aggregate evidence file applied strip-components=1 to a single-level tar member, so no remote file was created. The missing-file SHA check rejected it; the corrected noclobber single-file create was used next.",
+      "stage": "aggregate_evidence_archive",
+      "status": "corrected_before_archive_acceptance"
+    }
+  ],
+  "observed_at": "2026-09-13T00:45:13+08:00",
+  "offline_readback": {
+    "image": "quantmind-oss:latest",
+    "image_id": "sha256:086d446ad5a0640f9d93bd0a423db2110a7e7f74115b26600ba0c048114f98f6",
+    "mirror_mount": "read_only",
+    "network": "container_none_plus_socket_and_dns_guards",
+    "reads": [
+      {
+        "api_name": "top10_holders",
+        "columns": 15,
+        "rows": 3
+      },
+      {
+        "api_name": "top10_floatholders",
+        "columns": 15,
+        "rows": 3
+      },
+      {
+        "api_name": "index_daily",
+        "columns": 17,
+        "rows": 3
+      },
+      {
+        "api_name": "fund_share",
+        "columns": 9,
+        "rows": 3
+      }
+    ],
+    "report_sha256": "144abdb51dc23dc5e91306561ef93a27d27b62e48dc87faa8137d94fd4d40413",
+    "status": "passed",
+    "token_variables_empty": true,
+    "upstream_calls": 0
+  },
+  "publication": {
+    "completed_at": "2026-09-13T00:30:13.632+08:00",
+    "datasets": 136334,
+    "elapsed_seconds": 396.57517092861235,
+    "files": 983029,
+    "manifest_bytes": 449388756,
+    "manifest_sha256": "beb5348fce0777b49d3b2a392567521e24b2fa1bfac13876be1bfeafd795c3f1",
+    "mode": "publish_only",
+    "release_id": "data-beb5348fce0777b49d3b2a392567521e24b2fa1bfac13876be1bfeafd795c3f1",
+    "retained_observations_included": true,
+    "task_id": "edbbf157-53fd-45c7-80fc-792e915bec2c",
+    "upstream_calls": 0
+  },
+  "schema_version": 1,
+  "services": {
+    "celery_beat": "healthy",
+    "document_worker": "healthy",
+    "quantmind": "healthy",
+    "quantmind_db": "healthy",
+    "tushare_worker": "healthy"
+  },
+  "status": "post_960e_four_batches_fixed_release_closed"
+}

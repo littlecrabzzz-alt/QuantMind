@@ -1421,3 +1421,14 @@ Mac标准LaunchAgent空闲时以不带-k的kickstart进入第273轮，下载2704
 两个批次均未发布/切CURRENT。worker和Beat已恢复healthy，五个服务restart0、OOM false；云盘距100GiB保留线仍有220483780608字节。它们与top10第2、3批一起等待正常publisher、云/Mac精确验收和禁网读取。机器证据docs/tushare-index-daily22-20260913.evidence.json、docs/tushare-fund-share-batch17-20260913.evidence.json；协调记录coordination/tushare-data/20260913T000700Z-index-daily22-fund-share17.md。
 
 发布门补记：top10第2/3批、index_daily第22批、fund_share第17批四份清单合计3915引用，跨批逐路径重复0，合并后仍为3915项/29307118字节（1440 object、1440 observation、1035 parquet）。合并清单SHA dc694753ef483527c3251d9c9be0edc76c2772a20caea2a9fa6641e06a5c2f42已create-only保存到authority validation/pending-release-20260913/960e-four-batches和仓库docs/tushare-fixed-release-after-960e-four-batches-20260913。四份960e负对照均缺各批全部新引用；正常发布、云/Mac同集精确验证和禁网读取完成前不声明本地可用。
+
+
+## 2026-09-13 beb5固定版闭合四批待发布数据
+
+正常publisher任务edbbf157以publish_only、0上游调用、396.575秒发布data-beb5348fce0777b49d3b2a392567521e24b2fa1bfac13876be1bfeafd795c3f1；449388756字节manifest含983029文件、136334数据集并保留observations。top10股东第2/3批、index_daily第22批及fund_share第17批的3915个唯一引用/29307118字节在云端缺失0、metadata错误0、物理SHA错误0。
+
+Mac标准LaunchAgent第276轮下载6063个新增文件，全量校验983029项后exit0、stderr空，并原子切换到同一beb5版本。本地对同一3915项的复核再次全通过，云/Mac报告逐字节一致，SHA为1988becd17eb7e7edf796288f617787973ccf8313b91745dec63a80cc2bd1597。生产镜像在Docker network none、只读Mac镜像、空Token及socket/DNS/secret拦截下，从top10_holders、top10_floatholders、index_daily、fund_share各读取3行，上游调用0。
+
+首次只读离线命令误用CURRENT文本指针且未挂载当前backend源码，在读取数据前失败；空报告已由通过的重跑原子替换。create-only归档传输忽略两个macOS provenance扩展头后，authority再次逐文件SHA确认六份JSON一致。总证据文件首次tar命令误剥单层路径、因此云端未创建文件，缺失SHA检查拒绝后改用noclobber单文件创建。五个服务均running/healthy，QuantDB从未停止；云盘可用326995460096字节，距100GiB保留线219621277696字节。证据位于docs/tushare-fixed-release-beb5-four-batches-20260913.evidence.json、docs/tushare-fixed-release-after-960e-four-batches-20260913及authority validation/fixed-release-20260913/beb5-four-batches。
+
+四批待发布清单现已闭合并可在Mac离线消费。完整历史、供应商修订、空响应完整性、known_at/PIT、RRG及交易结论继续开放；下一成熟候选为fund_nav第10批和index_daily第23批，执行前仍需重新冻结固定版并完成历史零重叠准入。总目标保持active。
