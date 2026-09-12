@@ -298,12 +298,18 @@ def fetch_manifest(root, host, source, release, sha):
                     root, "archives/" + sha + ".json", relative, expected
                 )
             return
-    # A private directory prevents partially transferred bytes from becoming a
-    # releases/*/manifest.json. Every retry pins CURRENT anew and starts safely.
-    with tempfile.TemporaryDirectory(prefix=".manifest-", dir=root) as folder:
-        staging = Path(folder)
-        listing = staging / "files"
-        listing.write_text(relative + "\n")
+    # A private persistent directory prevents partial bytes from becoming a
+    # public manifest while letting rsync resume after a broken SSH connection.
+    partial_root = root / ".manifest-transfer"
+    staging = partial_root / sha
+    for path in (partial_root, staging):
+        if path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
+            raise ValueError("Refusing mirrored manifest staging symlink")
+    partial_root.mkdir(mode=0o700, exist_ok=True)
+    staging.mkdir(mode=0o700, exist_ok=True)
+    listing = staging / "files"
+    listing.write_text(relative + "\n")
+    try:
         with mirror_stage("manifest_transfer"):
             subprocess.run(
                 [
@@ -312,6 +318,7 @@ def fetch_manifest(root, host, source, release, sha):
                     "--compress-level=3",
                     "--checksum",
                     "--timeout=45",
+                    "--partial-dir=.rsync-partial",
                     "--rsync-path=sudo -n rsync",
                     "--files-from=" + str(listing),
                     "-e",
@@ -334,6 +341,19 @@ def fetch_manifest(root, host, source, release, sha):
                 raise ValueError("Remote manifest mismatch")
             destination.parent.mkdir(parents=True, exist_ok=True)
             os.replace(incoming, destination)
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        # Transport failures retain only private partial bytes for the next run.
+        # Verification failures discard untrusted staging before any retry.
+        if getattr(exc, "mirror_stage", None) != "manifest_transfer":
+            shutil.rmtree(staging, ignore_errors=True)
+        raise
+    else:
+        shutil.rmtree(staging, ignore_errors=True)
+    finally:
+        try:
+            partial_root.rmdir()
+        except OSError:
+            pass
 
 
 def mirror(root):

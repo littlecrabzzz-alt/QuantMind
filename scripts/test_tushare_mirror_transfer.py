@@ -76,6 +76,7 @@ class ManifestTransfer(unittest.TestCase):
                 kwargs["timeout"], mirror.MANIFEST_TRANSFER_TIMEOUT_SECONDS
             )
             self.assertTrue(kwargs["capture_output"])
+            self.assertIn("--partial-dir=.rsync-partial", cmd)
         for name in names:
             target = Path(cmd[-1]) / name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -130,8 +131,15 @@ class ManifestTransfer(unittest.TestCase):
         self.assertNotIn("secret", json.dumps(report))
         self.assertEqual((self.root / "CURRENT.json").read_bytes(), self.before)
         self.assertFalse((self.root / self.relative).exists())
-        self.assertEqual(list(self.root.glob(".manifest-*")), [])
+        staged = (
+            self.root
+            / ".manifest-transfer"
+            / self.release.removeprefix("data-")
+            / self.relative
+        )
+        self.assertEqual(staged.read_bytes(), self.raw[:12])
         self.assertEqual(self.run_mirror()["status"], "verified")
+        self.assertFalse((self.root / ".manifest-transfer").exists())
 
     def test_wrong_sha_and_symlink_never_install_or_advance(self):
         for attack in ("wrong_sha", "symlink"):
