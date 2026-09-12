@@ -41,9 +41,9 @@ INPUT_FIELDS = {api: list(fields) for api, fields in INPUT_METADATA.items()}
 PORTFOLIO_READ_CONTRACTS = {}
 for _api, _doc in (("p_list", 446), ("p_get", 449)):
     _keys = (
-        ("_observation_id", "id")
+        ("_observation", "id")
         if _api == "p_list"
-        else ("_observation_id", "_request_identity", "id")
+        else ("_observation", "_request_identity", "id")
     )
     spec = _contract(
         1000,

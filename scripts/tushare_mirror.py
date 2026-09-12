@@ -169,6 +169,7 @@ def install_schedule(root):
         "backend/shared/tushare_realtime_extra_contracts.py",
         "backend/shared/tushare_realtime_replay_contracts.py",
         "backend/shared/tushare_offcatalog_contracts.py",
+        "backend/shared/tushare_portfolio_read_contracts.py",
         "backend/shared/tushare_documents.py",
         "backend/shared/tushare_archive.py",
         "backend/shared/tushare_text_contracts.py",

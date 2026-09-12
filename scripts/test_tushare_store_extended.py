@@ -185,9 +185,11 @@ class FixedStore(unittest.TestCase):
             "limit_list_ths": {"trade_date": "20260904", "limit_type": "涨停池"},
             "limit_list_d": {"trade_date": "20260904", "limit_type": "D"},
             "fina_mainbz": {"ts_code": "600036.SH", "type": "P"},
+            "fina_mainbz_vip": {"type": "P"},
             "stock_hsgt": {"trade_date": "20260904", "type": "HK_SZ"},
             "hsgt_top10": {"trade_date": "20260904", "market_type": "1"},
             "moneyflow_ind_dc": {"trade_date": "20260904", "content_type": "行业"},
+            "p_get": {"name": "private-fixture"},
         }
         identity_params.update({api: {"freq": "1min"} for api in store.HISTORY_MINUTES_RUNTIME_CONTRACTS})
         identity_params.update({api: {field: {"freq": "1MIN", "ts_code": "CU2609.SHF" if "fut" in api else "000001.SH", "date_str": "2026-09-08", "ts_type": "STK", "topic": "HQ_FND_TICK"}[field] for field in spec["request_identity_fields"]} for api, spec in store.REALTIME_RUNTIME_CONTRACTS.items() if spec["request_identity_fields"]})
@@ -219,7 +221,7 @@ class FixedStore(unittest.TestCase):
                 )
                 values.update(_row_identity="b" * 64, _observation=name)
                 observations[name] = observation
-                if api in store.REALTIME_RUNTIME_CONTRACTS:
+                if api in store.REALTIME_RUNTIME_CONTRACTS or api == "p_get":
                     request_json = json.dumps({field: identity_params[api].get(field) for field in store.CONTRACTS[api]["request_identity_fields"]}, sort_keys=True)
                     values.update(_raw_row_identity="b" * 64, _request_identity=request_json,
                                   _request_identity_status="complete", _request_identity_missing="[]",
@@ -269,7 +271,7 @@ class FixedStore(unittest.TestCase):
             }
             <= {api for api, _ in fixtures}
         )
-        self.assertEqual(len(fixtures), 243)
+        self.assertEqual(len(fixtures), 246)
 
     def test_dates_codes_and_macro_periods(self):
         pinned = release(

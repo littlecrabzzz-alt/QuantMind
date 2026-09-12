@@ -198,7 +198,7 @@ class LegacyConnectContractsTest(unittest.TestCase):
             PORTFOLIO_READ_CONTRACTS,
             ADJACENT_API_OBLIGATIONS,
         )
-        self.assertEqual(result["counts"]["not_registered_in_scope"], 6)
+        self.assertEqual(result["counts"]["not_registered_in_scope"], 4)
         remaining = {
             row["api_name"]
             for row in result["apis"]
@@ -208,8 +208,6 @@ class LegacyConnectContractsTest(unittest.TestCase):
             remaining,
             {
                 "ggt_monthly",
-                "p_list",
-                "p_get",
                 "p_save",
                 "p_delete",
                 "pro_bar",

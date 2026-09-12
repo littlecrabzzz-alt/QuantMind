@@ -36,6 +36,7 @@ from backend.shared.tushare_registry import (
     RISK_EVENT_RUNTIME_CONTRACTS,
     TECHNICAL_EXTRA_RUNTIME_CONTRACTS,
     STOCK_CONTEXT_RUNTIME_CONTRACTS,
+    PORTFOLIO_READ_RUNTIME_CONTRACTS,
 )
 from backend.shared.tushare_credit_extra_contracts import CREDIT_EXTRA_CONTRACTS
 from backend.shared.tushare_etf_basket_contracts import ETF_BASKET_CONTRACTS
@@ -77,6 +78,7 @@ CONTRACTS = {
     **CONNECT_RUNTIME_CONTRACTS,
     **LEGACY_CONNECT_RUNTIME_CONTRACTS,
     **OFFCATALOG_RUNTIME_CONTRACTS,
+    **PORTFOLIO_READ_RUNTIME_CONTRACTS,
     **ETF_BASKET_CONTRACTS,
     **CREDIT_EXTRA_CONTRACTS,
     **TEXT_CONTRACTS,
@@ -442,6 +444,7 @@ def _dataset(root, release_id, api_name):
             "ts_code" in columns
             and api_name not in CONCEPT_EXTRA_RUNTIME_CONTRACTS
             and api_name not in DC_EXTRA_RUNTIME_CONTRACTS
+            and api_name not in PORTFOLIO_READ_RUNTIME_CONTRACTS
             and not api_name.startswith(("opt_", "sge_", "fx_", "us_"))
         ):
             # Canonicalize the old stored supplier spelling without rewriting
@@ -664,6 +667,19 @@ def _dataset(root, release_id, api_name):
                     "minimum_points",
                 ):
                     metadata[note] = value
+        if api_name in PORTFOLIO_READ_RUNTIME_CONTRACTS:
+            metadata["visibility"] = "account_private"
+            for note, value in spec.items():
+                if note.endswith(("_gap", "_note")) or note in (
+                    "field_gaps",
+                    "field_metadata",
+                    "hidden_fields",
+                    "permission_status",
+                    "date_field",
+                    "history_bound_verified",
+                    "row_cap_verified",
+                ):
+                    metadata[note] = value
         if identity_fields:
             metadata["request_identity_fields"] = list(identity_fields)
             metadata["request_identity_status"] = "verified_from_immutable_observations"
@@ -797,6 +813,8 @@ def _default_date_field(api_name, columns):
 
 
 def _default_code_field(api_name, columns):
+    if api_name == "p_get" and "source_ts_code" in columns:
+        return "source_ts_code"
     keys = KEYS.get(api_name, ())
     return (
         "index_code"

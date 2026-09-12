@@ -9,9 +9,18 @@ import sys
 import unittest
 from unittest.mock import patch
 
+import httpx
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from backend.shared import tushare_portfolio_read_contracts as portfolio
+from backend.shared.tushare_intake import capture_sample
+from backend.shared.tushare_pipeline import Pipeline, _planning_inputs
+from backend.shared.tushare_registry import EXTENDED_CONTRACTS, PLANNERS, contract_for
+from backend.shared.tushare_store import dataset_schema, read_dataset
+from backend.shared import tushare_store
+
+CATALOG = json.loads((ROOT / "config/tushare-catalog.json").read_bytes())
 
 
 class PortfolioReadContracts(unittest.TestCase):
@@ -194,6 +203,184 @@ class PortfolioReadContracts(unittest.TestCase):
         stream = portfolio.iter_portfolio_read_jobs(self.config, self.today, source)
         self.assertEqual(len(list(islice(stream, 5))), 5)
         self.assertEqual(len(list(stream)), 1496)
+
+
+class PortfolioReadRuntime(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.pipeline = Pipeline(self.root, CATALOG)
+        self.addCleanup(self.pipeline.close)
+        for target in (
+            "socket.socket.connect",
+            "socket.getaddrinfo",
+            "backend.shared.tushare_pipeline.get_secret",
+        ):
+            blocked = patch(target, side_effect=AssertionError("offline only"))
+            blocked.start()
+            self.addCleanup(blocked.stop)
+
+    def capture(self, api, params, rows, epoch):
+        task_id = self.pipeline.enqueue(api, params, 10, epoch)
+        saved = self.pipeline.db.execute(
+            "SELECT * FROM jobs WHERE id=?", (task_id,)
+        ).fetchone()
+        job = json.loads(saved["job"])
+
+        def respond(request):
+            sent = json.loads(request.content)
+            self.assertEqual(sent["api_name"], api)
+            self.assertEqual(sent["params"], params)
+            self.assertEqual(set(sent["fields"].split(",")), set(portfolio.FIELDS[api]))
+            fields = list(rows[0]) if rows else portfolio.FIELDS[api]
+            return httpx.Response(
+                200,
+                json={
+                    "code": 0,
+                    "data": {
+                        "fields": fields,
+                        "items": [[row.get(field) for field in fields] for row in rows],
+                        "has_more": False,
+                    },
+                },
+            )
+
+        with httpx.Client(transport=httpx.MockTransport(respond)) as client:
+            result = self.pipeline.normalize(
+                capture_sample(client, "test-token-opaque", job, self.root)
+            )
+        state = "done" if rows else "empty"
+        if result["status"] not in ("sample_ok", "empty_unverified"):
+            state = "quality"
+        with self.pipeline.db:
+            self.pipeline.db.execute(
+                "INSERT INTO attempts VALUES(?,?,?)",
+                (task_id, 1, json.dumps(result)),
+            )
+            self.pipeline.db.execute(
+                "UPDATE jobs SET result=?,state=?,tries=1 WHERE id=?",
+                (json.dumps(result), state, task_id),
+            )
+        return task_id, result
+
+    def test_registry_is_read_only_default_disabled_and_policy_is_snapshot_bound(self):
+        self.assertEqual(
+            set(EXTENDED_CONTRACTS).intersection(
+                {"p_list", "p_get", "p_save", "p_delete"}
+            ),
+            {"p_list", "p_get"},
+        )
+        self.assertEqual(set(PLANNERS).intersection({"portfolio_read"}), {"portfolio_read"})
+        self.assertEqual(set(contract_for("p_list")), set(EXTENDED_CONTRACTS["p_list"]))
+        self.assertEqual(contract_for("p_save"), {})
+        self.assertEqual(contract_for("p_delete"), {})
+        self.assertFalse({"p_save", "p_delete"}.intersection(tushare_store.KEYS))
+        self.assertTrue({"p_list", "p_get"}.issubset(tushare_store.KEYS))
+        self.assertEqual(
+            list(PLANNERS["portfolio_read"]({}, date(2026, 9, 9), {})), []
+        )
+        base = {
+            "enable_portfolio_read": True,
+            "portfolio_read_snapshot_epoch": "20260909T080000Z",
+        }
+        first = _planning_inputs("portfolio_read", base, {})
+        changed = _planning_inputs(
+            "portfolio_read",
+            {**base, "portfolio_read_snapshot_epoch": "20260909T090000Z"},
+            {},
+        )
+        self.assertNotEqual(first[0], changed[0])
+
+    def test_two_phase_plan_and_fixed_query_preserve_private_component_identity(self):
+        config = {
+            "enable_portfolio_read": True,
+            "portfolio_read_snapshot_epoch": "20260909T080000Z",
+            "plan_jobs_per_tick": 20,
+        }
+        self.pipeline.plan_extended(config, date(2026, 9, 9))
+        jobs = [
+            json.loads(row[0])
+            for row in self.pipeline.db.execute(
+                "SELECT job FROM jobs WHERE group_name='portfolio_read' ORDER BY rowid"
+            ).fetchall()
+        ]
+        self.assertEqual([(j["api_name"], j["params"]) for j in jobs], [("p_list", {})])
+        epoch = "snapshot-20260909T080000Z"
+        self.capture(
+            "p_list",
+            {},
+            [
+                {
+                    "id": 7,
+                    "name": "private-fixture",
+                    "desc": None,
+                    "create_time": "2026-09-09 08:00:00",
+                    "update_time": "2026-09-09 08:00:00",
+                }
+            ],
+            epoch,
+        )
+        self.pipeline.plan_extended(config, date(2026, 9, 9))
+        member = self.pipeline.db.execute(
+            "SELECT job FROM jobs WHERE group_name='portfolio_read' "
+            "AND json_extract(job,'$.api_name')='p_get'"
+        ).fetchone()
+        self.assertIsNotNone(member)
+        self.assertEqual(json.loads(member[0])["params"], {"name": "private-fixture"})
+
+        self.capture(
+            "p_get",
+            {"name": "private-fixture"},
+            [
+                {
+                    "id": 11,
+                    "ts_code": "000001.SZ",
+                    "ts_type": "custom",
+                    "name": "component",
+                    "desc": None,
+                    "weight": 0.25,
+                    "create_time": "2026-09-09 08:01:00",
+                    "update_time": "2026-09-09 08:01:00",
+                    "supplier_extra": {"opaque": True},
+                }
+            ],
+            epoch,
+        )
+        self.capture(
+            "p_get",
+            {"name": "another-private-fixture"},
+            [
+                {
+                    "id": 11,
+                    "ts_code": "000001.SZ",
+                    "ts_type": "custom",
+                    "name": "component",
+                    "desc": None,
+                    "weight": 0.5,
+                    "create_time": "2026-09-09 08:02:00",
+                    "update_time": "2026-09-09 08:02:00",
+                    "supplier_extra": {"opaque": True},
+                }
+            ],
+            epoch,
+        )
+        release = self.pipeline.publish()
+        table = read_dataset(self.root, release, "p_get", codes=["000001.SZ"])
+        self.assertEqual(table.num_rows, 2)
+        row = table.to_pylist()[0]
+        self.assertEqual(row["ts_code"], "000001.SZ")
+        self.assertEqual(row["source_ts_code"], "000001.SZ")
+        self.assertEqual(row["supplier_extra"], {"opaque": True})
+        self.assertEqual(
+            {json.loads(item["_request_identity"])["name"] for item in table.to_pylist()},
+            {"private-fixture", "another-private-fixture"},
+        )
+        schema = dataset_schema(self.root, release, "p_get")
+        self.assertEqual(schema["visibility"], "account_private")
+        self.assertEqual(schema["default_code_field"], "source_ts_code")
 
 
 if __name__ == "__main__":

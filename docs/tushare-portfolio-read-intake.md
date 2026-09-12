@@ -1,6 +1,6 @@
 # 自选组合只读候选（446 / 449）
 
-仅纯合同与离线规划，默认关闭；没有运行接线、真实账户读取或组合变更。只允许 `p_list` / `p_get`，明确排除 `p_save` / `p_delete`。组合内容是账户私有数据，不能因纳入全目录就暴露给公共行情查询。
+候选已接入合同、两阶段离线规划、固定版本地查询和 Mac 镜像运行文件，仍默认关闭；没有生产配置、真实账户读取或组合变更。只允许 `p_list` / `p_get`，明确排除 `p_save` / `p_delete`。组合内容是账户私有数据，查询元数据固定标记 `account_private`；当前入口只读取调用者显式指定的本地固定版，不新增公共 HTTP 数据接口。
 
 | API | 官方输入 | 完整输出 | 语义 |
 |---|---|---|---|
@@ -19,7 +19,7 @@
 
 导出 `PORTFOLIO_READ_CONTRACTS`、`iter_portfolio_read_jobs(config,today,identifiers=None)`、`portfolio_read_prerequisites(...)`。family 为 `portfolio_read`；`enable_portfolio_read` 默认关闭；`portfolio_read_apis` 只能选择上述 2 API。必须显式 `portfolio_read_snapshot_epoch=YYYYMMDDTHHMMSSZ`，沿用现有 `_epoch` 验证属于传入 `today` 的北京时间日期；实际供应商时间戳时区仍未知。
 
-`p_list` 先产生无参数快照；`p_get` 只有在调用者传入已认证、持久化、同 epoch 的实际列表观察时才能规划。依赖结构为 `identifiers['portfolio_read_list']`，内含 `api_name='p_list'`、`params={}`、`epoch='snapshot-'+UTCepoch`、`status='done'/'empty'`、原文 `rows`（至少保留 `id`、`name`）。调用者必须从真实原文/观察关联构建该结构；纯函数只能验证形状，不能认证来源真实性，手填配置名不构成来源。未完成、权限拒绝、饱和或旧 epoch 观察不会规划成分。
+`p_list` 先产生无参数快照；`p_get` 只有在 Pipeline 从同一 authority 中最新的持久化、同 epoch、终态成功的实际 `p_list` 任务重建列表观察后才能规划。依赖结构为 `identifiers['portfolio_read_list']`，内含 `api_name='p_list'`、`params={}`、`epoch='snapshot-'+UTCepoch`、`status='done'/'empty'`、原文 `rows`（只投影规划必需的 `id`、`name`）。手填配置名不构成来源。未完成、权限拒绝、饱和或旧 epoch 观察不会规划成分。
 
 组合名只作为合法结构化 `name` 输入，不拼接命令；不裁剪、大小写折叠或 Unicode 标准化。源 id 只用于发现身份检查，不作为上游参数。同名不同 id / 同 id 不同名视为歧义并拒绝推断。缺字段、非法字符仅抛固定文字，状态和 gap 只输出计数，不输出私人名称、描述、代码或持仓；生产运行接线还必须审查通用任务状态/manifest/读取鉴权，不能假定本纯模块已完成隐私边界。
 
@@ -27,7 +27,7 @@
 
 ## 身份、时间与未完成项
 
-- 列表自然键候选为账户范围 id；成分 id 只称“编号”，不能证明跨组合唯一或永久不变。合同以 `_observation_id`（成分再加 `_request_identity`）隔离不同快照/请求，保留来源 id 和完整不同源行。请求身份是组合 name；运行层需保留列表 id 的私有来源关联，但不能把列表 id 伪装为合法请求输入。
+- 列表自然键候选为账户范围 id；成分 id 只称“编号”，不能证明跨组合唯一或永久不变。合同以实际持久化的 `_observation`（成分再加 `_request_identity`）隔离不同快照/请求，保留来源 id 和完整不同源行。请求身份是组合 name；运行层需保留列表 id 的私有来源关联，但不能把列表 id 伪装为合法请求输入。
 - `create_time` / `update_time` 是供应商创建/修改元数据，没有 timezone、精度、成员有效期或 PIT 保证；默认查询日期为 `None`，不可当作交易日或历史成员起止时间。保存实际请求/观察时间，后续不改写旧观察。
 - `ts_type` 是用户自定义分类；`ts_code` 可为股票、行业、概念等，保留原始代码/类型与账户组合上下文，不能一律转 A 股前缀。跨市场识别和内部 opaque namespace 投影须在运行接入时明确验证。
 - `weight` 单位、百分比/比例、是否归一化、负数/零含义均未说明，不缩放、不检查合计为 1、不强加非负约束。

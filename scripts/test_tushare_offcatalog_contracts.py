@@ -282,8 +282,8 @@ class OffCatalogContractsTest(unittest.TestCase):
             ADJACENT_API_OBLIGATIONS,
         )
         self.assertEqual(result["counts"]["total_named_scope"], 249)
-        self.assertEqual(result["counts"]["registered_union"], 243)
-        self.assertEqual(result["counts"]["not_registered_in_scope"], 6)
+        self.assertEqual(result["counts"]["registered_union"], 246)
+        self.assertEqual(result["counts"]["not_registered_in_scope"], 4)
         remaining = {
             row["api_name"]: row["implementation"]
             for row in result["apis"]
@@ -293,8 +293,6 @@ class OffCatalogContractsTest(unittest.TestCase):
             remaining,
             {
                 "ggt_monthly": "public_read_only_contract_blocked",
-                "p_list": "pure_contract_only_private",
-                "p_get": "pure_contract_only_private",
                 "p_save": "excluded_mutation",
                 "p_delete": "excluded_mutation",
                 "pro_bar": "sdk_only",
@@ -304,6 +302,7 @@ class OffCatalogContractsTest(unittest.TestCase):
     def test_mirror_installer_bundles_offcatalog_contract(self):
         installer = (ROOT / "scripts/tushare_mirror.py").read_text()
         self.assertIn('"backend/shared/tushare_offcatalog_contracts.py"', installer)
+        self.assertIn('"backend/shared/tushare_portfolio_read_contracts.py"', installer)
 
 
 if __name__ == "__main__":

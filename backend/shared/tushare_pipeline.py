@@ -46,6 +46,8 @@ from backend.shared.tushare_registry import (
     cross_asset_identifiers,
     MARKET_SENTIMENT_RUNTIME_CONTRACTS,
     market_sentiment_prerequisites,
+    PORTFOLIO_READ_RUNTIME_CONTRACTS,
+    portfolio_read_prerequisites,
     EXTENDED_CONTRACTS,
     PLANNERS,
     APPEND_PLANNERS,
@@ -165,9 +167,11 @@ def _planning_inputs(family, config, identifiers):
     if family == "market_members":
         dependencies.update(MARKET_MEMBER_DEPENDENCIES[api] for api in contracts)
     keys = {"history_start", family + "_apis"}
+    if family == "portfolio_read":
+        keys = {"portfolio_read_apis", "portfolio_read_snapshot_epoch"}
     if family == "market_members":
         keys.remove("history_start")
-    if family not in ("structured", "market"):
+    if family not in ("structured", "market", "portfolio_read"):
         # This family name already ends in history; its public scope key does not
         # repeat that suffix. Hash the key actually consumed by its pure planner.
         keys.add(
@@ -954,6 +958,13 @@ class Pipeline:
             for key in code_fields:
                 if result["api_name"] in REALTIME_RUNTIME_CONTRACTS:
                     continue  # Already projected using source API/request asset identity.
+                if result["api_name"] in PORTFOLIO_READ_RUNTIME_CONTRACTS:
+                    # User-defined components may only look like securities. Keep
+                    # the supplier spelling and use request identity for portfolio
+                    # context instead of inventing an exchange or asset namespace.
+                    if key == "ts_code" and isinstance(row.get(key), str):
+                        row["source_ts_code"] = row[key]
+                    continue
                 if result["api_name"] in CALENDAR_EXTRA_RUNTIME_CONTRACTS or result["api_name"] in ACCOUNT_HISTORY_RUNTIME_CONTRACTS or result["api_name"] == "factor_list":
                     continue  # Calendar/factor taxonomy labels are not securities.
                 if result["api_name"] == "factor_value" and key != "ts_code":
@@ -1489,6 +1500,27 @@ class Pipeline:
             pass
         return result
 
+    def portfolio_read_identifier(self):
+        """Return the latest durable successful unfiltered list observation."""
+        row = self.db.execute(
+            "SELECT job,epoch,state,result FROM jobs INDEXED BY jobs_group_pending "
+            "WHERE state IN ('done','empty') AND group_name='portfolio_read' "
+            "AND json_extract(job,'$.api_name')='p_list' "
+            "ORDER BY rowid DESC LIMIT 1"
+        ).fetchone()
+        if row is None:
+            return None
+        job, saved = json.loads(row["job"]), json.loads(row["result"])
+        return {
+            "api_name": "p_list",
+            "params": job["params"],
+            "epoch": row["epoch"],
+            "status": row["state"],
+            # Planning needs the exact request name and source ID only. Private
+            # descriptions and holdings do not enter the planning checkpoint.
+            "rows": self.records(saved, fields=frozenset(("id", "name"))),
+        }
+
     def record_global_planning_gaps(self, config, identifiers):
         # Nonempty discovery and an explicit 1990 scope are not completeness proof.
         # Keep planning evidence in the existing portable capability inventory.
@@ -1666,6 +1698,7 @@ class Pipeline:
             "listing_extra": listing_extra_prerequisites,
             "trading_event": trading_event_prerequisites,
             "connect": connect_prerequisites,
+            "portfolio_read": portfolio_read_prerequisites,
             "etf_basket": etf_basket_prerequisites,
             "credit_extra": credit_extra_prerequisites,
             "futures_extra": futures_extra_prerequisites,
@@ -1713,6 +1746,8 @@ class Pipeline:
         self.identifier_timing = None
         try:
             identifiers = self.identifiers()
+            if config.get("enable_portfolio_read") is True:
+                identifiers["portfolio_read_list"] = self.portfolio_read_identifier()
         finally:
             if isinstance(self.identifier_timing, dict):
                 self.planning_timing["discovery"] = self.identifier_timing
@@ -1815,6 +1850,12 @@ class Pipeline:
             (
                 "connect",
                 lambda cfg, ids: self.record_extra_planning_gaps("connect", cfg, ids),
+            ),
+            (
+                "portfolio_read",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "portfolio_read", cfg, ids
+                ),
             ),
             (
                 "etf_basket",

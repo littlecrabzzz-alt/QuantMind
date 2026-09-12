@@ -56,6 +56,16 @@ from backend.shared.tushare_offcatalog_contracts import (
     OFFCATALOG_CONTRACTS,
     iter_offcatalog_jobs,
 )
+from backend.shared.tushare_portfolio_read_contracts import (
+    PORTFOLIO_READ_CONTRACTS,
+    iter_portfolio_read_jobs,
+    portfolio_read_prerequisites,
+)
+
+PORTFOLIO_READ_RUNTIME_CONTRACTS = {
+    api: {**spec, "group": "portfolio_read"}
+    for api, spec in PORTFOLIO_READ_CONTRACTS.items()
+}
 
 from backend.shared.tushare_trading_event_contracts import (
     TRADING_EVENT_CONTRACTS,
@@ -851,6 +861,7 @@ EXTENDED_CONTRACTS = {
     **CONNECT_RUNTIME_CONTRACTS,
     **LEGACY_CONNECT_RUNTIME_CONTRACTS,
     **OFFCATALOG_RUNTIME_CONTRACTS,
+    **PORTFOLIO_READ_RUNTIME_CONTRACTS,
     **{
         api: {**spec, "group": "etf_basket"}
         for api, spec in ETF_BASKET_CONTRACTS.items()
@@ -920,6 +931,7 @@ PLANNERS = {
     "connect": iter_connect_jobs,
     "legacy_connect": iter_legacy_connect_jobs,
     "offcatalog": iter_offcatalog_jobs,
+    "portfolio_read": iter_portfolio_read_jobs,
     "etf_basket": iter_etf_basket_jobs,
     "credit_extra": iter_credit_extra_jobs,
     "text": lambda config, today, ids: iter_text_jobs(config, today),
