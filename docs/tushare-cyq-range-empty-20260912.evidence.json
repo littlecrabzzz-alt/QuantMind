@@ -1,0 +1,295 @@
+{
+  "archives": {
+    "before-deploy.json": {
+      "bytes": 4065,
+      "path": "validation/cyq-range-empty-20260912/before-deploy.json",
+      "sha256": "530bcd117e32d0cb12e5e970a741d5cc290646be913d2d94de0ce0e294d8bbb1"
+    },
+    "inventory.json": {
+      "bytes": 786,
+      "path": "validation/cyq-range-empty-20260912/inventory.json",
+      "sha256": "e09c568800b59b0499cb2b2223efd6330d2195c64af81128ac8c25fcae487634"
+    },
+    "pending-release-inventory.json": {
+      "bytes": 739490,
+      "path": "validation/cyq-range-empty-20260912/pending-release-inventory.json",
+      "sha256": "5ed55cb16f4c3c390a327adba26168a320fbb1d828d207176c3c561e38a92236"
+    },
+    "target-retry-independent-closure.json": {
+      "bytes": 4467,
+      "path": "validation/cyq-range-empty-20260912/target-retry-independent-closure.json",
+      "sha256": "1574280ca041637badbe69bdb6c6325b25b0fc3812c900c3ed47fa29d1e24c36"
+    },
+    "target-retry-receipt.json": {
+      "bytes": 5791,
+      "path": "validation/cyq-range-empty-20260912/target-retry-receipt.json",
+      "sha256": "ff95fb3e0651ea78d235516da0993f191c96daeae9f90fa7c1957cb37aeefb6e"
+    }
+  },
+  "before": {
+    "attempt_watermark": 236093,
+    "config_sha256": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a",
+    "database_read_seconds": 0.001271246001124382,
+    "target_state": "pending",
+    "target_tries": 3
+  },
+  "boundaries": [
+    "empty_unverified is not complete history/global data absence/PIT/RRG proof",
+    "legacy attempts and raw observations retained",
+    "new supplier evidence waits next normal fixed release and Mac verification",
+    "cyq_chips daily quota gap is independently recorded; do not seed unknown deployment-day usage as zero",
+    "pool2 candidate not merged: limited Mac full-stage benchmark only3.1percent median gain"
+  ],
+  "code_commit": "e1481f354767c86b10d311f94e312835492c6130",
+  "deployment": {
+    "all_three_services": "healthy",
+    "beat_started_at": "2026-09-12T07:15:46.252937448Z",
+    "document_worker_started_at_unchanged": "2026-09-12T04:44:58.161153655Z",
+    "drain_mode": "planning_only",
+    "handoff": "passed",
+    "natural_drain_seconds": 299.4231791552156,
+    "natural_drain_task": "5fd48edb-2b9b-485d-af90-9edaecbaadfd",
+    "oom": false,
+    "quantdb_not_stopped": true,
+    "restart_counts": 0,
+    "resumed_normal_task": "baba6808-6bb4-4c2e-9905-0eab4f0c3447",
+    "source_digest": "40302f944336acbb3cef8c1b0990e9bd4f001f36ff706ffe9c4ed2601226c665",
+    "worker_exit_code": 0,
+    "worker_exited_at": "2026-09-12T07:14:48.133253721Z",
+    "worker_started_at": "2026-09-12T07:16:38.971284775Z"
+  },
+  "independent_closure": {
+    "boundaries": [
+      "supplier_empty_hint and empty_unverified do not prove coverage, history completeness, PIT or supplier-wide availability",
+      "fixed archives and physical files only; no live SQLite, credentials or upstream access",
+      "no service operation and no release publication"
+    ],
+    "code": {
+      "before": "4911af05ffbe1d537709fed35a6def1fbb18f27d",
+      "deployed": "e1481f354767c86b10d311f94e312835492c6130"
+    },
+    "created_at": "2026-09-12T07:17:42.970690+00:00",
+    "kind": "cyq_chips_range_empty_target_retry_independent_closure",
+    "new_evidence": {
+      "assessment": {
+        "code": 50101,
+        "coverage_proven": false,
+        "field_coverage": "unverified_default_or_invalid",
+        "history_complete": false,
+        "http_status": 200,
+        "pit_verified": false,
+        "requested_missing_fields": null,
+        "response_complete": true,
+        "response_format": "json",
+        "row_count": 0,
+        "status": "empty_unverified",
+        "supplier_empty_hint": true,
+        "unexpected_returned_fields": null
+      },
+      "attempt": 4,
+      "business_code": 50101,
+      "explicit_data_null": true,
+      "http_status": 200,
+      "inventory": {
+        "bytes": 786,
+        "path": "validation/cyq-range-empty-20260912/inventory.json",
+        "physical_bytes": 927,
+        "refs": 2,
+        "sha256": "e09c568800b59b0499cb2b2223efd6330d2195c64af81128ac8c25fcae487634"
+      },
+      "observation_object_link": true,
+      "supplier_message": "指定数据不存在，请确认参数！"
+    },
+    "old_evidence": {
+      "attempt_rows_byte_equal_in_archives": true,
+      "attempts": 3,
+      "physical_bytes": 2397,
+      "physical_errors": 0,
+      "physical_refs": 6,
+      "refs": {
+        "objects/0352aa685ff635780657e254d74c1e820569affdbd1eb85a23a7616b6a51fc59.json": {
+          "bytes": 144,
+          "kind": "object",
+          "sha256": "0352aa685ff635780657e254d74c1e820569affdbd1eb85a23a7616b6a51fc59"
+        },
+        "objects/7936f4af51bcd520146bff7232ebc2eae7c0f970f87572a40b6a20acaa388a86.json": {
+          "bytes": 144,
+          "kind": "object",
+          "sha256": "7936f4af51bcd520146bff7232ebc2eae7c0f970f87572a40b6a20acaa388a86"
+        },
+        "objects/f046f7ef83c10b3500384f83e3ed94db2a9069970ec38756a109114908eed6dc.json": {
+          "bytes": 144,
+          "kind": "object",
+          "sha256": "f046f7ef83c10b3500384f83e3ed94db2a9069970ec38756a109114908eed6dc"
+        },
+        "observations/4f1a8639de6849ff87cc7afa505ce535.json": {
+          "bytes": 655,
+          "kind": "observation",
+          "sha256": "03a64c995805db9e09e911d5710c59d588f7312ce31780b6b0bcf027be3328d9"
+        },
+        "observations/743c5c46c9b74cdeb13ba542dcd38cd2.json": {
+          "bytes": 655,
+          "kind": "observation",
+          "sha256": "625ab4a7ee8b3e9c4d5665e0387fb37f4b779d07a217ddef355b8dabc015e983"
+        },
+        "observations/7b525fed579b48b0ac2db844abfa52ca.json": {
+          "bytes": 655,
+          "kind": "observation",
+          "sha256": "cc3bba3776df71cb208788095e6ecc80d9239484194e3987fe17248a1dea74a8"
+        }
+      }
+    },
+    "runs": {
+      "exact_task_scope": true,
+      "first_upstream_calls": 1,
+      "max_upstream_calls": 2,
+      "second_upstream_calls": 0
+    },
+    "schema_version": 1,
+    "source_archives": {
+      "before_deploy": {
+        "bytes": 4065,
+        "path": "validation/cyq-range-empty-20260912/before-deploy.json",
+        "sha256": "530bcd117e32d0cb12e5e970a741d5cc290646be913d2d94de0ce0e294d8bbb1"
+      },
+      "target_retry_receipt": {
+        "bytes": 5791,
+        "path": "validation/cyq-range-empty-20260912/target-retry-receipt.json",
+        "sha256": "ff95fb3e0651ea78d235516da0993f191c96daeae9f90fa7c1957cb37aeefb6e"
+      }
+    },
+    "status": "passed",
+    "task": {
+      "after_state": "empty",
+      "after_tries": 4,
+      "attempt_watermark_before": 236093,
+      "before_state": "pending",
+      "before_tries": 3,
+      "epoch": "history",
+      "group_name": "technical_extra",
+      "logical_key": "621fd8c3bd6578365b69ce08592e52d80ede7b5433a80a61c67e9318138032e6",
+      "new_attempt_rowid": 236094,
+      "params": {
+        "end_date": "20180131",
+        "start_date": "20180101",
+        "ts_code": "000522.SZ"
+      },
+      "task_id": "8d98620659ec90a01a39c40c0ee1aa353cdd18bfaf2a7564a1379c7047ea5209"
+    },
+    "unchanged": {
+      "capability": [
+        {
+          "checked_at": "2026-09-12T07:06:58.142039+00:00",
+          "reason": "sample_ok",
+          "scope": "cyq_chips:",
+          "status": "available"
+        }
+      ],
+      "config": true,
+      "current": true,
+      "release_published": false
+    }
+  },
+  "pending_fixed_release": {
+    "baseline_release": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+    "deduplicated_references": 0,
+    "physical_bytes": 130422296,
+    "schema_version": 1,
+    "scope": "selected acceptance inventories; not all supplier data or all ongoing normal acquisitions",
+    "source_references": 3449,
+    "sources": [
+      {
+        "bytes": 514764,
+        "path": "validation/source-semantics-20260912/pending-release-inventory.json",
+        "references": 2408,
+        "sha256": "ffd8f57870f871df8c288b7b31fb33cf130aefd37591d21062c8b808dd99b8d8"
+      },
+      {
+        "bytes": 224323,
+        "path": "validation/index-daily-batch-20260912/batch-20-inventory.json",
+        "references": 1039,
+        "sha256": "6840958c9c3798a77e98b1f4a2ae521861d52805544fb3e41273313ede848fba"
+      },
+      {
+        "bytes": 786,
+        "path": "validation/cyq-range-empty-20260912/inventory.json",
+        "references": 2,
+        "sha256": "e09c568800b59b0499cb2b2223efd6330d2195c64af81128ac8c25fcae487634"
+      }
+    ],
+    "status": "pending_next_normal_fixed_release_and_mac",
+    "unique_references": 3449
+  },
+  "real_retry": {
+    "after_state": "empty",
+    "after_tries": 4,
+    "capability_unchanged": true,
+    "config_unchanged": true,
+    "current_unchanged": true,
+    "first_run": {
+      "blocked": 15305,
+      "deferred_legacy_period_plan": 9802,
+      "done": 123168,
+      "elapsed_seconds": 0.194,
+      "empty": 99944,
+      "exact_task_scope": true,
+      "pending": 5413590,
+      "permission_blocked": 3493,
+      "quality": 438,
+      "requests": 1,
+      "resolved": 2004,
+      "scoped_jobs": 1,
+      "split_pending": 5912
+    },
+    "old_attempts_unchanged": true,
+    "result": {
+      "api_name": "cyq_chips",
+      "code": 50101,
+      "coverage_proven": false,
+      "field_coverage": "unverified_default_or_invalid",
+      "history_complete": false,
+      "http_status": 200,
+      "object_sha256": "2c3b721b6afac9b38fd513311fbf9775d8539c292f3e20976e23a5f70cbb67f7",
+      "observation": "570cfb523de74ce3a5a5f7f67ea07e9e.json",
+      "observation_sha256": "fd05819b472a9d104fa31e70a27df4960adb3e5871ef1e549ed83c6ba56ce824",
+      "pit_verified": false,
+      "requested_missing_fields": null,
+      "response_complete": true,
+      "response_format": "json",
+      "row_count": 0,
+      "status": "empty_unverified",
+      "supplier_empty_hint": true,
+      "unexpected_returned_fields": null
+    },
+    "second_run": {
+      "blocked": 15305,
+      "deferred_legacy_period_plan": 9802,
+      "done": 123168,
+      "elapsed_seconds": 0.0,
+      "empty": 99944,
+      "exact_task_scope": true,
+      "pending": 5413590,
+      "permission_blocked": 3493,
+      "quality": 438,
+      "requests": 0,
+      "resolved": 2004,
+      "scoped_jobs": 1,
+      "split_pending": 5912
+    },
+    "target_task_id": "8d98620659ec90a01a39c40c0ee1aa353cdd18bfaf2a7564a1379c7047ea5209"
+  },
+  "schema_version": 1,
+  "scope": "cyq_chips exact supplier-empty classification for complete legal range; no planner/config/quota changes",
+  "source_contract": "https://tushare.pro/document/2?doc_id=294",
+  "status": "production_retry_and_independent_closure_accepted_pending_fixed_release_and_mac",
+  "verification": {
+    "broad_pipeline_tests": 179,
+    "compile": "passed",
+    "diff_check": "passed",
+    "focused_tests": 41,
+    "independent_review_tests": 41,
+    "old_base_e2e": "failed with pending2 as expected; candidate empty2 passed",
+    "overlapping_test_sets": true,
+    "ruff": "passed"
+  }
+}

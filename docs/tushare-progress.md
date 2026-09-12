@@ -1305,3 +1305,16 @@
 并行publisher pool2候选63499b79已在隔离worktree提交、142测试通过，未合并部署；约1.711倍仅为文件_save微基准，需完整document_index阶段比较后决定。下一轮先闭合待发布清单，再审范围请求与cyq_chips每日配额范围；完整历史、修订、known_at/PIT、单日index_weight完整性告警和RRG分类继续开放。机器证据：docs/tushare-source-semantics-20260912.evidence.json。
 
 补记：pool2候选独立复审通过，104项相关测试及25项专项测试通过（重叠集合），跨wave失败离线探针确认全事务回滚。候选仍未部署，完整document_index阶段收益尚待验证。审查记录：coordination/tushare-data/20260912T070522Z-document-index-pool2-independent-review.md。
+
+
+## 2026-09-12 指数日线第20批、range修复与发布基准
+
+第20批index_daily通过现有精确入口完成360个首次任务、47.299秒（456.669rpm），319 done/41 empty、75689行；1039个物理引用/18821543字节逐SHA通过。原prepare/closure列出命名目录内6180历史项，独立复核发现batch3位于另一目录；追加不可覆盖补正后，19份已知历史共6540 task/logical/request，三层重叠仍全部0，原材料保留。普通worker和Beat均已恢复，文档worker/QuantDB未停。六份原材料与补正位于validation/index-daily-batch-20260912/batch-20-*，机器证据docs/tushare-index-daily20-20260912.evidence.json。41个空响应仍不证明历史完整，本批等待正常固定发布及Mac镜像。
+
+cyq_chips官方doc294与已保存3586行成功响应证明月range合法；修复只扩展供应商空结果分类器，月规划/6000行检测/日期二分不变。master34c5a1e4/e1481f35已push、双端对齐并部署。41定向、179 pipeline及独立41复审通过（集合重叠）；旧代码E2E先复现pending2，新代码正确empty2。规划任务5fd48edb自然SUCCESS299.423秒后普通worker退出0，部署后对已到重试时间的000522.SZ/201801月任务执行现有Pipeline精确scope：1请求、0.194秒终止empty/tries4，第二次run0请求；旧3attempt、capability、config、CURRENT不变，服务恢复healthy。独立物理闭包另附机器证据docs/tushare-cyq-range-empty-20260912.evidence.json。
+
+并行pool2完整document_index有限fixture基准采用Mac已验证ce43的固定文件重建，包含78153状态行、7447 mappings、1958 attempts和3000原文件，真实fsync/atomiclink、SQLite事务及原文件扫描全部执行。ABBA总耗时中位0.503332→0.487707秒，仅1.032x；四次输出286对象/37742374字节完全一致。结果不证明云端部署收益，本轮保持serial，不合入63499b79。脚本/报告不可覆盖归档validation/document-index-stage-20260912，repo机器证据docs/tushare-document-index-stage-benchmark-20260912.evidence.json。
+
+另已确认cyq_chips每日上限未接入账本，现有200rpm及账户500门继续保持。下一配额变更应复用现有API/day账本及activation guard，禁止把部署当天未知使用量重置0；当前仍只有cyq_perf每日保护，不能宣称此缺口已修复。下一步先验待发布清单的云/Mac固定版闭包，再实施日配额保护；完整历史/修订/known_at/PIT/RRG与index_weight单日饱和告警继续开放。
+
+range独立闭包补记：旧3attempt及6份旧物理证据不变，新attempt4的2引用/927字节逐SHA/请求链校验通过。上一轮2408引用、第20批1039引用及本次2引用严格去重后共3449引用/130422296字节，已create-only归档validation/cyq-range-empty-20260912/pending-release-inventory.json（SHA 5ed55cb16f4c3c390a327adba26168a320fbb1d828d207176c3c561e38a92236）。这是指定验收批次集合，其他正常采集仍由全量publisher纳入；下一轮按该清单闭合固定版和Mac，不重拉已存数据。

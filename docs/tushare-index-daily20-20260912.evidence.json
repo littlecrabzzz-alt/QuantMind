@@ -1,0 +1,206 @@
+{
+  "archives": {
+    "closure": {
+      "bytes": 1958,
+      "path": "validation/index-daily-batch-20260912/batch-20-closure.json",
+      "sha256": "85c8efba27d017191b6ca27ff60d172a939b198901e5dbc9174b0f8e8de12295"
+    },
+    "inventory": {
+      "bytes": 224323,
+      "path": "validation/index-daily-batch-20260912/batch-20-inventory.json",
+      "sha256": "6840958c9c3798a77e98b1f4a2ae521861d52805544fb3e41273313ede848fba"
+    },
+    "manifest": {
+      "bytes": 209968,
+      "path": "validation/index-daily-batch-20260912/batch-20-manifest.json",
+      "sha256": "2acc9ddfc5151c0d6d46f4feea28d77b4f2ada93b95dde4d5cdced9a9b6514ae"
+    },
+    "plan": {
+      "bytes": 1592,
+      "path": "validation/index-daily-batch-20260912/batch-20-plan.json",
+      "sha256": "f5b738b490462bc26737a246868ea8e12a6c3200ef3ca57a9b4dbe63d95a2c40"
+    },
+    "prepare": {
+      "bytes": 4165,
+      "path": "validation/index-daily-batch-20260912/batch-20-prepare.json",
+      "sha256": "343413c81a3c2b08a9654928e8e96bbfd913c48466173585997068235bb90668"
+    },
+    "receipt": {
+      "bytes": 2047,
+      "path": "validation/index-daily-batch-20260912/batch-20-receipt.json",
+      "sha256": "3e059675891e5fe3245bdc3a94a79ea94171379fe002038f2a297e40b871d599"
+    }
+  },
+  "closure": {
+    "api_name": "index_daily",
+    "archive_refs": {
+      "manifest": {
+        "path": "validation/index-daily-batch-20260912/batch-20-manifest.json",
+        "sha256": "2acc9ddfc5151c0d6d46f4feea28d77b4f2ada93b95dde4d5cdced9a9b6514ae"
+      },
+      "plan": {
+        "path": "validation/index-daily-batch-20260912/batch-20-plan.json",
+        "sha256": "f5b738b490462bc26737a246868ea8e12a6c3200ef3ca57a9b4dbe63d95a2c40"
+      },
+      "prepare": {
+        "path": "validation/index-daily-batch-20260912/batch-20-prepare.json",
+        "sha256": "343413c81a3c2b08a9654928e8e96bbfd913c48466173585997068235bb90668"
+      },
+      "receipt": {
+        "path": "validation/index-daily-batch-20260912/batch-20-receipt.json",
+        "sha256": "3e059675891e5fe3245bdc3a94a79ea94171379fe002038f2a297e40b871d599"
+      }
+    },
+    "batch": 20,
+    "boundaries": [
+      "empty responses remain unverified",
+      "full history and PIT not proven",
+      "pending next normal publication and Mac mirror"
+    ],
+    "db_closed_before_files": true,
+    "db_read_seconds": 0.006141358986496925,
+    "historical_overlap": {
+      "logical": 0,
+      "request": 0,
+      "task": 0
+    },
+    "historical_tasks": 6180,
+    "http_statuses": {
+      "200": 360
+    },
+    "physical_bytes": 18821543,
+    "physical_errors": 0,
+    "query_plan": [
+      {
+        "detail": "SEARCH j USING INDEX sqlite_autoindex_jobs_1 (id=?)",
+        "id": 6,
+        "notused": 0,
+        "parent": 0
+      },
+      {
+        "detail": "SEARCH a USING INDEX sqlite_autoindex_attempts_1 (job_id=?) LEFT-JOIN",
+        "id": 1099,
+        "notused": 0,
+        "parent": 0
+      }
+    ],
+    "receipt_id": "97189accd8147f941fd7323143ebeab164e9247ffd53b55da6c7645722ac5982",
+    "refs": 1039,
+    "release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+    "requests": 360,
+    "retained_rows": 75689,
+    "schema_version": 1,
+    "states": {
+      "done": 319,
+      "empty": 41
+    },
+    "status": "passed",
+    "statuses": {
+      "empty_unverified": 41,
+      "sample_ok": 319
+    }
+  },
+  "code_commit": "4911af05ffbe1d537709fed35a6def1fbb18f27d",
+  "deployment_window": {
+    "document_worker_and_quantdb_not_stopped": true,
+    "natural_drain_seconds": 92.7650582101196,
+    "natural_drain_task": "9543c6a5-77b6-4abe-ae1c-4228ebde9020",
+    "worker_and_beat_restored_existing_containers": true,
+    "worker_exit_code": 0,
+    "worker_exited_at": "2026-09-12T07:07:53.695453749Z"
+  },
+  "independent_correction": {
+    "bytes": 7238,
+    "known_historical_tasks": 6540,
+    "original_6180_scope": "named index-daily-batch directories omitted batch3 in exact-index-fund-wave-20260911T1100; original archives retained",
+    "path": "validation/index-daily-batch-20260912/batch-20-independent-correction.json",
+    "sha256": "097fe1774fcfec548ab2d9d128d5c8c890e4720ee399d9d0ede6c8bca8c4a0f7",
+    "task_logical_request_overlap": 0
+  },
+  "observed_at": "2026-09-12T07:10:16.261152+00:00",
+  "observed_rpm": 456.6692741918434,
+  "pending_prior_inventory": {
+    "bytes": 111599826,
+    "path": "validation/source-semantics-20260912/pending-release-inventory.json",
+    "references": 2408,
+    "sha256": "ffd8f57870f871df8c288b7b31fb33cf130aefd37591d21062c8b808dd99b8d8"
+  },
+  "receipt": {
+    "after_states": [
+      {
+        "api_name": "index_daily",
+        "jobs": 319,
+        "state": "done"
+      },
+      {
+        "api_name": "index_daily",
+        "jobs": 41,
+        "state": "empty"
+      }
+    ],
+    "all_task_ids_sha256": "d2a16288a920a8f2c9f936aff8de1457df0a06cba6fde033afa1c0387d1f5fe1",
+    "api_counts": {
+      "index_daily": 360
+    },
+    "attempted_by_api": {
+      "index_daily": 360
+    },
+    "authority_config_sha256": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a",
+    "batch_manifest_sha256": "2acc9ddfc5151c0d6d46f4feea28d77b4f2ada93b95dde4d5cdced9a9b6514ae",
+    "before_states": [
+      {
+        "api_name": "index_daily",
+        "jobs": 360,
+        "state": "pending"
+      }
+    ],
+    "current_release_switched": false,
+    "elapsed_seconds": 47.299,
+    "eligible_jobs": 108531,
+    "eligible_task_ids_sha256": "1e7f75bca35f02a5b336cd199bf594a7ce7e8f7eea9d2a2388ed03f9c35a2601",
+    "exact_task_scope": true,
+    "helper_sha256": "a1dd8044669e89ba37e82897a8ec6cc8f3ea18da5cf6434db6c8e119ecb7ad08",
+    "max_seconds": 90,
+    "max_upstream_calls": 360,
+    "preparation_sha256": "1a24b23763fb0ca1e963fc908167d6b83bdd0608bd61c00a01b632feea09f832",
+    "rate_gate": {
+      "account_rpm": 500,
+      "api_rpm": 500,
+      "rate_policy": "tiered_v1",
+      "rate_source": "points_regular_allowlist_doc290",
+      "rollout_account_rpm": 500
+    },
+    "receipt_id": "97189accd8147f941fd7323143ebeab164e9247ffd53b55da6c7645722ac5982",
+    "release_id": "data-ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+    "release_manifest_sha256": "ce43326f62bfc30dccb314a965c8e58533472f6914735e32692cdbec023f60e6",
+    "release_published": false,
+    "schema_version": 1,
+    "selected": {
+      "end_date_max": "20260901",
+      "jobs": 360,
+      "request_ranges_sha256": "cc922099012378aaef54a0d90adbad272e46ba99d12f897c4c6db6ad444672ae",
+      "start_date_min": "20240101",
+      "suffix_counts": {
+        "CSI": 82,
+        "SH": 12,
+        "SZ": 266
+      },
+      "unique_index_codes": 360
+    },
+    "status": "exact_batch_executed",
+    "upstream_calls": 360,
+    "verified_jobs": 360
+  },
+  "runtime_health": {
+    "beat": "healthy",
+    "beat_started_at": "2026-09-12T07:09:38.913356104Z",
+    "document_worker": "healthy",
+    "document_worker_started_at": "2026-09-12T04:44:58.161153655Z",
+    "oom": false,
+    "ordinary_worker": "healthy",
+    "restart_counts": 0,
+    "worker_started_at": "2026-09-12T07:09:38.768400336Z"
+  },
+  "schema_version": 1,
+  "status": "cloud_exact_batch_accepted_pending_fixed_release_and_mac"
+}
