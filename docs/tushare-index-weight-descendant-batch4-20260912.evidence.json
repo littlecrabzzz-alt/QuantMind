@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "status": "index_weight_descendant_batch_4_exact_execution_closed_waiting_fixed_release",
+  "observed_at": "2026-09-12T13:40:00+08:00",
+  "batch": {
+    "api_name": "index_weight",
+    "batch": 4,
+    "pairs": 180,
+    "jobs": 360,
+    "upstream_calls": 360,
+    "http_statuses": {
+      "200": 360
+    },
+    "elapsed_seconds": 50.832,
+    "observed_rpm": 424.929,
+    "states": {
+      "blocked": 91,
+      "empty": 180,
+      "split_pending": 89
+    },
+    "statuses": {
+      "empty_unverified": 180,
+      "possibly_truncated": 180
+    },
+    "rows": 279962,
+    "pair_outcomes": {
+      "blocked+empty": 91,
+      "empty+split_pending": 89
+    }
+  },
+  "descendants": {
+    "eligible_pairs_at_prepare": 629,
+    "split_parents": 89,
+    "new_pristine_tasks": 178,
+    "children_per_split_parent": 2,
+    "blocked_single_day_saturation": 91,
+    "blocked_is_permission_or_rate_error": false,
+    "coverage_complete_claimed": false,
+    "sibling_pair_atomicity_claimed": false
+  },
+  "pins": {
+    "release_id_at_prepare": "data-85ffcb29fa67c2b08699d1e53425bd8d9a6349039856e6490161507fc91dca99",
+    "release_manifest_sha256": "85ffcb29fa67c2b08699d1e53425bd8d9a6349039856e6490161507fc91dca99",
+    "config_sha256": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a",
+    "preparation_sha256": "9de738dd4cf2c96b7ee7f51b7acf50518c6241e0df005b47714680074676a107",
+    "helper_sha256": "95d536672f0cdd652b1f9062c67051b95ab7e38d365068bef5be02234d4d0105",
+    "manifest_sha256": "4fadc4a29ff2d5f9f081f9a299df1c06c096557969ad64215e15177e81db0bd6",
+    "prepare_sha256": "f6fdea327ae63c0985b455f0577026babc1c03d1a01f9f5489c4edf07fb7ab58",
+    "plan_sha256": "985ed967fd27619b388035d18f2754b8ee4c477753ce98486fadc8971fbefec8",
+    "inspect_sha256": "89d6e8ed7ac925656f58c97f1b0340174f2fd2cdce6546e16ef15d6db711e164",
+    "receipt_sha256": "d4c4e66f293761a1c90c7d3527bc263097d6ffa4a9e79f3a6951397f0fa67e91",
+    "receipt_id": "a61209ea82edbe10e2264347546b735808421130e9b16cd58c2f425d570fd304",
+    "closure_sha256": "79395c1875813c12aa1e821a3b9603d084fc2ad28bebdd556e6c10a4dd14c266",
+    "task_ids_sha256": "60832c756a20d0d3b833e07a7f50d89aa06778c051b5b9945a8c68c57b0f1aa9",
+    "pair_set_sha256": "72c4d5b062d087bc8a498afd49a53c10b411de35d47ba5142c0f47cf14f895f6",
+    "history_inventory_sha256": "f5eb739242dd24b1cbd83c242417dbba497696e458f8966129ca7ef388ef6fcf",
+    "before_graph_sha256": "6f81756dd61fe9de8cc850e30488ac89e9152e6f8ee5e35efc42d2f6586d4546",
+    "after_graph_sha256": "46ed1c3db71354e77706afdc739d996c440bbc54c8ce48efaef72364dbefdace"
+  },
+  "archive": {
+    "authority_path": "validation/index-weight-descendant-batch-20260912/batch-4-*",
+    "artifacts": {
+      "manifest": "4fadc4a29ff2d5f9f081f9a299df1c06c096557969ad64215e15177e81db0bd6",
+      "prepare": "f6fdea327ae63c0985b455f0577026babc1c03d1a01f9f5489c4edf07fb7ab58",
+      "plan": "985ed967fd27619b388035d18f2754b8ee4c477753ce98486fadc8971fbefec8",
+      "inspect": "89d6e8ed7ac925656f58c97f1b0340174f2fd2cdce6546e16ef15d6db711e164",
+      "receipt": "d4c4e66f293761a1c90c7d3527bc263097d6ffa4a9e79f3a6951397f0fa67e91",
+      "closure": "79395c1875813c12aa1e821a3b9603d084fc2ad28bebdd556e6c10a4dd14c266"
+    },
+    "physical": {
+      "references": 900,
+      "bytes": 25757763,
+      "by_kind": {
+        "object": 360,
+        "observation": 360,
+        "parquet": 180
+      },
+      "errors": 0
+    }
+  },
+  "independent_read_only_audit": {
+    "status": "passed_candidate_and_execution_gate",
+    "historical_manifests": 18,
+    "historical_task_overlap": 0,
+    "historical_logical_overlap": 0,
+    "historical_request_overlap": 0,
+    "authority_writes": 0,
+    "credentials_accessed": false,
+    "upstream_calls": 0
+  },
+  "operational_notes": [
+    "Beat stopped first. Normal task 5935776c completed naturally in 257.359 seconds before worker exit; no revoke or kill occurred.",
+    "Read-only candidate audit initially encountered the ordinary writer lock twice, recorded it as non-blocking and succeeded after natural drain.",
+    "The exact batch did not publish or switch CURRENT."
+  ],
+  "services_after_restore": {
+    "worker": "healthy",
+    "document_worker": "healthy",
+    "beat": "starting_then_healthy",
+    "restart_count": 0,
+    "oom": false,
+    "normal_pipeline_resumed": true
+  },
+  "boundary": "The 91 blocked leaves are HTTP-200 single-day saturation cases that cannot be date-split further. This batch does not prove their complete coverage, complete index history, empty-result completeness, revisions, known_at/PIT semantics, fixed-release inclusion, Mac availability or RRG classification.",
+  "credential_hygiene": {
+    "secrets_in_git_or_report": false
+  }
+}

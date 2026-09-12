@@ -1265,3 +1265,6 @@
 
 
 2026-09-12 13:32 CST：正常任务c1970c83以Celery SUCCESS、publish_only、0上游调用，用291.411秒原子发布data-85ffcb29；405242861字节manifest含917489文件/127560数据集并保留observations。fund_share第16批和index_weight第15批合计720任务、166816行、2012个唯一引用/17567369字节在云端逐文件收录、元数据及物理SHA均零错误。空闲的标准Mac LaunchAgent启动第258轮，下载7037个增量文件并完整验证917489项，exit0、stderr空，于13:29:45原子切换；本地同一2012引用再次零错误。空Token、Docker network none并阻断socket/DNS后，fund_share与index_weight各读取3行，上游0，确认两批存量数据不依赖Tushare Pro。worker、文档worker和Beat均healthy、restart0、OOM false；9月11恢复快照继续独立后台传输，本地表观159G且latest仍待全量验证后切换。机器证据为docs/tushare-fixed-release-85ff-share16-weight15-20260912.evidence.json。
+
+
+2026-09-12 13:40 CST：Beat先停，普通任务5935776c用257.359秒自然完成后worker退出，无revoke/kill；独立只读审计重建629个可用完整兄弟对并确认所选180对/360叶与18份历史manifest在task/logical/request三层零重叠。精确窗口50.832秒完成360次HTTP 200、279962行：180 empty、89 split pending、91 blocked；91个blocked全部为单日仍possibly_truncated，已无法按日期继续二分，是覆盖未证明边界而非权限、限流或网络失败。89个可拆叶生成178个pristine子任务。闭包验证900个唯一引用/25757763字节全部SHA通过，六份材料不可覆盖归档。worker、文档worker和Beat恢复且restart0、OOM false；本批等待固定发布与Mac镜像，单日饱和、空结果、完整历史、修订、known_at/PIT语义及RRG分类仍开放。机器证据为docs/tushare-index-weight-descendant-batch4-20260912.evidence.json。
