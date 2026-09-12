@@ -39,6 +39,74 @@ class TechnicalExtraRuntime(unittest.TestCase):
     setUp = fixtures.RiskEventRuntime.setUp
     discovery = fixtures.RiskEventRuntime.discovery
 
+    def test_supplier_empty_hint_stops_retry_without_proving_availability(self):
+        params = {"ts_code": "000003.SZ", "trade_date": "20260903"}
+        key = self.p.enqueue("cyq_chips", params, 10, "history")
+        payload = {
+            "code": 50101,
+            "msg": "指定数据不存在，请确认参数！",
+            "data": None,
+        }
+        calls = []
+
+        def respond(request):
+            calls.append(json.loads(request.content))
+            return httpx.Response(200, json=payload)
+
+        with httpx.Client(
+            transport=httpx.MockTransport(respond), trust_env=False
+        ) as client:
+            first = self.p.run(
+                client, "fixture", {}, max_requests=5, max_seconds=5,
+                pause=0, task_ids=[key],
+            )
+            second = self.p.run(
+                client, "fixture", {}, max_requests=5, max_seconds=5,
+                pause=0, task_ids=[key],
+            )
+        self.assertEqual((first["requests"], second["requests"]), (1, 0))
+        self.assertEqual(len(calls), 1)
+        row = self.p.db.execute("SELECT * FROM jobs WHERE id=?", (key,)).fetchone()
+        self.assertEqual((row["state"], row["tries"]), ("empty", 1))
+        result = json.loads(row["result"])
+        self.assertEqual(result["code"], 50101)
+        self.assertTrue(result["supplier_empty_hint"])
+        self.assertFalse(result["coverage_proven"])
+        self.assertFalse(result["history_complete"])
+        self.assertFalse(result["pit_verified"])
+        self.assertNotIn("parquet", result)
+        self.assertEqual(self.p.rows(result), [])
+        self.assertEqual(
+            self.p.db.execute("SELECT count(*) FROM attempts WHERE job_id=?", (key,)).fetchone()[0],
+            1,
+        )
+        self.assertIsNone(self.p.db.execute(
+            "SELECT * FROM capability WHERE scope='cyq_chips:'"
+        ).fetchone())
+        raw = json.loads((self.root / "objects" / (result["object_sha256"] + ".json")).read_bytes())
+        self.assertEqual(raw, payload)
+        observation = json.loads((self.root / "observations" / result["observation"]).read_bytes())
+        self.assertEqual(observation["assessment"]["code"], 50101)
+        self.assertEqual(observation["request"]["params"], params)
+
+    def test_nearby_supplier_error_keeps_original_retry_semantics(self):
+        key = self.p.enqueue(
+            "cyq_chips", {"ts_code": "000003.SZ", "trade_date": "20260903"},
+            10, "history",
+        )
+        with httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(
+            200, json={"code": 50101, "msg": "指定数据不存在，请确认权限！", "data": None},
+        )), trust_env=False) as client:
+            report = self.p.run(
+                client, "fixture", {}, max_requests=1, max_seconds=5,
+                pause=0, task_ids=[key],
+            )
+        self.assertEqual(report["requests"], 1)
+        row = self.p.db.execute("SELECT * FROM jobs WHERE id=?", (key,)).fetchone()
+        self.assertEqual((row["state"], row["tries"]), ("pending", 1))
+        self.assertEqual(json.loads(row["result"])["status"], "api_error")
+        self.assertNotIn("supplier_empty_hint", json.loads(row["result"]))
+
     def capture(self, api, params, rows=None, more=False, epoch="test", omit=()):
         key = self.p.enqueue(api, params, 10, epoch)
         row = self.p.db.execute("SELECT * FROM jobs WHERE id=?", (key,)).fetchone()

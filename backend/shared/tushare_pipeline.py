@@ -3108,7 +3108,9 @@ class Pipeline:
                 "invalid_values",
                 "possibly_truncated",
                 "empty_unverified",
-            ):
+            ) and not result.get("supplier_empty_hint"):
+                # An explicit supplier no-data error stops duplicate retries,
+                # but its nonzero business code does not prove API availability.
                 self.db.execute(
                     "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
                     (
