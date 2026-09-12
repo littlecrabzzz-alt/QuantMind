@@ -381,6 +381,39 @@ class IndexWeightDescendantBatchTests(unittest.TestCase):
         self.assertEqual(len(scans), 1)
         self.assertIn("EXISTS (SELECT 1 FROM attempts", scans[0])
 
+    def test_live_attempt_overlap_fails_for_another_epoch(self):
+        manifest = self.prepare()
+        selected = manifest["records"][0]
+        pipeline = runner.pipeline_module.Pipeline(
+            self.authority,
+            json.loads((ROOT / "config/tushare-catalog.json").read_bytes()),
+        )
+        try:
+            prior_id = pipeline.enqueue(
+                selected["job"]["api_name"],
+                selected["job"]["params"],
+                priority=selected["priority"],
+                epoch="recent",
+            )
+            prior = pipeline.db.execute(
+                "SELECT logical_key FROM jobs WHERE id=?", (prior_id,)
+            ).fetchone()
+            self.assertEqual(prior["logical_key"], selected["logical_key"])
+            result = json.dumps({"status": "sample_ok"}, sort_keys=True)
+            pipeline.db.execute(
+                "UPDATE jobs SET state='done',tries=1,result=? WHERE id=?",
+                (result, prior_id),
+            )
+            pipeline.db.execute(
+                "INSERT INTO attempts(job_id,attempt,result) VALUES(?,1,?)",
+                (prior_id, result),
+            )
+            pipeline.db.commit()
+            with self.assertRaisesRegex(ValueError, "gained an attempt"):
+                runner._verify_live(pipeline, manifest)
+        finally:
+            pipeline.close()
+
     def test_execute_rejects_every_identity_or_live_drift_before_http(self):
         manifest = self.prepare()
         calls = 0
