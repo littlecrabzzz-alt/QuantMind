@@ -1,0 +1,93 @@
+{
+  "archive": {
+    "authority_path": "validation/index-weight-descendant-batch-20260912/batch-2-*",
+    "artifacts": {
+      "closure": "e4e9bafd0fccf535e88f1304f1a813f232f7eab69fa16c0c00343846b1381767",
+      "inspect": "185fc18abf488053b20c305f46c9d45e173ebbba0765efd44dcf6c3d347e882d",
+      "manifest": "01d730b262110e321bbcafd872884344f87bbca379667021b0b9d5d0219d43dc",
+      "plan": "af310ecea5ed3a267f23532c8e045a6b2453d8f0ab43fb062cc896ad7cdfb117",
+      "prepare": "00512eadc59815eccc18f62801b999d4b39537511b5c2b9ccdce139ca2b0b705",
+      "receipt": "56ac9648e26ecef6fdf1c2811781f435fb1fcf053bc07a2aa811c4567b504341"
+    },
+    "physical_bytes": 26188287,
+    "physical_errors": 0,
+    "references": 900
+  },
+  "batch": {
+    "after_graph": {
+      "edges": 720,
+      "sha256": "d6ba63589a81781bb1e946240a0ec147d8572b3706522323b8eb74daf08ce117",
+      "tasks": 900
+    },
+    "before_graph": {
+      "edges": 360,
+      "sha256": "8caa9b57ed0378ccae8c5f314480f71ae28c8e586b706c5b03a3c15a52913312",
+      "tasks": 540
+    },
+    "elapsed_seconds": 45.865,
+    "http_statuses": {"200": 360},
+    "jobs": 360,
+    "new_grandchildren": 360,
+    "observed_rpm": 470.948,
+    "pairs": 180,
+    "rows": 285105,
+    "states": {"empty": 180, "split_pending": 180},
+    "statuses": {"empty_unverified": 180, "possibly_truncated": 180},
+    "upstream_calls": 360
+  },
+  "boundary": {
+    "coverage_complete_claimed": false,
+    "current_release_switched": false,
+    "release_published": false,
+    "sibling_pair_atomicity_claimed": false,
+    "statement": "This closes the selected leaves and validates their direct grandchildren only. Deeper descendants, complete history, revisions, known_at, PIT semantics and RRG classification remain open."
+  },
+  "credential_hygiene": {"secrets_in_git_or_report": false},
+  "observed_at": "2026-09-12T11:40:00+08:00",
+  "operational_notes": [
+    "The first one-off closure attempt stopped before producing output or writing authority data because its path regex was over-escaped. The corrected read-only rerun passed.",
+    "Worker and Beat were restored through exact docker start after immutable archival."
+  ],
+  "open_issues": [
+    {
+      "next_action": "Wait for the normal publish-only task, then mirror and exact-verify this batch on the Mac fixed release.",
+      "stage": "fixed_release_and_mac_mirror",
+      "status": "pending"
+    },
+    {
+      "next_action": "Allow the existing background recovery snapshot transfer to finish and verify before switching its local latest pointer.",
+      "stage": "full_recovery_snapshot",
+      "status": "in_progress_non_blocking"
+    }
+  ],
+  "performance_change": {
+    "batched_query_production_seconds": 2.982097,
+    "commits": ["e540b05e", "53ba7a9e"],
+    "new_inspect_seconds": 15.901949,
+    "old_inspect_seconds_approx": 557,
+    "reduction_percent": 97.1,
+    "root_cause": "The prior per-leaf attempt check caused 360 scans of the roughly 5.14 million-row jobs table because jobs.logical_key is not a leading index. One batched IN plus EXISTS query preserves the any-epoch exclusion contract.",
+    "targeted_tests_passed": 23
+  },
+  "pins": {
+    "all_parent_ids_sha256": "d7e38779b4bae03be7ef46e38596e340d6ee03fdbd90d8c82b1c0646e1618f3f",
+    "all_task_ids_sha256": "bae076752c2a704c18a9500b8be86d43e29c1c1897146ae23ddbe856c3b1813a",
+    "config_sha256": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a",
+    "helper_sha256": "95d536672f0cdd652b1f9062c67051b95ab7e38d365068bef5be02234d4d0105",
+    "history_inventory_sha256": "255aadaf8879b8ea1f4617b58bf59629e719a4e2359e7817a30506cb43f9d2bf",
+    "manifest_sha256": "01d730b262110e321bbcafd872884344f87bbca379667021b0b9d5d0219d43dc",
+    "pair_set_sha256": "1e5909333d1b98e717fa1035b0b6e47dc836ba5309f79df9ceb1d28f6c7ecb9e",
+    "preparer_sha256": "9de738dd4cf2c96b7ee7f51b7acf50518c6241e0df005b47714680074676a107",
+    "receipt_id": "c32e64eb7cd0a7c9adcf34fa2b1e1c51926b3ecfc7ec63fb8106d16c1381ec2f",
+    "source_release_id": "data-77bb1b4c3c2cff71de2d74ccf0678e8c4b8bd997d54235b4d8c0d13534bbeee8"
+  },
+  "schema_version": 1,
+  "services_after_restore": {
+    "beat": "healthy",
+    "normal_pipeline_resumed": true,
+    "oom": false,
+    "restart_count": 0,
+    "worker": "healthy"
+  },
+  "status": "index_weight_descendant_batch_2_exact_execution_closed_waiting_fixed_release"
+}
