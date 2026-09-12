@@ -118,6 +118,47 @@ class TechnicalExtraRuntime(unittest.TestCase):
         self.assertEqual(json.loads(row["result"])["status"], "api_error")
         self.assertNotIn("supplier_empty_hint", json.loads(row["result"]))
 
+    def test_range_empty_retry_preserves_previous_attempt_and_capability(self):
+        params = {"ts_code": "000522.SZ", "start_date": "20180101", "end_date": "20180131"}
+        key = self.p.enqueue("cyq_chips", params, 10, "history")
+        payload = {"code": 50101, "msg": "指定数据不存在，请确认参数！", "data": None}
+        previous = ("cyq_chips:", "available", "earlier-observation", "sample_ok")
+        self.p.db.execute("INSERT INTO capability VALUES(?,?,?,?)", previous)
+        with httpx.Client(transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, json=payload)
+        ), trust_env=False) as client:
+            # Reproduce a retained attempt from before the range classification fix.
+            with patch("backend.shared.tushare_intake._cyq_chips_supplier_empty", return_value=False):
+                self.p.run(client, "fixture", {}, max_requests=1, max_seconds=5, pause=0, task_ids=[key])
+            old = self.p.db.execute("SELECT * FROM attempts WHERE job_id=?", (key,)).fetchone()
+            old_result = json.loads(old["result"])
+            self.assertEqual(old_result["status"], "api_error")
+            paths = [self.root / "objects" / (old_result["object_sha256"] + ".json"),
+                     self.root / "observations" / old_result["observation"]]
+            old_bytes = [path.read_bytes() for path in paths]
+            retry_at = self.p.db.execute("SELECT retry_after FROM jobs WHERE id=?", (key,)).fetchone()[0]
+            with patch("backend.shared.tushare_pipeline.time.time", return_value=retry_at + 1):
+                second = self.p.run(client, "fixture", {}, max_requests=1, max_seconds=5, pause=0, task_ids=[key])
+                third = self.p.run(client, "fixture", {}, max_requests=1, max_seconds=5, pause=0, task_ids=[key])
+        self.assertEqual((second["requests"], third["requests"]), (1, 0))
+        row = self.p.db.execute("SELECT * FROM jobs WHERE id=?", (key,)).fetchone()
+        self.assertEqual((row["state"], row["tries"]), ("empty", 2))
+        result = json.loads(row["result"])
+        self.assertEqual(result["status"], "empty_unverified")
+        self.assertTrue(result["supplier_empty_hint"])
+        for flag in ("coverage_proven", "history_complete", "pit_verified"):
+            self.assertIs(result[flag], False)
+        self.assertEqual(result["field_coverage"], "unverified_default_or_invalid")
+        self.assertEqual([path.read_bytes() for path in paths], old_bytes)
+        attempts = self.p.db.execute("SELECT * FROM attempts WHERE job_id=? ORDER BY attempt", (key,)).fetchall()
+        self.assertEqual(len(attempts), 2)
+        self.assertEqual(tuple(attempts[0]), tuple(old))
+        self.assertEqual(tuple(self.p.db.execute("SELECT * FROM capability WHERE scope='cyq_chips:'").fetchone()), previous)
+        observation = json.loads((self.root / "observations" / result["observation"]).read_bytes())
+        self.assertEqual(observation["request"]["params"], params)
+        self.assertEqual(observation["assessment"]["code"], 50101)
+        self.assertEqual(json.loads((self.root / "objects" / (result["object_sha256"] + ".json")).read_bytes()), payload)
+
     def capture(self, api, params, rows=None, more=False, epoch="test", omit=()):
         key = self.p.enqueue(api, params, 10, epoch)
         row = self.p.db.execute("SELECT * FROM jobs WHERE id=?", (key,)).fetchone()
