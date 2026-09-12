@@ -171,10 +171,18 @@ class IntakeAcceptance(unittest.TestCase):
                 return capture_sample(client, "synthetic-test-token", job, root), root
 
         with tempfile.TemporaryDirectory() as directory:
-            for code in ("600001.SH", "T600001.SH", "830001.BJ"):
-                result, root = capture(
-                    params={"ts_code": code, "trade_date": "20240229"}
-                )
+            valid_params = (
+                {"ts_code": "600001.SH", "trade_date": "20240229"},
+                {"ts_code": "T600001.SH", "trade_date": "20240229"},
+                {"ts_code": "830001.BJ", "trade_date": "20240229"},
+                {
+                    "ts_code": "600001.SH",
+                    "start_date": "20240201",
+                    "end_date": "20240229",
+                },
+            )
+            for params in valid_params:
+                result, root = capture(params=params)
                 self.assertEqual(result["status"], "empty_unverified")
                 self.assertEqual(result["code"], 50101)
                 self.assertEqual(result["row_count"], 0)
@@ -203,16 +211,22 @@ class IntakeAcceptance(unittest.TestCase):
                 ("real rows", "cyq_chips", None, {**empty, "data": {"fields": ["ts_code"], "items": [["600001.SH"]]}}, 200, "api_error"),
                 ("permission", "cyq_chips", None, {"code": 2002, "msg": "无权限", "data": None}, 200, "permission_denied"),
                 ("missing date", "cyq_chips", {"ts_code": "600001.SH"}, empty, 200, "api_error"),
-                ("range shape", "cyq_chips", {"ts_code": "600001.SH", "start_date": "20260904", "end_date": "20260904"}, empty, 200, "api_error"),
+                ("range start only", "cyq_chips", {"ts_code": "600001.SH", "start_date": "20260904"}, empty, 200, "api_error"),
+                ("range end only", "cyq_chips", {"ts_code": "600001.SH", "end_date": "20260904"}, empty, 200, "api_error"),
+                ("reversed range", "cyq_chips", {"ts_code": "600001.SH", "start_date": "20260905", "end_date": "20260904"}, empty, 200, "api_error"),
+                ("mixed date axes", "cyq_chips", {"ts_code": "600001.SH", "trade_date": "20260904", "start_date": "20260904", "end_date": "20260904"}, empty, 200, "api_error"),
                 ("bad code", "cyq_chips", {"ts_code": "SH600001", "trade_date": "20260904"}, empty, 200, "api_error"),
                 ("non-string code", "cyq_chips", {"ts_code": 600001, "trade_date": "20260904"}, empty, 200, "api_error"),
                 ("bad date", "cyq_chips", {"ts_code": "600001.SH", "trade_date": "20260229"}, empty, 200, "api_error"),
+                ("bad range start", "cyq_chips", {"ts_code": "600001.SH", "start_date": "20260229", "end_date": "20260301"}, empty, 200, "api_error"),
+                ("bad range end", "cyq_chips", {"ts_code": "600001.SH", "start_date": "20260201", "end_date": "20260229"}, empty, 200, "api_error"),
                 ("short date", "cyq_chips", {"ts_code": "600001.SH", "trade_date": "202611"}, empty, 200, "api_error"),
                 ("numeric date", "cyq_chips", {"ts_code": "600001.SH", "trade_date": 20260904}, empty, 200, "api_error"),
                 ("string code", "cyq_chips", None, {**empty, "code": "50101"}, 200, "api_error"),
                 ("boolean code", "cyq_chips", None, {**empty, "code": True}, 200, "api_error"),
                 ("data dict", "cyq_chips", None, {**empty, "data": {}}, 200, "api_error"),
                 ("extra param", "cyq_chips", {"ts_code": "600001.SH", "trade_date": "20260904", "unknown": "value"}, empty, 200, "api_error"),
+                ("range extra param", "cyq_chips", {"ts_code": "600001.SH", "start_date": "20260901", "end_date": "20260904", "unknown": "value"}, empty, 200, "api_error"),
             )
             for name, api, params, payload, status, expected in negative_cases:
                 with self.subTest(name=name):

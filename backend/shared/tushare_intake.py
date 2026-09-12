@@ -261,20 +261,28 @@ def _cyq_chips_supplier_empty(job, payload):
     ):
         return False
     params = job.get("params")
-    if not isinstance(params, dict) or set(params) != {"ts_code", "trade_date"}:
+    if not isinstance(params, dict):
+        return False
+    keys = set(params)
+    if keys == {"ts_code", "trade_date"}:
+        date_values = (params["trade_date"],)
+    elif keys == {"ts_code", "start_date", "end_date"}:
+        date_values = (params["start_date"], params["end_date"])
+    else:
         return False
     if not isinstance(params["ts_code"], str) or not re.fullmatch(
         r"T?[0-9]{6}\.(?:SH|SZ|BJ)", params["ts_code"]
     ):
         return False
-    trade_date = params["trade_date"]
-    if not isinstance(trade_date, str) or not re.fullmatch(r"[0-9]{8}", trade_date):
-        return False
-    try:
-        datetime.strptime(trade_date, "%Y%m%d")
-    except (TypeError, ValueError):
-        return False
-    return True
+    parsed_dates = []
+    for value in date_values:
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9]{8}", value):
+            return False
+        try:
+            parsed_dates.append(datetime.strptime(value, "%Y%m%d"))
+        except (TypeError, ValueError):
+            return False
+    return len(parsed_dates) == 1 or parsed_dates[0] <= parsed_dates[1]
 
 
 def validate_request_shape(job):
