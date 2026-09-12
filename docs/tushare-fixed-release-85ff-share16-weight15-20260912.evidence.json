@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "status": "fixed_release_85ff_fund_share16_index_weight15_mac_offline_accepted",
+  "observed_at": "2026-09-12T13:32:00+08:00",
+  "publication": {
+    "task_id": "c1970c83-e3df-4d4f-ba6a-3f4480ac515a",
+    "celery_status": "SUCCESS",
+    "elapsed_seconds": 291.41137737594545,
+    "mode": "publish_only",
+    "status": "published",
+    "performed": true,
+    "requests": 0,
+    "upstream_calls": 0
+  },
+  "release": {
+    "release_id": "data-85ffcb29fa67c2b08699d1e53425bd8d9a6349039856e6490161507fc91dca99",
+    "manifest_sha256": "85ffcb29fa67c2b08699d1e53425bd8d9a6349039856e6490161507fc91dca99",
+    "manifest_bytes": 405242861,
+    "files": 917489,
+    "datasets": 127560,
+    "retained_observations_included": true
+  },
+  "exact_round": {
+    "jobs": 720,
+    "rows": 166816,
+    "references": 2012,
+    "physical_bytes": 17567369,
+    "inventory_sha256": "3f37ee5c2761bda4e9caf4f50d2d11bfc7c28821e3eaae206422bc111fcae16f",
+    "references_by_kind": {
+      "object": 720,
+      "observation": 720,
+      "parquet": 572
+    },
+    "batches": [
+      {
+        "name": "fund_share_batch_16",
+        "jobs": 360,
+        "rows": 59951,
+        "states": {
+          "done": 251,
+          "empty": 109
+        },
+        "references": 971,
+        "physical_bytes": 6092611
+      },
+      {
+        "name": "index_weight_batch_15",
+        "jobs": 360,
+        "rows": 106865,
+        "states": {
+          "done": 288,
+          "empty": 39,
+          "split_pending": 33
+        },
+        "references": 1041,
+        "physical_bytes": 11474758
+      }
+    ]
+  },
+  "cloud_verification": {
+    "status": "passed",
+    "missing_from_manifest": 0,
+    "manifest_metadata_errors": 0,
+    "physical_errors": 0,
+    "verified_references": 2012,
+    "verified_bytes": 17567369,
+    "report_sha256": "94e48c425ee5d260ecdb53081efaff6464519cc0cff95b78a30ea4f88ae1c090"
+  },
+  "mac_mirror": {
+    "launchagent_run": 258,
+    "trigger": "idle standard LaunchAgent kickstart after publication",
+    "exit_code": 0,
+    "stderr_empty": true,
+    "switched_at": "2026-09-12T13:29:45+08:00",
+    "downloaded_files": 7037,
+    "files": 917489,
+    "release_id": "data-85ffcb29fa67c2b08699d1e53425bd8d9a6349039856e6490161507fc91dca99"
+  },
+  "mac_verification": {
+    "status": "passed",
+    "missing_from_manifest": 0,
+    "manifest_metadata_errors": 0,
+    "physical_errors": 0,
+    "verified_references": 2012,
+    "verified_bytes": 17567369,
+    "report_sha256": "94e48c425ee5d260ecdb53081efaff6464519cc0cff95b78a30ea4f88ae1c090"
+  },
+  "offline_read": {
+    "status": "offline_fixed_release_reads_passed",
+    "network_guards": [
+      "docker_network_none",
+      "socket.connect",
+      "socket.create_connection",
+      "socket.getaddrinfo"
+    ],
+    "token_variables_empty": true,
+    "upstream_calls": 0,
+    "reads": [
+      {
+        "api_name": "fund_share",
+        "rows": 3,
+        "columns": 9
+      },
+      {
+        "api_name": "index_weight",
+        "rows": 3,
+        "columns": 11
+      }
+    ],
+    "report_sha256": "5df73215111690aed6f408ba50ceeaea55bebb709fcf0a8d172259e4f2f5593b"
+  },
+  "archive": {
+    "path": "validation/fixed-release-20260912/85ff-fund-share16-index-weight15-*",
+    "artifacts": {
+      "inventory": "3f37ee5c2761bda4e9caf4f50d2d11bfc7c28821e3eaae206422bc111fcae16f",
+      "cloud_verify": "94e48c425ee5d260ecdb53081efaff6464519cc0cff95b78a30ea4f88ae1c090",
+      "mac_verify": "94e48c425ee5d260ecdb53081efaff6464519cc0cff95b78a30ea4f88ae1c090",
+      "offline_read": "5df73215111690aed6f408ba50ceeaea55bebb709fcf0a8d172259e4f2f5593b"
+    }
+  },
+  "services": {
+    "worker": "healthy",
+    "document_worker": "healthy",
+    "beat": "healthy",
+    "restart_count": 0,
+    "oom": false,
+    "normal_pipeline_continuing": true,
+    "cloud_available_bytes": 336071196672
+  },
+  "parallel_recovery_snapshot": {
+    "snapshot_id": "snapshot-20260911T230002081103Z",
+    "process_active": true,
+    "local_apparent_size": "159G",
+    "local_latest_switched": false,
+    "status": "background_transfer_in_progress"
+  },
+  "non_blocking_events": [
+    {
+      "stage": "post_publish_queue",
+      "status": "expected_stale_messages_discarded",
+      "detail": "Persistent revoked/expired continuation envelopes were discarded by Celery; fresh ordinary tasks completed normally and the pipeline continued."
+    }
+  ],
+  "boundary": "This closes fixed-release and Mac-local availability for fund_share batch 16 and index_weight batch 15. It does not claim complete history, empty-result confirmation, split-descendant closure, revisions, known_at/PIT semantics or RRG classification.",
+  "credential_hygiene": {
+    "secrets_in_git_or_report": false,
+    "token_variables_empty_during_offline_read": true
+  }
+}
