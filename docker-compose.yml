@@ -4,6 +4,26 @@
 name: quantmind
 
 services:
+  research-agent:
+    profiles: [research-agent]
+    image: quantmind-research-agent:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.research-agent
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-quantmind}
+      DB_USER: ${DB_USER:-quantmind}
+      DB_PASSWORD: ${DB_PASSWORD:-quantmind2026}
+      INTERNAL_CALL_SECRET: ${INTERNAL_CALL_SECRET:-changeme-internal-secret}
+      RESEARCH_ENGINE_URL: http://quantmind:8001
+      LANGSMITH_TRACING: "false"
+      LANGCHAIN_TRACING_V2: "false"
+    networks: [quantmind-net]
+    mem_limit: 1536m
+    cpus: 1.0
+    restart: unless-stopped
   # 1. 数据库 (PostgreSQL)
   db:
     # 使用官方标签；部署脚本配置的 Docker registry mirror 负责国内加速。

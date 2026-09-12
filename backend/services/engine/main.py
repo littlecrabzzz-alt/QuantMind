@@ -273,6 +273,7 @@ async def auth_middleware(request: Request, call_next):
             "/api/v1/alpha-agent/",
             "/api/v1/pipeline/",
             "/api/v1/research-runs",
+            "/api/v1/research-agent",
             "/api/v1/tushare-data",
             "/api/v1/admin/",
         )
@@ -429,6 +430,8 @@ except ImportError as e:
 try:
     from backend.services.engine.routers.research_runs import router as research_runs_router
     app.include_router(research_runs_router)
+    from backend.services.engine.routers.research_agent import router as research_agent_router
+    app.include_router(research_agent_router)
 except ImportError as e:
     logger.error(f"Failed to load research workbench: {e}")
 

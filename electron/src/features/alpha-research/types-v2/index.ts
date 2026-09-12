@@ -180,6 +180,7 @@ export interface LogEntry {
 
 // Factor information
 export interface Factor {
+  metadata?: Record<string, any>;
   factorId: string;
   factorName: string;
   factorExpression: string;

@@ -2,7 +2,9 @@
  * 回测历史模块（适配新布局）
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { backtestService } from '../../services/backtestService';
 import { AnimatePresence, motion } from 'framer-motion';
 import ReactECharts from 'echarts-for-react';
 import {
@@ -28,9 +30,21 @@ export const BacktestHistoryModule: React.FC = () => {
   const resolvedUserId = storedUser?.id ?? storedUser?.user_id;
   const userId = normalizeUserId(resolvedUserId || backtestConfig.user_id || 'default');
   const [selectedBacktest, setSelectedBacktest] = useState<BacktestResult | null>(null);
+  const location = useLocation();
+  const [openError, setOpenError] = useState('');
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('backtest');
+    if (!id) return;
+    let cancelled = false;
+    void backtestService.getResult(id).then(result => { if (!cancelled) setSelectedBacktest(result); })
+      .catch(() => { if (!cancelled) setOpenError('无法打开该回测，请确认当前账户和节点。'); });
+    return () => { cancelled = true; };
+  }, [location.search, userId]);
 
   return (
     <div className="h-full p-4">
+      {openError && <p role="alert">{openError}</p>}
+      {new URLSearchParams(location.search).get('research') && <a className="text-primary text-sm block mb-3" href={`#/alpha-research?research=${encodeURIComponent(new URLSearchParams(location.search).get('research')!)}`}>返回来源研究课题</a>}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -69,7 +83,7 @@ const BacktestDetailModal: React.FC<BacktestDetailModalProps> = ({
   onClose,
 }) => {
   const config = (backtest as BacktestResult & { config?: Record<string, unknown> }).config || {};
-  const strategyName = resolveStrategyName(backtest);
+  const strategyName = String(config.research_title || resolveStrategyName(backtest));
   const detailStartDate = String(backtest.start_date || config.start_date || '-');
   const detailEndDate = String(backtest.end_date || config.end_date || '-');
 
@@ -98,13 +112,13 @@ const BacktestDetailModal: React.FC<BacktestDetailModalProps> = ({
     },
     {
       label: '年化收益',
-      value: `${((backtest.annual_return || 0) * 100).toFixed(2)}%`,
+      value: backtest.annual_return == null ? '未计算' : `${(backtest.annual_return * 100).toFixed(2)}%`,
       icon: Activity,
       color: (backtest.annual_return || 0) >= 0 ? 'text-red-600' : 'text-green-600',
     },
     {
       label: '夏普比率',
-      value: (backtest.sharpe_ratio || 0).toFixed(2),
+      value: backtest.sharpe_ratio == null ? '未计算' : backtest.sharpe_ratio.toFixed(2),
       icon: Shield,
       color: 'text-orange-600',
     },
@@ -116,13 +130,13 @@ const BacktestDetailModal: React.FC<BacktestDetailModalProps> = ({
     },
     {
       label: '胜率',
-      value: `${((backtest.win_rate || 0) * 100).toFixed(2)}%`,
+      value: backtest.win_rate == null ? '未计算' : `${(backtest.win_rate * 100).toFixed(2)}%`,
       icon: Target,
       color: 'text-red-600',
     },
     {
       label: '盈亏比',
-      value: (backtest.profit_factor || 0).toFixed(2),
+      value: backtest.profit_factor == null ? '未计算' : backtest.profit_factor.toFixed(2),
       icon: DollarSign,
       color: 'text-gray-600',
     },

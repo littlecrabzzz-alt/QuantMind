@@ -44,10 +44,10 @@ export interface ResearchRun {
 
 const base = '/research-runs';
 // Pin each request to its authenticated connection; reject late results after a switch.
-async function request(path: string, node?: string, config: AxiosRequestConfig = {}) {
+export async function request(path: string, node?: string, config: AxiosRequestConfig = {}, root = base) {
   const endpoint = String(SERVICE_ENDPOINTS.AI_STRATEGY).replace(/\/+$/, '');
   const token = authService.getAccessToken();
-  const response = await axios.request({ ...config, url: `${endpoint}${base}${path}`, timeout: 30000,
+  const response = await axios.request({ ...config, url: `${endpoint}${root}${path}`, timeout: 45000,
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(node ? { 'X-Research-Node': node } : {}) } });
   if (endpoint !== String(SERVICE_ENDPOINTS.AI_STRATEGY).replace(/\/+$/, '') || token !== authService.getAccessToken()) {

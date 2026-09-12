@@ -5,6 +5,7 @@ import ReactECharts from 'echarts-for-react';
 import { Layout, type PageId } from '../components-v2/layout/Layout';
 import { researchRuns, type ResearchCapabilities, type ResearchExperiment, type ResearchRun } from '../services-v2/researchRuns';
 import ResearchDiscussion from './ResearchDiscussion';
+import AgentWorkspace from './AgentWorkspace';
 import { SERVICE_ENDPOINTS } from '../../../config/services';
 
 const { Text, Paragraph } = Typography;
@@ -133,6 +134,8 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
       data: s.values.map(v => [v.date, v.nav]) })) || [] };
   const experiments = selected?.experiments || [];
   return <Layout currentPage="home" onNavigate={onNavigate}>
+    <AgentWorkspace />
+    <details className="mt-8"><summary className="cursor-pointer text-sm text-muted-foreground">旧版固定实验记录与计划</summary>
     <div className="space-y-5 select-text" data-testid="research-workbench">
       <div className="flex flex-wrap justify-between items-start gap-3">
         <div><h2 className="text-2xl font-semibold mb-1">研究工作台</h2><Text type="secondary">先讨论研究什么、怎么验证；看过计划后，再决定是否执行。</Text></div>
@@ -200,5 +203,6 @@ export default function ResearchWorkbench({ onNavigate }: { onNavigate: (page: P
         </div>
       </Card>}
     </div>
+    </details>
   </Layout>;
 }

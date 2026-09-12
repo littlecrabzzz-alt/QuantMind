@@ -208,7 +208,8 @@ class BacktestPersistence:
                     "task_id": task_id,
                 },
             )
-            await self._prune_user_history(session, user_id, tenant_id)
+            if not (config or {}).get("research_id"):
+                await self._prune_user_history(session, user_id, tenant_id)
         if has_local_payload and backup_status == "pending":
             self._trigger_cos_backup(
                 backtest_id=backtest_id,
@@ -868,6 +869,7 @@ class BacktestPersistence:
                         ) AS rn
                     FROM qlib_backtest_runs
                     WHERE user_id = :user_id AND tenant_id = :tenant_id
+                      AND COALESCE(config_json->>'research_id', '') = ''
                 )
                 SELECT backtest_id, result_file_path
                 FROM ranked

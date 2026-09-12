@@ -2,6 +2,18 @@
 name: quantmind-dev
 
 services:
+  research-agent:
+    container_name: quantmind-dev-research-agent
+    environment:
+      QM_NODE_ROLE: sandbox
+      HOST_RUNTIME_PATH: ${QM_LOCAL_STATE}
+    volumes:
+      - ${QM_LOCAL_STATE}/data:/data
+      - ./backend/services/research_agent:/app/backend/services/research_agent:ro
+      - ./scripts/research_workbench_v2.sql:/app/scripts/research_workbench_v2.sql:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.config/quantmind/glm-research-api.json:/run/secrets/research-llm.json:ro
+    restart: "no"
   db:
     container_name: quantmind-dev-db
     ports: !reset []

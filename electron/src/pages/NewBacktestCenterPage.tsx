@@ -8,6 +8,7 @@
  */
 
 import React, { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BacktestSidebar } from '../components/backtestCenter/BacktestSidebar';
 import { QlibQuickBacktest } from '../components/backtest/QlibQuickBacktest';
@@ -24,6 +25,7 @@ import { PAGE_LAYOUT } from '../config/pageLayout';
 // 固定尺寸常量已移除，改为自适应布局
 
 export const NewBacktestCenterPage: React.FC = () => {
+  const location = useLocation();
   const { activeModule, setActiveModule } = useBacktestCenterStore();
   // 组件挂载时，仅在 activeModule 为空或无效时重置为默认模块
   useEffect(() => {
@@ -36,6 +38,9 @@ export const NewBacktestCenterPage: React.FC = () => {
     }
   }, [activeModule, setActiveModule]);
 
+  useEffect(() => {
+    if (new URLSearchParams(location.search).has('backtest')) setActiveModule('backtest-history');
+  }, [location.search, setActiveModule]);
   // 渲染对应模块内容
   const renderModuleContent = () => {
     switch (activeModule) {
