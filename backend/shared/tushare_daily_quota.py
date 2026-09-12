@@ -157,6 +157,8 @@ def status(root, config, *, now=None):
             )
     except (sqlite3.Error, OSError, ValueError) as exc:
         for result in per_api.values():
+            result["used"] = None
+            result.pop("remaining", None)
             result.update(
                 status="quota_ledger_unavailable", error_type=type(exc).__name__
             )

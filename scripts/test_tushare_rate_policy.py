@@ -535,6 +535,30 @@ class DurableQuota(unittest.TestCase):
         self.assertEqual(summary["used"], 1)
         self.assertEqual(summary["remaining"], 199999)
 
+    def test_status_corrupt_api_fails_closed_without_stale_balance(self):
+        path = self.root / "daily-quota.sqlite"
+        db = sqlite3.connect(path)
+        db.execute(
+            "CREATE TABLE daily_quota (api TEXT NOT NULL,day TEXT NOT NULL,used INTEGER NOT NULL,PRIMARY KEY(api,day))"
+        )
+        db.execute("CREATE TABLE activation (api TEXT PRIMARY KEY,day TEXT NOT NULL)")
+        db.executemany(
+            "INSERT INTO activation VALUES(?,?)",
+            [(api, "2026-09-08") for api in quota.DAILY_QUOTA_APIS],
+        )
+        db.executemany(
+            "INSERT INTO daily_quota VALUES(?,?,?)",
+            [("cyq_perf", "2026-09-09", 7), ("cyq_chips", "2026-09-09", -1)],
+        )
+        db.commit()
+        db.close()
+
+        report = quota.status(self.root, CONFIG, now=self.day)
+        for row in [report, *report["apis"].values()]:
+            self.assertEqual(row["status"], "quota_ledger_unavailable")
+            self.assertIsNone(row["used"])
+            self.assertNotIn("remaining", row)
+
     def test_quota_database_is_not_in_published_files(self):
         self.reserve()
         pipeline = pmod.Pipeline(self.root, {"entries": []})
