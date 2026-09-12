@@ -165,7 +165,10 @@ async def factor(ident: str, request: Request):
 
 @router.post("/api/v1/research-agent-tools/{ident}/strategy")
 async def strategy(ident: str, request: Request):
-    from backend.shared.strategy_storage import get_strategy_storage_service
+    from backend.shared.strategy_storage import (
+        get_strategy_storage_service,
+        _ensure_int_user_id,
+    )
 
     s, cfg, user, tenant = await owned_case(request, ident, True)
     if "register_strategy" not in s["approval"].get("allowed_tools", []):
@@ -189,6 +192,7 @@ async def strategy(ident: str, request: Request):
         "snapshot_id": cfg["snapshot_id"],
         "validation_status": "unvalidated_candidate",
     }
+    storage_user_id = await asyncio.to_thread(_ensure_int_user_id, user)
     async with get_session() as db:
         await db.execute(
             text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"),
@@ -198,7 +202,7 @@ async def strategy(ident: str, request: Request):
             await db.execute(
                 text("""SELECT id FROM strategies WHERE user_id=:user
             AND config->>'research_id'=:research AND config->>'code_sha256'=:sha"""),
-                {"user": int(user), "research": ident, "sha": data["sha256"]},
+                {"user": storage_user_id, "research": ident, "sha": data["sha256"]},
             )
         ).scalar()
         if existing is None:
