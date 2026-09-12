@@ -45,16 +45,41 @@ def audit(registered, manifest, release_id):
             continue
         coverage.setdefault(row["api_name"], {})[row.get("state")] = row.get("partitions")
     capabilities = _direct_capabilities(manifest)
+    gap_assessments = {}
+    for item in manifest.get("gaps", []):
+        if not isinstance(item, dict) or not item.get("api_name"):
+            continue
+        assessment = item.get("assessment")
+        if assessment:
+            gap_assessments.setdefault(item["api_name"], Counter())[assessment] += 1
+
+    def evidence_classification(api):
+        api_capabilities = capabilities.get(api, [])
+        api_gaps = gap_assessments.get(api, Counter())
+        if (any(item.get("status") == "permission_denied" for item in api_capabilities)
+                or api_gaps.get("permission_denied")):
+            return "permission_denied"
+        if api_gaps.get("api_error"):
+            return "api_error"
+        if (coverage.get(api, {}).get("empty")
+                and any(item.get("status") == "available" for item in api_capabilities)):
+            return "available_empty_only"
+        return "unclassified"
 
     def row(api):
         return {
             "api_name": api,
             "coverage": dict(sorted(coverage.get(api, {}).items())),
             "capabilities": capabilities.get(api, []),
+            "gap_assessments": dict(sorted(gap_assessments.get(api, {}).items())),
+            "evidence_classification": evidence_classification(api),
         }
 
+    missing_dataset_apis = sorted((registered & planned) - set(datasets))
+    missing_dataset_evidence = Counter(evidence_classification(api) for api in missing_dataset_apis)
+
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "release_id": release_id,
         "manifest_file_count": len(manifest.get("files", {})),
         "counts": {
@@ -64,9 +89,10 @@ def audit(registered, manifest, release_id):
             "registered_with_published_dataset": len(registered & set(datasets)),
             "published_dataset_apis": len(datasets),
         },
+        "missing_dataset_evidence_counts": dict(sorted(missing_dataset_evidence.items())),
         "registered_not_planned": [row(api) for api in sorted(registered - planned)],
         "registered_planned_without_published_dataset": [
-            row(api) for api in sorted((registered & planned) - set(datasets))
+            row(api) for api in missing_dataset_apis
         ],
         "published_dataset_counts": {
             api: datasets[api] for api in sorted(registered & set(datasets))
@@ -78,6 +104,7 @@ def audit(registered, manifest, release_id):
             "Registration, planning and a published dataset are separate states.",
             "A published dataset does not prove complete history, fields, revisions, attachments or point-in-time validity.",
             "An empty or blocked partition can legitimately have no published dataset and remains explicit in coverage.",
+            "Gap assessments are retained outcomes. An api_error is distinct from permission denial and requires its raw observation to identify the supplier reason.",
             "A registered but unplanned API may be intentionally disabled pending permission or runtime validation.",
         ],
     }
@@ -104,8 +131,11 @@ def main():
     output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps({
         "release_id": release_id,
-        "counts": result["counts"],
-        "registered_not_planned": len(result["registered_not_planned"]),
+                "counts": result["counts"],
+                "missing_dataset_evidence_counts": result[
+                    "missing_dataset_evidence_counts"
+                ],
+                "registered_not_planned": len(result["registered_not_planned"]),
         "registered_planned_without_published_dataset": len(
             result["registered_planned_without_published_dataset"]
         ),

@@ -1358,3 +1358,10 @@ Mac定时客户端264从空闲手动kickstart（不带-k、不打断传输），
 只读准备审计确认历史批次1至20共6900个任务，task identity、logical key和request signature三层历史集合均无内部重叠，且该通道历史未混入`.CFX/.SI/.SW`。预备器发现共享pipeline writer lock忙，30秒后只重试一次仍忙，随后退出；没有生成候选manifest、读取凭据、调用上游、写authority/config、操作服务或Git。磁盘当时可用329997246464字节，较100 GiB保留线多222623064064字节，容量不是阻塞原因。
 
 因此第21批尚未准入，也不声称已证明360个pristine任务或plan-only五项全false。待共享锁自然空闲后，继续使用现有prepare/run入口，先做具体候选的后缀排除、三层零重叠、pending/tries0与plan-only验收；该调度锁仅作为非阻塞运维记录，不解释为Tushare权限或数据覆盖结论。记录：`coordination/tushare-data/20260912T091645Z-index-daily21-headroom-audit.md`。
+
+
+## 2026-09-12 df2d无数据集接口证据分类修正
+
+固定版覆盖审计器现同时读取manifest的API级capability和retained gap assessment，仍完全离线、只读且不访问authority。50个已注册/已规划但没有发布数据集的接口准确分为：37个已有permission_denied证据、11个已有api_error证据、2个可调用但只有空响应；unclassified为0。此前34/14/2只按direct capability分组，把3个gap内拒权和11个API错误笼统放入“无直接capability”，是报表口径问题，不是原始响应丢失。
+
+既有raw复审已确认11个api_error均为供应商40101接口名拒绝；固定manifest未嵌消息文本，因此机器报表保持诚实的api_error粒度。`stk_alert`有4个空观察，`stk_high_shock`有2个，均不构成数据集、完整历史、事件不存在、修订或PIT证据。当前48个拒权/API错误接口不重复探测；`stk_alert`至多保留一次新的窄范围过滤语义探针，`stk_high_shock`须先获得新的权威非空日期/代码。v2报告SHA为bf20745992cfa78c426aa400032ae37f54f3f199596d259b91ac6a63d5c4d3b9，记录：`coordination/tushare-data/20260912T092136Z-df2d-coverage-evidence-classification.md`。

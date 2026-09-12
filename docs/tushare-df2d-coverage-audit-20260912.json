@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "release_id": "data-df2dceada681d30b2d4c24c7df5877452c5d27f2479557b493378d7f4ec3f7ff",
   "manifest_file_count": 969815,
   "counts": {
@@ -9,16 +9,25 @@
     "registered_with_published_dataset": 194,
     "published_dataset_apis": 194
   },
+  "missing_dataset_evidence_counts": {
+    "api_error": 11,
+    "available_empty_only": 2,
+    "permission_denied": 37
+  },
   "registered_not_planned": [
     {
       "api_name": "p_get",
       "coverage": {},
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {},
+      "evidence_classification": "unclassified"
     },
     {
       "api_name": "p_list",
       "coverage": {},
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {},
+      "evidence_classification": "unclassified"
     }
   ],
   "registered_planned_without_published_dataset": [
@@ -27,28 +36,44 @@
       "coverage": {
         "blocked": 1
       },
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {
+        "api_error": 1
+      },
+      "evidence_classification": "api_error"
     },
     {
       "api_name": "bo_daily",
       "coverage": {
         "blocked": 1
       },
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {
+        "api_error": 1
+      },
+      "evidence_classification": "api_error"
     },
     {
       "api_name": "bo_monthly",
       "coverage": {
         "blocked": 1
       },
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {
+        "api_error": 1
+      },
+      "evidence_classification": "api_error"
     },
     {
       "api_name": "bo_weekly",
       "coverage": {
         "blocked": 1
       },
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {
+        "api_error": 1
+      },
+      "evidence_classification": "api_error"
     },
     {
       "api_name": "cb_price_chg",
@@ -61,7 +86,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-08T17:27:06.134946+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "etf_mins",
@@ -73,7 +102,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T07:00:15.790101+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "factor_list",
@@ -85,14 +118,22 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T05:51:06.913240+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "film_record",
       "coverage": {
         "blocked": 1
       },
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {
+        "api_error": 1
+      },
+      "evidence_classification": "api_error"
     },
     {
       "api_name": "ft_mins",
@@ -104,21 +145,33 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T07:00:16.512477+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "fund_sales_ratio",
       "coverage": {
         "blocked": 1
       },
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {
+        "api_error": 1
+      },
+      "evidence_classification": "api_error"
     },
     {
       "api_name": "fund_sales_vol",
       "coverage": {
         "blocked": 1
       },
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {
+        "api_error": 1
+      },
+      "evidence_classification": "api_error"
     },
     {
       "api_name": "hk_adjfactor",
@@ -130,7 +183,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-08T18:37:50.120376+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "hk_balancesheet",
@@ -142,7 +199,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T02:55:58.681455+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "hk_cashflow",
@@ -154,7 +215,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T02:55:58.927560+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "hk_daily_adj",
@@ -166,7 +231,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-08T18:37:49.871183+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "hk_fina_indicator",
@@ -178,7 +247,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T02:55:59.770591+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "hk_income",
@@ -190,7 +263,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T02:55:58.547269+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "hk_mins",
@@ -202,7 +279,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T07:00:17.017170+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "idx_mins",
@@ -214,7 +295,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T07:00:16.028198+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "opt_mins",
@@ -226,7 +311,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T07:00:16.762808+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "rt_etf_k",
@@ -238,7 +327,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-10T03:25:07.876152+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "rt_etf_min",
@@ -250,7 +343,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-10T07:24:15.300187+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "rt_etf_min_daily",
@@ -262,7 +359,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-10T07:24:15.420273+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "rt_etf_sz_iopv",
@@ -274,7 +375,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-10T03:25:06.820825+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "rt_fut_min",
@@ -286,7 +391,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-10T03:25:07.300422+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "rt_fut_min_daily",
@@ -298,7 +407,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-10T03:25:08.383449+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "rt_idx_k",
@@ -310,7 +423,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-10T03:25:06.940624+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "rt_idx_min",
@@ -322,7 +439,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-10T03:25:07.058934+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "rt_idx_min_daily",
@@ -334,7 +455,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-10T03:25:08.337063+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "rt_k",
@@ -346,7 +471,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-10T03:25:07.829372+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "rt_sw_k",
@@ -358,14 +487,22 @@
           "status": "permission_denied",
           "checked_at": "2026-09-10T03:25:07.193794+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "stk_account_old",
       "coverage": {
         "blocked": 1
       },
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {
+        "api_error": 1
+      },
+      "evidence_classification": "api_error"
     },
     {
       "api_name": "stk_alert",
@@ -377,7 +514,11 @@
           "status": "available",
           "checked_at": "2026-09-12T07:39:56.401071+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "empty_unverified": 4
+      },
+      "evidence_classification": "available_empty_only"
     },
     {
       "api_name": "stk_auction",
@@ -389,21 +530,33 @@
           "status": "permission_denied",
           "checked_at": "2026-09-10T03:25:06.767493+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "stk_auction_c",
       "coverage": {
         "blocked": 1
       },
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "stk_auction_o",
       "coverage": {
         "blocked": 1
       },
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "stk_high_shock",
@@ -415,14 +568,22 @@
           "status": "available",
           "checked_at": "2026-09-12T07:39:56.457178+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "empty_unverified": 2
+      },
+      "evidence_classification": "available_empty_only"
     },
     {
       "api_name": "stk_premarket",
       "coverage": {
         "blocked": 1
       },
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "sw_mins",
@@ -434,28 +595,44 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T07:00:16.266388+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "teleplay_record",
       "coverage": {
         "blocked": 1
       },
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {
+        "api_error": 1
+      },
+      "evidence_classification": "api_error"
     },
     {
       "api_name": "tmt_twincome",
       "coverage": {
         "blocked": 1
       },
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {
+        "api_error": 1
+      },
+      "evidence_classification": "api_error"
     },
     {
       "api_name": "tmt_twincomedetail",
       "coverage": {
         "blocked": 1
       },
-      "capabilities": []
+      "capabilities": [],
+      "gap_assessments": {
+        "api_error": 1
+      },
+      "evidence_classification": "api_error"
     },
     {
       "api_name": "us_adjfactor",
@@ -467,7 +644,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-08T18:37:50.881189+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "us_balancesheet",
@@ -479,7 +660,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T02:56:00.066048+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "us_cashflow",
@@ -491,7 +676,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T02:56:00.318342+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "us_daily",
@@ -503,7 +692,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-08T18:37:50.370551+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "us_daily_adj",
@@ -515,7 +708,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-08T18:37:50.621547+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "us_fina_indicator",
@@ -527,7 +724,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T02:56:00.567097+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "us_income",
@@ -539,7 +740,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T02:55:59.814024+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     },
     {
       "api_name": "yc_cb",
@@ -552,7 +757,11 @@
           "status": "permission_denied",
           "checked_at": "2026-09-09T04:52:53.417979+00:00"
         }
-      ]
+      ],
+      "gap_assessments": {
+        "permission_denied": 1
+      },
+      "evidence_classification": "permission_denied"
     }
   ],
   "published_dataset_counts": {
@@ -758,6 +967,7 @@
     "Registration, planning and a published dataset are separate states.",
     "A published dataset does not prove complete history, fields, revisions, attachments or point-in-time validity.",
     "An empty or blocked partition can legitimately have no published dataset and remains explicit in coverage.",
+    "Gap assessments are retained outcomes. An api_error is distinct from permission denial and requires its raw observation to identify the supplier reason.",
     "A registered but unplanned API may be intentionally disabled pending permission or runtime validation."
   ]
 }

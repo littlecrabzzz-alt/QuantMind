@@ -27,6 +27,10 @@ class FixedCoverageAuditTests(unittest.TestCase):
                 {"api_name": "empty", "state": "empty", "partitions": 3},
                 {"api_name": "disabled_elsewhere", "state": "blocked", "partitions": 1},
             ],
+            "gaps": [
+                {"api_name": "empty", "assessment": "empty_unverified"},
+                {"api_name": "disabled_elsewhere", "assessment": "permission_denied"},
+            ],
             "capabilities": [
                 {"scope": "disabled_elsewhere:", "status": "permission_denied", "checked_at": "2026-01-01"},
                 {"scope": "planning:ready:history_gap", "status": "coverage_unverified", "checked_at": "2026-01-02"},
@@ -47,9 +51,17 @@ class FixedCoverageAuditTests(unittest.TestCase):
                          ["never_planned"])
         missing = {row["api_name"]: row for row in result["registered_planned_without_published_dataset"]}
         self.assertEqual(missing["empty"]["coverage"], {"empty": 3})
+        self.assertEqual(missing["empty"]["gap_assessments"], {"empty_unverified": 1})
+        self.assertEqual(missing["empty"]["evidence_classification"], "unclassified")
         self.assertEqual(missing["disabled_elsewhere"]["capabilities"], [
             {"status": "permission_denied", "checked_at": "2026-01-01"}
         ])
+        self.assertEqual(missing["disabled_elsewhere"]["evidence_classification"],
+                         "permission_denied")
+        self.assertEqual(result["missing_dataset_evidence_counts"], {
+            "permission_denied": 1,
+            "unclassified": 1,
+        })
         self.assertEqual(result["unregistered_planned"], ["unknown"])
         self.assertEqual(result["unregistered_published_dataset_apis"], ["unknown"])
 
@@ -57,6 +69,38 @@ class FixedCoverageAuditTests(unittest.TestCase):
         result = audit({"ready"}, self.fixture(), "data-" + "1" * 64)
         self.assertEqual(result["registered_not_planned"], [])
         self.assertEqual(result["published_dataset_counts"], {"ready": 1})
+
+    def test_gap_outcomes_classify_missing_datasets_without_capability_rows(self):
+        manifest = self.fixture()
+        manifest["scope"].extend(["api_error", "available_empty"])
+        manifest["coverage_by_api"].append(
+            {"api_name": "available_empty", "state": "empty", "partitions": 2}
+        )
+        manifest["gaps"].extend([
+            {"api_name": "api_error", "assessment": "api_error"},
+            {"api_name": "available_empty", "assessment": "empty_unverified"},
+        ])
+        manifest["capabilities"].append({
+            "scope": "available_empty:", "status": "available", "checked_at": "2026-01-03",
+        })
+        result = audit(
+            {"api_error", "available_empty", "disabled_elsewhere"},
+            manifest,
+            "data-" + "1" * 64,
+        )
+        missing = {
+            row["api_name"]: row
+            for row in result["registered_planned_without_published_dataset"]
+        }
+        self.assertEqual(missing["api_error"]["evidence_classification"], "api_error")
+        self.assertEqual(
+            missing["available_empty"]["evidence_classification"], "available_empty_only"
+        )
+        self.assertEqual(result["missing_dataset_evidence_counts"], {
+            "api_error": 1,
+            "available_empty_only": 1,
+            "permission_denied": 1,
+        })
 
     def test_audit_is_deterministic_and_offline(self):
         manifest = self.fixture()
