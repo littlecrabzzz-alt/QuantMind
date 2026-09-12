@@ -3,13 +3,25 @@
 import json
 import sqlite3
 import time
-from datetime import datetime, time as daytime, timedelta
+from datetime import date, datetime, time as daytime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from backend.shared.tushare_rate_policy import enabled, cyq_daily_limit
 
 
 DAILY_QUOTA_APIS = ("cyq_perf", "cyq_chips")
+
+
+def _validated_day(value):
+    if not isinstance(value, str):
+        raise ValueError("Invalid daily quota date")
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError("Invalid daily quota date") from exc
+    if parsed.isoformat() != value:
+        raise ValueError("Invalid daily quota date")
+    return value
 
 
 def reserve(root, api, *, now=None):
@@ -45,6 +57,7 @@ def reserve(root, api, *, now=None):
         if first is None:
             db.execute("INSERT INTO activation VALUES(?,?)", (api, day))
             first = (day,)
+        first_day = _validated_day(first[0])
         row = db.execute(
             "SELECT used FROM daily_quota WHERE api=? AND day=?", (api, day)
         ).fetchone()
@@ -54,12 +67,13 @@ def reserve(root, api, *, now=None):
         latest = db.execute(
             "SELECT day FROM daily_quota WHERE api=? ORDER BY day DESC LIMIT 1", (api,)
         ).fetchone()
+        latest_day = _validated_day(latest[0]) if latest else None
         # Unknown pre-activation usage and clock rollback must not be treated as zero.
         reason = (
             "activation_guard"
-            if day <= first[0]
+            if day <= first_day
             else "clock_rollback_guard"
-            if latest and day < latest[0]
+            if latest_day and day < latest_day
             else "daily_quota_exhausted"
             if used >= limit
             else None
@@ -141,10 +155,12 @@ def status(root, config, *, now=None):
         for api, result in per_api.items():
             if api not in first:
                 continue
-            if day <= first[api]:
+            first_day = _validated_day(first[api])
+            latest_day = _validated_day(latest[api]) if api in latest else None
+            if day <= first_day:
                 result["status"] = "activation_guard"
                 continue
-            if api in latest and day < latest[api]:
+            if latest_day and day < latest_day:
                 result["status"] = "clock_rollback_guard"
                 continue
             used = rows.get(api, 0)
@@ -191,16 +207,18 @@ def activate(root, *, now=None):
             activation_day = day
             if first is None:
                 db.execute("INSERT INTO activation VALUES(?,?)", (api, day))
-            elif not enabled(config):
+            else:
+                first_day = _validated_day(first[0])
+            if first is not None and not enabled(config):
                 # Pre-config failure/recovery on a later day cannot use an earlier
                 # activation to pretend that legacy HTTPs were already counted.
-                activation_day = max(day, first[0])
+                activation_day = max(day, first_day)
                 db.execute(
                     "UPDATE activation SET day=? WHERE api=?",
                     (activation_day, api),
                 )
-            else:
-                activation_day = first[0]
+            elif first is not None:
+                activation_day = first_day
             activation_days[api] = activation_day
         db.commit()
         return {

@@ -181,6 +181,13 @@ class DurableQuota(unittest.TestCase):
     def reserve_api(self, api, stamp=None):
         return quota.reserve(self.root, api, now=self.day if stamp is None else stamp)
 
+    def test_quota_dates_require_canonical_iso_calendar_days(self):
+        self.assertEqual(quota._validated_day("2026-09-09"), "2026-09-09")
+        for value in (None, 20260909, "20260909", "2026-9-09", "2026-02-30"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "Invalid daily quota date"):
+                    quota._validated_day(value)
+
     def test_first_day_guard_persists_reopen_only_cyq(self):
         for _ in range(2):
             r = self.reserve()
@@ -270,6 +277,72 @@ class DurableQuota(unittest.TestCase):
         ) as client:
             with self.assertRaises(sqlite3.DatabaseError):
                 capture_sample(client, "synthetic", {"api_name": "cyq_perf"}, self.root)
+        self.assertEqual(calls, [])
+
+    def test_malformed_activation_fails_closed_without_http_or_activation_write(self):
+        path = self.root / "daily-quota.sqlite"
+        db = sqlite3.connect(path)
+        db.execute(
+            "CREATE TABLE daily_quota (api TEXT NOT NULL,day TEXT NOT NULL,used INTEGER NOT NULL,PRIMARY KEY(api,day))"
+        )
+        db.execute("CREATE TABLE activation (api TEXT PRIMARY KEY,day TEXT NOT NULL)")
+        db.execute("INSERT INTO activation VALUES('cyq_chips','0000-00-00')")
+        db.commit()
+        before = db.execute("SELECT api,day FROM activation ORDER BY api").fetchall()
+        db.close()
+
+        report = quota.status(self.root, CONFIG, now=self.day)
+        for row in [report, *report["apis"].values()]:
+            self.assertEqual(row["status"], "quota_ledger_unavailable")
+            self.assertIsNone(row["used"])
+            self.assertNotIn("remaining", row)
+        calls = []
+        job = {
+            "api_name": "cyq_chips",
+            "params": {"ts_code": "000001.SZ", "trade_date": "20260909"},
+            "fields": "ts_code,trade_date",
+        }
+        with httpx.Client(
+            transport=httpx.MockTransport(lambda request: calls.append(request))
+        ) as client:
+            with self.assertRaisesRegex(ValueError, "Invalid daily quota date"):
+                capture_sample(client, "synthetic", job, self.root)
+        self.assertEqual(calls, [])
+        with self.assertRaisesRegex(ValueError, "Invalid daily quota date"):
+            quota.activate(self.root, now=self.day)
+        db = sqlite3.connect(path)
+        after = db.execute("SELECT api,day FROM activation ORDER BY api").fetchall()
+        db.close()
+        self.assertEqual(after, before)
+
+    def test_malformed_latest_day_fails_closed_before_http(self):
+        path = self.root / "daily-quota.sqlite"
+        db = sqlite3.connect(path)
+        db.execute(
+            "CREATE TABLE daily_quota (api TEXT NOT NULL,day TEXT NOT NULL,used INTEGER NOT NULL,PRIMARY KEY(api,day))"
+        )
+        db.execute("CREATE TABLE activation (api TEXT PRIMARY KEY,day TEXT NOT NULL)")
+        db.execute("INSERT INTO activation VALUES('cyq_chips','2026-09-08')")
+        db.execute("INSERT INTO daily_quota VALUES('cyq_chips','9999-99-99',1)")
+        db.commit()
+        db.close()
+
+        report = quota.status(self.root, CONFIG, now=self.day)
+        for row in [report, *report["apis"].values()]:
+            self.assertEqual(row["status"], "quota_ledger_unavailable")
+            self.assertIsNone(row["used"])
+            self.assertNotIn("remaining", row)
+        calls = []
+        job = {
+            "api_name": "cyq_chips",
+            "params": {"ts_code": "000001.SZ", "trade_date": "20260909"},
+            "fields": "ts_code,trade_date",
+        }
+        with httpx.Client(
+            transport=httpx.MockTransport(lambda request: calls.append(request))
+        ) as client:
+            with self.assertRaisesRegex(ValueError, "Invalid daily quota date"):
+                capture_sample(client, "synthetic", job, self.root)
         self.assertEqual(calls, [])
 
     def test_guard_preserves_jobs_observed_gate_and_other_api_consumes(self):
