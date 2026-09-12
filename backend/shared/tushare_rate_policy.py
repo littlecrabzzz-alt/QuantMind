@@ -418,6 +418,7 @@ def policy_report(config, now=None):
         "rollout_account_rpm": config.get("rollout_account_rpm"),
         "entitlement": entitlement(config, now),
         "cyq_perf_daily_cap": cyq_daily_limit(config, now),
+        "cyq_chips_daily_cap": cyq_daily_limit(config, now),
         "daily_timezone": "Asia/Shanghai",
         "permission_grant": False,
     }

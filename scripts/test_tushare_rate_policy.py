@@ -92,6 +92,9 @@ class Rates(unittest.TestCase):
         self.assertEqual(
             policy.policy_report(CONFIG, expired)["cyq_perf_daily_cap"], 20000
         )
+        self.assertEqual(
+            policy.policy_report(CONFIG, expired)["cyq_chips_daily_cap"], 20000
+        )
         self.assertEqual(self.rate("daily", now=expired), 500)
         self.assertEqual(self.rate("cyq_perf", now=expired), 200)
         self.assertEqual(
@@ -173,9 +176,10 @@ class DurableQuota(unittest.TestCase):
             self.addCleanup(guard.stop)
 
     def reserve(self, stamp=None):
-        return quota.reserve(
-            self.root, "cyq_perf", now=self.day if stamp is None else stamp
-        )
+        return self.reserve_api("cyq_perf", stamp)
+
+    def reserve_api(self, api, stamp=None):
+        return quota.reserve(self.root, api, now=self.day if stamp is None else stamp)
 
     def test_first_day_guard_persists_reopen_only_cyq(self):
         for _ in range(2):
@@ -184,6 +188,40 @@ class DurableQuota(unittest.TestCase):
             self.assertFalse(r["reserved"])
         self.assertIsNone(quota.reserve(self.root, "daily", now=self.day))
         self.assertTrue(self.reserve(self.day + 86400)["reserved"])
+
+    def test_new_chips_activation_isolated_restart_and_next_day(self):
+        # Reproduce the deployed ledger before cyq_chips joins the protected set.
+        path = self.root / "daily-quota.sqlite"
+        db = sqlite3.connect(path)
+        db.execute(
+            "CREATE TABLE daily_quota (api TEXT NOT NULL,day TEXT NOT NULL,used INTEGER NOT NULL,PRIMARY KEY(api,day))"
+        )
+        db.execute("CREATE TABLE activation (api TEXT PRIMARY KEY,day TEXT NOT NULL)")
+        db.execute("INSERT INTO activation VALUES('cyq_perf','2026-09-08')")
+        db.execute("INSERT INTO daily_quota VALUES('cyq_perf','2026-09-09',7)")
+        db.commit()
+        db.close()
+
+        activated = quota.activate(self.root, now=self.day)
+        self.assertEqual(activated["activation_day"], "2026-09-08")
+        self.assertEqual(
+            activated["activation_days"],
+            {"cyq_perf": "2026-09-08", "cyq_chips": "2026-09-09"},
+        )
+        self.assertEqual(self.reserve()["used"], 8)
+        for _ in range(2):
+            guarded = self.reserve_api("cyq_chips")
+            self.assertFalse(guarded["reserved"])
+            self.assertEqual(guarded["reason"], "activation_guard")
+        self.assertEqual(self.reserve_api("cyq_chips", self.day + 86400)["used"], 1)
+        self.assertEqual(self.reserve_api("cyq_perf", self.day + 1)["used"], 9)
+
+        report = quota.status(self.root, CONFIG, now=self.day)
+        self.assertEqual(report["used"], 9)  # Legacy top-level cyq_perf view.
+        self.assertEqual(report["apis"]["cyq_perf"]["used"], 9)
+        self.assertEqual(report["apis"]["cyq_chips"]["status"], "activation_guard")
+        self.assertIsNone(report["apis"]["cyq_chips"]["used"])
+        self.assertNotIn("remaining", report["apis"]["cyq_chips"])
 
     def test_midnight_is_beijing_and_cap_reopen(self):
         self.reserve()
@@ -340,6 +378,128 @@ class DurableQuota(unittest.TestCase):
                 self.reserve(self.day + 2 * 86400)
         self.assertEqual(self.reserve(self.day + 2 * 86400)["used"], 1)
 
+    def test_concurrent_caps_are_atomic_and_isolated_per_api(self):
+        from concurrent.futures import ThreadPoolExecutor
+
+        for api in quota.DAILY_QUOTA_APIS:
+            self.reserve_api(api)
+            self.reserve_api(api, self.day + 86400)
+        path = self.root / "daily-quota.sqlite"
+        db = sqlite3.connect(path)
+        db.execute("UPDATE daily_quota SET used=199999 WHERE day='2026-09-10'")
+        db.commit()
+        db.close()
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            futures = [
+                pool.submit(self.reserve_api, api, self.day + 86400 + 1)
+                for api in quota.DAILY_QUOTA_APIS
+                for _ in range(8)
+            ]
+        rows = [future.result() for future in futures]
+        for api in quota.DAILY_QUOTA_APIS:
+            self.assertEqual(
+                sum(row["reserved"] for row in rows if row["api_name"] == api), 1
+            )
+            self.assertEqual(
+                {row["used"] for row in rows if row["api_name"] == api}, {200000}
+            )
+
+    def test_points_expiry_lowers_both_api_caps(self):
+        expired = datetime(2026, 12, 5, 12, tzinfo=NOW.tzinfo).timestamp()
+        for api in quota.DAILY_QUOTA_APIS:
+            self.reserve_api(api)
+            result = self.reserve_api(api, expired)
+            self.assertTrue(result["reserved"])
+            self.assertEqual(result["limit"], 20000)
+        report = quota.status(self.root, CONFIG, now=expired)
+        self.assertEqual(report["limit"], 20000)
+        self.assertEqual({row["limit"] for row in report["apis"].values()}, {20000})
+
+    def test_new_chips_guard_prevents_http_and_does_not_block_perf(self):
+        path = self.root / "daily-quota.sqlite"
+        db = sqlite3.connect(path)
+        db.execute(
+            "CREATE TABLE daily_quota (api TEXT NOT NULL,day TEXT NOT NULL,used INTEGER NOT NULL,PRIMARY KEY(api,day))"
+        )
+        db.execute("CREATE TABLE activation (api TEXT PRIMARY KEY,day TEXT NOT NULL)")
+        db.execute("INSERT INTO activation VALUES('cyq_perf','2026-09-08')")
+        db.commit()
+        db.close()
+        p = pmod.Pipeline(self.root, {"entries": []})
+        self.addCleanup(p.close)
+        chips = p.enqueue(
+            "cyq_chips",
+            {"ts_code": "000001.SZ", "trade_date": "20260904"},
+            1,
+            "history",
+        )
+        perf = p.enqueue(
+            "cyq_perf",
+            {"ts_code": "000001.SZ", "trade_date": "20260904"},
+            2,
+            "history",
+        )
+        p.db.commit()
+        calls = []
+
+        def respond(request):
+            calls.append(json.loads(request.content)["api_name"])
+            return httpx.Response(
+                200,
+                json={
+                    "code": 0,
+                    "data": {"fields": ["ts_code", "trade_date"], "items": []},
+                },
+            )
+
+        original_reserve = quota.reserve
+        started = time.monotonic()
+        with (
+            patch.object(
+                pmod.time,
+                "time",
+                side_effect=lambda: self.day + time.monotonic() - started,
+            ),
+            patch.object(
+                quota,
+                "reserve",
+                side_effect=lambda root, api: original_reserve(root, api, now=self.day),
+            ),
+            httpx.Client(transport=httpx.MockTransport(respond)) as client,
+        ):
+            result = p.run(
+                client,
+                "synthetic",
+                CONFIG,
+                max_requests=1,
+                max_seconds=2,
+                pause=0,
+            )
+        self.assertEqual(result["requests"], 1)
+        self.assertEqual(calls, ["cyq_perf"])
+        self.assertEqual(
+            tuple(
+                p.db.execute(
+                    "SELECT state,tries,result FROM jobs WHERE id=?", (chips,)
+                ).fetchone()
+            ),
+            ("pending", 0, None),
+        )
+        self.assertEqual(
+            p.db.execute(
+                "SELECT COUNT(*) FROM attempts WHERE job_id=?", (chips,)
+            ).fetchone()[0],
+            0,
+        )
+        self.assertEqual(
+            tuple(
+                p.db.execute(
+                    "SELECT state,tries FROM jobs WHERE id=?", (perf,)
+                ).fetchone()
+            ),
+            ("empty", 1),
+        )
+
     def test_rollout_activation_without_calls_does_not_delay_first_later_request(self):
         for delay in (86400, 21 * 86400):
             with tempfile.TemporaryDirectory() as temp:
@@ -369,6 +529,7 @@ class DurableQuota(unittest.TestCase):
         summary = quota.status(self.root, CONFIG, now=self.day)
         self.assertEqual(summary["status"], "activation_guard")
         self.assertIsNone(summary["used"])
+        self.assertEqual(summary["apis"]["cyq_chips"]["status"], "not_initialized")
         self.reserve(self.day + 86400)
         summary = quota.status(self.root, CONFIG, now=self.day + 86400)
         self.assertEqual(summary["used"], 1)

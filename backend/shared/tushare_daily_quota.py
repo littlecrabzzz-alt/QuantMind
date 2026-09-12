@@ -9,8 +9,11 @@ from zoneinfo import ZoneInfo
 from backend.shared.tushare_rate_policy import enabled, cyq_daily_limit
 
 
+DAILY_QUOTA_APIS = ("cyq_perf", "cyq_chips")
+
+
 def reserve(root, api, *, now=None):
-    if api != "cyq_perf":
+    if api not in DAILY_QUOTA_APIS:
         return None
     root = Path(root)
     config_path = root / "pipeline-config.json"
@@ -93,47 +96,71 @@ def status(root, config, *, now=None):
     stamp = time.time() if now is None else now
     local = datetime.fromtimestamp(stamp, ZoneInfo("Asia/Shanghai"))
     day = local.date().isoformat()
-    result = {
-        "day": day,
-        "timezone": "Asia/Shanghai",
-        "limit": cyq_daily_limit(config, local),
-        "scope": "this_root_capture_sample_only",
-        "status": "not_initialized",
-        "used": None,
-    }
+    limit = cyq_daily_limit(config, local)
+
+    def entry():
+        return {
+            "day": day,
+            "timezone": "Asia/Shanghai",
+            "limit": limit,
+            "scope": "this_root_capture_sample_only",
+            "status": "not_initialized",
+            "used": None,
+        }
+
+    per_api = {api: entry() for api in DAILY_QUOTA_APIS}
     path = Path(root) / "daily-quota.sqlite"
     if not path.exists():
-        return result
+        return {**per_api["cyq_perf"], "apis": per_api}
     try:
         if path.is_symlink():
             raise ValueError("Invalid daily quota path")
         db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=0)
         try:
-            first = db.execute(
-                "SELECT day FROM activation WHERE api='cyq_perf'"
-            ).fetchone()
-            row = db.execute(
-                "SELECT used FROM daily_quota WHERE api='cyq_perf' AND day=?", (day,)
-            ).fetchone()
-            latest = db.execute(
-                "SELECT day FROM daily_quota WHERE api='cyq_perf' ORDER BY day DESC LIMIT 1"
-            ).fetchone()
+            placeholders = ",".join("?" for _ in DAILY_QUOTA_APIS)
+            first = dict(
+                db.execute(
+                    f"SELECT api,day FROM activation WHERE api IN ({placeholders})",
+                    DAILY_QUOTA_APIS,
+                ).fetchall()
+            )
+            rows = dict(
+                db.execute(
+                    f"SELECT api,used FROM daily_quota WHERE day=? AND api IN ({placeholders})",
+                    (day, *DAILY_QUOTA_APIS),
+                ).fetchall()
+            )
+            latest = dict(
+                db.execute(
+                    f"SELECT api,MAX(day) FROM daily_quota WHERE api IN ({placeholders}) GROUP BY api",
+                    DAILY_QUOTA_APIS,
+                ).fetchall()
+            )
         finally:
             db.close()
-        used = row[0] if row else 0
-        if not first or day <= first[0]:
-            result["status"] = "activation_guard"
-        elif latest and day < latest[0]:
-            result["status"] = "clock_rollback_guard"
-        else:
+        for api, result in per_api.items():
+            if api not in first:
+                continue
+            if day <= first[api]:
+                result["status"] = "activation_guard"
+                continue
+            if api in latest and day < latest[api]:
+                result["status"] = "clock_rollback_guard"
+                continue
+            used = rows.get(api, 0)
+            if type(used) is not int or used < 0:
+                raise ValueError("Invalid daily quota counter")
             result.update(
                 used=used,
                 remaining=max(0, result["limit"] - used),
                 status="daily_quota_exhausted" if used >= result["limit"] else "ready",
             )
     except (sqlite3.Error, OSError, ValueError) as exc:
-        result.update(status="quota_ledger_unavailable", error_type=type(exc).__name__)
-    return result
+        for result in per_api.values():
+            result.update(
+                status="quota_ledger_unavailable", error_type=type(exc).__name__
+            )
+    return {**per_api["cyq_perf"], "apis": per_api}
 
 
 def activate(root, *, now=None):
@@ -154,18 +181,32 @@ def activate(root, *, now=None):
         db.execute(
             "CREATE TABLE IF NOT EXISTS activation (api TEXT PRIMARY KEY,day TEXT NOT NULL)"
         )
-        first = db.execute("SELECT day FROM activation WHERE api='cyq_perf'").fetchone()
-        if first is None:
-            db.execute("INSERT INTO activation VALUES('cyq_perf',?)", (day,))
-        elif not enabled(config):
-            # Pre-config failure/recovery on a later day cannot use an earlier
-            # activation to pretend that legacy HTTPs were already counted.
-            day = max(day, first[0])
-            db.execute("UPDATE activation SET day=? WHERE api='cyq_perf'", (day,))
-        else:
-            day = first[0]
+        activation_days = {}
+        for api in DAILY_QUOTA_APIS:
+            first = db.execute(
+                "SELECT day FROM activation WHERE api=?", (api,)
+            ).fetchone()
+            activation_day = day
+            if first is None:
+                db.execute("INSERT INTO activation VALUES(?,?)", (api, day))
+            elif not enabled(config):
+                # Pre-config failure/recovery on a later day cannot use an earlier
+                # activation to pretend that legacy HTTPs were already counted.
+                activation_day = max(day, first[0])
+                db.execute(
+                    "UPDATE activation SET day=? WHERE api=?",
+                    (activation_day, api),
+                )
+            else:
+                activation_day = first[0]
+            activation_days[api] = activation_day
         db.commit()
-        return {"activation_day": day, "timezone": "Asia/Shanghai", "upstream_calls": 0}
+        return {
+            "activation_day": activation_days["cyq_perf"],
+            "activation_days": activation_days,
+            "timezone": "Asia/Shanghai",
+            "upstream_calls": 0,
+        }
     except BaseException:
         db.rollback()
         raise
