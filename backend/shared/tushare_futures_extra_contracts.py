@@ -231,7 +231,7 @@ def _identifiers(identifiers, enabled):
 
 
 def validate_futures_index_request(params):
-    """Validate the bounded request shape used for fut_index_daily only."""
+    """Require the observed selector; validate optional documented date filters."""
     if not isinstance(params, dict) or params.keys() - set(
         INPUT_FIELDS["fut_index_daily"]
     ):
@@ -241,14 +241,15 @@ def validate_futures_index_request(params):
         raise ValueError("fut_index_daily requires a legal .NH ts_code")
     point = "trade_date" in params
     ranged = "start_date" in params or "end_date" in params
-    if point == ranged:
-        raise ValueError("fut_index_daily requires one reviewed date axis")
-    if point:
-        _parse(params["trade_date"])
-        return
-    if not {"start_date", "end_date"} <= params.keys():
-        raise ValueError("fut_index_daily requires a complete date range")
-    if _parse(params["start_date"]) > _parse(params["end_date"]):
+    if point and ranged:
+        raise ValueError("Mixed date axes are outside the local request contract")
+    for name in ("trade_date", "start_date", "end_date"):
+        if name in params:
+            _parse(params[name])
+    if (
+        {"start_date", "end_date"} <= params.keys()
+        and _parse(params["start_date"]) > _parse(params["end_date"])
+    ):
         raise ValueError("Reversed fut_index_daily date window")
 
 

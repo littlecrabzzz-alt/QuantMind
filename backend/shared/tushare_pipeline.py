@@ -99,7 +99,9 @@ from backend.shared.tushare_concept_extra_contracts import concept_extra_prerequ
 from backend.shared.tushare_dc_extra_contracts import dc_extra_prerequisites
 from backend.shared.runtime_secrets import get_secret
 from backend.shared.stock_utils import StockCodeUtil
-from backend.shared.tushare_intake import capture_sample, digest, json_bytes, utc_now
+from backend.shared.tushare_intake import (
+    capture_sample, digest, json_bytes, utc_now, validate_request_shape,
+)
 from backend.shared.tushare_rrg_contracts import RRG_CONTRACTS
 
 STOCK_IDENTIFIER_SOURCE_APIS = (
@@ -555,23 +557,21 @@ class Pipeline:
                     "ORDER BY priority,rowid LIMIT 1",
                     (now,),
                 ).fetchone()
+            checkpoints = []
             if row and task_scope:
                 row, checkpoints = self._next_exact_task_job(
                     now, check_gates=False
                 )
-                try:
-                    self.db.executemany(
-                        "INSERT INTO scheduler_state(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
-                        checkpoints,
-                    )
-                    self.db.commit()
-                except BaseException:
-                    self.db.rollback()
-                    raise
             elif row and row["group_name"] in fair_families:
                 row, checkpoints = self._next_family_job(
                     row["group_name"], now, check_gates=False
                 )
+            if row:
+                try:
+                    validate_request_shape(json.loads(row["job"]))
+                except ValueError:
+                    return row  # run records the gap without a rate/fairness reservation.
+            if checkpoints:
                 try:
                     self.db.executemany(
                         "INSERT INTO scheduler_state(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
@@ -636,7 +636,12 @@ class Pipeline:
                 if row and row["group_name"] in fair_families:
                     row, checkpoints = self._next_family_job(row["group_name"], now)
             if row:
-                api = json.loads(row["job"])["api_name"]
+                job = json.loads(row["job"])
+                try:
+                    validate_request_shape(job)
+                except ValueError:
+                    return row  # No rate or fairness budget for a locally invalid request.
+                api = job["api_name"]
                 resolved = resolved_api_rate(api, contract_for(api), config)
                 api_rpm = resolved["rpm"]
                 if not 1 <= api_rpm <= 500:
@@ -2986,6 +2991,7 @@ class Pipeline:
         if not task_scope:
             self.reconcile_partitions(deadline=deadline)
         completed = 0
+        invalid_requests = 0
         while completed < max_requests and time.monotonic() - started < max_seconds:
             if not task_scope:
                 self.expand(config)
@@ -2997,6 +3003,34 @@ class Pipeline:
             if row is None or time.monotonic() - started >= max_seconds:
                 break
             job = json.loads(row["job"])
+            try:
+                validate_request_shape(job)
+            except ValueError as error:
+                # Old planner jobs keep their request/result/attempt identities.
+                # Corrected contract policies replay the configured date scope;
+                # this local rejection is an explicit gap, never a data success.
+                with self.db:
+                    self.db.execute(
+                        "UPDATE jobs SET state='blocked' WHERE id=?",
+                        (row["id"],),
+                    )
+                    self.db.execute(
+                        "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
+                        "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
+                        (
+                            "dispatch:" + row["id"],
+                            "request_contract_blocked",
+                            utc_now(),
+                            json.dumps({
+                                "api_name": job["api_name"],
+                                "reason": str(error),
+                                "upstream_calls": 0,
+                                "coverage_proven": False,
+                            }),
+                        ),
+                    )
+                invalid_requests += 1
+                continue
             rejected = realtime_dispatch_status(
                 job["api_name"], row["epoch"], config, time.time()
             )
@@ -3205,6 +3239,8 @@ class Pipeline:
         }
         if partition_work is not None:
             report["partition_work"] = partition_work
+        if invalid_requests:
+            report["invalid_requests_blocked"] = invalid_requests
         if task_scope:
             report.update(exact_task_scope=True, scoped_jobs=scoped_jobs)
         return report

@@ -400,8 +400,6 @@ class FuturesExtra(unittest.TestCase):
         for params in (
             {"trade_date": "20260909"},
             {"ts_code": "CU.SHF", "trade_date": "20260909"},
-            {"ts_code": "CU.NH"},
-            {"ts_code": "CU.NH", "start_date": "20260901"},
             {
                 "ts_code": "CU.NH",
                 "trade_date": "20260909",
@@ -419,6 +417,8 @@ class FuturesExtra(unittest.TestCase):
             with self.subTest(params=params), self.assertRaises(ValueError):
                 validate_futures_index_request(params)
         validate_futures_index_request({"ts_code": "CU.NH", "trade_date": "20260909"})
+        for optional in ({}, {"start_date": "20260901"}, {"end_date": "20260909"}):
+            validate_futures_index_request({"ts_code": "CU.NH", **optional})
         validate_futures_index_request(
             {
                 "ts_code": "CU.NH",

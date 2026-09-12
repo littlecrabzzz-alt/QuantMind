@@ -38,7 +38,7 @@ PARAMS = {
     "fut_daily_adj": {"trade_date": "20260904"},
     "fut_weekly_monthly": {"trade_date": "20260904", "freq": "week"},
     "fut_holding": {"trade_date": "20260904"},
-    "fut_index_daily": {"trade_date": "20260904"},
+    "fut_index_daily": {"ts_code": "NH0100.NH", "trade_date": "20260904"},
     "fut_weekly_detail": {"week": "202636"},
     "ft_limit": {"trade_date": "20260904"},
     "fina_audit": {"ts_code": "600036.SH"},

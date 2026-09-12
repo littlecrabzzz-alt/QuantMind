@@ -248,12 +248,30 @@ def assess_response(
     }
 
 
+def validate_request_shape(job):
+    """Enforce the four observed minimum contracts for every acquisition caller."""
+    api = job["api_name"]
+    if api == "fut_index_daily":
+        from backend.shared.tushare_futures_extra_contracts import (
+            validate_futures_index_request,
+        )
+
+        validate_futures_index_request(job["params"])
+    elif api in ("idx_factor_pro", "fund_factor_pro", "cb_factor_pro"):
+        from backend.shared.tushare_cross_asset_extra_contracts import (
+            validate_cross_asset_request,
+        )
+
+        validate_cross_asset_request(api, job["params"])
+
+
 def capture_sample(client, token, job, root: Path):
     """One request, no automatic retry/watermark. Store raw response plus metadata.
 
     Content objects deduplicate identical responses; observations preserve each
     fetch time. A release consists of immutable observations and object hashes.
     """
+    validate_request_shape(job)
     if not token:
         raise ValueError("Missing token")
     # All callers, including finite probes, share this pre-HTTP reservation.
