@@ -1,0 +1,91 @@
+{
+  "archive": {
+    "authority_path": "validation/index-weight-descendant-batch-20260912/batch-1-*",
+    "artifacts": {
+      "closure": "5972dc283e36ea9ab740c352e3fbfae2190059fc77e248d73e8b6e3d92627bc7",
+      "inspect": "4af9f00ddb771a6d67af3cf22f10450ee9a516a8bc13eed9c461334ac3005777",
+      "manifest": "2c7d263348dc3ccdc10ad024d1010aba3fbc0c9b09f00589d1edf57588f2a2f2",
+      "plan": "a04b6b3937de9b5f10b04b155983896cf6c74b39671f420a90dbdca5fcdc1218",
+      "prepare": "aba5c6d343ec0f4adb2dcccf0f59c6b33d338272142a526e6b7e61132eea131d",
+      "receipt": "c288f46162b9625e1ac4659a7fe004f70c64a1fea52287f1d07febed4433e4e3"
+    },
+    "physical_bytes": 26636330,
+    "physical_errors": 0,
+    "references": 900
+  },
+  "batch": {
+    "after_graph": {
+      "edges": 720,
+      "sha256": "c31c503e551b9fa951d304bb69fc79c26066a0ef066a6adabcd5e84f1e91eb54",
+      "tasks": 900
+    },
+    "before_graph": {
+      "edges": 360,
+      "sha256": "4981a5b59fb2ccd81864da0b55709bbdf41a4f2b33e0f8a522042e32af4cb0ed",
+      "tasks": 540
+    },
+    "elapsed_seconds": 47.044,
+    "http_statuses": {
+      "200": 360
+    },
+    "jobs": 360,
+    "new_grandchildren": 360,
+    "observed_rpm": 459.145,
+    "pairs": 180,
+    "rows": 289938,
+    "states": {
+      "empty": 180,
+      "split_pending": 180
+    },
+    "statuses": {
+      "empty_unverified": 180,
+      "possibly_truncated": 180
+    },
+    "upstream_calls": 360
+  },
+  "boundary": {
+    "coverage_complete_claimed": false,
+    "current_release_switched": false,
+    "release_published": false,
+    "sibling_pair_atomicity_claimed": false,
+    "statement": "This closes the selected leaves and validates their direct grandchildren only. Deeper descendants, complete history, revisions, known_at, PIT semantics and RRG classification remain open."
+  },
+  "credential_hygiene": {
+    "secrets_in_git_or_report": false
+  },
+  "observed_at": "2026-09-12T10:56:42+08:00",
+  "open_issues": [
+    {
+      "impact": "The batch succeeded, but repeating this validation cost would slow future windows.",
+      "next_action": "Profile fixed-manifest hashing and graph validation with stage timings before changing validation semantics.",
+      "stage": "read_only_preflight",
+      "status": "non_blocking_performance_follow_up",
+      "wall_seconds_approx": 557
+    },
+    {
+      "next_action": "Wait for the normal publish-only task, then mirror and exact-verify this closure together with index_daily batch 19.",
+      "stage": "fixed_release_and_mac_mirror",
+      "status": "pending"
+    }
+  ],
+  "pins": {
+    "all_task_ids_sha256": "64343594be12b688a0adc0206481dbb5661ece675b47ee350fe9a70c692a2d6c",
+    "config_sha256": "8ea3f3c5331130058dc854ded3a53d2051c78bb352a2a14e209ff43373cfae8a",
+    "helper_sha256": "03b0f536d938a142cb85da86996bd76508534bb100df8946ca98d1841a32ab60",
+    "history_inventory_sha256": "25266d5f0a7eba91d42ee46c1d7f0c56a888978d5b9873625b772c4624798e5d",
+    "manifest_sha256": "2c7d263348dc3ccdc10ad024d1010aba3fbc0c9b09f00589d1edf57588f2a2f2",
+    "pair_set_sha256": "08021658fec3d6d6c3e933ca6533ae73a1d3429ec14396e06e785ce4a7e33117",
+    "preparer_sha256": "9de738dd4cf2c96b7ee7f51b7acf50518c6241e0df005b47714680074676a107",
+    "receipt_id": "882743b9edfd276465025c588133b22db5cf8615cb5033cf1e431be86653ff70",
+    "source_release_id": "data-3861558a914f5066de24a7c315442a1ba079269139f7309765f4a377704bbe9c"
+  },
+  "schema_version": 1,
+  "services_after_restore": {
+    "beat": "healthy",
+    "normal_pipeline_resumed": true,
+    "oom": false,
+    "restart_count": 0,
+    "worker": "healthy"
+  },
+  "status": "index_weight_descendant_batch_1_exact_execution_closed_waiting_fixed_release"
+}
