@@ -22,6 +22,7 @@ from backend.shared.tushare_intake import digest
 from backend.shared.tushare_pipeline import atomic_bytes, atomic_json, manifest_at
 
 PROJECT = Path(__file__).resolve().parents[1]
+MANIFEST_TRANSFER_TIMEOUT_SECONDS = 900
 
 
 def fingerprint(path):
@@ -318,7 +319,7 @@ def fetch_manifest(root, host, source, release, sha):
                     str(staging) + "/",
                 ],
                 check=True,
-                timeout=180,
+                timeout=MANIFEST_TRANSFER_TIMEOUT_SECONDS,
                 capture_output=True,
             )
         incoming = staging / relative

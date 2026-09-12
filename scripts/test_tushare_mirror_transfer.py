@@ -72,7 +72,9 @@ class ManifestTransfer(unittest.TestCase):
         listing = next(v.split("=", 1)[1] for v in cmd if v.startswith("--files-from="))
         names = Path(listing).read_text().splitlines()
         if names == [self.relative]:
-            self.assertEqual(kwargs["timeout"], 180)
+            self.assertEqual(
+                kwargs["timeout"], mirror.MANIFEST_TRANSFER_TIMEOUT_SECONDS
+            )
             self.assertTrue(kwargs["capture_output"])
         for name in names:
             target = Path(cmd[-1]) / name
@@ -112,14 +114,19 @@ class ManifestTransfer(unittest.TestCase):
             incoming.parent.mkdir(parents=True)
             incoming.write_bytes(self.raw[:12])
             raise subprocess.TimeoutExpired(
-                ["secret-host", "secret-token"], 180, output=b"secret", stderr=b"secret"
+                ["secret-host", "secret-token"],
+                mirror.MANIFEST_TRANSFER_TIMEOUT_SECONDS,
+                output=b"secret",
+                stderr=b"secret",
             )
 
         with self.assertRaises(subprocess.TimeoutExpired) as error:
             self.run_mirror(fail)
         report = mirror.failure_report(error.exception)
         self.assertEqual(report["stage"], "manifest_transfer")
-        self.assertEqual(report["timeout_seconds"], 180)
+        self.assertEqual(
+            report["timeout_seconds"], mirror.MANIFEST_TRANSFER_TIMEOUT_SECONDS
+        )
         self.assertNotIn("secret", json.dumps(report))
         self.assertEqual((self.root / "CURRENT.json").read_bytes(), self.before)
         self.assertFalse((self.root / self.relative).exists())
@@ -162,7 +169,7 @@ class ManifestTransfer(unittest.TestCase):
 
     def test_object_failure_retains_fixed_manifest_but_not_current(self):
         def fail_objects(cmd, **kwargs):
-            if kwargs.get("timeout") == 180:
+            if kwargs.get("timeout") == mirror.MANIFEST_TRANSFER_TIMEOUT_SECONDS:
                 return self.transfer(cmd, **kwargs)
             raise subprocess.CalledProcessError(
                 23, ["secret-command"], stderr=b"secret"
