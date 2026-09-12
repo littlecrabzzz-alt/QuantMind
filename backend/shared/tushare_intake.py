@@ -267,8 +267,11 @@ def _cyq_chips_supplier_empty(job, payload):
         r"T?[0-9]{6}\.(?:SH|SZ|BJ)", params["ts_code"]
     ):
         return False
+    trade_date = params["trade_date"]
+    if not isinstance(trade_date, str) or not re.fullmatch(r"[0-9]{8}", trade_date):
+        return False
     try:
-        datetime.strptime(params["trade_date"], "%Y%m%d")
+        datetime.strptime(trade_date, "%Y%m%d")
     except (TypeError, ValueError):
         return False
     return True

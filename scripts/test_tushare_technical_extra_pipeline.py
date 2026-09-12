@@ -75,7 +75,7 @@ class TechnicalExtraRuntime(unittest.TestCase):
         self.assertFalse(result["history_complete"])
         self.assertFalse(result["pit_verified"])
         self.assertNotIn("parquet", result)
-        self.assertEqual(self.p.rows(result), [])
+        self.assertEqual(self.p.records(result), [])
         self.assertEqual(
             self.p.db.execute("SELECT count(*) FROM attempts WHERE job_id=?", (key,)).fetchone()[0],
             1,
