@@ -356,6 +356,22 @@ def fetch_manifest(root, host, source, release, sha):
             pass
 
 
+def validated_pointer(pointer):
+    """Return a safe release id before constructing any remote path."""
+    import re
+
+    if not isinstance(pointer, dict) or not all(
+        isinstance(pointer.get(key), str) for key in ("release_id", "manifest_sha256")
+    ):
+        raise ValueError("Invalid remote pointer")
+    release = pointer["release_id"]
+    if not re.fullmatch(r"data-[a-f0-9]{64}", release):
+        raise ValueError("Invalid remote release")
+    if pointer["manifest_sha256"] != release.removeprefix("data-"):
+        raise ValueError("Remote pointer identity mismatch")
+    return release
+
+
 def mirror(root):
     topology = dict(
         line.split("=", 1)
@@ -372,27 +388,26 @@ def mirror(root):
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return {"status": "already_running"}
-        with mirror_stage("pointer_fetch"):
-            pointer = json.loads(
-                subprocess.check_output(
-                    ssh + ["sudo -n cat " + shlex.quote(source + "CURRENT.json")],
-                    timeout=30,
-                    stderr=subprocess.PIPE,
+        retry_pointer = root / ".mirror-target.json"
+        if retry_pointer.is_symlink():
+            raise ValueError("Refusing mirrored retry pointer symlink")
+        if retry_pointer.exists():
+            with mirror_stage("pointer_retry"):
+                pointer = json.loads(retry_pointer.read_bytes())
+        else:
+            with mirror_stage("pointer_fetch"):
+                pointer = json.loads(
+                    subprocess.check_output(
+                        ssh + ["sudo -n cat " + shlex.quote(source + "CURRENT.json")],
+                        timeout=30,
+                        stderr=subprocess.PIPE,
+                    )
                 )
-            )
-            if not isinstance(pointer, dict) or not all(
-                isinstance(pointer.get(key), str)
-                for key in ("release_id", "manifest_sha256")
-            ):
-                raise ValueError("Invalid remote pointer")
-        release = pointer["release_id"]
-        # Validate before constructing any remote path.
+            validated_pointer(pointer)
+            atomic_json(retry_pointer, pointer)
+        release = validated_pointer(pointer)
         import re
 
-        if not re.fullmatch(r"data-[a-f0-9]{64}", release):
-            raise ValueError("Invalid remote release")
-        if pointer["manifest_sha256"] != release.removeprefix("data-"):
-            raise ValueError("Remote pointer identity mismatch")
         with mirror_stage("manifest_prepare"):
             fetch_manifest(root, host, source, release, pointer["manifest_sha256"])
         with mirror_stage("manifest_validate"):
@@ -447,6 +462,7 @@ def mirror(root):
                     if checked_file(path, expected) is None:
                         raise ValueError("Dataset object checksum mismatch")
         atomic_json(root / "CURRENT.json", pointer)
+        retry_pointer.unlink(missing_ok=True)
         result = {
             "status": "verified",
             "release_id": release,

@@ -51,6 +51,7 @@ class ManifestTransfer(unittest.TestCase):
         self.before = b'{"release_id":"previous-fixed-version"}'
         (self.root / "CURRENT.json").write_bytes(self.before)
         self.calls = []
+        self.pointer_fetches = 0
         for target in ("socket.socket.connect", "socket.getaddrinfo"):
             guard = patch(target, side_effect=AssertionError("offline fixture"))
             guard.start()
@@ -60,6 +61,7 @@ class ManifestTransfer(unittest.TestCase):
         self.addCleanup(guard.stop)
 
     def pointer_fetch(self, cmd, **kwargs):
+        self.pointer_fetches += 1
         self.assertEqual(kwargs["timeout"], 30)
         self.assertTrue(cmd[-1].endswith("CURRENT.json"))
         return json.dumps(self.pointer).encode()
@@ -131,6 +133,10 @@ class ManifestTransfer(unittest.TestCase):
         self.assertNotIn("secret", json.dumps(report))
         self.assertEqual((self.root / "CURRENT.json").read_bytes(), self.before)
         self.assertFalse((self.root / self.relative).exists())
+        self.assertEqual(
+            json.loads((self.root / ".mirror-target.json").read_bytes()),
+            self.pointer,
+        )
         staged = (
             self.root
             / ".manifest-transfer"
@@ -140,6 +146,8 @@ class ManifestTransfer(unittest.TestCase):
         self.assertEqual(staged.read_bytes(), self.raw[:12])
         self.assertEqual(self.run_mirror()["status"], "verified")
         self.assertFalse((self.root / ".manifest-transfer").exists())
+        self.assertFalse((self.root / ".mirror-target.json").exists())
+        self.assertEqual(self.pointer_fetches, 1)
 
     def test_wrong_sha_and_symlink_never_install_or_advance(self):
         for attack in ("wrong_sha", "symlink"):
@@ -190,7 +198,13 @@ class ManifestTransfer(unittest.TestCase):
         )
         self.assertEqual((self.root / "CURRENT.json").read_bytes(), self.before)
         self.assertEqual((self.root / self.relative).read_bytes(), self.raw)
+        self.pointer = {"release_id": "data-" + "f" * 64, "manifest_sha256": "f" * 64}
         self.assertEqual(self.run_mirror()["status"], "verified")
+        self.assertEqual(
+            json.loads((self.root / "CURRENT.json").read_bytes())["release_id"],
+            self.release,
+        )
+        self.assertEqual(self.pointer_fetches, 1)
 
     def test_pointer_timeout_is_distinguished_and_invalid_identity_rejected(self):
         with patch.object(
