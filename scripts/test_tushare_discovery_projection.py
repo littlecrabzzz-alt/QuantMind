@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from backend.shared.tushare_pipeline import (
     Pipeline,
     STOCK_IDENTIFIER_SOURCE_APIS,
+    IDENTIFIER_SPLIT_SOURCE_APIS,
     json_bytes,
 )
 
@@ -198,6 +199,25 @@ class ProjectionTest(unittest.TestCase):
         self.assertEqual(self.p.identifier_timing["duplicate_bodies"], 1)
         with self.assertRaisesRegex(ValueError, "Unsupported identifier"):
             self.p.identifiers(_source_apis=("stock_basic",))
+
+    def test_dc_projection_keeps_jobs_attempts_and_all_three_sources(self):
+        saved = self.body(["ts_code"], [["BK0001.DC"]], "dc_index")
+        job = self.p.enqueue("dc_index", {"trade_date": "20260908"}, 1, "history")
+        self.p.db.execute("UPDATE jobs SET state='done',result=? WHERE id=?", (json.dumps(saved), job))
+        for api, field, value in (
+            ("dc_member", "ts_code", "BK0002.DC"),
+            ("dc_daily", "index_code", "BK0003.DC"),
+            ("dc_index", "ts_code", "BK0004.DC"),
+            ("daily", "ts_code", "000001.SZ"),
+        ):
+            self.save(self.body([field], [[value]], api, "possibly_truncated"))
+        expected = self.p.identifiers()["dc_indices"]
+        with patch.object(self.p, "records", wraps=self.p.records) as reads:
+            actual = self.p.identifiers(_source_apis=IDENTIFIER_SPLIT_SOURCE_APIS["dc_indices"])["dc_indices"]
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual, ["BK0001.DC", "BK0002.DC", "BK0003.DC", "BK0004.DC"])
+        self.assertEqual({call.args[0]["api_name"] for call in reads.call_args_list}, {"dc_index", "dc_member", "dc_daily"})
+        self.assertEqual(reads.call_count, 4)
 
     def test_projection_inventory_covers_static_record_accesses(self):
         tree = ast.parse(textwrap.dedent(inspect.getsource(Pipeline.identifiers)))

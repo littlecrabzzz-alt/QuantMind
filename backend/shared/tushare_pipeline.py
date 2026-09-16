@@ -111,6 +111,10 @@ STOCK_IDENTIFIER_SOURCE_APIS = (
     "stock_basic",
     *sorted(SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS),
 )
+IDENTIFIER_SPLIT_SOURCE_APIS = {
+    "stocks": STOCK_IDENTIFIER_SOURCE_APIS,
+    "dc_indices": ("dc_index", "dc_member", "dc_daily"),
+}
 ROOT = Path(os.getenv("QM_TUSHARE_ARCHIVE_ROOT", "/data/tushare"))
 CONTRACTS = {
     api: (spec["row_cap"], spec["required_fields"])
@@ -1291,8 +1295,8 @@ class Pipeline:
         )
         if _source_apis is None:
             source_apis = tuple(families)
-        elif tuple(_source_apis) == STOCK_IDENTIFIER_SOURCE_APIS:
-            source_apis = STOCK_IDENTIFIER_SOURCE_APIS
+        elif tuple(_source_apis) in IDENTIFIER_SPLIT_SOURCE_APIS.values():
+            source_apis = tuple(_source_apis)
         else:
             raise ValueError("Unsupported identifier source projection")
         placeholders = ",".join("?" for _ in source_apis)
@@ -2536,8 +2540,8 @@ class Pipeline:
                 )
 
             identifiers = (
-                self.identifiers(_source_apis=STOCK_IDENTIFIER_SOURCE_APIS)
-                if family == "stocks"
+                self.identifiers(_source_apis=IDENTIFIER_SPLIT_SOURCE_APIS[family])
+                if family in IDENTIFIER_SPLIT_SOURCE_APIS
                 else self.identifiers()
             )
             discovered = {code for code in identifiers.get(family, []) if usable(code)}
@@ -3034,10 +3038,10 @@ class Pipeline:
             None if task_scope else self.resume_identifier_split(deadline, config)
         )
         if partition_work is not None:
-            # Full discovery remains isolated. The narrow stocks projection may
+            # Full discovery remains isolated. Proven source projections may
             # use only the unspent original deadline for unrelated acquisition.
             if (
-                partition_work.get("discovery_family") != "stocks"
+                partition_work.get("discovery_family") not in IDENTIFIER_SPLIT_SOURCE_APIS
                 or time.monotonic() >= deadline
             ):
                 return {

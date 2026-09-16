@@ -240,6 +240,16 @@ class DeferredSplit(unittest.TestCase):
         self.assertEqual(self.calls, [])
         self.assertEqual(report["partition_work"]["discovery_family"], "stocks")
 
+    def test_fast_dc_projection_leaves_budget_for_acquisition(self):
+        self.parent()
+        with patch.object(self.p, "resume_identifier_split", return_value={
+            "status": "partitioned", "discovery_family": "dc_indices", "upstream_calls": 0,
+        }):
+            report = self.run_once(requests=1)
+        self.assertEqual(report["requests"], 1)
+        self.assertEqual(report["partition_work"]["discovery_family"], "dc_indices")
+        self.assertTrue(self.calls)
+
     def test_nonstock_partition_keeps_full_discovery_isolation(self):
         with (
             patch.object(
