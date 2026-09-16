@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Explicit, consistent cloud snapshots and non-destructive offline downloads.
 
-No live database file sync, no local database write-back, no automatic pruning.
+No live database file sync or local database write-back.
 """
 import argparse
 import datetime
@@ -129,15 +129,40 @@ def finish_snapshot(target):
     (target / "COMPLETE").touch()
 
 
+def prune_snapshots(base, apply=False):
+    """Keep the current complete recovery point; leave staging and invalid entries alone."""
+    latest = base / "latest"
+    require(latest.is_symlink(), "Missing latest snapshot link; refusing to prune")
+    current = latest.resolve(strict=True)
+    require(current.parent == base.resolve() and current.name.startswith("snapshot-")
+            and current.is_dir() and (current / "COMPLETE").is_file(),
+            "Latest snapshot is not a complete child of the snapshot directory")
+    candidates = sorted([p for p in base.glob("snapshot-*")
+                         if p.name != current.name and p.is_dir() and not p.is_symlink()
+                         and (p / "COMPLETE").is_file()]
+                        + [p for p in base.glob(".deleting-snapshot-*")
+                           if p.is_dir() and not p.is_symlink()])
+    for path in candidates:
+        print(json.dumps({"snapshot": path.name, "action": "delete" if apply else "would_delete"}), flush=True)
+        if apply:
+            deleting = path if path.name.startswith(".deleting-") else base / (".deleting-" + path.name)
+            if path != deleting:
+                path.rename(deleting)
+            shutil.rmtree(deleting)
+    return len(candidates)
+
+
 def cloud_snapshot():
     require(os.geteuid() == 0 and (Path(REMOTE) / "AUTHORITY").is_file(), "Run on the cloud authority after cutover")
     require(output("findmnt", "-n", "-o", "UUID", "-T", REMOTE) == SETTINGS["QM_DISK_UUID"], "Wrong or unmounted SSD")
-    # Fail before creating a snapshot if there is insufficient recovery headroom.
-    require(shutil.disk_usage(REMOTE).free > 100 * 1024**3, "Keep 100 GiB free for recovery")
     base = Path(REMOTE) / "snapshots"
     base.mkdir(exist_ok=True, mode=0o700)
     with (base / ".lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if (base / "latest").is_symlink() or list(base.glob("snapshot-*")):
+            prune_snapshots(base, apply=True)
+        # Fail before creating a snapshot if there is insufficient recovery headroom.
+        require(shutil.disk_usage(REMOTE).free > 100 * 1024**3, "Keep 100 GiB free for recovery")
         name = "snapshot-" + datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
         # Resume an unpublished attempt rather than creating another full 65 GiB copy.
         target = base / ".building"
@@ -211,7 +236,17 @@ def cloud_snapshot():
         published = base / name
         target.rename(published)
         publish_link(base, published)
+        prune_snapshots(base, apply=True)
         print(published)
+
+
+def cloud_prune(apply=False):
+    require(os.geteuid() == 0 and (Path(REMOTE) / "AUTHORITY").is_file(), "Run on the cloud authority")
+    require(output("findmnt", "-n", "-o", "UUID", "-T", REMOTE) == SETTINGS["QM_DISK_UUID"], "Wrong or unmounted SSD")
+    base = Path(REMOTE) / "snapshots"
+    with (base / ".lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        print(json.dumps({"candidate_count": prune_snapshots(base, apply=apply), "applied": apply}), flush=True)
 
 
 def pull_snapshot(base=None, only_new=False, remote_base="snapshots"):
@@ -336,7 +371,8 @@ if __name__ == "__main__":
     install_signal_handlers()
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("create", "pull", "install-mac-pull"))
+    parser.add_argument("action", choices=("create", "pull", "install-mac-pull", "prune"))
+    parser.add_argument("--apply", action="store_true", help="Delete old complete cloud snapshots after a dry run")
     parser.add_argument("--root", type=Path)
     parser.add_argument("--only-new", action="store_true")
     parser.add_argument("--quantdb-project", type=Path)
@@ -346,6 +382,8 @@ if __name__ == "__main__":
     try:
         if args.action == "create":
             cloud_snapshot()
+        elif args.action == "prune":
+            cloud_prune(args.apply)
         elif args.action == "install-mac-pull":
             install_mac_pull()
         else:

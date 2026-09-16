@@ -372,6 +372,57 @@ class SnapshotSafety(unittest.TestCase):
                 self.assertNotIn('inventory',events[events.index('stop'):events.index('start')])
 
 
+class SnapshotRetention(unittest.TestCase):
+    def test_prune_keeps_latest_and_ignores_unpublished_or_symlink_entries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            old = base / "snapshot-20260901T000000000000Z"
+            new = base / "snapshot-20260902T000000000000Z"
+            for path in (old, new):
+                (path / "project").mkdir(parents=True)
+                (path / "COMPLETE").touch()
+            (base / "latest").symlink_to(new.name)
+            (base / "snapshot-incomplete").mkdir()
+            outside = base.parent / "outside"
+            (base / "snapshot-link").symlink_to(outside)
+            self.assertEqual(snapshot.prune_snapshots(base), 1)
+            self.assertTrue(old.exists())
+            self.assertEqual(snapshot.prune_snapshots(base, apply=True), 1)
+            self.assertFalse(old.exists())
+            self.assertTrue((new / "COMPLETE").exists())
+            self.assertTrue((base / "snapshot-incomplete").exists())
+            self.assertTrue((base / "snapshot-link").is_symlink())
+
+    def test_invalid_latest_never_deletes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            old = base / "snapshot-old"
+            old.mkdir()
+            (old / "COMPLETE").touch()
+            (base / "latest").symlink_to("missing")
+            with self.assertRaises(FileNotFoundError):
+                snapshot.prune_snapshots(base, apply=True)
+            self.assertTrue(old.exists())
+
+    def test_interrupted_delete_resumes_without_exposing_partial_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            old = base / "snapshot-old"
+            new = base / "snapshot-new"
+            for path in (old, new):
+                path.mkdir()
+                (path / "COMPLETE").touch()
+            (base / "latest").symlink_to(new.name)
+            with patch.object(snapshot.shutil, "rmtree", side_effect=InterruptedError):
+                with self.assertRaises(InterruptedError):
+                    snapshot.prune_snapshots(base, apply=True)
+            self.assertFalse(old.exists())
+            self.assertTrue((base / ".deleting-snapshot-old").exists())
+            self.assertEqual(snapshot.prune_snapshots(base, apply=True), 1)
+            self.assertFalse((base / ".deleting-snapshot-old").exists())
+            self.assertTrue((new / "COMPLETE").exists())
+
+
 class ScheduledPull(unittest.TestCase):
     def test_interrupted_pull_never_publishes_complete(self):
         with tempfile.TemporaryDirectory() as directory:
