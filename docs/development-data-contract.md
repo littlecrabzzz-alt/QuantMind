@@ -105,7 +105,7 @@ Mac 全栈沙盒首次执行 `scripts/local-dev.sh init`：它从 `logs/cloud-sn
 
 复用 `scripts/dual_node_snapshot.py` 的增量传输、不可变版本、SHA256 和发布校验；`scripts/quantdb_refresh.py` 仅编排 QuantDB Parquet 发布、下载和本地应用。云端保存于 `/root/data/disk/quantmind/quantdb-snapshots`，只发布校验通过的固定版本，不复制 Tushare、数据库卷或研究结果，不停止云端全栈；与 A 股采集共用锁，源文件变化就拒绝发布。100 GiB 云端恢复余量仍保留。
 
-云端现有 A 股任务每天 03:00 更新 Parquet、PG 和 Qlib；错过时间可当日补派，市场队列复用现有 worker，超时失败不无限重投。Mac 原 `com.quantmind.snapshot-pull` 每 3600 秒先执行限定 QuantDB 更新，再检查完整快照；代码变更后必须重装客户端：`python3 scripts/dual_node_snapshot.py install-mac-pull`。手动更新走同一路径 `python3 scripts/quantdb_refresh.py refresh`，不另建守护进程。
+云端现有 A 股任务每天 03:00 更新 Parquet、PG 和 Qlib；错过时间可当日补派，市场队列复用现有 worker，超时失败不无限重投。Mac `com.quantmind.snapshot-pull` 每15分钟执行限定 QuantDB 更新，休眠错过的日历触发在唤醒后合并补跑；传输中断对同一版本最多重试两次，失败后下轮再试。完整业务快照按需手动下载，不再串行阻塞日常更新；代码变更后必须重装客户端：`python3 scripts/dual_node_snapshot.py install-mac-pull`。手动更新走同一路径 `python3 scripts/quantdb_refresh.py refresh`，不另建守护进程。
 
 下载至原快照池的 `quantdb/`。沙盒空闲时，核对本地文件相对上次基线是否有修改；冲突则保留双方并失败，不静默覆盖。用 APFS 副本准备新目录、逐文件校验并原子交换，旧目录保存在 `.local-dev/quantdb-before-*`；本地业务库、实验、模型、队列和固定研究输入不被替换，仅向本地行情表补新增日期并更新派生 Qlib。活动任务、未启动后端、断网、失败或冲突须明确报告；下轮重试，不能标记已应用。保留旧版，不自动删历史。
 
@@ -117,3 +117,5 @@ Mac 全栈沙盒首次执行 `scripts/local-dev.sh init`：它从 `logs/cloud-sn
 Qlib 是 QuantDB 的派生缓存。每日调度、控制台和维护脚本统一调用 `QlibDataBuilder.build_all`：DuckDB 使用 256MB、单线程预算并允许临时磁盘溢出；Python 分块读取有序查询，仅保留当前标的历史，不再全市场 `fetchdf`。指数查询只绑定指数分区，兼容分区 schema 差异，不顺带绑定因子/财务视图。容器限额与服务器空闲内存独立；不能把 DuckDB 上限当成 Python 或整个容器的内存上限。
 
 构建在实际缓存目录的同盘临时目录中进行，以文件锁串行化；所有字段长度、日期索引和股票数据截止日校验通过后，在 Linux/macOS 原子交换整个目录。失败保留原发布版本；构建成功才整体替换，不先发布日历。临时磁盘和旧派生缓存随后回收，不增加长期快照层；异常强杀留下的临时目录须确认作业已结束后再处理。局部标的构建使用独立输出目录，禁止覆盖现有完整缓存。Mac 固定沙盒和正式原始数据不因缓存重建而改写。
+
+2026-09-16 恢复补充：云端准备快照占锁时，日常采集15分钟后补派，不消耗当天更新机会；新发布暂不可用时仍尝试拉取最后一个完整版本，但保留失败状态。部分数据源失败必须报部分失败，不能以任务返回或单个成功数据集代表整体成功。Mac休眠期间不会下载，联网且沙盒空闲时才应用；以实际页面、PG、Qlib日期及更新进程完成记录验收。

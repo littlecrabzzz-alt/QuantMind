@@ -164,9 +164,10 @@ sudo -n systemctl enable --now quantmind-snapshot.timer
 sudo -n systemctl list-timers quantmind-snapshot.timer
 sudo -n journalctl -u quantmind-snapshot.service -n 30 --no-pager
 
-# Mac：部署现有客户端并安装每小时拉取（保留已下载数据和固定沙盒）
+# Mac：每15分钟及唤醒后补拉QuantDB（保留已下载数据和固定沙盒）
 python3 scripts/dual_node_snapshot.py install-mac-pull
 launchctl print gui/$(id -u)/com.quantmind.snapshot-pull
+# 完整业务快照改为按需手动拉取，避免拖住日常行情更新
 # 需要重新完整校验时，不传 --only-new
 python3 scripts/dual_node_snapshot.py pull
 ```
