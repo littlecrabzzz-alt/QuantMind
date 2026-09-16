@@ -62,7 +62,6 @@ def publish():
     snapshot.require(os.geteuid() == 0 and (remote / 'AUTHORITY').is_file(), 'Cloud authority required')
     snapshot.require(snapshot.output('findmnt', '-n', '-o', 'UUID', '-T', str(remote)) ==
                      snapshot.SETTINGS['QM_DISK_UUID'], 'Cloud SSD not mounted')
-    snapshot.require(shutil.disk_usage(remote).free > 100 * 1024**3, 'Keep 100 GiB recovery reserve')
     base = remote / 'quantdb-snapshots'
     base.mkdir(exist_ok=True)
     with (base / '.lock').open('w') as lock, cloud_sync_lock():
@@ -84,6 +83,8 @@ def publish():
         if (previous / 'COMPLETE').exists() and (previous / 'runtime-manifest.jsonl').read_text() == raw:
             print('QuantDB unchanged:', previous, flush=True)
             return
+        # Existing verified releases remain downloadable even with a low reserve.
+        snapshot.require(shutil.disk_usage(remote).free > 100 * 1024**3, 'Keep 100 GiB recovery reserve')
         target = base / '.building'
         (target / 'project/data/quantdb').mkdir(parents=True, exist_ok=True)
         (target / 'COMPLETE').unlink(missing_ok=True)
@@ -286,12 +287,19 @@ def apply(project, downloaded):
 
 def refresh(project, base):
     snapshot.PROJECT = project
-    snapshot.run('ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', snapshot.SETTINGS['QM_SSH_TARGET'],
-                 'sudo -n python3 ' + snapshot.SETTINGS['QM_REMOTE_PROJECT'] + '/scripts/quantdb_refresh.py publish')
+    publish_error = None
+    try:
+        snapshot.run('ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', snapshot.SETTINGS['QM_SSH_TARGET'],
+                     'sudo -n python3 ' + snapshot.SETTINGS['QM_REMOTE_PROJECT'] + '/scripts/quantdb_refresh.py publish')
+    except subprocess.CalledProcessError as exc:
+        publish_error = exc
+        print('New publication unavailable; trying last completed release:', exc.returncode, flush=True)
     snapshot.pull_snapshot(base, only_new=True, remote_base='quantdb-snapshots')
     downloaded = (base / 'latest').resolve()
     snapshot.require((downloaded / 'VERIFIED').is_file(), 'Download is not verified')
     apply(project, downloaded)
+    if publish_error is not None:
+        raise publish_error  # Preserve failure visibility after catching up safely.
 
 
 if __name__ == '__main__':

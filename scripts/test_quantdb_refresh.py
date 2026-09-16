@@ -14,6 +14,18 @@ import dual_node_snapshot as snapshot
 
 class QuantDBRefresh(unittest.TestCase):
 
+    def test_publish_failure_still_applies_verified_release_and_remains_visible(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "latest").mkdir()
+            (base / "latest/VERIFIED").touch()
+            with patch.object(snapshot, "run", side_effect=subprocess.CalledProcessError(75, "ssh")), patch.object(snapshot, "pull_snapshot") as pull, patch.object(refresh, "apply") as apply:
+                with self.assertRaises(subprocess.CalledProcessError):
+                    refresh.refresh(base, base)
+                pull.assert_called_once_with(base, only_new=True, remote_base="quantdb-snapshots")
+                apply.assert_called_once_with(base, (base / "latest").resolve())
+
     def test_host_cache_exchange_keeps_previous_generation_and_checks_mount(self):
         with tempfile.TemporaryDirectory() as tmp:
             local = Path(tmp)
@@ -123,7 +135,11 @@ class QuantDBRefresh(unittest.TestCase):
                     (second / "project" / data.relative_to(project)).read_text(),
                     "second",
                 )
-                refresh.publish()
+                with patch.object(shutil, "disk_usage", return_value=shutil._ntuple_diskusage(500 * 1024**3, 499 * 1024**3, 1024**3)):
+                    refresh.publish()  # No allocation: the last release stays usable.
+                    data.write_text("third")
+                    with self.assertRaisesRegex(RuntimeError, "recovery reserve"):
+                        refresh.publish()
                 self.assertEqual(
                     (remote / "quantdb-snapshots/latest").resolve(), second
                 )
