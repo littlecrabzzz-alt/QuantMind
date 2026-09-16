@@ -94,3 +94,8 @@ CURRENT、ARCHIVE_AUTHORITY 和 ENABLED。任何匹配失败都不会启用本�
 ARCHIVE_RELOCATED 标记并移除 Tushare continuation；市场同步和市场快照调度
 保持原样。确认云端Tushare在途任务为空后，停止两个专用Tushare worker，
 不要停止QuantDB的market_sync worker或整个Compose栈。
+
+本地运行环境同时安装 `httpx[socks]`，并在安装验收时构造HTTP客户端。
+macOS系统代理可能提供SOCKS条目，即使HTTPS请求走HTTP代理，HTTPX初始化也需要
+SOCKS依赖。仅测试import httpx不足以证明采集能发出请求；本次已用原私有凭据
+在Mac真实读取两日trade_cal，HTTP200/业务码0/两行，未启动全量采集。

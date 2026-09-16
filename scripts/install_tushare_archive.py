@@ -26,15 +26,16 @@ def prepare(runtime):
         target = runtime / source.relative_to(PROJECT)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
-    # Only document parsing adds a dependency beyond the existing mirror runtime.
-    if subprocess.run([str(python), '-I', '-c', 'import pypdf'], capture_output=True).returncode:
+    # Native intake also needs SOCKS support when macOS system proxies enable it.
+    if subprocess.run([str(python), '-I', '-c', 'import pypdf, socksio; import httpx; httpx.Client().close()'], capture_output=True).returncode:
         uv = shutil.which('uv')
         if not uv:
-            raise RuntimeError('uv required to install document parser')
-        subprocess.run([uv, 'pip', 'install', '--python', str(python), 'pypdf==6.17.0'], check=True)
+            raise RuntimeError('uv required to install native client dependencies')
+        subprocess.run([uv, 'pip', 'install', '--python', str(python), 'pypdf==6.17.0', 'httpx[socks]==0.28.1'], check=True)
     subprocess.run([str(python), '-I', '-c',
                     'import sys; sys.path.insert(0,sys.argv[1]); '
-                    'from backend.shared import tushare_pipeline,tushare_documents; import pypdf',
+                    'from backend.shared import tushare_pipeline,tushare_documents; import pypdf,socksio; '
+                    'import httpx; httpx.Client().close()',
                     str(runtime)], check=True)
     return python
 
