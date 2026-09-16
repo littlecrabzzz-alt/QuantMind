@@ -160,3 +160,19 @@ Mac 使用 `--action verify-preserved --root <完整归档> --checkpoint <其冻
 失败回滚；不改 v6 表结构、行内容、历史尝试或批处理工具的版本约束。
 冻结库的隔离副本验证了索引前后股票/板块查询的 94/9,045 条结果及哈希一致；
 这只验证发现查询，不代表整个采集循环或全部历史已经完成。
+
+
+2026-09-17 云端旧归档释放验收：冻结清单中的 1,209,626 个不可变文件已按
+Mac 再验证收据删除，清理服务终态成功。随后对 11 个旧 SQLite 源库使用只读连接
+重新 backup（包含 WAL），输出逐个匹配 Mac 冻结数据库 SHA；持有迁移/写入锁，
+确认源文件 inode、大小、mtime 未变且检查点哈希匹配后，精确释放 22 个源库及
+检查点文件，共 34,884,812,800 逻辑字节。未删除 Mac 文件、研究缓存或完整备份。
+该次受限运维脚本及 SOURCE_DATABASES_VERIFIED.json、DATABASE_RETIREMENT_PLAN.json、
+DATABASE_RETIREMENT.json 保存在云端原归档 `.migration/` 对应检查点中；
+Mac 私有验收汇总为 `~/Library/Application Support/QuantMind/tushare-cloud-retirement-verified-20260917.json`。
+旧归档剩余约 648 MiB 的停写标记、清单和运维证据，研究缓存约 1.5 GiB；
+文件系统可用约 352 GiB（验收时点值，非容量承诺）。完整备份约 306 GiB 暂时保留，
+待下一份正常备份校验成功后整体轮转，不就地删改 COMPLETE 快照内容。
+清理后实际云端应用路由的 daily/adj_factor/ci_daily 均从研究缓存返回记录，
+upstream_calls=0；应用与 QuantDB worker 启动时间不变，健康检查正常。
+这项验收不代表全量历史采齐，也不代表已完成外部认证 HTTP 或 UI 验收。
