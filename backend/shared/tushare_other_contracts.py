@@ -189,8 +189,11 @@ _DOCS = {
 BASICS = ("opt_basic", "sge_basic", "fx_obasic")
 DAILY = ("opt_daily", "sge_daily", "fx_daily")
 CURRENCIES = ("USD", "EUR", "JPY", "GBP", "CHF")
-# Keep the unfiltered request too: these are documented venues, not a closed universe.
-OPTION_EXCHANGES = ("SSE", "SZSE", "CFFEX", "DCE", "SHFE", "CZCE")
+# Keep the unfiltered request too: neither the documented list nor live observations
+# prove a closed universe. GFEX is retained from a verified 2026-09-16 response.
+DOCUMENTED_OPTION_EXCHANGES = ("SSE", "SZSE", "CFFEX", "DCE", "SHFE", "CZCE")
+OBSERVED_OPTION_EXCHANGES = ("GFEX",)
+OPTION_EXCHANGES = DOCUMENTED_OPTION_EXCHANGES + OBSERVED_OPTION_EXCHANGES
 FAMILIES = {
     "opt_daily": "options",
     "sge_daily": "spot_metals",
@@ -250,6 +253,15 @@ OTHER_CONTRACTS["opt_basic"].update(
 )
 OTHER_CONTRACTS["opt_daily"]["permission_note"] = (
     "Detail docs say 2000 points and opt_basic 5000; permission overview gives different thresholds. Actual account must be probed."
+)
+OTHER_CONTRACTS["opt_daily"].update(
+    saturation_partition_param="exchange",
+    saturation_partition_values=list(OPTION_EXCHANGES),
+    saturation_partition_note=(
+        "Partition a capped unfiltered day by the documented venues plus every "
+        "venue observed in the retained parent response. The supplier venue "
+        "universe is not closed, so the resulting coverage remains unverified."
+    ),
 )
 OTHER_CONTRACTS["sge_basic"]["discovery_note"] = (
     "All currently documented contracts in one unfiltered call; historical retired-contract coverage is unspecified. Preserve union of every stored discovery and daily response."

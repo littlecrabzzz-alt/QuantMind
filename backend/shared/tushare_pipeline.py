@@ -1287,13 +1287,14 @@ class Pipeline:
         """
         if not isinstance(epoch, str) or not re.fullmatch(r"\d{8}", epoch):
             raise ValueError("Invalid recent queue compaction epoch")
-        checkpoint = "recent_queue_compaction:" + epoch
+        checkpoint = "recent_queue_compaction_v2:" + epoch
         if not force and self.db.execute(
             "SELECT 1 FROM scheduler_state WHERE name=?", (checkpoint,)
         ).fetchone():
             return {"status": "already_compacted", "epoch": epoch}
         temporary = (
             "temp.stale_recent_roots",
+            "temp.stale_recent_duplicates",
             "temp.stale_recent_jobs",
             "temp.protected_stale_jobs",
             "temp.eligible_stale_jobs",
@@ -1326,12 +1327,54 @@ class Pipeline:
                 "SELECT count(*) FROM stale_recent_roots"
             ).fetchone()[0]
             self.db.execute(
+                "CREATE TEMP TABLE stale_recent_duplicates(id TEXT PRIMARY KEY) WITHOUT ROWID"
+            )
+            self.db.execute("""
+                INSERT INTO stale_recent_duplicates
+                WITH duplicate_groups AS (
+                    SELECT logical_key,max(rowid) AS newest_rowid
+                    FROM jobs AS j INDEXED BY jobs_open_logical
+                    WHERE j.state IN ('pending','split_pending')
+                      AND j.epoch<>'history'
+                    GROUP BY logical_key HAVING count(*)>1
+                ), candidates AS (
+                    SELECT j.id,j.logical_key,j.rowid,duplicate.newest_rowid,
+                           EXISTS (
+                               SELECT 1
+                               FROM partition_children AS edge
+                               JOIN jobs AS parent ON parent.id=edge.parent_id
+                               WHERE edge.child_id=j.id
+                                 AND parent.state='split_pending'
+                           ) AS active_parent
+                    FROM duplicate_groups AS duplicate
+                    CROSS JOIN jobs AS j INDEXED BY jobs_open_logical
+                    WHERE j.state IN ('pending','split_pending')
+                      AND j.epoch<>'history'
+                      AND j.logical_key=duplicate.logical_key
+                ), annotated AS (
+                    SELECT *,max(active_parent) OVER (
+                        PARTITION BY logical_key
+                    ) AS has_active_parent
+                    FROM candidates
+                )
+                SELECT candidate.id
+                FROM annotated AS candidate
+                WHERE NOT candidate.active_parent
+                  AND (candidate.has_active_parent
+                       OR candidate.rowid<candidate.newest_rowid)
+            """)
+            stale_duplicates = self.db.execute(
+                "SELECT count(*) FROM stale_recent_duplicates"
+            ).fetchone()[0]
+            self.db.execute(
                 "CREATE TEMP TABLE stale_recent_jobs(id TEXT PRIMARY KEY) WITHOUT ROWID"
             )
             self.db.execute("""
                 INSERT OR IGNORE INTO stale_recent_jobs
                 WITH RECURSIVE descendants(id) AS (
                     SELECT id FROM stale_recent_roots
+                    UNION
+                    SELECT id FROM stale_recent_duplicates
                     UNION
                     SELECT edge.child_id
                     FROM partition_children AS edge
@@ -1350,8 +1393,11 @@ class Pipeline:
                     SELECT stale.id
                     FROM stale_recent_jobs AS stale
                     WHERE EXISTS (
-                        SELECT 1 FROM partition_children AS edge
+                        SELECT 1
+                        FROM partition_children AS edge
+                        JOIN jobs AS parent ON parent.id=edge.parent_id
                         WHERE edge.child_id=stale.id
+                          AND parent.state='split_pending'
                           AND edge.parent_id NOT IN (
                               SELECT id FROM stale_recent_jobs
                           )
@@ -1391,7 +1437,7 @@ class Pipeline:
                 WHERE id IN (SELECT id FROM eligible_stale_jobs)
             """)
             self.db.execute(
-                "DELETE FROM scheduler_state WHERE name GLOB 'recent_queue_compaction:*'"
+                "DELETE FROM scheduler_state WHERE name GLOB 'recent_queue_compaction*:*'"
             )
             self.db.execute(
                 "INSERT INTO scheduler_state(name,value) VALUES(?,?)",
@@ -1408,6 +1454,7 @@ class Pipeline:
             "status": "compacted",
             "epoch": epoch,
             "stale_roots": stale_roots,
+            "stale_duplicate_jobs": stale_duplicates,
             "superseded_open_jobs": eligible,
             "protected_shared_jobs": protected,
         }
@@ -2801,6 +2848,110 @@ class Pipeline:
             "param", "ts_code"
         )
         fanout = family and param not in params
+        partition_param = spec.get("saturation_partition_param")
+        if fanout and partition_param and partition_param not in params:
+            saved = result if result is not None else json.loads(row["result"] or "{}")
+            if saved.get("object_sha256"):
+                configured = spec.get("saturation_partition_values", [])
+                if not isinstance(configured, (list, tuple)) or any(
+                    not isinstance(value, str)
+                    or not re.fullmatch(r"[A-Z0-9]{2,16}", value)
+                    for value in configured
+                ):
+                    raise ValueError("Invalid saturation partition values")
+                observed, invalid = set(), 0
+                for record in self.records(saved, fields={partition_param}):
+                    value = record.get(partition_param)
+                    if isinstance(value, str) and re.fullmatch(
+                        r"[A-Z0-9]{2,16}", value
+                    ):
+                        observed.add(value)
+                    else:
+                        invalid += 1
+                values = sorted(set(configured) | observed)
+                if values:
+                    previous = {
+                        child[0]
+                        for child in self.db.execute(
+                            "SELECT child_id FROM partition_children WHERE parent_id=?",
+                            (row["id"],),
+                        )
+                    }
+                    children = {
+                        self.enqueue(
+                            job["api_name"],
+                            {**params, partition_param: value},
+                            row["priority"] + 1,
+                            row["epoch"],
+                        )
+                        for value in values
+                    }
+                    evidence = {
+                        "origin": "documented_union_parent_observation",
+                        "partition_param": partition_param,
+                        "configured_values": list(configured),
+                        "observed_values": sorted(observed),
+                        "invalid_parent_values": invalid,
+                        "parent_observation": saved.get("observation"),
+                        "parent_object_sha256": saved.get("object_sha256"),
+                        "universe_complete": False,
+                    }
+                    retired = previous - children
+                    if existing:
+                        evidence["replaced_method"] = existing["method"]
+                        evidence["replaced_children"] = len(previous)
+                        self.db.execute(
+                            "DELETE FROM partition_children WHERE parent_id=?",
+                            (row["id"],),
+                        )
+                        self.db.execute(
+                            "UPDATE partition_splits SET method='observed_value_fanout',expected_children=?,coverage_proven=0,evidence=?,status='pending',gap=NULL WHERE parent_id=?",
+                            (len(children), json.dumps(evidence, sort_keys=True), row["id"]),
+                        )
+                    else:
+                        self.record_partition(
+                            row["id"],
+                            sorted(children),
+                            "observed_value_fanout",
+                            False,
+                            evidence,
+                        )
+                    if existing:
+                        self.db.executemany(
+                            "INSERT OR IGNORE INTO partition_children VALUES(?,?)",
+                            [(row["id"], child) for child in sorted(children)],
+                        )
+                    retired_open = 0
+                    if retired:
+                        self.db.execute(
+                            "CREATE TEMP TABLE IF NOT EXISTS retired_partition_children "
+                            "(id TEXT PRIMARY KEY) WITHOUT ROWID"
+                        )
+                        self.db.execute("DELETE FROM retired_partition_children")
+                        self.db.executemany(
+                            "INSERT INTO retired_partition_children VALUES(?)",
+                            ((child,) for child in retired),
+                        )
+                        retired_open = self.db.execute("""
+                            UPDATE jobs SET state='superseded'
+                            WHERE id IN (SELECT id FROM retired_partition_children)
+                              AND state IN ('pending','split_pending')
+                              AND NOT EXISTS (
+                                  SELECT 1
+                                  FROM partition_children AS edge
+                                  JOIN jobs AS parent ON parent.id=edge.parent_id
+                                  WHERE edge.child_id=jobs.id
+                                    AND parent.state='split_pending'
+                              )
+                        """).rowcount
+                    return {
+                        "method": "observed_value_fanout",
+                        "partition_param": partition_param,
+                        "children": len(children),
+                        "universe_complete": False,
+                        "observed_values": sorted(observed),
+                        "retired_open_children": retired_open,
+                    }
         if (
             existing
             and existing["expected_children"]
@@ -3209,6 +3360,7 @@ class Pipeline:
         observed_rule = (
             ECO_CAL_OBSERVED_FANOUT if job["api_name"] == "eco_cal" else {}
         )
+        partition_param = spec.get("saturation_partition_param")
         return bool(
             (spec.get("saturation_fallback") or observed_rule.get("family"))
             and (
@@ -3216,6 +3368,10 @@ class Pipeline:
                 or observed_rule.get("param", "ts_code")
             )
             not in job["params"]
+            and not (
+                partition_param
+                and partition_param not in job["params"]
+            )
             and job["api_name"] not in ("fut_holding", "fut_weekly_detail")
             and not (spec.get("group") == "global" and spec.get("pagination"))
             and not self.date_children(job)

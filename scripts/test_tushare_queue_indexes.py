@@ -250,6 +250,7 @@ class QueueIndexTest(unittest.TestCase):
                 "status": "compacted",
                 "epoch": "20260912",
                 "stale_roots": 1,
+                "stale_duplicate_jobs": 1,
                 "superseded_open_jobs": 2,
                 "protected_shared_jobs": 1,
             },
@@ -272,6 +273,55 @@ class QueueIndexTest(unittest.TestCase):
         self.assertEqual(
             self.p.compact_stale_recent_roots("20260912"),
             {"status": "already_compacted", "epoch": "20260912"},
+        )
+
+    def test_compaction_removes_duplicate_child_of_terminal_parent(self):
+        params = {"trade_date": "20260910"}
+        old_parent = self.p.enqueue("daily", params, 1, "20260911")
+        old_child = self.p.enqueue(
+            "daily", {**params, "ts_code": "000001.SZ"}, 2, "20260911"
+        )
+        self.p.record_partition(
+            old_parent,
+            [old_child],
+            "identifier_fanout",
+            False,
+            {"origin": "old"},
+        )
+        self.p.db.execute(
+            "UPDATE jobs SET state='blocked' WHERE id=?", (old_parent,)
+        )
+        new_parent = self.p.enqueue("daily", params, 1, "20260912")
+        new_child = self.p.enqueue(
+            "daily", {**params, "ts_code": "000001.SZ"}, 2, "20260912"
+        )
+        self.p.record_partition(
+            new_parent,
+            [new_child],
+            "identifier_fanout",
+            False,
+            {"origin": "new"},
+        )
+        self.p.db.execute(
+            "UPDATE jobs SET state='split_pending' WHERE id=?", (new_parent,)
+        )
+        self.p.db.commit()
+
+        report = self.p.compact_stale_recent_roots("20260912")
+        self.assertEqual(report["stale_roots"], 0)
+        self.assertEqual(report["stale_duplicate_jobs"], 1)
+        self.assertEqual(report["superseded_open_jobs"], 1)
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (old_child,)
+            ).fetchone()[0],
+            "superseded",
+        )
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (new_child,)
+            ).fetchone()[0],
+            "pending",
         )
 
     def test_weighted_selection_matches_old_query_and_survives_reopen(self):

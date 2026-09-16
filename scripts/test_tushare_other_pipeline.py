@@ -210,18 +210,22 @@ class OtherPipeline(unittest.TestCase):
         ]
         self.capture({"opt_basic": records})
         rows = [
-            sample("opt_daily"),
-            {**sample("opt_daily"), "ts_code": "M1707-C-2400.DCE"},
+            {**sample("opt_daily"), "exchange": "GFEX"},
+            {
+                **sample("opt_daily"),
+                "ts_code": "M1707-C-2400.DCE",
+                "exchange": "DCE",
+            },
         ]
         with patch.dict(module.EXTENDED_CONTRACTS["opt_daily"], {"row_cap": 2}):
             key = self.p.enqueue("opt_daily", {"trade_date": "20260908"})
             self.p.db.commit()
             self.capture({"opt_daily": rows})
-            self.capture({})  # Resume one durable fanout; no additional HTTP.
         split = self.p.db.execute(
             "SELECT * FROM partition_splits WHERE parent_id=?", (key,)
         ).fetchone()
-        self.assertEqual(split["expected_children"], 2)
+        self.assertEqual(split["method"], "observed_value_fanout")
+        self.assertEqual(split["expected_children"], 7)
         self.assertEqual(split["coverage_proven"], 0)
         self.p.reconcile_partitions()
         split = self.p.db.execute(
@@ -233,14 +237,83 @@ class OtherPipeline(unittest.TestCase):
             (key,),
         ).fetchall()
         self.assertEqual(
-            {json.loads(j[0])["params"]["ts_code"] for j in children},
-            {"600000.SH", "M1707-C-2400.DCE"},
+            {json.loads(j[0])["params"]["exchange"] for j in children},
+            {"SSE", "SZSE", "CFFEX", "DCE", "SHFE", "CZCE", "GFEX"},
+        )
+        self.assertTrue(
+            all("ts_code" not in json.loads(j[0])["params"] for j in children)
         )
         self.assertEqual(
             self.p.db.execute("SELECT state FROM jobs WHERE id=?", (key,)).fetchone()[
                 0
             ],
             "split_pending",
+        )
+
+    def test_observed_exchange_fanout_replaces_open_identifier_children(self):
+        self.p.enqueue("opt_basic", {})
+        self.p.db.commit()
+        self.capture(
+            {
+                "opt_basic": [
+                    sample("opt_basic"),
+                    {**sample("opt_basic"), "ts_code": "M1707-C-2400.DCE"},
+                ]
+            }
+        )
+        rows = [
+            {**sample("opt_daily"), "exchange": "GFEX"},
+            {
+                **sample("opt_daily"),
+                "ts_code": "M1707-C-2400.DCE",
+                "exchange": "DCE",
+            },
+        ]
+        with patch.dict(
+            module.EXTENDED_CONTRACTS["opt_daily"],
+            {"row_cap": 2, "saturation_partition_param": None},
+        ):
+            parent = self.p.enqueue(
+                "opt_daily", {"trade_date": "20260908"}, epoch="old"
+            )
+            self.p.db.commit()
+            self.capture({"opt_daily": rows})
+            self.capture({})
+        old_children = {
+            child[0]
+            for child in self.p.db.execute(
+                "SELECT child_id FROM partition_children WHERE parent_id=?", (parent,)
+            )
+        }
+        self.assertEqual(len(old_children), 2)
+        row = self.p.db.execute("SELECT * FROM jobs WHERE id=?", (parent,)).fetchone()
+        split = self.p.split_request(
+            row, json.loads(row["job"]), json.loads(row["result"])
+        )
+        self.p.db.commit()
+
+        self.assertEqual(split["method"], "observed_value_fanout")
+        self.assertEqual(split["retired_open_children"], 2)
+        self.assertEqual(
+            {
+                child[0]
+                for child in self.p.db.execute(
+                    "SELECT state FROM jobs WHERE id IN (?,?)", tuple(old_children)
+                )
+            },
+            {"superseded"},
+        )
+        current = [
+            json.loads(child[0])["params"]
+            for child in self.p.db.execute(
+                "SELECT j.job FROM partition_children AS edge "
+                "JOIN jobs AS j ON j.id=edge.child_id WHERE edge.parent_id=?",
+                (parent,),
+            )
+        ]
+        self.assertEqual(len(current), 7)
+        self.assertTrue(
+            all(set(params) == {"trade_date", "exchange"} for params in current)
         )
 
     def test_hk_retired_reused_code_remains_distinct(self):
