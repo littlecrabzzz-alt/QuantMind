@@ -107,6 +107,8 @@ CURRENT、ARCHIVE_AUTHORITY 和 ENABLED。任何匹配失败都不会启用本�
 ARCHIVE_RELOCATED 标记并移除 Tushare continuation；市场同步和市场快照调度
 保持原样。确认云端Tushare在途任务为空后，停止两个专用Tushare worker，
 不要停止QuantDB的market_sync worker或整个Compose栈。
+两个旧 Tushare worker 归入 `legacy-tushare-acquisition` Compose profile，常规整栈启动
+不再自动拉起它们；`ARCHIVE_RELOCATED` 仍负责拒绝写入，profile 本身不是所有权控制。
 
 本地运行环境同时安装 `httpx[socks]`，并在安装验收时构造HTTP客户端。
 macOS系统代理可能提供SOCKS条目，即使HTTPS请求走HTTP代理，HTTPX初始化也需要

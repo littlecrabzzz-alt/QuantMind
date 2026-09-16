@@ -57,6 +57,7 @@ services:
       QM_NODE_ROLE: authority
     command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q market_sync,${QLIB_CELERY_QUEUE:-qlib_backtest_srv} --loglevel=info --concurrency=1
   tushare-worker:
+    profiles: [legacy-tushare-acquisition]
     extends:
       file: docker-compose.yml
       service: celery-worker
@@ -71,6 +72,7 @@ services:
     cpus: 0.75
     command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q tushare_acquire --loglevel=info --concurrency=1 --prefetch-multiplier=1
   tushare-document-worker:
+    profiles: [legacy-tushare-acquisition]
     extends:
       file: docker-compose.yml
       service: celery-worker
