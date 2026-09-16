@@ -191,17 +191,21 @@ case "${1:-help}" in
     [ "$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' quantmind-dev-research-agent | grep '^QM_NODE_ROLE=')" = QM_NODE_ROLE=sandbox ] || fail 'Expected isolated Agent service.'
     "${COMPOSE[@]}" restart research-agent
     ;;
-  restart-research-worker|restart-backend)
+  restart-research-worker|restart-backend|recreate-backend)
     lock_operation
     service=research-worker; container=quantmind-dev-research-worker
-    if [ "$1" = restart-backend ]; then service=quantmind; container=quantmind-dev; fi
+    if [ "$1" != restart-research-worker ]; then service=quantmind; container=quantmind-dev; fi
     [ "$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$container" | grep '^QM_NODE_ROLE=')" = QM_NODE_ROLE=sandbox ] || fail 'Expected an isolated sandbox service.'
-    "${COMPOSE[@]}" restart "$service"
+    if [ "$1" = recreate-backend ]; then
+      "${COMPOSE[@]}" up -d --no-deps --no-build --pull never "$service"
+    else
+      "${COMPOSE[@]}" restart "$service"
+    fi
     ;;
   stop) lock_operation; stop_local ;;
   status)
     echo "snapshot=$(cat "$STATE/SNAPSHOT_ID" 2>/dev/null || echo uninitialized)"
     "${COMPOSE[@]}" ps
     ;;
-  *) echo 'Usage: scripts/local-dev.sh {init|start [core|full|research]|start-agent|restart-agent|restart-research-worker|restart-backend|stop|status}'; exit 2 ;;
+  *) echo 'Usage: scripts/local-dev.sh {init|start [core|full|research]|start-agent|restart-agent|restart-research-worker|restart-backend|recreate-backend|stop|status}'; exit 2 ;;
 esac

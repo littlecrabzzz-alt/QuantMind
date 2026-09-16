@@ -59,7 +59,7 @@
 仅允许 `archive`（过渡期默认）或 `research-cache` 两个固定目录，客户端不能指定路径。
 切换前须验收所需研究数据及固定版本，之后在应用服务可重启窗口加载该变量；
 不能仅因首次小子集传输成功，就宣称整个应用已经使用新缓存。
-云端 Compose 显式传入该变量，默认仍为 `archive`。完成验收后在云端部署 `.env`
+云端 Compose 显式传入该变量，默认仍为 `archive`。完成验收后在云端部署 `.env.local`
 设置 `QM_TUSHARE_READ_STORE=research-cache`，通过
 `bash scripts/dual-node.sh cloud-compose up -d --no-deps quantmind` 重建应用容器以加载变量；
 仅 `restart` 不会更新容器环境。Mac 沙盒目前仍读取自己的快照目录，完整归档迁移
@@ -68,10 +68,22 @@
 Mac 应用的 Tushare HTTP 读取入口支持 `.env.local` 中的 `QM_LOCAL_TUSHARE_ROOT`，
 默认是原沙盒 `data/tushare`，以只读方式挂载到应用容器的 `/data/tushare`。
 完整迁移及固定版本验收后，将其设置为 Mac 归档绝对路径；以后可设置为 NAS 挂载路径。
-在本地任务空闲的窗口，通过 `local-dev.sh stop` / `start <原模式>` 重建沙盒容器，
+在本地任务空闲的窗口，通过 `bash scripts/local-dev.sh recreate-backend` 仅重建 API 容器，
 随后核对 Docker 实际挂载的源目录、只读标志和指定 release 的真实查询。仅重启后端
 不会更换挂载。此变量只改变应用读入口，不改变独立采集进程、业务库及其他沙盒数据；
 独立研究作业仍按其冻结输入契约读取数据。
+该入口保留本地角色检查及操作锁，不构建或拉取镜像，不重启数据库和研究 worker。
+切换前核对当前容器与本地 `quantmind-oss:latest` 镜像一致，避免混入其他镜像更新。
+切换后的可重复只读检查（NAS 时替换 expected）：
+
+```python
+import json, subprocess
+from pathlib import Path
+expected = str(Path.home() / "Library/Application Support/QuantMind/tushare")
+container = json.loads(subprocess.check_output(["docker", "inspect", "quantmind-dev"]))[0]
+assert any(m["Destination"] == "/data/tushare" and m["Source"] == expected
+           and not m["RW"] for m in container["Mounts"])
+```
 
 最终迁移的 CURRENT 随冻结检查点暂存；验收时可加 `--staged-current` 检查
 检查点中的新指针，保持本地当前读版本不变。所有文件校验和唯一写入者交接
