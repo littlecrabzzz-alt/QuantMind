@@ -39,6 +39,10 @@ class MigrationCheck(unittest.TestCase):
             self.assertEqual(result['files'], 3)
             self.assertFalse(result['migration_verified'])
             self.assertFalse((target / 'ARCHIVE_AUTHORITY.json').exists())
+            (target / 'CURRENT.json').write_text('old pinned pointer')
+            verify_checkpoint(target, checkpoint, staged_current=True)
+            self.assertEqual((target / 'CURRENT.json').read_text(), 'old pinned pointer')
+            shutil.copyfile(checkpoint / 'CURRENT.json', target / 'CURRENT.json')
             (target / 'unpublished/raw.json').write_text('corrupt')
             with self.assertRaises(ValueError):
                 verify_checkpoint(target, checkpoint)

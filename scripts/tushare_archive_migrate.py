@@ -94,7 +94,10 @@ def frozen_checkpoint(root):
             for path in inventory_files(root):
                 relative = path.relative_to(root).as_posix()
                 source = path
-                if path.suffix in ('.sqlite', '.sqlite3') and path.stat().st_size:
+                if relative == 'CURRENT.json':
+                    source = target / 'CURRENT.json'
+                    shutil.copyfile(path, source)
+                elif path.suffix in ('.sqlite', '.sqlite3') and path.stat().st_size:
                     source = target / 'databases' / relative
                     source.parent.mkdir(parents=True, exist_ok=True)
                     with sqlite3.connect(path.as_uri() + '?mode=ro', uri=True) as db:
@@ -117,7 +120,7 @@ def frozen_checkpoint(root):
         return target
 
 
-def verify_checkpoint(root, checkpoint):
+def verify_checkpoint(root, checkpoint, *, staged_current=False):
     """Verify transferred content against a frozen source; never grant ownership."""
     root = root.resolve()
     proof = json.loads((checkpoint / 'COMPLETE.json').read_bytes())
@@ -131,7 +134,7 @@ def verify_checkpoint(root, checkpoint):
             relative = Path(record['path'])
             if relative.is_absolute() or '..' in relative.parts:
                 raise ValueError('Invalid inventory path')
-            path = root / relative
+            path = (checkpoint / 'CURRENT.json') if staged_current and record['path'] == 'CURRENT.json' else root / relative
             if path.is_symlink() or any(p.is_symlink() for p in path.parents):
                 raise ValueError('Symlink in destination')
             if digest(path) != {k: record[k] for k in ('bytes', 'sha256')}:
@@ -152,6 +155,7 @@ if __name__ == '__main__':
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--action', choices=['precopy', 'checkpoint', 'verify'], default='precopy')
     parser.add_argument('--checkpoint', type=Path)
+    parser.add_argument('--staged-current', action='store_true')
     args = parser.parse_args()
     args.root.mkdir(parents=True, exist_ok=True)
     with (args.root / ".migration.lock").open("a") as lock:
@@ -163,4 +167,4 @@ if __name__ == '__main__':
         else:
             if args.checkpoint is None:
                 parser.error('--checkpoint is required for verify')
-            print(json.dumps(verify_checkpoint(args.root, args.checkpoint)))
+            print(json.dumps(verify_checkpoint(args.root, args.checkpoint, staged_current=args.staged_current)))
