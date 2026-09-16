@@ -111,7 +111,7 @@ STOCK_IDENTIFIER_SOURCE_APIS = (
     "stock_basic",
     *sorted(SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS),
 )
-ROOT = Path("/data/tushare")
+ROOT = Path(os.getenv("QM_TUSHARE_ARCHIVE_ROOT", "/data/tushare"))
 CONTRACTS = {
     api: (spec["row_cap"], spec["required_fields"])
     for api, spec in RRG_CONTRACTS.items()
@@ -288,6 +288,15 @@ def serialize_manifest_file(directory, content, timing=None):
 
 
 def authority():
+    if os.getenv("QM_NODE_ROLE") == "archive":
+        import socket
+        marker = ROOT / "ARCHIVE_AUTHORITY.json"
+        if not ROOT.is_absolute() or ROOT.resolve() != ROOT or marker.is_symlink():
+            raise ValueError("Invalid archive authority directory")
+        state = json.loads(marker.read_bytes())
+        if state.get("owner_hostname") != socket.gethostname() or state.get("migration_verified") is not True:
+            raise ValueError("Archive authority migration is not verified")
+        return
     if (
         os.getenv("QM_NODE_ROLE") != "authority"
         or not Path("/.dockerenv").exists()
@@ -3904,7 +3913,7 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
             raise ValueError(
                 "Planning cadence requires a positive publication interval"
             )
-        if shutil.disk_usage(ROOT).free < 100 * 2**30:
+        if shutil.disk_usage(ROOT).free < (300 if os.getenv("QM_NODE_ROLE") == "archive" else 100) * 2**30:
             return {"status": "blocked_disk_reserve"}
         token = None
         if not publish_interval:
