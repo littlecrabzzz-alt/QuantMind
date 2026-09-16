@@ -417,6 +417,21 @@ class ScheduledPull(unittest.TestCase):
                 snapshot.pull_snapshot(root, True)
             self.assertEqual(run.call_count, 1)  # remote COMPLETE check; no rsync
 
+    def test_transfer_retries_only_network_failures_without_switching_target(self):
+        args = ("rsync", "--partial", "fixed-source", "fixed-target")
+        failure = subprocess.CalledProcessError(255, args)
+        with patch.object(snapshot, "run", side_effect=[failure, None]) as run, patch.object(snapshot.time, "sleep"):
+            snapshot.transfer(*args)
+            self.assertEqual(run.call_args_list[0], run.call_args_list[1])
+        with patch.object(snapshot, "run", side_effect=subprocess.CalledProcessError(23, args)) as run:
+            with self.assertRaises(subprocess.CalledProcessError):
+                snapshot.transfer(*args)
+            self.assertEqual(run.call_count, 1)
+        with patch.object(snapshot, "run", side_effect=failure) as run, patch.object(snapshot.time, "sleep"):
+            with self.assertRaises(subprocess.CalledProcessError):
+                snapshot.transfer(*args)
+            self.assertEqual(run.call_count, 3)
+
     def test_background_install_reuses_data_and_preserves_fixed_sandbox(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

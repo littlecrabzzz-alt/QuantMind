@@ -36,6 +36,18 @@ def run(*args, **kwargs):
     return subprocess.run(args, check=True, **kwargs)
 
 
+def transfer(*args):
+    """Resume the same immutable download after a transient network failure."""
+    for attempt in range(3):
+        try:
+            return run(*args)
+        except subprocess.CalledProcessError as exc:
+            if exc.returncode not in {12, 30, 35, 255} or attempt == 2:
+                raise
+            print(f"Transfer interrupted; resuming same snapshot (retry {attempt + 1}/2)", flush=True)
+            time.sleep(5 * (attempt + 1))
+
+
 def output(*args):
     return subprocess.check_output(args, text=True).strip()
 
@@ -244,9 +256,9 @@ def pull_snapshot(base=None, only_new=False, remote_base="snapshots"):
             if backups:
                 # PostgreSQL dump headers can change; rsync still reuses matching blocks.
                 metadata_args += ["--copy-dest=" + str(backups[-1].parent.resolve())]
-        run(*metadata_args, "--exclude=/project/", "--exclude=/COMPLETE", ssh + ":" + remote_path + "/", str(target) + "/")
+        transfer(*metadata_args, "--exclude=/project/", "--exclude=/COMPLETE", ssh + ":" + remote_path + "/", str(target) + "/")
         (target / "project").mkdir(exist_ok=True)
-        run(*data_args, ssh + ":" + remote_path + "/project/", str(target / "project") + "/")
+        transfer(*data_args, ssh + ":" + remote_path + "/project/", str(target / "project") + "/")
         hashes = json.loads((target / "SHA256.json").read_text())
         require(all(Path(name).name == name for name in hashes), "Invalid checksum path")
         require(all(digest(target / name) == expected for name, expected in hashes.items()), "Archive checksum mismatch")
