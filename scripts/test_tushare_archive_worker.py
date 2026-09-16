@@ -24,7 +24,8 @@ class WorkerStatus(unittest.TestCase):
                 self.assertTrue(captured.wait(2), 'acquisition must overlap documents')
                 finished.set()
                 return {'status': 'ok', 'processed': 100}
-            def acquire():
+            def acquire(*, before_nonpublication_work):
+                before_nonpublication_work()
                 self.assertTrue(started.wait(2), 'documents must start before acquisition ends')
                 captured.set()
                 return {'requests': 1}
@@ -41,6 +42,27 @@ class WorkerStatus(unittest.TestCase):
             self.assertEqual(report['acquisition']['requests'], 1)
             self.assertGreaterEqual(report['updated_at'], report['started_at'])
             self.assertGreaterEqual(report['elapsed_seconds'], 0)
+
+    def test_due_publication_runs_before_documents(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'ENABLED').touch()
+            (root / 'pipeline-config.json').write_text('{"enable_documents":true}')
+            order = []
+            def publish(**kwargs):
+                order.append('publish')
+                return {'status': 'publish_only', 'requests': 0}
+            def documents(*args, **kwargs):
+                order.append('documents')
+                return {'status': 'ok', 'processed': 100}
+            with patch.dict(os.environ), patch('sys.argv', ['worker', '--root', str(root), '--once']), \
+                    patch.object(tushare_pipeline, 'authority'), \
+                    patch.object(tushare_pipeline, 'tick', side_effect=publish), \
+                    patch.object(tushare_documents, 'run_documents', side_effect=documents), \
+                    patch.object(worker.shutil, 'disk_usage', return_value=SimpleNamespace(free=2**40)), \
+                    patch('builtins.print'):
+                self.assertEqual(worker.main(), 0)
+            self.assertEqual(order, ['publish', 'documents'])
 
     def test_document_failure_is_not_hidden_by_successful_acquisition(self):
         with tempfile.TemporaryDirectory() as directory:

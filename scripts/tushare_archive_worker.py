@@ -44,11 +44,18 @@ def main():
                     # another cycle or shutdown; SQLite connections stay task-local.
                     with ThreadPoolExecutor(max_workers=1) as pool:
                         documents = None
-                        if config.get('enable_documents') and shutil.disk_usage(root).free >= 300 * 2**30:
-                            documents = pool.submit(
-                                run_documents, root, max_documents=100, max_seconds=90,
-                                download_workers=min(2, max(1, int(config.get('document_download_workers', 1)))))
-                        report['acquisition'] = tick()
+                        def start_documents():
+                            nonlocal documents
+                            if (documents is None and config.get('enable_documents')
+                                    and shutil.disk_usage(root).free >= 300 * 2**30):
+                                documents = pool.submit(
+                                    run_documents, root, max_documents=100, max_seconds=90,
+                                    download_workers=min(2, max(1, int(config.get('document_download_workers', 1)))))
+                        report['acquisition'] = tick(
+                            before_nonpublication_work=start_documents
+                        )
+                        if report['acquisition'].get('status') != 'publish_deferred_documents_active':
+                            start_documents()
                         if documents is not None:
                             report['documents'] = documents.result()
                     acquisition_status = report['acquisition'].get('status', '')
