@@ -163,9 +163,10 @@ if os.getenv("MARKET_SNAPSHOT_ENABLED", "true").lower() == "true":
         "schedule": crontab(minute="10", hour="4", day_of_week="1-5"),
     }
 
-# Only the cloud authority schedules acquisition; /data/tushare/ENABLED is the
-# local operator switch. Sandbox never acquires even when it shares credentials.
-if os.getenv("QM_NODE_ROLE") == "authority":
+# The retired cloud archive must not keep adding jobs after Mac takes ownership.
+# ENABLED remains the temporary operator switch; other market schedules continue.
+if (os.getenv("QM_NODE_ROLE") == "authority"
+        and not Path("/data/tushare/ARCHIVE_RELOCATED.json").exists()):
     beat_schedule["tushare-acquire-continuation"] = {
         "task": "engine.tasks.tushare_acquire",
         "schedule": 120.0,

@@ -89,3 +89,8 @@ CURRENT、ARCHIVE_AUTHORITY 和 ENABLED。任何匹配失败都不会启用本�
 接管写入采用 pending 所有权标记：先标记 migration_verified=false，再写 ENABLED，
 最后提交已验证所有权。若中断发生在其中，authority 会继续拒绝采集；对同一节点、
 同一检查点重跑 finalize 会重新验证并继续。已经完成的所有权不会被再次覆盖。
+
+云端交接完成后还需在独立服务窗口重新加载 celery-beat，使调度读取
+ARCHIVE_RELOCATED 标记并移除 Tushare continuation；市场同步和市场快照调度
+保持原样。确认云端Tushare在途任务为空后，停止两个专用Tushare worker，
+不要停止QuantDB的market_sync worker或整个Compose栈。
