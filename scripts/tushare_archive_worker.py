@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Single bounded acquisition loop on the verified Mac/NAS archive owner."""
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import fcntl
 import json
 import os
@@ -28,7 +29,7 @@ def main():
         while True:
             start = time.monotonic()
             free = shutil.disk_usage(root).free
-            report = {'updated_at': utc_now(), 'free_bytes': free,
+            report = {'started_at': utc_now(), 'free_bytes': free,
                       'nas_migration_warning': free < 500 * 2**30}
             try:
                 if free < 300 * 2**30:
@@ -36,17 +37,27 @@ def main():
                 elif not (root / 'ENABLED').exists():
                     report['status'] = 'disabled'
                 else:
-                    report['acquisition'] = tick()
+                    authority()
                     config = json.loads((root / 'pipeline-config.json').read_bytes())
-                    if config.get('enable_documents') and shutil.disk_usage(root).free >= 300 * 2**30:
-                        report['documents'] = run_documents(root, max_documents=100, max_seconds=90,
-                                                           download_workers=min(2, max(1, int(config.get('document_download_workers', 1)))))
+                    # The cloud already used independent acquisition/document workers.
+                    # Keep one archive owner and wait for both bounded phases before
+                    # another cycle or shutdown; SQLite connections stay task-local.
+                    with ThreadPoolExecutor(max_workers=1) as pool:
+                        documents = None
+                        if config.get('enable_documents') and shutil.disk_usage(root).free >= 300 * 2**30:
+                            documents = pool.submit(
+                                run_documents, root, max_documents=100, max_seconds=90,
+                                download_workers=min(2, max(1, int(config.get('document_download_workers', 1)))))
+                        report['acquisition'] = tick()
+                        if documents is not None:
+                            report['documents'] = documents.result()
                     acquisition_status = report['acquisition'].get('status', '')
                     report['status'] = (acquisition_status if acquisition_status.startswith('blocked')
                                         or acquisition_status in ('disabled', 'already_running')
                                         else 'completed_cycle')
             except Exception as exc:
                 report.update(status='failed', error_type=type(exc).__name__)
+            report.update(updated_at=utc_now(), elapsed_seconds=round(time.monotonic() - start, 3))
             atomic_json(root / 'archive-worker-status.json', report)
             print(json.dumps(report), flush=True)
             if args.once:
