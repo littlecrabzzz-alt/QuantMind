@@ -16,7 +16,7 @@ Mac 和云端都可以改代码、做研究。**正式业务数据由云端维�
 | `.git`、分支和提交历史 | 不由 Syncthing 同步 | 用 Git push/fetch 传递提交；主工作树换端后用 `handoff` 核对并显式对齐元数据 |
 | 独立 worktree | 不自动双向同步 | 在另一端取得提交后建立自己的 worktree；不能复制 worktree 的 `.git` 路径文件 |
 | 云端 PostgreSQL、Redis、模型和结果 | 云端持续写入；通过完整快照单向提供本地副本 | 不用文件同步工具复制运行中的数据库，不把 Mac 的旧数据覆盖到云端 |
-| QuantDB 基础数据 | 复用快照校验，每小时从云端发布/拉取限定 Parquet 版本；本地空闲时应用并补齐行情表和 Qlib | 以 `.local-dev/QUANTDB_SYNC.json` 的 `applied` 和实际数据日期验收；本地修改冲突、活动任务或失败时保留数据并报错，下轮重试 |
+| QuantDB 基础数据 | 复用快照校验，每15分钟及唤醒后从云端发布/拉取限定 Parquet 版本；本地空闲时应用并补齐行情表和 Qlib | 以 `.local-dev/QUANTDB_SYNC.json` 的 `applied` 和实际数据日期验收；本地修改冲突、活动任务或失败时保留数据并报错，下轮重试 |
 | Mac `.local-dev/project` 和 `quantmind-dev_*` 数据库卷 | 独立沙盒，不参与双向同步 | 本地测试可写；完整库基线记录于 `.local-dev/SNAPSHOT_ID`；QuantDB 更新另记 `QUANTDB_SYNC.json`，本地新增结果保留 |
 | Mac Tushare 镜像 | 云端发布固定版本后，Mac 独立定时下载并校验 | 按 `release_id` 只读使用；不是 QuantDB 的替代品，不自动导入本地 PostgreSQL/沙盒 |
 | 依赖、镜像、虚拟环境、构建产物 | 不双向同步 | 按平台安装/构建；Mac 当前后端镜像为 amd64，在 Apple Silicon 上有架构转换开销 |
@@ -98,11 +98,11 @@ sudo -n bash scripts/dual-node.sh cloud-compose ps
 
 ## 数据如何更新，什么时候会落后
 
-- **QuantDB 日常更新**：云端 A 股配置每天北京时间 03:00 采集，错过时间可当日补派；市场同步走现有 worker 的独立队列，失败任务不会无限重投。Mac 原 `com.quantmind.snapshot-pull` 每 3600 秒先发布/拉取限定 QuantDB Parquet，再在沙盒空闲时应用；复用文件哈希、增量传输和既有 PG/Qlib 入口，不依赖完整快照成功，也不停止云端整套服务。手动同一路径为 `python3 scripts/quantdb_refresh.py refresh`。
+- **QuantDB 日常更新**：云端 A 股配置每天北京时间 03:00 采集，错过时间可当日补派；市场同步走现有 worker 的独立队列，失败任务不会无限重投。Mac `com.quantmind.snapshot-pull` 每15分钟按日历触发，休眠错过的触发在唤醒后合并补跑；只发布/拉取限定 QuantDB Parquet，再在沙盒空闲时应用；复用文件哈希、增量传输和既有 PG/Qlib 入口，不依赖完整快照成功，也不停止云端整套服务。手动同一路径为 `python3 scripts/quantdb_refresh.py refresh`。
 - **应用与保护**：本地已有行情修改发生冲突则拒绝覆盖；旧 QuantDB 留在 `.local-dev/quantdb-before-*`，只向本地行情表补新增日期，不恢复或覆盖业务库。任务运行或后端未启动时保留下载、延后应用。研究固定输入目录保持原样；查看 `.local-dev/QUANTDB_SYNC.json`、应用真实最新日与代表标的数据，不能用下载成功替代验收。旧版保留，空间不足时先报告，不自动删除本地成果。
 - **页面派生结果也要跟随更新**：QuantDB 采集/本地应用后复用市场分析计算入口刷新 JSON 与标签库；同日来源修订也重算，计算失败保留旧版并报错，不把旧版当“最新”。已有 QuantDB 应用成功也要独立补查市场分析结果；验收包括真实市场分析页面的日期、指数/资金流/板块内容，而非仅查行情文件或 Qlib。显式历史日期和固定研究输入保持原版本。
 - **更新范围要说清楚**：当前日常采集覆盖股票/指数日线、因子、估值等现有 23 个数据集。分钟线、Tick 仍属按需数据，旧 `4_bond_etf/etf_kline` 也不在这条采集链路；不能把“QuantDB 日线追平”说成全部数据都已更新。融资融券及财报按各自上游可用日验收，不伪造统一日期。
-- **完整数据库快照**：仍是独立恢复基线，包含业务数据库等；整项目快照容量不足时可以暂停，但不能连带关闭上述 QuantDB 日常更新。下载区仍为 `~/Library/Application Support/QuantMind/cloud-snapshots`，其中 `quantdb/` 保存限定基础数据版本。
+- **完整数据库快照**：仍是独立恢复基线，包含业务数据库等；整项目快照容量不足时可以暂停，但不能连带关闭上述 QuantDB 日常更新。完整快照手动按需下载，不再串行占用日常行情定时器。下载区仍为 `~/Library/Application Support/QuantMind/cloud-snapshots`，其中 `quantdb/` 保存限定基础数据版本。
 - **忙时不会强行做完整快照**：存在活动任务时退出 75、保留旧版，当前计划等下一次 07:00 再试，没有保证当天一定出新快照的补跑机制。Mac 拉取成功可能只是确认“仍是旧的已校验版本”；检查快照 ID 与日期，不能只看任务已安装或退出码为 0。
 - **Tushare**：云端持续采集并按既有节奏发布固定版本，Mac 每 900 秒校验下载到 `~/Library/Application Support/QuantMind/tushare`。下载区更新 `CURRENT.json` 后，正在进行的研究仍应使用原先固定的 `release_id`。镜像成功不代表所有历史、权限、字段或时间点数据已经齐全；读取和安装说明见 [Tushare 镜像说明](docs/tushare-mirror-installation.md)。
 - **完整快照的下载与切换输入是两件事**：完整快照下载不自动修改 `.local-dev/SNAPSHOT_ID`、沙盒数据库或研究模板。需要换沙盒基线时先保存本地成果、结束任务并停沙盒，再按恢复流程重建；当前没有一键合并/无损升级两套数据库的入口，不要为了通过 `init` 的检查随手删除旧卷。

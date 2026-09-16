@@ -440,6 +440,9 @@ class ScheduledPull(unittest.TestCase):
             import plistlib
             definition = plistlib.loads((root / "Library/LaunchAgents/com.quantmind.snapshot-pull.plist").read_bytes())
             self.assertIn("/usr/local/bin", definition["EnvironmentVariables"]["PATH"].split(":"))
+            self.assertNotIn("StartInterval", definition)
+            self.assertEqual(definition["StartCalendarInterval"], [{"Minute": m} for m in (0, 15, 30, 45)])
+            self.assertIn("--quantdb-only", definition["ProgramArguments"])
 
 
 

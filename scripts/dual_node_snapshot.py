@@ -286,8 +286,10 @@ def install_mac_pull():
     definition = {
         "Label": label,
         "ProgramArguments": [sys.executable, str(runtime / "scripts/dual_node_snapshot.py"),
-                             "pull", "--root", str(destination), "--only-new", "--quantdb-project", str(PROJECT)],
-        "WorkingDirectory": str(runtime), "RunAtLoad": True, "StartInterval": 3600,
+                             "pull", "--root", str(destination), "--only-new", "--quantdb-project", str(PROJECT), "--quantdb-only"],
+        "WorkingDirectory": str(runtime), "RunAtLoad": True,
+        # Calendar events missed during sleep coalesce into one run on wake.
+        "StartCalendarInterval": [{"Minute": minute} for minute in (0, 15, 30, 45)],
         "EnvironmentVariables": {"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"},
         "StandardOutPath": str(logs / "snapshot-pull.out.log"),
         "StandardErrorPath": str(logs / "snapshot-pull.err.log"),
@@ -303,7 +305,7 @@ def install_mac_pull():
     plist.parent.mkdir(parents=True, exist_ok=True)
     plist.write_bytes(raw)
     run("launchctl", "bootstrap", f"gui/{os.getuid()}", str(plist))
-    print("Installed hourly snapshot pull:", destination)
+    print("Installed wake-aware QuantDB pull (every 15 minutes):", destination)
 
 
 def install_signal_handlers():
@@ -326,6 +328,8 @@ if __name__ == "__main__":
     parser.add_argument("--root", type=Path)
     parser.add_argument("--only-new", action="store_true")
     parser.add_argument("--quantdb-project", type=Path)
+    parser.add_argument("--quantdb-only", action="store_true",
+                        help="Keep automatic daily data refresh independent of full backups")
     args = parser.parse_args()
     try:
         if args.action == "create":
@@ -336,7 +340,8 @@ if __name__ == "__main__":
             if args.quantdb_project:
                 from quantdb_refresh import refresh
                 refresh(args.quantdb_project, args.root / "quantdb")
-            pull_snapshot(args.root, args.only_new)
+            if not args.quantdb_only:
+                pull_snapshot(args.root, args.only_new)
     except BusyError as exc:
         print(str(exc), flush=True)
         raise SystemExit(75)
