@@ -48,7 +48,7 @@ def prepare(root, apis):
     pointer = json.loads((root / 'CURRENT.json').read_bytes())
     source = pointer['release_id']
     export = root / '.research-exports'
-    key = hashlib.sha256(json.dumps(sorted(apis)).encode()).hexdigest()
+    key = hashlib.sha256(json.dumps({'format': 2, 'apis': sorted(apis)}).encode()).hexdigest()
     saved = export / (key + '.json')
     if saved.exists():
         old = json.loads(saved.read_bytes())
@@ -76,12 +76,19 @@ def prepare(root, apis):
         if not FILE.fullmatch(name):
             raise ValueError('Invalid research file')
         checked(root, name, manifest['files'][name])
-    subset = dict(manifest)
-    subset.update(source_release_id=source, scope='research_subset',
-                  selected_api_names=sorted(apis), datasets=datasets,
-                  files={name: manifest['files'][name] for name in sorted(names)},
-                  documents={}, archive={}, history_complete=False,
-                  historical_versions_complete=False)
+    subset = {
+        'schema_version': manifest.get('schema_version', 1),
+        'source_release_id': source, 'scope': 'research_subset',
+        'selected_api_names': sorted(apis), 'datasets': datasets,
+        'files': {name: manifest['files'][name] for name in sorted(names)},
+        'schema_path': schema, 'history_complete': False,
+        'historical_versions_complete': False,
+        'coverage': {'research_partitions': len(datasets)},
+        'coverage_by_api': [r for r in manifest.get('coverage_by_api', [])
+                            if r.get('api_name') in apis],
+        'rrg_status': manifest.get('rrg_status', 'unverified'),
+        'gaps': ['Research subset only; full acquisition evidence remains in source_release_id'],
+    }
     raw = json.dumps(subset, sort_keys=True, ensure_ascii=False).encode()
     sha = hashlib.sha256(raw).hexdigest()
     result = {'release_id': 'data-' + sha, 'manifest_sha256': sha,
