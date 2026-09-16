@@ -338,14 +338,139 @@ def finalize_archive(root, checkpoint):
         return report
 
 
+# Only immutable, fully transferred payloads. Keep source databases, checkpoints,
+# ownership fences and operational evidence until separately retired.
+RELOCATED_PAYLOAD_DIRS = frozenset({
+    'archives', 'attachments', 'documents', 'extracted', 'objects',
+    'observations', 'parquet', 'releases', 'schemas',
+})
+
+
+def relocated_records(checkpoint):
+    proof = json.loads((checkpoint / 'COMPLETE.json').read_bytes())
+    inventory = checkpoint / 'inventory.jsonl'
+    if digest(inventory) != proof['inventory']:
+        raise ValueError('Inventory checksum mismatch')
+    count = total = 0
+    with inventory.open() as stream:
+        for line in stream:
+            record = json.loads(line)
+            relative = Path(record['path'])
+            if relative.is_absolute() or '..' in relative.parts or not relative.parts:
+                raise ValueError('Invalid inventory path')
+            count += 1
+            total += record['bytes']
+            if relative.parts[0] in RELOCATED_PAYLOAD_DIRS:
+                if len(relative.parts) < 2 or record.get('checkpoint_path'):
+                    raise ValueError('Invalid immutable payload')
+                yield record
+    if count != proof['files'] or total != proof['bytes']:
+        raise ValueError('Inventory totals mismatch')
+
+
+def verify_preserved(root, checkpoint):
+    """Rehash immutable local copies while the Mac owner continues appending."""
+    root, checkpoint = root.resolve(), checkpoint.resolve()
+    if not checkpoint.is_relative_to(root / '.migration'):
+        raise ValueError('Checkpoint must belong to local archive')
+    (checkpoint / 'PRESERVED.json').unlink(missing_ok=True)
+    owner = json.loads((root / 'ARCHIVE_AUTHORITY.json').read_bytes())
+    proof = json.loads((checkpoint / 'COMPLETE.json').read_bytes())
+    if (owner.get('migration_verified') is not True or owner.get('activation_pending')
+            or owner.get('owner_hostname') != socket.gethostname()
+            or owner.get('inventory') != proof['inventory']):
+        raise ValueError('Verified local ownership required')
+    count = total = 0
+    for record in relocated_records(checkpoint):
+        path = root / record['path']
+        if path.is_symlink() or any(p.is_symlink() for p in path.parents):
+            raise ValueError('Symlink payload')
+        if digest(path) != {k: record[k] for k in ('bytes', 'sha256')}:
+            raise ValueError('Local preserved payload mismatch: ' + record['path'])
+        count += 1
+        total += record['bytes']
+    report = {'status': 'preserved_payloads_verified', 'inventory': proof['inventory'],
+              'owner_hostname': owner['owner_hostname'], 'current': owner['current'],
+              'files': count, 'bytes': total, 'verified_at': utc_now(),
+              'payload_dirs': sorted(RELOCATED_PAYLOAD_DIRS)}
+    atomic_json(checkpoint / 'PRESERVED.json', report)
+    return report
+
+
+def prune_relocated(root, checkpoint, receipt, *, apply=False):
+    """Delete only unchanged frozen payloads with a destination verification receipt.
+
+    Reader/pin acceptance is an operator prerequisite. This does not prune a
+    snapshot or the separate research cache. Missing files support safe resume.
+    """
+    root, checkpoint = root.resolve(), checkpoint.resolve()
+    if not checkpoint.is_relative_to(root / '.migration'):
+        raise ValueError('Checkpoint must belong to source archive')
+    if (root / 'ENABLED').exists() or (root / 'ARCHIVE_AUTHORITY.json').exists():
+        raise ValueError('Refuse cleanup on an enabled or owning archive')
+    seal = json.loads((root / 'ARCHIVE_RELOCATED.json').read_bytes())
+    proof = json.loads((checkpoint / 'COMPLETE.json').read_bytes())
+    receipt = json.loads(receipt.read_bytes())
+    if (seal.get('source_paused') is not True
+            or seal.get('owner_hostname') == socket.gethostname()
+            or receipt.get('status') != 'preserved_payloads_verified'
+            or receipt.get('payload_dirs') != sorted(RELOCATED_PAYLOAD_DIRS)
+            or receipt.get('inventory') != proof['inventory']
+            or any(receipt.get(k) != seal.get(k) for k in ('inventory', 'owner_hostname', 'current'))):
+        raise ValueError('Destination receipt does not match source handoff')
+    # Validate the entire inventory/totals before any deletion, including on resume.
+    records = list(relocated_records(checkpoint))
+    if len(records) != receipt['files'] or sum(r['bytes'] for r in records) != receipt['bytes']:
+        raise ValueError('Destination receipt totals mismatch')
+    with ExitStack() as stack:
+        for name in ('pipeline.lock', 'documents.lock', '.archive.lock'):
+            lock = stack.enter_context((root / name).open('a'))
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if (root / 'ENABLED').exists() or digest(root / 'CURRENT.json') != seal['current']:
+            raise ValueError('Source resumed or changed publication')
+        report = {'status': 'running', 'apply': apply, 'files': 0, 'logical_bytes': 0,
+                  'already_absent': 0, 'inventory': proof['inventory'], 'started_at': utc_now()}
+        status = root / 'archive-cleanup-status.json'
+        atomic_json(status, report)
+        try:
+            for record in records:
+                path = root / record['path']
+                if path.is_symlink() or any(p.is_symlink() for p in path.parents):
+                    raise ValueError('Symlink source payload')
+                if not path.exists():
+                    report['already_absent'] += 1
+                    continue
+                before = path.stat()
+                if digest(path) != {k: record[k] for k in ('bytes', 'sha256')}:
+                    raise ValueError('Source payload changed: ' + record['path'])
+                after = path.stat()
+                if (before.st_ino, before.st_size, before.st_mtime_ns) != (after.st_ino, after.st_size, after.st_mtime_ns):
+                    raise ValueError('Source payload changed while verifying')
+                if apply:
+                    path.unlink()
+                report['files'] += 1
+                report['logical_bytes'] += record['bytes']
+                if report['files'] % 10000 == 0:
+                    atomic_json(status, {**report, 'updated_at': utc_now()})
+            report['status'] = 'pruned' if apply else 'dry_run_verified'
+        except BaseException:
+            report['status'] = 'interrupted_preserve_remaining'
+            raise
+        finally:
+            atomic_json(status, {**report, 'updated_at': utc_now()})
+        return report
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
-    parser.add_argument('--action', choices=['precopy', 'checkpoint', 'install-checkpoint', 'verify', 'seal-source', 'finalize', 'sync-frozen'], default='precopy')
+    parser.add_argument('--action', choices=['precopy', 'checkpoint', 'install-checkpoint', 'verify', 'seal-source', 'finalize', 'sync-frozen', 'verify-preserved', 'prune-relocated'], default='precopy')
     parser.add_argument('--checkpoint', type=Path)
     parser.add_argument('--staged-current', action='store_true')
     parser.add_argument('--wait-locks', action='store_true')
     parser.add_argument('--owner')
+    parser.add_argument('--receipt', type=Path)
+    parser.add_argument('--apply', action='store_true')
     args = parser.parse_args()
     args.root.mkdir(parents=True, exist_ok=True)
     with (args.root / ".migration.lock").open("a") as lock:
@@ -357,6 +482,14 @@ if __name__ == '__main__':
         else:
             if args.checkpoint is None:
                 parser.error('--checkpoint is required')
+            if args.action == 'verify-preserved':
+                print(json.dumps(verify_preserved(args.root, args.checkpoint)))
+                raise SystemExit(0)
+            if args.action == 'prune-relocated':
+                if args.receipt is None:
+                    parser.error('--receipt is required')
+                print(json.dumps(prune_relocated(args.root, args.checkpoint, args.receipt, apply=args.apply)))
+                raise SystemExit(0)
             if args.action == 'sync-frozen':
                 print(json.dumps(sync_frozen(args.root, args.checkpoint.name)))
                 raise SystemExit(0)

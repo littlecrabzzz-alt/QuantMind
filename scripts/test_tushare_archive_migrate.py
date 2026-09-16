@@ -15,6 +15,64 @@ from scripts.tushare_archive_migrate import frozen_checkpoint, verify_checkpoint
 
 
 class MigrationCheck(unittest.TestCase):
+    def test_relocated_cleanup_requires_preserved_copy_and_keeps_other_data(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, target = Path(directory) / 'cloud', Path(directory) / 'mac'
+            (source / 'objects').mkdir(parents=True)
+            (source / 'objects/a.json').write_text('immutable raw')
+            (source / 'CURRENT.json').write_text('{}')
+            (source / 'pipeline.sqlite').touch()
+            (source / 'ENABLED.migration-paused').touch()
+            checkpoint = frozen_checkpoint(source)
+            seal = seal_source(source, checkpoint, socket.gethostname())
+            shutil.copytree(source, target)
+            local_checkpoint = target / checkpoint.relative_to(source.resolve())
+            (target / 'ARCHIVE_AUTHORITY.json').write_text(json.dumps({
+                **seal, 'migration_verified': True, 'activation_pending': False,
+            }))
+            (target / 'objects/a.json').write_text('damaged')
+            with self.assertRaisesRegex(ValueError, 'preserved payload mismatch'):
+                migration.verify_preserved(target, local_checkpoint)
+            self.assertFalse((local_checkpoint / 'PRESERVED.json').exists())
+            (target / 'objects/a.json').write_text('immutable raw')
+            report = migration.verify_preserved(target, local_checkpoint)
+            self.assertEqual(report['files'], 1)
+            receipt = local_checkpoint / 'PRESERVED.json'
+            good_receipt = receipt.read_bytes()
+            receipt.write_text(json.dumps({**report, 'files': 999}))
+            with patch.object(migration.socket, 'gethostname', return_value='cloud-node'):
+                with self.assertRaisesRegex(ValueError, 'totals mismatch'):
+                    migration.prune_relocated(source, checkpoint, receipt, apply=True)
+            self.assertTrue((source / 'objects/a.json').exists())
+            receipt.write_bytes(good_receipt)
+            # A file created after the checkpoint is outside deletion authority.
+            (source / 'objects/new.json').write_text('preserve unknown')
+            with patch.object(migration.socket, 'gethostname', return_value='cloud-node'):
+                dry = migration.prune_relocated(source, checkpoint, receipt)
+                self.assertEqual(dry['status'], 'dry_run_verified')
+                self.assertTrue((source / 'objects/a.json').exists())
+                (source / 'ENABLED').touch()
+                with self.assertRaisesRegex(ValueError, 'enabled'):
+                    migration.prune_relocated(source, checkpoint, receipt, apply=True)
+                (source / 'ENABLED').unlink()
+                (source / 'objects/a.json').write_text('changed')
+                with self.assertRaisesRegex(ValueError, 'Source payload changed'):
+                    migration.prune_relocated(source, checkpoint, receipt, apply=True)
+                self.assertTrue((source / 'objects/a.json').exists())
+                (source / 'objects/a.json').write_text('immutable raw')
+                with (source / 'pipeline.lock').open('a') as lock:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    with self.assertRaises(BlockingIOError):
+                        migration.prune_relocated(source, checkpoint, receipt, apply=True)
+                done = migration.prune_relocated(source, checkpoint, receipt, apply=True)
+                self.assertEqual(done['files'], 1)
+                resumed = migration.prune_relocated(source, checkpoint, receipt, apply=True)
+                self.assertEqual(resumed['already_absent'], 1)
+            self.assertFalse((source / 'objects/a.json').exists())
+            for name in ['objects/new.json', 'pipeline.sqlite', 'CURRENT.json', 'ARCHIVE_RELOCATED.json']:
+                self.assertTrue((source / name).exists())
+            self.assertEqual((target / 'objects/a.json').read_text(), 'immutable raw')
+
     @patch("scripts.tushare_archive_migrate.shutil.disk_usage", return_value=SimpleNamespace(free=2**40))
     def test_checkpoint_is_complete_and_detects_corruption(self, _disk):
         with tempfile.TemporaryDirectory() as directory:
