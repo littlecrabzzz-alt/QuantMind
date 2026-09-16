@@ -42,6 +42,7 @@ services:
       ENABLE_TDX_PUSH: "false"
     volumes: !override
       - ${QM_LOCAL_STATE:?run through scripts/local-dev.sh}/data:/data
+      - ${QM_LOCAL_TUSHARE_ROOT:-${QM_LOCAL_STATE}/data/tushare}:/data/tushare:ro
       - ${QM_LOCAL_STATE}/models:/app/models
       - ${QM_LOCAL_STATE}/db:/app/db
       - ${QM_LOCAL_STATE}/logs:/app/logs
