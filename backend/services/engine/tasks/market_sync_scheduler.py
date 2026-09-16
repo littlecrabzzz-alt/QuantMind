@@ -103,12 +103,12 @@ def _last_run_today(market: str, date_str: str) -> bool:
     return r.exists(_LAST_RUN_KEY.format(market=market, date=date_str)) > 0
 
 
-def _mark_run(market: str, date_str: str) -> None:
+def _mark_run(market: str, date_str: str, ttl: int = 2 * 24 * 3600) -> None:
     r = _redis()
     r.set(
         _LAST_RUN_KEY.format(market=market, date=date_str),
         "1",
-        ex=2 * 24 * 3600,
+        ex=ttl,
     )
 
 
@@ -132,6 +132,8 @@ def run_market_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
         token = uuid4().hex
         key = "quantmind:daily_sync:lock"
         if not acquire_lock(key, token, ttl=7200):
+            # Publishing a snapshot must not consume today's acquisition slot.
+            _mark_run(market, datetime.now().strftime("%Y-%m-%d"), ttl=900)
             return {"market": market, "status": "skipped", "reason": "sync busy or Redis unavailable"}
         job_id = None
         try:
@@ -203,12 +205,12 @@ def dispatch_due_syncs() -> dict[str, Any]:
             continue
         if _last_run_today(market, date_str):
             continue
-        _mark_run(market, date_str)
         celery_app.send_task(
             "engine.tasks.run_market_scheduled_sync",
             args=[market, cfg],
             queue="market_sync",
         )
+        _mark_run(market, date_str)
         dispatched.append(market)
         logger.info("[SyncSchedule] %s 到点 %s，已派发同步任务", MARKETS[market], now_hm)
 

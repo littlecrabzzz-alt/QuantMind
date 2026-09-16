@@ -21,12 +21,14 @@ class _StubRedis:
 
     def __init__(self) -> None:
         self._data: dict[str, str] = {}
+        self.expiry = {}
 
     def get(self, key: str) -> str | None:
         return self._data.get(key)
 
     def set(self, key: str, value: str, ex: int | None = None) -> None:
         self._data[key] = value
+        self.expiry[key] = ex
 
     def exists(self, key: str) -> bool:
         return key in self._data
@@ -118,7 +120,7 @@ def test_normalize_of_missing_config_for_unknown_market_uses_global_defaults():
 
 
 @pytest.mark.parametrize("with_qlib,errors", [(True, []), (False, ["upstream failed"])])
-def test_ashare_updates_pg_and_reports_upstream_failures(monkeypatch, with_qlib, errors):
+def test_ashare_updates_pg_and_reports_upstream_failures(monkeypatch, stub_redis, with_qlib, errors):
     import sys
     from types import ModuleType
     from unittest.mock import Mock
@@ -147,6 +149,7 @@ def test_ashare_updates_pg_and_reports_upstream_failures(monkeypatch, with_qlib,
     jobs.acquire_lock.return_value = False
     assert run_market_sync("A", {})["status"] == "skipped"
     source.run_daily_sync.assert_not_called()
+    assert list(stub_redis.expiry.values()) == [900]
 
 
 def test_late_dispatch_catches_up_on_market_queue(monkeypatch, stub_redis):
@@ -168,6 +171,11 @@ def test_late_dispatch_catches_up_on_market_queue(monkeypatch, stub_redis):
     assert scheduler.dispatch_due_syncs()['dispatched'] == ['A']
     assert app_module.celery_app.send_task.call_args.kwargs['queue'] == 'market_sync'
     assert scheduler.dispatch_due_syncs()['dispatched'] == []
+    stub_redis._data.pop(scheduler._LAST_RUN_KEY.format(market='A', date='2026-09-11'))
+    app_module.celery_app.send_task.side_effect = RuntimeError('broker offline')
+    with pytest.raises(RuntimeError, match='broker offline'):
+        scheduler.dispatch_due_syncs()
+    assert not scheduler._last_run_today('A', '2026-09-11')
 
 
 def test_pg_partial_is_not_completed(monkeypatch):
