@@ -413,6 +413,28 @@ class Pipeline:
                 self.db.rollback()
                 self.db.close()
                 raise
+        discovery_indexes = self.db.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name IN "
+            "('jobs_discovery_api','attempts_discovery_api')"
+        ).fetchall()
+        if len(discovery_indexes) != 2:
+            # Discovery reads only completed results and historical attempts;
+            # millions of pending jobs must not be scanned for each fanout.
+            # Tables/rows retain the v6 contract used by offline batch tools.
+            try:
+                self.db.executescript("""
+                    BEGIN IMMEDIATE;
+                    CREATE INDEX IF NOT EXISTS jobs_discovery_api
+                        ON jobs(json_extract(job,'$.api_name'))
+                        WHERE result IS NOT NULL;
+                    CREATE INDEX IF NOT EXISTS attempts_discovery_api
+                        ON attempts(json_extract(result,'$.api_name'));
+                    COMMIT;
+                """)
+            except BaseException:
+                self.db.rollback()
+                self.db.close()
+                raise
         cursor = self.db.execute(
             "SELECT value FROM scheduler_state WHERE name='family_turn'"
         ).fetchone()

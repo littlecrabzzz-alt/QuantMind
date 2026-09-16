@@ -82,6 +82,63 @@ class QueueIndexTest(unittest.TestCase):
                 map(tuple, self.p.db.execute("SELECT rowid,* FROM jobs ORDER BY rowid"))
             ),
         )
+
+        schema = self.p.db.execute("PRAGMA schema_version").fetchone()[0]
+        self.p.close()
+        self.p = module.Pipeline(self.root, {"entries": []})
+        self.assertEqual(self.p.db.execute("PRAGMA schema_version").fetchone()[0], schema)
+        self.assertEqual(before, [tuple(r) for r in self.p.db.execute("SELECT rowid,* FROM jobs ORDER BY rowid")])
+
+    def test_discovery_seeks_preserve_historical_results_without_pending_scan(self):
+        self.seed(50000, 60)
+        self.p.db.execute("UPDATE jobs SET result=NULL WHERE state='pending'")
+        self.p.db.executemany("INSERT INTO attempts VALUES(?,?,?)", [
+            ('old', 1, json.dumps({'api_name': 'daily', 'old_version': 1})),
+            ('old', 2, json.dumps({'api_name': 'daily', 'old_version': 2})),
+        ])
+        self.p.db.commit()
+        sql = """SELECT result FROM jobs {hint} WHERE result IS NOT NULL
+            AND json_extract(job,'$.api_name') IN (?) UNION SELECT result
+            FROM attempts {hint} WHERE json_extract(result,'$.api_name') IN (?)"""
+        results, steps = [], []
+        for hint in ('NOT INDEXED', ''):
+            counter = [0]
+            def progress():
+                counter[0] += 1
+                return 0
+            self.p.db.set_progress_handler(progress, 100)
+            results.append([r[0] for r in self.p.db.execute(sql.format(hint=hint), ('daily', 'daily'))])
+            self.p.db.set_progress_handler(None, 0)
+            steps.append(counter[0])
+        self.assertEqual(results[0], results[1])
+        self.assertEqual(len(results[1]), 3)  # Current result and both old attempts.
+        self.assertLess(steps[1], steps[0] / 10)
+        plan = ' '.join(r[3] for r in self.p.db.execute(
+            'EXPLAIN QUERY PLAN ' + sql.format(hint=''), ('daily', 'daily')))
+        self.assertIn('USING INDEX jobs_discovery_api', plan)
+        self.assertIn('USING INDEX attempts_discovery_api', plan)
+
+    def test_failed_discovery_index_migration_rolls_back_then_preserves_rows(self):
+        self.seed()
+        before = [tuple(r) for r in self.p.db.execute('SELECT rowid,* FROM jobs ORDER BY rowid')]
+        self.p.db.executescript('DROP INDEX jobs_discovery_api; DROP INDEX attempts_discovery_api; PRAGMA user_version=6;')
+        self.p.close()
+        connect = sqlite3.connect
+        def deny_second(*args, **kwargs):
+            db = connect(*args, **kwargs)
+            db.set_authorizer(lambda action, name, *rest: sqlite3.SQLITE_DENY
+                              if action == sqlite3.SQLITE_CREATE_INDEX and name == 'attempts_discovery_api'
+                              else sqlite3.SQLITE_OK)
+            return db
+        with patch.object(module.sqlite3, 'connect', side_effect=deny_second):
+            with self.assertRaises(sqlite3.DatabaseError):
+                module.Pipeline(self.root, {'entries': []})
+        with connect(self.root / 'pipeline.sqlite') as db:
+            self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0], 6)
+            self.assertEqual(db.execute("SELECT name FROM sqlite_master WHERE name IN ('jobs_discovery_api','attempts_discovery_api')").fetchall(), [])
+        self.p = module.Pipeline(self.root, {'entries': []})
+        self.assertEqual(self.p.db.execute('PRAGMA user_version').fetchone()[0], 6)
+        self.assertEqual(before, [tuple(r) for r in self.p.db.execute('SELECT rowid,* FROM jobs ORDER BY rowid')])
         schema = self.p.db.execute("PRAGMA schema_version").fetchone()[0]
         self.p.close()
         self.p = module.Pipeline(self.root, {"entries": []})
