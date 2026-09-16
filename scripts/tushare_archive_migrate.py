@@ -73,7 +73,7 @@ def digest(path):
     return {'bytes': size, 'sha256': sha.hexdigest()}
 
 
-def frozen_checkpoint(root):
+def frozen_checkpoint(root, *, wait_locks=False):
     """Called only after disabling Tushare admission and draining its workers.
 
     Busy locks fail immediately. Nothing enables/disables services here.
@@ -85,7 +85,9 @@ def frozen_checkpoint(root):
     with ExitStack() as stack:
         for name in ('pipeline.lock', 'documents.lock', '.archive.lock'):
             lock = stack.enter_context((root / name).open('a'))
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(lock, fcntl.LOCK_EX | (0 if wait_locks else fcntl.LOCK_NB))
+        if (root / 'ENABLED').exists():
+            raise ValueError('Acquisition was reenabled while waiting for locks')
         target = root / '.migration' / ('checkpoint-' + utc_now().replace(':', '-'))
         target.mkdir(parents=True)
         count = total = 0
@@ -217,6 +219,7 @@ if __name__ == '__main__':
     parser.add_argument('--action', choices=['precopy', 'checkpoint', 'install-checkpoint', 'verify'], default='precopy')
     parser.add_argument('--checkpoint', type=Path)
     parser.add_argument('--staged-current', action='store_true')
+    parser.add_argument('--wait-locks', action='store_true')
     args = parser.parse_args()
     args.root.mkdir(parents=True, exist_ok=True)
     with (args.root / ".migration.lock").open("a") as lock:
@@ -224,7 +227,7 @@ if __name__ == '__main__':
         if args.action == 'precopy':
             raise SystemExit(precopy(args.root))
         elif args.action == 'checkpoint':
-            print(frozen_checkpoint(args.root))
+            print(frozen_checkpoint(args.root, wait_locks=args.wait_locks))
         else:
             if args.checkpoint is None:
                 parser.error('--checkpoint is required')
