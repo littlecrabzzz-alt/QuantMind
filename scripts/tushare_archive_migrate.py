@@ -6,6 +6,8 @@ import json
 import hashlib
 import os
 import sqlite3
+import socket
+import shlex
 from contextlib import ExitStack
 from pathlib import Path
 import shutil
@@ -213,13 +215,80 @@ def verify_checkpoint(root, checkpoint, *, staged_current=False):
     return report
 
 
+def seal_source(root, checkpoint, owner):
+    """Fence the paused source after destination verification; never delete data."""
+    root, checkpoint = root.resolve(), checkpoint.resolve()
+    if not checkpoint.is_relative_to(root / '.migration') or not owner or len(owner) > 255:
+        raise ValueError('Invalid handoff identity')
+    if (root / 'ENABLED').exists() or not (root / 'ENABLED.migration-paused').exists():
+        raise ValueError('Source must remain paused')
+    proof = json.loads((checkpoint / 'COMPLETE.json').read_bytes())
+    if digest(checkpoint / 'inventory.jsonl') != proof['inventory']:
+        raise ValueError('Source inventory mismatch')
+    with ExitStack() as stack:
+        for name in ('pipeline.lock', 'documents.lock', '.archive.lock'):
+            lock = stack.enter_context((root / name).open('a'))
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if (root / 'ENABLED').exists():
+            raise ValueError('Source resumed during handoff')
+        if digest(root / 'CURRENT.json') != digest(checkpoint / 'CURRENT.json'):
+            raise ValueError('Source published after checkpoint')
+        record = {'owner_hostname': owner, 'inventory': proof['inventory'],
+                  'current': digest(checkpoint / 'CURRENT.json'), 'source_paused': True}
+        marker = root / 'ARCHIVE_RELOCATED.json'
+        if marker.exists() and json.loads(marker.read_bytes()) != record:
+            raise ValueError('Source already handed to a different checkpoint or owner')
+        atomic_json(marker, record)
+        return record
+
+
+def finalize_archive(root, checkpoint):
+    """Verify every local file, fence cloud, then publish local ownership."""
+    root, checkpoint = root.resolve(), checkpoint.resolve()
+    if (root / 'ENABLED').exists() or (root / 'ARCHIVE_AUTHORITY.json').exists():
+        raise ValueError('Archive ownership already active; refuse another handoff')
+    # The caller holds .migration.lock, excluding the precopy installer.
+    with (root / '.archive-worker.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        report = verify_checkpoint(root, checkpoint, staged_current=True)
+        topology = dict(line.split('=', 1) for line in
+                        (Path(__file__).resolve().parents[1] / 'deploy/dual-node.env').read_text().splitlines()
+                        if line and not line.startswith('#'))
+        remote_root = topology['QM_REMOTE_PROJECT'] + '/data/tushare'
+        remote_checkpoint = remote_root + '/.migration/' + checkpoint.name
+        command = ['sudo', '-n', '/usr/bin/python3',
+                   topology['QM_REMOTE_PROJECT'] + '/scripts/tushare_archive_migrate.py',
+                   '--root', remote_root, '--action', 'seal-source',
+                   '--checkpoint', remote_checkpoint, '--owner', socket.gethostname()]
+        result = subprocess.run(['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15',
+                                 topology['QM_SSH_TARGET'], shlex.join(command)],
+                                check=True, capture_output=True, text=True, timeout=120)
+        seal = json.loads(result.stdout)
+        if (seal.get('owner_hostname') != socket.gethostname()
+                or seal.get('inventory') != report['inventory']
+                or seal.get('current') != digest(checkpoint / 'CURRENT.json')
+                or seal.get('source_paused') is not True):
+            raise ValueError('Cloud handoff evidence does not match local verification')
+        from backend.shared.tushare_pipeline import atomic_bytes
+        atomic_bytes(root / 'CURRENT.json', (checkpoint / 'CURRENT.json').read_bytes())
+        atomic_json(root / 'ARCHIVE_AUTHORITY.json', {
+            **seal, 'migration_verified': True, 'verified_at': utc_now(),
+            'verified_files': report['files'], 'verified_bytes': report['bytes']})
+        atomic_bytes(root / 'ENABLED', b'archive-owner\n')
+        report.update(status='ownership_transferred', migration_verified=True,
+                      cloud_writer_disabled=True, owner_hostname=socket.gethostname())
+        atomic_json(root / 'archive-migration-status.json', report)
+        return report
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
-    parser.add_argument('--action', choices=['precopy', 'checkpoint', 'install-checkpoint', 'verify'], default='precopy')
+    parser.add_argument('--action', choices=['precopy', 'checkpoint', 'install-checkpoint', 'verify', 'seal-source', 'finalize'], default='precopy')
     parser.add_argument('--checkpoint', type=Path)
     parser.add_argument('--staged-current', action='store_true')
     parser.add_argument('--wait-locks', action='store_true')
+    parser.add_argument('--owner')
     args = parser.parse_args()
     args.root.mkdir(parents=True, exist_ok=True)
     with (args.root / ".migration.lock").open("a") as lock:
@@ -231,6 +300,12 @@ if __name__ == '__main__':
         else:
             if args.checkpoint is None:
                 parser.error('--checkpoint is required')
+            if args.action == 'seal-source':
+                print(json.dumps(seal_source(args.root, args.checkpoint, args.owner)))
+                raise SystemExit(0)
+            if args.action == 'finalize':
+                print(json.dumps(finalize_archive(args.root, args.checkpoint)))
+                raise SystemExit(0)
             if args.action == 'install-checkpoint':
                 print(json.dumps(install_checkpoint(args.root, args.checkpoint)))
                 raise SystemExit(0)

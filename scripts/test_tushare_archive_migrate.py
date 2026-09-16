@@ -2,13 +2,14 @@ import fcntl
 import json
 from pathlib import Path
 import shutil
+import socket
 import sqlite3
 import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from scripts.tushare_archive_migrate import frozen_checkpoint, verify_checkpoint, install_checkpoint
+from scripts.tushare_archive_migrate import frozen_checkpoint, verify_checkpoint, install_checkpoint, finalize_archive, seal_source
 
 
 class MigrationCheck(unittest.TestCase):
@@ -68,6 +69,32 @@ class MigrationCheck(unittest.TestCase):
             (checkpoint / 'inventory.jsonl').write_text('tampered')
             with self.assertRaises(ValueError):
                 verify_checkpoint(target, checkpoint)
+
+    def test_handoff_requires_matching_cloud_fence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, target = Path(directory) / 'source', Path(directory) / 'target'
+            source.mkdir()
+            (source / 'CURRENT.json').write_text('{}')
+            (source / 'ENABLED.migration-paused').touch()
+            checkpoint = frozen_checkpoint(source)
+            shutil.copytree(source, target)
+            copied = target / checkpoint.relative_to(source.resolve())
+            marker = seal_source(source, checkpoint, socket.gethostname())
+            self.assertEqual(seal_source(source, checkpoint, socket.gethostname()), marker)
+            with patch('scripts.tushare_archive_migrate.subprocess.run', return_value=SimpleNamespace(stdout='{}')):
+                with self.assertRaisesRegex(ValueError, 'handoff evidence'):
+                    finalize_archive(target, copied)
+            self.assertFalse((target / 'ENABLED').exists())
+            self.assertFalse((target / 'ARCHIVE_AUTHORITY.json').exists())
+            with patch('scripts.tushare_archive_migrate.subprocess.run', return_value=SimpleNamespace(stdout=json.dumps(marker))):
+                report = finalize_archive(target, copied)
+            self.assertTrue(report['migration_verified'])
+            self.assertTrue((target / 'ENABLED').exists())
+            with self.assertRaisesRegex(ValueError, 'already active'):
+                finalize_archive(target, copied)
+            (source / 'CURRENT.json').write_text('changed')
+            with self.assertRaisesRegex(ValueError, 'published after'):
+                seal_source(source, checkpoint, socket.gethostname())
 
     def test_symlink_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
