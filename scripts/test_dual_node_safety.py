@@ -509,6 +509,13 @@ class ScheduledPull(unittest.TestCase):
             self.assertNotIn("StartInterval", definition)
             self.assertEqual(definition["StartCalendarInterval"], [{"Minute": m} for m in (0, 15, 30, 45)])
             self.assertIn("--quantdb-only", definition["ProgramArguments"])
+            plist = root / "Library/LaunchAgents/com.quantmind.snapshot-pull.plist"
+            plist.write_bytes(b"old definition")
+            statuses = [subprocess.CompletedProcess([], code) for code in (0, 0, 1)]
+            with patch.object(snapshot, "PROJECT", project), patch.object(snapshot.sys, "platform", "darwin"), patch.object(Path, "home", return_value=root), patch.object(snapshot, "run") as run, patch.object(snapshot.subprocess, "run", side_effect=statuses), patch.object(snapshot.time, "sleep") as sleep:
+                snapshot.install_mac_pull()
+                sleep.assert_called_once_with(0.5)
+                self.assertEqual(run.call_args.args[1], "bootstrap")
 
 
 

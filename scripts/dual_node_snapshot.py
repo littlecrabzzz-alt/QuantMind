@@ -349,6 +349,13 @@ def install_mac_pull():
         return
     if installed:
         run("launchctl", "bootout", target)
+        # bootout returns before a running job has exited; bootstrap then fails EIO.
+        for _ in range(30):
+            if subprocess.run(["launchctl", "print", target], capture_output=True).returncode != 0:
+                break
+            time.sleep(0.5)
+        else:
+            raise RuntimeError("Previous snapshot client is still stopping; retry installation")
     plist.parent.mkdir(parents=True, exist_ok=True)
     plist.write_bytes(raw)
     run("launchctl", "bootstrap", f"gui/{os.getuid()}", str(plist))
