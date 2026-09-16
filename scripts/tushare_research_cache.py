@@ -5,6 +5,8 @@ Transport is loopback HTTP inside an SSH tunnel, never a public HTTP listener.
 The full archive, acquisition databases and credentials are never served.
 """
 import argparse
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 import fcntl
 import hashlib
 import json
@@ -18,7 +20,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.request import urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from backend.shared.tushare_pipeline import atomic_json, atomic_bytes, manifest_at
+from backend.shared.tushare_pipeline import atomic_json, atomic_bytes, manifest_at, utc_now
 
 DEFAULT_APIS = ('daily', 'index_daily', 'fund_daily', 'adj_factor', 'daily_basic',
                 'index_weight', 'ci_daily', 'sw_daily', 'stock_basic', 'index_basic',
@@ -192,10 +194,40 @@ def pull(root, url, budget, reserve):
         needed = sum(item['bytes'] for _, item in missing)
         if used + needed > budget or shutil.disk_usage(root).free < reserve + needed:
             raise ValueError('Cache budget exceeded; existing release retained')
-        for name, expected in missing:
+        progress = {'status': 'downloading', **pointer, 'total_missing_files': len(missing),
+                    'downloaded_files': 0, 'downloaded_bytes': 0, 'needed_bytes': needed,
+                    'started_at': utc_now()}
+        def save_progress():
+            progress['updated_at'] = utc_now()
+            atomic_json(root / 'cache-transfer-status.json', progress)
+        def download(item):
+            name, expected = item
             if shutil.disk_usage(root).free < reserve + expected['bytes']:
                 raise ValueError('Disk reserve reached')
             fetch(url + '/' + name, root / name, expected, expected['bytes'])
+            return expected['bytes']
+        save_progress()
+        try:
+            # Eight in-flight objects amortize SSH latency; memory stays bounded.
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                pending = deque()
+                items = iter(missing)
+                for _ in range(min(8, len(missing))):
+                    pending.append(pool.submit(download, next(items)))
+                while pending:
+                    progress['downloaded_bytes'] += pending.popleft().result()
+                    progress['downloaded_files'] += 1
+                    item = next(items, None)
+                    if item is not None:
+                        pending.append(pool.submit(download, item))
+                    if progress['downloaded_files'] % 100 == 0:
+                        save_progress()
+        except Exception as exc:
+            progress.update(status='failed', error_type=type(exc).__name__)
+            save_progress()
+            raise
+        progress['status'] = 'downloaded'
+        save_progress()
         atomic_json(root / 'CURRENT.json', pointer)
         report = {'status': 'verified', **pointer, 'downloaded_files': len(missing),
                   'selected_api_names': manifest['selected_api_names'],

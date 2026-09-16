@@ -59,6 +59,11 @@ class ResearchCache(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'budget'):
                     cache.pull(target, 'http://127.0.0.1:18765', 0, 0)
                 self.assertFalse((target / 'CURRENT.json').exists())
+                with patch.object(cache, 'fetch', side_effect=ValueError('transfer failed')):
+                    with self.assertRaisesRegex(ValueError, 'transfer failed'):
+                        cache.pull(target, 'http://127.0.0.1:18765', 1024**2, 0)
+                self.assertFalse((target / 'CURRENT.json').exists())
+                self.assertEqual(json.loads((target / 'cache-transfer-status.json').read_bytes())['status'], 'failed')
                 report = cache.pull(target, 'http://127.0.0.1:18765', 1024**2, 0)
                 self.assertEqual(report['downloaded_files'], 2)
                 self.assertEqual(cache.pull(target, 'http://127.0.0.1:18765', 1024**2, 0)['downloaded_files'], 0)

@@ -1,0 +1,11 @@
+[Unit]
+Description=Verified research subset from Mac archive over SSH loopback
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/data/disk/quantmind/project
+ExecStart=/usr/bin/python3 scripts/tushare_research_cache.py pull --root /root/data/disk/quantmind/project/data/tushare-research --budget-gib 50 --reserve-gib 100
+UMask=0077
+Nice=10
+TimeoutStartSec=infinity

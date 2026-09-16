@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh Mac-sourced research cache every fifteen minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=15min
+Unit=tushare-research-cache.service
+
+[Install]
+WantedBy=timers.target

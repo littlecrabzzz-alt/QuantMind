@@ -48,3 +48,9 @@
 激活前检查已部署代码的 authority、节点标记及密钥文件权限，安装
 `com.quantmind.tushare-archive` LaunchAgent。已有采集进程时拒绝覆盖运行代码，
 升级须先自然结束当前采集周期。300 GiB 停写线和 500 GiB NAS 提醒由 worker 执行。
+
+云端定时缓存使用 `deploy/tushare-research-cache.service` 和对应 `.timer`，
+安装到 `/etc/systemd/system/` 后启用 timer。部署前等待当前临时拉取 unit 结束，
+避免重复扫描。定时器在上次结束 15 分钟后再拉，离线失败保留 CURRENT。
+传输最多同时下载 8 个对象，`cache-transfer-status.json` 每 100 个完成文件更新；
+`cache-status.json` 仅在全部文件验证并原子切换 CURRENT 后更新。
