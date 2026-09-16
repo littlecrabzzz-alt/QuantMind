@@ -289,12 +289,21 @@ def seal_source(root, checkpoint, owner):
 def finalize_archive(root, checkpoint):
     """Verify every local file, fence cloud, then publish local ownership."""
     root, checkpoint = root.resolve(), checkpoint.resolve()
-    if (root / 'ENABLED').exists() or (root / 'ARCHIVE_AUTHORITY.json').exists():
+    marker = root / 'ARCHIVE_AUTHORITY.json'
+    pending = json.loads(marker.read_bytes()) if marker.exists() else None
+    if pending is not None:
+        if (pending.get('activation_pending') is not True
+                or pending.get('migration_verified') is not False
+                or pending.get('owner_hostname') != socket.gethostname()):
+            raise ValueError('Archive ownership already active; refuse another handoff')
+    elif (root / 'ENABLED').exists():
         raise ValueError('Archive ownership already active; refuse another handoff')
     # The caller holds .migration.lock, excluding the precopy installer.
     with (root / '.archive-worker.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         report = verify_checkpoint(root, checkpoint, staged_current=True)
+        if pending is not None and pending.get('inventory') != report['inventory']:
+            raise ValueError('Pending handoff belongs to a different checkpoint')
         topology = dict(line.split('=', 1) for line in
                         (Path(__file__).resolve().parents[1] / 'deploy/dual-node.env').read_text().splitlines()
                         if line and not line.startswith('#'))
@@ -315,10 +324,14 @@ def finalize_archive(root, checkpoint):
             raise ValueError('Cloud handoff evidence does not match local verification')
         from backend.shared.tushare_pipeline import atomic_bytes
         atomic_bytes(root / 'CURRENT.json', (checkpoint / 'CURRENT.json').read_bytes())
-        atomic_json(root / 'ARCHIVE_AUTHORITY.json', {
-            **seal, 'migration_verified': True, 'verified_at': utc_now(),
-            'verified_files': report['files'], 'verified_bytes': report['bytes']})
+        ownership = {**seal, 'migration_verified': False, 'activation_pending': True,
+                     'verified_at': utc_now(), 'verified_files': report['files'],
+                     'verified_bytes': report['bytes']}
+        atomic_json(marker, ownership)
         atomic_bytes(root / 'ENABLED', b'archive-owner\n')
+        # authority() rejects the pending marker even if ENABLED was written.
+        ownership.update(migration_verified=True, activation_pending=False)
+        atomic_json(marker, ownership)
         report.update(status='ownership_transferred', migration_verified=True,
                       cloud_writer_disabled=True, owner_hostname=socket.gethostname())
         atomic_json(root / 'archive-migration-status.json', report)

@@ -85,3 +85,7 @@ CURRENT、ARCHIVE_AUTHORITY 和 ENABLED。任何匹配失败都不会启用本�
 入口通过 SSH 确认源仍暂停且 COMPLETE 存在，补传最终不可变文件，再拉检查点
 和采集配置；随后才执行 install-checkpoint/finalize。该步骤保留原 CURRENT，
 不复制活跃 SQLite，不启用采集；中断后可复用 rsync 已完成的文件继续。
+
+接管写入采用 pending 所有权标记：先标记 migration_verified=false，再写 ENABLED，
+最后提交已验证所有权。若中断发生在其中，authority 会继续拒绝采集；对同一节点、
+同一检查点重跑 finalize 会重新验证并继续。已经完成的所有权不会被再次覆盖。

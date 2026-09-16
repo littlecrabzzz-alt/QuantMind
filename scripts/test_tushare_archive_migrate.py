@@ -9,6 +9,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from scripts import tushare_archive_migrate as migration
 from scripts.tushare_archive_migrate import frozen_checkpoint, verify_checkpoint, install_checkpoint, finalize_archive, seal_source, sync_frozen
 
 
@@ -86,6 +87,18 @@ class MigrationCheck(unittest.TestCase):
                     finalize_archive(target, copied)
             self.assertFalse((target / 'ENABLED').exists())
             self.assertFalse((target / 'ARCHIVE_AUTHORITY.json').exists())
+            original = migration.atomic_json
+            def interrupted(path, value):
+                if path.name == 'ARCHIVE_AUTHORITY.json' and value.get('migration_verified') is True:
+                    raise OSError('simulated process interruption')
+                return original(path, value)
+            with patch('scripts.tushare_archive_migrate.subprocess.run', return_value=SimpleNamespace(stdout=json.dumps(marker))), \
+                    patch.object(migration, 'atomic_json', side_effect=interrupted):
+                with self.assertRaisesRegex(OSError, 'interruption'):
+                    finalize_archive(target, copied)
+            state = json.loads((target / 'ARCHIVE_AUTHORITY.json').read_bytes())
+            self.assertFalse(state['migration_verified'])
+            self.assertTrue(state['activation_pending'])
             with patch('scripts.tushare_archive_migrate.subprocess.run', return_value=SimpleNamespace(stdout=json.dumps(marker))):
                 report = finalize_archive(target, copied)
             self.assertTrue(report['migration_verified'])
