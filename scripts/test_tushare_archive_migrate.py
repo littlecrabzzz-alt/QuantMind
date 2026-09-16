@@ -24,6 +24,7 @@ class MigrationCheck(unittest.TestCase):
             with sqlite3.connect(source / 'pipeline.sqlite') as db:
                 db.execute('CREATE TABLE jobs(id INTEGER)')
                 db.execute('INSERT INTO jobs VALUES(7)')
+            (source / 'state.sqlite3').touch()
             (source / 'ENABLED').touch()
             with self.assertRaises(ValueError):
                 frozen_checkpoint(source)
@@ -54,7 +55,7 @@ class MigrationCheck(unittest.TestCase):
                 if 'checkpoint_path' in row:
                     shutil.copyfile(source / row['checkpoint_path'], target / row['path'])
             result = verify_checkpoint(target, checkpoint)
-            self.assertEqual(result['files'], 3)
+            self.assertEqual(result['files'], 4)
             self.assertFalse(result['migration_verified'])
             self.assertFalse((target / 'ARCHIVE_AUTHORITY.json').exists())
             (target / 'CURRENT.json').write_text('old pinned pointer')

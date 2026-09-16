@@ -97,14 +97,17 @@ def frozen_checkpoint(root):
                 if relative == 'CURRENT.json':
                     source = target / 'CURRENT.json'
                     shutil.copyfile(path, source)
-                elif path.suffix in ('.sqlite', '.sqlite3') and path.stat().st_size:
+                elif path.suffix in ('.sqlite', '.sqlite3'):
                     source = target / 'databases' / relative
                     source.parent.mkdir(parents=True, exist_ok=True)
-                    with sqlite3.connect(path.as_uri() + '?mode=ro', uri=True) as db:
-                        with sqlite3.connect(source) as copy:
-                            db.backup(copy)
-                            if copy.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
-                                raise ValueError('Invalid checkpoint database')
+                    if path.stat().st_size == 0:
+                        source.touch()
+                    else:
+                        with sqlite3.connect(path.as_uri() + '?mode=ro', uri=True) as db:
+                            with sqlite3.connect(source) as copy:
+                                db.backup(copy)
+                                if copy.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
+                                    raise ValueError('Invalid checkpoint database')
                 record = {'path': relative, **digest(source)}
                 if source != path:
                     record['checkpoint_path'] = source.relative_to(root).as_posix()

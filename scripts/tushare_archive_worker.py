@@ -41,7 +41,10 @@ def main():
                     if config.get('enable_documents') and shutil.disk_usage(root).free >= 300 * 2**30:
                         report['documents'] = run_documents(root, max_documents=100, max_seconds=90,
                                                            download_workers=min(2, max(1, int(config.get('document_download_workers', 1)))))
-                    report['status'] = 'completed_cycle'
+                    acquisition_status = report['acquisition'].get('status', '')
+                    report['status'] = (acquisition_status if acquisition_status.startswith('blocked')
+                                        or acquisition_status in ('disabled', 'already_running')
+                                        else 'completed_cycle')
             except Exception as exc:
                 report.update(status='failed', error_type=type(exc).__name__)
             atomic_json(root / 'archive-worker-status.json', report)
