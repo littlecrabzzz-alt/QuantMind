@@ -193,3 +193,14 @@ def test_pg_partial_is_not_completed(monkeypatch):
     monkeypatch.setitem(sys.modules, source.__name__, source)
     monkeypatch.setitem(sys.modules, jobs.__name__, jobs)
     assert run_market_sync('A', {})['status'] == 'partial'
+
+
+@pytest.mark.parametrize("result,failed", [
+    ({"sources": {"north": {"error": "source missing"}}}, True),
+    ({"result": {"kline": {"errors": 2}}}, True),
+    ({"sources": {"north": {"status": "failed"}}}, True),
+    ({"parquet": {"errors": []}, "qlib": {"status": "ok"}}, False),
+])
+def test_nested_source_failure_is_not_reported_as_success(result, failed):
+    from backend.services.engine.tasks.market_sync_scheduler import _has_sync_errors
+    assert _has_sync_errors(result) is failed

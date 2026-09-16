@@ -112,6 +112,17 @@ def _mark_run(market: str, date_str: str, ttl: int = 2 * 24 * 3600) -> None:
     )
 
 
+def _has_sync_errors(value: Any) -> bool:
+    """Nested source failures must not be reported as a successful daily sync."""
+    if isinstance(value, dict):
+        if value.get("status") in {"error", "partial", "failed"} or value.get("error") or value.get("errors"):
+            return True
+        return any(_has_sync_errors(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_has_sync_errors(item) for item in value)
+    return False
+
+
 def run_market_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
     """执行指定市场的同步（按配置的数据集/天数）。"""
     days = int(cfg.get("days") or 5)
@@ -141,10 +152,7 @@ def run_market_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
             data = run_daily_sync(datasets=datasets or None, skip_pg=False,
                                   skip_qlib=not with_qlib,
                                   progress_cb=celery_progress_cb(job_id))
-            failed = bool((data.get("parquet") or {}).get("errors")) or any(
-                isinstance(value, dict) and value.get("status") in {"error", "partial", "failed"}
-                for value in data.values()
-            )
+            failed = _has_sync_errors(data)
             result.update(result=data, job_id=job_id,
                           status="partial" if failed else "completed",
                           finished=datetime.now().isoformat())
@@ -184,6 +192,7 @@ def run_market_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
             logger.error("%s 定时同步 qlib 缓存失败: %s", market, exc, exc_info=True)
             result["qlib"] = {"status": "error", "reason": str(exc)}
 
+    result["status"] = "partial" if _has_sync_errors(result) else "completed"
     result["finished"] = datetime.now().isoformat()
     return result
 
