@@ -1,7 +1,7 @@
 """Authenticated, fixed-release offline data reads; no provider fallback.
 
-ROOT is deliberately not user/env configurable. Sandbox tests patch this module
-constant. Register the router behind the engine's existing identity middleware.
+ROOT uses an allowlisted deployment store, never a request-supplied path.
+Sandbox tests patch this module constant. Register the router behind the engine's existing identity middleware.
 """
 
 from contextlib import contextmanager
@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from backend.services.engine.auth_context import get_authenticated_identity
 from backend.shared import tushare_store
 
-ROOT = Path("/data/tushare")
+ROOT = tushare_store.deployed_read_root()
 RELEASE = r"^data-[a-f0-9]{64}$"
 OBJECT = r"(?:documents|attachments|extracted)/[a-f0-9]{64}\.(?:json|pdf|html)"
 router = APIRouter(

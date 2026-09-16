@@ -137,6 +137,14 @@ TEXT_FIELDS = (
 OBSERVATION_NOTE = "as_of filters this system's observation time; it is not historical publication-time or PIT proof"
 
 
+def deployed_read_root():
+    """Deployment selects one fixed store; requests cannot choose filesystem paths."""
+    store = os.getenv('QM_TUSHARE_READ_STORE', 'archive')
+    if store not in ('archive', 'research-cache'):
+        raise ValueError('Unknown Tushare read store')
+    return Path('/data/tushare-research' if store == 'research-cache' else '/data/tushare')
+
+
 def _identifier(name, columns):
     if not isinstance(name, str) or name not in columns:
         raise ValueError(f"Unknown stored field: {name!r}")

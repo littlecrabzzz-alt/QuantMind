@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -12,6 +13,15 @@ import tushare_research_cache as cache
 
 
 class ResearchCache(unittest.TestCase):
+    def test_deployment_read_store_is_allowlisted(self):
+        from backend.shared.tushare_store import deployed_read_root
+        for value, expected in [('archive', '/data/tushare'), ('research-cache', '/data/tushare-research')]:
+            with patch.dict(os.environ, {'QM_TUSHARE_READ_STORE': value}):
+                self.assertEqual(deployed_read_root(), Path(expected))
+        with patch.dict(os.environ, {'QM_TUSHARE_READ_STORE': '/tmp/arbitrary'}):
+            with self.assertRaises(ValueError):
+                deployed_read_root()
+
     def fixture(self, root):
         files, datasets = {}, []
         for api in ('daily', 'fund_daily'):

@@ -54,3 +54,8 @@
 避免重复扫描。定时器在上次结束 15 分钟后再拉，离线失败保留 CURRENT。
 传输最多同时下载 8 个对象，`cache-transfer-status.json` 每 100 个完成文件更新；
 `cache-status.json` 仅在全部文件验证并原子切换 CURRENT 后更新。
+
+应用接口读取切换由部署变量 `QM_TUSHARE_READ_STORE=research-cache` 控制，
+仅允许 `archive`（过渡期默认）或 `research-cache` 两个固定目录，客户端不能指定路径。
+切换前须验收所需研究数据及固定版本，之后在应用服务可重启窗口加载该变量；
+不能仅因首次小子集传输成功，就宣称整个应用已经使用新缓存。
