@@ -41,6 +41,7 @@ services:
       TRAIN_NTHREADS: "2"
       TRAIN_IC_WORKERS: "1"
       OSS_EMBEDDED_CELERY: "false"
+      QM_TUSHARE_READ_STORE: ${QM_TUSHARE_READ_STORE:-archive}
       QUANTMIND_ENABLE_WEB_UPDATE: "false"
       ENABLE_REAL_TRADING: "false"
       ENABLE_TDX_PUSH: "false"

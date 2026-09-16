@@ -59,6 +59,11 @@
 仅允许 `archive`（过渡期默认）或 `research-cache` 两个固定目录，客户端不能指定路径。
 切换前须验收所需研究数据及固定版本，之后在应用服务可重启窗口加载该变量；
 不能仅因首次小子集传输成功，就宣称整个应用已经使用新缓存。
+云端 Compose 显式传入该变量，默认仍为 `archive`。完成验收后在云端部署 `.env`
+设置 `QM_TUSHARE_READ_STORE=research-cache`，通过
+`bash scripts/dual-node.sh cloud-compose up -d --no-deps quantmind` 重建应用容器以加载变量；
+仅 `restart` 不会更新容器环境。Mac 沙盒目前仍读取自己的快照目录，完整归档迁移
+本身不会自动改写沙盒容器挂载，应用读目录需另行核验。
 
 最终迁移的 CURRENT 随冻结检查点暂存；验收时可加 `--staged-current` 检查
 检查点中的新指针，保持本地当前读版本不变。所有文件校验和唯一写入者交接
