@@ -115,6 +115,7 @@ IDENTIFIER_SPLIT_SOURCE_APIS = {
     "stocks": STOCK_IDENTIFIER_SOURCE_APIS,
     "dc_indices": ("dc_index", "dc_member", "dc_daily"),
 }
+IDENTIFIER_CACHE_VERSION = 1
 ROOT = Path(os.getenv("QM_TUSHARE_ARCHIVE_ROOT", "/data/tushare"))
 CONTRACTS = {
     api: (spec["row_cap"], spec["required_fields"])
@@ -435,6 +436,13 @@ class Pipeline:
                 self.db.rollback()
                 self.db.close()
                 raise
+        self.db.execute("""
+            CREATE TABLE IF NOT EXISTS identifier_discovery_cache (
+                version INTEGER PRIMARY KEY, attempt_rowid INTEGER NOT NULL,
+                attempt_count INTEGER NOT NULL, result TEXT NOT NULL,
+                objects TEXT NOT NULL)
+        """)
+        self.db.commit()
         cursor = self.db.execute(
             "SELECT value FROM scheduler_state WHERE name='family_turn'"
         ).fetchone()
@@ -1216,7 +1224,52 @@ class Pipeline:
                         )
         self.db.commit()
 
-    def identifiers(self, *, _source_apis=None):
+    def _load_identifier_cache(self):
+        row = self.db.execute(
+            "SELECT * FROM identifier_discovery_cache WHERE version=?",
+            (IDENTIFIER_CACHE_VERSION,),
+        ).fetchone()
+        if row is None:
+            return None
+        retained = self.db.execute(
+            "SELECT count(*) FROM attempts WHERE rowid<=?", (row["attempt_rowid"],)
+        ).fetchone()[0]
+        if retained != row["attempt_count"]:
+            return None
+        objects = json.loads(row["objects"])
+        for sha, expected in objects.items():
+            current = (self.root / "objects" / (sha + ".json")).stat()
+            observed = [
+                current.st_dev,
+                current.st_ino,
+                current.st_size,
+                current.st_mtime_ns,
+                current.st_ctime_ns,
+            ]
+            if observed != expected:
+                return None
+        return json.loads(row["result"]), row["attempt_rowid"], objects
+
+    def _save_identifier_cache(self, result, attempt_rowid, attempt_count, objects):
+        self.db.execute(
+            "DELETE FROM identifier_discovery_cache WHERE version<>?",
+            (IDENTIFIER_CACHE_VERSION,),
+        )
+        self.db.execute(
+            "INSERT INTO identifier_discovery_cache VALUES(?,?,?,?,?) "
+            "ON CONFLICT(version) DO UPDATE SET "
+            "attempt_rowid=excluded.attempt_rowid,attempt_count=excluded.attempt_count,"
+            "result=excluded.result,objects=excluded.objects",
+            (
+                IDENTIFIER_CACHE_VERSION,
+                attempt_rowid,
+                attempt_count,
+                json_bytes(result).decode(),
+                json_bytes(objects).decode(),
+            ),
+        )
+
+    def identifiers(self, *, _source_apis=None, _use_cache=False):
         bond_source_apis = ("cb_daily", "cb_issue", "cb_call", "cb_rate", "cb_price_chg", "cb_share")
         factor_records = {}
         reward_period_records = {}
@@ -1294,17 +1347,31 @@ class Pipeline:
         }
         # Additional sources enter only the minute projection, never an old universe.
         families = {**dict.fromkeys(MINUTE_SOURCE_FAMILIES, "minute_source_only"), **families}
-        result = {name: set() for name in families.values()}
-        result.update({name: set() for name in MINUTE_SOURCE_FAMILIES.values()})
-        result.update({name: set() for name in REALTIME_SOURCE_FAMILIES.values()})
-        result["minute_futures_unmapped"] = set()
-        result.update(
-            sw_indexes=set(),
-            futures_continuous=set(),
-            futures_products=set(),
-            etfs=set(),
-            bse_new_codes=set(),
-        )
+        cached = self._load_identifier_cache() if _use_cache and _source_apis is None else None
+        if cached:
+            cached_result, cached_attempt_rowid, object_stats = cached
+            factor_records = {
+                json_bytes(item): item
+                for item in cached_result.pop("factor_library_factors", [])
+            }
+            reward_period_records = {
+                json_bytes(item): item
+                for item in cached_result.pop("stock_context_reward_periods", [])
+            }
+            result = {key: set(values) for key, values in cached_result.items()}
+        else:
+            cached_attempt_rowid, object_stats = 0, {}
+            result = {name: set() for name in families.values()}
+            result.update({name: set() for name in MINUTE_SOURCE_FAMILIES.values()})
+            result.update({name: set() for name in REALTIME_SOURCE_FAMILIES.values()})
+            result["minute_futures_unmapped"] = set()
+            result.update(
+                sw_indexes=set(),
+                futures_continuous=set(),
+                futures_products=set(),
+                etfs=set(),
+                bse_new_codes=set(),
+            )
         # All columns used below, including cross-market/member discovery. Raw
         # JSON is still fully decoded; only temporary row dictionaries narrow.
         discovery_fields = frozenset(
@@ -1322,17 +1389,38 @@ class Pipeline:
         else:
             raise ValueError("Unsupported identifier source projection")
         placeholders = ",".join("?" for _ in source_apis)
+        attempt_rowid, attempt_count = self.db.execute(
+            "SELECT COALESCE(max(rowid),0),count(*) FROM attempts"
+        ).fetchone()
         seen = set()
         discovery = {"results": 0, "duplicate_bodies": 0, "bypassed": 0, "body_reads": 0}
+        if cached:
+            discovery.update(
+                cache_hit=True,
+                cached_attempt_rowid=cached_attempt_rowid,
+                cached_objects=len(object_stats),
+            )
         self.identifier_timing = discovery
-        for row in self.db.execute(
-            "SELECT result FROM jobs WHERE result IS NOT NULL AND json_extract(job,'$.api_name') IN ("
-            + placeholders
-            + ") UNION SELECT result FROM attempts WHERE json_extract(result,'$.api_name') IN ("
-            + placeholders
-            + ")",
-            source_apis + source_apis,
-        ):
+        if cached:
+            # Every new response is appended to attempts in the same transaction
+            # that updates jobs.result. The initial scan includes legacy job
+            # variants; the durable attempt rowid is sufficient thereafter.
+            rows = self.db.execute(
+                "SELECT result FROM attempts NOT INDEXED WHERE rowid>? AND rowid<=? "
+                "AND json_extract(result,'$.api_name') IN (" + placeholders + ") "
+                "ORDER BY rowid",
+                (cached_attempt_rowid, attempt_rowid, *source_apis),
+            )
+        else:
+            rows = self.db.execute(
+                "SELECT result FROM jobs WHERE result IS NOT NULL AND json_extract(job,'$.api_name') IN ("
+                + placeholders
+                + ") UNION SELECT result FROM attempts WHERE json_extract(result,'$.api_name') IN ("
+                + placeholders
+                + ")",
+                source_apis + source_apis,
+            )
+        for row in rows:
             saved = json.loads(row[0])
             discovery["results"] += 1
             api, sha = saved.get("api_name"), saved.get("object_sha256")
@@ -1353,8 +1441,16 @@ class Pipeline:
                 )
                 and saved.get("response_format") != "non_json"
             )
-            if eligible and not bypass:
+            if eligible:
                 stat = (self.root / "objects" / (sha + ".json")).stat()
+                object_stats[sha] = [
+                    stat.st_dev,
+                    stat.st_ino,
+                    stat.st_size,
+                    stat.st_mtime_ns,
+                    stat.st_ctime_ns,
+                ]
+            if eligible and not bypass:
                 key = (
                     api,
                     sha,
@@ -1536,6 +1632,10 @@ class Pipeline:
             # Keep raw discovery for family-local validation below; malformed
             # credit inputs must not block unrelated families in identifiers().
             pass
+        if _use_cache and _source_apis is None:
+            self._save_identifier_cache(
+                result, attempt_rowid, attempt_count, object_stats
+            )
         return result
 
     def portfolio_read_identifier(self, epoch):
@@ -1786,7 +1886,7 @@ class Pipeline:
         started = time.monotonic()
         self.identifier_timing = None
         try:
-            identifiers = self.identifiers()
+            identifiers = self.identifiers(_use_cache=True)
             if config.get("enable_portfolio_read") is True:
                 identifiers["portfolio_read_list"] = self.portfolio_read_identifier(
                     portfolio_read_snapshot_epoch(config, today)

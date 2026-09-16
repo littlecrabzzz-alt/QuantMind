@@ -121,6 +121,24 @@ class DiscoveryTiming(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             self.p.identifiers()
 
+    def test_planning_cache_reads_only_new_attempts_and_checks_old_objects(self):
+        old = self.body(["T600018.SH"])
+        self.result("stock_basic", old)
+        direct = self.p.identifiers()
+        first = self.p.identifiers(_use_cache=True)
+        self.p.db.commit()
+        self.result("stock_basic", self.body(["600018.SH"]))
+        with patch.object(self.p, "records", wraps=self.p.records) as reads:
+            second = self.p.identifiers(_use_cache=True)
+        self.assertEqual(reads.call_count, 1)
+        self.assertEqual(module.json_bytes(first), module.json_bytes(direct))
+        self.assertEqual(first["stocks"], ["T600018.SH"])
+        self.assertEqual(second["stocks"], ["600018.SH", "T600018.SH"])
+        self.assertTrue(self.p.identifier_timing["cache_hit"])
+        (self.root / "objects" / (old + ".json")).unlink()
+        with self.assertRaises(FileNotFoundError):
+            self.p.identifiers(_use_cache=True)
+
     def test_missing_duplicate_file_not_hidden_and_errors_do_not_require_body(self):
         sha = self.body(["600000.SH"])
         self.result("stock_basic", sha)

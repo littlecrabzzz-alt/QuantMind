@@ -176,7 +176,7 @@ class PlanningInterval(unittest.TestCase):
         self.published()
         with (
             patch.object(module.Pipeline, "plan_extended", REAL_PLAN),
-            patch.object(module.Pipeline, "identifiers", side_effect=lambda: ids),
+            patch.object(module.Pipeline, "identifiers", side_effect=lambda **_: ids),
             patch.dict(module.PLANNERS, {"structured": universe_planner}, clear=True),
         ):
             self.tick(1)
