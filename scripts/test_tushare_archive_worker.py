@@ -16,10 +16,21 @@ class WorkerStatus(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'ENABLED').touch()
-            (root / 'pipeline-config.json').write_text('{"enable_documents":true,"document_download_workers":2}')
+            (root / 'pipeline-config.json').write_text(
+                '{"enable_documents":true,"document_download_workers":2,'
+                '"document_worker_max_documents":240,'
+                '"document_worker_max_seconds":85}'
+            )
             started, captured, finished = threading.Event(), threading.Event(), threading.Event()
             def documents(*args, **kwargs):
-                self.assertEqual(kwargs, {'max_documents': 100, 'max_seconds': 90, 'download_workers': 2})
+                self.assertEqual(
+                    kwargs,
+                    {
+                        'max_documents': 240,
+                        'max_seconds': 85.0,
+                        'download_workers': 2,
+                    },
+                )
                 started.set()
                 self.assertTrue(captured.wait(2), 'acquisition must overlap documents')
                 finished.set()
@@ -54,6 +65,14 @@ class WorkerStatus(unittest.TestCase):
                 return {'status': 'publish_only', 'requests': 0}
             def documents(*args, **kwargs):
                 order.append('documents')
+                self.assertEqual(
+                    kwargs,
+                    {
+                        'max_documents': 100,
+                        'max_seconds': 90.0,
+                        'download_workers': 1,
+                    },
+                )
                 return {'status': 'ok', 'processed': 100}
             with patch.dict(os.environ), patch('sys.argv', ['worker', '--root', str(root), '--once']), \
                     patch.object(tushare_pipeline, 'authority'), \

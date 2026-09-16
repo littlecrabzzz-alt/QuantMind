@@ -49,8 +49,17 @@ def main():
                             if (documents is None and config.get('enable_documents')
                                     and shutil.disk_usage(root).free >= 300 * 2**30):
                                 documents = pool.submit(
-                                    run_documents, root, max_documents=100, max_seconds=90,
-                                    download_workers=min(2, max(1, int(config.get('document_download_workers', 1)))))
+                                    run_documents, root,
+                                    max_documents=int(config.get(
+                                        'document_worker_max_documents', 100)),
+                                    max_seconds=float(config.get(
+                                        'document_worker_max_seconds', 90)),
+                                    download_workers=min(
+                                        2,
+                                        max(1, int(config.get(
+                                            'document_download_workers', 1))),
+                                    ),
+                                )
                         report['acquisition'] = tick(
                             before_nonpublication_work=start_documents
                         )
