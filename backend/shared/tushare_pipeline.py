@@ -436,6 +436,25 @@ class Pipeline:
                 self.db.rollback()
                 self.db.close()
                 raise
+        if self.db.execute(
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type='index' AND name='jobs_open_logical'"
+        ).fetchone() is None:
+            # Recent observation epochs may overlap while a large saturation
+            # fanout is still pending. Seek the already-open logical request
+            # before adding another daily root; history remains independent.
+            try:
+                self.db.executescript("""
+                    BEGIN IMMEDIATE;
+                    CREATE INDEX IF NOT EXISTS jobs_open_logical
+                        ON jobs(logical_key)
+                        WHERE state IN ('pending','split_pending');
+                    COMMIT;
+                """)
+            except BaseException:
+                self.db.rollback()
+                self.db.close()
+                raise
         self.db.execute("""
             CREATE TABLE IF NOT EXISTS identifier_discovery_cache (
                 version INTEGER PRIMARY KEY, attempt_rowid INTEGER NOT NULL,
@@ -755,7 +774,15 @@ class Pipeline:
     def close(self):
         self.db.close()
 
-    def enqueue(self, api, params, priority=10, epoch="history"):
+    def enqueue(
+        self,
+        api,
+        params,
+        priority=10,
+        epoch="history",
+        *,
+        reuse_recent_open=False,
+    ):
         spec = contract_for(api)
         if spec.get("group") == "global" and spec.get("pagination"):
             params = dict(params)
@@ -796,6 +823,15 @@ class Pipeline:
         }
         logical = digest(json_bytes(job))
         key = digest(json_bytes([logical, epoch]))
+        if reuse_recent_open and epoch != "history":
+            existing = self.db.execute(
+                "SELECT id FROM jobs INDEXED BY jobs_open_logical "
+                "WHERE logical_key=? AND epoch<>'history' "
+                "AND state IN ('pending','split_pending') ORDER BY rowid DESC LIMIT 1",
+                (logical,),
+            ).fetchone()
+            if existing:
+                return existing["id"]
         scope = api + ":" + str(params.get("src", ""))
         denied = self.db.execute(
             "SELECT 1 FROM capability WHERE scope=? AND status='permission_denied'",
@@ -1176,6 +1212,7 @@ class Pipeline:
                 {"exchange": "SSE", "start_date": a, "end_date": b},
                 priority - 1,
                 current,
+                reuse_recent_open=current != "history",
             )
             for code in sorted(industries):
                 self.enqueue(
@@ -1183,13 +1220,24 @@ class Pipeline:
                     {"ts_code": code, "start_date": a, "end_date": b},
                     priority,
                     current,
+                    reuse_recent_open=current != "history",
                 )
         for status in ("L", "D", "P"):
-            self.enqueue("etf_basic", {"list_status": status}, 0, epoch)
+            self.enqueue(
+                "etf_basic",
+                {"list_status": status},
+                0,
+                epoch,
+                reuse_recent_open=True,
+            )
         for code in sorted(industries):
             for current in ("Y", "N"):
                 self.enqueue(
-                    "ci_index_member", {"l1_code": code, "is_new": current}, 1, epoch
+                    "ci_index_member",
+                    {"l1_code": code, "is_new": current},
+                    1,
+                    epoch,
+                    reuse_recent_open=True,
                 )
         # Recent revisions are rechecked independently of historical checkpoints.
         for days in range(1, 8):
@@ -1199,6 +1247,7 @@ class Pipeline:
                 {"exchange": "SSE", "start_date": d, "end_date": d},
                 0,
                 epoch,
+                reuse_recent_open=True,
             )
         # Holdings: all available fund identifiers, from listing (unknown -> full start).
         # Pending/empty periods remain explicit gaps, not evidence of complete exposure.
@@ -1221,8 +1270,147 @@ class Pipeline:
                             if period
                             >= (today - timedelta(days=400)).strftime("%Y%m%d")
                             else "history",
+                            reuse_recent_open=(
+                                period
+                                >= (today - timedelta(days=400)).strftime("%Y%m%d")
+                            ),
                         )
         self.db.commit()
+
+    def compact_stale_recent_roots(self, epoch, *, force=False):
+        """Supersede older unexecuted recent roots and their private split trees.
+
+        An epoch labels an observation attempt; it cannot recreate a missed past
+        observation. When the same top-level logical request is still open in
+        several non-history epochs, only the newest root can add evidence now.
+        Completed results and the stable history graph are never changed.
+        """
+        if not isinstance(epoch, str) or not re.fullmatch(r"\d{8}", epoch):
+            raise ValueError("Invalid recent queue compaction epoch")
+        checkpoint = "recent_queue_compaction:" + epoch
+        if not force and self.db.execute(
+            "SELECT 1 FROM scheduler_state WHERE name=?", (checkpoint,)
+        ).fetchone():
+            return {"status": "already_compacted", "epoch": epoch}
+        temporary = (
+            "temp.stale_recent_roots",
+            "temp.stale_recent_jobs",
+            "temp.protected_stale_jobs",
+            "temp.eligible_stale_jobs",
+        )
+        for table in temporary:
+            self.db.execute("DROP TABLE IF EXISTS " + table)
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
+            self.db.execute(
+                "CREATE TEMP TABLE stale_recent_roots(id TEXT PRIMARY KEY) WITHOUT ROWID"
+            )
+            self.db.execute("""
+                INSERT INTO stale_recent_roots
+                WITH ranked AS (
+                    SELECT j.id,
+                           row_number() OVER (
+                               PARTITION BY j.logical_key ORDER BY j.rowid DESC
+                           ) AS position
+                    FROM jobs AS j INDEXED BY jobs_open_logical
+                    WHERE j.state IN ('pending','split_pending')
+                      AND j.epoch<>'history'
+                      AND NOT EXISTS (
+                          SELECT 1 FROM partition_children AS edge
+                          WHERE edge.child_id=j.id
+                      )
+                )
+                SELECT id FROM ranked WHERE position>1
+            """)
+            stale_roots = self.db.execute(
+                "SELECT count(*) FROM stale_recent_roots"
+            ).fetchone()[0]
+            self.db.execute(
+                "CREATE TEMP TABLE stale_recent_jobs(id TEXT PRIMARY KEY) WITHOUT ROWID"
+            )
+            self.db.execute("""
+                INSERT OR IGNORE INTO stale_recent_jobs
+                WITH RECURSIVE descendants(id) AS (
+                    SELECT id FROM stale_recent_roots
+                    UNION
+                    SELECT edge.child_id
+                    FROM partition_children AS edge
+                    JOIN descendants ON edge.parent_id=descendants.id
+                )
+                SELECT id FROM descendants
+            """)
+            # A split leaf may exceptionally be shared by another live root.
+            # Protect that leaf and everything below it before changing states.
+            self.db.execute(
+                "CREATE TEMP TABLE protected_stale_jobs(id TEXT PRIMARY KEY) WITHOUT ROWID"
+            )
+            self.db.execute("""
+                INSERT OR IGNORE INTO protected_stale_jobs
+                WITH RECURSIVE protected(id) AS (
+                    SELECT stale.id
+                    FROM stale_recent_jobs AS stale
+                    WHERE EXISTS (
+                        SELECT 1 FROM partition_children AS edge
+                        WHERE edge.child_id=stale.id
+                          AND edge.parent_id NOT IN (
+                              SELECT id FROM stale_recent_jobs
+                          )
+                    )
+                    UNION
+                    SELECT edge.child_id
+                    FROM partition_children AS edge
+                    JOIN protected ON edge.parent_id=protected.id
+                )
+                SELECT id FROM protected
+            """)
+            protected = self.db.execute(
+                "SELECT count(*) FROM protected_stale_jobs"
+            ).fetchone()[0]
+            self.db.execute(
+                "CREATE TEMP TABLE eligible_stale_jobs(id TEXT PRIMARY KEY) WITHOUT ROWID"
+            )
+            # CROSS JOIN fixes the small temporary set as the outer loop; each
+            # candidate then uses the jobs primary key instead of scanning every
+            # pending row and rewriting several partial indexes needlessly.
+            self.db.execute("""
+                INSERT INTO eligible_stale_jobs
+                SELECT job.id
+                FROM stale_recent_jobs AS stale
+                CROSS JOIN jobs AS job INDEXED BY sqlite_autoindex_jobs_1
+                LEFT JOIN protected_stale_jobs AS protected
+                  ON protected.id=stale.id
+                WHERE job.id=stale.id
+                  AND job.state IN ('pending','split_pending')
+                  AND protected.id IS NULL
+            """)
+            eligible = self.db.execute(
+                "SELECT count(*) FROM eligible_stale_jobs"
+            ).fetchone()[0]
+            self.db.execute("""
+                UPDATE jobs SET state='superseded'
+                WHERE id IN (SELECT id FROM eligible_stale_jobs)
+            """)
+            self.db.execute(
+                "DELETE FROM scheduler_state WHERE name GLOB 'recent_queue_compaction:*'"
+            )
+            self.db.execute(
+                "INSERT INTO scheduler_state(name,value) VALUES(?,?)",
+                (checkpoint, int(time.time())),
+            )
+            self.db.commit()
+        except BaseException:
+            self.db.rollback()
+            raise
+        finally:
+            for table in temporary:
+                self.db.execute("DROP TABLE IF EXISTS " + table)
+        return {
+            "status": "compacted",
+            "epoch": epoch,
+            "stale_roots": stale_roots,
+            "superseded_open_jobs": eligible,
+            "protected_shared_jobs": protected,
+        }
 
     def _load_identifier_cache(self):
         row = self.db.execute(
@@ -2266,6 +2454,7 @@ class Pipeline:
                                 job["params"],
                                 job["priority"],
                                 job["epoch"],
+                                reuse_recent_open=mode == "recent",
                             )
                         finally:
                             timing["enqueue_seconds"] += max(
@@ -2968,13 +3157,21 @@ class Pipeline:
 
     def partition_inventory(self):
         entries = []
-        for row in self.db.execute("SELECT * FROM partition_splits ORDER BY parent_id"):
+        for row in self.db.execute(
+            "SELECT split.* FROM partition_splits AS split "
+            "LEFT JOIN jobs AS parent ON parent.id=split.parent_id "
+            "WHERE COALESCE(parent.state,'')<>'superseded' ORDER BY split.parent_id"
+        ):
             item = dict(row)
             item["evidence"] = json.loads(item["evidence"])
             item["children"] = [
                 r[0]
                 for r in self.db.execute(
-                    "SELECT child_id FROM partition_children WHERE parent_id=? ORDER BY child_id",
+                    "SELECT edge.child_id FROM partition_children AS edge "
+                    "LEFT JOIN jobs AS child ON child.id=edge.child_id "
+                    "WHERE edge.parent_id=? "
+                    "AND COALESCE(child.state,'')<>'superseded' "
+                    "ORDER BY edge.child_id",
                     (row["parent_id"],),
                 )
             ]
@@ -3720,7 +3917,8 @@ class Pipeline:
             files = dict(previous["files"]) if previous else {}
             active, gaps = {}, []
             for row in self.db.execute(
-                "SELECT * FROM jobs WHERE state NOT IN ('done','pending') ORDER BY rowid"
+                "SELECT * FROM jobs "
+                "WHERE state NOT IN ('done','pending','superseded') ORDER BY rowid"
             ):
                 result = json.loads(row["result"]) if row["result"] else {}
                 if row["state"] not in ("done", "pending", "resolved"):
@@ -4274,6 +4472,12 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                         pipeline.initialize(config, today)
                     with measure("planning"):
                         report["planning"] = pipeline.plan_extended(config, today)
+                    with measure("queue_compaction"):
+                        report["queue_compaction"] = (
+                            pipeline.compact_stale_recent_roots(
+                                today.strftime("%Y%m%d")
+                            )
+                        )
                     if planning_interval:
                         # Do not checkpoint partial initialize/planning work on any
                         # failure. Existing family cursors retain their own semantics.

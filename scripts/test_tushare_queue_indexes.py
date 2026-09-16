@@ -183,6 +183,97 @@ class QueueIndexTest(unittest.TestCase):
             self.assertEqual(db.execute("SELECT COUNT(*) FROM jobs").fetchone()[0], 40)
         self.p = module.Pipeline(self.root, {"entries": []})
 
+    def test_recent_planning_reuses_open_request_but_history_is_independent(self):
+        params = {"trade_date": "20260910"}
+        first = self.p.enqueue(
+            "daily", params, 1, "20260911", reuse_recent_open=True
+        )
+        repeated = self.p.enqueue(
+            "daily", params, 1, "20260912", reuse_recent_open=True
+        )
+        history = self.p.enqueue(
+            "daily", params, 1, "history", reuse_recent_open=True
+        )
+        split_child = self.p.enqueue("daily", params, 1, "20260912")
+        self.assertEqual(repeated, first)
+        self.assertNotEqual(history, first)
+        self.assertNotEqual(split_child, first)
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT count(*) FROM jobs WHERE logical_key=("
+                "SELECT logical_key FROM jobs WHERE id=?)",
+                (first,),
+            ).fetchone()[0],
+            3,
+        )
+
+    def test_compaction_supersedes_only_stale_recent_root_tree(self):
+        params = {"trade_date": "20260910"}
+        old = self.p.enqueue("daily", params, 1, "20260911")
+        children = [
+            self.p.enqueue(
+                "daily", {**params, "ts_code": code}, 2, "20260911"
+            )
+            for code in ("000001.SZ", "600000.SH")
+        ]
+        self.p.record_partition(
+            old,
+            children,
+            "identifier_fanout",
+            False,
+            {"origin": "test", "universe_complete": False},
+        )
+        self.p.db.execute(
+            "UPDATE jobs SET state='split_pending' WHERE id=?", (old,)
+        )
+        retained_parent = self.p.enqueue(
+            "daily", {"trade_date": "20260909"}, 1, "20260911"
+        )
+        self.p.record_partition(
+            retained_parent,
+            [children[0]],
+            "identifier_fanout",
+            False,
+            {"origin": "shared-test", "universe_complete": False},
+        )
+        self.p.db.execute(
+            "UPDATE jobs SET state='split_pending' WHERE id=?", (retained_parent,)
+        )
+        newest = self.p.enqueue("daily", params, 1, "20260912")
+        history = self.p.enqueue("daily", params, 1, "history")
+        self.p.db.commit()
+
+        report = self.p.compact_stale_recent_roots("20260912")
+        self.assertEqual(
+            report,
+            {
+                "status": "compacted",
+                "epoch": "20260912",
+                "stale_roots": 1,
+                "superseded_open_jobs": 2,
+                "protected_shared_jobs": 1,
+            },
+        )
+        states = dict(
+            self.p.db.execute(
+                "SELECT id,state FROM jobs WHERE id IN (?,?,?,?,?)",
+                (old, *children, newest, history),
+            )
+        )
+        self.assertEqual(states[old], "superseded")
+        self.assertEqual(states[children[0]], "pending")
+        self.assertEqual(states[children[1]], "superseded")
+        self.assertEqual(states[newest], "pending")
+        self.assertEqual(states[history], "pending")
+        closure = self.p.partition_inventory()["splits"]
+        self.assertEqual(len(closure), 1)
+        self.assertEqual(closure[0]["parent_id"], retained_parent)
+        self.assertEqual(closure[0]["children"], [children[0]])
+        self.assertEqual(
+            self.p.compact_stale_recent_roots("20260912"),
+            {"status": "already_compacted", "epoch": "20260912"},
+        )
+
     def test_weighted_selection_matches_old_query_and_survives_reopen(self):
         self.seed(60, 0)
         config = {
