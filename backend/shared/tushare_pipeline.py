@@ -288,6 +288,8 @@ def serialize_manifest_file(directory, content, timing=None):
 
 
 def authority():
+    if os.getenv("QM_NODE_ROLE") == "authority" and (ROOT / "ARCHIVE_RELOCATED.json").exists():
+        raise ValueError("Cloud archive acquisition has been relocated to Mac/NAS")
     if os.getenv("QM_NODE_ROLE") == "archive":
         import socket
         marker = ROOT / "ARCHIVE_AUTHORITY.json"

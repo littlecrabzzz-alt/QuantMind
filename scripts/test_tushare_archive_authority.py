@@ -25,6 +25,10 @@ class ArchiveAuthority(unittest.TestCase):
                 marker.write_text(json.dumps({'owner_hostname': 'another-node', 'migration_verified': True}))
                 with self.assertRaises(ValueError):
                     pipeline.authority()
+            (root / 'ARCHIVE_RELOCATED.json').write_text('{}')
+            with patch.object(pipeline, 'ROOT', root), patch.dict(os.environ, {'QM_NODE_ROLE': 'authority'}):
+                with self.assertRaisesRegex(ValueError, 'relocated'):
+                    pipeline.authority()
             with patch.object(pipeline, 'ROOT', root), patch.dict(os.environ, {'QM_NODE_ROLE': 'sandbox'}):
                 with self.assertRaises(ValueError):
                     pipeline.authority()
