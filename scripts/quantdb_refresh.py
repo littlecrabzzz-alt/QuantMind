@@ -118,7 +118,7 @@ def check_local_changes(project, baseline, incoming):
             raise RuntimeError(f'Local QuantDB edit retained; resolve before refresh: {name}')
 
 
-def require_local_idle(project):
+def require_local_idle(project, *, recovering=False):
     snapshot.require(sys.platform == 'darwin', 'Apply only on Mac')
     snapshot.require(not os.getenv('DOCKER_HOST'), 'Unset DOCKER_HOST')
     endpoint = snapshot.output('docker', 'context', 'inspect', '--format', '{{.Endpoints.docker.Host}}')
@@ -135,7 +135,7 @@ def require_local_idle(project):
             tasks = json.loads(snapshot.output('docker', 'exec', worker, 'celery', '-A', app,
                                               'inspect', kind, '--json', '--timeout=5'))
             snapshot.require(bool(tasks) and not any(tasks.values()), 'Local work pending; retry when idle')
-    snapshot.require('quantmind-dev' in running, 'Local backend stopped; downloaded version retained for next start')
+    snapshot.require(recovering or 'quantmind-dev' in running, 'Local backend stopped; downloaded version retained for next start')
     mounts = json.loads(snapshot.output('docker', 'inspect', 'quantmind-dev', '--format', '{{json .Mounts}}'))
     expected = (project / '.local-dev/project/data').resolve()
     snapshot.require(any(m['Destination'] == '/data' and sandbox_mount_path(m['Source'], project) == expected for m in mounts),
@@ -226,8 +226,15 @@ def apply(project, downloaded):
     lockdir.mkdir()  # Share the existing local start/stop mutex.
     (lockdir / 'pid').write_text(str(os.getpid()))
     stopped = []
+    recovering = prior.get('status') == 'files_applied'
+    can_restart = not recovering
     try:
-        stopped = require_local_idle(project)
+        stopped = require_local_idle(project, recovering=recovering)
+        if recovering:
+            resume = prior.get('resume_services', ['quantmind-dev'])
+            snapshot.require(set(resume) <= {'quantmind-dev', 'quantmind-dev-celery', 'quantmind-dev-research-worker'},
+                             'Unexpected recovery service list')
+            stopped = list(dict.fromkeys([*stopped, *resume]))
         previous = Path(prior['snapshot']) if prior.get('snapshot') else (
             project / 'logs/cloud-snapshots' / (state / 'SNAPSHOT_ID').read_text().strip())
         baseline = [json.loads(line) for line in (previous / 'runtime-manifest.jsonl').read_text().splitlines()
@@ -255,7 +262,9 @@ def apply(project, downloaded):
             # Same atomic directory exchange used by Qlib publication; old files survive.
             publish_local_directory(staged, live)
             staged.rename(backup)
-            write_json(receipt, {'status': 'files_applied', 'snapshot': str(downloaded), 'backup': str(backup)})
+            write_json(receipt, {'status': 'files_applied', 'snapshot': str(downloaded), 'backup': str(backup),
+                                 'resume_services': stopped})
+            can_restart = False
         # Keep the API stopped until files, PG and Qlib agree: no new training
         # request can enter between the data exchange and cache completion.
         result = snapshot.output(
@@ -275,11 +284,14 @@ def apply(project, downloaded):
             qlib_staged.rename(qlib_backup)
         write_json(receipt, {'status': 'applied', 'snapshot': str(downloaded), 'backup': str(backup),
                              'qlib_backup': str(qlib_backup), 'validation': validation})
+        can_restart = True
         print('Applied local QuantDB:', result, flush=True)
     finally:
         try:
-            if stopped:
+            if stopped and can_restart:
                 snapshot.run('docker', 'start', *stopped)
+            elif stopped:
+                print('Derived data incomplete: services remain paused; next refresh resumes automatically', flush=True)
         finally:
             (lockdir / 'pid').unlink(missing_ok=True)
             lockdir.rmdir()

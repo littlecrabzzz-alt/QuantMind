@@ -50,13 +50,14 @@ class QuantDBRefresh(unittest.TestCase):
             data = project / ".local-dev/project/data"
             data.mkdir(parents=True)
 
+            running = "quantmind-dev"
             def output(*args):
                 if args[1] == "context":
                     return "unix:///var/run/docker.sock"
                 if args[1] == "info":
                     return "Docker Desktop"
                 if args[1] == "ps":
-                    return "quantmind-dev"
+                    return running
                 return json.dumps([{"Source": source, "Destination": "/data"}])
 
             with (
@@ -65,6 +66,11 @@ class QuantDBRefresh(unittest.TestCase):
             ):
                 source = "/host_mnt" + str(data.resolve())
                 self.assertEqual(refresh.require_local_idle(project), ["quantmind-dev"])
+                running = ""
+                with self.assertRaisesRegex(RuntimeError, "backend stopped"):
+                    refresh.require_local_idle(project)
+                self.assertEqual(refresh.require_local_idle(project, recovering=True), [])
+                running = "quantmind-dev"
                 source = "/host_mnt/tmp/authority"
                 with self.assertRaisesRegex(RuntimeError, "escaped isolation"):
                     refresh.require_local_idle(project)
@@ -203,7 +209,8 @@ class QuantDBRefresh(unittest.TestCase):
             )
             self.assertEqual(data.read_text(), "new")
             self.assertEqual(result.read_text(), "keep")
-            self.assertEqual(events[-1], "start")
+            self.assertNotIn("start", events)
+            self.assertEqual(receipt["resume_services"], ["quantmind-dev"])
             self.assertFalse((root / "logs/local-dev.lock").exists())
             original_backup = receipt["backup"]
             cache = local / "db/qlib_data"
@@ -215,11 +222,12 @@ class QuantDBRefresh(unittest.TestCase):
             validation = {"qlib_staged": "/app/db/.quantdb-qlib-test",
                           "qlib_live": "/app/db/qlib_data", "latest_date": "20260911"}
             with (
-                patch.object(refresh, "require_local_idle", return_value=["quantmind-dev"]),
+                patch.object(refresh, "require_local_idle", return_value=[]) as idle,
                 patch.object(snapshot, "run", side_effect=run),
                 patch.object(snapshot, "output", return_value=json.dumps(validation)),
             ):
                 refresh.apply(root, downloaded)
+                idle.assert_called_once_with(root, recovering=True)
             receipt = json.loads((root / ".local-dev/QUANTDB_SYNC.json").read_text())
             self.assertEqual(receipt["status"], "applied")
             self.assertEqual(receipt["backup"], original_backup)
@@ -227,7 +235,7 @@ class QuantDBRefresh(unittest.TestCase):
             self.assertEqual((cache / "day").read_text(), "new")
             self.assertEqual((Path(receipt["qlib_backup"]) / "day").read_text(), "old")
             self.assertEqual(result.read_text(), "keep")
-            self.assertEqual(events, ["stop", "copy", "start", "stop", "start"])
+            self.assertEqual(events, ["stop", "copy", "stop", "start"])
 
     def test_local_edits_block_but_identical_retries_and_unique_results_survive(self):
         with tempfile.TemporaryDirectory() as tmp:
