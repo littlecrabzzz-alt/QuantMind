@@ -17,3 +17,21 @@
 3. 切换后全量采集在归档节点进行；Mac 休眠时暂停，云端使用已缓存研究版本。NAS 迁移同样按校验、唯一写入者、原子切换流程执行。
 4. Mac 至少预留 300 GiB；低于 500 GiB 时准备 NAS 迁移，达到保留线停止新采集/下载而非删除唯一归档。此处阈值是目标策略，采集迁移完成前不得声称已生效。
 5. 云端原有 Tushare 全量目录只在全量迁移证据完成后回收；新子集缓存和旧全量目录在过渡期会暂时并存。当前代码没有自动删除云端全量数据的入口。
+
+### 完整迁移验收入口
+
+`scripts/tushare_archive_migrate.py --root <归档目录>` 进行可恢复预复制；
+只靠大小/时间判断哪些文件需要重传，最终完整性由独立 SHA-256 验收保证。
+预复制不传活跃 SQLite，不切换 CURRENT，不授予采集权限。
+
+仅在关闭 Tushare 新任务准入、确认在途任务自然排空后，云端执行
+`--action checkpoint`。它要求 ENABLED 不存在，并独占 pipeline/documents/archive
+三把锁，使用 SQLite backup 创建一致检查点，对所有历史及未发布文件生成
+`.migration/checkpoint-*/inventory.jsonl` 和 COMPLETE.json。锁繁忙直接失败，
+不会停止 QuantDB 或其他服务。窗口内须保持 Tushare 准入关闭。
+
+继续传输冻结归档，将清单中 checkpoint_path 对应的数据库副本安装到目标 path，
+然后 Mac 执行 `--action verify --checkpoint <已传输的检查点目录>`。
+校验包含文件路径、大小、SHA-256 和清单总数，缺失或损坏即失败；此命令只证明
+文件迁移，不生成 ARCHIVE_AUTHORITY，也不宣称供应商历史全量完成。
+最后还需独立核验云端停写、Mac 唯一采集者、权限/日配额连续性及真实采集结果。

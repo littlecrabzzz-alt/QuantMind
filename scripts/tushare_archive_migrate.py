@@ -3,6 +3,10 @@
 import argparse
 import fcntl
 import json
+import hashlib
+import os
+import sqlite3
+from contextlib import ExitStack
 from pathlib import Path
 import shutil
 import subprocess
@@ -25,8 +29,8 @@ def precopy(root):
     exclusions = ['*.sqlite*', '*.lock', 'ENABLED*', 'CURRENT.json',
                   '*-status.json', 'pipeline-config.json', '*.tmp', '*.part',
                   '.migration/', '.research-exports/', '.manifest-transfer/', '.rsync-partial/']
-    command = [shutil.which('rsync') or 'rsync', '-az', '--checksum', '--stats',
-               '--timeout=120', '--partial-dir=.rsync-partial', '--rsync-path=sudo -n rsync',
+    command = [shutil.which('rsync') or 'rsync', '-az', '--stats',
+               '--timeout=600', '--partial-dir=.rsync-partial', '--rsync-path=sudo -n rsync',
                '-e', 'ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=30']
     command += ['--exclude=' + value for value in exclusions]
     command += [topology['QM_SSH_TARGET'] + ':' + topology['QM_REMOTE_PROJECT'] + '/data/tushare/',
@@ -42,11 +46,121 @@ def precopy(root):
     return result.returncode
 
 
+IGNORED_DIRS = {'.migration', '.research-exports', '.manifest-transfer', '.rsync-partial'}
+
+
+def inventory_files(root):
+    """All stored content, including unpublished objects and old releases."""
+    for directory, dirs, files in os.walk(root, followlinks=False):
+        dirs[:] = sorted(d for d in dirs if d not in IGNORED_DIRS)
+        for name in dirs + files:
+            if (Path(directory) / name).is_symlink():
+                raise ValueError('Symlink in archive')
+        for name in sorted(files):
+            if (name.endswith(('.lock', '.tmp', '.part', '-status.json', '-wal', '-shm'))
+                    or name.startswith('ENABLED') or name == 'ARCHIVE_AUTHORITY.json'):
+                continue
+            yield Path(directory) / name
+
+
+def digest(path):
+    sha = hashlib.sha256()
+    size = 0
+    with path.open('rb') as stream:
+        for block in iter(lambda: stream.read(4 * 1024**2), b''):
+            sha.update(block)
+            size += len(block)
+    return {'bytes': size, 'sha256': sha.hexdigest()}
+
+
+def frozen_checkpoint(root):
+    """Called only after disabling Tushare admission and draining its workers.
+
+    Busy locks fail immediately. Nothing enables/disables services here.
+    SQLite backup output and file inventory remain private under .migration.
+    """
+    root = root.resolve()
+    if (root / 'ENABLED').exists():
+        raise ValueError('Disable Tushare acquisition before checkpoint')
+    with ExitStack() as stack:
+        for name in ('pipeline.lock', 'documents.lock', '.archive.lock'):
+            lock = stack.enter_context((root / name).open('a'))
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        target = root / '.migration' / ('checkpoint-' + utc_now().replace(':', '-'))
+        target.mkdir(parents=True)
+        count = total = 0
+        inventory = target / 'inventory.jsonl'
+        with inventory.open('w') as output:
+            for path in inventory_files(root):
+                relative = path.relative_to(root).as_posix()
+                source = path
+                if path.suffix in ('.sqlite', '.sqlite3') and path.stat().st_size:
+                    source = target / 'databases' / relative
+                    source.parent.mkdir(parents=True, exist_ok=True)
+                    with sqlite3.connect(path.as_uri() + '?mode=ro', uri=True) as db:
+                        with sqlite3.connect(source) as copy:
+                            db.backup(copy)
+                            if copy.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
+                                raise ValueError('Invalid checkpoint database')
+                record = {'path': relative, **digest(source)}
+                if source != path:
+                    record['checkpoint_path'] = source.relative_to(root).as_posix()
+                output.write(json.dumps(record, sort_keys=True) + '\n')
+                count += 1
+                total += record['bytes']
+        if (root / 'ENABLED').exists():
+            raise ValueError('Acquisition was reenabled during checkpoint')
+        atomic_json(target / 'COMPLETE.json', {
+            'created_at': utc_now(), 'files': count, 'bytes': total,
+            'inventory': digest(inventory), 'cloud_writer_disabled': True,
+        })
+        return target
+
+
+def verify_checkpoint(root, checkpoint):
+    """Verify transferred content against a frozen source; never grant ownership."""
+    root = root.resolve()
+    proof = json.loads((checkpoint / 'COMPLETE.json').read_bytes())
+    inventory = checkpoint / 'inventory.jsonl'
+    if digest(inventory) != proof['inventory']:
+        raise ValueError('Inventory checksum mismatch')
+    count = total = 0
+    with inventory.open() as stream:
+        for line in stream:
+            record = json.loads(line)
+            relative = Path(record['path'])
+            if relative.is_absolute() or '..' in relative.parts:
+                raise ValueError('Invalid inventory path')
+            path = root / relative
+            if path.is_symlink() or any(p.is_symlink() for p in path.parents):
+                raise ValueError('Symlink in destination')
+            if digest(path) != {k: record[k] for k in ('bytes', 'sha256')}:
+                raise ValueError('Migration file mismatch: ' + relative.as_posix())
+            count += 1
+            total += record['bytes']
+    if count != proof['files'] or total != proof['bytes']:
+        raise ValueError('Inventory totals mismatch')
+    report = {'status': 'verified_files', 'files': count, 'bytes': total,
+              'inventory': proof['inventory'], 'verified_at': utc_now(),
+              'migration_verified': False, 'reason': 'Writer handoff still required'}
+    atomic_json(root / 'archive-migration-status.json', report)
+    return report
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
+    parser.add_argument('--action', choices=['precopy', 'checkpoint', 'verify'], default='precopy')
+    parser.add_argument('--checkpoint', type=Path)
     args = parser.parse_args()
     args.root.mkdir(parents=True, exist_ok=True)
     with (args.root / ".migration.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        raise SystemExit(precopy(args.root))
+        if args.action == 'precopy':
+            raise SystemExit(precopy(args.root))
+        elif args.action == 'checkpoint':
+            print(frozen_checkpoint(args.root))
+        else:
+            if args.checkpoint is None:
+                parser.error('--checkpoint is required for verify')
+            print(json.dumps(verify_checkpoint(args.root, args.checkpoint)))
