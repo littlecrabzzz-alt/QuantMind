@@ -99,3 +99,7 @@ ARCHIVE_RELOCATED 标记并移除 Tushare continuation；市场同步和市场�
 macOS系统代理可能提供SOCKS条目，即使HTTPS请求走HTTP代理，HTTPX初始化也需要
 SOCKS依赖。仅测试import httpx不足以证明采集能发出请求；本次已用原私有凭据
 在Mac真实读取两日trade_cal，HTTP200/业务码0/两行，未启动全量采集。
+
+归档补传使用 rsync -H 保留源硬链接：archives与releases中同一份不可变清单只占
+一份文件空间。最终补传也会把先前分开复制的别名恢复为硬链接；不删除任何历史
+版本或字段，最终仍按照每条清单引用校验哈希。已用实际rsync本地夹具验证恢复行为。

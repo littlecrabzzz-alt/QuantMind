@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import shutil
 import socket
+import subprocess
 import sqlite3
 import tempfile
 import unittest
@@ -140,6 +141,34 @@ class MigrationCheck(unittest.TestCase):
             self.assertEqual((target / 'CURRENT.json').read_text(), 'old release')
             self.assertEqual((target / 'pipeline-config.json').read_bytes(), (source / 'pipeline-config.json').read_bytes())
             self.assertFalse((target / 'ARCHIVE_AUTHORITY.json').exists())
+
+    @unittest.skipUnless(shutil.which('rsync'), 'rsync not installed')
+    @patch('scripts.tushare_archive_migrate.shutil.disk_usage', return_value=SimpleNamespace(free=2**40))
+    def test_precopy_preserves_hardlinked_manifest_aliases(self, _disk):
+        with tempfile.TemporaryDirectory() as directory:
+            source, target = Path(directory) / 'source', Path(directory) / 'target'
+            (source / 'archives').mkdir(parents=True)
+            (source / 'releases/data-a').mkdir(parents=True)
+            canonical = source / 'archives/a.json'
+            canonical.write_text('{"immutable":true}')
+            (source / 'releases/data-a/manifest.json').hardlink_to(canonical)
+            shutil.copytree(source, target)  # Simulate an earlier copy that lost hardlinks.
+            self.assertNotEqual((target / 'archives/a.json').stat().st_ino,
+                                (target / 'releases/data-a/manifest.json').stat().st_ino)
+            original_run = subprocess.run
+            def local_transfer(command):
+                # Run the production flags on a local fixture; never SSH.
+                flags = command[:-2]
+                at = flags.index('-e')
+                flags = flags[:at] + flags[at+2:]
+                flags = [arg for arg in flags if not arg.startswith('--rsync-path=')]
+                result = original_run(flags + [str(source) + '/', str(target) + '/'], capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stderr.decode())
+                return result
+            with patch.object(migration.subprocess, 'run', side_effect=local_transfer):
+                self.assertEqual(migration.precopy(target), 0)
+            self.assertEqual((target / 'archives/a.json').stat().st_ino,
+                             (target / 'releases/data-a/manifest.json').stat().st_ino)
 
     def test_symlink_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

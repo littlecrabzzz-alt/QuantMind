@@ -31,7 +31,7 @@ def precopy(root):
     exclusions = ['*.sqlite*', '*.lock', 'ENABLED*', 'CURRENT.json',
                   '*-status.json', 'pipeline-config.json', '*.tmp', '*.part',
                   '.migration/', '.research-exports/', '.manifest-transfer/', '.rsync-partial/']
-    command = [shutil.which('rsync') or 'rsync', '-az', '--stats',
+    command = [shutil.which('rsync') or 'rsync', '-aHz', '--stats',
                '--timeout=600', '--partial-dir=.rsync-partial', '--rsync-path=sudo -n rsync',
                '-e', 'ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=30']
     command += ['--exclude=' + value for value in exclusions]
@@ -243,7 +243,7 @@ def sync_frozen(root, checkpoint_name):
         raise ValueError('Frozen immutable delta transfer failed; resume required')
     checkpoint = root / '.migration' / checkpoint_name
     checkpoint.mkdir(parents=True, exist_ok=True)
-    base = [shutil.which('rsync') or 'rsync', '-az', '--timeout=600',
+    base = [shutil.which('rsync') or 'rsync', '-aHz', '--timeout=600',
             '--partial-dir=.rsync-partial', '--rsync-path=sudo -n rsync',
             '-e', 'ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=30']
     subprocess.run(base + [topology['QM_SSH_TARGET'] + ':' + remote + '/.migration/' + checkpoint_name + '/',
