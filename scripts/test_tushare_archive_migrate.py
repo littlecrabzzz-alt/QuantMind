@@ -5,12 +5,15 @@ import shutil
 import sqlite3
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from scripts.tushare_archive_migrate import frozen_checkpoint, verify_checkpoint
+from scripts.tushare_archive_migrate import frozen_checkpoint, verify_checkpoint, install_checkpoint
 
 
 class MigrationCheck(unittest.TestCase):
-    def test_checkpoint_is_complete_and_detects_corruption(self):
+    @patch("scripts.tushare_archive_migrate.shutil.disk_usage", return_value=SimpleNamespace(free=2**40))
+    def test_checkpoint_is_complete_and_detects_corruption(self, _disk):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / 'source'
             target = Path(directory) / 'target'
@@ -30,6 +33,21 @@ class MigrationCheck(unittest.TestCase):
                 with self.assertRaises(BlockingIOError):
                     frozen_checkpoint(source)
             checkpoint = frozen_checkpoint(source)
+            installed = Path(directory) / 'installed'
+            installed.mkdir()
+            install_checkpoint(installed, checkpoint)
+            install_checkpoint(installed, checkpoint)  # Safe resume is idempotent.
+            self.assertFalse((installed / 'CURRENT.json').exists())
+            with sqlite3.connect(installed / 'pipeline.sqlite') as copied:
+                self.assertEqual(copied.execute('SELECT id FROM jobs').fetchall(), [(7,)])
+            (installed / 'pipeline.sqlite-wal').touch()
+            with self.assertRaisesRegex(ValueError, 'live SQLite'):
+                install_checkpoint(installed, checkpoint)
+            (installed / 'pipeline.sqlite-wal').unlink()
+            (installed / 'pipeline.sqlite').write_bytes(b'existing independent data')
+            with self.assertRaisesRegex(ValueError, 'Existing database differs'):
+                install_checkpoint(installed, checkpoint)
+            self.assertEqual((installed / 'pipeline.sqlite').read_bytes(), b'existing independent data')
             shutil.copytree(source, target)
             for line in (checkpoint / 'inventory.jsonl').read_text().splitlines():
                 row = json.loads(line)

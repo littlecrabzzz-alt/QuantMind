@@ -120,6 +120,64 @@ def frozen_checkpoint(root):
         return target
 
 
+def install_checkpoint(root, checkpoint):
+    """Install verified SQLite backups without overwriting an existing writer."""
+    root, checkpoint = root.resolve(), checkpoint.resolve()
+    if (root / 'ENABLED').exists() or (root / 'ARCHIVE_AUTHORITY.json').exists():
+        raise ValueError('Refusing checkpoint installation on an enabled owner')
+    proof = json.loads((checkpoint / 'COMPLETE.json').read_bytes())
+    inventory = checkpoint / 'inventory.jsonl'
+    if digest(inventory) != proof['inventory']:
+        raise ValueError('Inventory checksum mismatch')
+    with ExitStack() as stack:
+        for name in ('.archive-worker.lock', 'pipeline.lock', 'documents.lock', '.archive.lock'):
+            lock = stack.enter_context((root / name).open('a'))
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        backups = []
+        with inventory.open() as stream:
+            for line in stream:
+                record = json.loads(line)
+                if not record.get('checkpoint_path') or record['path'] == 'CURRENT.json':
+                    continue
+                relative = Path(record['path'])
+                if relative.is_absolute() or '..' in relative.parts or relative.suffix not in ('.sqlite', '.sqlite3'):
+                    raise ValueError('Invalid database destination')
+                source = checkpoint / 'databases' / relative
+                target = root / relative
+                for path in (source, target):
+                    if path.is_symlink() or any(p.is_symlink() for p in path.parents):
+                        raise ValueError('Symlink checkpoint path')
+                expected = {k: record[k] for k in ('bytes', 'sha256')}
+                if digest(source) != expected:
+                    raise ValueError('Corrupt database checkpoint')
+                if any(Path(str(target) + suffix).exists() for suffix in ('-wal', '-shm', '-journal')):
+                    raise ValueError('Destination has live SQLite state')
+                if target.exists() and digest(target) != expected:
+                    raise ValueError('Existing database differs; preserve and reconcile it')
+                backups.append((source, target, expected))
+        needed = sum(info['bytes'] for _, target, info in backups if not target.exists())
+        if shutil.disk_usage(root).free < needed + 300 * 2**30:
+            raise ValueError('Keep 300 GiB free while installing checkpoints')
+        for source, target, expected in backups:
+            if target.exists():
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            temporary = target.with_name(target.name + '.part')
+            if temporary.is_symlink():
+                raise ValueError('Symlink checkpoint staging path')
+            try:
+                shutil.copyfile(source, temporary)
+                if digest(temporary) != expected:
+                    raise ValueError('Checkpoint copy checksum mismatch')
+                with temporary.open('rb') as stream:
+                    os.fsync(stream.fileno())
+                temporary.replace(target)
+            finally:
+                temporary.unlink(missing_ok=True)
+        return {'status': 'checkpoints_installed', 'databases': len(backups),
+                'current_published': False, 'migration_verified': False}
+
+
 def verify_checkpoint(root, checkpoint, *, staged_current=False):
     """Verify transferred content against a frozen source; never grant ownership."""
     root = root.resolve()
@@ -153,7 +211,7 @@ def verify_checkpoint(root, checkpoint, *, staged_current=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
-    parser.add_argument('--action', choices=['precopy', 'checkpoint', 'verify'], default='precopy')
+    parser.add_argument('--action', choices=['precopy', 'checkpoint', 'install-checkpoint', 'verify'], default='precopy')
     parser.add_argument('--checkpoint', type=Path)
     parser.add_argument('--staged-current', action='store_true')
     args = parser.parse_args()
@@ -166,5 +224,8 @@ if __name__ == '__main__':
             print(frozen_checkpoint(args.root))
         else:
             if args.checkpoint is None:
-                parser.error('--checkpoint is required for verify')
+                parser.error('--checkpoint is required')
+            if args.action == 'install-checkpoint':
+                print(json.dumps(install_checkpoint(args.root, args.checkpoint)))
+                raise SystemExit(0)
             print(json.dumps(verify_checkpoint(args.root, args.checkpoint, staged_current=args.staged_current)))
