@@ -35,3 +35,16 @@
 校验包含文件路径、大小、SHA-256 和清单总数，缺失或损坏即失败；此命令只证明
 文件迁移，不生成 ARCHIVE_AUTHORITY，也不宣称供应商历史全量完成。
 最后还需独立核验云端停写、Mac 唯一采集者、权限/日配额连续性及真实采集结果。
+
+### 本地采集运行环境
+
+在 Mac 执行 `python scripts/install_tushare_archive.py`，复用持久客户端 Python，
+安装完整 Tushare 共享模块、目录配置和文档解析器（与当前云端版本相同）。
+默认仅准备运行环境，不启动采集。Token 单独放入运行目录的
+`config/archive.env`，权限 0600，只保存 TUSHARE_TOKEN，不纳入源码或数据同步。
+
+完成完整归档迁移、云端停写与所有权验收后，才执行
+`python scripts/install_tushare_archive.py --activate --root <完整归档目录>`。
+激活前检查已部署代码的 authority、节点标记及密钥文件权限，安装
+`com.quantmind.tushare-archive` LaunchAgent。已有采集进程时拒绝覆盖运行代码，
+升级须先自然结束当前采集周期。300 GiB 停写线和 500 GiB NAS 提醒由 worker 执行。
