@@ -9,7 +9,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from scripts.tushare_archive_migrate import frozen_checkpoint, verify_checkpoint, install_checkpoint, finalize_archive, seal_source
+from scripts.tushare_archive_migrate import frozen_checkpoint, verify_checkpoint, install_checkpoint, finalize_archive, seal_source, sync_frozen
 
 
 class MigrationCheck(unittest.TestCase):
@@ -95,6 +95,38 @@ class MigrationCheck(unittest.TestCase):
             (source / 'CURRENT.json').write_text('changed')
             with self.assertRaisesRegex(ValueError, 'published after'):
                 seal_source(source, checkpoint, socket.gethostname())
+
+    def test_frozen_transfer_rejects_unfinished_source_and_keeps_current(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, target = Path(directory) / 'source', Path(directory) / 'target'
+            source.mkdir()
+            target.mkdir()
+            (source / 'CURRENT.json').write_text('{}')
+            (source / 'pipeline-config.json').write_text('{"batch_requests": 360}')
+            (target / 'CURRENT.json').write_text('old release')
+            checkpoint = frozen_checkpoint(source)
+            proof = json.loads((checkpoint / 'COMPLETE.json').read_bytes())
+            with patch('scripts.tushare_archive_migrate.subprocess.run', return_value=SimpleNamespace(stdout='{}')), \
+                    patch('scripts.tushare_archive_migrate.precopy') as precopy:
+                with self.assertRaisesRegex(ValueError, 'not frozen'):
+                    sync_frozen(target, checkpoint.name)
+                precopy.assert_not_called()
+            def run(command, **kwargs):
+                if command[0] == 'ssh':
+                    return SimpleNamespace(stdout=json.dumps(proof))
+                destination = Path(command[-1])
+                if command[-1].endswith('/'):
+                    shutil.copytree(checkpoint, destination, dirs_exist_ok=True)
+                else:
+                    shutil.copyfile(source / 'pipeline-config.json', destination)
+                return SimpleNamespace(returncode=0)
+            with patch('scripts.tushare_archive_migrate.subprocess.run', side_effect=run), \
+                    patch('scripts.tushare_archive_migrate.precopy', return_value=0):
+                report = sync_frozen(target, checkpoint.name)
+            self.assertTrue(report['cloud_writer_disabled'])
+            self.assertEqual((target / 'CURRENT.json').read_text(), 'old release')
+            self.assertEqual((target / 'pipeline-config.json').read_bytes(), (source / 'pipeline-config.json').read_bytes())
+            self.assertFalse((target / 'ARCHIVE_AUTHORITY.json').exists())
 
     def test_symlink_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

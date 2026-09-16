@@ -80,3 +80,8 @@ CURRENT，也不授予所有权；之后仍必须运行完整归档校验和唯�
 CURRENT、ARCHIVE_AUTHORITY 和 ENABLED。任何匹配失败都不会启用本地采集。
 随后使用本地安装程序 `--activate` 启动唯一采集 worker，实际采集验收另行完成。
 这套接管不删除任何源数据，也不能替代 Tushare 历史队列完成度验收。
+
+冻结检查点完成后可执行 `--action sync-frozen --checkpoint <检查点目录名>`。
+入口通过 SSH 确认源仍暂停且 COMPLETE 存在，补传最终不可变文件，再拉检查点
+和采集配置；随后才执行 install-checkpoint/finalize。该步骤保留原 CURRENT，
+不复制活跃 SQLite，不启用采集；中断后可复用 rsync 已完成的文件继续。

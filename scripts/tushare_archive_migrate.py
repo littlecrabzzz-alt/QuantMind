@@ -215,6 +215,50 @@ def verify_checkpoint(root, checkpoint, *, staged_current=False):
     return report
 
 
+def sync_frozen(root, checkpoint_name):
+    """Resume immutable delta and transfer only a completed, paused checkpoint."""
+    import re
+    if not re.fullmatch(r'checkpoint-[0-9T.+-]+', checkpoint_name):
+        raise ValueError('Invalid checkpoint name')
+    root = root.resolve()
+    if (root / 'ARCHIVE_AUTHORITY.json').exists() or (root / 'ENABLED').exists():
+        raise ValueError('Refusing frozen transfer onto an active archive')
+    topology = dict(line.split('=', 1) for line in
+                    (Path(__file__).resolve().parents[1] / 'deploy/dual-node.env').read_text().splitlines()
+                    if line and not line.startswith('#'))
+    remote = topology['QM_REMOTE_PROJECT'] + '/data/tushare'
+    probe = ("from pathlib import Path; import sys; r=Path(sys.argv[1]); "
+             "assert not (r/'ENABLED').exists(), 'Source not paused'; "
+             "assert (r/'ENABLED.migration-paused').exists(), 'Pause marker missing'; "
+             "print((r/'.migration'/sys.argv[2]/'COMPLETE.json').read_text())")
+    command = shlex.join(['sudo', '-n', 'python3', '-c', probe, remote, checkpoint_name])
+    result = subprocess.run(['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15',
+                             topology['QM_SSH_TARGET'], command], check=True,
+                            capture_output=True, text=True, timeout=30)
+    proof = json.loads(result.stdout)
+    if proof.get('cloud_writer_disabled') is not True:
+        raise ValueError('Checkpoint source is not frozen')
+    # No live state copied here. The second pass also catches a last publication.
+    if precopy(root):
+        raise ValueError('Frozen immutable delta transfer failed; resume required')
+    checkpoint = root / '.migration' / checkpoint_name
+    checkpoint.mkdir(parents=True, exist_ok=True)
+    base = [shutil.which('rsync') or 'rsync', '-az', '--timeout=600',
+            '--partial-dir=.rsync-partial', '--rsync-path=sudo -n rsync',
+            '-e', 'ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=30']
+    subprocess.run(base + [topology['QM_SSH_TARGET'] + ':' + remote + '/.migration/' + checkpoint_name + '/',
+                           str(checkpoint) + '/'], check=True)
+    local_proof = json.loads((checkpoint / 'COMPLETE.json').read_bytes())
+    if local_proof != proof or digest(checkpoint / 'inventory.jsonl') != proof['inventory']:
+        raise ValueError('Transferred checkpoint manifest mismatch')
+    subprocess.run(base + [topology['QM_SSH_TARGET'] + ':' + remote + '/pipeline-config.json',
+                           str(root / 'pipeline-config.json')], check=True)
+    report = {'stage': 'frozen_transfer', 'status': 'copied', 'checkpoint': str(checkpoint),
+              'cloud_writer_disabled': True, 'migration_verified': False, 'updated_at': utc_now()}
+    atomic_json(root / 'archive-migration-status.json', report)
+    return report
+
+
 def seal_source(root, checkpoint, owner):
     """Fence the paused source after destination verification; never delete data."""
     root, checkpoint = root.resolve(), checkpoint.resolve()
@@ -284,7 +328,7 @@ def finalize_archive(root, checkpoint):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
-    parser.add_argument('--action', choices=['precopy', 'checkpoint', 'install-checkpoint', 'verify', 'seal-source', 'finalize'], default='precopy')
+    parser.add_argument('--action', choices=['precopy', 'checkpoint', 'install-checkpoint', 'verify', 'seal-source', 'finalize', 'sync-frozen'], default='precopy')
     parser.add_argument('--checkpoint', type=Path)
     parser.add_argument('--staged-current', action='store_true')
     parser.add_argument('--wait-locks', action='store_true')
@@ -300,6 +344,9 @@ if __name__ == '__main__':
         else:
             if args.checkpoint is None:
                 parser.error('--checkpoint is required')
+            if args.action == 'sync-frozen':
+                print(json.dumps(sync_frozen(args.root, args.checkpoint.name)))
+                raise SystemExit(0)
             if args.action == 'seal-source':
                 print(json.dumps(seal_source(args.root, args.checkpoint, args.owner)))
                 raise SystemExit(0)
