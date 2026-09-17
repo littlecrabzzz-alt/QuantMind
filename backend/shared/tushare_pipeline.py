@@ -839,10 +839,12 @@ class Pipeline:
                 if account_wait >= deadline - time.monotonic():
                     return None
                 wait_started = time.perf_counter()
+                profile = getattr(self, "_selection_profile", None)
+                if profile is not None:
+                    profile["seconds"]["account_gate_requested_sleep"] += account_wait
                 try:
                     time.sleep(account_wait)
                 finally:
-                    profile = getattr(self, "_selection_profile", None)
                     if profile is not None:
                         profile["seconds"]["account_gate_sleep"] += (
                             time.perf_counter() - wait_started
@@ -4734,6 +4736,7 @@ class Pipeline:
         }
         self._selection_profile = {
             "seconds": {
+                "account_gate_requested_sleep": 0.0,
                 "account_gate_sleep": 0.0,
                 "empty_queue_sleep": 0.0,
                 "gate_reservation_commit": 0.0,
