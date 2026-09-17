@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reassess retained quality responses without replaying supplier requests."""
+"""Reassess retained contract failures without replaying supplier requests."""
 
 from __future__ import annotations
 
@@ -67,20 +67,35 @@ def _contract_sha(job):
     )
 
 
-def reassess(pipeline, *, apply=False):
+def reassess(pipeline, *, apply=False, apis=None):
     """Promote only artifact-verified results accepted by the current contract."""
     db = pipeline.db
     if db.execute("PRAGMA user_version").fetchone()[0] != 6:
         raise ValueError("Expected pipeline schema 6")
+    apis = tuple(dict.fromkeys(apis or ()))
+    if any(not isinstance(api, str) or not re.fullmatch(r"[a-z0-9_]+", api) for api in apis):
+        raise ValueError("Invalid API reassessment filter")
     attempts_before = db.execute("SELECT count(*) FROM attempts").fetchone()[0]
     promoted = Counter()
     unchanged = Counter()
     try:
         db.execute("BEGIN IMMEDIATE")
+        api_filter = (
+            " AND json_extract(job,'$.api_name') IN ("
+            + ",".join("?" for _ in apis)
+            + ")"
+            if apis
+            else ""
+        )
         rows = db.execute(
-            "SELECT id,job,result FROM jobs WHERE state='quality' "
-            "AND json_extract(result,'$.status') IN ('schema_gap','invalid_values') "
-            "ORDER BY rowid"
+            "SELECT id,state,job,result FROM jobs WHERE ("
+            "(state='quality' AND json_extract(result,'$.status') "
+            "IN ('schema_gap','invalid_values')) OR "
+            "(state='blocked' AND json_extract(result,'$.status')="
+            "'possibly_truncated'))"
+            + api_filter
+            + " ORDER BY rowid",
+            apis,
         ).fetchall()
         for row in rows:
             job, saved = json.loads(row["job"]), json.loads(row["result"])
@@ -125,6 +140,7 @@ def reassess(pipeline, *, apply=False):
                 continue
             marker = {
                 "version": 1,
+                "previous_state": row["state"],
                 "previous_status": saved["status"],
                 "reassessed_status": "sample_ok",
                 "assessed_at": utc_now(),
@@ -135,8 +151,8 @@ def reassess(pipeline, *, apply=False):
             updated = {**saved, **assessment, "contract_reassessment": marker}
             encoded = json.dumps(updated, sort_keys=True)
             changed = db.execute(
-                "UPDATE jobs SET state='done',result=? WHERE id=? AND state='quality'",
-                (encoded, row["id"]),
+                "UPDATE jobs SET state='done',result=? WHERE id=? AND state=?",
+                (encoded, row["id"], row["state"]),
             ).rowcount
             if changed != 1:
                 raise ValueError("Quality job changed during reassessment")
@@ -157,6 +173,9 @@ def reassess(pipeline, *, apply=False):
             "status": "applied" if apply else "planned_rollback",
             "schema_version": 1,
             "candidate_jobs": len(rows),
+            "candidate_states": dict(
+                sorted(Counter(row["state"] for row in rows).items())
+            ),
             "promoted_jobs": sum(promoted.values()),
             "promoted_by_api": dict(sorted(promoted.items())),
             "unchanged_jobs": sum(unchanged.values()),
@@ -209,6 +228,7 @@ def main():
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--catalog", type=Path, required=True)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--api", action="append", default=[])
     args = parser.parse_args()
     root = args.root.resolve()
     catalog = json.loads(_regular(args.catalog, "Catalog").read_bytes())
@@ -220,7 +240,7 @@ def main():
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
         pipeline = Pipeline(root, catalog)
         stack.callback(pipeline.close)
-        report = reassess(pipeline, apply=args.apply)
+        report = reassess(pipeline, apply=args.apply, apis=args.api)
         if args.apply:
             report["receipt"] = str(_write_receipt(root, report))
     print(json.dumps(report, ensure_ascii=False, sort_keys=True))
