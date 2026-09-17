@@ -18,4 +18,4 @@
 ## Node boundary
 
 - Mac remains the only full Tushare acquisition writer. Cloud remains fenced from provider acquisition and receives only the published research subset through the existing private read path.
-- `bash scripts/dual-node.sh handoff --align-git mac` passed before this record with HEAD `5e91255e932fd69441552020dad0a979ed25809b` and source digest `fca5d2c26a6821bf89b703f19403c1271c6e9d538d69fc30e165e5fea5791886`.
+- After this record was committed, `bash scripts/dual-node.sh handoff --align-git mac` passed at HEAD `9c795bbe089144295f8c2e3981ca27c21cf0b1f3` with source digest `ae871a873d490419aae7f2cd5e3703e04033b05963e6aa485df3201eab66b171`. On cloud, `tushare-research-cache.timer` is enabled and active; `data/tushare/ARCHIVE_RELOCATED.json` still records `source_paused=true` and the Mac hostname as archive owner.
