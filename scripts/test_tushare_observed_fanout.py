@@ -98,43 +98,6 @@ class ObservedFanout(unittest.TestCase):
         self.assertNotIn("end_date", self.children(row)[0])
         self.assertNotIn("float_date", self.children(row)[0])
 
-    def test_npr_leaf_normalization_replaces_open_full_path_children(self):
-        row, job = self.parent(
-            "npr",
-            start_date="2008-03-28 08:00:00",
-            end_date="2008-03-28 08:00:00",
-        )
-        source = self.source(
-            ["科技、教育\\教育", "综合政务\\其他"], field="ptype"
-        )
-        spec = module.EXTENDED_CONTRACTS["npr"]
-        with patch.dict(spec, {"saturation_partition_observed_normalizer": None}):
-            self.p.split_request(row, job, source)
-        old = {
-            saved[0]
-            for saved in self.p.db.execute(
-                "SELECT child_id FROM partition_children WHERE parent_id=?",
-                (row["id"],),
-            )
-        }
-        repaired = self.p.split_request(row, job, source)
-        self.assertEqual(
-            {child["ptype"] for child in self.children(row)}, {"教育", "其他"}
-        )
-        self.assertEqual(repaired["retired_open_children"], 2)
-        self.assertEqual(
-            {
-                saved[0]
-                for saved in self.p.db.execute(
-                    "SELECT state FROM jobs WHERE id IN (?,?)", tuple(old)
-                )
-            },
-            {"superseded"},
-        )
-        split, evidence = self.evidence(row)
-        self.assertEqual(split["expected_children"], 2)
-        self.assertEqual(evidence["observed_normalizer"], "npr_ptype_leaf")
-
     def test_reentry_adds_observed_codes_preserves_children_and_evidence(self):
         row, job = self.parent()
         with patch.object(

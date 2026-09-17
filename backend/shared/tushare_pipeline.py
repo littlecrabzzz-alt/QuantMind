@@ -107,10 +107,7 @@ from backend.shared.tushare_intake import (
 )
 from backend.shared.tushare_rrg_contracts import RRG_CONTRACTS
 from backend.shared.tushare_stock_lifecycle import valid_date
-from backend.shared.tushare_text_contracts import (
-    normalize_anns_d_ts_code,
-    normalize_npr_ptype,
-)
+from backend.shared.tushare_text_contracts import normalize_anns_d_ts_code
 
 STOCK_IDENTIFIER_SOURCE_APIS = (
     "stock_basic",
@@ -3351,15 +3348,6 @@ class Pipeline:
         partition_axis = _saturation_partition_axis(spec, params)
         if partition_axis:
             partition_param = partition_axis["param"]
-            observed_normalizer = spec.get(
-                "saturation_partition_observed_normalizer"
-            )
-            if observed_normalizer not in (None, "npr_ptype_leaf"):
-                raise ValueError("Invalid saturation partition observed normalizer")
-            if observed_normalizer == "npr_ptype_leaf" and (
-                job["api_name"] != "npr" or partition_param != "ptype"
-            ):
-                raise ValueError("NPR ptype normalizer used outside its contract")
             saved = result if result is not None else json.loads(row["result"] or "{}")
             if saved.get("object_sha256"):
                 configured = partition_axis["values"]
@@ -3386,8 +3374,6 @@ class Pipeline:
                 observed, invalid = set(), 0
                 for record in self.records(saved, fields={partition_param}):
                     value = record.get(partition_param)
-                    if observed_normalizer == "npr_ptype_leaf":
-                        value = normalize_npr_ptype(value)
                     if valid_partition_value(value):
                         observed.add(value)
                     else:
@@ -3423,8 +3409,6 @@ class Pipeline:
                         "parent_object_sha256": saved.get("object_sha256"),
                         "universe_complete": False,
                     }
-                    if observed_normalizer:
-                        evidence["observed_normalizer"] = observed_normalizer
                     retired = previous - children
                     if existing:
                         evidence["replaced_method"] = existing["method"]
