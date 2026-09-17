@@ -233,6 +233,8 @@ TEXT_CONTRACT_NOTES = {
         "hidden_fields": ["url", "content_html"],
         "source_status": "omit org and ptype to cover all; docs only give partial category examples",
         "coverage_gaps": [
+            "2026-09-18 live probes returned explicit empty results for documented ptype leaf values, returned group-path values and org+ptype combinations across exact-second, daily and unbounded requests; ptype fanout is disabled",
+            "an org-only daily probe still returned 500 rows with has_more=true, so organization filtering does not close the terminal historical window",
             "HTML may contain linked attachments that need independent discovery"
         ],
     },

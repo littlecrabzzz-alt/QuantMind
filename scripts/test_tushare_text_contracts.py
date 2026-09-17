@@ -154,6 +154,14 @@ class TextPlans(unittest.TestCase):
             self.assertTrue(
                 TEXT_CONTRACTS[api]["recover_legacy_blocked_identifier_fanout"]
             )
+        self.assertNotIn("saturation_partition_axes", TEXT_CONTRACTS["npr"])
+        self.assertNotIn(
+            "recover_legacy_blocked_observed_fanout", TEXT_CONTRACTS["npr"]
+        )
+        self.assertIn(
+            "ptype fanout is disabled",
+            TEXT_CONTRACT_NOTES["npr"]["coverage_gaps"][0],
+        )
 
     def test_month_mode_covers_all_days_sources_and_both_qa_axes(self):
         start, today = date(2024, 1, 29), date(2024, 3, 8)
