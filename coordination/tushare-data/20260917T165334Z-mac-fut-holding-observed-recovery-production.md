@@ -53,6 +53,8 @@ The LaunchAgent resumed after the scoped acceptance with PID 15970. The first co
 
 ## Dual-node boundary
 
-Mac remains the only full-archive writer. The cloud keeps the research cache only; no cloud full Tushare writer is permitted. Cloud Git alignment, timer/no-writer verification and the relocation-marker check are recorded after this evidence commit is pushed.
+After the implementation and evidence commit was pushed, dual-node Git alignment passed at `d7cdcf600312a4a2d8c88bbd553b69b5c089d03e` with source digest `a4225cce361f6869a49c47999d02b4fe1ff735ac94813e007e2a3f8bb4171e05`. The cloud research-cache timer is enabled and active, no cloud full-archive writer unit is loaded, and `/root/data/disk/quantmind/project/data/tushare/ARCHIVE_RELOCATED.json` remains present. The cloud `quantmind` and `quantmind-db` containers are healthy.
+
+Mac remains the only full Tushare archive writer. The cloud keeps the research cache only.
 
 Full local historical synchronization remains active and incomplete.
