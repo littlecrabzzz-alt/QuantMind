@@ -50,3 +50,17 @@ uv run --no-project --python 3.10 --with httpx --with pyarrow --with duckdb pyth
 
 
 同一6a46d2c0固定版本随后经标准Mac mirror同步成功：新增6448、共188149文件校验。父另外在Mac逐个重算本周期6438增量文件的SHA与字节数，261619850字节全部一致，涵盖2490原文/2490观察/1325Parquet/73附件/60提取正文。证据`/tmp/tushare-live-interval-mac-acceptance.json`及`/tmp/tushare-interval-mirror-result.json`；这补足本次周期的离线文件闭包，不代表其他历史缺口已完成。
+
+## 2026-09-18 Mac 全量归档周期
+
+迁移到 Mac 后，固定版本 manifest 已增长到 456,697,375 字节。一次正常自动发布实测
+耗时 461.93 秒，其中 `metadata_inventory` 214.87 秒、
+`scan_attempts_and_stat` 180.28 秒；该轮为 `publish_only`，上游请求为 0。继续按一小时
+周期会让约 12.8% 的单 worker 墙钟时间用于重复全库发布扫描。
+
+Mac 生产配置因此将 `publish_interval_seconds` 从 3600 调整为 21600，
+`planning_interval_seconds=900` 保持不变。六小时只是自动发布检查的最小间隔；原始响应、
+attempt、文档及解析结果继续按各自事务立即持久化，显式手动发布仍可立即冻结研究输入。
+按本次耗时估算，每六小时少做五次发布可释放约 2,310 秒给采集，代价是固定 release
+通常最多延后约六小时可见。估算不是吞吐承诺，生产验收仍以调整后的真实请求周期、
+错误日志、CURRENT 身份和下次到期时间为准。

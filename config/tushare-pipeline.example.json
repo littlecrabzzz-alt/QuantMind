@@ -9,6 +9,8 @@
   "batch_requests": 360,
   "batch_seconds": 100,
   "archive_worker_cycle_seconds": 120,
+  "publish_interval_seconds": 21600,
+  "planning_interval_seconds": 900,
   "throughput_fast_lane_apis": [],
   "throughput_fast_lane_every": null,
   "enable_text": true,
