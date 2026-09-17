@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replace open daily_info/dc_daily history days with complete month ranges."""
+"""Replace open daily_info/dc_daily/fund_share history days with month ranges."""
 
 from __future__ import annotations
 
@@ -25,13 +25,23 @@ from backend.shared.tushare_dc_extra_contracts import (  # noqa: E402
 from backend.shared.tushare_listing_extra_contracts import (  # noqa: E402
     iter_listing_extra_jobs,
 )
+from backend.shared.tushare_market_contracts import iter_market_jobs  # noqa: E402
 from backend.shared.tushare_pipeline import Pipeline  # noqa: E402
 
-APIS = ("daily_info", "dc_daily")
-GROUPS = {"daily_info": "listing_extra", "dc_daily": "dc_extra"}
-PLANNING_STATES = ("history:listing_extra", "history:dc_extra")
+APIS = ("daily_info", "dc_daily", "fund_share")
+GROUPS = {
+    "daily_info": "listing_extra",
+    "dc_daily": "dc_extra",
+    "fund_share": "market",
+}
+PLANNING_STATES = {
+    "daily_info": ("history:listing_extra",),
+    "dc_daily": ("history:dc_extra",),
+    "fund_share": ("history:market", "history:fund_share_history"),
+}
 USABLE_RANGE_STATES = ("pending", "split_pending", "done", "empty")
 DC_VARIANTS = {item["idx_type"] for item in DAILY_VARIANTS}
+FUND_MARKETS = {"SH", "SZ"}
 
 
 def _encoded(value):
@@ -63,6 +73,9 @@ def _planned_ranges(config, today, api):
     elif api == "dc_daily":
         selected["dc_extra_apis"] = [api]
         jobs = iter_dc_extra_jobs(selected, today, {})
+    elif api == "fund_share":
+        selected["market_apis"] = [api]
+        jobs = iter_market_jobs(selected, today, {})
     else:
         raise ValueError("Unsupported low-volume range API")
     for job in jobs:
@@ -114,17 +127,23 @@ def migrate(pipeline, config, today, *, apply=False):
             by_api[api] = len(rows)
             for row in rows:
                 params = json.loads(row["job"])["params"]
-                expected = {"trade_date"} if api == "daily_info" else {
-                    "trade_date",
-                    "idx_type",
-                }
+                expected = (
+                    {"trade_date"}
+                    if api == "daily_info"
+                    else {
+                        "trade_date",
+                        "idx_type" if api == "dc_daily" else "market",
+                    }
+                )
                 if set(params) != expected:
                     raise ValueError(f"Unexpected {api} history-day request shape")
                 trade_date = params["trade_date"]
                 _validate_date(trade_date, f"{api} trade_date")
-                variant = params.get("idx_type", "")
+                variant = params.get("idx_type", params.get("market", ""))
                 if api == "dc_daily" and variant not in DC_VARIANTS:
                     raise ValueError("Invalid dc_daily idx_type")
+                if api == "fund_share" and variant not in FUND_MARKETS:
+                    raise ValueError("Invalid fund_share market")
                 daily.append((row["id"], api, trade_date, variant))
             split_daily = _count(
                 db,
@@ -137,6 +156,7 @@ def migrate(pipeline, config, today, *, apply=False):
             if split_daily:
                 raise ValueError(f"Split {api} history days require separate review")
         db.executemany("INSERT INTO low_volume_daily_open VALUES(?,?,?,?)", daily)
+        affected = [api for api in APIS if by_api[api]]
 
         db.execute(
             "CREATE TEMP TABLE low_volume_ranges ("
@@ -145,7 +165,7 @@ def migrate(pipeline, config, today, *, apply=False):
         )
         inserted = 0
         planned_by_api = {}
-        for api in APIS:
+        for api in affected:
             planned_by_api[api] = 0
             seen = set()
             for job in _planned_ranges(config, today, api):
@@ -163,20 +183,26 @@ def migrate(pipeline, config, today, *, apply=False):
                 if row is None or row["state"] not in USABLE_RANGE_STATES:
                     raise ValueError(f"Planned {api} range is missing or unusable")
                 params = json.loads(row["job"])["params"]
-                expected = {"start_date", "end_date"} if api == "daily_info" else {
-                    "start_date",
-                    "end_date",
-                    "idx_type",
-                }
+                expected = (
+                    {"start_date", "end_date"}
+                    if api == "daily_info"
+                    else {
+                        "start_date",
+                        "end_date",
+                        "idx_type" if api == "dc_daily" else "market",
+                    }
+                )
                 if set(params) != expected:
                     raise ValueError(f"Unexpected {api} range request shape")
                 _validate_date(params["start_date"], f"{api} start_date")
                 _validate_date(params["end_date"], f"{api} end_date")
                 if params["start_date"] > params["end_date"]:
                     raise ValueError(f"Invalid {api} range order")
-                variant = params.get("idx_type", "")
+                variant = params.get("idx_type", params.get("market", ""))
                 if api == "dc_daily" and variant not in DC_VARIANTS:
                     raise ValueError("Invalid dc_daily range idx_type")
+                if api == "fund_share" and variant not in FUND_MARKETS:
+                    raise ValueError("Invalid fund_share range market")
                 db.execute(
                     "INSERT INTO low_volume_ranges VALUES(?,?,?,?,?)",
                     (
@@ -236,15 +262,20 @@ def migrate(pipeline, config, today, *, apply=False):
             != results_before
         ):
             raise ValueError("Result-bearing jobs changed during queue migration")
-        placeholders = ",".join("?" for _ in PLANNING_STATES)
-        planning_states_reset = db.execute(
-            f"DELETE FROM planning_state WHERE name IN ({placeholders})",
-            PLANNING_STATES,
-        ).rowcount
+        planning_names = tuple(
+            dict.fromkeys(name for api in affected for name in PLANNING_STATES[api])
+        )
+        planning_states_reset = 0
+        if planning_names:
+            placeholders = ",".join("?" for _ in planning_names)
+            planning_states_reset = db.execute(
+                f"DELETE FROM planning_state WHERE name IN ({placeholders})",
+                planning_names,
+            ).rowcount
         report = {
             "status": "applied" if apply else "snapshot_validation_rollback",
             "schema_version": 1,
-            "apis": list(APIS),
+            "apis": affected,
             "today": today.strftime("%Y%m%d"),
             "planned_range_jobs": sum(planned_by_api.values()),
             "planned_range_jobs_by_api": planned_by_api,

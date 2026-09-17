@@ -21,6 +21,31 @@ def day(value):
 
 
 class MarketPlanning(unittest.TestCase):
+    def test_fund_share_history_uses_month_ranges_and_recent_stays_daily(self):
+        jobs = list(
+            iter_market_jobs(
+                {"history_start": "20231220", "market_apis": ["fund_share"]},
+                date(2024, 2, 10),
+            )
+        )
+        recent = [job["params"] for job in jobs if job["epoch"] != "history"]
+        history = [job["params"] for job in jobs if job["epoch"] == "history"]
+        self.assertEqual(len(recent), 14)
+        self.assertTrue(all("trade_date" in params for params in recent))
+        self.assertEqual(len(history), 6)
+        self.assertEqual(
+            {
+                (params["start_date"], params["end_date"])
+                for params in history
+            },
+            {
+                ("20231220", "20231231"),
+                ("20240101", "20240131"),
+                ("20240201", "20240202"),
+            },
+        )
+        self.assertEqual({params["market"] for params in history}, {"SH", "SZ"})
+
     def test_month_windows_cover_every_date_without_gaps_or_future(self):
         config = {
             "history_start": "20240227",

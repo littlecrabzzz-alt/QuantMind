@@ -23,6 +23,7 @@ CONFIG = {
     "dc_extra_history_start": "20260101",
 }
 TODAY = date(2026, 1, 10)
+FUND_CONFIG = {**CONFIG, "history_start": "20260101"}
 
 
 class LowVolumeDailyRetirement(unittest.TestCase):
@@ -74,7 +75,8 @@ class LowVolumeDailyRetirement(unittest.TestCase):
         )
         recent = self.enqueue("daily_info", {"trade_date": "20260109"}, "20260110")
         unrelated = self.enqueue("suspend_d", {"trade_date": "20260101"})
-        for name in migration.PLANNING_STATES:
+        for api in ("daily_info", "dc_daily"):
+            name = migration.PLANNING_STATES[api][0]
             self.pipeline.db.execute(
                 "INSERT INTO planning_state(name,anchor,signature,offset,done) "
                 "VALUES(?, 'old', '{}', 99, 0)",
@@ -116,7 +118,10 @@ class LowVolumeDailyRetirement(unittest.TestCase):
         self.assertEqual(
             self.pipeline.db.execute(
                 "SELECT count(*) FROM planning_state WHERE name IN (?,?)",
-                migration.PLANNING_STATES,
+                (
+                    migration.PLANNING_STATES["daily_info"][0],
+                    migration.PLANNING_STATES["dc_daily"][0],
+                ),
             ).fetchone()[0],
             0,
         )
@@ -150,6 +155,45 @@ class LowVolumeDailyRetirement(unittest.TestCase):
         self.pipeline.db.commit()
         with self.assertRaisesRegex(ValueError, "shared by active split parents"):
             migration.migrate(self.pipeline, CONFIG, TODAY, apply=True)
+
+    def test_fund_share_apply_uses_market_ranges_and_resets_both_cursors(self):
+        day = self.enqueue(
+            "fund_share", {"trade_date": "20260102", "market": "SH"}
+        )
+        for name in migration.PLANNING_STATES["fund_share"]:
+            self.pipeline.db.execute(
+                "INSERT INTO planning_state(name,anchor,signature,offset,done) "
+                "VALUES(?, 'old', '{}', 99, 0)",
+                (name,),
+            )
+        self.pipeline.db.commit()
+        report = migration.migrate(self.pipeline, FUND_CONFIG, TODAY, apply=True)
+        self.assertEqual(report["apis"], ["fund_share"])
+        self.assertEqual(report["planned_range_jobs_by_api"], {"fund_share": 2})
+        self.assertEqual(report["superseded_history_daily_jobs"], 1)
+        self.assertEqual(report["history_planning_states_reset"], 2)
+        self.assertEqual(
+            self.pipeline.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (day,)
+            ).fetchone()[0],
+            "superseded",
+        )
+        ranges = [
+            json.loads(row[0])["params"]
+            for row in self.pipeline.db.execute(
+                "SELECT job FROM jobs WHERE epoch='history' "
+                "AND json_extract(job,'$.api_name')='fund_share' "
+                "AND json_type(job,'$.params.start_date')='text'"
+            )
+        ]
+        self.assertEqual({params["market"] for params in ranges}, {"SH", "SZ"})
+        self.assertTrue(
+            all(
+                params["start_date"] == "20260101"
+                and params["end_date"] == "20260102"
+                for params in ranges
+            )
+        )
 
 
 if __name__ == "__main__":

@@ -48,11 +48,19 @@ class FundShareAppend(unittest.TestCase):
         self.assertIn("fund_share_history", APPEND_PLANNERS)
         first = self.plan_append()["history:fund_share_history"]
         self.assertTrue(first["done"])
-        self.assertEqual(first["new_jobs"], 4)
+        self.assertEqual(first["new_jobs"], 2)
         jobs = self.jobs()
         self.assertEqual({job["api_name"] for job in jobs}, {"fund_share"})
         self.assertEqual(
             {job["params"]["market"] for job in jobs}, {"SH", "SZ"}
+        )
+        self.assertTrue(
+            all(
+                job["params"]["start_date"] == "20260901"
+                and job["params"]["end_date"] == "20260902"
+                and "trade_date" not in job["params"]
+                for job in jobs
+            )
         )
         self.assertEqual(
             {row[0] for row in self.p.db.execute("SELECT DISTINCT epoch FROM jobs")},
@@ -66,7 +74,7 @@ class FundShareAppend(unittest.TestCase):
         )
         self.p.db.commit()
         second = self.plan_append()["history:fund_share_history"]
-        self.assertEqual((second["new_jobs"], second["existing_jobs"]), (0, 4))
+        self.assertEqual((second["new_jobs"], second["existing_jobs"]), (0, 2))
         self.assertEqual(
             before,
             [tuple(row) for row in self.p.db.execute("SELECT * FROM jobs ORDER BY id")],

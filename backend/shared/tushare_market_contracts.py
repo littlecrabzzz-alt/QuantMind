@@ -142,6 +142,9 @@ MARKET_CONTRACTS["fund_manager"]["pagination"] = {
     "limit_param": "limit",
     "page_size": 1000,
 }
+MARKET_CONTRACTS["fund_share"]["history_partition"] = (
+    "closed_calendar_month_range_v1"
+)
 MARKET_CONTRACTS["cb_price_chg"]["permission_note"] = (
     "Independent entitlement; points do not grant access. Probe once, then block this API on denial."
 )
@@ -330,6 +333,24 @@ def iter_market_jobs(config, today, identifiers=None):
                     else [{}]
                 )
             )
+            if (
+                phase == "history"
+                and MARKET_CONTRACTS[api].get("history_partition")
+                == "closed_calendar_month_range_v1"
+            ):
+                for a, b in reversed(list(_months(left, right))):
+                    for params in variants:
+                        yield job(
+                            api,
+                            {
+                                **params,
+                                "start_date": a.strftime("%Y%m%d"),
+                                "end_date": b.strftime("%Y%m%d"),
+                            },
+                            priority,
+                            version,
+                        )
+                continue
             day = right
             while day >= left:
                 for params in variants:
