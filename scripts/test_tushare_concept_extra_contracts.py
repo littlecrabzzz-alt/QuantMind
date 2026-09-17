@@ -58,6 +58,7 @@ class ConceptExtra(unittest.TestCase):
             [s["row_cap"] for s in CONTRACTS.values()], [5000, 3000, 5000, 5000]
         )
         self.assertFalse(CONTRACTS["ths_member"]["row_cap_verified"])
+        self.assertTrue(CONTRACTS["ths_member"]["supplier_has_more_false_terminal"])
         self.assertTrue(
             all(
                 s["row_cap_verified"] for a, s in CONTRACTS.items() if a != "ths_member"

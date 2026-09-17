@@ -299,16 +299,18 @@ def assess_success_payload(job, payload):
     from backend.shared.tushare_registry import contract_for
 
     current_contract = contract_for(job["api_name"])
+    nullable_fields = current_contract.get(
+        "assessment_nullable_fields", job.get("nullable_fields", ())
+    )
+    positive_fields = current_contract.get(
+        "assessment_positive_fields", job.get("positive_fields", ())
+    )
     assessment = assess_response(
         payload,
         job["row_cap"],
         job["required_fields"],
-        current_contract.get(
-            "assessment_nullable_fields", job.get("nullable_fields", ())
-        ),
-        current_contract.get(
-            "assessment_positive_fields", job.get("positive_fields", ())
-        ),
+        nullable_fields,
+        positive_fields,
     )
     if _cyq_chips_supplier_empty(job, payload):
         assessment = {
@@ -320,6 +322,22 @@ def assess_success_payload(job, payload):
             "history_complete": False,
             "pit_verified": False,
         }
+    if (
+        current_contract.get("supplier_has_more_false_terminal") is True
+        and assessment.get("status") == "possibly_truncated"
+        and assessment.get("supplier_has_more") is False
+        and not assessment.get("missing_fields")
+        and not any(assessment.get("invalid_positive_counts", {}).values())
+        and not any(
+            count
+            for field, count in assessment.get("null_counts", {}).items()
+            if field not in nullable_fields
+        )
+    ):
+        assessment.update(
+            status="sample_ok",
+            supplier_terminal_evidence="has_more_false_over_unverified_local_alarm",
+        )
     coverage = _unverified_field_coverage()
     requested = job.get("fields")
     requested = requested.split(",") if isinstance(requested, str) else []

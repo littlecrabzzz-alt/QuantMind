@@ -13,7 +13,7 @@ import httpx
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from backend.shared import tushare_pipeline as module
-from backend.shared.tushare_intake import capture_sample
+from backend.shared.tushare_intake import assess_success_payload, capture_sample
 from backend.shared.tushare_concept_extra_contracts import FIELDS, DC_VARIANTS
 from backend.shared.tushare_registry import contract_for
 from backend.shared.tushare_store import read_dataset, export_jsonl, CONTRACTS
@@ -108,6 +108,43 @@ class ConceptExtraRuntime(unittest.TestCase):
             self.p.db.execute("SELECT * FROM jobs WHERE id=?", (key,)).fetchone(),
             job,
             result,
+        )
+
+    def test_member_explicit_terminal_flag_overrides_only_clean_local_cap_alarm(self):
+        spec = contract_for("ths_member")
+        fields = FIELDS["ths_member"]
+        job = {
+            "api_name": "ths_member",
+            "row_cap": 1,
+            "required_fields": fields,
+            "nullable_fields": spec["nullable_fields"],
+            "positive_fields": [],
+            "fields": ",".join(fields),
+        }
+        row = ["700001.TI", "600000.SH", "fixture", None, None, None, "Y"]
+
+        def assess(has_more, response_fields=fields, response_row=row):
+            return assess_success_payload(
+                job,
+                {
+                    "code": 0,
+                    "data": {
+                        "fields": response_fields,
+                        "items": [response_row],
+                        "has_more": has_more,
+                    },
+                },
+            )
+
+        terminal = assess(False)
+        self.assertEqual(terminal["status"], "sample_ok")
+        self.assertEqual(
+            terminal["supplier_terminal_evidence"],
+            "has_more_false_over_unverified_local_alarm",
+        )
+        self.assertEqual(assess(True)["status"], "possibly_truncated")
+        self.assertNotEqual(
+            assess(False, fields[1:], row[1:])["status"], "sample_ok"
         )
 
     def test_all_four_capture_publish_read_source_fields_categories_and_repeats(self):

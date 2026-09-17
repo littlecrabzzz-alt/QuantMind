@@ -84,7 +84,8 @@ CONCEPT_EXTRA_CONTRACTS["ths_daily"].update(
 )
 CONCEPT_EXTRA_CONTRACTS["ths_member"].update(
     documented_requests_per_minute=200,
-    cap_note="Single-call row limit is unpublished. 5000 is a conservative local guard only; even smaller responses do not establish completeness.",
+    cap_note="Single-call row limit is unpublished. 5000 is a conservative local guard; an explicit has_more=false is accepted as terminal only after schema and value checks pass.",
+    supplier_has_more_false_terminal=True,
     unavailable_fields=["weight", "in_date", "out_date"],
     history_gap="Official interface supplies latest members only; weight/in_date/out_date are documented unavailable. is_new is output-only. Do not fabricate membership periods or request historical/is_new parameters.",
     discovery_gap="Enumerate snapshots only for stored/discovered ths_indices, including removed/foreign identities when observed. Missing master, excluded historical indices and unavailable entry/exit history remain explicit gaps.",
