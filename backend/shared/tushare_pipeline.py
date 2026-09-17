@@ -2990,6 +2990,9 @@ class Pipeline:
             family
             and param not in params
             and not (
+                spec.get("saturation_date_first") and self.date_children(job)
+            )
+            and not (
                 spec.get("saturation_history_only")
                 and row["epoch"] != "history"
             )

@@ -414,6 +414,7 @@ MARKET_SENTIMENT_CONTRACTS["kpl_list"].update(
     saturation_fallback="market_sentiment_stocks",
     saturation_param="ts_code",
     saturation_dependencies=["market_sentiment_stocks"],
+    saturation_date_first=True,
     category_gap="Request all five tag literals, not just default涨停. Returned tag is described merely as标签, so preserve immutable requesttag and audit correspondence; states/themes/reasons may be multi-valued strings.",
     discovery_gap="Saturated date/tag partitions need historical/delisted/T stocks plus source-observed KP securities. Current listings cannot establish that universe complete.",
     namespace_note="ts_code is a source security identity, independent of theme strings. Theme names are not KP concept IDs or historically effective industry membership.",

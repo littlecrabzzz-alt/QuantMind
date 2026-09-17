@@ -290,6 +290,7 @@ class MarketSentiment(unittest.TestCase):
             C["kpl_list"]["documented_quota_tiers"][1]["requests_per_minute"], 500
         )
         self.assertEqual(C["kpl_list"]["requests_per_minute"], 30)
+        self.assertTrue(C["kpl_list"]["saturation_date_first"])
 
     def test_configuration_validation_and_per_api_scope(self):
         today = date(2026, 9, 9)

@@ -263,6 +263,29 @@ class MarketSentimentRuntime(unittest.TestCase):
     def test_saturation_fanout_preserves_request_and_hot_terminal_blocks(self):
         self.discovery("stock_basic", [{"ts_code": "T600018.SH"}])
         self.discovery("tdx_index", [{"ts_code": "880002.TDX"}])
+        ranged = {
+            "start_date": "20260901",
+            "end_date": "20260904",
+            "tag": "涨停",
+        }
+        row, job, result = self.capture(
+            "kpl_list", ranged, [source("kpl_list")], more=True, epoch="range"
+        )
+        split = self.p.split_request(row, job, result)
+        self.assertEqual(split, {"method": "date_bisection", "children": 2})
+        children = [
+            json.loads(item[0])["params"]
+            for item in self.p.db.execute(
+                "SELECT j.job FROM partition_children c "
+                "JOIN jobs j ON j.id=c.child_id WHERE c.parent_id=?",
+                (row["id"],),
+            )
+        ]
+        self.assertTrue(all("ts_code" not in child for child in children))
+        self.assertEqual(
+            {(child["start_date"], child["end_date"]) for child in children},
+            {("20260901", "20260902"), ("20260903", "20260904")},
+        )
         for api in FIELDS:
             row, job, result = self.capture(api, params(api), [source(api)], more=True)
             split = self.p.split_request(row, job, result)
