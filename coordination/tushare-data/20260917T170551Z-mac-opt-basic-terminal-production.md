@@ -48,6 +48,8 @@ The first complete post-restart production cycle ended at 2026-09-17T17:07:18.21
 
 ## Dual-node boundary
 
-Mac remains the only full Tushare archive writer. The cloud keeps the research cache only. Git alignment, cloud timer/no-writer verification and the relocation-marker check follow the evidence commit.
+After the implementation and evidence commit was pushed, dual-node Git alignment passed at `a6e1f766fd2f2f92220c3e7183ee6545f51051b5` with source digest `db11e835a55dd5fd64ca339d9acbd8b896ff091ac494acec92c29af4f249c8dc`. The cloud research-cache timer is enabled and active, no cloud full-archive writer unit is loaded, and `/root/data/disk/quantmind/project/data/tushare/ARCHIVE_RELOCATED.json` remains present. The cloud `quantmind` and `quantmind-db` containers are healthy.
+
+Mac remains the only full Tushare archive writer. The cloud keeps the research cache only.
 
 Full local historical synchronization remains active and incomplete.
