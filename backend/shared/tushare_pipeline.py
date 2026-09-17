@@ -135,6 +135,10 @@ LEGACY_OBSERVED_RECOVERY_APIS = tuple(
 )
 IDENTIFIER_CACHE_VERSION = 4
 RANGE_REPLACEMENT_GAP = "replaced_by_stock_range_plan_v1"
+INDEX_PERIOD_REPLACEMENT_GAP = "replaced_by_index_period_plan_v1"
+REPLACEMENT_GAPS = frozenset(
+    (RANGE_REPLACEMENT_GAP, INDEX_PERIOD_REPLACEMENT_GAP)
+)
 ROOT = Path(os.getenv("QM_TUSHARE_ARCHIVE_ROOT", "/data/tushare"))
 CONTRACTS = {
     api: (spec["row_cap"], spec["required_fields"])
@@ -4157,7 +4161,7 @@ class Pipeline:
             evidence = json.loads(split["evidence"])
             replacement_gap = evidence.get("replacement_gap")
             preserve_replacement = (
-                replacement_gap == RANGE_REPLACEMENT_GAP
+                replacement_gap in REPLACEMENT_GAPS
                 and parent["state"] == "blocked"
             )
             if preserve_replacement:
