@@ -89,7 +89,20 @@ class ListingExtra(unittest.TestCase):
         }
         for api in ("bak_basic", "daily_info"):
             selected = [p for p in plan if p["api_name"] == api]
-            self.assertEqual({p["params"]["trade_date"] for p in selected}, expected)
+            covered = set()
+            for item in selected:
+                params = item["params"]
+                if "trade_date" in params:
+                    covered.add(params["trade_date"])
+                    continue
+                day, last = (
+                    datetime.strptime(params[k], "%Y%m%d").date()
+                    for k in ("start_date", "end_date")
+                )
+                while day <= last:
+                    covered.add(day.strftime("%Y%m%d"))
+                    day += timedelta(days=1)
+            self.assertEqual(covered, expected)
             self.assertEqual(len(selected), len(expected))
         issuance = set()
         for job in plan:
@@ -98,7 +111,7 @@ class ListingExtra(unittest.TestCase):
             self.assertEqual(job["fields"].split(","), FIELDS[api])
             self.assertNotIn("offset", params)
             self.assertNotIn("limit", params)
-            if api == "new_share" and params:
+            if api == "new_share" and {"start_date", "end_date"} <= params.keys():
                 day, last = (
                     datetime.strptime(params[k], "%Y%m%d").date()
                     for k in ("start_date", "end_date")
@@ -111,12 +124,15 @@ class ListingExtra(unittest.TestCase):
         priorities = [j["priority"] for j in plan]
         self.assertEqual(priorities, sorted(priorities))
 
-    def test_unknown_ipo_history_keeps_unfiltered_future_discovery_and_gap(self):
+    def test_unknown_ipo_history_keeps_open_ended_future_discovery_and_gap(self):
         config = {"listing_extra_apis": ["new_share"], "planning_epoch": "anchor"}
         plan = list(jobs(config, date(2026, 9, 9)))
         self.assertEqual(
             [j["params"] for j in plan],
-            [{}, {"start_date": "20260903", "end_date": "20260909"}],
+            [
+                {"start_date": "20260909"},
+                {"start_date": "20260903", "end_date": "20260909"},
+            ],
         )
         self.assertTrue(all(j["epoch"] == "anchor" for j in plan))
         self.assertTrue(
@@ -127,6 +143,9 @@ class ListingExtra(unittest.TestCase):
         )
         self.assertIn("future horizon", CONTRACTS["new_share"]["discovery_gap"])
         self.assertIn("illegal", CONTRACTS["new_share"]["terminal_gap"])
+        self.assertEqual(
+            CONTRACTS["new_share"]["future_discovery_lower_bound"], "today"
+        )
 
     def test_historical_floors_and_lazy_round_robin(self):
         plan = list(islice(jobs({"history_start": "19000101"}, date(2026, 9, 9)), 22))
@@ -139,7 +158,10 @@ class ListingExtra(unittest.TestCase):
         self.assertEqual(
             history[1]["params"], {"start_date": "19000101", "end_date": "19000131"}
         )
-        self.assertEqual(history[2]["params"], {"trade_date": "19901219"})
+        self.assertEqual(
+            history[2]["params"],
+            {"start_date": "19901219", "end_date": "19901231"},
+        )
         self.assertEqual(CONTRACTS["bak_basic"]["history_precision"], "year")
         self.assertEqual(
             CONTRACTS["daily_info"]["history_precision"], "per_category_day"

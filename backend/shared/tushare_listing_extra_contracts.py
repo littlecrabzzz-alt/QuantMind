@@ -114,10 +114,11 @@ LISTING_EXTRA_CONTRACTS["bak_basic"].update(
 LISTING_EXTRA_CONTRACTS["new_share"].update(
     split_axis="ipo_date",
     discovery_snapshot=True,
+    future_discovery_lower_bound="today",
     namespace_note="ts_code is the security code; sub_code is an opaque subscription code (e.g. 780162 vs 601162.SH). Do not infer an exchange from sub_code or merge it into a tradable identity.",
     date_axis_note="Input start_date/end_date filter online issuance (ipo_date), not listing (issue_date). issue_date can be null or future and may be completed after the original issuance window ages out.",
-    discovery_gap="An unfiltered recent snapshot discovers supplier-returned past/upcoming issues without inventing a future cutoff. At 2000 rows this snapshot is not complete and has no generic range to bisect; do not derive an exhaustive history or future horizon from its extrema.",
-    terminal_gap="A one-day issuance window at cap has no documented ts_code filter. Preserve blocked coverage; a stock-universe fanout would be illegal.",
+    discovery_gap="A lower-bounded open-ended request discovers supplier-returned issues whose ipo_date is today or later without inventing a future cutoff. A terminal response covers only what the supplier knows at request time; it does not prove the future horizon, older revisions or backfills absent.",
+    terminal_gap="A one-day issuance window or start-only open future request at cap has no legal second date boundary to bisect. Adding ts_code, offset or limit would be illegal; preserve blocked coverage.",
     unit_note="amount/market_amount/limit_amount are ten-thousand shares; funds is hundred-million CNY. Preserve source pe/ballot scaling and signed/zero values.",
 )
 LISTING_EXTRA_CONTRACTS["bse_mapping"].update(
@@ -251,7 +252,9 @@ def iter_listing_extra_jobs(config, today, identifiers=None):
         if api in ("bse_mapping", "new_share"):
             yield {
                 "api_name": api,
-                "params": {},
+                "params": {}
+                if api == "bse_mapping"
+                else {"start_date": today.strftime("%Y%m%d")},
                 "fields": ",".join(FIELDS[api]),
                 "priority": 20,
                 "epoch": epoch,

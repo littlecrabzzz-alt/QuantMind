@@ -293,6 +293,7 @@ class ListingExtraRuntime(unittest.TestCase):
         )
         for api, params in (
             ("new_share", {"start_date": "20260904", "end_date": "20260904"}),
+            ("new_share", {"start_date": "20260904"}),
             ("new_share", {}),
             ("bse_mapping", {}),
             ("daily_info", {"trade_date": "20260904", "ts_code": "SH_A"}),
@@ -337,7 +338,7 @@ class ListingExtraRuntime(unittest.TestCase):
         pending = [
             self.p.enqueue(api, params, 1, "terminal-run")
             for api, params in (
-                ("new_share", {}),
+                ("new_share", {"start_date": "20260904"}),
                 ("bse_mapping", {}),
                 ("daily_info", {"trade_date": "20260904", "ts_code": "SH_A"}),
             )
