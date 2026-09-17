@@ -134,6 +134,58 @@ CONTRACTS = {
 }
 
 
+def _saturation_partition_axis(spec, params):
+    """Return the first legal response-derived partition not already applied."""
+    axes = spec.get("saturation_partition_axes")
+    if axes is None:
+        param = spec.get("saturation_partition_param")
+        if not param:
+            return None
+        axes = [
+            {
+                "param": param,
+                "values": spec.get("saturation_partition_values", []),
+                "value_kind": spec.get("saturation_partition_value_kind", "code"),
+            }
+        ]
+    if not isinstance(axes, (list, tuple)) or not axes:
+        raise ValueError("Invalid saturation partition axes")
+    seen, normalized = set(), []
+    for index, axis in enumerate(axes):
+        if not isinstance(axis, dict) or set(axis) - {
+            "param",
+            "values",
+            "value_kind",
+        }:
+            raise ValueError("Invalid saturation partition axis")
+        param = axis.get("param")
+        values = axis.get("values", [])
+        value_kind = axis.get("value_kind", "code")
+        if (
+            not isinstance(param, str)
+            or not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", param)
+            or param in seen
+            or not isinstance(values, (list, tuple))
+            or value_kind not in ("code", "supplier_text")
+        ):
+            raise ValueError("Invalid saturation partition axis")
+        seen.add(param)
+        normalized.append(
+            {
+                "param": param,
+                "values": values,
+                "value_kind": value_kind,
+                "index": index,
+                "count": len(axes),
+            }
+        )
+    for axis in normalized:
+        param = axis["param"]
+        if param not in params:
+            return axis
+    return None
+
+
 def _planning_inputs(family, config, identifiers):
     """Only request-planner dependencies affect a family's enumeration.
 
@@ -3286,12 +3338,13 @@ class Pipeline:
                 and row["epoch"] != "history"
             )
         )
-        partition_param = spec.get("saturation_partition_param")
-        if fanout and partition_param and partition_param not in params:
+        partition_axis = _saturation_partition_axis(spec, params)
+        if partition_axis:
+            partition_param = partition_axis["param"]
             saved = result if result is not None else json.loads(row["result"] or "{}")
             if saved.get("object_sha256"):
-                configured = spec.get("saturation_partition_values", [])
-                value_kind = spec.get("saturation_partition_value_kind", "code")
+                configured = partition_axis["values"]
+                value_kind = partition_axis["value_kind"]
 
                 def valid_partition_value(value):
                     if value_kind == "code":
@@ -3342,6 +3395,8 @@ class Pipeline:
                         "configured_values": list(configured),
                         "observed_values": sorted(observed),
                         "value_kind": value_kind,
+                        "partition_axis_index": partition_axis["index"],
+                        "partition_axis_count": partition_axis["count"],
                         "invalid_parent_values": invalid,
                         "parent_observation": saved.get("observation"),
                         "parent_object_sha256": saved.get("object_sha256"),
@@ -3820,7 +3875,7 @@ class Pipeline:
         observed_rule = (
             ECO_CAL_OBSERVED_FANOUT if job["api_name"] == "eco_cal" else {}
         )
-        partition_param = spec.get("saturation_partition_param")
+        partition_axis = _saturation_partition_axis(spec, job["params"])
         return bool(
             (spec.get("saturation_fallback") or observed_rule.get("family"))
             and not (
@@ -3831,10 +3886,7 @@ class Pipeline:
                 or observed_rule.get("param", "ts_code")
             )
             not in job["params"]
-            and not (
-                partition_param
-                and partition_param not in job["params"]
-            )
+            and not partition_axis
             and job["api_name"] not in ("fut_holding", "fut_weekly_detail")
             and not (spec.get("group") == "global" and spec.get("pagination"))
             and not self.date_children(job)
@@ -3844,11 +3896,9 @@ class Pipeline:
         if self.identifier_split_needs_discovery(job, epoch=epoch):
             return "identifier_fanout"
         spec = contract_for(job["api_name"])
-        partition_param = spec.get("saturation_partition_param")
+        partition_axis = _saturation_partition_axis(spec, job["params"])
         if (
-            spec.get("saturation_fallback")
-            and partition_param
-            and partition_param not in job["params"]
+            partition_axis
             and result.get("object_sha256")
         ):
             return "observed_value_fanout"

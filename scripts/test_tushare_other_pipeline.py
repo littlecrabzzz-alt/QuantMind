@@ -14,7 +14,11 @@ import httpx
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from backend.shared import tushare_pipeline as module  # noqa: E402
-from backend.shared.tushare_other_contracts import OTHER_CONTRACTS, FIELDS  # noqa: E402
+from backend.shared.tushare_other_contracts import (  # noqa: E402
+    OTHER_CONTRACTS,
+    FIELDS,
+    OPTION_EXCHANGES,
+)
 from backend.shared.tushare_store import read_dataset, dataset_schema, KEYS  # noqa: E402
 
 CATALOG = json.loads((ROOT / "config/tushare-catalog.json").read_text())
@@ -86,6 +90,23 @@ class OtherPipeline(unittest.TestCase):
                 pause=0,
             )
         self.assertEqual(set(seen), set(samples))
+
+    def partition_children(self, parent):
+        return {
+            row["id"]: json.loads(row["job"])["params"]
+            for row in self.p.db.execute(
+                "SELECT child.id,child.job FROM partition_children AS edge "
+                "JOIN jobs AS child ON child.id=edge.child_id "
+                "WHERE edge.parent_id=?",
+                (parent,),
+            )
+        }
+
+    def partition_params(self, parent):
+        return {
+            tuple(sorted(params.items()))
+            for params in self.partition_children(parent).values()
+        }
 
     def test_all_fifteen_capture_and_offline_pinned_read(self):
         for api in OTHER_CONTRACTS:
@@ -225,7 +246,7 @@ class OtherPipeline(unittest.TestCase):
             "SELECT * FROM partition_splits WHERE parent_id=?", (key,)
         ).fetchone()
         self.assertEqual(split["method"], "observed_value_fanout")
-        self.assertEqual(split["expected_children"], 7)
+        self.assertEqual(split["expected_children"], len(OPTION_EXCHANGES))
         self.assertEqual(split["coverage_proven"], 0)
         self.p.reconcile_partitions()
         split = self.p.db.execute(
@@ -238,7 +259,7 @@ class OtherPipeline(unittest.TestCase):
         ).fetchall()
         self.assertEqual(
             {json.loads(j[0])["params"]["exchange"] for j in children},
-            {"SSE", "SZSE", "CFFEX", "DCE", "SHFE", "CZCE", "GFEX"},
+            set(OPTION_EXCHANGES),
         )
         self.assertTrue(
             all("ts_code" not in json.loads(j[0])["params"] for j in children)
@@ -248,6 +269,139 @@ class OtherPipeline(unittest.TestCase):
                 0
             ],
             "split_pending",
+        )
+
+    def test_saturated_basic_uses_exchange_call_put_opt_code_axes(self):
+        cffex_c = {
+            **sample("opt_basic"),
+            "ts_code": "IO2609-C-4000.CFX",
+            "exchange": "CFFEX",
+            "call_put": "C",
+            "opt_code": "OPIO2609.CFX",
+        }
+        cffex_p = {
+            **cffex_c,
+            "ts_code": "IO2609-P-4000.CFX",
+            "call_put": "P",
+        }
+        with patch.dict(module.EXTENDED_CONTRACTS["opt_basic"], {"row_cap": 2}):
+            parent = self.p.enqueue("opt_basic", {})
+            self.p.db.commit()
+            self.capture({"opt_basic": [cffex_c, cffex_p]})
+            exchanges = self.partition_children(parent)
+            self.assertEqual(
+                self.partition_params(parent),
+                {(("exchange", exchange),) for exchange in OPTION_EXCHANGES},
+            )
+            cffex = next(
+                child
+                for child, params in exchanges.items()
+                if params == {"exchange": "CFFEX"}
+            )
+            self.p.db.execute(
+                "UPDATE jobs SET state='superseded' WHERE state='pending' AND id<>?",
+                (cffex,),
+            )
+            self.p.db.commit()
+            self.capture({"opt_basic": [cffex_c, cffex_p]})
+            call_put = self.partition_children(cffex)
+            self.assertEqual(
+                self.partition_params(cffex),
+                {
+                    (("call_put", "C"), ("exchange", "CFFEX")),
+                    (("call_put", "P"), ("exchange", "CFFEX")),
+                },
+            )
+
+            call_child = next(
+                child for child, params in call_put.items() if params["call_put"] == "C"
+            )
+            self.p.db.execute(
+                "UPDATE jobs SET state='superseded' WHERE state='pending' AND id<>?",
+                (call_child,),
+            )
+            self.p.db.commit()
+            second_c = {
+                **cffex_c,
+                "ts_code": "MO2609-C-3000.CFX",
+                "opt_code": "OPMO2609.CFX",
+            }
+            self.capture({"opt_basic": [cffex_c, second_c]})
+            self.assertEqual(
+                self.partition_params(call_child),
+                {
+                    (
+                        ("call_put", "C"),
+                        ("exchange", "CFFEX"),
+                        ("opt_code", "OPIO2609.CFX"),
+                    ),
+                    (
+                        ("call_put", "C"),
+                        ("exchange", "CFFEX"),
+                        ("opt_code", "OPMO2609.CFX"),
+                    ),
+                },
+            )
+
+    def test_legacy_blocked_basic_recovers_without_http(self):
+        rows = [
+            {
+                **sample("opt_basic"),
+                "ts_code": "IO2609-C-4000.CFX",
+                "exchange": "CFFEX",
+                "call_put": "C",
+                "opt_code": "OPIO2609.CFX",
+            },
+            {
+                **sample("opt_basic"),
+                "ts_code": "MO2609-P-3000.CFX",
+                "exchange": "CFFEX",
+                "call_put": "P",
+                "opt_code": "OPMO2609.CFX",
+            },
+        ]
+        spec = module.EXTENDED_CONTRACTS["opt_basic"]
+        with patch.dict(
+            spec,
+            {"row_cap": 2, "saturation_partition_axes": None},
+        ):
+            parent = self.p.enqueue("opt_basic", {})
+            self.p.db.commit()
+            self.capture({"opt_basic": rows})
+        before = self.p.db.execute(
+            "SELECT tries,result FROM jobs WHERE id=?", (parent,)
+        ).fetchone()
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (parent,)
+            ).fetchone()[0],
+            "blocked",
+        )
+        with httpx.Client(
+            transport=httpx.MockTransport(
+                lambda _request: self.fail("legacy recovery must not call HTTP")
+            )
+        ) as client:
+            report = self.p.run(
+                client,
+                "fixture-only",
+                {"priority_start": "20200101"},
+                max_requests=0,
+                pause=0,
+            )
+        self.assertTrue(report["partition_work"]["legacy_parent_recovered"])
+        self.assertEqual(report["partition_work"]["upstream_calls"], 0)
+        self.assertEqual(
+            self.partition_params(parent),
+            {(("exchange", exchange),) for exchange in OPTION_EXCHANGES},
+        )
+        after = self.p.db.execute(
+            "SELECT state,tries,result FROM jobs WHERE id=?", (parent,)
+        ).fetchone()
+        self.assertEqual(after["state"], "split_pending")
+        self.assertEqual(after["tries"], before["tries"])
+        self.assertEqual(
+            json.loads(after["result"])["partition_recovery"]["upstream_calls"], 0
         )
 
     def test_observed_exchange_fanout_replaces_open_identifier_children(self):
@@ -311,7 +465,7 @@ class OtherPipeline(unittest.TestCase):
                 (parent,),
             )
         ]
-        self.assertEqual(len(current), 7)
+        self.assertEqual(len(current), len(OPTION_EXCHANGES))
         self.assertTrue(
             all(set(params) == {"trade_date", "exchange"} for params in current)
         )

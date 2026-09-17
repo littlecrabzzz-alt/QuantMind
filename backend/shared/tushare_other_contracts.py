@@ -190,10 +190,11 @@ BASICS = ("opt_basic", "sge_basic", "fx_obasic")
 DAILY = ("opt_daily", "sge_daily", "fx_daily")
 CURRENCIES = ("USD", "EUR", "JPY", "GBP", "CHF")
 # Keep the unfiltered request too: neither the documented list nor live observations
-# prove a closed universe. GFEX is retained from a verified 2026-09-16 response.
+# prove a closed universe. GFEX and INE are retained from verified responses.
 DOCUMENTED_OPTION_EXCHANGES = ("SSE", "SZSE", "CFFEX", "DCE", "SHFE", "CZCE")
-OBSERVED_OPTION_EXCHANGES = ("GFEX",)
+OBSERVED_OPTION_EXCHANGES = ("GFEX", "INE")
 OPTION_EXCHANGES = DOCUMENTED_OPTION_EXCHANGES + OBSERVED_OPTION_EXCHANGES
+OPTION_CALL_PUT = ("C", "P")
 FAMILIES = {
     "opt_daily": "options",
     "sge_daily": "spot_metals",
@@ -250,6 +251,26 @@ OTHER_CONTRACTS["opt_basic"].update(
     discovery_note="Unfiltered, all documented exchanges and exact list_date partitions; retain expired/delisted contracts. No list_status or date-range parameters exist.",
     revision_note="exercise_price and opt_multiplier are adjusted; preserve every observation, not point-in-time originals.",
     saturation_gap="A saturated listing date requires verified venue/underlying/call_put subdivision; no invented offset or start_date parameters.",
+    saturation_partition_axes=[
+        {
+            "param": "exchange",
+            "values": list(OPTION_EXCHANGES),
+            "value_kind": "code",
+        },
+        {
+            "param": "call_put",
+            "values": list(OPTION_CALL_PUT),
+            "value_kind": "supplier_text",
+        },
+        {"param": "opt_code", "values": [], "value_kind": "supplier_text"},
+    ],
+    saturation_partition_note=(
+        "Partition capped catalogue responses by venue, then C/P, then every "
+        "standard contract code observed in the retained parent. Each level "
+        "remains universe-unverified because the supplier publishes no closed "
+        "venue or standard-contract vocabulary."
+    ),
+    recover_legacy_blocked_identifier_fanout=True,
 )
 OTHER_CONTRACTS["opt_daily"]["permission_note"] = (
     "Detail docs say 2000 points and opt_basic 5000; permission overview gives different thresholds. Actual account must be probed."

@@ -16,6 +16,7 @@ from backend.shared.tushare_other_contracts import (  # noqa: E402
     FIELDS,
     CURRENCIES,
     OPTION_EXCHANGES,
+    OPTION_CALL_PUT,
     iter_other_jobs,
     other_prerequisites,
 )
@@ -50,6 +51,15 @@ class OtherContracts(unittest.TestCase):
         )
         self.assertEqual(OTHER_CONTRACTS["opt_daily"]["row_cap"], 15000)
         self.assertFalse(OTHER_CONTRACTS["opt_basic"]["row_cap_verified"])
+        self.assertIn("INE", OPTION_EXCHANGES)
+        self.assertEqual(OPTION_CALL_PUT, ("C", "P"))
+        self.assertEqual(
+            [
+                axis["param"]
+                for axis in OTHER_CONTRACTS["opt_basic"]["saturation_partition_axes"]
+            ],
+            ["exchange", "call_put", "opt_code"],
+        )
 
     def test_discovery_unfiltered_and_no_active_status_bias(self):
         jobs = list(
