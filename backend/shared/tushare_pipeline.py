@@ -822,7 +822,16 @@ class Pipeline:
             if account_wait:
                 if account_wait >= deadline - time.monotonic():
                     return None
-                time.sleep(account_wait)
+                wait_started = time.perf_counter()
+                try:
+                    time.sleep(account_wait)
+                finally:
+                    profile = getattr(self, "_selection_profile", None)
+                    if profile is not None:
+                        profile["seconds"]["account_gate_sleep"] += (
+                            time.perf_counter() - wait_started
+                        )
+                        profile["counts"]["account_gate_sleeps"] += 1
                 continue
             if not task_scope:
                 groups = ["rrg"] + [
@@ -909,6 +918,7 @@ class Pipeline:
                     "effective_account_rpm": int(rpm),
                     "observed_quota_preserved": quota is not None,
                 }
+                reservation_started = time.perf_counter()
                 try:
                     self.db.executemany(
                         "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=excluded.next_at",
@@ -925,6 +935,13 @@ class Pipeline:
                 except BaseException:
                     self.db.rollback()
                     raise
+                finally:
+                    profile = getattr(self, "_selection_profile", None)
+                    if profile is not None:
+                        profile["seconds"]["gate_reservation_commit"] += (
+                            time.perf_counter() - reservation_started
+                        )
+                        profile["counts"]["gate_reservations"] += 1
                 self._fair_turn += 1
                 return row
             earliest_sql = """
@@ -943,7 +960,16 @@ class Pipeline:
             delay = max(0.01, earliest - now) if earliest is not None else None
             if delay is None or delay >= deadline - time.monotonic():
                 return None
-            time.sleep(delay)
+            wait_started = time.perf_counter()
+            try:
+                time.sleep(delay)
+            finally:
+                profile = getattr(self, "_selection_profile", None)
+                if profile is not None:
+                    profile["seconds"]["empty_queue_sleep"] += (
+                        time.perf_counter() - wait_started
+                    )
+                    profile["counts"]["empty_queue_sleeps"] += 1
         return None
 
     def close(self):
@@ -4491,6 +4517,18 @@ class Pipeline:
             "dispatch_rejections": 0,
             "local_quota_deferrals": 0,
         }
+        self._selection_profile = {
+            "seconds": {
+                "account_gate_sleep": 0.0,
+                "empty_queue_sleep": 0.0,
+                "gate_reservation_commit": 0.0,
+            },
+            "counts": {
+                "account_gate_sleeps": 0,
+                "empty_queue_sleeps": 0,
+                "gate_reservations": 0,
+            },
+        }
 
         def work_timing():
             return {
@@ -4499,6 +4537,15 @@ class Pipeline:
                     for name, value in work_seconds.items()
                 },
                 "counts": dict(work_counts),
+                "job_selection_detail": {
+                    "seconds": {
+                        name: round(value, 6)
+                        for name, value in self._selection_profile[
+                            "seconds"
+                        ].items()
+                    },
+                    "counts": dict(self._selection_profile["counts"]),
+                },
             }
 
         task_scope = task_ids is not None
