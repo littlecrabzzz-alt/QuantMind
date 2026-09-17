@@ -7,6 +7,7 @@ pipeline; producing a plan does not prove that the supplier returned all rows.
 
 from calendar import monthrange
 from datetime import date, datetime, timedelta
+import re
 
 NEWS_SOURCES = (
     "sina",
@@ -147,6 +148,23 @@ TEXT_CONTRACTS = {
     ),
 }
 TEXT_CONTRACTS["research_report"]["optional_requested_fields"] = ["file_name"]
+TEXT_CONTRACTS["anns_d"].update(
+    saturation_fallback="announcement_securities",
+    saturation_param="ts_code",
+    saturation_jobs_per_run=1000,
+    saturation_history_only=True,
+)
+
+
+def normalize_anns_d_ts_code(value):
+    """Convert announcement output codes to the documented request syntax."""
+    if not isinstance(value, str):
+        return None
+    if re.fullmatch(r"[0-9]{6}\.(SH|SZ|BJ)", value):
+        return value
+    match = re.fullmatch(r"(SH|SZ|BJ)([0-9]{6})", value)
+    return f"{match[2]}.{match[1]}" if match else None
+
 
 # Machine-readable exceptions are part of the contract, not completeness waivers.
 TEXT_CONTRACT_NOTES = {
@@ -177,7 +195,7 @@ TEXT_CONTRACT_NOTES = {
         "history_status": "unknown_exact_start; entitlement table says over 10 years",
         "hidden_fields": ["rec_time"],
         "coverage_gaps": [
-            "capped day requires exhaustive instrument universe including funds and fixed income",
+            "capped historical day requires an exhaustive listed-company code universe; current and historical stock_basic plus announcement-observed codes are requested, but the supplier exposes no independent total",
             "download URL availability is not successful PDF download or parsing",
         ],
     },

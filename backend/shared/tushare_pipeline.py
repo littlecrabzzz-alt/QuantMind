@@ -107,16 +107,19 @@ from backend.shared.tushare_intake import (
 )
 from backend.shared.tushare_rrg_contracts import RRG_CONTRACTS
 from backend.shared.tushare_stock_lifecycle import valid_date
+from backend.shared.tushare_text_contracts import normalize_anns_d_ts_code
 
 STOCK_IDENTIFIER_SOURCE_APIS = (
     "stock_basic",
     *sorted(SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS),
 )
+ANNOUNCEMENT_IDENTIFIER_SOURCE_APIS = STOCK_IDENTIFIER_SOURCE_APIS
 IDENTIFIER_SPLIT_SOURCE_APIS = {
     "stocks": STOCK_IDENTIFIER_SOURCE_APIS,
+    "announcement_securities": ANNOUNCEMENT_IDENTIFIER_SOURCE_APIS,
     "dc_indices": ("dc_index", "dc_member", "dc_daily"),
 }
-IDENTIFIER_CACHE_VERSION = 3
+IDENTIFIER_CACHE_VERSION = 4
 ROOT = Path(os.getenv("QM_TUSHARE_ARCHIVE_ROOT", "/data/tushare"))
 CONTRACTS = {
     api: (spec["row_cap"], spec["required_fields"])
@@ -1619,6 +1622,7 @@ class Pipeline:
             result = {name: set() for name in families.values()}
             result.update({name: set() for name in MINUTE_SOURCE_FAMILIES.values()})
             result.update({name: set() for name in REALTIME_SOURCE_FAMILIES.values()})
+            result["announcement_securities"] = set()
             result["minute_futures_unmapped"] = set()
             result.update(
                 sw_indexes=set(),
@@ -1941,6 +1945,7 @@ class Pipeline:
         result["risk_securities"].update(
             result["risk_stocks"] | result["funds"] | result["etfs"]
         )
+        result.setdefault("announcement_securities", set()).update(result["stocks"])
         # Isolated discovery unions: never widen old-family stocks/funds/bonds.
         result["cross_asset_indexes"].update(result["indexes"] | result["sw_indexes"])
         result["cross_asset_funds"].update(result["funds"] | result["etfs"])
@@ -2967,7 +2972,14 @@ class Pipeline:
         param = spec.get("saturation_param") or observed_rule.get(
             "param", "ts_code"
         )
-        fanout = family and param not in params
+        fanout = (
+            family
+            and param not in params
+            and not (
+                spec.get("saturation_history_only")
+                and row["epoch"] != "history"
+            )
+        )
         partition_param = spec.get("saturation_partition_param")
         if fanout and partition_param and partition_param not in params:
             saved = result if result is not None else json.loads(row["result"] or "{}")
@@ -3104,6 +3116,11 @@ class Pipeline:
             return self.split_observed_futures(row, job, result, existing)
         if fanout:
 
+            def normalize(code):
+                if job["api_name"] == "anns_d":
+                    return normalize_anns_d_ts_code(code)
+                return code
+
             def usable(code):
                 if observed_rule:
                     return (
@@ -3126,13 +3143,17 @@ class Pipeline:
                 if family in IDENTIFIER_SPLIT_SOURCE_APIS
                 else self.identifiers()
             )
-            discovered = {code for code in identifiers.get(family, []) if usable(code)}
+            discovered = {
+                normalized
+                for code in identifiers.get(family, [])
+                if usable(normalized := normalize(code))
+            }
             saved = result if result is not None else json.loads(row["result"] or "{}")
             observed = (
                 {
-                    record.get(param)
+                    normalized
                     for record in self.records(saved)
-                    if usable(record.get(param))
+                    if usable(normalized := normalize(record.get(param)))
                 }
                 if saved.get("object_sha256")
                 else set()
@@ -3475,7 +3496,7 @@ class Pipeline:
             self.db.execute("UPDATE jobs SET expanded=1 WHERE id=?", (row["id"],))
         self.db.commit()
 
-    def identifier_split_needs_discovery(self, job):
+    def identifier_split_needs_discovery(self, job, *, epoch=None):
         spec = contract_for(job["api_name"])
         observed_rule = (
             ECO_CAL_OBSERVED_FANOUT if job["api_name"] == "eco_cal" else {}
@@ -3483,6 +3504,9 @@ class Pipeline:
         partition_param = spec.get("saturation_partition_param")
         return bool(
             (spec.get("saturation_fallback") or observed_rule.get("family"))
+            and not (
+                spec.get("saturation_history_only") and epoch != "history"
+            )
             and (
                 spec.get("saturation_param")
                 or observed_rule.get("param", "ts_code")
@@ -3537,7 +3561,7 @@ class Pipeline:
         if (
             result.get("partition_deferred") != {"version": 1, "kind": "identifier_fanout"}
             or result.get("status") != "possibly_truncated"
-            or not self.identifier_split_needs_discovery(job)
+            or not self.identifier_split_needs_discovery(job, epoch=row["epoch"])
         ):
             raise ValueError(
                 "Unsupported deferred identifier partition; evidence preserved"
@@ -3795,7 +3819,9 @@ class Pipeline:
                 )
             if status == "possibly_truncated":
                 state = "blocked"
-                if self.identifier_split_needs_discovery(job):
+                if self.identifier_split_needs_discovery(
+                    job, epoch=row["epoch"]
+                ):
                     # Commit capture/normalization/attempt below before any full
                     # discovery scan. A resumed parent never repeats its HTTP call.
                     result["partition_deferred"] = {
