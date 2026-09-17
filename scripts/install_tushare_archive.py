@@ -54,6 +54,30 @@ def prepare(runtime):
     return python
 
 
+def launch_agent_document(root, runtime, python, secret, logs):
+    return {
+        'Label': 'com.quantmind.tushare-archive',
+        'ProgramArguments': [
+            str(python), '-I', str(runtime / 'scripts/tushare_archive_worker.py'),
+            '--root', str(root),
+        ],
+        'WorkingDirectory': str(runtime),
+        'RunAtLoad': True,
+        'KeepAlive': True,
+        # Standard/background LaunchAgents coalesce the 120ms account gate to
+        # roughly 250ms. Interactive preserves the reviewed Tushare cadence;
+        # it does not change request caps or worker concurrency.
+        'ProcessType': 'Interactive',
+        'ThrottleInterval': 60,
+        'EnvironmentVariables': {
+            'QM_RUNTIME_ENV_FILE': str(secret),
+            'PATH': '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin',
+        },
+        'StandardOutPath': str(logs / 'tushare-archive.out.log'),
+        'StandardErrorPath': str(logs / 'tushare-archive.err.log'),
+    }
+
+
 def activate(root, runtime, python):
     # Check using the deployed runtime before installing an automatic writer.
     env = dict(os.environ, QM_NODE_ROLE='archive', QM_TUSHARE_ARCHIVE_ROOT=str(root))
@@ -68,14 +92,7 @@ def activate(root, runtime, python):
     logs = BASE / 'logs'
     logs.mkdir(parents=True, exist_ok=True)
     plist = Path.home() / 'Library/LaunchAgents' / (label + '.plist')
-    document = {
-        'Label': label, 'ProgramArguments': [str(python), '-I', str(runtime / 'scripts/tushare_archive_worker.py'), '--root', str(root)],
-        'WorkingDirectory': str(runtime), 'RunAtLoad': True, 'KeepAlive': True,
-        'ThrottleInterval': 60,
-        'EnvironmentVariables': {'QM_RUNTIME_ENV_FILE': str(secret), 'PATH': '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin'},
-        'StandardOutPath': str(logs / 'tushare-archive.out.log'),
-        'StandardErrorPath': str(logs / 'tushare-archive.err.log'),
-    }
+    document = launch_agent_document(root, runtime, python, secret, logs)
     target = f'gui/{os.getuid()}/{label}'
     if subprocess.run(['launchctl', 'print', target], capture_output=True).returncode == 0:
         raise ValueError('Archive worker already installed; drain it before upgrading')

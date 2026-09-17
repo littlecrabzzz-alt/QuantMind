@@ -213,6 +213,10 @@ HTTP worker 和一条预取任务移入独立进程，Token 通过进程初始�
 限速调度，可将 `document_worker_execution` 从默认 `thread` 灰度设为 `process`。
 它不改变文档锁、任务数据库、下载并发数或采集/发布顺序，只隔离 Python 调度；worker
 状态会报告实际使用的 `document_execution`，配置值仅允许 `thread` 或 `process`。
+安装器为归档 LaunchAgent 设置 `ProcessType=Interactive`。本机一次性无网络探针实测，
+默认/Standard 进程的 120ms 睡眠中位数约 262ms，Interactive 约 126ms；因此该键用于
+避免 macOS 合并账户频控定时器。它不提高配置的 RPM、不增加 HTTP worker，生产仍须
+以 `account_gate_requested_sleep`、实际 sleep、供应商限频结果和 CPU 占用共同验收。
 
 
 2026-09-17 云端旧归档释放验收：冻结清单中的 1,209,626 个不可变文件已按
