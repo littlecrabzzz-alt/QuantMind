@@ -3,6 +3,7 @@
 No permissions, account access, historical completeness or RRG PIT claims.
 """
 
+from calendar import monthrange
 from datetime import date, datetime, timedelta
 from itertools import product
 
@@ -418,6 +419,7 @@ MARKET_SENTIMENT_CONTRACTS["kpl_list"].update(
     namespace_note="ts_code is a source security identity, independent of theme strings. Theme names are not KP concept IDs or historically effective industry membership.",
     unit_note="net_change/bid_amount are yuan; pct_chg/bid_pct_chg/rt_pct_chg/bid_turnover/turnover_rate percent. Other order/float/amount/net fields have unstated unit/scale; do not infer all values are yuan or shares.",
     date_axis_note="trade_date is supplier trading date; lu_time/ld_time/open_time/last_time are source time strings. Keep partial/empty times and multiple reasons; source update time/timezone and actual availability not documented.",
+    history_partition="closed_calendar_month_range_v1",
     saturation_gap="Legal date ranges and stock fanout preserve request tag; single-stock/day/tag saturation cannot split on output-only theme/reason/time.",
 )
 MARKET_SENTIMENT_CONTRACTS["kpl_concept_cons"].update(
@@ -522,6 +524,22 @@ def _params(api, begin, end):
             yield {**day, **variant}
 
 
+def _history_params(api, begin, end):
+    if api != "kpl_list":
+        yield from _params(api, begin, end)
+        return
+    cursor = begin
+    while cursor <= end:
+        right = min(end, date(cursor.year, cursor.month, monthrange(cursor.year, cursor.month)[1]))
+        bounds = {
+            "start_date": cursor.strftime("%Y%m%d"),
+            "end_date": right.strftime("%Y%m%d"),
+        }
+        for variant in VARIANTS[api]:
+            yield {**bounds, **variant}
+        cursor = right + timedelta(days=1)
+
+
 def iter_market_sentiment_jobs(config, today, identifiers=None):
     """Round-robin complete categories over recent7 then lazy explicit history."""
     if isinstance(today, datetime):
@@ -540,7 +558,9 @@ def iter_market_sentiment_jobs(config, today, identifiers=None):
             start = starts[api]
             if history:
                 if start and start < recent:
-                    streams[api] = iter(_params(api, start, recent - timedelta(days=1)))
+                    streams[api] = iter(
+                        _history_params(api, start, recent - timedelta(days=1))
+                    )
             else:
                 streams[api] = iter(_params(api, max(start or recent, recent), today))
         while streams:

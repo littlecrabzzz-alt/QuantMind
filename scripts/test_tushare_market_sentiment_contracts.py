@@ -115,14 +115,34 @@ class MarketSentiment(unittest.TestCase):
         seen = set()
         for api in C:
             group = [j for j in jobs if j["api_name"] == api]
-            self.assertEqual({j["params"]["trade_date"] for j in group}, expected)
+            if api == "kpl_list":
+                dates = {
+                    j["params"].get("trade_date")
+                    or (j["params"]["start_date"], j["params"]["end_date"])
+                    for j in group
+                }
+                self.assertEqual(dates, expected - {"20240227"} | {("20240227", "20240227")})
+            else:
+                self.assertEqual({j["params"]["trade_date"] for j in group}, expected)
             for job in group:
                 key = (api, json.dumps(job["params"], sort_keys=True))
                 self.assertNotIn(key, seen)
                 seen.add(key)
         self.assertEqual(
-            {j["params"]["trade_date"] for j in jobs if j["epoch"] == "history"},
+            {
+                j["params"]["trade_date"]
+                for j in jobs
+                if j["epoch"] == "history" and j["api_name"] != "kpl_list"
+            },
             {"20240227"},
+        )
+        self.assertEqual(
+            {
+                (j["params"]["start_date"], j["params"]["end_date"])
+                for j in jobs
+                if j["epoch"] == "history" and j["api_name"] == "kpl_list"
+            },
+            {("20240227", "20240227")},
         )
         counts = []
         original = module._days
@@ -139,6 +159,38 @@ class MarketSentiment(unittest.TestCase):
             sample = list(islice(iterator, 46 * 7 + 1))
         self.assertEqual(sample[-1]["params"]["trade_date"], "19900101")
         self.assertLessEqual(len(counts), 50)
+
+    def test_kpl_history_uses_closed_month_ranges_and_recent_stays_daily(self):
+        jobs = list(
+            module.iter_market_sentiment_jobs(
+                {
+                    "market_sentiment_apis": ["kpl_list"],
+                    "market_sentiment_history_start": "20240130",
+                },
+                date(2024, 3, 10),
+            )
+        )
+        history = [job for job in jobs if job["epoch"] == "history"]
+        recent = [job for job in jobs if job["epoch"] != "history"]
+        self.assertEqual(len(history), 15)
+        self.assertEqual(len(recent), 35)
+        self.assertEqual(
+            {
+                (job["params"]["start_date"], job["params"]["end_date"])
+                for job in history
+            },
+            {
+                ("20240130", "20240131"),
+                ("20240201", "20240229"),
+                ("20240301", "20240303"),
+            },
+        )
+        self.assertEqual({job["params"]["tag"] for job in history}, set(module.KPL_TAGS))
+        self.assertTrue(all("trade_date" in job["params"] for job in recent))
+        self.assertTrue(
+            all("start_date" not in job["params"] for job in recent)
+        )
+        self.assertEqual(C["kpl_list"]["history_partition"], "closed_calendar_month_range_v1")
 
     def test_legal_split_axes_preserve_board_member_or_tag(self):
         split = existing_pure_function(

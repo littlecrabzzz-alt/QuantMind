@@ -22,6 +22,7 @@ def prepare(runtime):
         'scripts/tushare_archive_worker.py', 'scripts/tushare_archive_migrate.py',
         'scripts/tushare_range_queue_migration.py',
         'scripts/tushare_factor_daily_retirement.py',
+        'scripts/tushare_kpl_daily_retirement.py',
         'scripts/tushare_stock_lifecycle_migration.py',
         'scripts/tushare_asset_lifecycle_migration.py',
         'scripts/tushare_reassess_saved_quality.py',
