@@ -284,6 +284,25 @@ class StockContextRuntime(unittest.TestCase):
                 self.assertIsNone(self.p.split_request(row, job, result))
         self.assertTrue(all(not contract_for(api).get("pagination") for api in FIELDS))
 
+    def test_rewards_supplier_false_terminates_unverified_local_alarm(self):
+        rows = [source("stk_rewards", name=f"manager-{index}") for index in range(1001)]
+        _, _, terminal = self.capture(
+            "stk_rewards", params("stk_rewards"), rows, more=False
+        )
+        self.assertEqual(terminal["status"], "sample_ok")
+        self.assertEqual(
+            terminal["supplier_terminal_evidence"],
+            "has_more_false_over_unverified_local_alarm",
+        )
+        _, _, continuing = self.capture(
+            "stk_rewards",
+            params("stk_rewards"),
+            rows,
+            more=True,
+            epoch="continuing",
+        )
+        self.assertEqual(continuing["status"], "possibly_truncated")
+
     def test_terminal_saturation_stays_blocked_with_saved_response(self):
         keys = [
             self.p.enqueue(api, params(api, "T600001.SH"), 1, "terminal")

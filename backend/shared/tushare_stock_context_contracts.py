@@ -226,6 +226,7 @@ STOCK_CONTEXT_CONTRACTS["stk_managers"].update(
     multi_code_note="Comma-separated ts_code is explicitly supported, but this planner uses all-market exact announcement days and legal single-code saturation fallback, without guessing multi-code count limits.",
 )
 STOCK_CONTEXT_CONTRACTS["stk_rewards"].update(
+    supplier_has_more_false_terminal=True,
     date_axis_note="Only ts_code (required) and optional end_date REPORT PERIOD are legal inputs. Output ann_date is publication date; end_date is the financial period, never a request interval end. Store default ann_date for availability-oriented filtering, explicit end_date for report cohorts.",
     dependencies=["stocks", "reward_periods"],
     history_request="observed_single_stock_report_periods",
