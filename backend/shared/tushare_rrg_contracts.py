@@ -246,6 +246,7 @@ RRG_CONTRACTS["etf_basic"].update(
     date_axis_note="setup_date and list_date are source lifecycle dates. Current list_status observations do not reconstruct every historical status transition.",
 )
 RRG_CONTRACTS["fund_portfolio"].update(
+    supplier_has_more_false_terminal=True,
     date_axis_note="ann_date is the publication date; end_date is the report period. Local date filters default to ann_date and do not manufacture announcement times.",
     unit_note="mkv, amount and ratios retain supplier values and units; no local rescaling, weight completion or holdings look-through is inferred.",
 )

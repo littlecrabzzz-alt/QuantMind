@@ -13,7 +13,7 @@ import httpx
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from backend.shared.tushare_pipeline import Pipeline
-from backend.shared.tushare_intake import capture_sample
+from backend.shared.tushare_intake import assess_success_payload, capture_sample
 from backend.shared.tushare_registry import EXTENDED_CONTRACTS, contract_for
 from backend.shared.tushare_rrg_contracts import FIELDS, INPUT_FIELDS, RRG_CONTRACTS
 from backend.shared.tushare_store import KEYS, dataset_schema, read_dataset
@@ -250,6 +250,40 @@ class RRGContracts(unittest.TestCase):
                 )
             self.assertEqual(result["quality"], 1)
             pipeline.close()
+
+    def test_fund_portfolio_supplier_false_terminates_unverified_local_alarm(self):
+        spec = RRG_CONTRACTS["fund_portfolio"]
+        fields = FIELDS["fund_portfolio"]
+        job = {
+            "api_name": "fund_portfolio",
+            "row_cap": spec["row_cap"],
+            "required_fields": spec["required_fields"],
+            "nullable_fields": spec["nullable_fields"],
+            "positive_fields": spec["positive_fields"],
+            "fields": ",".join(fields),
+        }
+        row = [source_value("fund_portfolio", field) for field in fields]
+
+        def assess(has_more):
+            return assess_success_payload(
+                job,
+                {
+                    "code": 0,
+                    "data": {
+                        "fields": fields,
+                        "items": [row] * (spec["row_cap"] + 1),
+                        "has_more": has_more,
+                    },
+                },
+            )
+
+        terminal = assess(False)
+        self.assertEqual(terminal["status"], "sample_ok")
+        self.assertEqual(
+            terminal["supplier_terminal_evidence"],
+            "has_more_false_over_unverified_local_alarm",
+        )
+        self.assertEqual(assess(True)["status"], "possibly_truncated")
 
 
 if __name__ == "__main__":
