@@ -8133,13 +8133,22 @@
     {
       "doc_id": "104",
       "url": "https://tushare.pro/document/2?doc_id=104",
-      "api_names": [],
-      "status": "review_required",
-      "permission_status": "unverified",
+      "api_names": [
+        "hs_const"
+      ],
+      "status": "implemented_live_observed",
+      "permission_status": "available_observed",
       "content_status": "document_missing_http_200",
       "source_sha256": "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf",
       "evidence": "docs/tushare-catalog-special-review-1.evidence.json",
-      "next_action": "Resolve linked documentation and classify scope; do not infer an API from a missing document."
+      "next_action": "Retain all four hs_type/is_new snapshots locally and keep the pre-2014 and 2020-2025 history/PIT gaps explicit; do not present this retired endpoint as current constituents.",
+      "runtime_evidence": {
+        "path": "docs/tushare-hs-const-live-probe-20260918.evidence.json",
+        "status": "sample_ok",
+        "row_count": 1811,
+        "probe_session_id": "probe-hs-const-live-20260918",
+        "enabled": true
+      }
     },
     {
       "doc_id": "31",

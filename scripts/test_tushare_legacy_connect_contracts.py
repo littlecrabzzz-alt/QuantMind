@@ -46,7 +46,7 @@ class LegacyConnectContractsTest(unittest.TestCase):
         }
         self.assertEqual(
             set(LEGACY_CONNECT_CONTRACTS),
-            {"moneyflow_hsgt", "ggt_daily", "ggt_top10"},
+            {"hs_const", "moneyflow_hsgt", "ggt_daily", "ggt_top10"},
         )
         for api, spec in LEGACY_CONNECT_CONTRACTS.items():
             entry = entries[api]
@@ -67,6 +67,11 @@ class LegacyConnectContractsTest(unittest.TestCase):
         self.assertEqual(
             INPUT_FIELDS["ggt_daily"], ["trade_date", "start_date", "end_date"]
         )
+        self.assertEqual(INPUT_FIELDS["hs_const"], ["hs_type", "is_new"])
+        self.assertEqual(
+            LEGACY_CONNECT_CONTRACTS["hs_const"]["keys"],
+            ["ts_code", "hs_type", "in_date", "out_date", "is_new"],
+        )
         self.assertFalse(LEGACY_CONNECT_CONTRACTS["ggt_daily"]["observed_has_more"])
         self.assertTrue(
             LEGACY_CONNECT_CONTRACTS["ggt_daily"]["previous_unfiltered_observation"][
@@ -81,6 +86,7 @@ class LegacyConnectContractsTest(unittest.TestCase):
             iter_legacy_connect_jobs(
                 {
                     "legacy_connect_apis": [
+                        "hs_const",
                         "moneyflow_hsgt",
                         "ggt_daily",
                         "ggt_top10",
@@ -91,7 +97,16 @@ class LegacyConnectContractsTest(unittest.TestCase):
                 date(2026, 9, 10),
             )
         )
-        self.assertEqual(len(jobs), 30)
+        self.assertEqual(len(jobs), 34)
+        snapshots = [job for job in jobs if job["api_name"] == "hs_const"]
+        self.assertEqual(
+            {(job["params"]["hs_type"], job["params"]["is_new"]) for job in snapshots},
+            {("SH", "0"), ("SH", "1"), ("SZ", "0"), ("SZ", "1")},
+        )
+        self.assertTrue(
+            all(job["epoch"] == "history" and job["priority"] == 20 for job in snapshots)
+        )
+        self.assertTrue(all("trade_date" not in job["params"] for job in snapshots))
         for api in ("moneyflow_hsgt", "ggt_daily", "ggt_top10"):
             selected = [job for job in jobs if job["api_name"] == api]
             self.assertEqual(len(selected), 10)
@@ -124,6 +139,10 @@ class LegacyConnectContractsTest(unittest.TestCase):
             fields = body["fields"].split(",")
             values = {
                 "trade_date": "20260904",
+                "hs_type": "SH",
+                "in_date": "20141117",
+                "out_date": None,
+                "is_new": "1",
                 "ggt_ss": -1.0,
                 "ggt_sz": 2.0,
                 "hgt": 3.0,
@@ -166,17 +185,22 @@ class LegacyConnectContractsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             pipeline = Pipeline(tmp, catalog)
             for api in LEGACY_CONNECT_CONTRACTS:
-                pipeline.enqueue(api, {"trade_date": "20260904"})
+                params = (
+                    {"hs_type": "SH", "is_new": "1"}
+                    if api == "hs_const"
+                    else {"trade_date": "20260904"}
+                )
+                pipeline.enqueue(api, params)
             pipeline.db.commit()
             with httpx.Client(transport=httpx.MockTransport(handler)) as client:
                 result = pipeline.run(
                     client,
                     "synthetic-token",
                     {"priority_start": "20200101", "enable_legacy_connect": True},
-                    max_requests=3,
+                    max_requests=4,
                     pause=0,
                 )
-            self.assertEqual(result["done"], 3)
+            self.assertEqual(result["done"], 4)
             release = pipeline.publish()
             pipeline.close()
             for api, spec in LEGACY_CONNECT_CONTRACTS.items():

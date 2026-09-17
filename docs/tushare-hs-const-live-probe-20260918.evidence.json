@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "probe_session_id": "probe-hs-const-live-20260918",
+  "observed_at": "2026-09-17T20:46:42Z",
+  "endpoint": "https://api.tushare.pro",
+  "api_name": "hs_const",
+  "credential_retention": "token_not_logged_or_saved",
+  "tls_verification": true,
+  "requested_fields": [
+    "ts_code",
+    "hs_type",
+    "in_date",
+    "out_date",
+    "is_new"
+  ],
+  "explicit_filter_observations": [
+    {
+      "params": {"hs_type": "SH", "is_new": "0"},
+      "source_code": 0,
+      "rows": 414,
+      "supplier_has_more": false,
+      "in_date_range": ["20141117", "20190617"],
+      "out_date_range": ["20141212", "20191213"],
+      "null_counts": {"ts_code": 0, "hs_type": 0, "in_date": 0, "out_date": 0, "is_new": 0}
+    },
+    {
+      "params": {"hs_type": "SH", "is_new": "1"},
+      "source_code": 0,
+      "rows": 581,
+      "supplier_has_more": false,
+      "in_date_range": ["20141117", "20191227"],
+      "out_date_range": null,
+      "null_counts": {"ts_code": 0, "hs_type": 0, "in_date": 0, "out_date": 581, "is_new": 0}
+    },
+    {
+      "params": {"hs_type": "SZ", "is_new": "0"},
+      "source_code": 0,
+      "rows": 574,
+      "supplier_has_more": false,
+      "in_date_range": ["20161205", "20190617"],
+      "out_date_range": ["20161230", "20191213"],
+      "null_counts": {"ts_code": 0, "hs_type": 0, "in_date": 0, "out_date": 0, "is_new": 0}
+    },
+    {
+      "params": {"hs_type": "SZ", "is_new": "1"},
+      "source_code": 0,
+      "rows": 242,
+      "supplier_has_more": false,
+      "in_date_range": ["20170703", "20191223"],
+      "out_date_range": null,
+      "null_counts": {"ts_code": 0, "hs_type": 0, "in_date": 0, "out_date": 242, "is_new": 0}
+    }
+  ],
+  "default_filter_observations": [
+    {"params": {"hs_type": "SH"}, "source_code": 0, "rows": 581, "observed_is_new": ["1"]},
+    {"params": {"hs_type": "SZ"}, "source_code": 0, "rows": 242, "observed_is_new": ["1"]}
+  ],
+  "conclusions": [
+    "The retired endpoint remains readable for this account.",
+    "The unqualified route result is current-within-the-retired-snapshot only; is_new=0 is required to retain exited constituents.",
+    "Observed dates end in 2019, so the endpoint is historical retention evidence rather than a current constituent source.",
+    "The missing official page leaves row-cap, entitlement threshold, hidden fields, complete oldest bound and PIT semantics unverified."
+  ]
+}

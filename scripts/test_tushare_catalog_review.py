@@ -43,9 +43,10 @@ class CatalogReview(unittest.TestCase):
                                 observed["status"], ("sample_ok", "possibly_truncated")
                             )
                             self.assertGreater(observed["row_count"], 0)
-                            self.assertTrue(
-                                observed["probe_release_id"].startswith("probe-")
+                            probe_id = observed.get(
+                                "probe_release_id", observed.get("probe_session_id", "")
                             )
+                            self.assertTrue(probe_id.startswith("probe-"))
                         else:
                             self.assertEqual(
                                 actual["permission_status"], "permission_denied"

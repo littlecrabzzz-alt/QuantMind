@@ -11,6 +11,7 @@ from backend.shared.tushare_structured_contracts import _contract, _parse
 
 
 FIELDS = {
+    "hs_const": ["ts_code", "hs_type", "in_date", "out_date", "is_new"],
     "moneyflow_hsgt": [
         "trade_date",
         "ggt_ss",
@@ -49,6 +50,9 @@ FIELDS = {
 }
 
 INPUT_FIELDS = {
+    # The live retired endpoint accepted both filters on 2026-09-18.  It
+    # returns a finite 2014-2019 snapshot; no date input is represented.
+    "hs_const": ["hs_type", "is_new"],
     # trade_date is also proven by the archived successful request.  The range
     # names come from a historical official-page cache, so the planner stays on
     # exact days until range behavior is validated again.
@@ -57,23 +61,34 @@ INPUT_FIELDS = {
     "ggt_top10": ["trade_date"],
 }
 
-_DOCS = {"moneyflow_hsgt": 47, "ggt_daily": 196, "ggt_top10": 49}
+_DOCS = {
+    "hs_const": 104,
+    "moneyflow_hsgt": 47,
+    "ggt_daily": 196,
+    "ggt_top10": 49,
+}
 _MISSING_BODY_SHA256 = (
     "bbf4318386ca0ea4c5072fc5e67fe0302f473ccbeba7238c45607226236dfadf"
 )
 
 LEGACY_CONNECT_CONTRACTS = {}
 for _api in FIELDS:
-    _keys = (
-        ("trade_date", "ts_code", "market_type")
-        if _api == "ggt_top10"
-        else ("trade_date",)
+    if _api == "hs_const":
+        _keys = ("ts_code", "hs_type", "in_date", "out_date", "is_new")
+    elif _api == "ggt_top10":
+        _keys = ("trade_date", "ts_code", "market_type")
+    else:
+        _keys = ("trade_date",)
+    _required = (
+        ("ts_code", "hs_type", "in_date", "is_new")
+        if _api == "hs_const"
+        else _keys
     )
     _spec = _contract(
         1000,
         _keys,
-        required=_keys,
-        nullable=tuple(field for field in FIELDS[_api] if field not in _keys),
+        required=_required,
+        nullable=tuple(field for field in FIELDS[_api] if field not in _required),
         split=False,
         rpm=30,
         extra=FIELDS[_api],
@@ -87,7 +102,7 @@ for _api in FIELDS:
         input_fields=INPUT_FIELDS[_api],
         requested_fields=FIELDS[_api],
         hidden_fields=[],
-        date_field="trade_date",
+        date_field="in_date" if _api == "hs_const" else "trade_date",
         permission_status="available_observed",
         independent_permission=None,
         minimum_points=None,
@@ -111,6 +126,32 @@ for _api in FIELDS:
         saturation_dependencies=[],
     )
     LEGACY_CONNECT_CONTRACTS[_api] = _spec
+
+LEGACY_CONNECT_CONTRACTS["hs_const"].update(
+    observed_requests=[
+        {"hs_type": hs_type, "is_new": is_new}
+        for hs_type in ("SH", "SZ")
+        for is_new in ("0", "1")
+    ],
+    observed_rows={"SH:0": 414, "SH:1": 581, "SZ:0": 574, "SZ:1": 242},
+    observed_has_more=False,
+    observed_date_spans={
+        "SH:0": {"in_date": ["20141117", "20190617"], "out_date": ["20141212", "20191213"]},
+        "SH:1": {"in_date": ["20141117", "20191227"], "out_date": None},
+        "SZ:0": {"in_date": ["20161205", "20190617"], "out_date": ["20161230", "20191213"]},
+        "SZ:1": {"in_date": ["20170703", "20191223"], "out_date": None},
+    },
+    observed_probe_evidence="docs/tushare-hs-const-live-probe-20260918.evidence.json",
+    row_identity_note="Keep source membership rows distinct by route, entry date, exit date and current/retired flag.",
+    rate_note="30/min is the legacy-policy fallback. Tiered policy treats this removed-page leaf as unspecified and caps the current 10100-point account at 300/min with review_required=true; no official endpoint-specific minute limit is claimed.",
+    history_gap="The live retired endpoint exposes a finite 2014-2019 snapshot, but does not prove coverage before its first observed row or after 2019. The 2020-2025 gap to stock_hsgt remains explicit.",
+    pit_gap="in_date/out_date are source membership dates, not proof of announcement time, effective-time revisions or what was knowable on a historical date.",
+    hidden_field_gap="Only the five explicitly requested and returned fields are known. The removed page cannot establish hidden or discontinued columns.",
+    refresh_gap="The endpoint was still readable on 2026-09-18 but its latest observed membership date was 2019. Treat it as a retained historical snapshot, not a current constituent source.",
+    unit_gap="hs_type and is_new are retained as supplier codes. Do not infer direction, tradability or current membership beyond the returned values.",
+    date_filter_status="no date input; four bounded hs_type/is_new snapshots observed",
+    update_status="retired_snapshot_observed_through_2019",
+)
 
 LEGACY_CONNECT_CONTRACTS["moneyflow_hsgt"].update(
     observed_request={"trade_date": "20260904"},
@@ -178,6 +219,16 @@ def iter_legacy_connect_jobs(config, today, identifiers=None):
         raise ValueError("History start cannot be after today")
     recent = today - timedelta(days=6)
     for api in selected:
+        if api == "hs_const":
+            for hs_type in ("SH", "SZ"):
+                for is_new in ("0", "1"):
+                    yield {
+                        "api_name": api,
+                        "params": {"hs_type": hs_type, "is_new": is_new},
+                        "priority": 20,
+                        "epoch": "history",
+                    }
+            continue
         day = recent
         while day <= today:
             yield {
@@ -190,6 +241,8 @@ def iter_legacy_connect_jobs(config, today, identifiers=None):
     if start is None:
         return
     for api in selected:
+        if api == "hs_const":
+            continue
         day = start
         while day < recent:
             yield {

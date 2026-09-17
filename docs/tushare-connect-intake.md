@@ -24,7 +24,9 @@ iter_connect_jobs(config, today, identifiers=None)
 connect_prerequisites(identifiers=None, enabled_apis=None, config=None)
 ```
 
-配置使用 `connect_apis`（默认本轮 5 个）、`connect_history_start`（YYYYMMDD 或逐 API 字典，回退 `history_start`）。所有最近 7 个自然日与全部明确类型先输出，priority 20，epoch 为当天或 `planning_epoch`；随后按 API 轮流输出历史，priority 40，epoch `history`。历史按月的三个资金流接口仍声明合法 start_date/end_date 日级二分，饱和月应递归细分。十大成交页要求代码或日期，规划始终用 exact trade_date，避免仅范围或空请求。没有交易日历捷径、抽样上限或推断历史起点。
+配置使用 `connect_apis`（当前 5 个新接口）、`connect_history_start`（YYYYMMDD 或逐 API 字典，回退 `history_start`）。所有最近 7 个自然日与全部明确类型先输出，priority 20，epoch 为当天或 `planning_epoch`；随后按 API 轮流输出历史，priority 40，epoch `history`。历史按月的三个资金流接口仍声明合法 start_date/end_date 日级二分，饱和月应递归细分。十大成交页要求代码或日期，规划始终用 exact trade_date，避免仅范围或空请求。没有交易日历捷径、抽样上限或推断历史起点。
+
+退役接口 `hs_const` 归入 `legacy_connect_apis`。2026-09-18 实测其四个 `hs_type × is_new` 过滤组合仍可读取，但仅暴露 2014–2019 年有限快照；规划器以固定 `history` epoch 各采一次，不生成伪造的逐日请求，也不把它当成当前成分。它与 2025-08-12 起的 `stock_hsgt` 并存，二者之间的历史缺口保持显式。
 
 港通名单使用官网声明的 20250812 下界，不能重建此前 PIT 成员关系。其他四项未声明最早日期；没有用户日期范围时只规划近期并留下 unknown-history gap。配置一个早期范围也不证明该范围之前无历史。七日重叠不保证捕获所有旧日修订，采集时间也不是历史可得时间。
 
