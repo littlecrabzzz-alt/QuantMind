@@ -153,6 +153,7 @@ TEXT_CONTRACTS["anns_d"].update(
     saturation_param="ts_code",
     saturation_jobs_per_run=1000,
     saturation_history_only=True,
+    recent_epoch_granularity="day",
 )
 for _api in ("irm_qa_sh", "irm_qa_sz"):
     TEXT_CONTRACTS[_api].update(
@@ -203,6 +204,7 @@ TEXT_CONTRACT_NOTES = {
         "coverage_gaps": [
             "capped historical day requires an exhaustive listed-company code universe; current and historical stock_basic plus announcement-observed codes are requested, but the supplier exposes no independent total",
             "download URL availability is not successful PDF download or parsing",
+            "recent exact-day snapshots use one durable generation per Shanghai calendar day and are revisited for seven days; historical capped days use the stock-code fanout",
         ],
     },
     "irm_qa_sh": {
@@ -295,9 +297,11 @@ def iter_text_jobs(config, today):
     prefix query to discover records before the configured start.
 
     ``planning_epoch`` overrides recent acquisition epochs for intraday refresh.
-    Includes today (possibly incomplete) and six previous days in the recent
-    epoch. All other days use epoch='history'. Callers persist job identities,
-    paginate/split capped responses, and keep ongoing-day coverage incomplete.
+    Contracts with ``recent_epoch_granularity='day'`` instead use the Shanghai
+    calendar day so every recent date is rechecked once per day for seven days
+    without duplicating the same request every hour. All older days use
+    epoch='history'. Callers persist job identities, paginate/split capped
+    responses, and keep ongoing-day coverage incomplete.
     """
     today = _date(today)
     history_window = config.get("text_history_window", "day")
@@ -320,6 +324,15 @@ def iter_text_jobs(config, today):
         documented = TEXT_CONTRACTS[api]["history_start"]
         starts[api] = max(start, _date(documented)) if documented else start
     recent_start = today - timedelta(days=6)
+    configured_recent_epoch = str(
+        config.get("planning_epoch", today.strftime("%Y%m%d"))
+    )
+
+    def recent_epoch(api):
+        if TEXT_CONTRACTS[api].get("recent_epoch_granularity") == "day":
+            return today.strftime("%Y%m%d")
+        return configured_recent_epoch
+
     oldest = min(starts.values(), default=today)
     # Streaming, newest day first. Iteration/resume state belongs to the parent.
     day = today
@@ -357,9 +370,7 @@ def iter_text_jobs(config, today):
                     "api_name": api,
                     "params": params,
                     "priority": 20 if recent else 40,
-                    "epoch": str(config.get("planning_epoch", today.strftime("%Y%m%d")))
-                    if recent
-                    else "history",
+                    "epoch": recent_epoch(api) if recent else "history",
                 }
             if (recent or history_window == "month") and api in (
                 "irm_qa_sh",
@@ -374,9 +385,7 @@ def iter_text_jobs(config, today):
                         "pub_end": (day + timedelta(days=1)).isoformat() + " 00:00:00",
                     },
                     "priority": 20 if recent else 40,
-                    "epoch": str(config.get("planning_epoch", today.strftime("%Y%m%d")))
-                    if recent
-                    else "history",
+                    "epoch": recent_epoch(api) if recent else "history",
                 }
         day -= timedelta(days=1)
     # Optional-date APIs can query everything before the requested start. Keep

@@ -90,6 +90,35 @@ class TextPlans(unittest.TestCase):
         self.assertEqual(sum(j["epoch"] == "history" for j in jobs), 2)
         self.assertTrue(all("ann_date" not in j["params"] for j in jobs))
 
+    def test_announcements_use_daily_recent_epoch_with_seven_day_rechecks(self):
+        config = {
+            "history_start": "20260903",
+            "text_apis": ["anns_d"],
+            "planning_epoch": "20260909T1200",
+        }
+        first = list(iter_text_jobs(config, "20260909"))
+        same_day = list(
+            iter_text_jobs({**config, "planning_epoch": "20260909T2300"}, "20260909")
+        )
+        next_day = list(
+            iter_text_jobs({**config, "planning_epoch": "20260910T0100"}, "20260910")
+        )
+        self.assertEqual(first, same_day)
+        recent = [job for job in first if job["epoch"] != "history"]
+        self.assertEqual(len(recent), 7)
+        self.assertEqual({job["epoch"] for job in recent}, {"20260909"})
+        self.assertEqual(
+            {
+                job["params"]["start_date"]
+                for job in next_day
+                if job["epoch"] == "20260910"
+            },
+            {
+                (date(2026, 9, 10) - timedelta(days=offset)).strftime("%Y%m%d")
+                for offset in range(7)
+            },
+        )
+
     def test_fields_cover_catalog_and_hidden_example(self):
         catalog = json.loads(
             (
