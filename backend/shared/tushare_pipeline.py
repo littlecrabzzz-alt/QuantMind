@@ -119,6 +119,13 @@ IDENTIFIER_SPLIT_SOURCE_APIS = {
     "announcement_securities": ANNOUNCEMENT_IDENTIFIER_SOURCE_APIS,
     "dc_indices": ("dc_index", "dc_member", "dc_daily"),
 }
+LEGACY_IDENTIFIER_RECOVERY_APIS = tuple(
+    sorted(
+        api
+        for api, spec in EXTENDED_CONTRACTS.items()
+        if spec.get("recover_legacy_blocked_identifier_fanout")
+    )
+)
 IDENTIFIER_CACHE_VERSION = 4
 ROOT = Path(os.getenv("QM_TUSHARE_ARCHIVE_ROOT", "/data/tushare"))
 CONTRACTS = {
@@ -3830,16 +3837,20 @@ class Pipeline:
         ).fetchone()
         recovered_legacy = False
         if row is None:
-            # Older eco_cal caps were terminal only because country fanout was
-            # absent. Reuse their retained response; never repeat the HTTP call.
+            # Selected older caps were terminal only because a now-reviewed
+            # identifier fanout was absent. Reuse retained responses; never
+            # repeat their HTTP calls. Other blocked parents may have been
+            # deliberately retired by a later range plan and stay excluded.
+            legacy_apis = ("eco_cal", *LEGACY_IDENTIFIER_RECOVERY_APIS)
+            placeholders = ",".join("?" for _ in legacy_apis)
             row = self.db.execute(
                 "SELECT * FROM jobs WHERE state='blocked' "
-                "AND json_extract(job,'$.api_name')='eco_cal' "
-                "AND json_type(job,'$.params.country') IS NULL "
+                f"AND json_extract(job,'$.api_name') IN ({placeholders}) "
                 "AND json_extract(result,'$.status')='possibly_truncated' "
                 "AND json_type(result,'$.object_sha256')='text' "
                 "AND json_type(result,'$.observation')='text' "
-                "ORDER BY priority,rowid LIMIT 1"
+                "ORDER BY priority,rowid LIMIT 1",
+                legacy_apis,
             ).fetchone()
             recovered_legacy = row is not None
         if row is None:

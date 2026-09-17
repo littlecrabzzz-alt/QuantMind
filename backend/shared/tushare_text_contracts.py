@@ -154,6 +154,12 @@ TEXT_CONTRACTS["anns_d"].update(
     saturation_jobs_per_run=1000,
     saturation_history_only=True,
 )
+for _api in ("irm_qa_sh", "irm_qa_sz"):
+    TEXT_CONTRACTS[_api].update(
+        saturation_fallback="stocks",
+        saturation_param="ts_code",
+        recover_legacy_blocked_identifier_fanout=True,
+    )
 
 
 def normalize_anns_d_ts_code(value):
@@ -205,6 +211,7 @@ TEXT_CONTRACT_NOTES = {
         "coverage_gaps": [
             "sample ann_date conflicts with parameter table; use documented start_date/end_date",
             "pub_start/pub_end filter another time axis; cannot replace trade_date coverage",
+            "a capped terminal time window fans out by the documented ts_code input over retained stock identities; the supplier exposes no independent complete historical stock universe",
             "seven-day lookback does not guarantee capture of very late replies to old questions",
         ],
     },
@@ -213,6 +220,7 @@ TEXT_CONTRACT_NOTES = {
         "history_status": "documented month 2010-10; entitlement table conflicts (25 years)",
         "coverage_gaps": [
             "sample ann_date conflicts with parameter table; use documented start_date/end_date",
+            "a capped terminal time window fans out by the documented ts_code input over retained stock identities; the supplier exposes no independent complete historical stock universe",
             "pub_time is response time; unanswered and late replies need separate coverage",
             "sample six-digit code requires normalization with known exchange, preserve original",
         ],

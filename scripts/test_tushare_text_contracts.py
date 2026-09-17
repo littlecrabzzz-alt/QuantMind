@@ -119,6 +119,12 @@ class TextPlans(unittest.TestCase):
             TEXT_CONTRACT_NOTES["research_report"]["coverage_gaps"][0],
         )
         self.assertIn("_source", TEXT_CONTRACTS["news"]["keys"])
+        for api in ("irm_qa_sh", "irm_qa_sz"):
+            self.assertEqual(TEXT_CONTRACTS[api]["saturation_fallback"], "stocks")
+            self.assertEqual(TEXT_CONTRACTS[api]["saturation_param"], "ts_code")
+            self.assertTrue(
+                TEXT_CONTRACTS[api]["recover_legacy_blocked_identifier_fanout"]
+            )
 
     def test_month_mode_covers_all_days_sources_and_both_qa_axes(self):
         start, today = date(2024, 1, 29), date(2024, 3, 8)

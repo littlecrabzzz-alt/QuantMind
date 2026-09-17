@@ -369,6 +369,110 @@ class DeferredSplit(unittest.TestCase):
             self.run_once(requests=0, respond=lambda r: self.fail("no HTTP"))
         self.assertEqual(self.stored(row)["tries"], 1)
 
+    def test_reviewed_irm_stock_fanout_recovers_legacy_cap_without_http(self):
+        with patch.dict(module.EXTENDED_CONTRACTS["irm_qa_sh"], {"row_cap": 2}):
+            parent_id = self.p.enqueue(
+                "irm_qa_sh",
+                {
+                    "pub_start": "2025-01-15 17:06:54",
+                    "pub_end": "2025-01-15 17:06:54",
+                },
+                epoch="history",
+            )
+
+            def response(request):
+                body = json.loads(request.content)
+                fields = body["fields"].split(",")
+                records = [
+                    {
+                        "ts_code": code,
+                        "name": "fixture",
+                        "trade_date": "20230705",
+                        "q": "q",
+                        "a": "a",
+                        "pub_time": "2025-01-15 17:06:54",
+                    }
+                    for code in ("600036.SH", "600000.SH")
+                ]
+                return httpx.Response(
+                    200,
+                    json={
+                        "code": 0,
+                        "data": {
+                            "fields": fields,
+                            "items": [
+                                [record.get(field) for field in fields]
+                                for record in records
+                            ],
+                            "has_more": True,
+                        },
+                    },
+                )
+
+            captured = self.run_once(respond=response)
+        self.assertEqual(captured["requests"], 1)
+        before = dict(
+            self.p.db.execute(
+                "SELECT * FROM jobs WHERE id=?", (parent_id,)
+            ).fetchone()
+        )
+        result = json.loads(before["result"])
+        self.assertEqual(
+            result.pop("partition_deferred"),
+            {"version": 1, "kind": "identifier_fanout"},
+        )
+        self.p.db.execute(
+            "UPDATE jobs SET state='blocked',result=? WHERE id=?",
+            (json.dumps(result), parent_id),
+        )
+        self.p.db.commit()
+        attempts = self.attempts()
+        self.reopen()
+        with patch.object(
+            self.p,
+            "identifiers",
+            return_value={"stocks": ["600036.SH", "000001.SZ"]},
+        ):
+            recovered = self.run_once(
+                requests=0,
+                respond=lambda request: self.fail("legacy parent must not call HTTP"),
+            )
+        self.assertEqual(recovered["requests"], 0)
+        self.assertTrue(recovered["partition_work"]["legacy_parent_recovered"])
+        self.assertEqual(recovered["partition_work"]["discovery_family"], "stocks")
+        after = self.stored({"id": parent_id})
+        saved = json.loads(after["result"])
+        self.assertEqual(after["state"], "split_pending")
+        self.assertEqual(after["tries"], before["tries"])
+        self.assertEqual(saved["partition_recovery"]["upstream_calls"], 0)
+        self.assertEqual(
+            {
+                child["ts_code"]
+                for child in self.children({"id": parent_id})
+            },
+            {"600036.SH", "600000.SH", "000001.SZ"},
+        )
+        self.assertEqual(self.attempts(), attempts)
+
+    def test_unreviewed_legacy_blocked_fanout_is_not_reactivated(self):
+        row, _ = self.parent()
+        self.run_once()
+        result = json.loads(self.stored(row)["result"])
+        result.pop("partition_deferred")
+        self.p.db.execute(
+            "UPDATE jobs SET state='blocked',result=? WHERE id=?",
+            (json.dumps(result), row["id"]),
+        )
+        self.p.db.commit()
+        with patch.object(
+            self.p, "identifiers", side_effect=AssertionError("must remain retired")
+        ):
+            report = self.run_once(
+                requests=0, respond=lambda request: self.fail("no HTTP")
+            )
+        self.assertNotIn("partition_work", report)
+        self.assertEqual(self.stored(row)["state"], "blocked")
+
     def test_normalization_failure_does_not_lose_legacy_child_obligation(self):
         row, _ = self.parent()
         with patch.object(
