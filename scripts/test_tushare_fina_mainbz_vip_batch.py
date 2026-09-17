@@ -54,6 +54,12 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
         self.unrelated = pipeline.enqueue(
             "fina_audit", {"ts_code": "600999.SH"}, priority=40, epoch="history"
         )
+        self.pagination_child = pipeline.enqueue(
+            preparation.API,
+            {"period": "20241231", "type": "P", "offset": 10000},
+            priority=40,
+            epoch=preparation.EPOCH,
+        )
         pipeline.db.commit()
         pipeline.close()
         (self.root / "pipeline.lock").touch()
@@ -192,6 +198,10 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
         self.assertFalse(self.manifest["boundaries"]["pit_verified"])
         self.assertFalse(self.manifest["boundaries"]["known_at_verified"])
         self.assertFalse(self.manifest["boundaries"]["history_completeness_verified"])
+        self.assertNotIn(
+            self.pagination_child,
+            {record["task_id"] for record in self.manifest["records"]},
+        )
 
     def test_plan_only_needs_no_authority_credentials_network_or_writes(self):
         result = runner.run_batch(

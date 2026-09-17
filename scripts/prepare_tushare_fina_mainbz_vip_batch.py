@@ -336,6 +336,7 @@ def eligible_records(db):
         "AND j.group_name=? AND j.state='pending' AND j.tries=0 "
         "AND NOT EXISTS(SELECT 1 FROM attempts a WHERE a.job_id=j.id) "
         "AND json_type(j.job,'$.params.period')='text' "
+        "AND json_type(j.job,'$.params.offset') IS NULL "
         "ORDER BY json_extract(j.job,'$.params.period') DESC,"
         "json_extract(j.job,'$.params.type'),j.id",
         (EPOCH, API, GROUP),

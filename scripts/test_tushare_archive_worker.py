@@ -64,6 +64,10 @@ class WorkerStatus(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 worker.cycle_seconds({'archive_worker_cycle_seconds': value})
 
+    def test_planning_only_resumes_acquisition_after_minimum_delay(self):
+        self.assertEqual(worker.next_cycle_delay(105, 58, 'planning_only'), 5)
+        self.assertEqual(worker.next_cycle_delay(105, 58, None), 47)
+
     def test_due_publication_runs_before_documents(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

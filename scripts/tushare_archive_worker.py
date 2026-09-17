@@ -24,6 +24,12 @@ def cycle_seconds(config):
     return float(value)
 
 
+def next_cycle_delay(interval, elapsed, acquisition_status):
+    if acquisition_status == 'planning_only':
+        return 5
+    return max(5, interval - elapsed)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
@@ -92,7 +98,11 @@ def main():
             print(json.dumps(report), flush=True)
             if args.once:
                 return 0 if report['status'] == 'completed_cycle' else 2
-            time.sleep(max(5, interval - (time.monotonic() - start)))
+            time.sleep(next_cycle_delay(
+                interval,
+                time.monotonic() - start,
+                report.get('acquisition', {}).get('status'),
+            ))
 
 
 if __name__ == '__main__':
