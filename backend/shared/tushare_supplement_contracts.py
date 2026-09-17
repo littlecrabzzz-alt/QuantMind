@@ -150,6 +150,15 @@ for _api in ("moneyflow_dc", "moneyflow_ths"):
         percentage_unit="percent",
         dataset_note="Preserve this vendor series separately from moneyflow and the other vendor; metric definitions and units are not interchangeable.",
     )
+SUPPLEMENT_CONTRACTS["moneyflow_dc"].update(
+    dependencies=["stocks"],
+    range_planning_note=(
+        "When retained stock identifiers are available, request each stock over "
+        "the bounded history and recent-overlap ranges. A live 2023-09-11 to "
+        "2026-09-16 stock range returned 730 rows below the 6000-row cap. "
+        "Keep stock-universe completeness unverified."
+    ),
+)
 SUPPLEMENT_CONTRACTS["moneyflow_ths"]["field_note"] = (
     "latest and net_d5_amount are distinct documented fields; do not substitute DC close/net amounts."
 )
@@ -294,7 +303,7 @@ def iter_supplement_jobs(config, today, identifiers=None):
     if not isinstance(today, date):
         raise ValueError("today must be a date")
     enabled = _enabled(config)
-    _identifiers(identifiers if identifiers is not None else {}, enabled)
+    ids = _identifiers(identifiers if identifiers is not None else {}, enabled)
     requested = _requested_starts(config, enabled)
     if any(start and start > today for start in requested.values()):
         raise ValueError("History start cannot be after today")
@@ -313,13 +322,49 @@ def iter_supplement_jobs(config, today, identifiers=None):
         start = max(recent, starts[MARKET_TOTAL] or recent)
         if start <= today:
             yield _job(MARKET_TOTAL, _range(start, today), epoch, 20)
+    moneyflow_codes = ids.get("stocks", []) if "moneyflow_dc" in enabled else []
+    if moneyflow_codes:
+        start = starts["moneyflow_dc"]
+        recent_start = max(recent, start or recent)
+        if recent_start <= today:
+            for code in moneyflow_codes:
+                yield _job(
+                    "moneyflow_dc",
+                    {**_range(recent_start, today), "ts_code": code},
+                    epoch,
+                    20,
+                )
     day = recent
     while day <= today:
         for api in enabled:
-            if api not in (BASIC, MARKET_TOTAL) and day >= (starts[api] or recent):
+            if (
+                api not in (BASIC, MARKET_TOTAL)
+                and not (api == "moneyflow_dc" and moneyflow_codes)
+                and day >= (starts[api] or recent)
+            ):
                 yield _job(api, {"trade_date": day.strftime("%Y%m%d")}, epoch, 20)
         day += timedelta(days=1)
-    cursors = {a: s for a, s in starts.items() if a != BASIC and s and s < recent}
+    if moneyflow_codes and starts["moneyflow_dc"] < recent:
+        for code in moneyflow_codes:
+            yield _job(
+                "moneyflow_dc",
+                {
+                    **_range(
+                        starts["moneyflow_dc"], recent - timedelta(days=1)
+                    ),
+                    "ts_code": code,
+                },
+                "history",
+                40,
+            )
+    cursors = {
+        api: start
+        for api, start in starts.items()
+        if api != BASIC
+        and start
+        and start < recent
+        and not (api == "moneyflow_dc" and moneyflow_codes)
+    }
     while cursors:
         for api, start in tuple(cursors.items()):
             if api == MARKET_TOTAL:

@@ -214,6 +214,35 @@ class SupplementContracts(unittest.TestCase):
             )
         )
 
+    def test_moneyflow_dc_uses_bounded_stock_ranges_when_discovery_exists(self):
+        today = date(2026, 9, 17)
+        config = {
+            "supplement_apis": ["moneyflow_dc"],
+            "history_start": "20230911",
+            "planning_epoch": "fixture",
+        }
+        codes = ["000001.SZ", "T600001.SH"]
+        jobs = list(iter_supplement_jobs(config, today, {"stocks": codes}))
+        self.assertEqual(len(jobs), 4)
+        self.assertEqual([job["params"]["ts_code"] for job in jobs], codes * 2)
+        self.assertEqual(
+            {tuple(sorted(job["params"])) for job in jobs},
+            {("end_date", "start_date", "ts_code")},
+        )
+        self.assertEqual(
+            [(job["params"]["start_date"], job["params"]["end_date"]) for job in jobs],
+            [
+                ("20260911", "20260917"),
+                ("20260911", "20260917"),
+                ("20230911", "20260910"),
+                ("20230911", "20260910"),
+            ],
+        )
+        self.assertEqual([job["epoch"] for job in jobs], ["fixture"] * 2 + ["history"] * 2)
+        self.assertEqual(
+            SUPPLEMENT_CONTRACTS["moneyflow_dc"]["dependencies"], ["stocks"]
+        )
+
     def test_bad_configuration_and_streaming(self):
         today = date(2026, 9, 9)
         for config in (

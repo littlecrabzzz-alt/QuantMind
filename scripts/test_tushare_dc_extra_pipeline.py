@@ -14,7 +14,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from backend.shared import tushare_pipeline as module
 from backend.shared.tushare_intake import capture_sample
-from backend.shared.tushare_dc_extra_contracts import FIELDS, DAILY_VARIANTS
+from backend.shared.tushare_dc_extra_contracts import (
+    DAILY_VARIANTS,
+    FIELDS,
+    dc_extra_prerequisites,
+    iter_dc_extra_jobs,
+)
 from backend.shared.tushare_registry import contract_for
 from backend.shared.tushare_store import read_dataset, export_jsonl, CONTRACTS
 
@@ -166,7 +171,7 @@ class DcExtraRuntime(unittest.TestCase):
                     ).num_rows,
                     2,
                 )
-                self.assertIn("second dimension", metadata["saturation_gap"])
+                self.assertIn("con_code ranges", metadata["saturation_gap"])
             else:
                 self.assertEqual(
                     {json.loads(r["_request_identity"])["idx_type"] for r in rows},
@@ -273,6 +278,60 @@ class DcExtraRuntime(unittest.TestCase):
             '"backend/shared/tushare_dc_extra_contracts.py"',
             (ROOT / "scripts/tushare_mirror.py").read_text(),
         )
+
+    def test_member_planning_uses_stock_ranges_and_quarter_history(self):
+        config = {
+            "dc_extra_apis": ["dc_member"],
+            "dc_extra_history_start": "20241220",
+            "planning_epoch": "fixture",
+        }
+        jobs = list(
+            iter_dc_extra_jobs(
+                config,
+                date(2026, 9, 17),
+                {"stocks": ["600001.SH", "000001.SZ"]},
+            )
+        )
+        recent = [job for job in jobs if job["epoch"] == "fixture"]
+        history = [job for job in jobs if job["epoch"] == "history"]
+        self.assertEqual(
+            [job["params"] for job in recent],
+            [
+                {
+                    "con_code": "000001.SZ",
+                    "start_date": "20260911",
+                    "end_date": "20260917",
+                },
+                {
+                    "con_code": "600001.SH",
+                    "start_date": "20260911",
+                    "end_date": "20260917",
+                },
+            ],
+        )
+        self.assertEqual(len(history), 16)
+        self.assertEqual(
+            history[0]["params"],
+            {
+                "con_code": "000001.SZ",
+                "start_date": "20241220",
+                "end_date": "20241231",
+            },
+        )
+        self.assertEqual(
+            history[-1]["params"],
+            {
+                "con_code": "600001.SH",
+                "start_date": "20260701",
+                "end_date": "20260910",
+            },
+        )
+        gaps = dc_extra_prerequisites(
+            {"stocks": ["000001.SZ"]}, config=config
+        )
+        discovery = [gap for gap in gaps if gap["dependencies"]]
+        self.assertEqual(discovery[0]["observed_codes"], 1)
+        self.assertFalse(discovery[0]["universe_complete"])
 
     def test_range_and_observed_board_fanout_preserve_params_and_incompleteness(self):
         master = dict.fromkeys(contract_for("dc_index")["required_fields"])

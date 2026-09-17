@@ -60,7 +60,7 @@ class DcExtraContracts(unittest.TestCase):
             {v["idx_type"] for v in DAILY_VARIANTS},
             {"概念板块", "行业板块", "地域板块"},
         )
-        for spec in CONTRACTS.values():
+        for api, spec in CONTRACTS.items():
             self.assertTrue(spec["preserve_distinct_rows"])
             self.assertEqual(spec["split_axis"], "trade_date")
             self.assertEqual(spec["date_field"], "trade_date")
@@ -74,10 +74,10 @@ class DcExtraContracts(unittest.TestCase):
             )
             self.assertEqual(spec["saturation_fallback"], "dc_indices")
             self.assertEqual(spec["saturation_param"], "ts_code")
-            self.assertEqual(spec["dependencies"], [])
+            self.assertEqual(spec["dependencies"], ["stocks"] if api == "dc_member" else [])
             self.assertIn("opaque DC board", spec["namespace_note"])
         self.assertIn("con_code", INPUT_FIELDS["dc_member"])
-        self.assertIn("single-axis runtime", member["saturation_gap"])
+        self.assertIn("con_code ranges", member["saturation_gap"])
         self.assertIn("source_con_code", member["member_namespace_note"])
         self.assertFalse(
             {"is_new", "in_date", "out_date", "weight"}
