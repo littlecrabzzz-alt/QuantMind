@@ -247,10 +247,11 @@ for _api, (_doc, _cap, _points, _start) in _DOCS.items():
     OTHER_CONTRACTS[_api] = _spec
 
 OTHER_CONTRACTS["opt_basic"].update(
-    cap_note="6000 is an unverified saturation alarm; official numerical cap and pagination are absent.",
+    cap_note="6000 is an unverified saturation alarm; official numerical cap and pagination are absent. A live supplier has_more=false is accepted as terminal only after normal schema/value checks; has_more=true still partitions.",
+    supplier_has_more_false_terminal=True,
     discovery_note="Unfiltered, all documented exchanges and exact list_date partitions; retain expired/delisted contracts. No list_status or date-range parameters exist.",
     revision_note="exercise_price and opt_multiplier are adjusted; preserve every observation, not point-in-time originals.",
-    saturation_gap="A saturated listing date requires verified venue/underlying/call_put subdivision; no invented offset or start_date parameters.",
+    saturation_gap="A response with supplier has_more=true requires verified venue/underlying/call_put subdivision; no invented offset or start_date parameters.",
     saturation_partition_axes=[
         {
             "param": "exchange",

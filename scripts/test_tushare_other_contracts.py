@@ -20,6 +20,7 @@ from backend.shared.tushare_other_contracts import (  # noqa: E402
     iter_other_jobs,
     other_prerequisites,
 )
+from backend.shared.tushare_intake import assess_success_payload  # noqa: E402
 
 
 class OtherContracts(unittest.TestCase):
@@ -51,6 +52,9 @@ class OtherContracts(unittest.TestCase):
         )
         self.assertEqual(OTHER_CONTRACTS["opt_daily"]["row_cap"], 15000)
         self.assertFalse(OTHER_CONTRACTS["opt_basic"]["row_cap_verified"])
+        self.assertTrue(
+            OTHER_CONTRACTS["opt_basic"]["supplier_has_more_false_terminal"]
+        )
         self.assertIn("INE", OPTION_EXCHANGES)
         self.assertEqual(OPTION_CALL_PUT, ("C", "P"))
         self.assertEqual(
@@ -60,6 +64,40 @@ class OtherContracts(unittest.TestCase):
             ],
             ["exchange", "call_put", "opt_code"],
         )
+
+    def test_opt_basic_supplier_terminal_over_unverified_local_alarm(self):
+        fields = list(FIELDS["opt_basic"])
+        row = ["IO2609-C-4000.CFX" if field == "ts_code" else None for field in fields]
+        job = {
+            "api_name": "opt_basic",
+            "row_cap": 1,
+            "required_fields": ["ts_code"],
+            "nullable_fields": [field for field in fields if field != "ts_code"],
+            "positive_fields": [],
+            "fields": ",".join(fields),
+        }
+
+        def assess(has_more):
+            return assess_success_payload(
+                job,
+                {
+                    "code": 0,
+                    "data": {
+                        "fields": fields,
+                        "items": [row],
+                        "has_more": has_more,
+                        "count": 0,
+                    },
+                },
+            )
+
+        terminal = assess(False)
+        self.assertEqual(terminal["status"], "sample_ok")
+        self.assertEqual(
+            terminal["supplier_terminal_evidence"],
+            "has_more_false_over_unverified_local_alarm",
+        )
+        self.assertEqual(assess(True)["status"], "possibly_truncated")
 
     def test_discovery_unfiltered_and_no_active_status_bias(self):
         jobs = list(
