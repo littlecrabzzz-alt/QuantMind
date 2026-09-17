@@ -7,6 +7,7 @@ catalogue remains a separate coverage obligation. Readers never acquire data.
 from __future__ import annotations
 
 import fcntl
+import atexit
 import hashlib
 import itertools
 import json
@@ -17,7 +18,8 @@ import sqlite3
 import stat
 import time
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+import multiprocessing
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
@@ -66,6 +68,49 @@ from backend.shared.tushare_registry import (
     FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
     foreign_financial_runtime_prerequisites,
 )
+
+
+_CAPTURE_PROCESS_CLIENT = None
+_CAPTURE_PROCESS_TOKEN = None
+_CAPTURE_PROCESS_ROOT = None
+
+
+def _close_capture_process_client():
+    global _CAPTURE_PROCESS_CLIENT
+    if _CAPTURE_PROCESS_CLIENT is not None:
+        _CAPTURE_PROCESS_CLIENT.close()
+        _CAPTURE_PROCESS_CLIENT = None
+
+
+def _initialize_capture_process(token, root, api_root):
+    """Create one persistent HTTP client without putting the token in argv."""
+    global _CAPTURE_PROCESS_CLIENT, _CAPTURE_PROCESS_TOKEN, _CAPTURE_PROCESS_ROOT
+    from backend.shared import tushare_intake
+
+    tushare_intake.API_ROOT = api_root
+    _CAPTURE_PROCESS_CLIENT = httpx.Client(
+        trust_env=False, timeout=30, follow_redirects=False
+    )
+    _CAPTURE_PROCESS_TOKEN = token
+    _CAPTURE_PROCESS_ROOT = Path(root)
+    atexit.register(_close_capture_process_client)
+
+
+def _capture_in_process(job):
+    if (
+        _CAPTURE_PROCESS_CLIENT is None
+        or _CAPTURE_PROCESS_TOKEN is None
+        or _CAPTURE_PROCESS_ROOT is None
+    ):
+        raise RuntimeError("Capture process is not initialized")
+    started = time.perf_counter()
+    result = capture_sample(
+        _CAPTURE_PROCESS_CLIENT,
+        _CAPTURE_PROCESS_TOKEN,
+        job,
+        _CAPTURE_PROCESS_ROOT,
+    )
+    return result, time.perf_counter() - started
 from backend.shared.tushare_global_contracts import (
     GLOBAL_CONTRACTS,
     global_prerequisites,
@@ -4816,6 +4861,11 @@ class Pipeline:
         pipeline_depth = config.get("acquisition_pipeline_depth", 1)
         if type(pipeline_depth) is not int or not 1 <= pipeline_depth <= 2:
             raise ValueError("Invalid acquisition pipeline depth")
+        capture_execution = config.get("acquisition_capture_execution", "thread")
+        if capture_execution not in ("thread", "process"):
+            raise ValueError("Invalid acquisition capture execution")
+        if capture_execution == "process" and pipeline_depth != 2:
+            raise ValueError("Process capture requires pipeline depth two")
         completed = 0
         invalid_requests = 0
 
@@ -4914,13 +4964,14 @@ class Pipeline:
 
         def timed_capture(job):
             phase_started = time.perf_counter()
-            try:
-                return capture_sample(client, token, job, self.root)
-            finally:
-                # The pipelined worker is single-threaded. Only that worker
-                # mutates this counter while it is active.
-                work_seconds["capture"] += time.perf_counter() - phase_started
-                work_counts["capture_invocations"] += 1
+            result = capture_sample(client, token, job, self.root)
+            return result, time.perf_counter() - phase_started
+
+        def record_capture(future_result):
+            result, capture_seconds = future_result
+            work_seconds["capture"] += capture_seconds
+            work_counts["capture_invocations"] += 1
+            return result
 
         if pipeline_depth == 1:
             while completed < max_requests and time.monotonic() < deadline:
@@ -4928,7 +4979,7 @@ class Pipeline:
                 if selected is None:
                     break
                 row, job = selected
-                result = timed_capture(job)
+                result = record_capture(timed_capture(job))
                 if self._apply_capture_result(
                     row, job, result, deadline, work_counts, work_seconds
                 ):
@@ -4939,9 +4990,22 @@ class Pipeline:
             pending_captures = deque()
             dispatch_open = True
             high_watermark = 0
-            with ThreadPoolExecutor(
-                max_workers=1, thread_name_prefix="tushare-capture"
-            ) as pool:
+            if capture_execution == "process":
+                from backend.shared import tushare_intake
+
+                pool = ProcessPoolExecutor(
+                    max_workers=1,
+                    mp_context=multiprocessing.get_context("spawn"),
+                    initializer=_initialize_capture_process,
+                    initargs=(token, str(self.root), tushare_intake.API_ROOT),
+                )
+                capture_callable = _capture_in_process
+            else:
+                pool = ThreadPoolExecutor(
+                    max_workers=1, thread_name_prefix="tushare-capture"
+                )
+                capture_callable = timed_capture
+            with pool:
                 while completed < max_requests and (dispatch_open or pending_captures):
                     while (
                         dispatch_open
@@ -4955,13 +5019,13 @@ class Pipeline:
                             break
                         row, job = selected
                         pending_captures.append(
-                            (row, job, pool.submit(timed_capture, job))
+                            (row, job, pool.submit(capture_callable, job))
                         )
                         high_watermark = max(high_watermark, len(pending_captures))
                     if not pending_captures:
                         break
                     row, job, future = pending_captures.popleft()
-                    result = future.result()
+                    result = record_capture(future.result())
                     if self._apply_capture_result(
                         row, job, result, deadline, work_counts, work_seconds
                     ):
@@ -4971,6 +5035,7 @@ class Pipeline:
             work_timing_pipeline = {
                 "depth": pipeline_depth,
                 "http_workers": 1,
+                "capture_execution": capture_execution,
                 "queue_high_watermark": high_watermark,
                 "crash_recovered_jobs": self.recovered_inflight,
             }

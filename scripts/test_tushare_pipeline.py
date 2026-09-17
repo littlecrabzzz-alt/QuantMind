@@ -7,6 +7,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,6 +21,7 @@ from backend.shared.tushare_pipeline import (
     manifest_at,
     verify_data,
 )
+from backend.shared import tushare_intake
 from scripts.tushare_mirror import checked_file, mirror
 
 CATALOG = json.loads(
@@ -276,6 +278,75 @@ class PipelineAcceptance(unittest.TestCase):
             )
             recovered.close()
 
+    def test_depth_two_process_capture_uses_one_persistent_worker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            calls = []
+
+            class Handler(BaseHTTPRequestHandler):
+                def do_POST(self):
+                    size = int(self.headers["Content-Length"])
+                    calls.append(json.loads(self.rfile.read(size))["api_name"])
+                    body = json.dumps(
+                        {
+                            "code": 0,
+                            "data": {
+                                "fields": ["ts_code", "trade_date", "adj_factor"],
+                                "items": [["510300.SH", "20260907", 1]],
+                            },
+                        }
+                    ).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+
+                def log_message(self, *_):
+                    pass
+
+            server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            serving = threading.Thread(target=server.serve_forever, daemon=True)
+            serving.start()
+            original_api_root = tushare_intake.API_ROOT
+            tushare_intake.API_ROOT = (
+                f"http://127.0.0.1:{server.server_address[1]}/api"
+            )
+            try:
+                pipeline = Pipeline(Path(tmp), CATALOG)
+                for epoch in ("first", "second"):
+                    pipeline.enqueue(
+                        "fund_adj",
+                        {"trade_date": "20260907", "offset": 0, "limit": 2},
+                        epoch=epoch,
+                    )
+                pipeline.db.commit()
+                report = pipeline.run(
+                    object(),
+                    "synthetic-token",
+                    {
+                        **CONFIG,
+                        "acquisition_pipeline_depth": 2,
+                        "acquisition_capture_execution": "process",
+                    },
+                    max_requests=2,
+                    max_seconds=5,
+                    pause=0,
+                )
+                self.assertEqual(report["requests"], 2)
+                self.assertEqual(calls, ["fund_adj", "fund_adj"])
+                self.assertEqual(
+                    report["acquisition_pipeline"]["capture_execution"],
+                    "process",
+                )
+                self.assertEqual(report["acquisition_pipeline"]["http_workers"], 1)
+                self.assertEqual(pipeline.status(), {"done": 2})
+                pipeline.close()
+            finally:
+                tushare_intake.API_ROOT = original_api_root
+                server.shutdown()
+                server.server_close()
+                serving.join(2)
+
     def test_acquisition_pipeline_depth_is_bounded(self):
         for value in (True, 0, 3, "2"):
             with self.subTest(value=value), tempfile.TemporaryDirectory() as tmp:
@@ -289,6 +360,19 @@ class PipelineAcceptance(unittest.TestCase):
                         pause=0,
                     )
                 pipeline.close()
+
+    def test_process_capture_requires_depth_two(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pipeline = Pipeline(Path(tmp), CATALOG)
+            with self.assertRaises(ValueError):
+                pipeline.run(
+                    object(),
+                    "synthetic-token",
+                    {**CONFIG, "acquisition_capture_execution": "process"},
+                    max_seconds=1,
+                    pause=0,
+                )
+            pipeline.close()
 
     def test_publication_recovers_retention_interruptions_without_version_loop(self):
         from backend.shared.tushare_archive import retain_release, recover_archive

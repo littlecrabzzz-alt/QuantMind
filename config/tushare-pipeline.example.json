@@ -9,6 +9,7 @@
   "batch_requests": 360,
   "batch_seconds": 100,
   "acquisition_pipeline_depth": 1,
+  "acquisition_capture_execution": "thread",
   "archive_worker_cycle_seconds": 120,
   "publish_interval_seconds": 21600,
   "planning_interval_seconds": 900,
