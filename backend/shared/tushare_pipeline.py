@@ -472,6 +472,13 @@ class Pipeline:
                 contract_sha256 TEXT NOT NULL,
                 result TEXT NOT NULL)
         """)
+        self.db.execute("""
+            CREATE TABLE IF NOT EXISTS normalization_recoveries (
+                job_id TEXT PRIMARY KEY,
+                recovered_at TEXT NOT NULL,
+                normalizer_sha256 TEXT NOT NULL,
+                result TEXT NOT NULL)
+        """)
         self.db.commit()
         cursor = self.db.execute(
             "SELECT value FROM scheduler_state WHERE name='family_turn'"
@@ -4293,6 +4300,62 @@ class Pipeline:
                     raise ValueError("Contract reassessment API mismatch")
                 dataset["quality_state"] = result["status"]
                 dataset["contract_reassessment"] = marker
+        with measure("normalization_recovery_overlays"):
+            for row in self.db.execute(
+                "SELECT r.job_id,r.normalizer_sha256,r.result,j.job,j.state,"
+                "j.result AS job_result FROM normalization_recoveries r "
+                "JOIN jobs j ON j.id=r.job_id ORDER BY r.job_id"
+            ):
+                result = json.loads(row["result"])
+                marker = result.get("normalization_recovery")
+                parquet = result.get("parquet")
+                job = json.loads(row["job"])
+                if (
+                    row["state"] != "done"
+                    or row["job_result"] != row["result"]
+                    or not isinstance(marker, dict)
+                    or marker.get("recovered_status") != result.get("status")
+                    or marker.get("normalizer_sha256") != row["normalizer_sha256"]
+                    or marker.get("source_attempt_preserved") is not True
+                    or marker.get("upstream_calls") != 0
+                    or result.get("status") != "sample_ok"
+                    or result.get("api_name") != job.get("api_name")
+                    or not isinstance(parquet, dict)
+                ):
+                    raise ValueError("Invalid normalization recovery overlay")
+                relative = parquet.get("path")
+                sha = parquet.get("sha256")
+                size = parquet.get("bytes")
+                if (
+                    not isinstance(relative, str)
+                    or not re.fullmatch(r"parquet/[a-f0-9]{64}\.parquet", relative)
+                    or sha != Path(relative).stem
+                    or type(size) is not int
+                    or size <= 0
+                ):
+                    raise ValueError("Invalid normalization recovery artifact")
+                artifact = self.root / relative
+                if (
+                    artifact.is_symlink()
+                    or not artifact.is_file()
+                    or artifact.stat().st_size != size
+                    or digest(artifact.read_bytes()) != sha
+                ):
+                    raise ValueError("Normalization recovery artifact mismatch")
+                source = self.db.execute(
+                    "SELECT 1 FROM attempts WHERE job_id=? "
+                    "AND json_extract(result,'$.normalization_error')=? LIMIT 1",
+                    (row["job_id"], marker.get("previous_error")),
+                ).fetchone()
+                if source is None:
+                    raise ValueError("Normalization recovery source attempt missing")
+                files[relative] = {"sha256": sha, "bytes": size}
+                active[relative] = {
+                    "api_name": result["api_name"],
+                    "quality_state": result["status"],
+                    **parquet,
+                    "normalization_recovery": marker,
+                }
         with measure("schema_metadata"):
             # Ship the reviewed catalog/contract field definitions with every pinned
             # release; code availability must not substitute for offline metadata.

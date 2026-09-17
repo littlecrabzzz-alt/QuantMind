@@ -27,6 +27,7 @@ def prepare(runtime):
         'scripts/tushare_reassess_saved_quality.py',
         'scripts/tushare_invalid_request_retirement.py',
         'scripts/tushare_cyq_empty_reassessment.py',
+        'scripts/tushare_normalization_recovery.py',
         'scripts/tushare_research_cache.py', 'config/tushare-catalog.json',
         'deploy/dual-node.env')]
     for source in names:
