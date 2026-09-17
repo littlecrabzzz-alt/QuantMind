@@ -522,7 +522,7 @@ class DeferredSplit(unittest.TestCase):
         self.assertEqual(saved["partition_recovery"]["upstream_calls"], 0)
         self.assertEqual(
             {child["ptype"] for child in self.children({"id": parent_id})},
-            {"科技、教育\\教育", "综合政务\\其他"},
+            {"教育", "其他"},
         )
         split, evidence = self.evidence({"id": parent_id})
         self.assertEqual(split["method"], "observed_value_fanout")

@@ -159,6 +159,7 @@ TEXT_CONTRACTS["npr"].update(
     saturation_partition_axes=[
         {"param": "ptype", "values": [], "value_kind": "supplier_text"},
     ],
+    saturation_partition_observed_normalizer="npr_ptype_leaf",
     recover_legacy_blocked_observed_fanout=True,
 )
 for _api in ("irm_qa_sh", "irm_qa_sz"):
@@ -177,6 +178,14 @@ def normalize_anns_d_ts_code(value):
         return value
     match = re.fullmatch(r"(SH|SZ|BJ)([0-9]{6})", value)
     return f"{match[2]}.{match[1]}" if match else None
+
+
+def normalize_npr_ptype(value):
+    """Convert a returned ``group\\leaf`` label to the documented input leaf."""
+    if not isinstance(value, str):
+        return None
+    leaf = value.rsplit("\\", 1)[-1].strip()
+    return leaf or None
 
 
 # Machine-readable exceptions are part of the contract, not completeness waivers.

@@ -15,10 +15,17 @@ from backend.shared.tushare_text_contracts import (  # noqa: E402
     TEXT_CONTRACTS,
     TEXT_CONTRACT_NOTES,
     iter_text_jobs,
+    normalize_npr_ptype,
 )
 
 
 class TextPlans(unittest.TestCase):
+    def test_npr_output_category_normalizes_to_input_leaf(self):
+        self.assertEqual(normalize_npr_ptype("科技、教育\\教育"), "教育")
+        self.assertEqual(normalize_npr_ptype(" 科技 "), "科技")
+        self.assertIsNone(normalize_npr_ptype(""))
+        self.assertIsNone(normalize_npr_ptype(None))
+
     def test_sources_recent_first_and_leap_day(self):
         jobs = list(iter_text_jobs({"history_start": "20240228"}, date(2024, 3, 8)))
         recent = [j for j in jobs if j["epoch"] != "history"]
@@ -160,6 +167,10 @@ class TextPlans(unittest.TestCase):
         )
         self.assertTrue(
             TEXT_CONTRACTS["npr"]["recover_legacy_blocked_observed_fanout"]
+        )
+        self.assertEqual(
+            TEXT_CONTRACTS["npr"]["saturation_partition_observed_normalizer"],
+            "npr_ptype_leaf",
         )
 
     def test_month_mode_covers_all_days_sources_and_both_qa_axes(self):
