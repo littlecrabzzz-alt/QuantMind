@@ -148,6 +148,11 @@ class MarketPlanning(unittest.TestCase):
         self.assertIn("wh_id", MARKET_CONTRACTS["fut_wsr"]["keys"])
         manager = next(j for j in jobs if j["api_name"] == "fund_manager")
         self.assertEqual(manager["params"], {"offset": 0, "limit": 1000})
+        self.assertEqual(
+            MARKET_CONTRACTS["fund_basic"]["pagination"],
+            {"offset_param": "offset", "limit_param": "limit", "page_size": 15000},
+        )
+        self.assertTrue(MARKET_CONTRACTS["fund_basic"]["pagination_live_verified"])
         self.assertNotIn("saturation_param", MARKET_CONTRACTS["index_weight"])
 
     def test_dependencies_and_invalid_identifiers(self):

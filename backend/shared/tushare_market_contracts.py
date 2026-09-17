@@ -142,6 +142,19 @@ MARKET_CONTRACTS["fund_manager"]["pagination"] = {
     "limit_param": "limit",
     "page_size": 1000,
 }
+MARKET_CONTRACTS["fund_basic"].update(
+    pagination={
+        "offset_param": "offset",
+        "limit_param": "limit",
+        "page_size": 15000,
+    },
+    pagination_live_verified=True,
+    pagination_note=(
+        "The public page documents a 15,000-row maximum but omits pagination "
+        "parameters. Live authority probes on 2026-09-17 verified stable limit/offset "
+        "pages and a finite has_more=false tail."
+    ),
+)
 MARKET_CONTRACTS["fund_share"]["history_partition"] = (
     "closed_calendar_month_range_v1"
 )

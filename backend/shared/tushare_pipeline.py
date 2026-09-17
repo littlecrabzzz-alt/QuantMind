@@ -4277,7 +4277,10 @@ class Pipeline:
                             if status in ("sample_ok", "possibly_truncated")
                             else "quality"
                         )
-                elif status == "empty_unverified" and offset > 0:
+                elif offset > 0 and count < limit and status in (
+                    "sample_ok",
+                    "empty_unverified",
+                ):
                     state = "done"
                     result["pagination_end"] = True
             if result.get("row_count", 0) and status not in (
