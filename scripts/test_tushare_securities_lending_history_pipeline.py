@@ -385,7 +385,7 @@ class LendingRuntime(unittest.TestCase):
             self.p.db.execute("SELECT state FROM jobs WHERE id=?", (key,)).fetchone()[
                 0
             ],
-            "blocked",
+            "permission_blocked",
         )
         self.assertEqual(
             json.loads(

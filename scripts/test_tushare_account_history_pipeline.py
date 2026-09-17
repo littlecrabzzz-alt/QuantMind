@@ -394,7 +394,7 @@ class AccountHistoryRuntime(unittest.TestCase):
         saved = self.p.db.execute(
             "SELECT state,result FROM jobs WHERE id=?", (key,)
         ).fetchone()
-        self.assertEqual(saved["state"], "blocked")
+        self.assertEqual(saved["state"], "permission_blocked")
         self.assertEqual(json.loads(saved["result"])["status"], "permission_denied")
         newer = self.p.enqueue(
             "stk_account_old",

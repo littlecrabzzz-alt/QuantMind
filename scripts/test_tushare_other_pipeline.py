@@ -691,7 +691,7 @@ class OtherPipeline(unittest.TestCase):
             any(c["status"] == "permission_denied" for c in manifest["capabilities"])
         )
         self.assertTrue(any(g["api_name"] == "opt_basic" for g in manifest["gaps"]))
-        self.assertEqual(self.p.status().get("permission_blocked"), 1)
+        self.assertEqual(self.p.status().get("permission_blocked"), 2)
         self.assertFalse(manifest["history_complete"])
 
 

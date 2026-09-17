@@ -259,7 +259,7 @@ class ExtendedPipeline(unittest.TestCase):
         self.assertIn(("news", "cls"), requests)
         self.assertIn(("daily", None), requests)
         states = dict(p.db.execute("SELECT id,state FROM jobs"))
-        self.assertEqual(states[jobs[0]], "blocked")
+        self.assertEqual(states[jobs[0]], "permission_blocked")
         self.assertEqual(states[jobs[1]], "permission_blocked")
         self.assertNotIn(states[jobs[2]], ("blocked", "permission_blocked"))
         new = p.enqueue(

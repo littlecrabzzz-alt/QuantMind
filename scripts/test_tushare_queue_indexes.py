@@ -262,6 +262,13 @@ class QueueIndexTest(unittest.TestCase):
                     "preserved_attempts": 0,
                     "upstream_calls": 0,
                 },
+                "permission_states": {
+                    "status": "no_action",
+                    "reclassified_jobs": 0,
+                    "preserved_result_jobs": 0,
+                    "preserved_attempts": 0,
+                    "upstream_calls": 0,
+                },
             },
         )
         states = dict(
@@ -292,7 +299,61 @@ class QueueIndexTest(unittest.TestCase):
                     "preserved_attempts": 0,
                     "upstream_calls": 0,
                 },
+                "permission_states": {
+                    "status": "no_action",
+                    "reclassified_jobs": 0,
+                    "preserved_result_jobs": 0,
+                    "preserved_attempts": 0,
+                    "upstream_calls": 0,
+                },
             },
+        )
+
+    def test_permission_state_maintenance_preserves_evidence(self):
+        denied = self.p.enqueue("daily", {"trade_date": "20260910"})
+        error = self.p.enqueue("daily", {"trade_date": "20260911"})
+        denied_result = json.dumps(
+            {"api_name": "daily", "status": "permission_denied"}
+        )
+        error_result = json.dumps({"api_name": "daily", "status": "api_error"})
+        self.p.db.execute(
+            "UPDATE jobs SET state='blocked',tries=1,result=? WHERE id=?",
+            (denied_result, denied),
+        )
+        self.p.db.execute(
+            "UPDATE jobs SET state='blocked',tries=1,result=? WHERE id=?",
+            (error_result, error),
+        )
+        self.p.db.execute(
+            "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+            (denied, 1, denied_result),
+        )
+        self.p.db.commit()
+
+        report = self.p.maintain_permission_states()
+
+        self.assertEqual(
+            report,
+            {
+                "status": "maintained",
+                "reclassified_jobs": 1,
+                "preserved_result_jobs": 1,
+                "preserved_attempts": 1,
+                "upstream_calls": 0,
+            },
+        )
+        saved = self.p.db.execute(
+            "SELECT state,tries,result FROM jobs WHERE id=?", (denied,)
+        ).fetchone()
+        self.assertEqual(tuple(saved), ("permission_blocked", 1, denied_result))
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (error,)
+            ).fetchone()[0],
+            "blocked",
+        )
+        self.assertEqual(
+            self.p.maintain_permission_states()["status"], "no_action"
         )
 
     def test_compaction_removes_duplicate_child_of_terminal_parent(self):

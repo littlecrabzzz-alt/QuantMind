@@ -1649,6 +1649,88 @@ class Pipeline:
         )
         return report
 
+    def maintain_permission_states(self):
+        """Move retained permission denials into the permission gap bucket."""
+        rows = self.db.execute("""
+            SELECT id,tries,result
+            FROM jobs INDEXED BY jobs_pending
+            WHERE state='blocked'
+              AND json_extract(result,'$.status')='permission_denied'
+        """).fetchall()
+        report = {
+            "status": "no_action",
+            "reclassified_jobs": 0,
+            "preserved_result_jobs": 0,
+            "preserved_attempts": 0,
+            "upstream_calls": 0,
+        }
+        if not rows:
+            return report
+        ids = [row["id"] for row in rows]
+        placeholders = ",".join("?" for _ in ids)
+        before = {row["id"]: (row["tries"], row["result"]) for row in rows}
+        attempts = dict(
+            self.db.execute(
+                f"SELECT job_id,count(*) FROM attempts WHERE job_id IN ({placeholders}) "
+                "GROUP BY job_id",
+                ids,
+            )
+        )
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
+            changed = self.db.execute("""
+                UPDATE jobs SET state='permission_blocked'
+                WHERE state='blocked'
+                  AND json_extract(result,'$.status')='permission_denied'
+            """).rowcount
+            if changed != len(rows):
+                raise ValueError("Permission state changed during maintenance")
+            reason = json.dumps(
+                {
+                    "reclassified_jobs": changed,
+                    "results_preserved": sum(row["result"] is not None for row in rows),
+                    "attempts_preserved": sum(attempts.values()),
+                    "upstream_calls": 0,
+                },
+                sort_keys=True,
+            )
+            self.db.execute(
+                "INSERT INTO capability(scope,status,checked_at,reason) "
+                "VALUES('planning:permission_state_maintenance',?,?,?) "
+                "ON CONFLICT(scope) DO UPDATE SET "
+                "status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
+                ("applied", utc_now(), reason),
+            )
+            after = {
+                row["id"]: (row["tries"], row["result"])
+                for row in self.db.execute(
+                    f"SELECT id,tries,result FROM jobs WHERE id IN ({placeholders})",
+                    ids,
+                )
+            }
+            if after != before:
+                raise ValueError("Permission evidence changed during maintenance")
+            after_attempts = dict(
+                self.db.execute(
+                    f"SELECT job_id,count(*) FROM attempts WHERE job_id IN ({placeholders}) "
+                    "GROUP BY job_id",
+                    ids,
+                )
+            )
+            if after_attempts != attempts:
+                raise ValueError("Permission attempt ledger changed during maintenance")
+            self.db.commit()
+        except BaseException:
+            self.db.rollback()
+            raise
+        report.update(
+            status="maintained",
+            reclassified_jobs=changed,
+            preserved_result_jobs=sum(row["result"] is not None for row in rows),
+            preserved_attempts=sum(attempts.values()),
+        )
+        return report
+
     def compact_stale_recent_roots(self, epoch, *, force=False):
         """Supersede older unexecuted recent roots and their private split trees.
 
@@ -1661,6 +1743,7 @@ class Pipeline:
             raise ValueError("Invalid recent queue compaction epoch")
         checkpoint = "recent_queue_compaction_v2:" + epoch
         announcement_saturation = self.maintain_announcement_saturation()
+        permission_states = self.maintain_permission_states()
         if not force and self.db.execute(
             "SELECT 1 FROM scheduler_state WHERE name=?", (checkpoint,)
         ).fetchone():
@@ -1668,6 +1751,7 @@ class Pipeline:
                 "status": "already_compacted",
                 "epoch": epoch,
                 "announcement_saturation": announcement_saturation,
+                "permission_states": permission_states,
             }
         temporary = (
             "temp.stale_recent_roots",
@@ -1835,6 +1919,7 @@ class Pipeline:
             "superseded_open_jobs": eligible,
             "protected_shared_jobs": protected,
             "announcement_saturation": announcement_saturation,
+            "permission_states": permission_states,
         }
 
     def compact_fina_mainbz_vip_coverage(self):
@@ -4523,7 +4608,7 @@ class Pipeline:
                     ),
                 )
             if status == "permission_denied":
-                state = "blocked"
+                state = "permission_blocked"
                 scope = job["api_name"] + ":" + str(job["params"].get("src", ""))
                 self.db.execute(
                     "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
