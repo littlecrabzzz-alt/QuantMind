@@ -14,7 +14,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from backend.shared import tushare_pipeline as module
 from backend.shared.tushare_intake import capture_sample
-from backend.shared.tushare_technical_extra_contracts import FIELDS, FIELD_METADATA
+from backend.shared.tushare_technical_extra_contracts import (
+    FIELDS,
+    FIELD_METADATA,
+    iter_technical_extra_jobs,
+)
 from backend.shared.tushare_registry import contract_for
 from backend.shared.tushare_store import read_dataset, dataset_schema, export_jsonl
 import test_tushare_risk_event_pipeline as fixtures
@@ -328,16 +332,58 @@ class TechnicalExtraRuntime(unittest.TestCase):
                 {j["params"]["ts_code"] for j in histories if j["api_name"] == api},
                 expected,
             )
-            self.assertEqual(contract_for(api)["dependencies"], ["technical_stocks"])
+            self.assertEqual(
+                contract_for(api)["dependencies"],
+                ["technical_stocks", "stock_lifecycles"],
+            )
         self.assertEqual(
             set(module._planning_inputs("technical_extra", cfg, ids)[1]),
-            {"technical_stocks"},
+            {"technical_stocks", "stock_lifecycles"},
         )
         self.assertTrue(
             all(
                 set(j["params"]) == {"ts_code", "start_date", "end_date"}
                 for j in histories
             )
+        )
+
+    def test_cyq_listing_date_clips_ranges_and_days_without_narrowing_unknowns(self):
+        cfg = {
+            "technical_extra_apis": ["cyq_perf"],
+            "technical_extra_history_start": "20260801",
+        }
+        ids = {
+            "stocks": ["000001.SZ", "T600018.SH"],
+            "stock_lifecycles": [
+                {"ts_code": "000001.SZ", "list_date": "20260905"},
+                {"ts_code": "T600018.SH", "list_date": None},
+            ],
+        }
+        jobs = list(iter_technical_extra_jobs(cfg, date(2026, 9, 9), ids))
+        known = [j["params"] for j in jobs if j["params"]["ts_code"] == "000001.SZ"]
+        unknown = [j["params"] for j in jobs if j["params"]["ts_code"] == "T600018.SH"]
+        self.assertEqual(
+            [p["trade_date"] for p in known],
+            ["20260905", "20260906", "20260907", "20260908", "20260909"],
+        )
+        self.assertEqual(
+            [p for p in known if "start_date" in p],
+            [],
+        )
+        self.assertEqual(
+            [p for p in unknown if "start_date" in p],
+            [
+                {
+                    "ts_code": "T600018.SH",
+                    "start_date": "20260801",
+                    "end_date": "20260831",
+                },
+                {
+                    "ts_code": "T600018.SH",
+                    "start_date": "20260901",
+                    "end_date": "20260902",
+                },
+            ],
         )
 
     def test_opt_in_unknown_history_idempotence_and_validation_isolation(self):

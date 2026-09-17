@@ -486,7 +486,11 @@ TECHNICAL_EXTRA_RUNTIME_CONTRACTS = {
     api: {
         **spec,
         "group": "technical_extra",
-        "dependencies": ["technical_stocks"] if spec.get("dependencies") else [],
+        "dependencies": (
+            ["technical_stocks", "stock_lifecycles"]
+            if api.startswith("cyq_")
+            else []
+        ),
         "saturation_fallback": "technical_stocks",
         "saturation_dependencies": ["technical_stocks"],
     }
@@ -495,7 +499,10 @@ TECHNICAL_EXTRA_RUNTIME_CONTRACTS = {
 
 
 def _technical_identifiers(identifiers):
-    return {"stocks": identifiers.get("technical_stocks", [])}
+    return {
+        "stocks": identifiers.get("technical_stocks", []),
+        "stock_lifecycles": identifiers.get("stock_lifecycles", []),
+    }
 
 
 def technical_extra_runtime_prerequisites(identifiers, config=None):

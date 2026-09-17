@@ -287,7 +287,10 @@ class MinutesRuntime(unittest.TestCase):
         )
         self.assertEqual(
             json.loads(new["signature"])["identifiers"],
-            {"factor_library_stocks": ["T600001.SH"]},
+            {
+                "factor_library_stocks": ["T600001.SH"],
+                "stock_lifecycles": [],
+            },
         )
         for oldjob in jobs:
             self.assertEqual(
@@ -316,7 +319,10 @@ class MinutesRuntime(unittest.TestCase):
             "factor_library", {**cfg, "factor_library_value_mode": "code_only"}, ids
         )
         self.assertNotEqual(legacy[0], new[0])
-        self.assertEqual(new[1], {"factor_library_stocks": ["600001.SH"]})
+        self.assertEqual(
+            new[1],
+            {"factor_library_stocks": ["600001.SH"], "stock_lifecycles": []},
+        )
         self.assertIn("factor_library_factors", legacy[1])
         with patch.dict(
             module.EXTENDED_CONTRACTS,
@@ -335,7 +341,7 @@ class MinutesRuntime(unittest.TestCase):
                 },
                 ids,
             )
-        self.assertEqual(set(both[1]), set(ids))
+        self.assertEqual(set(both[1]), set(ids) | {"stock_lifecycles"})
 
 
 if __name__ == "__main__":

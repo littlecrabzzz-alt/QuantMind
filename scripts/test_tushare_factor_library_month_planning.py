@@ -80,7 +80,7 @@ class FactorMonths(unittest.TestCase):
             )
             self.assertTrue(all(counts == expected for counts in by_code.values()))
 
-    def test_daily_default_byte_identity_and_policy_backward_compatibility(self):
+    def test_daily_default_byte_identity_and_lifecycle_policy(self):
         explicit = {**CONFIG, "factor_library_history_window": "daily"}
         self.assertEqual(
             list(iter_factor_library_jobs(CONFIG, date(1990, 1, 20), IDS)),
@@ -92,7 +92,11 @@ class FactorMonths(unittest.TestCase):
         )
         self.assertEqual(
             current[0],
-            "5230e8b9d534c35cd082a84b2aa41cee2638eebdf46120ef7d11893c86c56bb1",
+            "63ded8b25a15596b7f6d298b581a1de5b62fe1856b929c4a0b52451c1045704c",
+        )
+        self.assertEqual(
+            current[1],
+            {"factor_library_stocks": IDS["factor_library_stocks"], "stock_lifecycles": []},
         )
         changed = {**CONFIG, "factor_library_history_window": "month"}
         self.assertNotEqual(
@@ -104,6 +108,50 @@ class FactorMonths(unittest.TestCase):
                 "factor_library", changed, {**IDS, "stocks": ["600001.SH"]}
             ),
         )
+
+    def test_listing_date_clips_known_code_and_preserves_unknown_code(self):
+        cfg = {
+            **CONFIG,
+            "factor_library_history_start": "19900101",
+            "factor_library_history_window": "month",
+        }
+        ids = {
+            "factor_library_stocks": ["000001.SZ", "T600018.SH"],
+            "stock_lifecycles": [
+                {"ts_code": "000001.SZ", "list_date": "19900210"},
+                {"ts_code": "T600018.SH", "list_date": None},
+            ],
+        }
+        jobs = list(iter_factor_library_jobs(cfg, date(1990, 2, 20), ids))
+        known = [j["params"] for j in jobs if j["params"]["ts_code"] == "000001.SZ"]
+        unknown = [j["params"] for j in jobs if j["params"]["ts_code"] == "T600018.SH"]
+        self.assertEqual(
+            [p for p in known if "start_date" in p],
+            [{"start_date": "19900210", "end_date": "19900213", "ts_code": "000001.SZ"}],
+        )
+        self.assertEqual(
+            [p for p in unknown if "start_date" in p],
+            [
+                {"start_date": "19900101", "end_date": "19900131", "ts_code": "T600018.SH"},
+                {"start_date": "19900201", "end_date": "19900213", "ts_code": "T600018.SH"},
+            ],
+        )
+        self.assertTrue(
+            all(p.get("trade_date", "99999999") >= "19900210" for p in known)
+        )
+        with self.assertRaisesRegex(ValueError, "list_date"):
+            list(
+                iter_factor_library_jobs(
+                    cfg,
+                    date(1990, 2, 20),
+                    {
+                        **ids,
+                        "stock_lifecycles": [
+                            {"ts_code": "000001.SZ", "list_date": "19900230"}
+                        ],
+                    },
+                )
+            )
 
     def test_unfinished_daily_snapshot_default_still_resumes_same_absolute_stream(self):
         self.plan(CONFIG)

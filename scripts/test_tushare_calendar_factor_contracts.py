@@ -382,7 +382,7 @@ class CalendarFactorContracts(unittest.TestCase):
             spec["planning_dependencies_by_value_mode"],
             {
                 "factor_name": ["factor_library_factors"],
-                "code_only": ["factor_library_stocks"],
+                "code_only": ["factor_library_stocks", "stock_lifecycles"],
             },
         )
         self.assertEqual(spec["row_cap"], 6000)

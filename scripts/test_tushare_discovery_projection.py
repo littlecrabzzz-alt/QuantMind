@@ -139,6 +139,35 @@ class ProjectionTest(unittest.TestCase):
         self.assertIn("T600018.SH", updated["technical_stocks"])
         self.assertIn("600018.SH", updated["technical_stocks"])
 
+    def test_stock_listing_dates_keep_earliest_valid_observation(self):
+        for list_date in ("19910101", None, "bad", "19901219"):
+            self.save(
+                self.body(
+                    ["ts_code", "list_date"],
+                    [["000001.SZ", list_date]],
+                    "stock_basic",
+                )
+            )
+        self.save(
+            self.body(
+                ["ts_code", "list_date"],
+                [["T600018.SH", None], ["not-a-stock", "19900101"]],
+                "stock_basic",
+            )
+        )
+        expected = [
+            {"ts_code": "000001.SZ", "list_date": "19901219"},
+            {"ts_code": "T600018.SH", "list_date": None},
+        ]
+        self.assertEqual(self.p.identifiers()["stock_lifecycles"], expected)
+        self.assertEqual(
+            self.p.identifiers(_use_cache=True)["stock_lifecycles"], expected
+        )
+        self.p.db.commit()
+        self.assertEqual(
+            self.p.identifiers(_use_cache=True)["stock_lifecycles"], expected
+        )
+
     def test_stock_projection_reads_every_stock_source_and_only_those_sources(self):
         stock_cases = list(
             zip(

@@ -106,6 +106,7 @@ from backend.shared.tushare_intake import (
     capture_sample, digest, json_bytes, utc_now, validate_request_shape,
 )
 from backend.shared.tushare_rrg_contracts import RRG_CONTRACTS
+from backend.shared.tushare_stock_lifecycle import valid_date
 
 STOCK_IDENTIFIER_SOURCE_APIS = (
     "stock_basic",
@@ -115,7 +116,7 @@ IDENTIFIER_SPLIT_SOURCE_APIS = {
     "stocks": STOCK_IDENTIFIER_SOURCE_APIS,
     "dc_indices": ("dc_index", "dc_member", "dc_daily"),
 }
-IDENTIFIER_CACHE_VERSION = 1
+IDENTIFIER_CACHE_VERSION = 2
 ROOT = Path(os.getenv("QM_TUSHARE_ARCHIVE_ROOT", "/data/tushare"))
 CONTRACTS = {
     api: (spec["row_cap"], spec["required_fields"])
@@ -1508,6 +1509,7 @@ class Pipeline:
         bond_source_apis = ("cb_daily", "cb_issue", "cb_call", "cb_rate", "cb_price_chg", "cb_share")
         factor_records = {}
         reward_period_records = {}
+        stock_lifecycle_records = {}
         families = {
             **dict.fromkeys(REALTIME_RUNTIME_CONTRACTS, "realtime_source_only"),
             **dict.fromkeys(SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS, "stocks"),
@@ -1593,6 +1595,10 @@ class Pipeline:
                 json_bytes(item): item
                 for item in cached_result.pop("stock_context_reward_periods", [])
             }
+            stock_lifecycle_records = {
+                item["ts_code"]: item
+                for item in cached_result.pop("stock_lifecycles", [])
+            }
             result = {key: set(values) for key, values in cached_result.items()}
         else:
             cached_attempt_rowid, object_stats = 0, {}
@@ -1614,7 +1620,7 @@ class Pipeline:
                 "ts_code", "index_code", "level", "fut_code", "o_code", "n_code",
                 "name", "hm_name", "l1_code", "l2_code", "l3_code", "con_code",
                 "factor_name", "asset_type", "mapping_ts_code", "code", "end_date",
-                "country",
+                "country", "list_date",
             )
         )
         if _source_apis is None:
@@ -1708,6 +1714,23 @@ class Pipeline:
                 observed = json.loads((self.root / "observations" / saved["observation"]).read_bytes())
                 realtime_params = observed.get("request", {}).get("params", {})
             for record in self.records(saved, fields=discovery_fields):
+                if saved["api_name"] == "stock_basic":
+                    code = record.get("ts_code")
+                    if isinstance(code, str) and re.fullmatch(
+                        r"T?[0-9]{6}\.(SH|SZ|BJ)", code
+                    ):
+                        list_date = record.get("list_date")
+                        list_date = list_date if valid_date(list_date) else None
+                        previous = stock_lifecycle_records.get(code)
+                        previous_date = previous.get("list_date") if previous else None
+                        stock_lifecycle_records[code] = {
+                            "ts_code": code,
+                            "list_date": (
+                                min(previous_date, list_date)
+                                if previous_date and list_date
+                                else previous_date or list_date
+                            ),
+                        }
                 if api == "stk_rewards":
                     # Body-only actual pairs, including capped historical attempts.
                     # Invalid/missing dates remain evidence for a prerequisite gap.
@@ -1851,6 +1874,9 @@ class Pipeline:
         result = {key: sorted(values) for key, values in result.items()}
         result["factor_library_factors"] = [factor_records[key] for key in sorted(factor_records)]
         result["stock_context_reward_periods"] = [reward_period_records[key] for key in sorted(reward_period_records)]
+        result["stock_lifecycles"] = [
+            stock_lifecycle_records[key] for key in sorted(stock_lifecycle_records)
+        ]
         for api, spec in CROSS_ASSET_RUNTIME_CONTRACTS.items():
             family = spec["saturation_fallback"]
             logical = EXTENDED_CONTRACTS[api].get("discovery_dependencies", [family])[0]

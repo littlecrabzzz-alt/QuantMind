@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 import re
 
 from backend.shared.tushare_market_contracts import _months
+from backend.shared.tushare_stock_lifecycle import clip_params, stock_list_dates
 from backend.shared.tushare_structured_contracts import _contract, _parse
 from backend.shared.tushare_technical_extra_contracts import _days
 
@@ -149,7 +150,7 @@ FACTOR_LIBRARY_CONTRACTS["factor_value"].update(
     value_mode_note="factor_library_value_mode is factor_name by default for existing stream compatibility, or explicit code_only. Mode and its actual discovery family must be frozen in the planning policy; never reinterpret an unfinished cursor under another mode.",
     planning_dependencies_by_value_mode={
         "factor_name": ["factor_library_factors"],
-        "code_only": ["factor_library_stocks"],
+        "code_only": ["factor_library_stocks", "stock_lifecycles"],
     },
     exact_date_param="trade_date",
     source_namespace="mainland_equity_only_preserve_source_ts_code",
@@ -329,12 +330,15 @@ def iter_factor_library_jobs(config, today, identifiers=None):
     mode = _value_mode(config)
     window = _history_window(config)
     selectors = []
+    list_dates = {}
     if "factor_value" in enabled:
         selectors = (
             _stock_codes(identifiers)
             if mode == "code_only"
             else _factor_names(identifiers)[0]
         )
+        if mode == "code_only":
+            list_dates = stock_list_dates(identifiers)
     selector_key = "ts_code" if mode == "code_only" else "factor_name"
     recent = today - timedelta(days=6)
     epoch = str(config.get("planning_epoch", today.strftime("%Y%m%d")))
@@ -366,9 +370,12 @@ def iter_factor_library_jobs(config, today, identifiers=None):
         )
         for params in windows:
             for selector in selectors:
+                bounded = clip_params(params, selector, list_dates)
+                if bounded is None:
+                    continue
                 yield {
                     "api_name": "factor_value",
-                    "params": {**params, selector_key: selector},
+                    "params": {**bounded, selector_key: selector},
                     "fields": ",".join(FIELDS["factor_value"]),
                     "epoch": "history" if history else epoch,
                     "priority": 55 if history else 20,

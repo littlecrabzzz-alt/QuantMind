@@ -8,6 +8,7 @@ from calendar import monthrange
 from datetime import date, datetime, timedelta
 
 from backend.shared.tushare_equity_event_contracts import _stocks
+from backend.shared.tushare_stock_lifecycle import clip_params, stock_list_dates
 from backend.shared.tushare_structured_contracts import _contract, _parse
 
 # Full official output table: field|type|default visibility|field semantics.
@@ -612,27 +613,33 @@ def technical_extra_prerequisites(identifiers=None, enabled_apis=None, config=No
     return gaps
 
 
-def _days(begin, end, stocks=None):
+def _days(begin, end, stocks=None, list_dates=None):
     day = begin
     while day <= end:
         for code in stocks if stocks is not None else (None,):
-            yield {
+            params = {
                 "trade_date": day.strftime("%Y%m%d"),
                 **({"ts_code": code} if code else {}),
             }
+            if code:
+                params = clip_params(params, code, list_dates or {})
+            if params is not None:
+                yield params
         day += timedelta(days=1)
 
 
-def _months(begin, end, stocks):
+def _months(begin, end, stocks, list_dates=None):
     day = begin
     while day <= end:
         last = min(end, date(day.year, day.month, monthrange(day.year, day.month)[1]))
         for code in stocks:
-            yield {
+            params = clip_params({
                 "ts_code": code,
                 "start_date": day.strftime("%Y%m%d"),
                 "end_date": last.strftime("%Y%m%d"),
-            }
+            }, code, list_dates or {})
+            if params is not None:
+                yield params
         day = last + timedelta(days=1)
 
 
@@ -649,6 +656,7 @@ def iter_technical_extra_jobs(config, today, identifiers=None):
         if any(api.startswith("cyq_") for api in enabled)
         else []
     )
+    list_dates = stock_list_dates(identifiers) if stocks else {}
     if any(start and start > today for start in starts.values()):
         raise ValueError("History start cannot be after today")
     recent = today - timedelta(days=6)
@@ -659,10 +667,19 @@ def iter_technical_extra_jobs(config, today, identifiers=None):
             start = starts[api]
             codes = stocks if api.startswith("cyq_") else None
             if not history:
-                streams[api] = iter(_days(max(start or recent, recent), today, codes))
+                streams[api] = iter(
+                    _days(max(start or recent, recent), today, codes, list_dates)
+                )
             elif start and start < recent:
                 streams[api] = (
-                    iter(_months(start, recent - timedelta(days=1), codes))
+                    iter(
+                        _months(
+                            start,
+                            recent - timedelta(days=1),
+                            codes,
+                            list_dates,
+                        )
+                    )
                     if codes is not None
                     else iter(_days(start, recent - timedelta(days=1)))
                 )
