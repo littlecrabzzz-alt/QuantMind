@@ -51,8 +51,18 @@ class WorkerStatus(unittest.TestCase):
             report = json.loads((root / 'archive-worker-status.json').read_text())
             self.assertEqual(report['documents']['processed'], 100)
             self.assertEqual(report['acquisition']['requests'], 1)
+            self.assertEqual(report['cycle_interval_seconds'], 120.0)
             self.assertGreaterEqual(report['updated_at'], report['started_at'])
             self.assertGreaterEqual(report['elapsed_seconds'], 0)
+
+    def test_configurable_cycle_interval_is_bounded(self):
+        self.assertEqual(worker.cycle_seconds({}), 120.0)
+        self.assertEqual(
+            worker.cycle_seconds({'archive_worker_cycle_seconds': 105}), 105.0
+        )
+        for value in (True, 104, 3601, '105'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                worker.cycle_seconds({'archive_worker_cycle_seconds': value})
 
     def test_due_publication_runs_before_documents(self):
         with tempfile.TemporaryDirectory() as directory:

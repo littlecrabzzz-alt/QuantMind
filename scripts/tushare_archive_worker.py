@@ -13,6 +13,17 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
+def cycle_seconds(config):
+    value = config.get('archive_worker_cycle_seconds', 120)
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not 105 <= value <= 3600
+    ):
+        raise ValueError('Invalid archive worker cycle seconds')
+    return float(value)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
@@ -28,6 +39,7 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         while True:
             start = time.monotonic()
+            interval = 120.0
             free = shutil.disk_usage(root).free
             report = {'started_at': utc_now(), 'free_bytes': free,
                       'nas_migration_warning': free < 500 * 2**30}
@@ -39,12 +51,14 @@ def main():
                 else:
                     authority()
                     config = json.loads((root / 'pipeline-config.json').read_bytes())
+                    interval = cycle_seconds(config)
+                    report['cycle_interval_seconds'] = interval
                     # The cloud already used independent acquisition/document workers.
                     # Keep one archive owner and wait for both bounded phases before
                     # another cycle or shutdown; SQLite connections stay task-local.
                     with ThreadPoolExecutor(max_workers=1) as pool:
                         documents = None
-                        def start_documents():
+                        def start_documents(config=config):
                             nonlocal documents
                             if (documents is None and config.get('enable_documents')
                                     and shutil.disk_usage(root).free >= 300 * 2**30):
@@ -78,7 +92,7 @@ def main():
             print(json.dumps(report), flush=True)
             if args.once:
                 return 0 if report['status'] == 'completed_cycle' else 2
-            time.sleep(max(5, 120 - (time.monotonic() - start)))
+            time.sleep(max(5, interval - (time.monotonic() - start)))
 
 
 if __name__ == '__main__':

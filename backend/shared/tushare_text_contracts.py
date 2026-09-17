@@ -146,6 +146,7 @@ TEXT_CONTRACTS = {
         attachments=("url", "pdf_url"),
     ),
 }
+TEXT_CONTRACTS["research_report"]["optional_requested_fields"] = ["file_name"]
 
 # Machine-readable exceptions are part of the contract, not completeness waivers.
 TEXT_CONTRACT_NOTES = {
@@ -212,7 +213,7 @@ TEXT_CONTRACT_NOTES = {
         "history_status": "documented exact start 2017-01-01",
         "source_status": "unfiltered covers stock/industry and unknown future types",
         "coverage_gaps": [
-            "file_name appears in official fields example only; request it and audit support",
+            "file_name appears in the official fields example but not the output table. Live range responses omitted it despite an explicit request; keep requesting and recording the optional gap without rejecting otherwise complete report rows.",
             "capped single day requires report_type and exhaustive institution/code partitions",
         ],
     },

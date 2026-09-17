@@ -323,6 +323,7 @@ def capture_sample(client, token, job, root: Path):
     field_coverage = {
         "field_coverage": "unverified_default_or_invalid",
         "requested_missing_fields": None,
+        "optional_requested_missing_fields": None,
         "unexpected_returned_fields": None,
     }
     try:
@@ -406,12 +407,27 @@ def capture_sample(client, token, job, root: Path):
     ):
         returned = set(payload["data"]["fields"])
         missing = sorted(set(requested) - returned)
+        optional = job.get("optional_requested_fields")
+        if optional is None:
+            from backend.shared.tushare_registry import contract_for
+
+            optional = contract_for(job["api_name"]).get(
+                "optional_requested_fields", ()
+            )
+        optional = set(optional)
+        optional_missing = sorted(set(missing) & optional)
+        blocking_missing = sorted(set(missing) - optional)
         field_coverage.update(
-            field_coverage="gap" if missing else "complete_for_explicit_request",
+            field_coverage="gap"
+            if blocking_missing
+            else "optional_gap"
+            if optional_missing
+            else "complete_for_explicit_request",
             requested_missing_fields=missing,
+            optional_requested_missing_fields=optional_missing,
             unexpected_returned_fields=sorted(returned - set(requested)),
         )
-        if missing and assessment["status"] == "sample_ok":
+        if blocking_missing and assessment["status"] == "sample_ok":
             assessment["status"] = "schema_gap"
     assessment.update(field_coverage)
     assessment.update(

@@ -27,6 +27,7 @@ class FieldCoverageAcceptance(unittest.TestCase):
         extra_data=None,
         api="synthetic",
         required=("ts_code",),
+        optional=None,
     ):
         payload = {
             "code": code,
@@ -39,6 +40,8 @@ class FieldCoverageAcceptance(unittest.TestCase):
             "row_cap": cap,
             "required_fields": list(required),
         }
+        if optional is not None:
+            job["optional_requested_fields"] = list(optional)
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             response = httpx.Response(http_status, json=payload)
@@ -85,6 +88,29 @@ class FieldCoverageAcceptance(unittest.TestCase):
         self.assertEqual(result["requested_missing_fields"], [])
         self.assertEqual(result["unexpected_returned_fields"], ["new_source"])
         self.assertEqual(raw["data"]["items"][0], ["000001.SZ", None, {"raw": 0}])
+
+    def test_documented_example_only_field_is_an_explicit_nonblocking_gap(self):
+        result, _ = self.capture(
+            ["ts_code"],
+            [["000001.SZ"]],
+            optional=("hidden",),
+        )
+        self.assertEqual(result["status"], "sample_ok")
+        self.assertEqual(result["field_coverage"], "optional_gap")
+        self.assertEqual(result["requested_missing_fields"], ["hidden"])
+        self.assertEqual(result["optional_requested_missing_fields"], ["hidden"])
+
+    def test_research_report_contract_applies_to_existing_job_identity(self):
+        result, _ = self.capture(
+            ["trade_date"],
+            [["20260911"]],
+            requested="trade_date,file_name",
+            api="research_report",
+            required=("trade_date",),
+        )
+        self.assertEqual(result["status"], "sample_ok")
+        self.assertEqual(result["field_coverage"], "optional_gap")
+        self.assertEqual(result["optional_requested_missing_fields"], ["file_name"])
 
     def test_empty_cap_and_continuation_keep_status_and_gap(self):
         for items, cap, extra, status in (

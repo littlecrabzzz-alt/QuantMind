@@ -110,6 +110,14 @@ class TextPlans(unittest.TestCase):
             self.assertGreater(contract["requests_per_minute"], 0)
             self.assertIn(api, TEXT_CONTRACT_NOTES)
         self.assertIn("file_name", TEXT_CONTRACTS["research_report"]["extra_fields"])
+        self.assertEqual(
+            TEXT_CONTRACTS["research_report"]["optional_requested_fields"],
+            ["file_name"],
+        )
+        self.assertIn(
+            "Live range responses omitted it",
+            TEXT_CONTRACT_NOTES["research_report"]["coverage_gaps"][0],
+        )
         self.assertIn("_source", TEXT_CONTRACTS["news"]["keys"])
 
     def test_month_mode_covers_all_days_sources_and_both_qa_axes(self):

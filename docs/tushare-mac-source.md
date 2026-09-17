@@ -48,6 +48,9 @@
 激活前检查已部署代码的 authority、节点标记及密钥文件权限，安装
 `com.quantmind.tushare-archive` LaunchAgent。已有采集进程时拒绝覆盖运行代码，
 升级须先自然结束当前采集周期。300 GiB 停写线和 500 GiB NAS 提醒由 worker 执行。
+`archive_worker_cycle_seconds` 默认 120 秒，合法范围 105 至 3600 秒；它只缩短有界
+采集轮次之间的空等时间，不改变账户、接口或每日配额门。缩短周期前后都必须以真实
+生产轮次核对请求数、限频响应、失败阶段、文档并行任务和磁盘余量。
 
 云端定时缓存使用 `deploy/tushare-research-cache.service` 和对应 `.timer`，
 安装到 `/etc/systemd/system/` 后启用 timer。部署前等待当前临时拉取 unit 结束，

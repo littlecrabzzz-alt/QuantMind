@@ -8,6 +8,7 @@
   },
   "batch_requests": 360,
   "batch_seconds": 100,
+  "archive_worker_cycle_seconds": 120,
   "enable_text": true,
   "enable_structured": true,
   "enable_market": true,
