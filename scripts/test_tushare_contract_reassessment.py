@@ -135,6 +135,60 @@ class ContractReassessmentTest(unittest.TestCase):
             original,
         )
 
+    def test_retired_replacement_parent_is_skipped_before_artifact_validation(self):
+        from backend.shared.tushare_other_contracts import FIELDS
+
+        fields = list(FIELDS["opt_basic"])
+        row = ["IO2609-C-4000.CFX" if field == "ts_code" else None for field in fields]
+        task, _, result = self.seed(
+            "opt_basic",
+            fields,
+            [row],
+            null_counts={field: int(field != "ts_code") for field in fields},
+            params={"exchange": "CFFEX"},
+            state="blocked",
+            result_status="possibly_truncated",
+            job_updates={"row_cap": 1},
+        )
+        result["parquet"] = None
+        self.pipeline.db.execute(
+            "UPDATE jobs SET result=? WHERE id=?", (json.dumps(result), task)
+        )
+        replacement_gap = "replaced_by_stock_range_plan_v1"
+        self.pipeline.db.execute(
+            "INSERT INTO partition_splits VALUES(?,?,?,?,?,?,?)",
+            (
+                task,
+                "identifier_fanout",
+                0,
+                0,
+                json.dumps({"replacement_gap": replacement_gap}),
+                "blocked",
+                replacement_gap,
+            ),
+        )
+        self.pipeline.db.commit()
+
+        report = reassess(self.pipeline, apply=True)
+
+        self.assertEqual(report["promoted_jobs"], 0)
+        self.assertEqual(
+            report["unchanged_by_api_and_status"],
+            [
+                {
+                    "api_name": "opt_basic",
+                    "status": "retired_replacement",
+                    "jobs": 1,
+                }
+            ],
+        )
+        self.assertEqual(
+            self.pipeline.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (task,)
+            ).fetchone()[0],
+            "blocked",
+        )
+
     def test_dry_run_rolls_back_then_apply_preserves_attempt_and_updates_manifest(self):
         fields = "abstr,author,ind_name,inst_csname,name,report_type,title,trade_date,ts_code,url".split(
             ","

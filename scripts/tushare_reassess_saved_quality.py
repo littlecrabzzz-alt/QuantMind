@@ -24,7 +24,7 @@ from backend.shared.tushare_intake import (  # noqa: E402
     json_bytes,
     utc_now,
 )
-from backend.shared.tushare_pipeline import Pipeline  # noqa: E402
+from backend.shared.tushare_pipeline import Pipeline, REPLACEMENT_GAPS  # noqa: E402
 from backend.shared.tushare_registry import contract_for  # noqa: E402
 
 
@@ -100,6 +100,21 @@ def reassess(pipeline, *, apply=False, apis=None):
         for row in rows:
             job, saved = json.loads(row["job"]), json.loads(row["result"])
             api = job["api_name"]
+            if row["state"] == "blocked":
+                split = db.execute(
+                    "SELECT status,gap,evidence FROM partition_splits WHERE parent_id=?",
+                    (row["id"],),
+                ).fetchone()
+                evidence = json.loads(split["evidence"]) if split else {}
+                replacement_gap = evidence.get("replacement_gap")
+                if (
+                    split
+                    and split["status"] == "blocked"
+                    and split["gap"] == replacement_gap
+                    and replacement_gap in REPLACEMENT_GAPS
+                ):
+                    unchanged[(api, "retired_replacement")] += 1
+                    continue
             if (
                 saved.get("response_complete") is not True
                 or saved.get("response_format") != "json"
