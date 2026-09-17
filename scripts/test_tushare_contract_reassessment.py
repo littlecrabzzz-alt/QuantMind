@@ -1,0 +1,186 @@
+"""Zero-request promotion of retained responses under corrected contracts."""
+
+import hashlib
+import json
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from backend.shared.tushare_intake import digest, json_bytes
+from backend.shared.tushare_pipeline import Pipeline, manifest_at
+from scripts.tushare_reassess_saved_quality import reassess
+
+
+CATALOG = json.loads(
+    (Path(__file__).resolve().parents[1] / "config/tushare-catalog.json").read_bytes()
+)
+
+
+class ContractReassessmentTest(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.pipeline = Pipeline(self.root, CATALOG)
+        self.addCleanup(self.pipeline.close)
+
+    def seed(self, api, fields, items, *, null_counts):
+        task = self.pipeline.enqueue(
+            api, {"start_date": "20260911", "end_date": "20260911"}
+        )
+        job = json.loads(
+            self.pipeline.db.execute(
+                "SELECT job FROM jobs WHERE id=?", (task,)
+            ).fetchone()[0]
+        )
+        raw = json_bytes(
+            {"code": 0, "data": {"fields": fields, "items": items, "has_more": False}}
+        )
+        sha = digest(raw)
+        (self.root / "objects").mkdir(exist_ok=True)
+        (self.root / "objects" / f"{sha}.json").write_bytes(raw)
+        observation_body = json_bytes({"fixture": task})
+        observation_sha = digest(observation_body)
+        (self.root / "observations").mkdir(exist_ok=True)
+        observation = task[:32] + ".json"
+        (self.root / "observations" / observation).write_bytes(observation_body)
+        parquet_body = b"retained-parquet-fixture"
+        parquet_sha = hashlib.sha256(parquet_body).hexdigest()
+        (self.root / "parquet").mkdir(exist_ok=True)
+        parquet_path = f"parquet/{parquet_sha}.parquet"
+        (self.root / parquet_path).write_bytes(parquet_body)
+        result = {
+            "api_name": api,
+            "status": "schema_gap",
+            "row_count": len(items),
+            "missing_fields": [],
+            "null_counts": null_counts,
+            "field_coverage": "gap",
+            "requested_missing_fields": ["file_name"]
+            if api == "research_report"
+            else [],
+            "optional_requested_missing_fields": [],
+            "unexpected_returned_fields": [],
+            "response_complete": True,
+            "response_format": "json",
+            "http_status": 200,
+            "object_sha256": sha,
+            "observation": observation,
+            "observation_sha256": observation_sha,
+            "parquet": {
+                "path": parquet_path,
+                "sha256": parquet_sha,
+                "bytes": len(parquet_body),
+            },
+        }
+        encoded = json.dumps(result, sort_keys=True)
+        self.pipeline.db.execute(
+            "UPDATE jobs SET state='quality',tries=1,result=? WHERE id=?",
+            (encoded, task),
+        )
+        self.pipeline.db.execute(
+            "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+            (task, 1, encoded),
+        )
+        self.pipeline.db.commit()
+        return task, job, result
+
+    def test_dry_run_rolls_back_then_apply_preserves_attempt_and_updates_manifest(self):
+        fields = "abstr,author,ind_name,inst_csname,name,report_type,title,trade_date,ts_code,url".split(
+            ","
+        )
+        task, _, original = self.seed(
+            "research_report",
+            fields,
+            [["a", None, "i", "c", None, "r", "t", "20260911", None, "u"]],
+            null_counts={"author": 1, "name": 1, "ts_code": 1},
+        )
+        planned = reassess(self.pipeline, apply=False)
+        self.assertEqual(planned["promoted_by_api"], {"research_report": 1})
+        self.assertEqual(
+            self.pipeline.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (task,)
+            ).fetchone()[0],
+            "quality",
+        )
+        applied = reassess(self.pipeline, apply=True)
+        self.assertEqual(applied["promoted_jobs"], 1)
+        row = self.pipeline.db.execute(
+            "SELECT state,result FROM jobs WHERE id=?", (task,)
+        ).fetchone()
+        saved = json.loads(row["result"])
+        self.assertEqual(row["state"], "done")
+        self.assertEqual(saved["status"], "sample_ok")
+        self.assertEqual(saved["field_coverage"], "optional_gap")
+        self.assertEqual(saved["optional_requested_missing_fields"], ["file_name"])
+        self.assertEqual(saved["contract_reassessment"]["upstream_calls"], 0)
+        self.assertEqual(
+            self.pipeline.db.execute(
+                "SELECT count(*) FROM contract_reassessments WHERE job_id=?", (task,)
+            ).fetchone()[0],
+            1,
+        )
+        attempt = json.loads(
+            self.pipeline.db.execute(
+                "SELECT result FROM attempts WHERE job_id=?", (task,)
+            ).fetchone()[0]
+        )
+        self.assertEqual(attempt, original)
+        release = self.pipeline.publish()
+        manifest = manifest_at(self.root, release)
+        dataset = next(
+            item
+            for item in manifest["datasets"]
+            if item["api_name"] == "research_report"
+        )
+        self.assertEqual(dataset["quality_state"], "sample_ok")
+        self.assertEqual(
+            dataset["contract_reassessment"]["previous_status"], "schema_gap"
+        )
+        self.assertNotIn(task, {gap["id"] for gap in manifest["gaps"]})
+
+    def test_current_contract_keeps_real_null_gap_unchanged(self):
+        task, _, _ = self.seed(
+            "cctv_news",
+            ["content", "date", "title"],
+            [[None, "20260911", "title"]],
+            null_counts={"content": 1, "date": 0, "title": 0},
+        )
+        report = reassess(self.pipeline, apply=True)
+        self.assertEqual(report["promoted_jobs"], 0)
+        self.assertEqual(report["unchanged_jobs"], 1)
+        self.assertEqual(
+            self.pipeline.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (task,)
+            ).fetchone()[0],
+            "quality",
+        )
+
+    def test_corrupt_retained_object_aborts_without_mutation(self):
+        fields = "abstr,author,ind_name,inst_csname,name,report_type,title,trade_date,ts_code,url".split(
+            ","
+        )
+        task, _, result = self.seed(
+            "research_report",
+            fields,
+            [["a", None, "i", "c", None, "r", "t", "20260911", None, "u"]],
+            null_counts={"author": 1, "name": 1, "ts_code": 1},
+        )
+        (self.root / "objects" / f"{result['object_sha256']}.json").write_bytes(
+            b"corrupt"
+        )
+        with self.assertRaisesRegex(ValueError, "checksum mismatch"):
+            reassess(self.pipeline, apply=True)
+        self.assertEqual(
+            self.pipeline.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (task,)
+            ).fetchone()[0],
+            "quality",
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

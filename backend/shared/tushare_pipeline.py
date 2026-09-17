@@ -465,6 +465,13 @@ class Pipeline:
                 attempt_count INTEGER NOT NULL, result TEXT NOT NULL,
                 objects TEXT NOT NULL)
         """)
+        self.db.execute("""
+            CREATE TABLE IF NOT EXISTS contract_reassessments (
+                job_id TEXT PRIMARY KEY,
+                reassessed_at TEXT NOT NULL,
+                contract_sha256 TEXT NOT NULL,
+                result TEXT NOT NULL)
+        """)
         self.db.commit()
         cursor = self.db.execute(
             "SELECT value FROM scheduler_state WHERE name='family_turn'"
@@ -4266,6 +4273,26 @@ class Pipeline:
                         "quality_state": result["status"],
                         **result["parquet"],
                     }
+        with measure("contract_reassessment_overlays"):
+            for row in self.db.execute(
+                "SELECT result FROM contract_reassessments ORDER BY job_id"
+            ):
+                result = json.loads(row[0])
+                parquet = result.get("parquet")
+                marker = result.get("contract_reassessment")
+                if (
+                    not isinstance(parquet, dict)
+                    or parquet.get("path") not in active
+                    or not isinstance(marker, dict)
+                    or marker.get("reassessed_status") != result.get("status")
+                    or marker.get("upstream_calls") != 0
+                ):
+                    raise ValueError("Invalid contract reassessment overlay")
+                dataset = active[parquet["path"]]
+                if dataset["api_name"] != result.get("api_name"):
+                    raise ValueError("Contract reassessment API mismatch")
+                dataset["quality_state"] = result["status"]
+                dataset["contract_reassessment"] = marker
         with measure("schema_metadata"):
             # Ship the reviewed catalog/contract field definitions with every pinned
             # release; code availability must not substitute for offline metadata.

@@ -285,6 +285,76 @@ def _cyq_chips_supplier_empty(job, payload):
     return len(parsed_dates) == 1 or parsed_dates[0] <= parsed_dates[1]
 
 
+def _unverified_field_coverage():
+    return {
+        "field_coverage": "unverified_default_or_invalid",
+        "requested_missing_fields": None,
+        "optional_requested_missing_fields": None,
+        "unexpected_returned_fields": None,
+    }
+
+
+def assess_success_payload(job, payload):
+    """Recompute a complete JSON response under the current reviewed contract."""
+    from backend.shared.tushare_registry import contract_for
+
+    current_contract = contract_for(job["api_name"])
+    assessment = assess_response(
+        payload,
+        job["row_cap"],
+        job["required_fields"],
+        current_contract.get(
+            "assessment_nullable_fields", job.get("nullable_fields", ())
+        ),
+        current_contract.get(
+            "assessment_positive_fields", job.get("positive_fields", ())
+        ),
+    )
+    if _cyq_chips_supplier_empty(job, payload):
+        assessment = {
+            "status": "empty_unverified",
+            "code": 50101,
+            "row_count": 0,
+            "supplier_empty_hint": True,
+            "coverage_proven": False,
+            "history_complete": False,
+            "pit_verified": False,
+        }
+    coverage = _unverified_field_coverage()
+    requested = job.get("fields")
+    requested = requested.split(",") if isinstance(requested, str) else []
+    requested = [field.strip() for field in requested]
+    if (
+        "row_count" in assessment
+        and isinstance(payload, dict)
+        and isinstance(payload.get("data"), dict)
+        and requested
+        and all(re.fullmatch(r"[A-Za-z0-9_]+", field) for field in requested)
+    ):
+        returned = set(payload["data"]["fields"])
+        missing = sorted(set(requested) - returned)
+        optional = job.get("optional_requested_fields")
+        if optional is None:
+            optional = current_contract.get("optional_requested_fields", ())
+        optional = set(optional)
+        optional_missing = sorted(set(missing) & optional)
+        blocking_missing = sorted(set(missing) - optional)
+        coverage.update(
+            field_coverage="gap"
+            if blocking_missing
+            else "optional_gap"
+            if optional_missing
+            else "complete_for_explicit_request",
+            requested_missing_fields=missing,
+            optional_requested_missing_fields=optional_missing,
+            unexpected_returned_fields=sorted(returned - set(requested)),
+        )
+        if blocking_missing and assessment["status"] == "sample_ok":
+            assessment["status"] = "schema_gap"
+    assessment.update(coverage)
+    return assessment
+
+
 def validate_request_shape(job):
     """Enforce the four observed minimum contracts for every acquisition caller."""
     api = job["api_name"]
@@ -320,12 +390,7 @@ def capture_sample(client, token, job, root: Path):
                 "local_daily_quota": daily, "upstream_calls": 0}
     request = {k: job[k] for k in ("api_name", "params", "fields")}
     started = utc_now()
-    field_coverage = {
-        "field_coverage": "unverified_default_or_invalid",
-        "requested_missing_fields": None,
-        "optional_requested_missing_fields": None,
-        "unexpected_returned_fields": None,
-    }
+    field_coverage = _unverified_field_coverage()
     try:
         # httpx.post reads the complete response before returning. Do not call
         # raise_for_status first: HTTP failures still have original evidence.
@@ -367,7 +432,6 @@ def capture_sample(client, token, job, root: Path):
     except (ValueError, UnicodeError):
         payload = None
         response_format = "non_json"
-    current_contract = {}
     if not response.is_success:
         assessment = {
             "status": "rate_limited"
@@ -378,63 +442,8 @@ def capture_sample(client, token, job, root: Path):
     elif response_format == "non_json":
         assessment = {"status": "invalid_response"}
     else:
-        from backend.shared.tushare_registry import contract_for
-
-        current_contract = contract_for(job["api_name"])
-        assessment = assess_response(
-            payload,
-            job["row_cap"],
-            job["required_fields"],
-            current_contract.get(
-                "assessment_nullable_fields", job.get("nullable_fields", ())
-            ),
-            current_contract.get(
-                "assessment_positive_fields", job.get("positive_fields", ())
-            ),
-        )
-        if response.status_code == 200 and _cyq_chips_supplier_empty(job, payload):
-            assessment = {
-                "status": "empty_unverified",
-                "code": 50101,
-                "row_count": 0,
-                "supplier_empty_hint": True,
-                "coverage_proven": False,
-                "history_complete": False,
-                "pit_verified": False,
-            }
-    requested = request["fields"]
-    requested = requested.split(",") if isinstance(requested, str) else []
-    requested = [field.strip() for field in requested]
-    # row_count is emitted only after successful response structure validation.
-    # Presence is independent of null values and never proves undocumented fields.
-    if (
-        "row_count" in assessment
-        and isinstance(payload.get("data"), dict)
-        and requested
-        and all(re.fullmatch(r"[A-Za-z0-9_]+", f) for f in requested)
-    ):
-        returned = set(payload["data"]["fields"])
-        missing = sorted(set(requested) - returned)
-        optional = job.get("optional_requested_fields")
-        if optional is None:
-            optional = current_contract.get(
-                "optional_requested_fields", ()
-            )
-        optional = set(optional)
-        optional_missing = sorted(set(missing) & optional)
-        blocking_missing = sorted(set(missing) - optional)
-        field_coverage.update(
-            field_coverage="gap"
-            if blocking_missing
-            else "optional_gap"
-            if optional_missing
-            else "complete_for_explicit_request",
-            requested_missing_fields=missing,
-            optional_requested_missing_fields=optional_missing,
-            unexpected_returned_fields=sorted(returned - set(requested)),
-        )
-        if blocking_missing and assessment["status"] == "sample_ok":
-            assessment["status"] = "schema_gap"
+        assessment = assess_success_payload(job, payload)
+        field_coverage = {}
     assessment.update(field_coverage)
     assessment.update(
         http_status=response.status_code,
