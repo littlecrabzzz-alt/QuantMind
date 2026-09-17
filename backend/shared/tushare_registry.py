@@ -315,6 +315,16 @@ def iter_market_member_jobs(config, today, identifiers=None):
     for job in iter_market_sentiment_jobs(projected, today, identifiers):
         # Retain the bulk request: known boards must not hide future discoveries.
         yield job
+        # One history range covers every board when it is below the supplier
+        # cap. A saturated root is bisected exhaustively by date; a saturated
+        # exact day then fans out over the observed board set. Do not eagerly
+        # multiply every old month by every currently observed board.
+        if (
+            job["api_name"] == "tdx_member"
+            and job["epoch"] == "history"
+            and "start_date" in job["params"]
+        ):
+            continue
         for code in codes[job["api_name"]]:
             yield {**job, "params": {**job["params"], "ts_code": code}}
 

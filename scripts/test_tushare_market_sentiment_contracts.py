@@ -115,7 +115,7 @@ class MarketSentiment(unittest.TestCase):
         seen = set()
         for api in C:
             group = [j for j in jobs if j["api_name"] == api]
-            if api == "kpl_list":
+            if api in ("tdx_member", "kpl_list"):
                 dates = {
                     j["params"].get("trade_date")
                     or (j["params"]["start_date"], j["params"]["end_date"])
@@ -132,7 +132,8 @@ class MarketSentiment(unittest.TestCase):
             {
                 j["params"]["trade_date"]
                 for j in jobs
-                if j["epoch"] == "history" and j["api_name"] != "kpl_list"
+                if j["epoch"] == "history"
+                and j["api_name"] not in ("tdx_member", "kpl_list")
             },
             {"20240227"},
         )
@@ -140,7 +141,8 @@ class MarketSentiment(unittest.TestCase):
             {
                 (j["params"]["start_date"], j["params"]["end_date"])
                 for j in jobs
-                if j["epoch"] == "history" and j["api_name"] == "kpl_list"
+                if j["epoch"] == "history"
+                and j["api_name"] in ("tdx_member", "kpl_list")
             },
             {("20240227", "20240227")},
         )
@@ -191,6 +193,10 @@ class MarketSentiment(unittest.TestCase):
             all("start_date" not in job["params"] for job in recent)
         )
         self.assertEqual(C["kpl_list"]["history_partition"], "closed_calendar_month_range_v1")
+        self.assertEqual(
+            C["tdx_member"]["history_partition"],
+            "closed_calendar_month_range_v1",
+        )
 
     def test_legal_split_axes_preserve_board_member_or_tag(self):
         split = existing_pure_function(

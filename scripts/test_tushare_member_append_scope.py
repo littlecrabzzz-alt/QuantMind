@@ -115,6 +115,48 @@ class MemberScope(unittest.TestCase):
             self.assertEqual(set(job['fields'].split(',')), set(contract_for(job['api_name'])['requested_fields']))
             self.assertEqual(row['group_name'], 'market_sentiment')
 
+    def test_tdx_history_uses_bulk_month_ranges_and_bisects_when_saturated(self):
+        cfg = configuration(
+            market_members_apis=['tdx_member'],
+            market_members_history_start='20260130',
+        )
+        jobs = list(iter_market_member_jobs(cfg, date(2026, 3, 10), IDS))
+        history = [job for job in jobs if job['epoch'] == 'history']
+        recent = [job for job in jobs if job['epoch'] != 'history']
+        self.assertEqual(len(history), 3)
+        self.assertEqual(len(recent), 14)
+        self.assertTrue(all('ts_code' not in job['params'] for job in history))
+        self.assertEqual(
+            {(job['params']['start_date'], job['params']['end_date']) for job in history},
+            {
+                ('20260130', '20260131'),
+                ('20260201', '20260228'),
+                ('20260301', '20260303'),
+            },
+        )
+
+        params = {'start_date': '20260101', 'end_date': '20260131'}
+        row, job, result = self.capture(
+            'tdx_member', params, [fixtures.source('tdx_member')], more=True,
+            epoch='history',
+        )
+        split = self.p.split_request(row, job, result)
+        self.assertEqual(split['method'], 'date_bisection')
+        children = [
+            json.loads(item[0])['params']
+            for item in self.p.db.execute(
+                'SELECT child.job FROM partition_children AS edge '
+                'JOIN jobs AS child ON child.id=edge.child_id '
+                'WHERE edge.parent_id=?',
+                (row['id'],),
+            )
+        ]
+        self.assertEqual(
+            {(child['start_date'], child['end_date']) for child in children},
+            {('20260101', '20260116'), ('20260117', '20260131')},
+        )
+        self.assertTrue(all('ts_code' not in child for child in children))
+
     def test_legacy_observations_saturation_children_and_universe_stay(self):
         row, job, result = self.capture('tdx_member', {'trade_date': '20260904'},
             [fixtures.source('tdx_member', ts_code='880206.TDX')], more=True, epoch='history')

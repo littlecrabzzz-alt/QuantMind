@@ -393,6 +393,7 @@ MARKET_SENTIMENT_CONTRACTS["tdx_member"].update(
     date_axis_note="trade_date and start/end describe source snapshot dates; no in_date/out_date/weight or first-publication timestamp is provided. A historical snapshot is not an effective membership interval.",
     saturation_gap="Date ranges can bisect to exact dates, then observed board codes. con_code is a legal second filter but its historical member universe is unknown; generic second-dimension fanout is not implemented and must remain a gap.",
     member_namespace_note="Examples include SH/SZ/BJ members. Preserve historical/T/source-observed members without current-stock filtering; unknown future formats require validation instead of invented A-share conversion.",
+    history_partition="closed_calendar_month_range_v1",
 )
 MARKET_SENTIMENT_CONTRACTS["tdx_daily"].update(
     unit_note="OHLC/pre_close are index points; pct_change/rise/turnover_rate/swing/horizon changes are percent; vol is lots. amount is ten-thousand monetary units BUT documentation says futures indices store open interest there. Shares and market values are hundred-million units. bm_buy_net is yuan; bm_net unit not stated. pe/pb/rise are source strings. Do not force this mixed board set into one amount/currency/asset interpretation.",
@@ -526,7 +527,10 @@ def _params(api, begin, end):
 
 
 def _history_params(api, begin, end):
-    if api != "kpl_list":
+    if (
+        MARKET_SENTIMENT_CONTRACTS[api].get("history_partition")
+        != "closed_calendar_month_range_v1"
+    ):
         yield from _params(api, begin, end)
         return
     cursor = begin
