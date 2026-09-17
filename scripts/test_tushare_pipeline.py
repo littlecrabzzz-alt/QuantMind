@@ -177,6 +177,26 @@ class PipelineAcceptance(unittest.TestCase):
                 report["partition_reconciliation"],
                 {"checked": 0, "resolved": 0},
             )
+            self.assertEqual(
+                report["work_timing"]["counts"],
+                {
+                    "capture_invocations": 1,
+                    "dispatch_rejections": 0,
+                    "local_quota_deferrals": 0,
+                },
+            )
+            self.assertEqual(
+                set(report["work_timing"]["seconds"]),
+                {
+                    "partition_work",
+                    "partition_reconciliation",
+                    "queue_expansion",
+                    "job_selection",
+                    "capture",
+                    "result_processing",
+                },
+            )
+            self.assertGreater(report["work_timing"]["seconds"]["capture"], 0)
             pipeline.close()
 
     def test_publication_recovers_retention_interruptions_without_version_loop(self):

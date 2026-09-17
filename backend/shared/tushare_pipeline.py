@@ -4478,11 +4478,36 @@ class Pipeline:
     ):
         started = time.monotonic()
         deadline = started + max_seconds
+        work_seconds = {
+            "partition_work": 0.0,
+            "partition_reconciliation": 0.0,
+            "queue_expansion": 0.0,
+            "job_selection": 0.0,
+            "capture": 0.0,
+            "result_processing": 0.0,
+        }
+        work_counts = {
+            "capture_invocations": 0,
+            "dispatch_rejections": 0,
+            "local_quota_deferrals": 0,
+        }
+
+        def work_timing():
+            return {
+                "seconds": {
+                    name: round(value, 6)
+                    for name, value in work_seconds.items()
+                },
+                "counts": dict(work_counts),
+            }
+
         task_scope = task_ids is not None
         scoped_jobs = self._install_exact_task_scope(task_ids) if task_scope else 0
+        phase_started = time.perf_counter()
         partition_work = (
             None if task_scope else self.resume_identifier_split(deadline, config)
         )
+        work_seconds["partition_work"] += time.perf_counter() - phase_started
         if partition_work is not None:
             # Full discovery remains isolated. Proven source projections may
             # use only the unspent original deadline for unrelated acquisition.
@@ -4500,6 +4525,7 @@ class Pipeline:
                     "requests": 0,
                     "elapsed_seconds": round(time.monotonic() - started, 3),
                     "partition_work": partition_work,
+                    "work_timing": work_timing(),
                     **self.status(),
                 }
         if not task_scope:
@@ -4511,21 +4537,39 @@ class Pipeline:
                 or not 1 <= reconciliation_parents <= 1000
             ):
                 raise ValueError("Invalid partition reconciliation budget")
-            partition_reconciliation = self.reconcile_partitions(
-                max_parents=reconciliation_parents, deadline=deadline
-            )
+            phase_started = time.perf_counter()
+            try:
+                partition_reconciliation = self.reconcile_partitions(
+                    max_parents=reconciliation_parents, deadline=deadline
+                )
+            finally:
+                work_seconds["partition_reconciliation"] += (
+                    time.perf_counter() - phase_started
+                )
         else:
             partition_reconciliation = None
         completed = 0
         invalid_requests = 0
         while completed < max_requests and time.monotonic() - started < max_seconds:
             if not task_scope:
-                self.expand(config)
+                phase_started = time.perf_counter()
+                try:
+                    self.expand(config)
+                finally:
+                    work_seconds["queue_expansion"] += (
+                        time.perf_counter() - phase_started
+                    )
             if time.monotonic() - started >= max_seconds:
                 break
-            row = self.next_job(
-                config, started + max_seconds, task_scope=task_scope
-            )
+            phase_started = time.perf_counter()
+            try:
+                row = self.next_job(
+                    config, started + max_seconds, task_scope=task_scope
+                )
+            finally:
+                work_seconds["job_selection"] += (
+                    time.perf_counter() - phase_started
+                )
             if row is None or time.monotonic() - started >= max_seconds:
                 break
             job = json.loads(row["job"])
@@ -4561,6 +4605,7 @@ class Pipeline:
                 job["api_name"], row["epoch"], config, time.time()
             )
             if rejected:
+                work_counts["dispatch_rejections"] += 1
                 self.db.execute("UPDATE jobs SET state=? WHERE id=?", (rejected, row["id"]))
                 self.db.execute(
                     "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
@@ -4581,8 +4626,14 @@ class Pipeline:
                 )
                 self.db.commit()
                 continue
-            result = capture_sample(client, token, job, self.root)
+            phase_started = time.perf_counter()
+            try:
+                result = capture_sample(client, token, job, self.root)
+            finally:
+                work_seconds["capture"] += time.perf_counter() - phase_started
+                work_counts["capture_invocations"] += 1
             if result.get("local_daily_quota"):
+                work_counts["local_quota_deferrals"] += 1
                 daily = result["local_daily_quota"]
                 self.daily_quota_status = daily
                 self.db.execute(
@@ -4592,6 +4643,7 @@ class Pipeline:
                 self.db.commit()
                 # No HTTP, result/tries/attempt rows or inferred supplier quota.
                 continue
+            phase_started = time.perf_counter()
             status = result["status"]
             state = "done" if status == "sample_ok" else "quality"
             if status == "empty_unverified":
@@ -4762,14 +4814,22 @@ class Pipeline:
             )
             self.db.commit()  # response + object references checkpoint before next request
             self.reconcile_partitions(child_id=row["id"], deadline=deadline)
+            work_seconds["result_processing"] += time.perf_counter() - phase_started
             completed += 1
             if pause:
                 time.sleep(pause)
         if not task_scope and time.monotonic() < deadline:
-            self.expand(config)
+            phase_started = time.perf_counter()
+            try:
+                self.expand(config)
+            finally:
+                work_seconds["queue_expansion"] += (
+                    time.perf_counter() - phase_started
+                )
         report = {
             "requests": completed,
             "elapsed_seconds": round(time.monotonic() - started, 3),
+            "work_timing": work_timing(),
             **self.status(),
         }
         if partition_work is not None:
