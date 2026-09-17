@@ -13,6 +13,7 @@ import httpx
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from backend.shared.tushare_pipeline import Pipeline
+from backend.shared.tushare_intake import capture_sample
 from backend.shared.tushare_registry import EXTENDED_CONTRACTS, contract_for
 from backend.shared.tushare_rrg_contracts import FIELDS, INPUT_FIELDS, RRG_CONTRACTS
 from backend.shared.tushare_store import KEYS, dataset_schema, read_dataset
@@ -102,6 +103,55 @@ class RRGContracts(unittest.TestCase):
                 self.assertEqual(job["required_fields"], FIELDS[api])
                 self.assertEqual(row["group_name"], "rrg")
             pipeline.close()
+
+    def test_ci_close_only_history_preserves_supplier_null_market_fields(self):
+        spec = RRG_CONTRACTS["ci_daily"]
+        nullable = {
+            "open",
+            "low",
+            "high",
+            "pre_close",
+            "change",
+            "pct_change",
+            "vol",
+            "amount",
+        }
+        self.assertLessEqual(nullable, set(spec["assessment_nullable_fields"]))
+        self.assertEqual(spec["assessment_positive_fields"], ["close"])
+        self.assertIn("no longer discloses", spec["partial_market_fields_note"])
+
+        fields = FIELDS["ci_daily"]
+        values = {
+            "ts_code": "CI005030.CI",
+            "trade_date": "20190102",
+            "close": 1234.5,
+        }
+        response = httpx.Response(
+            200,
+            json={
+                "code": 0,
+                "data": {
+                    "fields": fields,
+                    "items": [[values.get(field) for field in fields]],
+                },
+            },
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            pipeline = Pipeline(tmp, CATALOG)
+            key = pipeline.enqueue(
+                "ci_daily",
+                {"ts_code": "CI005030.CI", "start_date": "20190101", "end_date": "20190131"},
+            )
+            job = json.loads(
+                pipeline.db.execute("SELECT job FROM jobs WHERE id=?", (key,)).fetchone()[0]
+            )
+            self.assertEqual(job["positive_fields"], ["open", "close"])
+            pipeline.close()
+            with httpx.Client(transport=httpx.MockTransport(lambda _: response)) as client:
+                result = capture_sample(client, "synthetic-token", job, Path(tmp))
+        self.assertEqual(result["status"], "sample_ok")
+        self.assertEqual(result["null_counts"]["open"], 1)
+        self.assertEqual(result["null_counts"]["amount"], 1)
 
     def test_complete_mock_rows_publish_and_query_without_upstream_fallback(self):
         requests = []

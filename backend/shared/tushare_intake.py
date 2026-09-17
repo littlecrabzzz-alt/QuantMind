@@ -367,6 +367,7 @@ def capture_sample(client, token, job, root: Path):
     except (ValueError, UnicodeError):
         payload = None
         response_format = "non_json"
+    current_contract = {}
     if not response.is_success:
         assessment = {
             "status": "rate_limited"
@@ -377,12 +378,19 @@ def capture_sample(client, token, job, root: Path):
     elif response_format == "non_json":
         assessment = {"status": "invalid_response"}
     else:
+        from backend.shared.tushare_registry import contract_for
+
+        current_contract = contract_for(job["api_name"])
         assessment = assess_response(
             payload,
             job["row_cap"],
             job["required_fields"],
-            job.get("nullable_fields", ()),
-            job.get("positive_fields", ()),
+            current_contract.get(
+                "assessment_nullable_fields", job.get("nullable_fields", ())
+            ),
+            current_contract.get(
+                "assessment_positive_fields", job.get("positive_fields", ())
+            ),
         )
         if response.status_code == 200 and _cyq_chips_supplier_empty(job, payload):
             assessment = {
@@ -409,9 +417,7 @@ def capture_sample(client, token, job, root: Path):
         missing = sorted(set(requested) - returned)
         optional = job.get("optional_requested_fields")
         if optional is None:
-            from backend.shared.tushare_registry import contract_for
-
-            optional = contract_for(job["api_name"]).get(
+            optional = current_contract.get(
                 "optional_requested_fields", ()
             )
         optional = set(optional)

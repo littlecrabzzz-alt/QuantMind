@@ -220,6 +220,16 @@ for _api, (_doc_id, _source_sha) in _DOCS.items():
     )
     RRG_CONTRACTS[_api] = spec
 
+RRG_CONTRACTS["ci_daily"].update(
+    assessment_nullable_fields=[
+        field
+        for field in FIELDS["ci_daily"]
+        if field not in ("ts_code", "trade_date", "close")
+    ],
+    assessment_positive_fields=["close"],
+    partial_market_fields_note="The current official description says CITIC no longer discloses open, high, low, volume or amount. Live historical rows can also omit pre_close/change/pct_change. Preserve every requested column and source null; only code, date and close remain the non-null price core.",
+)
+
 RRG_CONTRACTS["ci_index_member"].update(
     dependencies=["stocks"],
     saturation_fallback="stocks",
