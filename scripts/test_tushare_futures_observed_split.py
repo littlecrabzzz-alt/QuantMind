@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -335,6 +336,55 @@ class FuturesObservedSplitTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "cycle"):
             self.p.split_request(row, job, self.source([{"week": "20192"}]))
+
+    def test_legacy_blocked_holding_reuses_retained_response_without_http(self):
+        row, _ = self.parent("fut_holding", {"trade_date": "20260904"})
+        result = {
+            **self.source(
+                [
+                    {
+                        "trade_date": "20260904",
+                        "exchange": "DCE",
+                        "symbol": "A2611",
+                    },
+                    {
+                        "trade_date": "20260904",
+                        "exchange": "CFFEX",
+                        "symbol": "IC2609",
+                    },
+                ]
+            ),
+            "status": "possibly_truncated",
+            "row_count": 2000,
+        }
+        encoded = json.dumps(result)
+        self.p.db.execute(
+            "UPDATE jobs SET state='blocked',tries=1,result=? WHERE id=?",
+            (encoded, row["id"]),
+        )
+        self.p.db.execute(
+            "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+            (row["id"], 1, encoded),
+        )
+        self.p.db.commit()
+
+        attempts = list(self.p.db.execute("SELECT * FROM attempts"))
+        report = self.p.resume_identifier_split(time.monotonic() + 10, {})
+
+        self.assertTrue(report["legacy_parent_recovered"])
+        self.assertTrue(report["local_only"])
+        self.assertEqual(report["upstream_calls"], 0)
+        self.assertEqual(report["split"]["method"], "observed_futures_fanout")
+        self.assertEqual(report["split"]["children"], 2)
+        saved = self.p.db.execute(
+            "SELECT state,tries,result FROM jobs WHERE id=?", (row["id"],)
+        ).fetchone()
+        self.assertEqual(saved["state"], "split_pending")
+        self.assertEqual(saved["tries"], 1)
+        self.assertEqual(
+            json.loads(saved["result"])["partition_recovery"]["upstream_calls"], 0
+        )
+        self.assertEqual(list(self.p.db.execute("SELECT * FROM attempts")), attempts)
 
 
 if __name__ == "__main__":

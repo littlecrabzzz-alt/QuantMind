@@ -126,6 +126,13 @@ LEGACY_IDENTIFIER_RECOVERY_APIS = tuple(
         if spec.get("recover_legacy_blocked_identifier_fanout")
     )
 )
+LEGACY_OBSERVED_RECOVERY_APIS = tuple(
+    sorted(
+        api
+        for api, spec in EXTENDED_CONTRACTS.items()
+        if spec.get("recover_legacy_blocked_observed_fanout")
+    )
+)
 IDENTIFIER_CACHE_VERSION = 4
 ROOT = Path(os.getenv("QM_TUSHARE_ARCHIVE_ROOT", "/data/tushare"))
 CONTRACTS = {
@@ -3895,6 +3902,11 @@ class Pipeline:
     def deferred_split_kind(self, job, result, *, epoch=None):
         if self.identifier_split_needs_discovery(job, epoch=epoch):
             return "identifier_fanout"
+        if (
+            job["api_name"] in ("fut_holding", "fut_weekly_detail")
+            and result.get("object_sha256")
+        ):
+            return "observed_futures_fanout"
         spec = contract_for(job["api_name"])
         partition_axis = _saturation_partition_axis(spec, job["params"])
         if (
@@ -3918,7 +3930,15 @@ class Pipeline:
             # identifier fanout was absent. Reuse retained responses; never
             # repeat their HTTP calls. Other blocked parents may have been
             # deliberately retired by a later range plan and stay excluded.
-            legacy_apis = ("eco_cal", *LEGACY_IDENTIFIER_RECOVERY_APIS)
+            legacy_apis = tuple(
+                dict.fromkeys(
+                    (
+                        "eco_cal",
+                        *LEGACY_IDENTIFIER_RECOVERY_APIS,
+                        *LEGACY_OBSERVED_RECOVERY_APIS,
+                    )
+                )
+            )
             placeholders = ",".join("?" for _ in legacy_apis)
             row = self.db.execute(
                 "SELECT * FROM jobs WHERE state='blocked' "
@@ -3998,7 +4018,9 @@ class Pipeline:
             "job_id": row["id"],
             "split": split,
             "local_only": bool(
-                split and split.get("method") == "observed_value_fanout"
+                split
+                and split.get("method")
+                in ("observed_value_fanout", "observed_futures_fanout")
             ),
             "legacy_parent_recovered": recovered_legacy,
             "discovery_family": (

@@ -133,6 +133,7 @@ FUTURES_EXTRA_CONTRACTS["fut_weekly_monthly"].update(
 )
 FUTURES_EXTRA_CONTRACTS["fut_holding"].update(
     hidden_fields=["exchange"],
+    recover_legacy_blocked_observed_fanout=True,
     parameter_note="At least trade_date or symbol is mandatory. Bare start_date/end_date is invalid. SHFE includes INE contracts; do not sum a second INE copy. symbol may denote a dated contract or a product, never a ts_code suffix.",
     saturation_gap="All-market daily rankings may hit 2000. Subdivision must use observed exchange+symbol pairs, retaining product and contract rankings; generic ts_code/stock fanout is invalid and not registered here.",
     discovery_gap="Observed holding symbols/members, including retired products/contracts, are not a complete historical universe; broker is only a member short name, not a verified immutable identity.",
