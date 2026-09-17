@@ -243,6 +243,7 @@ for _api in ("fund_daily", "fund_adj"):
         saturation_param="ts_code",
     )
 RRG_CONTRACTS["etf_basic"].update(
+    assessment_nullable_fields=RRG_CONTRACTS["etf_basic"]["nullable_fields"],
     date_axis_note="setup_date and list_date are source lifecycle dates. Current list_status observations do not reconstruct every historical status transition.",
 )
 RRG_CONTRACTS["fund_portfolio"].update(

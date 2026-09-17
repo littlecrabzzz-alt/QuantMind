@@ -260,6 +260,42 @@ class ContractReassessmentTest(unittest.TestCase):
             "quality",
         )
 
+    def test_old_etf_basic_job_uses_current_nullable_contract(self):
+        from backend.shared.tushare_rrg_contracts import FIELDS
+
+        fields = FIELDS["etf_basic"]
+        task, _, _ = self.seed(
+            "etf_basic",
+            fields,
+            [
+                [
+                    "159001.SZ"
+                    if field == "ts_code"
+                    else "L"
+                    if field == "list_status"
+                    else None
+                    for field in fields
+                ]
+            ],
+            null_counts={"ts_code": 0, "list_status": 0, "list_date": 1},
+            params={"list_status": "L"},
+            job_updates={
+                "required_fields": ["ts_code", "list_status", "list_date"],
+                "nullable_fields": [],
+            },
+        )
+
+        report = reassess(self.pipeline, apply=True)
+
+        self.assertEqual(report["promoted_by_api"], {"etf_basic": 1})
+        row = self.pipeline.db.execute(
+            "SELECT state,result FROM jobs WHERE id=?", (task,)
+        ).fetchone()
+        self.assertEqual(row["state"], "done")
+        result = json.loads(row["result"])
+        self.assertEqual(result["status"], "sample_ok")
+        self.assertEqual(result["null_counts"]["list_date"], 1)
+
     def test_corrupt_retained_object_aborts_without_mutation(self):
         fields = "abstr,author,ind_name,inst_csname,name,report_type,title,trade_date,ts_code,url".split(
             ","
