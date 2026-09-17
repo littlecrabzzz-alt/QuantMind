@@ -1,4 +1,4 @@
-"""Exact fina_mainbz_vip batches preserve quarter, type and terminal-cap gaps."""
+"""Exact fina_mainbz_vip batches preserve quarter/type and verified paging."""
 
 import json
 from datetime import date
@@ -115,10 +115,13 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
     def test_runtime_contract_is_vip_only(self):
         spec = contract_for(preparation.API)
         self.assertEqual(spec["minimum_points"], 5000)
-        self.assertEqual(spec["row_cap"], 100)
-        self.assertEqual(spec["input_fields"], ["period", "type"])
+        self.assertEqual(spec["row_cap"], 10000)
+        self.assertEqual(spec["input_fields"], ["period", "type", "offset", "limit"])
         self.assertFalse(spec["split"])
-        self.assertNotIn("pagination", spec)
+        self.assertEqual(
+            spec["pagination"],
+            {"offset_param": "offset", "limit_param": "limit", "page_size": 10000},
+        )
         self.assertEqual(spec["group"], preparation.API)
         self.assertIs(PLANNERS[preparation.API], iter_fina_mainbz_vip_jobs)
         self.assertEqual(
@@ -157,7 +160,6 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
             {gap["reason"] for gap in gaps},
             {
                 "configured_scope_does_not_prove_earlier_history_absent",
-                "pagination_gap",
                 "pit_unverified",
             },
         )
@@ -208,7 +210,7 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "hash mismatch"):
             runner.run_batch(self.output, "0" * 64)
 
-    def test_execute_is_exact_and_100_rows_becomes_terminal_gap(self):
+    def test_execute_full_page_enqueues_next_offset_without_splitting(self):
         requests = []
 
         def respond(request):
@@ -220,13 +222,15 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
             item[fields.index("end_date")] = body["params"]["period"]
             item[fields.index("bz_item")] = "segment"
             return httpx.Response(
-                200, json={"code": 0, "data": {"fields": fields, "items": [item] * 100}}
+                200,
+                json={"code": 0, "data": {"fields": fields, "items": [item] * 10000}},
             )
 
         pointer = (self.root / "CURRENT.json").read_bytes()
         result = self._execute(respond)
         self.assertEqual(len(requests), 1)
-        self.assertEqual(set(requests[0]["params"]), {"period", "type"})
+        self.assertEqual(set(requests[0]["params"]), {"period", "type", "limit"})
+        self.assertEqual(requests[0]["params"]["limit"], 10000)
         self.assertEqual(result["upstream_calls"], 1)
         self.assertFalse(result["release_published"])
         self.assertFalse(result["current_release_switched"])
@@ -237,7 +241,7 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
             state, saved = db.execute(
                 "SELECT state,result FROM jobs WHERE id=?", (task_id,)
             ).fetchone()
-            self.assertEqual(state, "blocked")
+            self.assertEqual(state, "done")
             self.assertEqual(json.loads(saved)["status"], "possibly_truncated")
             self.assertEqual(
                 db.execute(
@@ -246,6 +250,14 @@ class FinaMainbzVipBatchTest(unittest.TestCase):
                 ).fetchone()[0],
                 0,
             )
+            job = json.loads(
+                db.execute(
+                    "SELECT job FROM jobs WHERE json_extract(job,'$.api_name')=? "
+                    "AND json_extract(job,'$.params.offset')=10000",
+                    (preparation.API,),
+                ).fetchone()[0]
+            )
+            self.assertEqual(job["params"]["limit"], 10000)
             self.assertEqual(
                 db.execute(
                     "SELECT state FROM jobs WHERE id=?", (self.unrelated,)

@@ -802,7 +802,9 @@ class Pipeline:
         reuse_recent_open=False,
     ):
         spec = contract_for(api)
-        if spec.get("group") == "global" and spec.get("pagination"):
+        if spec.get("pagination") and (
+            spec.get("group") == "global" or spec.get("pagination_live_verified")
+        ):
             params = dict(params)
             pagination = spec["pagination"]
             params.setdefault(pagination["limit_param"], pagination["page_size"])

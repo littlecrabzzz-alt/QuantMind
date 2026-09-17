@@ -163,15 +163,32 @@ RESEARCH_EXTRA_CONTRACTS["fina_mainbz"].update(
 # quarterly batch tool, not by the stock/window research-extra planner above.
 FINA_MAINBZ_VIP_CONTRACT = {
     **RESEARCH_EXTRA_CONTRACTS["fina_mainbz"],
-    "input_fields": ["period", "type"],
+    "input_fields": ["period", "type", "offset", "limit"],
+    "row_cap": 10000,
+    "documented_row_cap": None,
     "minimum_points": 5000,
     "dependencies": [],
     "split": False,
     "row_cap_verified": True,
+    "pagination": {
+        "offset_param": "offset",
+        "limit_param": "limit",
+        "page_size": 10000,
+    },
+    "pagination_live_verified": {
+        "verified_at": "2026-09-17",
+        "account_scope": "current_archive_account",
+        "period": "20260630",
+        "type": "P",
+        "verified_full_offsets": [0, 10000, 20000],
+        "verified_terminal_offset": 999999,
+        "page_size": 10000,
+    },
     "catalog_api": "fina_mainbz_vip",
     "dataset_identity": "fina_mainbz",
-    "parameter_note": "Exact period=quarter end and type=P product, D region, I industry. The VIP endpoint returns all companies for that request; do not add ts_code, start_date, end_date, offset, page or limit.",
-    "pagination_gap": "The reviewed input table documents no offset/page/limit. A 100-row response for one period/type is a terminal saturated request and remains an explicit completeness gap.",
+    "parameter_note": "Exact period=quarter end and type=P product, D region, I industry. The official page does not list paging inputs, but this account returned disjoint 10000-row pages for offset=0/10000 and accepted offset=20000; use the live-verified offset/limit path without ts_code/start_date/end_date/page.",
+    "cap_note": "The official VIP page does not publish a row cap. The current archive account returned 10000 rows at limit=10000 for offsets 0, 10000 and 20000 on 2026-09-17; 10000 is the live-verified operational page size, not a universal documented cap.",
+    "pagination_gap": None,
     "history_scope_note": "Official earliest history is unspecified. Exact quarterly requests do not prove earlier periods complete.",
     "revision_note": "Output end_date is report period. No announcement timestamp is supplied, so known_at and PIT availability remain unverified.",
 }
@@ -196,12 +213,6 @@ def fina_mainbz_vip_prerequisites(identifiers=None, config=None):
         {
             "api_name": "fina_mainbz_vip",
             "dependencies": [],
-            "reason": "pagination_gap",
-            "detail": FINA_MAINBZ_VIP_CONTRACT["pagination_gap"],
-        },
-        {
-            "api_name": "fina_mainbz_vip",
-            "dependencies": [],
             "reason": "pit_unverified",
             "detail": FINA_MAINBZ_VIP_CONTRACT["revision_note"],
         },
@@ -209,7 +220,7 @@ def fina_mainbz_vip_prerequisites(identifiers=None, config=None):
 
 
 def iter_fina_mainbz_vip_jobs(config, today, identifiers=None):
-    """Plan exact quarter/type requests without inventing paging dimensions."""
+    """Plan exact quarter/type roots; runtime appends live-verified paging."""
     del identifiers
     if isinstance(today, datetime):
         today = today.date()

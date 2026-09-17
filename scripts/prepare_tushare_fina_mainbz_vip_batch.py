@@ -48,9 +48,10 @@ BOUNDARIES = {
     "pit_verified": False,
     "history_completeness_verified": False,
     "empty_response_proves_absence": False,
-    "row_cap": 100,
+    "row_cap": 10000,
     "offset_page_limit_documented": False,
-    "saturated_exact_request_is_terminal_gap": True,
+    "offset_page_limit_live_verified": True,
+    "saturated_exact_request_is_terminal_gap": False,
 }
 
 
@@ -175,13 +176,14 @@ def _validate_record(record):
         }
         or job.get("api_name") != API
         or job.get("fields") != EXPECTED_FIELDS
-        or job.get("row_cap") != 100
+        or job.get("row_cap") != 10000
         or job.get("required_fields") != ["ts_code", "end_date", "bz_item"]
         or job.get("nullable_fields")
         != ["bz_code", "bz_sales", "bz_profit", "bz_cost", "curr_type", "update_flag"]
         or job.get("positive_fields") != []
         or not isinstance(params, dict)
-        or set(params) != {"period", "type"}
+        or set(params) != {"period", "type", "limit"}
+        or params.get("limit") != 10000
         or params.get("type") not in TYPES
         or DAY_RE.fullmatch(str(params.get("period", ""))) is None
         or params["period"][4:] not in ("0331", "0630", "0930", "1231")

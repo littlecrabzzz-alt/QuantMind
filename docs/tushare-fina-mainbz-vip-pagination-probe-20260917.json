@@ -1,0 +1,49 @@
+{
+  "api_name": "fina_mainbz_vip",
+  "evidence_scope": "current_archive_account",
+  "fields_sha256": "bc4cb81d44b6111dfd93b8574dcf3cb21eb8f28ec21591671bd8b10cb7db011c",
+  "official_document": "https://tushare.pro/document/2?doc_id=81",
+  "official_paging_parameters_documented": false,
+  "period": "20260630",
+  "probe_date": "2026-09-17",
+  "requests": [
+    {
+      "api_code": 0,
+      "http_status": 200,
+      "limit": 10000,
+      "offset": 0,
+      "page_rows_sha256": "7753bc2124b954deee3bd30690b899d43812c40535e752da30c66fd311de53f7",
+      "row_count": 10000,
+      "unique_exact_rows": 10000
+    },
+    {
+      "api_code": 0,
+      "exact_row_overlap_with_offset_0": 0,
+      "http_status": 200,
+      "limit": 10000,
+      "offset": 10000,
+      "page_rows_sha256": "7b3dc9d5e428b5c3b26e267d3b523fe402ed47515c505884a7245683138ca128",
+      "row_count": 10000,
+      "unique_exact_rows": 10000
+    },
+    {
+      "api_code": 0,
+      "http_status": 200,
+      "limit": 10000,
+      "offset": 20000,
+      "page_rows_sha256": "ff8aded8dbe5f38e42f86693d9aaa9f54e8307f31ccd1b306fe7c33b42f4eacc",
+      "row_count": 10000,
+      "unique_exact_rows": 10000
+    },
+    {
+      "api_code": 50101,
+      "http_status": 200,
+      "limit": 10000,
+      "offset": 999999,
+      "row_count": 0
+    }
+  ],
+  "token_or_raw_rows_stored": false,
+  "type": "P",
+  "verification": "offset/limit accepted; first two full pages are disjoint; large offset returns the supplier empty response used by the runtime terminal rule"
+}
