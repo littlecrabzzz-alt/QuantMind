@@ -155,12 +155,6 @@ TEXT_CONTRACTS["anns_d"].update(
     saturation_history_only=True,
     recent_epoch_granularity="day",
 )
-TEXT_CONTRACTS["npr"].update(
-    saturation_partition_axes=[
-        {"param": "ptype", "values": [], "value_kind": "supplier_text"},
-    ],
-    recover_legacy_blocked_observed_fanout=True,
-)
 for _api in ("irm_qa_sh", "irm_qa_sz"):
     TEXT_CONTRACTS[_api].update(
         saturation_fallback="stocks",
@@ -239,7 +233,6 @@ TEXT_CONTRACT_NOTES = {
         "hidden_fields": ["url", "content_html"],
         "source_status": "omit org and ptype to cover all; docs only give partial category examples",
         "coverage_gaps": [
-            "a capped terminal time window fans out through ptype values observed in the retained parent; the roughly 110 policy types are not published as a closed machine-readable universe",
             "HTML may contain linked attachments that need independent discovery"
         ],
     },
