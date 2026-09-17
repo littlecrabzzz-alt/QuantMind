@@ -150,7 +150,7 @@ RESEARCH_EXTRA_CONTRACTS["fina_mainbz"].update(
     split_axis="report_period",
     date_field="end_date",
     types=["P", "D", "I"],
-    parameter_note="Required ts_code; type=P product, D region, I industry. start_date/end_date bound report periods, not announcements. Separate fina_mainbz_vip is documented at 5000 points but is outside this six-API implementation.",
+    parameter_note="Required ts_code; type=P product, D region, I industry. start_date/end_date bound report periods, not announcements. Separate fina_mainbz_vip is a 5000-point all-market runtime contract.",
     request_identity_fields=["type"],
     row_identity_note="Keep bz_code, bz_item and curr_type in identity plus raw-row identity. Parent must retain request type in provenance/identity when bz_code is missing; do not merge indistinguishable P/D/I payloads across requests.",
     refresh_cadence="weekly",

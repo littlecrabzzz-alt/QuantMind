@@ -1479,6 +1479,200 @@ class Pipeline:
             "protected_shared_jobs": protected,
         }
 
+    def compact_fina_mainbz_vip_coverage(self):
+        """Retire full-year stock jobs only after four VIP chains are complete."""
+        rows = self.db.execute(
+            "SELECT id,state,job,result FROM jobs INDEXED BY jobs_partition_lookup "
+            "WHERE epoch='history' "
+            "AND json_extract(job,'$.api_name')='fina_mainbz_vip' "
+            "AND json_extract(job,'$.params.limit')=10000"
+        ).fetchall()
+        chains, fields, invalid = {}, set(), 0
+        for row in rows:
+            try:
+                job = json.loads(row["job"])
+                params = job["params"]
+                period, kind = params["period"], params["type"]
+                offset = params.get("offset", 0)
+                expected = {"period", "type", "limit"} | (
+                    {"offset"} if "offset" in params else set()
+                )
+                parsed = datetime.strptime(period, "%Y%m%d").date()
+                if (
+                    set(params) != expected
+                    or params["limit"] != 10000
+                    or kind not in ("P", "D", "I")
+                    or (parsed.month, parsed.day)
+                    not in ((3, 31), (6, 30), (9, 30), (12, 31))
+                    or isinstance(offset, bool)
+                    or not isinstance(offset, int)
+                    or offset < 0
+                    or offset % 10000
+                ):
+                    raise ValueError
+                key = (period, kind, offset)
+                if key in chains:
+                    chains[key] = None
+                    invalid += 1
+                    continue
+                chains[key] = row
+                fields.add(job["fields"])
+            except (KeyError, TypeError, ValueError):
+                invalid += 1
+
+        complete, open_chains, empty_roots = set(), 0, 0
+        roots = {(period, kind) for period, kind, offset in chains if offset == 0}
+        invalid += sum(
+            offset > 0 and (period, kind, 0) not in chains
+            for period, kind, offset in chains
+        )
+        for period, kind in roots:
+            offset = 0
+            while True:
+                row = chains.get((period, kind, offset))
+                if row is None or row["state"] != "done" or not row["result"]:
+                    if offset == 0 and row is not None and row["state"] == "empty":
+                        empty_roots += 1
+                    open_chains += 1
+                    break
+                try:
+                    result = json.loads(row["result"])
+                    count = result["row_count"]
+                except (KeyError, TypeError, ValueError):
+                    invalid += 1
+                    open_chains += 1
+                    break
+                if (
+                    isinstance(count, bool)
+                    or not isinstance(count, int)
+                    or not 0 <= count <= 10000
+                ):
+                    invalid += 1
+                    open_chains += 1
+                    break
+                if count == 10000:
+                    offset += 10000
+                    continue
+                if any(
+                    saved_period == period
+                    and saved_kind == kind
+                    and saved_offset > offset
+                    for saved_period, saved_kind, saved_offset in chains
+                ):
+                    invalid += 1
+                    open_chains += 1
+                    break
+                complete.add((period, kind))
+                break
+
+        covered_year_types = []
+        years = {period[:4] for period, _kind in complete}
+        for year in sorted(years):
+            for kind in ("P", "D", "I"):
+                required = {
+                    (year + suffix, kind) for suffix in ("0331", "0630", "0930", "1231")
+                }
+                if required <= complete:
+                    covered_year_types.append((year, kind))
+
+        report = {
+            "status": "no_complete_years",
+            "vip_pages": len(rows),
+            "vip_complete_period_types": len(complete),
+            "vip_open_or_empty_chains": open_chains,
+            "vip_empty_roots": empty_roots,
+            "vip_invalid_pages": invalid,
+            "vip_field_schemas": len(fields),
+            "covered_year_types": len(covered_year_types),
+            "superseded_open_jobs": 0,
+            "recent_jobs_action": "unchanged",
+            "terminal_jobs_action": "unchanged",
+        }
+        if invalid or len(fields) != 1:
+            report["status"] = "blocked_invariant"
+            return report
+        if not covered_year_types:
+            return report
+
+        attempts = self.db.execute("SELECT count(*) FROM attempts").fetchone()[0]
+        result_jobs = self.db.execute(
+            "SELECT count(*) FROM jobs WHERE result IS NOT NULL"
+        ).fetchone()[0]
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
+            self.db.execute(
+                "CREATE TEMP TABLE fina_mainbz_vip_year_coverage("
+                "year TEXT NOT NULL,kind TEXT NOT NULL,PRIMARY KEY(year,kind)) "
+                "WITHOUT ROWID"
+            )
+            self.db.executemany(
+                "INSERT INTO fina_mainbz_vip_year_coverage VALUES(?,?)",
+                covered_year_types,
+            )
+            self.db.execute(
+                "CREATE TEMP TABLE fina_mainbz_vip_retire(id TEXT PRIMARY KEY) "
+                "WITHOUT ROWID"
+            )
+            self.db.execute(
+                "INSERT INTO fina_mainbz_vip_retire "
+                "SELECT job.id FROM jobs AS job INDEXED BY jobs_ready_api_history "
+                "JOIN fina_mainbz_vip_year_coverage AS coverage "
+                "ON coverage.year=substr(json_extract(job.job,'$.params.end_date'),1,4) "
+                "AND coverage.kind=json_extract(job.job,'$.params.type') "
+                "WHERE job.state='pending' AND job.group_name='research_extra' "
+                "AND job.epoch='history' "
+                "AND json_extract(job.job,'$.api_name')='fina_mainbz' "
+                "AND json_extract(job.job,'$.row_cap')=100 "
+                "AND json_extract(job.job,'$.fields')=? "
+                "AND (SELECT count(*) FROM json_each(job.job,'$.params'))=4 "
+                "AND json_type(job.job,'$.params.ts_code')='text' "
+                "AND json_extract(job.job,'$.params.start_date')=coverage.year||'0101' "
+                "AND json_extract(job.job,'$.params.end_date')=coverage.year||'1231'",
+                (next(iter(fields)),),
+            )
+            protected = self.db.execute(
+                "DELETE FROM fina_mainbz_vip_retire WHERE id IN ("
+                "SELECT edge.child_id FROM partition_children AS edge "
+                "JOIN jobs AS parent ON parent.id=edge.parent_id "
+                "WHERE parent.state='split_pending')"
+            ).rowcount
+            retired_attempts = self.db.execute(
+                "SELECT count(*) FROM attempts WHERE job_id IN "
+                "(SELECT id FROM fina_mainbz_vip_retire)"
+            ).fetchone()[0]
+            superseded = self.db.execute(
+                "UPDATE jobs SET state='superseded' WHERE state='pending' "
+                "AND id IN (SELECT id FROM fina_mainbz_vip_retire)"
+            ).rowcount
+            if (
+                self.db.execute("SELECT count(*) FROM attempts").fetchone()[0]
+                != attempts
+            ):
+                raise ValueError(
+                    "Attempt ledger changed during VIP coverage compaction"
+                )
+            if (
+                self.db.execute(
+                    "SELECT count(*) FROM jobs WHERE result IS NOT NULL"
+                ).fetchone()[0]
+                != result_jobs
+            ):
+                raise ValueError("Result jobs changed during VIP coverage compaction")
+            self.db.commit()
+        except BaseException:
+            self.db.rollback()
+            raise
+        finally:
+            self.db.execute("DROP TABLE IF EXISTS fina_mainbz_vip_retire")
+            self.db.execute("DROP TABLE IF EXISTS fina_mainbz_vip_year_coverage")
+        report.update(
+            status="compacted" if superseded else "no_covered_open_jobs",
+            superseded_open_jobs=superseded,
+            protected_shared_jobs=protected,
+            retired_job_attempts_preserved=retired_attempts,
+        )
+        return report
+
     def _load_identifier_cache(self):
         row = self.db.execute(
             "SELECT * FROM identifier_discovery_cache WHERE version=?",
@@ -4874,6 +5068,10 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                             pipeline.compact_stale_recent_roots(
                                 today.strftime("%Y%m%d")
                             )
+                        )
+                    with measure("fina_mainbz_vip_compaction"):
+                        report["fina_mainbz_vip_compaction"] = (
+                            pipeline.compact_fina_mainbz_vip_coverage()
                         )
                     if planning_interval:
                         # Do not checkpoint partial initialize/planning work on any
