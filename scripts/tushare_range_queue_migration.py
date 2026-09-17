@@ -31,6 +31,15 @@ from backend.shared.tushare_supplement_contracts import (  # noqa: E402
 SUPPORTED = ("moneyflow_dc", "dc_member")
 OPEN = ("pending", "split_pending")
 GAP = RANGE_REPLACEMENT_GAP
+REPLACEMENT_ID_FIELDS = {"moneyflow_dc": "ts_code", "dc_member": "con_code"}
+USABLE_REPLACEMENT_STATES = {
+    "pending",
+    "split_pending",
+    "done",
+    "empty",
+    "quality",
+    "resolved",
+}
 
 
 def _encoded(value):
@@ -91,12 +100,32 @@ def _count(db, sql, params=()):
     return db.execute(sql, params).fetchone()[0]
 
 
-def repair_reconciled_gaps(pipeline, expected_total, *, apply=False):
+def repair_reconciled_gaps(
+    pipeline,
+    expected_total,
+    *,
+    expected_retired_edges=0,
+    replacement_counts=None,
+    apply=False,
+):
     """Restore the durable range-replacement marker after legacy reconciliation."""
-    if isinstance(expected_total, bool) or not isinstance(expected_total, int):
-        raise ValueError("Expected replacement parent count must be an integer")
-    if expected_total < 0:
-        raise ValueError("Expected replacement parent count cannot be negative")
+    for value, label in (
+        (expected_total, "replacement parent"),
+        (expected_retired_edges, "retired edge"),
+    ):
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"Expected {label} count must be an integer")
+        if value < 0:
+            raise ValueError(f"Expected {label} count cannot be negative")
+    replacement_counts = {} if replacement_counts is None else replacement_counts
+    if not isinstance(replacement_counts, dict) or any(
+        api not in SUPPORTED
+        or isinstance(count, bool)
+        or not isinstance(count, int)
+        or count < 1
+        for api, count in replacement_counts.items()
+    ):
+        raise ValueError("Invalid replacement inventory counts")
     db = pipeline.db
     rows = db.execute("""
         SELECT split.parent_id,parent.state,parent.tries,parent.result,
@@ -111,7 +140,9 @@ def repair_reconciled_gaps(pipeline, expected_total, *, apply=False):
           AND split.coverage_proven=0
           AND NOT EXISTS (
               SELECT 1 FROM partition_children AS edge
+              LEFT JOIN jobs AS child ON child.id=edge.child_id
               WHERE edge.parent_id=split.parent_id
+                AND COALESCE(child.state,'')<>'superseded'
           )
         ORDER BY split.parent_id
     """).fetchall()
@@ -121,26 +152,135 @@ def repair_reconciled_gaps(pipeline, expected_total, *, apply=False):
         )
     ids = [row["parent_id"] for row in rows]
     placeholders = ",".join("?" for _ in ids)
+    child_rows = (
+        db.execute(
+            f"SELECT edge.parent_id,child.* FROM partition_children AS edge "
+            f"JOIN jobs AS child ON child.id=edge.child_id "
+            f"WHERE edge.parent_id IN ({placeholders}) ORDER BY edge.parent_id,child.id",
+            ids,
+        ).fetchall()
+        if ids
+        else []
+    )
+    children_by_parent = {parent_id: [] for parent_id in ids}
+    for child in child_rows:
+        if child["state"] != "superseded":
+            raise ValueError("Replacement parent still has a live child")
+        children_by_parent[child["parent_id"]].append(child)
+    inventories = {}
+    effective_retired_edges = 0
+    for row in rows:
+        evidence = json.loads(row["evidence"])
+        children = children_by_parent[row["parent_id"]]
+        recorded_edges = evidence.get("retired_child_edges", 0)
+        if (
+            isinstance(recorded_edges, bool)
+            or not isinstance(recorded_edges, int)
+            or recorded_edges < 0
+            or children and recorded_edges
+        ):
+            raise ValueError("Conflicting retired child evidence")
+        retired_edges = len(children) or recorded_edges
+        effective_retired_edges += retired_edges
+        if not retired_edges:
+            continue
+        job = json.loads(
+            db.execute(
+                "SELECT job FROM jobs WHERE id=?", (row["parent_id"],)
+            ).fetchone()[0]
+        )
+        api = job["api_name"]
+        trade_date = job["params"].get("trade_date")
+        expected = replacement_counts.get(api)
+        if expected is None or not isinstance(trade_date, str):
+            raise ValueError("Retired children require reviewed replacement coverage")
+        key = (api, trade_date)
+        if key in inventories:
+            continue
+        identity_field = REPLACEMENT_ID_FIELDS[api]
+        replacements = db.execute(
+            "SELECT id,state,job FROM jobs INDEXED BY jobs_partition_lookup "
+            "WHERE epoch='history' AND json_extract(job,'$.api_name')=? "
+            "AND json_extract(job,'$.params.start_date')<=? "
+            "AND json_extract(job,'$.params.end_date')>=?",
+            (api, trade_date, trade_date),
+        ).fetchall()
+        codes = set()
+        states = {}
+        parent_contract = {key: value for key, value in job.items() if key != "params"}
+        replacement_ids = []
+        for replacement in replacements:
+            replacement_job = json.loads(replacement["job"])
+            params = replacement_job.get("params")
+            if (
+                not isinstance(params, dict)
+                or set(params) != {identity_field, "start_date", "end_date"}
+                or not isinstance(params[identity_field], str)
+                or {
+                    key: value
+                    for key, value in replacement_job.items()
+                    if key != "params"
+                }
+                != parent_contract
+                or replacement["state"] not in USABLE_REPLACEMENT_STATES
+            ):
+                raise ValueError("Replacement range does not match reviewed contract")
+            codes.add(params[identity_field])
+            states[replacement["state"]] = states.get(replacement["state"], 0) + 1
+            replacement_ids.append(replacement["id"])
+        if len(replacements) != expected or len(codes) != expected:
+            raise ValueError(
+                f"Expected {expected} unique {api} replacements, found "
+                f"{len(replacements)} jobs and {len(codes)} codes"
+            )
+        replacement_placeholders = ",".join("?" for _ in replacement_ids)
+        if db.execute(
+            f"SELECT 1 FROM partition_children WHERE child_id IN "
+            f"({replacement_placeholders}) LIMIT 1",
+            replacement_ids,
+        ).fetchone():
+            raise ValueError("Replacement ranges must be independent roots")
+        inventories[key] = {
+            "api": api,
+            "trade_date": trade_date,
+            "identity_field": identity_field,
+            "jobs": len(replacements),
+            "codes": len(codes),
+            "states": dict(sorted(states.items())),
+        }
+    if effective_retired_edges != expected_retired_edges:
+        raise ValueError(
+            f"Expected {expected_retired_edges} retired child edges, found "
+            f"{effective_retired_edges}"
+        )
     before_jobs = {
         row["parent_id"]: (row["state"], row["tries"], row["result"])
         for row in rows
     }
+    protected_ids = ids + [child["id"] for child in child_rows]
+    protected_placeholders = ",".join("?" for _ in protected_ids)
+    before_children = {
+        child["id"]: (child["state"], child["tries"], child["result"])
+        for child in child_rows
+    }
     before_attempts = (
         dict(
             db.execute(
-                f"SELECT job_id,count(*) FROM attempts WHERE job_id IN ({placeholders}) "
+                f"SELECT job_id,count(*) FROM attempts WHERE job_id IN ({protected_placeholders}) "
                 "GROUP BY job_id",
-                ids,
+                protected_ids,
             )
         )
-        if ids
+        if protected_ids
         else {}
     )
     changed = 0
+    removed_edges = 0
     try:
         db.execute("BEGIN IMMEDIATE")
         for row in rows:
             evidence = json.loads(row["evidence"])
+            children = children_by_parent[row["parent_id"]]
             marker = evidence.get("replacement_gap")
             if marker not in (None, GAP):
                 raise ValueError("Conflicting replacement gap marker")
@@ -149,12 +289,39 @@ def repair_reconciled_gaps(pipeline, expected_total, *, apply=False):
             )
             if needs_update:
                 evidence["replacement_gap"] = GAP
+                if children:
+                    job = json.loads(
+                        db.execute(
+                            "SELECT job FROM jobs WHERE id=?", (row["parent_id"],)
+                        ).fetchone()[0]
+                    )
+                    api = job["api_name"]
+                    trade_date = job["params"]["trade_date"]
+                    inventory = inventories[(api, trade_date)]
+                    evidence.update(
+                        {
+                            "replacement_epoch": "history",
+                            "replacement_identity_field": inventory["identity_field"],
+                            "replacement_jobs": inventory["jobs"],
+                            "replacement_trade_date": trade_date,
+                            "retired_child_edges": len(children),
+                        }
+                    )
                 db.execute(
                     "UPDATE partition_splits SET evidence=?,status='blocked',gap=? "
                     "WHERE parent_id=?",
                     (json.dumps(evidence, sort_keys=True), GAP, row["parent_id"]),
                 )
                 changed += 1
+            elif children:
+                raise ValueError("Retired child evidence is not idempotent")
+        if child_rows:
+            removed_edges = db.execute(
+                f"DELETE FROM partition_children WHERE parent_id IN ({placeholders})",
+                ids,
+            ).rowcount
+            if removed_edges != len(child_rows):
+                raise ValueError("Retired child edge count changed")
         after_jobs = {
             row["id"]: (row["state"], row["tries"], row["result"])
             for row in db.execute(
@@ -165,15 +332,31 @@ def repair_reconciled_gaps(pipeline, expected_total, *, apply=False):
         after_attempts = (
             dict(
                 db.execute(
-                    f"SELECT job_id,count(*) FROM attempts WHERE job_id IN ({placeholders}) "
+                    f"SELECT job_id,count(*) FROM attempts WHERE job_id IN ({protected_placeholders}) "
                     "GROUP BY job_id",
-                    ids,
+                    protected_ids,
                 )
             )
-            if ids
+            if protected_ids
             else {}
         )
-        if after_jobs != before_jobs or after_attempts != before_attempts:
+        after_children = (
+            {
+                child["id"]: (child["state"], child["tries"], child["result"])
+                for child in db.execute(
+                    f"SELECT id,state,tries,result FROM jobs WHERE id IN "
+                    f"({','.join('?' for _ in before_children)})",
+                    list(before_children),
+                )
+            }
+            if before_children
+            else {}
+        )
+        if (
+            after_jobs != before_jobs
+            or after_children != before_children
+            or after_attempts != before_attempts
+        ):
             raise ValueError("Range replacement source evidence changed")
         if apply:
             db.commit()
@@ -183,9 +366,18 @@ def repair_reconciled_gaps(pipeline, expected_total, *, apply=False):
         db.rollback()
         raise
     return {
-        "status": "applied" if apply and changed else "no_action" if apply else "planned_rollback",
+        "status": (
+            "applied"
+            if apply and (changed or removed_edges)
+            else "no_action"
+            if apply
+            else "planned_rollback"
+        ),
         "replacement_parents": len(rows),
         "restored_markers": changed,
+        "removed_retired_child_edges": removed_edges,
+        "retired_child_edges": effective_retired_edges,
+        "replacement_inventories": list(inventories.values()),
         "preserved_result_jobs": sum(row["result"] is not None for row in rows),
         "preserved_attempts": sum(before_attempts.values()),
         "upstream_calls": 0,

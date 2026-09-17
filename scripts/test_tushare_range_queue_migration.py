@@ -265,6 +265,114 @@ class RangeQueueMigration(unittest.TestCase):
             )
         self.assertEqual(self.contents(), before)
 
+    def test_repair_retires_only_superseded_children_with_range_proof(self):
+        day = "20260908"
+        parent = self.pipeline.enqueue("dc_member", {"trade_date": day}, epoch="old")
+        children = [
+            self.pipeline.enqueue(
+                "dc_member", {"trade_date": day, "ts_code": code}, epoch="old"
+            )
+            for code in ("BK0001.DC", "BK0002.DC")
+        ]
+        self.pipeline.record_partition(
+            parent,
+            children,
+            "identifier_fanout",
+            False,
+            {"origin": "v4", "universe_complete": False},
+        )
+        result = json.dumps(
+            {
+                "api_name": "dc_member",
+                "status": "possibly_truncated",
+                "row_count": 8000,
+            },
+            sort_keys=True,
+        )
+        self.pipeline.db.execute(
+            "UPDATE jobs SET state='blocked',tries=1,result=? WHERE id=?",
+            (result, parent),
+        )
+        self.pipeline.db.execute(
+            "INSERT INTO attempts VALUES(?,?,?)", (parent, 1, result)
+        )
+        self.pipeline.db.executemany(
+            "UPDATE jobs SET state='superseded' WHERE id=?",
+            [(child,) for child in children],
+        )
+        for code in self.codes:
+            self.pipeline.enqueue(
+                "dc_member",
+                {
+                    "con_code": code,
+                    "start_date": "20260701",
+                    "end_date": "20260910",
+                },
+                epoch="history",
+            )
+        self.pipeline.db.commit()
+        before = self.contents()
+        with self.assertRaisesRegex(ValueError, "reviewed replacement coverage"):
+            migration.repair_reconciled_gaps(
+                self.pipeline, 1, expected_retired_edges=2, apply=True
+            )
+        self.assertEqual(self.contents(), before)
+        dry_run = migration.repair_reconciled_gaps(
+            self.pipeline,
+            1,
+            expected_retired_edges=2,
+            replacement_counts={"dc_member": 2},
+        )
+        self.assertEqual(dry_run["status"], "planned_rollback")
+        self.assertEqual(dry_run["retired_child_edges"], 2)
+        self.assertEqual(self.contents(), before)
+        report = migration.repair_reconciled_gaps(
+            self.pipeline,
+            1,
+            expected_retired_edges=2,
+            replacement_counts={"dc_member": 2},
+            apply=True,
+        )
+        self.assertEqual(report["status"], "applied")
+        self.assertEqual(report["removed_retired_child_edges"], 2)
+        self.assertEqual(report["preserved_result_jobs"], 1)
+        self.assertEqual(report["preserved_attempts"], 1)
+        self.assertFalse(
+            self.pipeline.db.execute(
+                "SELECT 1 FROM partition_children WHERE parent_id=?", (parent,)
+            ).fetchone()
+        )
+        parent_row = self.pipeline.db.execute(
+            "SELECT state,tries,result FROM jobs WHERE id=?", (parent,)
+        ).fetchone()
+        self.assertEqual(tuple(parent_row), ("blocked", 1, result))
+        self.assertEqual(
+            dict(
+                self.pipeline.db.execute(
+                    "SELECT id,state FROM jobs WHERE id IN (?,?)", children
+                )
+            ),
+            dict.fromkeys(children, "superseded"),
+        )
+        self.pipeline.reconcile_partitions(child_id=parent)
+        split = self.pipeline.db.execute(
+            "SELECT status,gap,evidence FROM partition_splits WHERE parent_id=?",
+            (parent,),
+        ).fetchone()
+        self.assertEqual((split["status"], split["gap"]), ("blocked", migration.GAP))
+        evidence = json.loads(split["evidence"])
+        self.assertEqual(evidence["retired_child_edges"], 2)
+        self.assertEqual(evidence["replacement_jobs"], 2)
+        second = migration.repair_reconciled_gaps(
+            self.pipeline,
+            1,
+            expected_retired_edges=2,
+            replacement_counts={"dc_member": 2},
+            apply=True,
+        )
+        self.assertEqual(second["status"], "no_action")
+        self.assertEqual(second["removed_retired_child_edges"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()
