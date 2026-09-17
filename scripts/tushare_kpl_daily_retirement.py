@@ -195,6 +195,9 @@ def migrate(pipeline, config, today, *, apply=False):
             raise ValueError("Attempt ledger changed during KPL queue migration")
         if _count(db, "SELECT count(*) FROM jobs WHERE result IS NOT NULL") != results_before:
             raise ValueError("Result-bearing jobs changed during KPL queue migration")
+        planning_states_reset = db.execute(
+            "DELETE FROM planning_state WHERE name='history:market_sentiment'"
+        ).rowcount
         report = {
             "status": "applied" if apply else "planned_rollback",
             "schema_version": 1,
@@ -208,6 +211,7 @@ def migrate(pipeline, config, today, *, apply=False):
             "candidate_attempts_preserved": candidate_attempts,
             "attempts_preserved": attempts_before,
             "result_jobs_preserved": results_before,
+            "history_planning_states_reset": planning_states_reset,
             "recent_daily_jobs_action": "unchanged",
             "completed_daily_jobs_action": "unchanged",
             "database_quick_check": "required_on_post_commit_consistent_copy",

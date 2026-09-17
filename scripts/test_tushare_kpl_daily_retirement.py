@@ -42,7 +42,13 @@ class KplDailyRetirement(unittest.TestCase):
     def snapshot(self):
         return {
             table: [tuple(row) for row in self.pipeline.db.execute(f"SELECT * FROM {table}")]
-            for table in ("jobs", "attempts", "partition_splits", "partition_children")
+            for table in (
+                "jobs",
+                "attempts",
+                "partition_splits",
+                "partition_children",
+                "planning_state",
+            )
         }
 
     def fixture(self):
@@ -63,6 +69,10 @@ class KplDailyRetirement(unittest.TestCase):
         child = self.enqueue(
             {"trade_date": "20260101", "tag": "涨停", "ts_code": "000001.SZ"}
         )
+        self.pipeline.db.execute(
+            "INSERT INTO planning_state(name,anchor,signature,offset,done) "
+            "VALUES('history:market_sentiment','old','{}',99,0)"
+        )
         self.pipeline.db.commit()
         return first, second, completed, recent, child
 
@@ -75,6 +85,7 @@ class KplDailyRetirement(unittest.TestCase):
         self.assertEqual(report["inserted_range_jobs"], 5)
         self.assertEqual(report["covered_history_days"], 2)
         self.assertEqual(report["candidate_attempts_preserved"], 1)
+        self.assertEqual(report["history_planning_states_reset"], 1)
         self.assertEqual(self.snapshot(), before)
 
     def test_apply_retires_only_covered_open_roots(self):
@@ -93,6 +104,12 @@ class KplDailyRetirement(unittest.TestCase):
         self.assertEqual(states[completed], "done")
         self.assertEqual(states[recent], "pending")
         self.assertEqual(states[child], "pending")
+        self.assertIsNone(
+            self.pipeline.db.execute(
+                "SELECT 1 FROM planning_state "
+                "WHERE name='history:market_sentiment'"
+            ).fetchone()
+        )
         ranges = [
             json.loads(row[0])["params"]
             for row in self.pipeline.db.execute(
