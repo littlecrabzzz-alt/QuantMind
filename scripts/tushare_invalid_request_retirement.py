@@ -97,6 +97,7 @@ def _candidate(row, api):
     return {
         "job_id": row["id"],
         "api": api,
+        "epoch": row["epoch"],
         "start": start,
         "end": end,
         "fields": fields,
@@ -110,9 +111,9 @@ def _candidates(db):
     for api in SUPPORTED:
         group = contract_for(api).get("group", "rrg")
         rows = db.execute(
-            "SELECT id,job,result FROM jobs INDEXED BY jobs_partition_lookup "
-            "WHERE epoch='history' AND json_extract(job,'$.api_name')=? "
-            "AND state='blocked' AND group_name=? ORDER BY rowid",
+            "SELECT id,epoch,job,result FROM jobs INDEXED BY jobs_pending "
+            "WHERE state='blocked' AND json_extract(job,'$.api_name')=? "
+            "AND group_name=? ORDER BY rowid",
             (api, group),
         )
         for row in rows:
@@ -122,28 +123,29 @@ def _candidates(db):
     return candidates
 
 
-def _factor_replacements(db):
+def _factor_replacements(db, epochs):
     replacements = {}
     placeholders = ",".join("?" for _ in USABLE_REPLACEMENT_STATES)
     for api in FACTOR_APIS:
-        rows = db.execute(
-            "SELECT id,job,state FROM jobs INDEXED BY jobs_partition_lookup "
-            "WHERE epoch='history' AND json_extract(job,'$.api_name')=? "
-            f"AND state IN ({placeholders}) ORDER BY rowid",
-            (api, *USABLE_REPLACEMENT_STATES),
-        )
-        for row in rows:
-            job = json.loads(row["job"])
-            params = job.get("params")
-            if not isinstance(params, dict) or set(params) != {"trade_date"}:
-                continue
-            key = (
-                api,
-                _day(params["trade_date"]),
-                job.get("fields"),
-                job.get("row_cap"),
+        for epoch in epochs:
+            rows = db.execute(
+                "SELECT id,job,state FROM jobs INDEXED BY jobs_partition_lookup "
+                "WHERE epoch=? AND json_extract(job,'$.api_name')=? "
+                f"AND state IN ({placeholders}) ORDER BY rowid",
+                (epoch, api, *USABLE_REPLACEMENT_STATES),
             )
-            replacements.setdefault(key, row["id"])
+            for row in rows:
+                job = json.loads(row["job"])
+                params = job.get("params")
+                if not isinstance(params, dict) or set(params) != {"trade_date"}:
+                    continue
+                key = (
+                    api,
+                    _day(params["trade_date"]),
+                    job.get("fields"),
+                    job.get("row_cap"),
+                )
+                replacements.setdefault(key, row["id"])
     return replacements
 
 
@@ -160,35 +162,36 @@ def _merge_intervals(intervals):
     )
 
 
-def _futures_replacements(db):
+def _futures_replacements(db, epochs):
     documented = set(FUT_INDEX_DAILY_DOCUMENTED_CODES)
     by_key = {}
     job_ids = set()
     placeholders = ",".join("?" for _ in USABLE_REPLACEMENT_STATES)
-    rows = db.execute(
-        "SELECT id,job,state FROM jobs INDEXED BY jobs_partition_lookup "
-        "WHERE epoch='history' AND json_extract(job,'$.api_name')=? "
-        f"AND state IN ({placeholders}) ORDER BY rowid",
-        (FUTURES_API, *USABLE_REPLACEMENT_STATES),
-    )
-    for row in rows:
-        job = json.loads(row["job"])
-        params = job.get("params")
-        if not isinstance(params, dict) or set(params) != {
-            "ts_code",
-            "start_date",
-            "end_date",
-        }:
-            continue
-        code = params["ts_code"]
-        if code not in documented:
-            continue
-        start, end = _day(params["start_date"]), _day(params["end_date"])
-        if start > end:
-            raise ValueError("Reversed futures replacement range")
-        key = (code, job.get("fields"), job.get("row_cap"))
-        by_key.setdefault(key, []).append((start, end))
-        job_ids.add(row["id"])
+    for epoch in epochs:
+        rows = db.execute(
+            "SELECT id,job,state FROM jobs INDEXED BY jobs_partition_lookup "
+            "WHERE epoch=? AND json_extract(job,'$.api_name')=? "
+            f"AND state IN ({placeholders}) ORDER BY rowid",
+            (epoch, FUTURES_API, *USABLE_REPLACEMENT_STATES),
+        )
+        for row in rows:
+            job = json.loads(row["job"])
+            params = job.get("params")
+            if not isinstance(params, dict) or set(params) != {
+                "ts_code",
+                "start_date",
+                "end_date",
+            }:
+                continue
+            code = params["ts_code"]
+            if code not in documented:
+                continue
+            start, end = _day(params["start_date"]), _day(params["end_date"])
+            if start > end:
+                raise ValueError("Reversed futures replacement range")
+            key = (code, job.get("fields"), job.get("row_cap"))
+            by_key.setdefault(key, []).append((start, end))
+            job_ids.add(row["id"])
     merged = {key: _merge_intervals(value) for key, value in by_key.items()}
     return merged, job_ids
 
@@ -218,6 +221,9 @@ def migrate(pipeline, *, apply=False):
             "job_id TEXT PRIMARY KEY,api TEXT NOT NULL,kind TEXT NOT NULL) WITHOUT ROWID"
         )
         candidates = _candidates(db)
+        replacement_epochs = sorted(
+            {"history", *(item["epoch"] for item in candidates)}
+        )
         db.executemany(
             "INSERT INTO invalid_request_candidates VALUES(?,?,?)",
             [(item["job_id"], item["api"], item["kind"]) for item in candidates],
@@ -233,8 +239,10 @@ def migrate(pipeline, *, apply=False):
         if active_parent_children:
             raise ValueError("Invalid requests are shared by active split parents")
 
-        factor_replacements = _factor_replacements(db)
-        futures_replacements, futures_job_ids = _futures_replacements(db)
+        factor_replacements = _factor_replacements(db, replacement_epochs)
+        futures_replacements, futures_job_ids = _futures_replacements(
+            db, replacement_epochs
+        )
         missing = []
         required_factor_days = 0
         required_futures_pairs = 0
@@ -330,6 +338,8 @@ def migrate(pipeline, *, apply=False):
             "schema_version": 1,
             "candidate_jobs": len(candidates),
             "candidate_jobs_by_api": per_api,
+            "candidate_epochs": sorted({item["epoch"] for item in candidates}),
+            "replacement_epochs": replacement_epochs,
             "superseded_jobs": superseded,
             "required_factor_day_coverage": required_factor_days,
             "required_futures_code_day_coverage": required_futures_pairs,

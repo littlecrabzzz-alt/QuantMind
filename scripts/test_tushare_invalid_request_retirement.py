@@ -35,14 +35,14 @@ class InvalidRequestRetirement(unittest.TestCase):
             guard.start()
             self.addCleanup(guard.stop)
 
-    def enqueue(self, api, params, *, state="pending"):
-        key = self.pipeline.enqueue(api, params, 55, "history")
+    def enqueue(self, api, params, *, state="pending", epoch="history"):
+        key = self.pipeline.enqueue(api, params, 55, epoch)
         if state != "pending":
             self.pipeline.db.execute("UPDATE jobs SET state=? WHERE id=?", (state, key))
         return key
 
-    def invalid(self, api, params, *, attempted=True):
-        key = self.enqueue(api, params)
+    def invalid(self, api, params, *, attempted=True, epoch="history"):
+        key = self.enqueue(api, params, epoch=epoch)
         result = None
         if attempted:
             result = json.dumps(
@@ -109,7 +109,10 @@ class InvalidRequestRetirement(unittest.TestCase):
             for api in FACTOR_APIS
         }
         invalid["fut_index_daily"] = self.invalid(
-            "fut_index_daily", {"trade_date": "20240229"}, attempted=False
+            "fut_index_daily",
+            {"trade_date": "20240229"},
+            attempted=False,
+            epoch="20240301",
         )
         replacements = {
             api: self.factor_days(api, "20240229")[0] for api in FACTOR_APIS
@@ -135,6 +138,8 @@ class InvalidRequestRetirement(unittest.TestCase):
         self.assertEqual(report["candidate_jobs"], 4)
         self.assertEqual(report["required_factor_day_coverage"], 3)
         self.assertEqual(report["required_futures_code_day_coverage"], 56)
+        self.assertEqual(report["candidate_epochs"], ["20240301", "history"])
+        self.assertEqual(report["replacement_epochs"], ["20240301", "history"])
         self.assertEqual(report["missing_coverage_units"], 0)
         self.assertEqual(self.snapshot(), before)
 
