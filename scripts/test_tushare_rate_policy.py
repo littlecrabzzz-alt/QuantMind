@@ -381,7 +381,11 @@ class DurableQuota(unittest.TestCase):
             count = p.run(
                 client,
                 "synthetic",
-                {**CONFIG, "priority_start": "20200101"},
+                {
+                    **CONFIG,
+                    "priority_start": "20200101",
+                    "acquisition_pipeline_depth": 2,
+                },
                 max_requests=1,
                 max_seconds=2,
                 pause=0,
@@ -392,6 +396,12 @@ class DurableQuota(unittest.TestCase):
             "SELECT state,tries,result FROM jobs WHERE id=?", (jid,)
         ).fetchone()
         self.assertEqual(tuple(row), ("pending", 0, None))
+        self.assertEqual(
+            p.db.execute(
+                "SELECT count(*) FROM jobs WHERE state='inflight'"
+            ).fetchone()[0],
+            0,
+        )
         self.assertIsNone(
             p.db.execute(
                 "SELECT * FROM capability WHERE scope='quota:cyq_perf'"
@@ -418,6 +428,39 @@ class DurableQuota(unittest.TestCase):
         self.assertEqual(p.rate_gate_status["effective_account_rpm"], 300)
         self.assertIsNone(p.next_job(CONFIG, time.monotonic() + 0.01))
         self.assertEqual(p._fair_turn, 1)
+
+    def test_tiered_gate_and_inflight_job_share_one_commit(self):
+        p = pmod.Pipeline(self.root, {"entries": []})
+        p.enqueue("daily", {"trade_date": "20260904"})
+        p.db.commit()
+        row = p.next_job(
+            CONFIG, time.monotonic() + 0.5, mark_inflight=True
+        )
+        self.assertIsNotNone(row)
+        self.assertEqual(
+            p.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (row["id"],)
+            ).fetchone()[0],
+            "inflight",
+        )
+        self.assertEqual(
+            p.db.execute(
+                "SELECT count(*) FROM request_gates "
+                "WHERE scope IN ('account','api:daily')"
+            ).fetchone()[0],
+            2,
+        )
+        p.close()
+
+        recovered = pmod.Pipeline(self.root, {"entries": []})
+        self.addCleanup(recovered.close)
+        self.assertEqual(recovered.recovered_inflight, 1)
+        self.assertEqual(
+            recovered.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (row["id"],)
+            ).fetchone()[0],
+            "pending",
+        )
 
     def test_concurrent_last_reservation_and_transaction_rollback(self):
         from concurrent.futures import ThreadPoolExecutor

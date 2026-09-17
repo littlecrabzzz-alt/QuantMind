@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -198,6 +199,96 @@ class PipelineAcceptance(unittest.TestCase):
             )
             self.assertGreater(report["work_timing"]["seconds"]["capture"], 0)
             pipeline.close()
+
+    def test_depth_two_overlaps_gate_selection_with_one_http_worker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pipeline = Pipeline(root, CATALOG)
+            for epoch in ("first", "second"):
+                pipeline.enqueue(
+                    "fund_adj",
+                    {"trade_date": "20260907", "offset": 0, "limit": 2},
+                    epoch=epoch,
+                )
+            pipeline.db.commit()
+            capture_started = threading.Event()
+            selection_overlapped = threading.Event()
+            original_next_job = pipeline.next_job
+            selections = 0
+
+            def observed_next_job(*args, **kwargs):
+                nonlocal selections
+                selections += 1
+                if selections == 2:
+                    self.assertTrue(capture_started.wait(2))
+                    selection_overlapped.set()
+                return original_next_job(*args, **kwargs)
+
+            def handler(_):
+                capture_started.set()
+                self.assertTrue(selection_overlapped.wait(2))
+                return self.response([1])
+
+            with (
+                patch.object(pipeline, "next_job", side_effect=observed_next_job),
+                httpx.Client(transport=httpx.MockTransport(handler)) as client,
+            ):
+                report = pipeline.run(
+                    client,
+                    "synthetic-token",
+                    {**CONFIG, "acquisition_pipeline_depth": 2},
+                    max_requests=2,
+                    max_seconds=5,
+                    pause=0,
+                )
+
+            self.assertEqual(report["requests"], 2)
+            self.assertEqual(report["acquisition_pipeline"]["depth"], 2)
+            self.assertEqual(report["acquisition_pipeline"]["http_workers"], 1)
+            self.assertEqual(report["acquisition_pipeline"]["queue_high_watermark"], 2)
+            self.assertEqual(
+                pipeline.db.execute(
+                    "SELECT count(*) FROM jobs WHERE state='inflight'"
+                ).fetchone()[0],
+                0,
+            )
+            self.assertEqual(pipeline.status(), {"done": 2})
+            pipeline.close()
+
+    def test_depth_two_inflight_job_recovers_after_restart(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pipeline = Pipeline(root, CATALOG)
+            job_id = pipeline.enqueue("fund_adj", {"trade_date": "20260907"})
+            pipeline.db.execute(
+                "UPDATE jobs SET state='inflight' WHERE id=?", (job_id,)
+            )
+            pipeline.db.commit()
+            pipeline.close()
+
+            recovered = Pipeline(root, CATALOG)
+            self.assertEqual(recovered.recovered_inflight, 1)
+            self.assertEqual(
+                recovered.db.execute(
+                    "SELECT state FROM jobs WHERE id=?", (job_id,)
+                ).fetchone()[0],
+                "pending",
+            )
+            recovered.close()
+
+    def test_acquisition_pipeline_depth_is_bounded(self):
+        for value in (True, 0, 3, "2"):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as tmp:
+                pipeline = Pipeline(Path(tmp), CATALOG)
+                with self.assertRaises(ValueError):
+                    pipeline.run(
+                        object(),
+                        "synthetic-token",
+                        {**CONFIG, "acquisition_pipeline_depth": value},
+                        max_seconds=1,
+                        pause=0,
+                    )
+                pipeline.close()
 
     def test_publication_recovers_retention_interruptions_without_version_loop(self):
         from backend.shared.tushare_archive import retain_release, recover_archive

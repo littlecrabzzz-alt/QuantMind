@@ -17,6 +17,7 @@ import sqlite3
 import stat
 import time
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
@@ -550,6 +551,12 @@ class Pipeline:
                 normalizer_sha256 TEXT NOT NULL,
                 result TEXT NOT NULL)
         """)
+        # A pipelined request is made durable before HTTP. If the process dies
+        # after that reservation, the next owner may safely retry the job; the
+        # account/API gate remains conservative and is never rolled back.
+        self.recovered_inflight = self.db.execute(
+            "UPDATE jobs SET state='pending' WHERE state='inflight'"
+        ).rowcount
         self.db.commit()
         cursor = self.db.execute(
             "SELECT value FROM scheduler_state WHERE name='family_turn'"
@@ -724,7 +731,7 @@ class Pipeline:
                     ]
         return None, []
 
-    def next_job(self, config, deadline, *, task_scope=False):
+    def next_job(self, config, deadline, *, task_scope=False, mark_inflight=False):
         # Preserve legacy structured fallback behavior; extend only enabled families.
         fair_families = {"structured"} | {
             name for name in PLANNERS if name != "rrg" and config.get("enable_" + name)
@@ -769,12 +776,21 @@ class Pipeline:
                     validate_request_shape(json.loads(row["job"]))
                 except ValueError:
                     return row  # run records the gap without a rate/fairness reservation.
-            if checkpoints:
+            if checkpoints or (row and mark_inflight):
                 try:
-                    self.db.executemany(
-                        "INSERT INTO scheduler_state(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
-                        checkpoints,
-                    )
+                    if checkpoints:
+                        self.db.executemany(
+                            "INSERT INTO scheduler_state(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                            checkpoints,
+                        )
+                    if row and mark_inflight:
+                        updated = self.db.execute(
+                            "UPDATE jobs SET state='inflight' "
+                            "WHERE id=? AND state='pending'",
+                            (row["id"],),
+                        ).rowcount
+                        if updated != 1:
+                            raise RuntimeError("Failed to reserve selected job")
                     self.db.commit()
                 except BaseException:
                     self.db.rollback()
@@ -931,6 +947,14 @@ class Pipeline:
                         "INSERT INTO scheduler_state(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
                         checkpoints + [("family_turn", self._fair_turn + 1)],
                     )
+                    if mark_inflight:
+                        updated = self.db.execute(
+                            "UPDATE jobs SET state='inflight' "
+                            "WHERE id=? AND state='pending'",
+                            (row["id"],),
+                        ).rowcount
+                        if updated != 1:
+                            raise RuntimeError("Failed to reserve selected job")
                     self.db.commit()  # reserve before the request, including failures
                 except BaseException:
                     self.db.rollback()
@@ -4491,6 +4515,197 @@ class Pipeline:
         self.db.commit()
         return len(task_ids)
 
+    def _apply_capture_result(
+        self, row, job, result, deadline, work_counts, work_seconds
+    ):
+        if result.get("local_daily_quota"):
+            work_counts["local_quota_deferrals"] += 1
+            daily = result["local_daily_quota"]
+            self.daily_quota_status = daily
+            self.db.execute(
+                "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=MAX(next_at,excluded.next_at)",
+                ("api:" + job["api_name"], daily["retry_at"]),
+            )
+            self.db.execute(
+                "UPDATE jobs SET state='pending' WHERE id=?", (row["id"],)
+            )
+            self.db.commit()
+            # No HTTP, result/tries/attempt rows or inferred supplier quota.
+            return False
+        phase_started = time.perf_counter()
+        status = result["status"]
+        state = "done" if status == "sample_ok" else "quality"
+        if status == "empty_unverified":
+            state = "empty"
+        if status in (
+            "transport_error",
+            "api_error",
+            "invalid_response",
+            "rate_limited",
+        ):
+            state = "blocked" if row["tries"] >= 4 else "pending"
+        if status == "rate_limited":
+            state = "pending"  # A quota wait is not a terminal data failure.
+            scoped = result.get("rate_limit_api") == job["api_name"]
+            scope = "api:" + job["api_name"] if scoped else "account"
+            cooldown = result.get("rate_limit_window_seconds", 60) if scoped else 60
+            self.db.execute(
+                "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=MAX(next_at,excluded.next_at)",
+                (scope, time.time() + cooldown),
+            )
+            if scoped:
+                self.db.execute(
+                    "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,'rate_limit_observed',?,?) ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
+                    (
+                        "quota:" + job["api_name"],
+                        utc_now(),
+                        json.dumps(
+                            {
+                                "window_seconds": cooldown,
+                                "requests": result["rate_limit_requests"],
+                                "interval_seconds": cooldown
+                                / result["rate_limit_requests"],
+                            }
+                        ),
+                    ),
+                )
+        if status in (
+            "sample_ok",
+            "schema_gap",
+            "invalid_values",
+            "possibly_truncated",
+            "empty_unverified",
+        ) and not result.get("supplier_empty_hint"):
+            # An explicit supplier no-data error stops duplicate retries,
+            # but its nonzero business code does not prove API availability.
+            self.db.execute(
+                "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
+                (
+                    job["api_name"] + ":" + str(job["params"].get("src", "")),
+                    "available",
+                    utc_now(),
+                    status,
+                ),
+            )
+        if status == "permission_denied":
+            state = "permission_blocked"
+            scope = job["api_name"] + ":" + str(job["params"].get("src", ""))
+            self.db.execute(
+                "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
+                (
+                    scope,
+                    "permission_denied",
+                    utc_now(),
+                    "upstream_permission_denied",
+                ),
+            )
+            self.db.execute(
+                "UPDATE jobs SET state='permission_blocked' WHERE state='pending' AND id<>? AND json_extract(job,'$.api_name')=? AND COALESCE(json_extract(job,'$.params.src'),'')=?",
+                (row["id"], job["api_name"], str(job["params"].get("src", ""))),
+            )
+        if status == "possibly_truncated":
+            state = "blocked"
+            if self.identifier_split_needs_discovery(
+                job, epoch=row["epoch"]
+            ):
+                # Commit capture/normalization/attempt below before any full
+                # discovery scan. A resumed parent never repeats its HTTP call.
+                result["partition_deferred"] = {
+                    "version": 1,
+                    "kind": "identifier_fanout",
+                }
+                state = "split_pending"
+            else:
+                split = self.split_request(row, job, result)
+                if split:
+                    result["split"] = split
+                    state = "split_pending"
+        pagination = contract_for(job["api_name"]).get("pagination")
+        if job["api_name"] == "fund_adj":
+            pagination = {"offset_param": "offset", "limit_param": "limit"}
+        if pagination:
+            offset_key, limit_key = (
+                pagination["offset_param"],
+                pagination["limit_param"],
+            )
+            params = job["params"]
+            offset, limit = int(params.get(offset_key, 0)), int(params[limit_key])
+            count = result.get("row_count", 0)
+            if count >= limit:
+                previous = self.db.execute(
+                    "SELECT job,result FROM jobs WHERE result IS NOT NULL AND id<>? AND epoch=? AND json_extract(job,'$.api_name')=?",
+                    (row["id"], row["epoch"], job["api_name"]),
+                )
+                base = {k: v for k, v in params.items() if k != offset_key}
+                repeated = any(
+                    {
+                        k: v
+                        for k, v in json.loads(x["job"])["params"].items()
+                        if k != offset_key
+                    }
+                    == base
+                    and json.loads(x["result"]).get("object_sha256")
+                    == result.get("object_sha256")
+                    for x in previous
+                )
+                if count != limit or repeated:
+                    state = "blocked"
+                    result["pagination_error"] = (
+                        "row_cap_mismatch" if count != limit else "repeated_page"
+                    )
+                else:
+                    self.enqueue(
+                        job["api_name"],
+                        {**params, offset_key: offset + limit},
+                        row["priority"],
+                        row["epoch"],
+                    )
+                    state = (
+                        "done"
+                        if status in ("sample_ok", "possibly_truncated")
+                        else "quality"
+                    )
+            elif offset > 0 and count < limit and status in (
+                "sample_ok",
+                "empty_unverified",
+            ):
+                state = "done"
+                result["pagination_end"] = True
+        if result.get("row_count", 0) and status not in (
+            "invalid_response",
+            "api_error",
+            "permission_denied",
+        ):
+            try:
+                result = self.normalize(result)
+            except Exception as exc:
+                # Split children independently normalize the exact covered
+                # partitions, so a parent conversion failure must not strand
+                # their already-durable completeness obligation.
+                state = (
+                    "split_pending"
+                    if result.get("partition_deferred") or result.get("split")
+                    else "blocked"
+                )
+                result["normalization_error"] = type(exc).__name__
+        self.db.execute(
+            "INSERT OR IGNORE INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+            (row["id"], row["tries"] + 1, json.dumps(result)),
+        )
+        self.db.execute(
+            "UPDATE jobs SET state=?,result=?,tries=tries+1,retry_after=? WHERE id=?",
+            (
+                state,
+                json.dumps(result),
+                time.time() + min(3600, 60 * 2 ** row["tries"]),
+                row["id"],
+            ),
+        )
+        self.db.commit()  # response + object references checkpoint before next request
+        self.reconcile_partitions(child_id=row["id"], deadline=deadline)
+        work_seconds["result_processing"] += time.perf_counter() - phase_started
+        return True
+
     def run(
         self,
         client,
@@ -4595,276 +4810,167 @@ class Pipeline:
                 )
         else:
             partition_reconciliation = None
+        pipeline_depth = config.get("acquisition_pipeline_depth", 1)
+        if type(pipeline_depth) is not int or not 1 <= pipeline_depth <= 2:
+            raise ValueError("Invalid acquisition pipeline depth")
         completed = 0
         invalid_requests = 0
-        while completed < max_requests and time.monotonic() - started < max_seconds:
-            if not task_scope:
+
+        def select_dispatch(mark_inflight):
+            nonlocal invalid_requests
+            while time.monotonic() < deadline:
+                if not task_scope:
+                    phase_started = time.perf_counter()
+                    try:
+                        self.expand(config)
+                    finally:
+                        work_seconds["queue_expansion"] += (
+                            time.perf_counter() - phase_started
+                        )
+                if time.monotonic() >= deadline:
+                    return None
                 phase_started = time.perf_counter()
                 try:
-                    self.expand(config)
+                    row = self.next_job(
+                        config,
+                        deadline,
+                        task_scope=task_scope,
+                        mark_inflight=mark_inflight,
+                    )
                 finally:
-                    work_seconds["queue_expansion"] += (
+                    work_seconds["job_selection"] += (
                         time.perf_counter() - phase_started
                     )
-            if time.monotonic() - started >= max_seconds:
-                break
-            phase_started = time.perf_counter()
-            try:
-                row = self.next_job(
-                    config, started + max_seconds, task_scope=task_scope
+                if row is None:
+                    return None
+                if time.monotonic() >= deadline:
+                    if mark_inflight:
+                        self.db.execute(
+                            "UPDATE jobs SET state='pending' WHERE id=?", (row["id"],)
+                        )
+                        self.db.commit()
+                    return None
+                job = json.loads(row["job"])
+                try:
+                    validate_request_shape(job)
+                except ValueError as error:
+                    # Old planner jobs keep their request/result/attempt identities.
+                    # Corrected contract policies replay the configured date scope;
+                    # this local rejection is an explicit gap, never a data success.
+                    with self.db:
+                        self.db.execute(
+                            "UPDATE jobs SET state='blocked' WHERE id=?",
+                            (row["id"],),
+                        )
+                        self.db.execute(
+                            "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
+                            "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
+                            (
+                                "dispatch:" + row["id"],
+                                "request_contract_blocked",
+                                utc_now(),
+                                json.dumps({
+                                    "api_name": job["api_name"],
+                                    "reason": str(error),
+                                    "upstream_calls": 0,
+                                    "coverage_proven": False,
+                                }),
+                            ),
+                        )
+                    invalid_requests += 1
+                    continue
+                rejected = realtime_dispatch_status(
+                    job["api_name"], row["epoch"], config, time.time()
                 )
-            finally:
-                work_seconds["job_selection"] += (
-                    time.perf_counter() - phase_started
-                )
-            if row is None or time.monotonic() - started >= max_seconds:
-                break
-            job = json.loads(row["job"])
-            try:
-                validate_request_shape(job)
-            except ValueError as error:
-                # Old planner jobs keep their request/result/attempt identities.
-                # Corrected contract policies replay the configured date scope;
-                # this local rejection is an explicit gap, never a data success.
-                with self.db:
+                if rejected:
+                    work_counts["dispatch_rejections"] += 1
                     self.db.execute(
-                        "UPDATE jobs SET state='blocked' WHERE id=?",
-                        (row["id"],),
+                        "UPDATE jobs SET state=? WHERE id=?", (rejected, row["id"])
                     )
                     self.db.execute(
                         "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
                         "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
                         (
                             "dispatch:" + row["id"],
-                            "request_contract_blocked",
-                            utc_now(),
-                            json.dumps({
-                                "api_name": job["api_name"],
-                                "reason": str(error),
-                                "upstream_calls": 0,
-                                "coverage_proven": False,
-                            }),
-                        ),
-                    )
-                invalid_requests += 1
-                continue
-            rejected = realtime_dispatch_status(
-                job["api_name"], row["epoch"], config, time.time()
-            )
-            if rejected:
-                work_counts["dispatch_rejections"] += 1
-                self.db.execute("UPDATE jobs SET state=? WHERE id=?", (rejected, row["id"]))
-                self.db.execute(
-                    "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
-                    "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
-                    (
-                        "dispatch:" + row["id"],
-                        rejected,
-                        utc_now(),
-                        json.dumps(
-                            {
-                                "api_name": job["api_name"],
-                                "epoch": row["epoch"],
-                                "reason": rejected,
-                                "upstream_calls": 0,
-                            }
-                        ),
-                    ),
-                )
-                self.db.commit()
-                continue
-            phase_started = time.perf_counter()
-            try:
-                result = capture_sample(client, token, job, self.root)
-            finally:
-                work_seconds["capture"] += time.perf_counter() - phase_started
-                work_counts["capture_invocations"] += 1
-            if result.get("local_daily_quota"):
-                work_counts["local_quota_deferrals"] += 1
-                daily = result["local_daily_quota"]
-                self.daily_quota_status = daily
-                self.db.execute(
-                    "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=MAX(next_at,excluded.next_at)",
-                    ("api:" + job["api_name"], daily["retry_at"]),
-                )
-                self.db.commit()
-                # No HTTP, result/tries/attempt rows or inferred supplier quota.
-                continue
-            phase_started = time.perf_counter()
-            status = result["status"]
-            state = "done" if status == "sample_ok" else "quality"
-            if status == "empty_unverified":
-                state = "empty"
-            if status in (
-                "transport_error",
-                "api_error",
-                "invalid_response",
-                "rate_limited",
-            ):
-                state = "blocked" if row["tries"] >= 4 else "pending"
-            if status == "rate_limited":
-                state = "pending"  # A quota wait is not a terminal data failure.
-                scoped = result.get("rate_limit_api") == job["api_name"]
-                scope = "api:" + job["api_name"] if scoped else "account"
-                cooldown = result.get("rate_limit_window_seconds", 60) if scoped else 60
-                self.db.execute(
-                    "INSERT INTO request_gates(scope,next_at) VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET next_at=MAX(next_at,excluded.next_at)",
-                    (scope, time.time() + cooldown),
-                )
-                if scoped:
-                    self.db.execute(
-                        "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,'rate_limit_observed',?,?) ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
-                        (
-                            "quota:" + job["api_name"],
+                            rejected,
                             utc_now(),
                             json.dumps(
                                 {
-                                    "window_seconds": cooldown,
-                                    "requests": result["rate_limit_requests"],
-                                    "interval_seconds": cooldown
-                                    / result["rate_limit_requests"],
+                                    "api_name": job["api_name"],
+                                    "epoch": row["epoch"],
+                                    "reason": rejected,
+                                    "upstream_calls": 0,
                                 }
                             ),
                         ),
                     )
-            if status in (
-                "sample_ok",
-                "schema_gap",
-                "invalid_values",
-                "possibly_truncated",
-                "empty_unverified",
-            ) and not result.get("supplier_empty_hint"):
-                # An explicit supplier no-data error stops duplicate retries,
-                # but its nonzero business code does not prove API availability.
-                self.db.execute(
-                    "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
-                    (
-                        job["api_name"] + ":" + str(job["params"].get("src", "")),
-                        "available",
-                        utc_now(),
-                        status,
-                    ),
-                )
-            if status == "permission_denied":
-                state = "permission_blocked"
-                scope = job["api_name"] + ":" + str(job["params"].get("src", ""))
-                self.db.execute(
-                    "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
-                    (
-                        scope,
-                        "permission_denied",
-                        utc_now(),
-                        "upstream_permission_denied",
-                    ),
-                )
-                self.db.execute(
-                    "UPDATE jobs SET state='permission_blocked' WHERE state='pending' AND id<>? AND json_extract(job,'$.api_name')=? AND COALESCE(json_extract(job,'$.params.src'),'')=?",
-                    (row["id"], job["api_name"], str(job["params"].get("src", ""))),
-                )
-            if status == "possibly_truncated":
-                state = "blocked"
-                if self.identifier_split_needs_discovery(
-                    job, epoch=row["epoch"]
+                    self.db.commit()
+                    continue
+                return row, job
+            return None
+
+        def timed_capture(job):
+            phase_started = time.perf_counter()
+            try:
+                return capture_sample(client, token, job, self.root)
+            finally:
+                # The pipelined worker is single-threaded. Only that worker
+                # mutates this counter while it is active.
+                work_seconds["capture"] += time.perf_counter() - phase_started
+                work_counts["capture_invocations"] += 1
+
+        if pipeline_depth == 1:
+            while completed < max_requests and time.monotonic() < deadline:
+                selected = select_dispatch(False)
+                if selected is None:
+                    break
+                row, job = selected
+                result = timed_capture(job)
+                if self._apply_capture_result(
+                    row, job, result, deadline, work_counts, work_seconds
                 ):
-                    # Commit capture/normalization/attempt below before any full
-                    # discovery scan. A resumed parent never repeats its HTTP call.
-                    result["partition_deferred"] = {
-                        "version": 1,
-                        "kind": "identifier_fanout",
-                    }
-                    state = "split_pending"
-                else:
-                    split = self.split_request(row, job, result)
-                    if split:
-                        result["split"] = split
-                        state = "split_pending"
-            pagination = contract_for(job["api_name"]).get("pagination")
-            if job["api_name"] == "fund_adj":
-                pagination = {"offset_param": "offset", "limit_param": "limit"}
-            if pagination:
-                offset_key, limit_key = (
-                    pagination["offset_param"],
-                    pagination["limit_param"],
-                )
-                params = job["params"]
-                offset, limit = int(params.get(offset_key, 0)), int(params[limit_key])
-                count = result.get("row_count", 0)
-                if count >= limit:
-                    previous = self.db.execute(
-                        "SELECT job,result FROM jobs WHERE result IS NOT NULL AND id<>? AND epoch=? AND json_extract(job,'$.api_name')=?",
-                        (row["id"], row["epoch"], job["api_name"]),
-                    )
-                    base = {k: v for k, v in params.items() if k != offset_key}
-                    repeated = any(
-                        {
-                            k: v
-                            for k, v in json.loads(x["job"])["params"].items()
-                            if k != offset_key
-                        }
-                        == base
-                        and json.loads(x["result"]).get("object_sha256")
-                        == result.get("object_sha256")
-                        for x in previous
-                    )
-                    if count != limit or repeated:
-                        state = "blocked"
-                        result["pagination_error"] = (
-                            "row_cap_mismatch" if count != limit else "repeated_page"
+                    completed += 1
+                if pause:
+                    time.sleep(pause)
+        else:
+            pending_captures = deque()
+            dispatch_open = True
+            high_watermark = 0
+            with ThreadPoolExecutor(
+                max_workers=1, thread_name_prefix="tushare-capture"
+            ) as pool:
+                while completed < max_requests and (dispatch_open or pending_captures):
+                    while (
+                        dispatch_open
+                        and len(pending_captures) < pipeline_depth
+                        and completed + len(pending_captures) < max_requests
+                        and time.monotonic() < deadline
+                    ):
+                        selected = select_dispatch(True)
+                        if selected is None:
+                            dispatch_open = False
+                            break
+                        row, job = selected
+                        pending_captures.append(
+                            (row, job, pool.submit(timed_capture, job))
                         )
-                    else:
-                        self.enqueue(
-                            job["api_name"],
-                            {**params, offset_key: offset + limit},
-                            row["priority"],
-                            row["epoch"],
-                        )
-                        state = (
-                            "done"
-                            if status in ("sample_ok", "possibly_truncated")
-                            else "quality"
-                        )
-                elif offset > 0 and count < limit and status in (
-                    "sample_ok",
-                    "empty_unverified",
-                ):
-                    state = "done"
-                    result["pagination_end"] = True
-            if result.get("row_count", 0) and status not in (
-                "invalid_response",
-                "api_error",
-                "permission_denied",
-            ):
-                try:
-                    result = self.normalize(result)
-                except Exception as exc:
-                    # Split children independently normalize the exact covered
-                    # partitions, so a parent conversion failure must not strand
-                    # their already-durable completeness obligation.
-                    state = (
-                        "split_pending"
-                        if result.get("partition_deferred") or result.get("split")
-                        else "blocked"
-                    )
-                    result["normalization_error"] = type(exc).__name__
-            self.db.execute(
-                "INSERT OR IGNORE INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
-                (row["id"], row["tries"] + 1, json.dumps(result)),
-            )
-            self.db.execute(
-                "UPDATE jobs SET state=?,result=?,tries=tries+1,retry_after=? WHERE id=?",
-                (
-                    state,
-                    json.dumps(result),
-                    time.time() + min(3600, 60 * 2 ** row["tries"]),
-                    row["id"],
-                ),
-            )
-            self.db.commit()  # response + object references checkpoint before next request
-            self.reconcile_partitions(child_id=row["id"], deadline=deadline)
-            work_seconds["result_processing"] += time.perf_counter() - phase_started
-            completed += 1
-            if pause:
-                time.sleep(pause)
+                        high_watermark = max(high_watermark, len(pending_captures))
+                    if not pending_captures:
+                        break
+                    row, job, future = pending_captures.popleft()
+                    result = future.result()
+                    if self._apply_capture_result(
+                        row, job, result, deadline, work_counts, work_seconds
+                    ):
+                        completed += 1
+                    if pause:
+                        time.sleep(pause)
+            work_timing_pipeline = {
+                "depth": pipeline_depth,
+                "http_workers": 1,
+                "queue_high_watermark": high_watermark,
+                "crash_recovered_jobs": self.recovered_inflight,
+            }
         if not task_scope and time.monotonic() < deadline:
             phase_started = time.perf_counter()
             try:
@@ -4879,6 +4985,8 @@ class Pipeline:
             "work_timing": work_timing(),
             **self.status(),
         }
+        if pipeline_depth > 1:
+            report["acquisition_pipeline"] = work_timing_pipeline
         if partition_work is not None:
             report["partition_work"] = partition_work
         if partition_reconciliation is not None:
