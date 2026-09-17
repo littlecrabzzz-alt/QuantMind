@@ -23,6 +23,7 @@ def prepare(runtime):
         'scripts/tushare_range_queue_migration.py',
         'scripts/tushare_factor_daily_retirement.py',
         'scripts/tushare_stock_lifecycle_migration.py',
+        'scripts/tushare_asset_lifecycle_migration.py',
         'scripts/tushare_research_cache.py', 'config/tushare-catalog.json',
         'deploy/dual-node.env')]
     for source in names:

@@ -92,6 +92,39 @@ class StructuredPlanning(unittest.TestCase):
                 )
             )
 
+    def test_index_history_uses_known_start_and_preserves_unknown(self):
+        config = {
+            "history_start": "20190101",
+            "structured_apis": ["index_daily"],
+        }
+        ids = {
+            "indexes": ["000300.SH", "000905.SH"],
+            "index_lifecycles": [{"ts_code": "000300.SH", "start_date": "20200615"}],
+        }
+        jobs = list(iter_structured_jobs(config, date(2022, 1, 10), ids))
+        known = [
+            job["params"] for job in jobs if job["params"].get("ts_code") == "000300.SH"
+        ]
+        unknown = [
+            job["params"] for job in jobs if job["params"].get("ts_code") == "000905.SH"
+        ]
+        self.assertEqual(min(row["start_date"] for row in known), "20200615")
+        self.assertEqual(min(row["start_date"] for row in unknown), "20190101")
+        self.assertTrue(all(row["end_date"] >= "20200615" for row in known))
+        with self.assertRaises(ValueError):
+            list(
+                iter_structured_jobs(
+                    config,
+                    date(2022, 1, 10),
+                    {
+                        "indexes": ["000300.SH"],
+                        "index_lifecycles": [
+                            {"ts_code": "000300.SH", "start_date": "20200230"}
+                        ],
+                    },
+                )
+            )
+
     def test_all_catalog_items_retained_and_alias_schema_resolvable(self):
         catalog = json.loads((ROOT / "config/tushare-catalog.json").read_text())
         ledger = json.loads((ROOT / "config/tushare-coverage-ledger.json").read_text())

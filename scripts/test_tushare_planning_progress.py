@@ -267,8 +267,16 @@ class PlanningProgress(unittest.TestCase):
     def test_actual_declared_and_implicit_dependencies(self):
         expected = [
             ("structured", ["namechange"], {"stocks"}),
-            ("structured", ["index_daily"], {"indexes"}),
-            ("market", ["fund_nav", "index_member_all"], {"funds", "sw_l3"}),
+            (
+                "structured",
+                ["index_daily"],
+                {"indexes", "index_lifecycles"},
+            ),
+            (
+                "market",
+                ["fund_nav", "index_member_all"],
+                {"funds", "fund_lifecycles", "sw_l3"},
+            ),
             ("credit_extra", ["pledge_stat"], {"stocks"}),
             ("etf_basket", ["etf_sh_cons"], {"etfs"}),
             ("text", ["news"], set()),

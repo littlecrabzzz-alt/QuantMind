@@ -10,6 +10,11 @@ from itertools import zip_longest
 import re
 
 from backend.shared.tushare_structured_contracts import _contract, _parse
+from backend.shared.tushare_stock_lifecycle import (
+    asset_start_dates,
+    clip_params,
+    stock_list_dates,
+)
 
 # All documented output fields, including default-hidden fields. Caller sends
 # these as the API request's top-level fields selector and retains unknown raw fields.
@@ -312,9 +317,12 @@ GLOBAL_CONTRACTS["monthly"].update(
 )
 for _api, _family in SYMBOL_PERIODS.items():
     GLOBAL_CONTRACTS[_api].update(
-        dependencies=[_family],
-        planning_version="stable_decade_partitions_v4",
-        planning_note="Fixed closed ten-year buckets, then one prior-year tail, one prior-month tail and at most one older completed-week tail; only tails change at their calendar boundary. Recent two completed periods share a period-end epoch. Daily planning_epoch does not force period refresh. Discovery and earliest history remain unverified.",
+        dependencies=[
+            _family,
+            "index_lifecycles" if _family == "indexes" else "stock_lifecycles",
+        ],
+        planning_version="stable_decade_partitions_v5",
+        planning_note="Fixed closed ten-year buckets, then one prior-year tail, one prior-month tail and at most one older completed-week tail; only tails change at their calendar boundary. Known official listing/base dates clip the lower bound; missing metadata remains unbounded. Recent two completed periods share a period-end epoch. Daily planning_epoch does not force period refresh.",
         period_wait_note="Open calendar weeks/months wait for their full boundary; daily-updated stk_* contracts remain independent. Late corrections outside the recent two periods require an explicit revision sweep.",
     )
 GLOBAL_CONTRACTS["hk_basic"]["identifier_note"] = (
@@ -518,23 +526,24 @@ def _completed_period_bounds(api, today):
     return start, end
 
 
-def _period_jobs(api, start, end, ids, epoch, priority):
+def _period_jobs(api, start, end, ids, epoch, priority, start_dates=None):
     if start > end:
         return
     for code in ids[SYMBOL_PERIODS[api]]:
-        yield _job(
-            api,
+        params = clip_params(
             {
                 "ts_code": code,
                 "start_date": start.strftime("%Y%m%d"),
                 "end_date": end.strftime("%Y%m%d"),
             },
-            epoch,
-            priority,
+            code,
+            start_dates or {},
         )
+        if params is not None:
+            yield _job(api, params, epoch, priority)
 
 
-def _period_history_jobs(api, start, today, ids):
+def _period_history_jobs(api, start, today, ids, start_dates=None):
     recent_start, closed = _completed_period_bounds(api, today)
     left = start
     # At most ten calendar years per code: <= 523 weekly / 120 monthly
@@ -542,7 +551,7 @@ def _period_history_jobs(api, start, today, ids):
     # supplier saturation still goes through the parent's normal split path.
     decade_end = date((left.year // 10 + 1) * 10 - 1, 12, 31)
     while decade_end <= closed:
-        yield from _period_jobs(api, left, decade_end, ids, "history", 40)
+        yield from _period_jobs(api, left, decade_end, ids, "history", 40, start_dates)
         left = decade_end + timedelta(days=1)
         decade_end = date(decade_end.year + 10, 12, 31)
     # Only the unclosed decade's tail changes yearly; complete decades keep
@@ -555,7 +564,7 @@ def _period_history_jobs(api, start, today, ids):
     )
     for right in (year_end, month_end, recent_start - timedelta(days=1)):
         if left <= right:
-            yield from _period_jobs(api, left, right, ids, "history", 40)
+            yield from _period_jobs(api, left, right, ids, "history", 40, start_dates)
             left = right + timedelta(days=1)
 
 
@@ -595,6 +604,22 @@ def iter_global_jobs(config, today, identifiers=None):
         raise ValueError("today must be a date")
     enabled = _enabled(config)
     ids = _identifiers(identifiers or {})
+    stock_starts = (
+        stock_list_dates(identifiers or {})
+        if any(
+            api in enabled and SYMBOL_PERIODS[api] == "stocks" for api in SYMBOL_PERIODS
+        )
+        else {}
+    )
+    index_starts = (
+        asset_start_dates(identifiers or {}, "index_lifecycles")
+        if any(
+            api in enabled and SYMBOL_PERIODS[api] == "indexes"
+            for api in SYMBOL_PERIODS
+        )
+        else {}
+    )
+    lifecycle_starts = {"stocks": stock_starts, "indexes": index_starts}
     starts = _starts(config, enabled)
     if any(start and start > today for start in starts.values()):
         raise ValueError("History start cannot be after today")
@@ -620,7 +645,13 @@ def iter_global_jobs(config, today, identifiers=None):
             start = max(period_start, starts[api] or period_start)
             streams.append(
                 _period_jobs(
-                    api, start, closed, ids, "period-" + closed.strftime("%Y%m%d"), 20
+                    api,
+                    start,
+                    closed,
+                    ids,
+                    "period-" + closed.strftime("%Y%m%d"),
+                    20,
+                    lifecycle_starts[SYMBOL_PERIODS[api]],
                 )
             )
         else:
@@ -634,7 +665,9 @@ def iter_global_jobs(config, today, identifiers=None):
         if api in BASICS or start is None or start > end:
             continue
         streams.append(
-            _period_history_jobs(api, start, today, ids)
+            _period_history_jobs(
+                api, start, today, ids, lifecycle_starts[SYMBOL_PERIODS[api]]
+            )
             if api in SYMBOL_PERIODS
             else _date_jobs(api, start, end, "history", 40)
         )

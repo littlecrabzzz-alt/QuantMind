@@ -8,6 +8,8 @@ from calendar import monthrange
 from datetime import date, datetime, timedelta
 import re
 
+from backend.shared.tushare_stock_lifecycle import asset_start_dates, clip_params
+
 
 def _contract(
     cap,
@@ -106,6 +108,7 @@ STRUCTURED_CONTRACTS = {
     "cn_pmi": _contract(2000, ("month",), split=False),
     "sf_month": _contract(2000, ("month",), split=False),
 }
+STRUCTURED_CONTRACTS["index_daily"]["dependencies"] = ["index_lifecycles"]
 # Demonstrated lower bounds from the 2026-09-09 authority capability probe,
 # period 20260630. These are saturation alarms, NOT verified provider maxima.
 # Using the ordinary 100-row alarm caused avoidable per-stock fanout even when
@@ -206,6 +209,9 @@ def iter_structured_jobs(config, today, identifiers=None):
         sorted(set(ids.get("stocks", []))),
         sorted(set(ids.get("indexes", []))),
     )
+    index_starts = (
+        asset_start_dates(ids, "index_lifecycles") if "index_daily" in enabled else {}
+    )
     for code in stocks + indexes:
         if not isinstance(code, str) or not re.fullmatch(r"[A-Z0-9]+\.[A-Z]+", code):
             raise ValueError(
@@ -292,7 +298,9 @@ def iter_structured_jobs(config, today, identifiers=None):
                     }
                     if code:
                         params["ts_code"] = code
-                    yield job(api, params, priority, version)
+                        params = clip_params(params, code, index_starts)
+                    if params is not None:
+                        yield job(api, params, priority, version)
         for api in sorted(enabled):
             if not api.endswith("_vip"):
                 continue

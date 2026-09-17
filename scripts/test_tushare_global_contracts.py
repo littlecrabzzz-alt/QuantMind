@@ -488,6 +488,54 @@ class GlobalContracts(unittest.TestCase):
             )
         )
 
+    def test_period_history_uses_known_lifecycle_starts_only(self):
+        config = {
+            "global_apis": ["weekly", "monthly", "index_weekly", "index_monthly"],
+            "global_history_start": "19900101",
+        }
+        ids = {
+            "stocks": ["600000.SH", "000001.SZ"],
+            "indexes": ["000300.CSI", "000905.CSI"],
+            "stock_lifecycles": [{"ts_code": "600000.SH", "list_date": "20120615"}],
+            "index_lifecycles": [{"ts_code": "000300.CSI", "start_date": "20050412"}],
+        }
+        jobs = list(iter_global_jobs(config, date(2026, 9, 9), ids))
+
+        def minimum(api, code):
+            return min(
+                job["params"]["start_date"]
+                for job in jobs
+                if job["api_name"] == api and job["params"]["ts_code"] == code
+            )
+
+        for api in ("weekly", "monthly"):
+            self.assertEqual(minimum(api, "600000.SH"), "20120615")
+            self.assertEqual(minimum(api, "000001.SZ"), "19900101")
+        for api in ("index_weekly", "index_monthly"):
+            self.assertEqual(minimum(api, "000300.CSI"), "20050412")
+            self.assertEqual(minimum(api, "000905.CSI"), "19900101")
+
+        # Malformed optional metadata cannot block an unrelated global API.
+        unrelated = {"index_lifecycles": "not-a-list"}
+        list(
+            iter_global_jobs(
+                {"global_apis": ["hk_daily"], "global_history_start": "20260901"},
+                date(2026, 9, 9),
+                unrelated,
+            )
+        )
+        with self.assertRaises(ValueError):
+            list(
+                iter_global_jobs(
+                    {
+                        "global_apis": ["index_weekly"],
+                        "global_history_start": "20200101",
+                    },
+                    date(2026, 9, 9),
+                    {"indexes": ["000300.CSI"], **unrelated},
+                )
+            )
+
     def test_retired_hk_bang_remains_distinct_and_does_not_abort_other_apis(self):
         from backend.shared.tushare_global_contracts import _identifiers
 

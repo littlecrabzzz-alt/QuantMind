@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 import re
 
 from backend.shared.tushare_structured_contracts import _contract, _parse
+from backend.shared.tushare_stock_lifecycle import asset_start_dates, clip_params
 
 EXCHANGES = ("CFFEX", "DCE", "CZCE", "SHFE", "INE", "GFEX")
 
@@ -120,9 +121,9 @@ MARKET_CONTRACTS = {
 # Explicit dependency and saturation metadata: callers must not silently replace
 # an incomplete universe by the records present in one capped discovery response.
 DEPENDENCIES = {
-    "fund_nav": ("funds",),
+    "fund_nav": ("funds", "fund_lifecycles"),
     "fund_div": ("funds",),
-    "index_weight": ("indexes",),
+    "index_weight": ("indexes", "index_lifecycles"),
     "index_member_all": ("sw_l3",),
     "cb_rate": ("bonds",),
     "cb_price_chg": ("bonds",),
@@ -212,6 +213,12 @@ def iter_market_jobs(config, today, identifiers=None):
     codes = {
         family: _codes(ids, family) for family in ("funds", "indexes", "bonds", "sw_l3")
     }
+    fund_starts = (
+        asset_start_dates(ids, "fund_lifecycles") if "fund_nav" in enabled else {}
+    )
+    index_starts = (
+        asset_start_dates(ids, "index_lifecycles") if "index_weight" in enabled else {}
+    )
     recent, epoch = max(start, today - timedelta(days=7)), today.strftime("%Y%m%d")
 
     def job(api, params, priority=25, version=epoch):
@@ -268,29 +275,29 @@ def iter_market_jobs(config, today, identifiers=None):
             if api in enabled:
                 for code in codes[family]:
                     # One full interval; the shared collector bisects capped windows.
-                    yield job(
-                        api,
-                        {
-                            "ts_code": code,
-                            "start_date": left.strftime("%Y%m%d"),
-                            "end_date": right.strftime("%Y%m%d"),
-                        },
-                        priority,
-                        version,
-                    )
+                    params = {
+                        "ts_code": code,
+                        "start_date": left.strftime("%Y%m%d"),
+                        "end_date": right.strftime("%Y%m%d"),
+                    }
+                    if api == "fund_nav":
+                        params = clip_params(params, code, fund_starts)
+                    if params is not None:
+                        yield job(api, params, priority, version)
         if "index_weight" in enabled:
             for code in codes["indexes"]:
                 for a, b in reversed(list(_months(left, right))):
-                    yield job(
-                        "index_weight",
+                    params = clip_params(
                         {
                             "index_code": code,
                             "start_date": a.strftime("%Y%m%d"),
                             "end_date": b.strftime("%Y%m%d"),
                         },
-                        priority,
-                        version,
+                        code,
+                        index_starts,
                     )
+                    if params is not None:
+                        yield job("index_weight", params, priority, version)
         for api in ("cb_issue", "cb_call"):
             if api in enabled:
                 for a, b in reversed(list(_months(left, right))):
@@ -344,9 +351,12 @@ def market_prerequisites(identifiers=None, enabled_apis=None):
     return [
         {
             "api_name": api,
-            "dependencies": [f for f in families if not ids.get(f)],
+            "dependencies": [
+                f for f in families if not f.endswith("_lifecycles") and not ids.get(f)
+            ],
             "reason": "awaiting_complete_stored_discovery",
         }
         for api, families in DEPENDENCIES.items()
-        if api in enabled and any(not ids.get(f) for f in families)
+        if api in enabled
+        and any(not ids.get(f) for f in families if not f.endswith("_lifecycles"))
     ]

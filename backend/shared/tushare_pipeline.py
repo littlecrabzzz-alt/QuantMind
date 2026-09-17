@@ -116,7 +116,7 @@ IDENTIFIER_SPLIT_SOURCE_APIS = {
     "stocks": STOCK_IDENTIFIER_SOURCE_APIS,
     "dc_indices": ("dc_index", "dc_member", "dc_daily"),
 }
-IDENTIFIER_CACHE_VERSION = 2
+IDENTIFIER_CACHE_VERSION = 3
 ROOT = Path(os.getenv("QM_TUSHARE_ARCHIVE_ROOT", "/data/tushare"))
 CONTRACTS = {
     api: (spec["row_cap"], spec["required_fields"])
@@ -1510,6 +1510,10 @@ class Pipeline:
         factor_records = {}
         reward_period_records = {}
         stock_lifecycle_records = {}
+        index_lifecycle_records = {}
+        fund_lifecycle_records = {}
+        observed_index_starts = {}
+        observed_fund_starts = {}
         families = {
             **dict.fromkeys(REALTIME_RUNTIME_CONTRACTS, "realtime_source_only"),
             **dict.fromkeys(SECURITIES_LENDING_HISTORY_RUNTIME_CONTRACTS, "stocks"),
@@ -1581,6 +1585,8 @@ class Pipeline:
             "sge_daily": "spot_metals",
             "fx_obasic": "fx_instruments",
             "fx_daily": "fx_instruments",
+            "index_weight": "minute_source_only",
+            "fund_nav": "minute_source_only",
         }
         # Additional sources enter only the minute projection, never an old universe.
         families = {**dict.fromkeys(MINUTE_SOURCE_FAMILIES, "minute_source_only"), **families}
@@ -1598,6 +1604,14 @@ class Pipeline:
             stock_lifecycle_records = {
                 item["ts_code"]: item
                 for item in cached_result.pop("stock_lifecycles", [])
+            }
+            index_lifecycle_records = {
+                item["ts_code"]: item.get("start_date")
+                for item in cached_result.pop("index_lifecycles", [])
+            }
+            fund_lifecycle_records = {
+                item["ts_code"]: item.get("start_date")
+                for item in cached_result.pop("fund_lifecycles", [])
             }
             result = {key: set(values) for key, values in cached_result.items()}
         else:
@@ -1620,7 +1634,9 @@ class Pipeline:
                 "ts_code", "index_code", "level", "fut_code", "o_code", "n_code",
                 "name", "hm_name", "l1_code", "l2_code", "l3_code", "con_code",
                 "factor_name", "asset_type", "mapping_ts_code", "code", "end_date",
-                "country", "list_date",
+                "country", "list_date", "base_date", "found_date", "issue_date",
+                "setup_date", "purc_startdate", "redm_startdate", "trade_date",
+                "nav_date",
             )
         )
         if _source_apis is None:
@@ -1731,6 +1747,66 @@ class Pipeline:
                                 else previous_date or list_date
                             ),
                         }
+                if saved["api_name"] == "index_basic":
+                    code = record.get("ts_code")
+                    if isinstance(code, str) and re.fullmatch(
+                        r"[A-Za-z0-9]+\.[A-Z]+", code
+                    ):
+                        dates = [
+                            record.get(field)
+                            for field in ("base_date", "list_date")
+                            if valid_date(record.get(field))
+                        ]
+                        if dates:
+                            start_date = min(dates)
+                            current = index_lifecycle_records.get(code)
+                            index_lifecycle_records[code] = (
+                                min(current, start_date) if current else start_date
+                            )
+                        else:
+                            index_lifecycle_records.setdefault(code, None)
+                if saved["api_name"] in ("fund_basic", "etf_basic"):
+                    code = record.get("ts_code")
+                    if isinstance(code, str) and re.fullmatch(
+                        r"[A-Za-z0-9]+\.[A-Z]+", code
+                    ):
+                        dates = [
+                            record.get(field)
+                            for field in (
+                                "issue_date", "found_date", "setup_date", "list_date",
+                                "purc_startdate", "redm_startdate",
+                            )
+                            if valid_date(record.get(field))
+                        ]
+                        if dates:
+                            start_date = min(dates)
+                            current = fund_lifecycle_records.get(code)
+                            fund_lifecycle_records[code] = (
+                                min(current, start_date) if current else start_date
+                            )
+                        else:
+                            fund_lifecycle_records.setdefault(code, None)
+                if saved["api_name"] in ("index_daily", "index_weight"):
+                    code = record.get("ts_code") or record.get("index_code")
+                    trade_date = record.get("trade_date")
+                    if (
+                        isinstance(code, str)
+                        and re.fullmatch(r"[A-Za-z0-9]+\.[A-Z]+", code)
+                        and valid_date(trade_date)
+                    ):
+                        observed_index_starts[code] = min(
+                            trade_date, observed_index_starts.get(code, trade_date)
+                        )
+                if saved["api_name"] == "fund_nav":
+                    code, nav_date = record.get("ts_code"), record.get("nav_date")
+                    if (
+                        isinstance(code, str)
+                        and re.fullmatch(r"[A-Za-z0-9]+\.[A-Z]+", code)
+                        and valid_date(nav_date)
+                    ):
+                        observed_fund_starts[code] = min(
+                            nav_date, observed_fund_starts.get(code, nav_date)
+                        )
                 if api == "stk_rewards":
                     # Body-only actual pairs, including capped historical attempts.
                     # Invalid/missing dates remain evidence for a prerequisite gap.
@@ -1876,6 +1952,24 @@ class Pipeline:
         result["stock_context_reward_periods"] = [reward_period_records[key] for key in sorted(reward_period_records)]
         result["stock_lifecycles"] = [
             stock_lifecycle_records[key] for key in sorted(stock_lifecycle_records)
+        ]
+        for code, observed in observed_index_starts.items():
+            if index_lifecycle_records.get(code):
+                index_lifecycle_records[code] = min(
+                    index_lifecycle_records[code], observed
+                )
+        for code, observed in observed_fund_starts.items():
+            if fund_lifecycle_records.get(code):
+                fund_lifecycle_records[code] = min(
+                    fund_lifecycle_records[code], observed
+                )
+        result["index_lifecycles"] = [
+            {"ts_code": code, "start_date": index_lifecycle_records[code]}
+            for code in sorted(index_lifecycle_records)
+        ]
+        result["fund_lifecycles"] = [
+            {"ts_code": code, "start_date": fund_lifecycle_records[code]}
+            for code in sorted(fund_lifecycle_records)
         ]
         for api, spec in CROSS_ASSET_RUNTIME_CONTRACTS.items():
             family = spec["saturation_fallback"]

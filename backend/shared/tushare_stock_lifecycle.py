@@ -4,6 +4,7 @@ from datetime import datetime
 import re
 
 CODE = re.compile(r"T?[0-9]{6}\.(SH|SZ|BJ)")
+ASSET_CODE = re.compile(r"[A-Za-z0-9]+\.[A-Z]+")
 
 
 def valid_date(value):
@@ -33,6 +34,26 @@ def stock_list_dates(identifiers):
         if not valid_date(list_date):
             raise ValueError("Invalid stock lifecycle list_date")
         result[code] = min(list_date, result.get(code, list_date))
+    return result
+
+
+def asset_start_dates(identifiers, family):
+    """Return conservative index/fund starts; absent metadata stays unbounded."""
+    values = (identifiers or {}).get(family, ())
+    if not isinstance(values, (list, tuple)):
+        raise ValueError(f"{family} must be a list of records")
+    result = {}
+    for item in values:
+        if not isinstance(item, dict):
+            raise ValueError(f"{family} must contain records")
+        code, start_date = item.get("ts_code"), item.get("start_date")
+        if not isinstance(code, str) or not ASSET_CODE.fullmatch(code):
+            raise ValueError(f"Invalid {family} code")
+        if start_date is None:
+            continue
+        if not valid_date(start_date):
+            raise ValueError(f"Invalid {family} start_date")
+        result[code] = min(start_date, result.get(code, start_date))
     return result
 
 

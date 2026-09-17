@@ -168,6 +168,68 @@ class ProjectionTest(unittest.TestCase):
             self.p.identifiers(_use_cache=True)["stock_lifecycles"], expected
         )
 
+    def test_asset_lifecycles_use_official_metadata_and_earlier_observations(self):
+        fixtures = (
+            (
+                "index_basic",
+                ["ts_code", "base_date", "list_date"],
+                [
+                    ["000300.SH", "20050408", "20050408"],
+                    ["000905.SH", None, "20070115"],
+                    ["399999.SZ", None, None],
+                ],
+            ),
+            (
+                "index_daily",
+                ["ts_code", "trade_date"],
+                [["000300.SH", "20050101"], ["OBSERVED.SH", "19990101"]],
+            ),
+            (
+                "index_weight",
+                ["index_code", "trade_date"],
+                [["000905.SH", "20061231"]],
+            ),
+            (
+                "fund_basic",
+                ["ts_code", "issue_date", "found_date", "list_date"],
+                [
+                    ["000001.OF", "20010101", "20010201", None],
+                    ["000002.OF", None, None, None],
+                ],
+            ),
+            (
+                "etf_basic",
+                ["ts_code", "list_date"],
+                [["510300.SH", "20120528"]],
+            ),
+            (
+                "fund_nav",
+                ["ts_code", "nav_date"],
+                [["000001.OF", "20001231"], ["OBSERVED.OF", "19990101"]],
+            ),
+        )
+        for api, fields, items in fixtures:
+            self.save(self.body(fields, items, api))
+        expected_indexes = [
+            {"ts_code": "000300.SH", "start_date": "20050101"},
+            {"ts_code": "000905.SH", "start_date": "20061231"},
+            {"ts_code": "399999.SZ", "start_date": None},
+        ]
+        expected_funds = [
+            {"ts_code": "000001.OF", "start_date": "20001231"},
+            {"ts_code": "000002.OF", "start_date": None},
+            {"ts_code": "510300.SH", "start_date": "20120528"},
+        ]
+        result = self.p.identifiers(_use_cache=True)
+        self.assertEqual(result["index_lifecycles"], expected_indexes)
+        self.assertEqual(result["fund_lifecycles"], expected_funds)
+        self.assertNotIn("OBSERVED.SH", {row["ts_code"] for row in expected_indexes})
+        self.assertNotIn("OBSERVED.OF", {row["ts_code"] for row in expected_funds})
+        self.p.db.commit()
+        cached = self.p.identifiers(_use_cache=True)
+        self.assertEqual(cached["index_lifecycles"], expected_indexes)
+        self.assertEqual(cached["fund_lifecycles"], expected_funds)
+
     def test_stock_projection_reads_every_stock_source_and_only_those_sources(self):
         stock_cases = list(
             zip(
@@ -208,9 +270,9 @@ class ProjectionTest(unittest.TestCase):
         self.p.db.commit()
         expected = self.p.identifiers()["stocks"]
         with patch.object(self.p, "records", wraps=self.p.records) as reads:
-            projected = self.p.identifiers(
-                _source_apis=STOCK_IDENTIFIER_SOURCE_APIS
-            )["stocks"]
+            projected = self.p.identifiers(_source_apis=STOCK_IDENTIFIER_SOURCE_APIS)[
+                "stocks"
+            ]
         self.assertEqual(projected, expected)
         self.assertEqual(
             projected,
@@ -232,7 +294,9 @@ class ProjectionTest(unittest.TestCase):
     def test_dc_projection_keeps_jobs_attempts_and_all_three_sources(self):
         saved = self.body(["ts_code"], [["BK0001.DC"]], "dc_index")
         job = self.p.enqueue("dc_index", {"trade_date": "20260908"}, 1, "history")
-        self.p.db.execute("UPDATE jobs SET state='done',result=? WHERE id=?", (json.dumps(saved), job))
+        self.p.db.execute(
+            "UPDATE jobs SET state='done',result=? WHERE id=?", (json.dumps(saved), job)
+        )
         for api, field, value in (
             ("dc_member", "ts_code", "BK0002.DC"),
             ("dc_daily", "index_code", "BK0003.DC"),
@@ -242,10 +306,15 @@ class ProjectionTest(unittest.TestCase):
             self.save(self.body([field], [[value]], api, "possibly_truncated"))
         expected = self.p.identifiers()["dc_indices"]
         with patch.object(self.p, "records", wraps=self.p.records) as reads:
-            actual = self.p.identifiers(_source_apis=IDENTIFIER_SPLIT_SOURCE_APIS["dc_indices"])["dc_indices"]
+            actual = self.p.identifiers(
+                _source_apis=IDENTIFIER_SPLIT_SOURCE_APIS["dc_indices"]
+            )["dc_indices"]
         self.assertEqual(actual, expected)
         self.assertEqual(actual, ["BK0001.DC", "BK0002.DC", "BK0003.DC", "BK0004.DC"])
-        self.assertEqual({call.args[0]["api_name"] for call in reads.call_args_list}, {"dc_index", "dc_member", "dc_daily"})
+        self.assertEqual(
+            {call.args[0]["api_name"] for call in reads.call_args_list},
+            {"dc_index", "dc_member", "dc_daily"},
+        )
         self.assertEqual(reads.call_count, 4)
 
     def test_projection_inventory_covers_static_record_accesses(self):

@@ -142,6 +142,40 @@ class MarketPlanning(unittest.TestCase):
         with self.assertRaises(ValueError):
             list(iter_market_jobs({"history_start": "20240230"}, date(2024, 3, 3)))
 
+    def test_index_and_fund_history_use_known_starts_only(self):
+        config = {
+            "history_start": "20190101",
+            "market_apis": ["index_weight", "fund_nav"],
+        }
+        ids = {
+            "indexes": ["000300.SH", "000905.SH"],
+            "funds": ["000001.OF", "000002.OF"],
+            "index_lifecycles": [{"ts_code": "000300.SH", "start_date": "20210210"}],
+            "fund_lifecycles": [{"ts_code": "000001.OF", "start_date": "20200615"}],
+        }
+        jobs = list(iter_market_jobs(config, date(2022, 1, 10), ids))
+
+        def starts(api, field, code):
+            return [
+                job["params"]["start_date"]
+                for job in jobs
+                if job["api_name"] == api and job["params"][field] == code
+            ]
+
+        self.assertEqual(
+            min(starts("index_weight", "index_code", "000300.SH")), "20210210"
+        )
+        self.assertEqual(
+            min(starts("index_weight", "index_code", "000905.SH")), "20190101"
+        )
+        self.assertEqual(min(starts("fund_nav", "ts_code", "000001.OF")), "20200615")
+        self.assertEqual(min(starts("fund_nav", "ts_code", "000002.OF")), "20190101")
+        self.assertFalse(market_prerequisites(ids, config["market_apis"]))
+
+        malformed = {**ids, "fund_lifecycles": "not-a-list"}
+        with self.assertRaises(ValueError):
+            list(iter_market_jobs(config, date(2022, 1, 10), malformed))
+
 
 if __name__ == "__main__":
     unittest.main()

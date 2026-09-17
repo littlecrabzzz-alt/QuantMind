@@ -36,6 +36,7 @@ class TickTimingTest(unittest.TestCase):
         self.stage_values = {
             "initialize": None,
             "planning": {"enqueued": 3},
+            "queue_compaction": {"superseded": 0},
             "archive": {"remaining": 4},
             "acquire": {"requests": 17, "elapsed_seconds": 90, "done": 21},
             "document_registration": {"registered": 2},
@@ -44,11 +45,12 @@ class TickTimingTest(unittest.TestCase):
             "close": None,
         }
         self.durations = dict(
-            zip(self.stage_values, (2, 3, 5, 90, 7, 11, 13, 1), strict=True)
+            zip(self.stage_values, (2, 3, 1, 5, 90, 7, 11, 13, 1), strict=True)
         )
         for method, stage in (
             ("initialize", "initialize"),
             ("plan_extended", "planning"),
+            ("compact_stale_recent_roots", "queue_compaction"),
             ("run", "acquire"),
             ("register_documents", "document_registration"),
             ("publish", "publish"),
@@ -108,6 +110,7 @@ class TickTimingTest(unittest.TestCase):
         expected = [
             "initialize",
             "planning",
+            "queue_compaction",
             "archive",
             "acquire",
             "document_registration",
@@ -120,6 +123,7 @@ class TickTimingTest(unittest.TestCase):
         self.assertEqual(report["elapsed_seconds"], 90)
         self.assertEqual(report["done"], 21)
         self.assertEqual(report["planning"], {"enqueued": 3})
+        self.assertEqual(report["queue_compaction"], {"superseded": 0})
         self.assertEqual(report["archive"], {"remaining": 4})
         self.assertEqual(report["release_id"], self.stage_values["publish"])
         timing = report["timing"]
@@ -129,7 +133,7 @@ class TickTimingTest(unittest.TestCase):
             timing["stage_seconds"],
             {**{key: self.durations[key] for key in expected}, "publish_lock": 0},
         )
-        self.assertEqual(timing["total_elapsed_seconds"], 121)
+        self.assertEqual(timing["total_elapsed_seconds"], 122)
         self.assertIsNone(timing["failed_stage"])
         self.assertEqual(timing["included_stages"], {"reconciliation": "acquire"})
         self.pipeline.run.assert_called_once_with(
@@ -147,6 +151,7 @@ class TickTimingTest(unittest.TestCase):
         stages = [
             "initialize",
             "planning",
+            "queue_compaction",
             "archive",
             "acquire",
             "document_registration",
@@ -182,7 +187,10 @@ class TickTimingTest(unittest.TestCase):
         with patch.object(module, "atomic_json", side_effect=OSError("disk full")):
             with self.assertRaisesRegex(RuntimeError, "test secret"):
                 module.tick()
-        self.assertEqual(self.calls, ["initialize", "planning", "archive", "close"])
+        self.assertEqual(
+            self.calls,
+            ["initialize", "planning", "queue_compaction", "archive", "close"],
+        )
 
     def test_inline_documents_and_explicit_batch_limits_unchanged(self):
         (self.root / "pipeline-config.json").write_text(

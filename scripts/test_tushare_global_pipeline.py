@@ -326,6 +326,7 @@ class GlobalPipeline(unittest.TestCase):
             pipeline = MagicMock()
             pipeline.run.return_value = {}
             pipeline.plan_extended.return_value = {}
+            pipeline.compact_stale_recent_roots.return_value = {}
             pipeline.publish.return_value = "synthetic-release"
             pipeline.register_documents.return_value = {"observations": 1}
             with (
