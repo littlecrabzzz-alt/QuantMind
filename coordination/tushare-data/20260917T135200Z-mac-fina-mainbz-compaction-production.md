@@ -1,0 +1,11 @@
+# Mac Tushare planning and VIP compaction production acceptance
+
+- Scope: deploy commit `17d80a1ab440987545c36a3f81f1e0a941960c43` to the Mac archive owner. QuantDB and all cloud services remained running; only `com.quantmind.tushare-archive` was drained at a completed-cycle boundary and reloaded.
+- The installed runtime hashes match `master` for `tushare_pipeline.py`, `tushare_research_extra_contracts.py`, and `tushare_archive_worker.py`. The reloaded LaunchAgent started as PID 47732.
+- The first deployed acquisition cycle completed at `2026-09-17T13:42:54.444827+00:00`: 209 real Tushare requests, no failed stage, 201,120 done, 185,828 empty, and 2,687,805 pending.
+- The scheduled planning cycle completed at `2026-09-17T13:49:48.535097+00:00` with `planning_status=planned`, zero supplier requests, and no failed stage. `planning_only` here is durable queue expansion and compaction, not a dry run.
+- Production VIP coverage compaction observed 547 modern `fina_mainbz_vip` pages, 190 complete period/type chains, 11 complete year/type groups, 109 empty roots, 248 open or empty chains, one field schema, and zero invalid pages. It reported `no_covered_open_jobs` and superseded zero ordinary jobs because the ordinary planner has not yet reached those covered years. Partial and empty chains remain protected.
+- Five seconds after planning, the next acquisition cycle started. It completed at `2026-09-17T13:51:36.625814+00:00` with 194 real requests, no failed stage, 201,472 done, 186,252 empty, and 2,688,943 pending. The pending count can grow after planning enumerates new historical gaps.
+- Focused validation before deployment passed 42 tests plus Ruff, `py_compile`, and `git diff --check`. The broader 1,248-test run retained unrelated baseline failures documented in the implementation handoff; none were in the focused compaction and worker timing set.
+- Mac/cloud handoff passed at `17d80a1a` with source digest `6b565abed9bc75c77b45442919cff820e0d36621647b0cfab1f74855451b3d01`. The cloud Tushare writer remains fenced; cloud application and database services were healthy.
+- Full local historical acquisition remains in progress. This acceptance proves the deployed planning-to-acquisition transition and conservative duplicate retirement gate, not full-history completion.
