@@ -1838,7 +1838,7 @@ class Pipeline:
         }
 
     def compact_fina_mainbz_vip_coverage(self):
-        """Retire full-year stock jobs only after four VIP chains are complete."""
+        """Retire covered legacy VIP roots and full-year stock jobs."""
         rows = self.db.execute(
             "SELECT id,state,job,result FROM jobs INDEXED BY jobs_partition_lookup "
             "WHERE epoch='history' "
@@ -1943,13 +1943,52 @@ class Pipeline:
             "vip_field_schemas": len(fields),
             "covered_year_types": len(covered_year_types),
             "superseded_open_jobs": 0,
+            "legacy_vip_blocked_jobs": 0,
+            "legacy_vip_eligible_jobs": 0,
+            "superseded_legacy_vip_jobs": 0,
             "recent_jobs_action": "unchanged",
             "terminal_jobs_action": "unchanged",
         }
         if invalid or len(fields) != 1:
             report["status"] = "blocked_invariant"
             return report
-        if not covered_year_types:
+        legacy_rows = self.db.execute(
+            "SELECT id,job,result FROM jobs INDEXED BY jobs_pending "
+            "WHERE state='blocked' AND epoch='history' "
+            "AND json_extract(job,'$.api_name')='fina_mainbz_vip' "
+            "AND json_type(job,'$.params.limit') IS NULL"
+        ).fetchall()
+        legacy_candidates = []
+        field_schema = next(iter(fields))
+        for row in legacy_rows:
+            try:
+                job = json.loads(row["job"])
+                params = job["params"]
+                result = json.loads(row["result"] or "{}")
+                parquet = result.get("parquet") or {}
+                eligible = (
+                    set(params) == {"period", "type"}
+                    and (params["period"], params["type"]) in complete
+                    and job.get("row_cap") == 100
+                    and job.get("fields") == field_schema
+                    and result.get("status") == "possibly_truncated"
+                    and isinstance(result.get("row_count"), int)
+                    and not isinstance(result.get("row_count"), bool)
+                    and result["row_count"] > 100
+                    and isinstance(result.get("object_sha256"), str)
+                    and isinstance(result.get("observation"), str)
+                    and isinstance(parquet.get("path"), str)
+                    and isinstance(parquet.get("sha256"), str)
+                )
+            except (KeyError, TypeError, ValueError):
+                eligible = False
+            if eligible:
+                legacy_candidates.append(row["id"])
+        report.update(
+            legacy_vip_blocked_jobs=len(legacy_rows),
+            legacy_vip_eligible_jobs=len(legacy_candidates),
+        )
+        if not covered_year_types and not legacy_candidates:
             return report
 
         attempts = self.db.execute("SELECT count(*) FROM attempts").fetchone()[0]
@@ -1972,6 +2011,14 @@ class Pipeline:
                 "WITHOUT ROWID"
             )
             self.db.execute(
+                "CREATE TEMP TABLE fina_mainbz_vip_legacy_retire("
+                "id TEXT PRIMARY KEY) WITHOUT ROWID"
+            )
+            self.db.executemany(
+                "INSERT INTO fina_mainbz_vip_legacy_retire VALUES(?)",
+                ((task_id,) for task_id in legacy_candidates),
+            )
+            self.db.execute(
                 "INSERT INTO fina_mainbz_vip_retire "
                 "SELECT job.id FROM jobs AS job INDEXED BY jobs_ready_api_history "
                 "JOIN fina_mainbz_vip_year_coverage AS coverage "
@@ -1986,10 +2033,16 @@ class Pipeline:
                 "AND json_type(job.job,'$.params.ts_code')='text' "
                 "AND json_extract(job.job,'$.params.start_date')=coverage.year||'0101' "
                 "AND json_extract(job.job,'$.params.end_date')=coverage.year||'1231'",
-                (next(iter(fields)),),
+                (field_schema,),
             )
             protected = self.db.execute(
                 "DELETE FROM fina_mainbz_vip_retire WHERE id IN ("
+                "SELECT edge.child_id FROM partition_children AS edge "
+                "JOIN jobs AS parent ON parent.id=edge.parent_id "
+                "WHERE parent.state='split_pending')"
+            ).rowcount
+            legacy_protected = self.db.execute(
+                "DELETE FROM fina_mainbz_vip_legacy_retire WHERE id IN ("
                 "SELECT edge.child_id FROM partition_children AS edge "
                 "JOIN jobs AS parent ON parent.id=edge.parent_id "
                 "WHERE parent.state='split_pending')"
@@ -1998,10 +2051,42 @@ class Pipeline:
                 "SELECT count(*) FROM attempts WHERE job_id IN "
                 "(SELECT id FROM fina_mainbz_vip_retire)"
             ).fetchone()[0]
+            legacy_retired_attempts = self.db.execute(
+                "SELECT count(*) FROM attempts WHERE job_id IN "
+                "(SELECT id FROM fina_mainbz_vip_legacy_retire)"
+            ).fetchone()[0]
             superseded = self.db.execute(
                 "UPDATE jobs SET state='superseded' WHERE state='pending' "
                 "AND id IN (SELECT id FROM fina_mainbz_vip_retire)"
             ).rowcount
+            legacy_superseded = self.db.execute(
+                "UPDATE jobs SET state='superseded' WHERE state='blocked' "
+                "AND id IN (SELECT id FROM fina_mainbz_vip_legacy_retire)"
+            ).rowcount
+            if legacy_superseded:
+                self.db.execute(
+                    "INSERT INTO capability(scope,status,checked_at,reason) "
+                    "VALUES('planning:fina_mainbz_vip:legacy_contract',?,?,?) "
+                    "ON CONFLICT(scope) DO UPDATE SET "
+                    "status=excluded.status,checked_at=excluded.checked_at,"
+                    "reason=excluded.reason",
+                    (
+                        "replaced_by_verified_pagination",
+                        utc_now(),
+                        json.dumps(
+                            {
+                                "complete_period_types": len(complete),
+                                "superseded_jobs": legacy_superseded,
+                                "attempts_preserved": legacy_retired_attempts,
+                                "task_ids_sha256": digest(
+                                    json_bytes(sorted(legacy_candidates))
+                                ),
+                                "upstream_calls": 0,
+                            },
+                            sort_keys=True,
+                        ),
+                    ),
+                )
             if (
                 self.db.execute("SELECT count(*) FROM attempts").fetchone()[0]
                 != attempts
@@ -2022,12 +2107,22 @@ class Pipeline:
             raise
         finally:
             self.db.execute("DROP TABLE IF EXISTS fina_mainbz_vip_retire")
+            self.db.execute("DROP TABLE IF EXISTS fina_mainbz_vip_legacy_retire")
             self.db.execute("DROP TABLE IF EXISTS fina_mainbz_vip_year_coverage")
         report.update(
-            status="compacted" if superseded else "no_covered_open_jobs",
+            status=(
+                "compacted"
+                if superseded or legacy_superseded
+                else "no_covered_open_jobs"
+            ),
             superseded_open_jobs=superseded,
             protected_shared_jobs=protected,
-            retired_job_attempts_preserved=retired_attempts,
+            superseded_legacy_vip_jobs=legacy_superseded,
+            protected_legacy_vip_jobs=legacy_protected,
+            legacy_vip_attempts_preserved=legacy_retired_attempts,
+            retired_job_attempts_preserved=(
+                retired_attempts + legacy_retired_attempts
+            ),
         )
         return report
 

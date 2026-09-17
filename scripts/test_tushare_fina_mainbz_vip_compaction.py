@@ -63,6 +63,43 @@ class FinaMainbzVipCompactionTest(unittest.TestCase):
             epoch,
         )
 
+    def legacy_vip(self, period, kind, rows=200, *, epoch="history"):
+        current = self.pipeline.enqueue(
+            "fina_mainbz_vip", {"period": period, "type": kind}, 40, epoch
+        )
+        job = json.loads(
+            self.pipeline.db.execute(
+                "SELECT job FROM jobs WHERE id=?", (current,)
+            ).fetchone()[0]
+        )
+        job["params"].pop("limit")
+        job["row_cap"] = 100
+        logical = module.digest(module.json_bytes(job))
+        task_id = module.digest(module.json_bytes([logical, epoch]))
+        result = json.dumps(
+            {
+                "api_name": "fina_mainbz_vip",
+                "status": "possibly_truncated",
+                "row_count": rows,
+                "object_sha256": "a" * 64,
+                "observation": task_id[:32] + ".json",
+                "parquet": {
+                    "path": "parquet/" + "b" * 64 + ".parquet",
+                    "sha256": "b" * 64,
+                    "bytes": 1,
+                },
+            }
+        )
+        self.pipeline.db.execute(
+            "INSERT INTO jobs(id,logical_key,epoch,job,priority,state,tries,result,"
+            "group_name) VALUES(?,?,?,?,?,'blocked',1,?,'research_extra')",
+            (task_id, logical, epoch, json.dumps(job), 40, result),
+        )
+        self.pipeline.db.execute(
+            "INSERT INTO attempts VALUES(?,?,?)", (task_id, 1, result)
+        )
+        return task_id
+
     def state(self, job_id):
         return self.pipeline.db.execute(
             "SELECT state FROM jobs WHERE id=?", (job_id,)
@@ -151,6 +188,49 @@ class FinaMainbzVipCompactionTest(unittest.TestCase):
         self.assertEqual(report["vip_invalid_pages"], 1)
         self.assertEqual(report["vip_complete_period_types"], 0)
         self.assertEqual(self.state(ordinary), "pending")
+
+    def test_complete_period_retires_matching_legacy_vip_without_full_year(self):
+        self.vip("20200331", "P", 17)
+        covered = self.legacy_vip("20200331", "P")
+        incomplete = self.legacy_vip("20200630", "P")
+        covered_result = self.pipeline.db.execute(
+            "SELECT result FROM jobs WHERE id=?", (covered,)
+        ).fetchone()[0]
+        covered_attempt = self.pipeline.db.execute(
+            "SELECT result FROM attempts WHERE job_id=?", (covered,)
+        ).fetchone()[0]
+        self.pipeline.db.commit()
+
+        report = self.pipeline.compact_fina_mainbz_vip_coverage()
+
+        self.assertEqual(report["status"], "compacted")
+        self.assertEqual(report["vip_complete_period_types"], 1)
+        self.assertEqual(report["covered_year_types"], 0)
+        self.assertEqual(report["legacy_vip_blocked_jobs"], 2)
+        self.assertEqual(report["legacy_vip_eligible_jobs"], 1)
+        self.assertEqual(report["superseded_legacy_vip_jobs"], 1)
+        self.assertEqual(report["legacy_vip_attempts_preserved"], 1)
+        self.assertEqual(report["retired_job_attempts_preserved"], 1)
+        self.assertEqual(self.state(covered), "superseded")
+        self.assertEqual(self.state(incomplete), "blocked")
+        self.assertEqual(
+            self.pipeline.db.execute(
+                "SELECT result FROM jobs WHERE id=?", (covered,)
+            ).fetchone()[0],
+            covered_result,
+        )
+        self.assertEqual(
+            self.pipeline.db.execute(
+                "SELECT result FROM attempts WHERE job_id=?", (covered,)
+            ).fetchone()[0],
+            covered_attempt,
+        )
+        capability = self.pipeline.db.execute(
+            "SELECT status,reason FROM capability "
+            "WHERE scope='planning:fina_mainbz_vip:legacy_contract'"
+        ).fetchone()
+        self.assertEqual(capability["status"], "replaced_by_verified_pagination")
+        self.assertEqual(json.loads(capability["reason"])["upstream_calls"], 0)
 
 
 if __name__ == "__main__":
