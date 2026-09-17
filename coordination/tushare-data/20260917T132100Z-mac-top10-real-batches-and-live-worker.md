@@ -1,0 +1,10 @@
+# Mac Tushare Top10 real batches and live worker
+
+- Scope: Mac archive authority only. QuantDB and other services were not stopped. The Tushare LaunchAgent was drained only at completed-cycle boundaries for three exact batches, then restarted.
+- These were real upstream acquisitions, not dry runs: 1,080 Tushare calls completed in 179.364 seconds. All selected jobs reached terminal states, with 669 `done`, 411 `empty`, and no uncertain call reported by the receipts.
+- Wave 1: manifest `2d418fbdb55715af81875b7304e1164ad7f253c4a75e82eda93fbf24ad990f2c`, receipt `38f7adee213dbed710458f232df5600c00789f8fb1dc06cbcbd674d21dd8aa58`; 360 calls in 55.215 seconds. Each of `top10_floatholders` and `top10_holders` closed 110 done and 70 empty jobs.
+- Wave 2: manifest `4ab19cf460b2c1630c28e44cd10f0297543bd9737c867b08ac0f69615502f5a9`, receipt `af890ab0204237c98b5aaac2d808d129218349c8524fd58ddb5043d22f5bef66`; 360 calls in 60.151 seconds. `top10_floatholders` closed 113 done and 67 empty jobs; `top10_holders` closed 114 done and 66 empty jobs.
+- Wave 3: manifest `f63d474fe86af76165d20255569ffc106982eeddef1a307c954d59e4be5da54c`, receipt `ab848cf937490e4eb64a0244012a8d43a4cad8000712e9848d5d2ba3d0add52d`; 360 calls in 63.998 seconds. Each API closed 111 done and 69 empty jobs.
+- Runtime resumed under `com.quantmind.tushare-archive`. Its production cycle completed at `2026-09-17T13:18:27.303521+00:00` with 313 real upstream requests, no failed stage, and global state counts of 200,166 done, 184,842 empty, 2,687,813 pending, 1,306 blocked, 231 quality, 5,548 split pending, 4,657 permission blocked, and 5,671,721 superseded.
+- `planning_only` denotes a durable queue-expansion cycle and makes zero supplier calls; it is not a dry run. Commit `0ddfb71762248020fa1a16e0012bdd136337e4da` already reduced the successful planning-to-acquisition pause to the existing five-second minimum.
+- The next queue optimization is gated on proven `fina_mainbz_vip` quarterly pagination closure. Legacy per-stock `fina_mainbz` jobs stay open until every replacement period/type chain is terminal, so queue reduction cannot create a history gap.
