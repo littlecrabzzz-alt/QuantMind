@@ -128,6 +128,7 @@ LISTING_EXTRA_CONTRACTS["bse_mapping"].update(
 )
 LISTING_EXTRA_CONTRACTS["daily_info"].update(
     history_precision="per_category_day",
+    history_partition="closed_calendar_month_range_v1",
     documented_category_starts=DAILY_INFO_STARTS,
     documented_exchanges=["SH", "SZ"],
     namespace_note="ts_code contains market/category names such as SH_A and SZ_BOND_CB, not stock/index security codes. Keep opaque source labels in a dedicated market-statistics discovery namespace; do not pass them into stocks or equity prefix conversion.",
@@ -212,10 +213,14 @@ def listing_extra_prerequisites(identifiers=None, enabled_apis=None, config=None
     return gaps
 
 
-def _windows(api, start, end):
+def _windows(api, start, end, *, history=False):
     day = start
     while day <= end:
-        if api == "new_share":
+        if api == "new_share" or (
+            history
+            and LISTING_EXTRA_CONTRACTS[api].get("history_partition")
+            == "closed_calendar_month_range_v1"
+        ):
             last = min(
                 end, date(day.year, day.month, monthrange(day.year, day.month)[1])
             )
@@ -263,7 +268,9 @@ def iter_listing_extra_jobs(config, today, identifiers=None):
                 "epoch": epoch,
             }
         if start and start < recent:
-            histories[api] = iter(_windows(api, start, recent - timedelta(days=1)))
+            histories[api] = iter(
+                _windows(api, start, recent - timedelta(days=1), history=True)
+            )
     while histories:
         for api in tuple(histories):
             params = next(histories[api], None)

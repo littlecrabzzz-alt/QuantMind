@@ -18,6 +18,7 @@ from backend.shared.tushare_listing_extra_contracts import (
     DAILY_INFO_STARTS,
     FIELDS,
     INPUT_FIELDS,
+    iter_listing_extra_jobs,
 )
 from backend.shared.tushare_registry import contract_for
 from backend.shared.tushare_store import read_dataset, dataset_schema
@@ -282,6 +283,14 @@ class ListingExtraRuntime(unittest.TestCase):
         self.assertEqual(
             self.p.split_request(row, job, result)["method"], "date_bisection"
         )
+        row, job, result = self.capture(
+            "daily_info",
+            {"start_date": "20260901", "end_date": "20260902"},
+            more=True,
+        )
+        self.assertEqual(
+            self.p.split_request(row, job, result)["method"], "date_bisection"
+        )
         for api, params in (
             ("new_share", {"start_date": "20260904", "end_date": "20260904"}),
             ("new_share", {}),
@@ -297,6 +306,32 @@ class ListingExtraRuntime(unittest.TestCase):
             self.assertTrue(
                 set(json.loads(record[0])["params"]) <= {"start_date", "end_date"}
             )
+
+    def test_daily_info_history_uses_month_ranges_and_recent_stays_daily(self):
+        jobs = list(
+            iter_listing_extra_jobs(
+                {
+                    "listing_extra_apis": ["daily_info"],
+                    "listing_extra_history_start": "20251220",
+                    "planning_epoch": "fixture",
+                },
+                date(2026, 2, 10),
+            )
+        )
+        recent = [job["params"] for job in jobs if job["epoch"] == "fixture"]
+        history = [job["params"] for job in jobs if job["epoch"] == "history"]
+        self.assertEqual(
+            recent,
+            [{"trade_date": f"202602{day:02d}"} for day in range(4, 11)],
+        )
+        self.assertEqual(
+            history,
+            [
+                {"start_date": "20251220", "end_date": "20251231"},
+                {"start_date": "20260101", "end_date": "20260131"},
+                {"start_date": "20260201", "end_date": "20260203"},
+            ],
+        )
 
     def test_actual_run_blocks_terminal_caps_without_synthetic_partitions(self):
         pending = [

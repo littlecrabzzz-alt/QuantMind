@@ -1,5 +1,6 @@
 """Pure DC historical board-member and daily price acquisition contracts."""
 
+from calendar import monthrange
 from datetime import date, datetime, timedelta
 import re
 
@@ -81,6 +82,7 @@ DC_EXTRA_CONTRACTS["dc_member"].update(
     saturation_gap="Legacy capped exact-day exact-board requests remain explicit gaps. New con_code ranges use exhaustive date bisection when capped, but retained stock discovery still does not prove the historical stock universe complete.",
 )
 DC_EXTRA_CONTRACTS["dc_daily"].update(
+    history_partition="closed_calendar_month_range_v1",
     documented_idx_types=[v["idx_type"] for v in DAILY_VARIANTS],
     category_gap="idx_type is optional in the official input table. Plan all three explicit categories to avoid reliance on defaults; output category differs in name and its literal mapping is not demonstrated. Keep request identity separate, require actual filter/row evidence before claiming coverage.",
     history_note="The official historical lower bound is year 2020; 20200101 is a planning floor only, not a certified first trading day.",
@@ -166,12 +168,27 @@ def dc_extra_prerequisites(identifiers=None, enabled_apis=None, config=None):
     return gaps
 
 
-def _days(api, begin, end):
+def _days(api, begin, end, *, history=False):
     day = begin
     while day <= end:
+        last = (
+            min(end, date(day.year, day.month, monthrange(day.year, day.month)[1]))
+            if history
+            and DC_EXTRA_CONTRACTS[api].get("history_partition")
+            == "closed_calendar_month_range_v1"
+            else None
+        )
         for variant in DAILY_VARIANTS if api == "dc_daily" else [{}]:
-            yield {"trade_date": day.strftime("%Y%m%d"), **variant}
-        day += timedelta(days=1)
+            yield (
+                {
+                    "start_date": day.strftime("%Y%m%d"),
+                    "end_date": last.strftime("%Y%m%d"),
+                    **variant,
+                }
+                if last
+                else {"trade_date": day.strftime("%Y%m%d"), **variant}
+            )
+        day = last + timedelta(days=1) if last else day + timedelta(days=1)
 
 
 def _stock_codes(identifiers):
@@ -260,7 +277,7 @@ def iter_dc_extra_jobs(config, today, identifiers=None):
             histories[api] = iter(
                 _member_ranges(stocks, start, recent - timedelta(days=1))
                 if api == "dc_member" and stocks
-                else _days(api, start, recent - timedelta(days=1))
+                else _days(api, start, recent - timedelta(days=1), history=True)
             )
     while histories:
         for api in tuple(histories):

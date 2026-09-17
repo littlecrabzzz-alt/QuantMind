@@ -333,6 +333,38 @@ class DcExtraRuntime(unittest.TestCase):
         self.assertEqual(discovery[0]["observed_codes"], 1)
         self.assertFalse(discovery[0]["universe_complete"])
 
+    def test_dc_daily_history_uses_month_ranges_and_recent_stays_daily(self):
+        jobs = list(
+            iter_dc_extra_jobs(
+                {
+                    "dc_extra_apis": ["dc_daily"],
+                    "dc_extra_history_start": "20251220",
+                    "planning_epoch": "fixture",
+                },
+                date(2026, 2, 10),
+            )
+        )
+        recent = [job["params"] for job in jobs if job["epoch"] == "fixture"]
+        history = [job["params"] for job in jobs if job["epoch"] == "history"]
+        self.assertEqual(len(recent), 21)
+        self.assertTrue(all("trade_date" in params for params in recent))
+        self.assertEqual(len(history), 9)
+        self.assertEqual(
+            {
+                (params["start_date"], params["end_date"])
+                for params in history
+            },
+            {
+                ("20251220", "20251231"),
+                ("20260101", "20260131"),
+                ("20260201", "20260203"),
+            },
+        )
+        self.assertEqual(
+            {params["idx_type"] for params in history},
+            {item["idx_type"] for item in DAILY_VARIANTS},
+        )
+
     def test_range_and_observed_board_fanout_preserve_params_and_incompleteness(self):
         master = dict.fromkeys(contract_for("dc_index")["required_fields"])
         master.update(ts_code="retired.DC", trade_date="20260901")
