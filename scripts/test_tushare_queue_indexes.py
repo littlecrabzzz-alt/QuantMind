@@ -370,6 +370,92 @@ class QueueIndexTest(unittest.TestCase):
                 self.assertEqual(self.p._fair_turn, turn + 1)
             self.assertIsNone(self.p.next_job(config, 0.1))
 
+    def test_reviewed_fast_lane_is_bounded_round_robin_and_persisted(self):
+        for api in ("top10_holders", "top10_floatholders"):
+            for code in ("000001.SZ", "000002.SZ", "000003.SZ"):
+                self.p.enqueue(
+                    api,
+                    {
+                        "ts_code": code,
+                        "start_date": "20250101",
+                        "end_date": "20251231",
+                    },
+                    20,
+                    "20260917",
+                )
+        for day in ("20260915", "20260916", "20260917"):
+            self.p.enqueue("daily", {"trade_date": day}, 1, "20260917")
+        self.p.db.commit()
+        config = {
+            "rate_policy": "tiered_v1",
+            "requests_per_minute": 500,
+            "rollout_account_rpm": 500,
+            "enable_equity_event": True,
+            "group_weights": {"rrg": 2, "equity_event": 1},
+            "throughput_fast_lane_apis": [
+                "top10_holders",
+                "top10_floatholders",
+            ],
+            "throughput_fast_lane_every": 2,
+        }
+        selected = []
+        with (
+            patch.object(module.time, "time", return_value=1000),
+            patch.object(module.time, "monotonic", return_value=0),
+        ):
+            for _ in range(4):
+                self.p.db.execute("DELETE FROM request_gates")
+                row = self.p.next_job(config, 1)
+                selected.append(json.loads(row["job"])["api_name"])
+                self.p.db.execute(
+                    "UPDATE jobs SET state='done' WHERE id=?", (row["id"],)
+                )
+                self.p.db.commit()
+                self.p.close()
+                self.p = module.Pipeline(self.root, {"entries": []})
+        self.assertEqual(
+            selected,
+            ["top10_holders", "daily", "top10_floatholders", "daily"],
+        )
+        turns = self.p.db.execute(
+            "SELECT name,value FROM scheduler_state "
+            "WHERE name GLOB 'throughput_api_turn:*'"
+        ).fetchall()
+        self.assertEqual(
+            dict(turns),
+            {
+                "throughput_api_turn:top10_holders": 1,
+                "throughput_api_turn:top10_floatholders": 2,
+            },
+        )
+        self.assertEqual(self.p._fair_turn, 4)
+
+    def test_fast_lane_rejects_unreviewed_or_disabled_apis(self):
+        base = {
+            "rate_policy": "tiered_v1",
+            "requests_per_minute": 500,
+            "rollout_account_rpm": 500,
+            "group_weights": {"rrg": 1},
+            "throughput_fast_lane_every": 2,
+        }
+        with self.assertRaisesRegex(ValueError, "reviewed account-rate"):
+            self.p.next_job(
+                {
+                    **base,
+                    "enable_factor_library": True,
+                    "throughput_fast_lane_apis": ["factor_value"],
+                },
+                time.monotonic() + 1,
+            )
+        with self.assertRaisesRegex(ValueError, "reviewed account-rate"):
+            self.p.next_job(
+                {
+                    **base,
+                    "throughput_fast_lane_apis": ["top10_holders"],
+                },
+                time.monotonic() + 1,
+            )
+
     def test_expand_visits_same_rows_order_and_marks_only_eligible(self):
         self.seed(30, 10)
         expected = [

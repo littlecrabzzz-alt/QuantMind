@@ -613,6 +613,46 @@ class Pipeline:
                     # borrowed the other one, or the ensuing request later fails.
                     return row, [(prefix + api, turn), (phase_name, (phase + 1) % 4)]
 
+    def _next_throughput_job(self, apis, now):
+        """Round-robin an explicitly reviewed fast lane without starving families."""
+        prefix = "throughput_api_turn:"
+        previous = self.db.execute(
+            "SELECT name,value FROM scheduler_state WHERE name GLOB ? "
+            "ORDER BY value DESC,name LIMIT 1",
+            (prefix + "*",),
+        ).fetchone()
+        cursor = previous["name"][len(prefix) :] if previous else None
+        turn = previous["value"] + 1 if previous else 1
+        start = (apis.index(cursor) + 1) if cursor in apis else 0
+        for offset in range(len(apis)):
+            api = apis[(start + offset) % len(apis)]
+            gate = self.db.execute(
+                "SELECT next_at FROM request_gates WHERE scope=?", ("api:" + api,)
+            ).fetchone()
+            if gate and gate[0] > now:
+                continue
+            family = contract_for(api).get("group")
+            phase_name = "throughput_phase:" + api
+            phase_row = self.db.execute(
+                "SELECT value FROM scheduler_state WHERE name=?", (phase_name,)
+            ).fetchone()
+            phase = phase_row[0] % 4 if phase_row else 0
+            history = int(phase == 3)
+            for bucket in (history, 1 - history):
+                row = self.db.execute(
+                    """SELECT * FROM jobs INDEXED BY jobs_ready_api_history
+                    WHERE state='pending' AND group_name=?
+                      AND json_extract(job,'$.api_name')=? AND (epoch='history')=?
+                      AND retry_after<=? ORDER BY priority,rowid LIMIT 1""",
+                    (family, api, bucket, now),
+                ).fetchone()
+                if row:
+                    return row, [
+                        (prefix + api, turn),
+                        (phase_name, (phase + 1) % 4),
+                    ]
+        return None, []
+
     def next_job(self, config, deadline, *, task_scope=False):
         # Preserve legacy structured fallback behavior; extend only enabled families.
         fair_families = {"structured"} | {
@@ -671,6 +711,37 @@ class Pipeline:
             return row
         if not 1 <= int(rpm) <= 500:
             raise ValueError("Invalid account request rate")
+        throughput_apis = config.get("throughput_fast_lane_apis", [])
+        throughput_every = config.get("throughput_fast_lane_every")
+        if throughput_apis:
+            if (
+                not isinstance(throughput_apis, list)
+                or not 1 <= len(throughput_apis) <= 32
+                or any(not isinstance(api, str) or not api for api in throughput_apis)
+                or len(throughput_apis) != len(set(throughput_apis))
+                or isinstance(throughput_every, bool)
+                or not isinstance(throughput_every, int)
+                or not 2 <= throughput_every <= 100
+            ):
+                raise ValueError("Invalid throughput fast lane configuration")
+            for api in throughput_apis:
+                spec = contract_for(api)
+                resolved = resolved_api_rate(api, spec, config)
+                if (
+                    not isinstance(spec.get("group"), str)
+                    or not spec["group"]
+                    or (
+                        spec["group"] not in ("rrg", "structured")
+                        and not config.get("enable_" + spec["group"])
+                    )
+                    or resolved.get("review_required")
+                    or resolved.get("rpm") != int(rpm)
+                ):
+                    raise ValueError(
+                        "Throughput fast lane requires reviewed account-rate APIs"
+                    )
+        elif throughput_every is not None:
+            raise ValueError("Throughput cadence requires a non-empty API list")
         while time.monotonic() < deadline:
             now = time.time()
             account = self.db.execute(
@@ -705,6 +776,21 @@ class Pipeline:
                 # family policy. The same account/API gates and reservations below
                 # still apply, and priority remains ordered within each API.
                 row, checkpoints = self._next_exact_task_job(now)
+            elif throughput_apis and self._fair_turn % throughput_every == 0:
+                row, checkpoints = self._next_throughput_job(
+                    throughput_apis, now
+                )
+                if row is None:
+                    if group in fair_families:
+                        row, checkpoints = self._next_family_job(group, now)
+                    else:
+                        row = self.db.execute(
+                            sql.format(
+                                group_filter="AND j.group_name=?",
+                                ready_index="jobs_ready_group",
+                            ),
+                            (now, now, group),
+                        ).fetchone()
             elif group in fair_families:
                 row, checkpoints = self._next_family_job(group, now)
             else:
