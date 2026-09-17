@@ -4503,7 +4503,19 @@ class Pipeline:
                     **self.status(),
                 }
         if not task_scope:
-            self.reconcile_partitions(deadline=deadline)
+            reconciliation_parents = config.get(
+                "reconciliation_parents_per_tick", 64
+            )
+            if (
+                type(reconciliation_parents) is not int
+                or not 1 <= reconciliation_parents <= 1000
+            ):
+                raise ValueError("Invalid partition reconciliation budget")
+            partition_reconciliation = self.reconcile_partitions(
+                max_parents=reconciliation_parents, deadline=deadline
+            )
+        else:
+            partition_reconciliation = None
         completed = 0
         invalid_requests = 0
         while completed < max_requests and time.monotonic() - started < max_seconds:
@@ -4762,6 +4774,8 @@ class Pipeline:
         }
         if partition_work is not None:
             report["partition_work"] = partition_work
+        if partition_reconciliation is not None:
+            report["partition_reconciliation"] = partition_reconciliation
         if invalid_requests:
             report["invalid_requests_blocked"] = invalid_requests
         if task_scope:

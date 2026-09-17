@@ -11,6 +11,7 @@
   "archive_worker_cycle_seconds": 120,
   "publish_interval_seconds": 21600,
   "planning_interval_seconds": 900,
+  "reconciliation_parents_per_tick": 64,
   "throughput_fast_lane_apis": [],
   "throughput_fast_lane_every": null,
   "enable_text": true,

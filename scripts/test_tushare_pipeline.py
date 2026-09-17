@@ -137,6 +137,48 @@ class PipelineAcceptance(unittest.TestCase):
                     self.assertEqual([r["adj_factor"] for r in rows], [value])
             pipeline.close()
 
+    def test_run_bounds_background_partition_reconciliation_before_acquisition(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pipeline = Pipeline(Path(tmp), CATALOG)
+            pipeline.enqueue(
+                "fund_adj", {"trade_date": "20260907", "offset": 0, "limit": 2}
+            )
+            pipeline.db.commit()
+            calls = []
+            reconcile = pipeline.reconcile_partitions
+
+            def observed_reconcile(*args, **kwargs):
+                calls.append(dict(kwargs))
+                return reconcile(*args, **kwargs)
+
+            with (
+                patch.object(
+                    pipeline,
+                    "reconcile_partitions",
+                    side_effect=observed_reconcile,
+                ),
+                httpx.Client(
+                    transport=httpx.MockTransport(
+                        lambda _: self.response([1])
+                    )
+                ) as client,
+            ):
+                report = pipeline.run(
+                    client,
+                    "synthetic-token",
+                    CONFIG,
+                    max_requests=1,
+                    pause=0,
+                )
+
+            self.assertEqual(calls[0]["max_parents"], 64)
+            self.assertEqual(report["requests"], 1)
+            self.assertEqual(
+                report["partition_reconciliation"],
+                {"checked": 0, "resolved": 0},
+            )
+            pipeline.close()
+
     def test_publication_recovers_retention_interruptions_without_version_loop(self):
         from backend.shared.tushare_archive import retain_release, recover_archive
         from backend.shared.tushare_pipeline import atomic_bytes
