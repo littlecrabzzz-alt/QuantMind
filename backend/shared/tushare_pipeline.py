@@ -3947,6 +3947,9 @@ class Pipeline:
             ),
             "job_id": row["id"],
             "split": split,
+            "local_only": bool(
+                split and split.get("method") == "observed_value_fanout"
+            ),
             "legacy_parent_recovered": recovered_legacy,
             "discovery_family": (
                 contract_for(job["api_name"]).get("saturation_fallback")
@@ -3998,9 +4001,15 @@ class Pipeline:
         if partition_work is not None:
             # Full discovery remains isolated. Proven source projections may
             # use only the unspent original deadline for unrelated acquisition.
+            # Observed-value partitions read only the retained parent object,
+            # so they can continue into acquisition without a discovery scan.
             if (
-                partition_work.get("discovery_family") not in IDENTIFIER_SPLIT_SOURCE_APIS
-                or time.monotonic() >= deadline
+                not partition_work.get("local_only")
+                and (
+                    partition_work.get("discovery_family")
+                    not in IDENTIFIER_SPLIT_SOURCE_APIS
+                    or time.monotonic() >= deadline
+                )
             ):
                 return {
                     "requests": 0,

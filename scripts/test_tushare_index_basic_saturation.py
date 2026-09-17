@@ -126,6 +126,44 @@ class IndexBasicSaturation(unittest.TestCase):
             json.loads(after["result"])["partition_recovery"]["upstream_calls"], 0
         )
 
+    def test_local_legacy_partition_keeps_remaining_acquisition_budget(self):
+        parent = self.pipeline.enqueue("index_basic", {"market": "CSI"})
+        self.pipeline.db.commit()
+        spec = module.EXTENDED_CONTRACTS["index_basic"]
+        with patch.dict(
+            spec,
+            {
+                "row_cap": 2,
+                "saturation_fallback": None,
+                "saturation_partition_param": None,
+            },
+        ):
+            self.capture(1)
+        calls = []
+
+        def child_response(request):
+            body = json.loads(request.content)
+            calls.append(body["params"])
+            publisher = body["params"]["publisher"]
+            return httpx.Response(
+                200,
+                json={
+                    "code": 0,
+                    "data": {
+                        "fields": ["ts_code", "publisher", "market"],
+                        "items": [["000300.CSI", publisher, "CSI"]],
+                        "has_more": False,
+                    },
+                },
+            )
+
+        report = self.capture(1, child_response)
+        self.assertTrue(report["partition_work"]["local_only"])
+        self.assertEqual(report["partition_work"]["upstream_calls"], 0)
+        self.assertEqual(report["requests"], 1)
+        self.assertEqual(len(calls), 1)
+        self.assertIn(calls[0], self.children(parent))
+
 
 if __name__ == "__main__":
     unittest.main()
