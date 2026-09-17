@@ -29,6 +29,8 @@ def prepare(runtime):
         'scripts/tushare_stock_lifecycle_migration.py',
         'scripts/tushare_asset_lifecycle_migration.py',
         'scripts/tushare_reassess_saved_quality.py',
+        'scripts/prepare_tushare_fund_nav_empty_review.py',
+        'scripts/run_tushare_fund_nav_empty_review.py',
         'scripts/tushare_invalid_request_retirement.py',
         'scripts/tushare_cyq_empty_reassessment.py',
         'scripts/tushare_normalization_recovery.py',
