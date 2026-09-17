@@ -108,6 +108,20 @@ STRUCTURED_CONTRACTS = {
     "cn_pmi": _contract(2000, ("month",), split=False),
     "sf_month": _contract(2000, ("month",), split=False),
 }
+STRUCTURED_CONTRACTS["index_basic"].update(
+    saturation_fallback="indexes",
+    saturation_param="ts_code",
+    saturation_dependencies=["indexes"],
+    saturation_partition_param="publisher",
+    saturation_partition_values=[],
+    saturation_partition_value_kind="supplier_text",
+    recover_legacy_blocked_identifier_fanout=True,
+    saturation_gap=(
+        "A capped market response is first subdivided by publisher values retained "
+        "in that response. The supplier does not publish a closed publisher "
+        "vocabulary, so the resulting coverage remains unverified."
+    ),
+)
 STRUCTURED_CONTRACTS["index_daily"]["dependencies"] = ["index_lifecycles"]
 # Demonstrated lower bounds from the 2026-09-09 authority capability probe,
 # period 20260630. These are saturation alarms, NOT verified provider maxima.

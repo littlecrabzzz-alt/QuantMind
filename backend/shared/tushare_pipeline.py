@@ -3291,18 +3291,30 @@ class Pipeline:
             saved = result if result is not None else json.loads(row["result"] or "{}")
             if saved.get("object_sha256"):
                 configured = spec.get("saturation_partition_values", [])
+                value_kind = spec.get("saturation_partition_value_kind", "code")
+
+                def valid_partition_value(value):
+                    if value_kind == "code":
+                        return isinstance(value, str) and bool(
+                            re.fullmatch(r"[A-Z0-9]{2,16}", value)
+                        )
+                    if value_kind == "supplier_text":
+                        return (
+                            isinstance(value, str)
+                            and value == value.strip()
+                            and 1 <= len(value) <= 128
+                            and all(ord(char) >= 32 and ord(char) != 127 for char in value)
+                        )
+                    raise ValueError("Invalid saturation partition value kind")
+
                 if not isinstance(configured, (list, tuple)) or any(
-                    not isinstance(value, str)
-                    or not re.fullmatch(r"[A-Z0-9]{2,16}", value)
-                    for value in configured
+                    not valid_partition_value(value) for value in configured
                 ):
                     raise ValueError("Invalid saturation partition values")
                 observed, invalid = set(), 0
                 for record in self.records(saved, fields={partition_param}):
                     value = record.get(partition_param)
-                    if isinstance(value, str) and re.fullmatch(
-                        r"[A-Z0-9]{2,16}", value
-                    ):
+                    if valid_partition_value(value):
                         observed.add(value)
                     else:
                         invalid += 1
@@ -3329,6 +3341,7 @@ class Pipeline:
                         "partition_param": partition_param,
                         "configured_values": list(configured),
                         "observed_values": sorted(observed),
+                        "value_kind": value_kind,
                         "invalid_parent_values": invalid,
                         "parent_observation": saved.get("observation"),
                         "parent_object_sha256": saved.get("object_sha256"),
@@ -3827,6 +3840,20 @@ class Pipeline:
             and not self.date_children(job)
         )
 
+    def deferred_split_kind(self, job, result, *, epoch=None):
+        if self.identifier_split_needs_discovery(job, epoch=epoch):
+            return "identifier_fanout"
+        spec = contract_for(job["api_name"])
+        partition_param = spec.get("saturation_partition_param")
+        if (
+            spec.get("saturation_fallback")
+            and partition_param
+            and partition_param not in job["params"]
+            and result.get("object_sha256")
+        ):
+            return "observed_value_fanout"
+        return None
+
     def resume_identifier_split(self, deadline, config):
         # Existing state index limits this read to unresolved parents, not the
         # millions of pending acquisition jobs. The result is already durable.
@@ -3858,10 +3885,11 @@ class Pipeline:
         if time.monotonic() >= deadline:
             return {"status": "deadline_deferred", "job_id": row["id"], "upstream_calls": 0}
         job, result = json.loads(row["job"]), json.loads(row["result"])
+        deferred_kind = self.deferred_split_kind(job, result, epoch=row["epoch"])
         if recovered_legacy:
             result["partition_deferred"] = {
                 "version": 1,
-                "kind": "identifier_fanout",
+                "kind": deferred_kind,
             }
             result["partition_recovery"] = {
                 "version": 1,
@@ -3869,9 +3897,10 @@ class Pipeline:
                 "upstream_calls": 0,
             }
         if (
-            result.get("partition_deferred") != {"version": 1, "kind": "identifier_fanout"}
+            not deferred_kind
+            or result.get("partition_deferred")
+            != {"version": 1, "kind": deferred_kind}
             or result.get("status") != "possibly_truncated"
-            or not self.identifier_split_needs_discovery(job, epoch=row["epoch"])
         ):
             raise ValueError(
                 "Unsupported deferred identifier partition; evidence preserved"
