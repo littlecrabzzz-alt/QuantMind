@@ -4125,6 +4125,14 @@ class Pipeline:
                 "SELECT rowid,parent_id FROM partition_splits WHERE rowid>? ORDER BY rowid LIMIT ?",
                 (cursor, max_parents),
             ).fetchall()
+            if len(selected) < max_parents:
+                selected.extend(
+                    self.db.execute(
+                        "SELECT rowid,parent_id FROM partition_splits "
+                        "WHERE rowid<=? ORDER BY rowid LIMIT ?",
+                        (cursor, max_parents - len(selected)),
+                    ).fetchall()
+                )
             pending = deque((row["parent_id"], row["rowid"]) for row in selected)
         else:
             pending = deque(

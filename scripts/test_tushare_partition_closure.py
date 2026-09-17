@@ -374,6 +374,30 @@ class Closure(unittest.TestCase):
             self.reopen()
         self.assertTrue(all(self.state(parent) == "resolved" for parent in parents))
 
+    def test_bounded_cursor_wraps_when_new_splits_follow_the_tail(self):
+        old, old_children = self.split(epoch="wrap-old")
+        for child in old_children:
+            self.finish(child)
+        cursor_parent, _ = self.split(epoch="wrap-cursor")
+        cursor = self.p.db.execute(
+            "SELECT rowid FROM partition_splits WHERE parent_id=?", (cursor_parent,)
+        ).fetchone()[0]
+        self.p.db.execute(
+            "INSERT INTO scheduler_state VALUES('partition_cursor',?) "
+            "ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+            (cursor,),
+        )
+        appended, appended_children = self.split(epoch="wrap-appended")
+        for child in appended_children:
+            self.finish(child)
+
+        report = self.p.reconcile_partitions(max_parents=2)
+
+        self.assertEqual(report, {"checked": 2, "resolved": 2})
+        self.assertEqual(self.state(old), "resolved")
+        self.assertEqual(self.state(appended), "resolved")
+        self.assertEqual(self.state(cursor_parent), "split_pending")
+
     def test_deadline_advances_cursor_only_past_reconciled_parents(self):
         parents = []
         rowids = []
