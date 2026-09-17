@@ -197,6 +197,183 @@ class AnnouncementSaturationTest(unittest.TestCase):
         )
         self.assertNotIn("partition_deferred", final)
 
+    def test_recent_caps_retire_only_after_canonical_history_fanout(self):
+        params = {"start_date": "20260915", "end_date": "20260915"}
+        fields = ["ann_date", "ts_code", "name", "title", "url", "rec_time"]
+        items = [["20260915", "SZ300604", "A", "T", "U", None]]
+        history = self.seed("anns_d", params, fields, items)
+        history_row = self.pipeline.db.execute(
+            "SELECT * FROM jobs WHERE id=?", (history,)
+        ).fetchone()
+        history_result = json.loads(history_row["result"])
+        history_result.update(status="possibly_truncated", observation="history.json")
+        with patch.object(
+            self.pipeline,
+            "identifiers",
+            return_value={"announcement_securities": ["300604.SZ", "600000.SH"]},
+        ):
+            split = self.pipeline.split_request(
+                history_row, json.loads(history_row["job"]), history_result
+            )
+        history_result["split"] = split
+        self.pipeline.db.execute(
+            "UPDATE jobs SET state='split_pending',result=? WHERE id=?",
+            (json.dumps(history_result), history),
+        )
+
+        recent = []
+        for epoch in ("2026091705", "20260918"):
+            task = self.seed("anns_d", params, fields, items, epoch=epoch)
+            result = json.loads(
+                self.pipeline.db.execute(
+                    "SELECT result FROM jobs WHERE id=?", (task,)
+                ).fetchone()[0]
+            )
+            result.update(status="possibly_truncated", observation=epoch + ".json")
+            self.pipeline.db.execute(
+                "UPDATE jobs SET state='blocked',result=? WHERE id=?",
+                (json.dumps(result), task),
+            )
+            recent.append(task)
+        unrelated = self.seed(
+            "anns_d",
+            {"start_date": "20260916", "end_date": "20260916"},
+            fields,
+            items,
+            epoch="20260918",
+        )
+        unrelated_result = json.loads(
+            self.pipeline.db.execute(
+                "SELECT result FROM jobs WHERE id=?", (unrelated,)
+            ).fetchone()[0]
+        )
+        unrelated_result.update(
+            status="possibly_truncated", observation="unrelated.json"
+        )
+        self.pipeline.db.execute(
+            "UPDATE jobs SET state='blocked',result=? WHERE id=?",
+            (json.dumps(unrelated_result), unrelated),
+        )
+        self.pipeline.db.commit()
+        before = dict(
+            self.pipeline.db.execute(
+                "SELECT id,result FROM jobs WHERE id IN (?,?,?)",
+                (*recent, unrelated),
+            )
+        )
+
+        report = self.pipeline.maintain_announcement_saturation()
+        self.assertEqual(report["status"], "maintained")
+        self.assertEqual(report["superseded_recent_caps"], 2)
+        self.assertEqual(report["recovered_date_split_parents"], 0)
+        self.assertEqual(report["preserved_result_jobs"], 2)
+        self.assertEqual(report["preserved_attempts"], 2)
+        rows = {
+            row["id"]: (row["state"], row["result"])
+            for row in self.pipeline.db.execute(
+                "SELECT id,state,result FROM jobs WHERE id IN (?,?,?,?)",
+                (history, *recent, unrelated),
+            )
+        }
+        self.assertEqual(rows[history][0], "split_pending")
+        self.assertTrue(all(rows[task][0] == "superseded" for task in recent))
+        self.assertEqual(rows[unrelated][0], "blocked")
+        self.assertTrue(all(rows[task][1] == before[task] for task in recent))
+        self.assertEqual(
+            self.pipeline.maintain_announcement_saturation()["status"], "no_action"
+        )
+
+    def test_legacy_date_split_parent_recovers_without_changing_evidence(self):
+        task = self.pipeline.enqueue(
+            "anns_d",
+            {"start_date": "20200416", "end_date": "20200423"},
+            epoch="history",
+        )
+        row = self.pipeline.db.execute(
+            "SELECT * FROM jobs WHERE id=?", (task,)
+        ).fetchone()
+        result = {
+            "api_name": "anns_d",
+            "status": "possibly_truncated",
+            "row_count": 6000,
+            "object_sha256": "a" * 64,
+            "observation": "legacy.json",
+            "normalization_error": "TimeoutError",
+        }
+        result["split"] = self.pipeline.split_request(
+            row, json.loads(row["job"]), result
+        )
+        self.pipeline.db.execute(
+            "UPDATE jobs SET state='blocked',tries=1,result=? WHERE id=?",
+            (json.dumps(result), task),
+        )
+        self.pipeline.db.execute(
+            "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+            (task, 1, json.dumps(result)),
+        )
+        self.pipeline.db.commit()
+        saved = self.pipeline.db.execute(
+            "SELECT result FROM jobs WHERE id=?", (task,)
+        ).fetchone()[0]
+
+        report = self.pipeline.maintain_announcement_saturation()
+        self.assertEqual(report["recovered_date_split_parents"], 1)
+        self.assertEqual(report["superseded_recent_caps"], 0)
+        parent = self.pipeline.db.execute(
+            "SELECT state,result FROM jobs WHERE id=?", (task,)
+        ).fetchone()
+        self.assertEqual(parent["state"], "split_pending")
+        self.assertEqual(parent["result"], saved)
+        split = self.pipeline.db.execute(
+            "SELECT status,gap FROM partition_splits WHERE parent_id=?", (task,)
+        ).fetchone()
+        self.assertEqual(tuple(split), ("gap", "child_not_verified"))
+        self.assertEqual(
+            self.pipeline.db.execute(
+                "SELECT count(*) FROM attempts WHERE job_id=?", (task,)
+            ).fetchone()[0],
+            1,
+        )
+
+    def test_new_date_split_keeps_running_when_parent_normalization_fails(self):
+        task = self.pipeline.enqueue(
+            "anns_d",
+            {"start_date": "20200416", "end_date": "20200423"},
+            epoch="history",
+        )
+        captured = {
+            "api_name": "anns_d",
+            "status": "possibly_truncated",
+            "row_count": 6000,
+            "supplier_empty_hint": False,
+            "object_sha256": "b" * 64,
+            "observation": "current.json",
+        }
+        with (
+            patch(
+                "backend.shared.tushare_pipeline.capture_sample",
+                return_value=captured,
+            ),
+            patch.object(self.pipeline, "normalize", side_effect=TimeoutError),
+        ):
+            report = self.pipeline.run(
+                None,
+                "test-token",
+                {},
+                max_requests=1,
+                max_seconds=30,
+                pause=0,
+                task_ids=[task],
+            )
+        self.assertEqual(report["requests"], 1)
+        parent = self.pipeline.db.execute(
+            "SELECT state,result FROM jobs WHERE id=?", (task,)
+        ).fetchone()
+        self.assertEqual(parent["state"], "split_pending")
+        result = json.loads(parent["result"])
+        self.assertEqual(result["normalization_error"], "TimeoutError")
+        self.assertEqual(result["split"], {"method": "date_bisection", "children": 2})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -103,7 +103,8 @@ class QueueIndexTest(unittest.TestCase):
         results, steps = [], []
         for hint in ('NOT INDEXED', ''):
             counter = [0]
-            def progress():
+
+            def progress(counter=counter):
                 counter[0] += 1
                 return 0
             self.p.db.set_progress_handler(progress, 100)
@@ -253,6 +254,14 @@ class QueueIndexTest(unittest.TestCase):
                 "stale_duplicate_jobs": 1,
                 "superseded_open_jobs": 2,
                 "protected_shared_jobs": 1,
+                "announcement_saturation": {
+                    "status": "no_action",
+                    "recovered_date_split_parents": 0,
+                    "superseded_recent_caps": 0,
+                    "preserved_result_jobs": 0,
+                    "preserved_attempts": 0,
+                    "upstream_calls": 0,
+                },
             },
         )
         states = dict(
@@ -272,7 +281,18 @@ class QueueIndexTest(unittest.TestCase):
         self.assertEqual(closure[0]["children"], [children[0]])
         self.assertEqual(
             self.p.compact_stale_recent_roots("20260912"),
-            {"status": "already_compacted", "epoch": "20260912"},
+            {
+                "status": "already_compacted",
+                "epoch": "20260912",
+                "announcement_saturation": {
+                    "status": "no_action",
+                    "recovered_date_split_parents": 0,
+                    "superseded_recent_caps": 0,
+                    "preserved_result_jobs": 0,
+                    "preserved_attempts": 0,
+                    "upstream_calls": 0,
+                },
+            },
         )
 
     def test_compaction_removes_duplicate_child_of_terminal_parent(self):

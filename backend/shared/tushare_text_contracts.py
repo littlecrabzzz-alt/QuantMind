@@ -205,6 +205,7 @@ TEXT_CONTRACT_NOTES = {
             "capped historical day requires an exhaustive listed-company code universe; current and historical stock_basic plus announcement-observed codes are requested, but the supplier exposes no independent total",
             "download URL availability is not successful PDF download or parsing",
             "recent exact-day snapshots use one durable generation per Shanghai calendar day and are revisited for seven days; historical capped days use the stock-code fanout",
+            "capped recent observations remain immutable revision evidence, but their duplicate blocker states are retired after the same logical request has a durable historical stock-code fanout",
         ],
     },
     "irm_qa_sh": {

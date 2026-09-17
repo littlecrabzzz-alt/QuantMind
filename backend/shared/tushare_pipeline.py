@@ -1449,6 +1449,206 @@ class Pipeline:
                         )
         self.db.commit()
 
+    def maintain_announcement_saturation(self):
+        """Close legacy announcement states without discarding any capture.
+
+        A stable historical ``anns_d`` identifier fanout owns the completeness
+        obligation for its logical request. Older capped recent observations are
+        still useful revision evidence, but keeping each one ``blocked`` repeats
+        the same gap. Date-bisection parents created before normalization failed
+        are likewise recoverable when their exact child relationship is already
+        durable and exhaustive.
+        """
+        recovered = []
+        for row in self.db.execute("""
+            SELECT job.id,job.epoch,job.job,job.result,
+                   split.expected_children,split.coverage_proven,split.method
+            FROM partition_splits AS split
+            JOIN jobs AS job ON job.id=split.parent_id
+            WHERE job.state='blocked' AND job.epoch='history'
+              AND split.method='date_bisection'
+              AND json_extract(job.job,'$.api_name')='anns_d'
+        """):
+            try:
+                job = json.loads(row["job"])
+                result = json.loads(row["result"] or "{}")
+                expected = self.date_children(job)
+                children = self.db.execute(
+                    "SELECT child.id,child.epoch,child.job "
+                    "FROM partition_children AS edge "
+                    "JOIN jobs AS child ON child.id=edge.child_id "
+                    "WHERE edge.parent_id=?",
+                    (row["id"],),
+                ).fetchall()
+                actual = []
+                valid_children = True
+                for child in children:
+                    saved = json.loads(child["job"])
+                    if (
+                        child["epoch"] != row["epoch"]
+                        or saved.get("api_name") != job.get("api_name")
+                    ):
+                        valid_children = False
+                        break
+                    actual.append(saved.get("params"))
+
+                def canonical(values):
+                    return {
+                        json.dumps(value, sort_keys=True, separators=(",", ":"))
+                        for value in values
+                    }
+                eligible = (
+                    result.get("status") == "possibly_truncated"
+                    and isinstance(result.get("normalization_error"), str)
+                    and isinstance(result.get("object_sha256"), str)
+                    and isinstance(result.get("observation"), str)
+                    and result.get("split")
+                    == {"method": "date_bisection", "children": len(expected)}
+                    and row["coverage_proven"] == 1
+                    and row["expected_children"] == len(expected)
+                    and len(children) == len(expected)
+                    and valid_children
+                    and canonical(actual) == canonical(expected)
+                )
+            except (KeyError, TypeError, ValueError):
+                eligible = False
+            if eligible:
+                recovered.append(row["id"])
+
+        canonical_history = {
+            row["logical_key"]
+            for row in self.db.execute("""
+                SELECT job.logical_key
+                FROM partition_splits AS split
+                JOIN jobs AS job ON job.id=split.parent_id
+                WHERE job.epoch='history'
+                  AND job.state IN ('split_pending','resolved')
+                  AND split.method='identifier_fanout'
+                  AND split.expected_children>0
+                  AND json_extract(job.job,'$.api_name')='anns_d'
+            """)
+        }
+        retired = []
+        if canonical_history:
+            for row in self.db.execute("""
+                SELECT job.id,job.logical_key,job.result
+                FROM jobs AS job INDEXED BY jobs_pending
+                WHERE job.state='blocked' AND job.epoch<>'history'
+                  AND json_extract(job.job,'$.api_name')='anns_d'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM partition_children AS edge
+                      WHERE edge.parent_id=job.id
+                  )
+            """):
+                try:
+                    result = json.loads(row["result"] or "{}")
+                except (TypeError, ValueError):
+                    continue
+                if (
+                    row["logical_key"] in canonical_history
+                    and result.get("status") == "possibly_truncated"
+                    and isinstance(result.get("object_sha256"), str)
+                    and isinstance(result.get("observation"), str)
+                ):
+                    retired.append(row["id"])
+
+        selected = [*recovered, *retired]
+        report = {
+            "status": "no_action",
+            "recovered_date_split_parents": len(recovered),
+            "superseded_recent_caps": len(retired),
+            "preserved_result_jobs": 0,
+            "preserved_attempts": 0,
+            "upstream_calls": 0,
+        }
+        if not selected:
+            return report
+        placeholders = ",".join("?" for _ in selected)
+        before = {
+            row["id"]: (row["state"], row["tries"], row["result"])
+            for row in self.db.execute(
+                f"SELECT id,state,tries,result FROM jobs WHERE id IN ({placeholders})",
+                selected,
+            )
+        }
+        attempt_counts = dict(
+            self.db.execute(
+                f"SELECT job_id,count(*) FROM attempts WHERE job_id IN ({placeholders}) "
+                "GROUP BY job_id",
+                selected,
+            )
+        )
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
+            for task_id in recovered:
+                changed = self.db.execute(
+                    "UPDATE jobs SET state='split_pending' "
+                    "WHERE id=? AND state='blocked'",
+                    (task_id,),
+                ).rowcount
+                if changed != 1:
+                    raise ValueError("Announcement date parent changed during recovery")
+            for task_id in retired:
+                changed = self.db.execute(
+                    "UPDATE jobs SET state='superseded' "
+                    "WHERE id=? AND state='blocked'",
+                    (task_id,),
+                ).rowcount
+                if changed != 1:
+                    raise ValueError("Announcement recent cap changed during retirement")
+            reason = json.dumps(
+                {
+                    "recovered_date_split_parents": len(recovered),
+                    "superseded_recent_caps": len(retired),
+                    "attempts_preserved": sum(attempt_counts.values()),
+                    "results_preserved": sum(
+                        before[task_id][2] is not None for task_id in selected
+                    ),
+                    "upstream_calls": 0,
+                },
+                sort_keys=True,
+            )
+            self.db.execute(
+                "INSERT INTO capability(scope,status,checked_at,reason) "
+                "VALUES('planning:anns_d:saturation_maintenance',?,?,?) "
+                "ON CONFLICT(scope) DO UPDATE SET "
+                "status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
+                ("applied", utc_now(), reason),
+            )
+            after = {
+                row["id"]: (row["state"], row["tries"], row["result"])
+                for row in self.db.execute(
+                    f"SELECT id,state,tries,result FROM jobs WHERE id IN ({placeholders})",
+                    selected,
+                )
+            }
+            for task_id in selected:
+                if before[task_id][1:] != after[task_id][1:]:
+                    raise ValueError("Announcement evidence changed during maintenance")
+            after_attempts = dict(
+                self.db.execute(
+                    f"SELECT job_id,count(*) FROM attempts "
+                    f"WHERE job_id IN ({placeholders}) GROUP BY job_id",
+                    selected,
+                )
+            )
+            if after_attempts != attempt_counts:
+                raise ValueError("Announcement attempt ledger changed during maintenance")
+            self.db.commit()
+        except BaseException:
+            self.db.rollback()
+            raise
+        for task_id in recovered:
+            self.reconcile_partitions(child_id=task_id)
+        report.update(
+            status="maintained",
+            preserved_result_jobs=sum(
+                before[task_id][2] is not None for task_id in selected
+            ),
+            preserved_attempts=sum(attempt_counts.values()),
+        )
+        return report
+
     def compact_stale_recent_roots(self, epoch, *, force=False):
         """Supersede older unexecuted recent roots and their private split trees.
 
@@ -1460,10 +1660,15 @@ class Pipeline:
         if not isinstance(epoch, str) or not re.fullmatch(r"\d{8}", epoch):
             raise ValueError("Invalid recent queue compaction epoch")
         checkpoint = "recent_queue_compaction_v2:" + epoch
+        announcement_saturation = self.maintain_announcement_saturation()
         if not force and self.db.execute(
             "SELECT 1 FROM scheduler_state WHERE name=?", (checkpoint,)
         ).fetchone():
-            return {"status": "already_compacted", "epoch": epoch}
+            return {
+                "status": "already_compacted",
+                "epoch": epoch,
+                "announcement_saturation": announcement_saturation,
+            }
         temporary = (
             "temp.stale_recent_roots",
             "temp.stale_recent_duplicates",
@@ -1629,6 +1834,7 @@ class Pipeline:
             "stale_duplicate_jobs": stale_duplicates,
             "superseded_open_jobs": eligible,
             "protected_shared_jobs": protected,
+            "announcement_saturation": announcement_saturation,
         }
 
     def compact_fina_mainbz_vip_coverage(self):
@@ -4313,11 +4519,13 @@ class Pipeline:
                 try:
                     result = self.normalize(result)
                 except Exception as exc:
-                    # The old path had already enqueued split children before a
-                    # normalization failure. Keep that obligation pending too;
-                    # resume restores blocked parent state after creating children.
+                    # Split children independently normalize the exact covered
+                    # partitions, so a parent conversion failure must not strand
+                    # their already-durable completeness obligation.
                     state = (
-                        "split_pending" if result.get("partition_deferred") else "blocked"
+                        "split_pending"
+                        if result.get("partition_deferred") or result.get("split")
+                        else "blocked"
                     )
                     result["normalization_error"] = type(exc).__name__
             self.db.execute(
