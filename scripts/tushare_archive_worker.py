@@ -2,8 +2,10 @@
 """Single bounded acquisition loop on the verified Mac/NAS archive owner."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 import fcntl
 import json
+import multiprocessing
 import os
 from pathlib import Path
 import shutil
@@ -28,6 +30,23 @@ def next_cycle_delay(interval, elapsed, acquisition_status):
     if acquisition_status == 'planning_only':
         return 5
     return max(5, interval - elapsed)
+
+
+def document_execution(config):
+    value = config.get('document_worker_execution', 'thread')
+    if value not in ('thread', 'process'):
+        raise ValueError('Invalid document worker execution')
+    return value
+
+
+def execute_documents(root, max_documents, max_seconds, download_workers):
+    from backend.shared.tushare_documents import run_documents
+    return run_documents(
+        root,
+        max_documents=max_documents,
+        max_seconds=max_seconds,
+        download_workers=download_workers,
+    )
 
 
 def main():
@@ -62,14 +81,24 @@ def main():
                     # The cloud already used independent acquisition/document workers.
                     # Keep one archive owner and wait for both bounded phases before
                     # another cycle or shutdown; SQLite connections stay task-local.
-                    with ThreadPoolExecutor(max_workers=1) as pool:
+                    execution = document_execution(config)
+                    report['document_execution'] = execution
+                    pool_type = (
+                        ProcessPoolExecutor if execution == 'process'
+                        else ThreadPoolExecutor
+                    )
+                    pool_options = (
+                        {'mp_context': multiprocessing.get_context('spawn')}
+                        if execution == 'process' else {}
+                    )
+                    with pool_type(max_workers=1, **pool_options) as pool:
                         documents = None
                         def start_documents(config=config):
                             nonlocal documents
                             if (documents is None and config.get('enable_documents')
                                     and shutil.disk_usage(root).free >= 300 * 2**30):
                                 documents = pool.submit(
-                                    run_documents, root,
+                                    execute_documents, root,
                                     max_documents=int(config.get(
                                         'document_worker_max_documents', 100)),
                                     max_seconds=float(config.get(

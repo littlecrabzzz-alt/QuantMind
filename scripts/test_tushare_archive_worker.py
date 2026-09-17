@@ -64,6 +64,33 @@ class WorkerStatus(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 worker.cycle_seconds({'archive_worker_cycle_seconds': value})
 
+    def test_document_execution_is_bounded(self):
+        self.assertEqual(worker.document_execution({}), 'thread')
+        self.assertEqual(
+            worker.document_execution({'document_worker_execution': 'process'}),
+            'process',
+        )
+        for value in (None, True, 'fork', 1):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                worker.document_execution({'document_worker_execution': value})
+
+    def test_document_process_executes_with_task_local_database(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with worker.ProcessPoolExecutor(
+                max_workers=1,
+                mp_context=worker.multiprocessing.get_context('spawn'),
+            ) as pool:
+                report = pool.submit(
+                    worker.execute_documents,
+                    Path(directory),
+                    0,
+                    1.0,
+                    1,
+                ).result(timeout=10)
+            self.assertEqual(report['status'], 'ok')
+            self.assertEqual(report['processed'], 0)
+            self.assertTrue((Path(directory) / 'documents.sqlite').exists())
+
     def test_planning_only_resumes_acquisition_after_minimum_delay(self):
         self.assertEqual(worker.next_cycle_delay(105, 58, 'planning_only'), 5)
         self.assertEqual(worker.next_cycle_delay(105, 58, None), 47)

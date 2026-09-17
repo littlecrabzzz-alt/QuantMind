@@ -209,6 +209,10 @@ VIP 分页链做覆盖压缩：同一年、同一 P/D/I 类型的四个季度必
 `acquisition_capture_execution` 从默认 `thread` 灰度设为 `process`。它只把同一个
 HTTP worker 和一条预取任务移入独立进程，Token 通过进程初始化管道传递，不进入命令
 参数、配置或报告；账户/API 频控预留、结果事务和唯一写入者仍由原主进程控制。
+若 `account_gate_requested_sleep` 与 `account_gate_sleep` 继续显示同进程文档线程阻塞
+限速调度，可将 `document_worker_execution` 从默认 `thread` 灰度设为 `process`。
+它不改变文档锁、任务数据库、下载并发数或采集/发布顺序，只隔离 Python 调度；worker
+状态会报告实际使用的 `document_execution`，配置值仅允许 `thread` 或 `process`。
 
 
 2026-09-17 云端旧归档释放验收：冻结清单中的 1,209,626 个不可变文件已按
