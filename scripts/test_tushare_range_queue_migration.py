@@ -176,13 +176,26 @@ class RangeQueueMigration(unittest.TestCase):
             self.assertEqual(states[pending], "superseded")
             self.assertEqual(states[done], "done")
             split = self.pipeline.db.execute(
-                "SELECT status,gap FROM partition_splits WHERE parent_id=?", (parent,)
+                "SELECT status,gap,evidence FROM partition_splits WHERE parent_id=?", (parent,)
             ).fetchone()
-            self.assertEqual(tuple(split), ("blocked", migration.GAP))
+            self.assertEqual(tuple(split)[:2], ("blocked", migration.GAP))
+            self.assertEqual(
+                json.loads(split["evidence"])["replacement_gap"], migration.GAP
+            )
             self.assertFalse(
                 self.pipeline.db.execute(
                     "SELECT 1 FROM partition_children WHERE parent_id=?", (parent,)
                 ).fetchone()
+            )
+            self.pipeline.reconcile_partitions(child_id=parent)
+            self.assertEqual(
+                tuple(
+                    self.pipeline.db.execute(
+                        "SELECT status,gap FROM partition_splits WHERE parent_id=?",
+                        (parent,),
+                    ).fetchone()
+                ),
+                ("blocked", migration.GAP),
             )
         second = migration.migrate(
             self.pipeline,
@@ -194,6 +207,31 @@ class RangeQueueMigration(unittest.TestCase):
         )
         self.assertEqual(second["inserted_range_jobs"], 0)
         self.assertEqual(second["old_open_daily_jobs"], 0)
+
+        for parent, _pending, _done in graphs.values():
+            evidence = json.loads(
+                self.pipeline.db.execute(
+                    "SELECT evidence FROM partition_splits WHERE parent_id=?", (parent,)
+                ).fetchone()[0]
+            )
+            evidence.pop("replacement_gap")
+            self.pipeline.db.execute(
+                "UPDATE partition_splits SET status='gap',gap='parent_not_split_pending',"
+                "evidence=? WHERE parent_id=?",
+                (json.dumps(evidence, sort_keys=True), parent),
+            )
+        self.pipeline.db.commit()
+        repair = migration.repair_reconciled_gaps(
+            self.pipeline, 2, apply=True
+        )
+        self.assertEqual(repair["status"], "applied")
+        self.assertEqual(repair["restored_markers"], 2)
+        self.assertEqual(repair["preserved_result_jobs"], 2)
+        self.assertEqual(repair["preserved_attempts"], 2)
+        self.assertEqual(
+            migration.repair_reconciled_gaps(self.pipeline, 2, apply=True)["status"],
+            "no_action",
+        )
 
     def test_existing_retired_range_identity_rejects_and_rolls_back(self):
         planned = next(

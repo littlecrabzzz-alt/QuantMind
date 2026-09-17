@@ -134,6 +134,7 @@ LEGACY_OBSERVED_RECOVERY_APIS = tuple(
     )
 )
 IDENTIFIER_CACHE_VERSION = 4
+RANGE_REPLACEMENT_GAP = "replaced_by_stock_range_plan_v1"
 ROOT = Path(os.getenv("QM_TUSHARE_ARCHIVE_ROOT", "/data/tushare"))
 CONTRACTS = {
     api: (spec["row_cap"], spec["required_fields"])
@@ -4153,7 +4154,15 @@ class Pipeline:
                 "LEFT JOIN jobs j ON j.id=c.child_id LEFT JOIN partition_splits s ON s.parent_id=c.child_id WHERE c.parent_id=?",
                 (parent_id,),
             ).fetchall()
-            if json.loads(split["evidence"]).get("origin") == "legacy_unverified":
+            evidence = json.loads(split["evidence"])
+            replacement_gap = evidence.get("replacement_gap")
+            preserve_replacement = (
+                replacement_gap == RANGE_REPLACEMENT_GAP
+                and parent["state"] == "blocked"
+            )
+            if preserve_replacement:
+                gap = replacement_gap
+            elif evidence.get("origin") == "legacy_unverified":
                 gap = "legacy_relationship_unverified"
             elif parent["state"] not in ("split_pending", "resolved"):
                 gap = "parent_not_split_pending"
@@ -4185,7 +4194,13 @@ class Pipeline:
                     gap = self.partition_artifact_gap(parquet)
                     if gap:
                         break
-            status = "gap" if gap else "resolved"
+            status = (
+                "blocked"
+                if preserve_replacement
+                else "gap"
+                if gap
+                else "resolved"
+            )
             changed = split["status"] != status or split["gap"] != gap
             self.db.execute(
                 "UPDATE partition_splits SET status=?,gap=? WHERE parent_id=?",

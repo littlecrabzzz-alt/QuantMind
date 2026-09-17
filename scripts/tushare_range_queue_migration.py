@@ -19,14 +19,18 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from backend.shared.tushare_dc_extra_contracts import iter_dc_extra_jobs  # noqa: E402
-from backend.shared.tushare_pipeline import Pipeline, contract_for  # noqa: E402
+from backend.shared.tushare_pipeline import (  # noqa: E402
+    Pipeline,
+    RANGE_REPLACEMENT_GAP,
+    contract_for,
+)
 from backend.shared.tushare_supplement_contracts import (  # noqa: E402
     iter_supplement_jobs,
 )
 
 SUPPORTED = ("moneyflow_dc", "dc_member")
 OPEN = ("pending", "split_pending")
-GAP = "replaced_by_stock_range_plan_v1"
+GAP = RANGE_REPLACEMENT_GAP
 
 
 def _encoded(value):
@@ -85,6 +89,107 @@ def planned_jobs(config, today, codes, apis):
 
 def _count(db, sql, params=()):
     return db.execute(sql, params).fetchone()[0]
+
+
+def repair_reconciled_gaps(pipeline, expected_total, *, apply=False):
+    """Restore the durable range-replacement marker after legacy reconciliation."""
+    if isinstance(expected_total, bool) or not isinstance(expected_total, int):
+        raise ValueError("Expected replacement parent count must be an integer")
+    if expected_total < 0:
+        raise ValueError("Expected replacement parent count cannot be negative")
+    db = pipeline.db
+    rows = db.execute("""
+        SELECT split.parent_id,parent.state,parent.tries,parent.result,
+               split.status,split.gap,split.evidence
+        FROM partition_splits AS split
+        JOIN jobs AS parent ON parent.id=split.parent_id
+        WHERE parent.state='blocked'
+          AND json_extract(parent.job,'$.api_name') IN ('moneyflow_dc','dc_member')
+          AND json_type(parent.job,'$.params.trade_date')='text'
+          AND json_extract(parent.result,'$.status')='possibly_truncated'
+          AND split.method='identifier_fanout'
+          AND split.coverage_proven=0
+          AND NOT EXISTS (
+              SELECT 1 FROM partition_children AS edge
+              WHERE edge.parent_id=split.parent_id
+          )
+        ORDER BY split.parent_id
+    """).fetchall()
+    if len(rows) != expected_total:
+        raise ValueError(
+            f"Expected {expected_total} replacement parents, found {len(rows)}"
+        )
+    ids = [row["parent_id"] for row in rows]
+    placeholders = ",".join("?" for _ in ids)
+    before_jobs = {
+        row["parent_id"]: (row["state"], row["tries"], row["result"])
+        for row in rows
+    }
+    before_attempts = (
+        dict(
+            db.execute(
+                f"SELECT job_id,count(*) FROM attempts WHERE job_id IN ({placeholders}) "
+                "GROUP BY job_id",
+                ids,
+            )
+        )
+        if ids
+        else {}
+    )
+    changed = 0
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        for row in rows:
+            evidence = json.loads(row["evidence"])
+            marker = evidence.get("replacement_gap")
+            if marker not in (None, GAP):
+                raise ValueError("Conflicting replacement gap marker")
+            needs_update = (
+                marker != GAP or row["status"] != "blocked" or row["gap"] != GAP
+            )
+            if needs_update:
+                evidence["replacement_gap"] = GAP
+                db.execute(
+                    "UPDATE partition_splits SET evidence=?,status='blocked',gap=? "
+                    "WHERE parent_id=?",
+                    (json.dumps(evidence, sort_keys=True), GAP, row["parent_id"]),
+                )
+                changed += 1
+        after_jobs = {
+            row["id"]: (row["state"], row["tries"], row["result"])
+            for row in db.execute(
+                f"SELECT id,state,tries,result FROM jobs WHERE id IN ({placeholders})",
+                ids,
+            )
+        } if ids else {}
+        after_attempts = (
+            dict(
+                db.execute(
+                    f"SELECT job_id,count(*) FROM attempts WHERE job_id IN ({placeholders}) "
+                    "GROUP BY job_id",
+                    ids,
+                )
+            )
+            if ids
+            else {}
+        )
+        if after_jobs != before_jobs or after_attempts != before_attempts:
+            raise ValueError("Range replacement source evidence changed")
+        if apply:
+            db.commit()
+        else:
+            db.rollback()
+    except BaseException:
+        db.rollback()
+        raise
+    return {
+        "status": "applied" if apply and changed else "no_action" if apply else "planned_rollback",
+        "replacement_parents": len(rows),
+        "restored_markers": changed,
+        "preserved_result_jobs": sum(row["result"] is not None for row in rows),
+        "preserved_attempts": sum(before_attempts.values()),
+        "upstream_calls": 0,
+    }
 
 
 def _capture_open_daily(db, apis):
@@ -201,9 +306,10 @@ def migrate(pipeline, config, today, codes, apis, *, apply=False):
             "AND state IN ('pending','split_pending')"
         ).rowcount
         db.execute(
-            "UPDATE partition_splits SET status='blocked',gap=? WHERE parent_id IN "
+            "UPDATE partition_splits SET status='blocked',gap=?,"
+            "evidence=json_set(evidence,'$.replacement_gap',?) WHERE parent_id IN "
             "(SELECT id FROM old_range_migration_parents)",
-            (GAP,),
+            (GAP, GAP),
         )
         superseded = db.execute(
             "UPDATE jobs SET state='superseded' WHERE id IN "
