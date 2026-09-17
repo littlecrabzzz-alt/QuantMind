@@ -1,0 +1,10 @@
+# Mac 指数/基金生命周期边界已生产验收
+
+- 时间、节点、目标：2026-09-17T07:10Z，Mac 全量归档节点；使用官方基础资料中的指数基日/上市日、基金发行/成立/上市等起始日，裁剪 `index_daily`、`index_weight`、`fund_nav`、`weekly`、`monthly`、`index_weekly`、`index_monthly` 中不可能有数据的历史请求。缺少有效官方元数据的代码继续保留完整历史，不使用到期日、退市日或终止日做上界。
+- 保守证据规则：已保存 `index_basic` 的 `base_date`/`list_date` 与 `fund_basic`/`etf_basic` 的起始字段取最早有效值；若已保存的 `index_daily`/`index_weight`/`fund_nav` 记录更早，仅对已有官方起始元数据的代码降低边界。仅有历史记录、没有官方元数据的代码保持无边界。依据见 Tushare `index_basic` doc_id=94、`index_daily` doc_id=95、`index_weight` doc_id=96、`fund_basic` doc_id=19、`fund_nav` doc_id=119。
+- 代码：master `2a5a4aae60f700f79f116af4ab6b0f7d051b06fe`，已推送 GitHub，并将 Mac/云端 Git 元数据对齐。identifier cache 升级到 v3；生命周期进入 structured/market/global 的 planning policy；新增原子、可回滚且不调用上游的 `tushare_asset_lifecycle_migration.py`。
+- 离线验证：67 个直接相关的 planner、discovery、planning、timing 和 migration 测试通过；Ruff、compileall、`git diff --check` 通过。13GB 一致副本 dry-run/apply 都识别 231,241 个候选与 42,289 个跨界替代，保留 364,229 条 attempts、360,896 个带结果任务、627 个 split_pending 及 196 个活动父任务引用的子任务；提交后副本 `PRAGMA quick_check=ok`。
+- 生产事务：worker 在 pipeline/documents 锁空闲后暂停，QuantDB 和云端服务未停。实际原子退役 232,062 个 pending，先建立 42,411 个跨界替代；保留 365,943 条 attempts、362,610 个带结果任务、627 个 split_pending 和 196 个活动父任务引用的子任务；候选 attempts 为 0，`upstream_calls=0`。回执 `/Users/lizeyu/Library/Application Support/QuantMind/tushare/asset-lifecycle-migration-v1.bdb56f24a75a9b2bb091329ea1b182ebd6ab1889f38437c2dc726d8dfbd0ffea.json`，正式库 `PRAGMA quick_check=ok`。
+- 重规划与无遗漏边界：identifier cache v3 包含 9,643 个有效指数起始日、22,235 个有效基金起始日和 5,904 个股票上市日。新版 planning 161 秒完成，structured/market/global 六个 planning state 均冻结对应 lifecycle 输入；七个 API 中已知边界的独立 pending 越界任务为 0。仅保留活动分片图要求的 196 个 pending fund_nav 子任务和 627 个 split_pending；未知生命周期代码继续不裁剪。
+- 真实吞吐：升级后连续采集周期完成 346、351、334、353 次请求/约 90 秒；重规划后又完成 275 次请求/90.1 秒，全部 `failed_stage=null`。LaunchAgent `com.quantmind.tushare-archive` 运行；迁移后 pending 约 293.9 万，完整历史仍在本地持续补采。
+- 节点与容量：本地卷 3.6TiB，已用约 1.2TiB、可用约 2.3TiB；临时 13GB 演练副本已删除。云端 HEAD 同为 `2a5a4aae`，`tushare-research-cache.timer=active`，完整 `tushare-archive.service=inactive`，`ARCHIVE_RELOCATED.json` 仍在。完整 Tushare 原始归档继续只由 Mac 写入，云端只同步研究子集。
