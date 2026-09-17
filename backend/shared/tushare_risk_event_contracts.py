@@ -1,5 +1,6 @@
 """Pure historical ST state, ST changes and exchange-warning contracts."""
 
+from calendar import monthrange
 from datetime import date, datetime, timedelta
 
 from backend.shared.tushare_equity_event_contracts import _stocks
@@ -12,6 +13,7 @@ FIELDS = {
     "stk_high_shock": "ts_code trade_date name trade_market reason period".split(),
     "stk_alert": "ts_code name start_date end_date type".split(),
 }
+RANGE_APIS = {"stk_high_shock", "stk_alert"}
 INPUT_FIELDS = {
     api: "ts_code pub_date imp_date".split()
     if api == "st"
@@ -95,6 +97,11 @@ for _api in ("stk_shock", "stk_high_shock"):
         documented_output_date_formats=["YYYYMMDD", "YYYY-MM-DD"],
         source_consistency_gap="Official samples contain code/exchange-label inconsistencies and examples whose requested day differs from returned rows. Preserve raw codes, market, dates and periods; real exact/range filtering must be validated before coverage is claimed.",
     )
+RISK_EVENT_CONTRACTS["stk_high_shock"].update(
+    parameter_note="Live validation found that a documented exact trade_date can return an empty result while the enclosing legal start_date/end_date range returns rows. Plan bounded ranges and let the existing date splitter bisect saturated responses; retain the exact-date inconsistency as provider evidence.",
+    range_filter_live_verified=True,
+    exact_date_filter_live_verified=False,
+)
 RISK_EVENT_CONTRACTS["stk_alert"].update(
     date_axis_note="Input trade_date denotes the warning START date. Output start_date is that start, and end_date is a reference expiry, potentially after today. Never treat input end_date as an output-expiry cutoff or manufacture output trade_date.",
     documented_output_date_formats=["YYYY-MM-DD"],
@@ -102,6 +109,9 @@ RISK_EVENT_CONTRACTS["stk_alert"].update(
     discovery_gap="Official examples include ETF 513310.SH as well as stocks. Future risk_securities fanout must union historical stocks, ETF/fund discovery and observed risk securities; do not filter to current A-share stock_basic only. Other security types and historical completeness remain unknown.",
     future_gap="A request for a known start can return a reference end after today; keep it. Start-date observations do not prove when the notice was published or every active warning on a later day.",
     source_consistency_gap="The official exact-day sample shows several output start dates. Do not assume exact/range filter equality from documentation alone; validate real response dates before claiming coverage.",
+    parameter_note="Live validation found that a documented exact trade_date can return an empty result while the enclosing legal start_date/end_date range returns rows. Plan bounded ranges and let the existing date splitter bisect saturated responses; preserve returned future end dates.",
+    range_filter_live_verified=True,
+    exact_date_filter_live_verified=False,
 )
 
 
@@ -196,8 +206,23 @@ def _days(api, begin, end):
         day += timedelta(days=1)
 
 
+def _window(begin, end):
+    return {
+        "start_date": begin.strftime("%Y%m%d"),
+        "end_date": end.strftime("%Y%m%d"),
+    }
+
+
+def _month_windows(begin, end):
+    while begin <= end:
+        ceiling = date(begin.year, begin.month, monthrange(begin.year, begin.month)[1])
+        finish = min(ceiling, end)
+        yield _window(begin, finish)
+        begin = finish + timedelta(days=1)
+
+
 def iter_risk_event_jobs(config, today, identifiers=None):
-    """Exact recent date axes, lazy historical days and unbounded stock ST events."""
+    """Bounded recent axes, lazy historical slices and unbounded stock ST events."""
     if isinstance(today, datetime):
         today = today.date()
     if not isinstance(today, date):
@@ -216,7 +241,13 @@ def iter_risk_event_jobs(config, today, identifiers=None):
     histories = {}
     for api in enabled:
         start = starts[api]
-        for params in _days(api, max(start or recent, recent), today):
+        recent_begin = max(start or recent, recent)
+        recent_params = (
+            [_window(recent_begin, today)]
+            if api in RANGE_APIS and recent_begin <= today
+            else _days(api, recent_begin, today)
+        )
+        for params in recent_params:
             yield {
                 "api_name": api,
                 "params": params,
@@ -226,6 +257,8 @@ def iter_risk_event_jobs(config, today, identifiers=None):
             }
         if api == "st":
             histories[api] = ({"ts_code": code} for code in stocks)
+        elif api in RANGE_APIS and start and start < recent:
+            histories[api] = _month_windows(start, recent - timedelta(days=1))
         elif start and start < recent:
             histories[api] = iter(_days(api, start, recent - timedelta(days=1)))
     while histories:

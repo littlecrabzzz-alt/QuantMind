@@ -298,11 +298,11 @@ class RiskEventRuntime(unittest.TestCase):
         }
         self.p.plan_extended(config, date(2026, 9, 9))
         self.assertEqual(
-            self.p.db.execute("SELECT COUNT(*) FROM jobs").fetchone()[0], 35
+            self.p.db.execute("SELECT COUNT(*) FROM jobs").fetchone()[0], 23
         )
         self.p.plan_extended(config, date(2026, 9, 9))
         self.assertEqual(
-            self.p.db.execute("SELECT COUNT(*) FROM jobs").fetchone()[0], 35
+            self.p.db.execute("SELECT COUNT(*) FROM jobs").fetchone()[0], 23
         )
         self.assertEqual(
             self.p.db.execute(

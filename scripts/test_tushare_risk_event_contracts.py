@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 from backend.shared.tushare_risk_event_contracts import (  # noqa: E402
     FIELDS,
     INPUT_FIELDS,
+    RANGE_APIS,
     RISK_EVENT_CONTRACTS as CONTRACTS,
     iter_risk_event_jobs as jobs,
     risk_event_prerequisites as gaps,
@@ -66,20 +67,26 @@ class RiskEvents(unittest.TestCase):
             )
         today = date(2026, 9, 9)
         planned = list(jobs({"history_start": "20260903"}, today))
-        self.assertEqual(len(planned), 42)
+        self.assertEqual(len(planned), 30)
         for job in planned:
             api, params = job["api_name"], job["params"]
             self.assertEqual(
                 set(params),
-                {"pub_date"}
+                {"start_date", "end_date"}
+                if api in RANGE_APIS
+                else {"pub_date"}
                 if api == "st" and "pub_date" in params
                 else {"imp_date"}
                 if api == "st"
                 else {"trade_date"},
             )
-            self.assertNotIn("end_date", params)
             self.assertEqual(job["fields"], ",".join(FIELDS[api]))
             self.assertTrue(set(params) <= set(INPUT_FIELDS[api]))
+        for api in RANGE_APIS:
+            spec = CONTRACTS[api]
+            self.assertTrue(spec["range_filter_live_verified"])
+            self.assertFalse(spec["exact_date_filter_live_verified"])
+            self.assertIn("start_date/end_date", spec["parameter_note"])
         self.assertIn(
             "potentially after today", CONTRACTS["stk_alert"]["date_axis_note"]
         )
@@ -118,7 +125,7 @@ class RiskEvents(unittest.TestCase):
     def test_unknown_starts_are_not_inferred_from_samples(self):
         enabled = ["stk_shock", "stk_high_shock", "stk_alert"]
         planned = list(jobs({"risk_event_apis": enabled}, date(2026, 9, 9)))
-        self.assertEqual(len(planned), 21)
+        self.assertEqual(len(planned), 9)
         self.assertTrue(all(j["epoch"] != "history" for j in planned))
         for api in enabled:
             self.assertIsNone(CONTRACTS[api]["history_start"])
@@ -147,7 +154,7 @@ class RiskEvents(unittest.TestCase):
             (date(2024, 2, 27) + timedelta(days=i)).strftime("%Y%m%d")
             for i in range(13)
         }
-        self.assertEqual(len(planned), 13 * 4)
+        self.assertEqual(len(planned), 32)
         self.assertEqual(
             len(
                 {
@@ -158,8 +165,29 @@ class RiskEvents(unittest.TestCase):
             len(planned),
         )
         for api in config["risk_event_apis"]:
+            covered = set()
+            for job in planned:
+                if job["api_name"] != api:
+                    continue
+                params = job["params"]
+                if "trade_date" in params:
+                    covered.add(params["trade_date"])
+                    continue
+                begin = date(
+                    int(params["start_date"][:4]),
+                    int(params["start_date"][4:6]),
+                    int(params["start_date"][6:]),
+                )
+                end = date(
+                    int(params["end_date"][:4]),
+                    int(params["end_date"][4:6]),
+                    int(params["end_date"][6:]),
+                )
+                while begin <= end:
+                    covered.add(begin.strftime("%Y%m%d"))
+                    begin += timedelta(days=1)
             self.assertEqual(
-                {j["params"]["trade_date"] for j in planned if j["api_name"] == api},
+                covered,
                 days,
             )
         head = list(
@@ -169,14 +197,18 @@ class RiskEvents(unittest.TestCase):
                     date(2026, 9, 9),
                     {"stocks": ["T600001.SH"]},
                 ),
-                47,
+                35,
             )
         )
-        self.assertEqual(len(head), 47)
-        self.assertEqual([j["api_name"] for j in head[42:]], list(CONTRACTS))
-        self.assertEqual(head[42]["params"], {"trade_date": "20000101"})
-        self.assertEqual(head[43]["params"], {"ts_code": "T600001.SH"})
-        self.assertEqual(head[44]["params"], {"trade_date": "19000101"})
+        self.assertEqual(len(head), 35)
+        self.assertEqual([j["api_name"] for j in head[30:]], list(CONTRACTS))
+        self.assertEqual(head[30]["params"], {"trade_date": "20000101"})
+        self.assertEqual(head[31]["params"], {"ts_code": "T600001.SH"})
+        self.assertEqual(head[32]["params"], {"trade_date": "19000101"})
+        self.assertEqual(
+            head[33]["params"],
+            {"start_date": "19000101", "end_date": "19000131"},
+        )
 
     def test_alert_etf_future_end_and_saturation_uncertainty_are_explicit(self):
         spec = CONTRACTS["stk_alert"]
@@ -235,7 +267,7 @@ class RiskEvents(unittest.TestCase):
                     )
                 )
             ),
-            7,
+            1,
         )
 
 
