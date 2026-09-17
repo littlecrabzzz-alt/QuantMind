@@ -154,6 +154,13 @@ class TextPlans(unittest.TestCase):
             self.assertTrue(
                 TEXT_CONTRACTS[api]["recover_legacy_blocked_identifier_fanout"]
             )
+        self.assertEqual(
+            TEXT_CONTRACTS["npr"]["saturation_partition_axes"],
+            [{"param": "ptype", "values": [], "value_kind": "supplier_text"}],
+        )
+        self.assertTrue(
+            TEXT_CONTRACTS["npr"]["recover_legacy_blocked_observed_fanout"]
+        )
 
     def test_month_mode_covers_all_days_sources_and_both_qa_axes(self):
         start, today = date(2024, 1, 29), date(2024, 3, 8)

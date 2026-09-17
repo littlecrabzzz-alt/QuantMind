@@ -454,6 +454,83 @@ class DeferredSplit(unittest.TestCase):
         )
         self.assertEqual(self.attempts(), attempts)
 
+    def test_reviewed_npr_type_fanout_recovers_legacy_cap_without_http(self):
+        spec = module.EXTENDED_CONTRACTS["npr"]
+        with patch.dict(spec, {"row_cap": 2, "saturation_partition_axes": None}):
+            parent_id = self.p.enqueue(
+                "npr",
+                {
+                    "start_date": "2008-03-28 08:00:00",
+                    "end_date": "2008-03-28 08:00:00",
+                },
+                epoch="history",
+            )
+
+            def response(request):
+                body = json.loads(request.content)
+                fields = body["fields"].split(",")
+                records = [
+                    {
+                        "pubtime": "2008-03-28 08:00:00",
+                        "title": "fixture " + ptype,
+                        "url": "https://example.invalid/policy",
+                        "content_html": "<p>fixture</p>",
+                        "pcode": "fixture",
+                        "puborg": "国务院",
+                        "ptype": ptype,
+                    }
+                    for ptype in ("科技、教育\\教育", "综合政务\\其他")
+                ]
+                return httpx.Response(
+                    200,
+                    json={
+                        "code": 0,
+                        "data": {
+                            "fields": fields,
+                            "items": [
+                                [record.get(field) for field in fields]
+                                for record in records
+                            ],
+                            "has_more": True,
+                        },
+                    },
+                )
+
+            captured = self.run_once(respond=response)
+        self.assertEqual(captured["requests"], 1)
+        before = dict(
+            self.p.db.execute(
+                "SELECT * FROM jobs WHERE id=?", (parent_id,)
+            ).fetchone()
+        )
+        self.assertEqual(before["state"], "blocked")
+        attempts = self.attempts()
+        self.reopen()
+        with patch.dict(spec, {"row_cap": 2}):
+            recovered = self.run_once(
+                requests=0,
+                respond=lambda request: self.fail("legacy parent must not call HTTP"),
+            )
+        self.assertEqual(recovered["requests"], 0)
+        self.assertTrue(recovered["partition_work"]["legacy_parent_recovered"])
+        self.assertTrue(recovered["partition_work"]["local_only"])
+        self.assertIsNone(recovered["partition_work"]["discovery_family"])
+        after = self.stored({"id": parent_id})
+        saved = json.loads(after["result"])
+        self.assertEqual(after["state"], "split_pending")
+        self.assertEqual(after["tries"], before["tries"])
+        self.assertEqual(saved["partition_recovery"]["upstream_calls"], 0)
+        self.assertEqual(
+            {child["ptype"] for child in self.children({"id": parent_id})},
+            {"科技、教育\\教育", "综合政务\\其他"},
+        )
+        split, evidence = self.evidence({"id": parent_id})
+        self.assertEqual(split["method"], "observed_value_fanout")
+        self.assertEqual(split["coverage_proven"], 0)
+        self.assertEqual(evidence["partition_param"], "ptype")
+        self.assertFalse(evidence["universe_complete"])
+        self.assertEqual(self.attempts(), attempts)
+
     def test_unreviewed_legacy_blocked_fanout_is_not_reactivated(self):
         row, _ = self.parent()
         self.run_once()
