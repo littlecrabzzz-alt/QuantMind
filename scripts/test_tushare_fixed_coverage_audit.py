@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from copy import deepcopy
 from pathlib import Path
 import socket
 import subprocess
@@ -46,6 +47,8 @@ class FixedCoverageAuditTests(unittest.TestCase):
             "registered_planned": 3,
             "registered_with_published_dataset": 1,
             "published_dataset_apis": 2,
+            "registered_not_planned": 1,
+            "actionable_registered_not_planned": 1,
         })
         self.assertEqual([row["api_name"] for row in result["registered_not_planned"]],
                          ["never_planned"])
@@ -62,6 +65,13 @@ class FixedCoverageAuditTests(unittest.TestCase):
             "permission_denied": 1,
             "unclassified": 1,
         })
+        self.assertEqual(result["registered_not_planned_evidence_counts"], {
+            "unclassified": 1,
+        })
+        self.assertEqual(
+            [row["api_name"] for row in result["actionable_registered_not_planned"]],
+            ["never_planned"],
+        )
         self.assertEqual(result["unregistered_planned"], ["unknown"])
         self.assertEqual(result["unregistered_published_dataset_apis"], ["unknown"])
 
@@ -110,6 +120,86 @@ class FixedCoverageAuditTests(unittest.TestCase):
             second = audit({"ready", "empty"}, manifest, "data-" + "1" * 64)
         self.assertEqual(first, second)
         self.assertEqual(json.dumps(manifest, sort_keys=True), before)
+
+    def test_empty_portfolio_list_explains_unplanned_member_read(self):
+        manifest = self.fixture()
+        manifest["scope"].append("p_list")
+        manifest["coverage_by_api"].append(
+            {"api_name": "p_list", "state": "empty", "partitions": 1}
+        )
+        manifest["gaps"].append(
+            {"api_name": "p_list", "assessment": "empty_unverified"}
+        )
+        manifest["capabilities"].append({
+            "scope": "p_list:", "status": "available", "checked_at": "2026-01-04",
+        })
+
+        result = audit({"p_list", "p_get"}, manifest, "data-" + "1" * 64)
+        self.assertEqual(result["counts"]["registered_not_planned"], 1)
+        self.assertEqual(result["counts"]["actionable_registered_not_planned"], 0)
+        self.assertEqual(result["registered_not_planned_evidence_counts"], {
+            "dependency_observed_empty": 1,
+        })
+        self.assertEqual(result["actionable_registered_not_planned"], [])
+        self.assertEqual(result["registered_not_planned"], [{
+            "api_name": "p_get",
+            "coverage": {},
+            "capabilities": [],
+            "gap_assessments": {},
+            "evidence_classification": "dependency_observed_empty",
+            "dependency_evidence": {
+                "parent_api": "p_list",
+                "parent_state": "available_empty_only",
+                "scope": "fixed_release_observation_only",
+                "historical_complete": False,
+            },
+        }])
+
+    def test_portfolio_dependency_requires_complete_parent_evidence(self):
+        base = self.fixture()
+        base["scope"].append("p_list")
+        base["coverage_by_api"].append(
+            {"api_name": "p_list", "state": "empty", "partitions": 1}
+        )
+        base["gaps"].append(
+            {"api_name": "p_list", "assessment": "empty_unverified"}
+        )
+        base["capabilities"].append({
+            "scope": "p_list:", "status": "available", "checked_at": "2026-01-04",
+        })
+        variants = []
+        no_capability = deepcopy(base)
+        no_capability["capabilities"] = [
+            row for row in no_capability["capabilities"]
+            if row.get("scope") != "p_list:"
+        ]
+        variants.append(no_capability)
+        no_empty = deepcopy(base)
+        no_empty["coverage_by_api"] = [
+            row for row in no_empty["coverage_by_api"]
+            if row.get("api_name") != "p_list"
+        ]
+        variants.append(no_empty)
+        no_gap = deepcopy(base)
+        no_gap["gaps"] = [
+            row for row in no_gap["gaps"]
+            if row.get("api_name") != "p_list"
+        ]
+        variants.append(no_gap)
+        parent_not_planned = deepcopy(base)
+        parent_not_planned["scope"].remove("p_list")
+        variants.append(parent_not_planned)
+
+        for manifest in variants:
+            with self.subTest(manifest=manifest):
+                result = audit({"p_list", "p_get"}, manifest, "data-" + "1" * 64)
+                child = next(
+                    row for row in result["registered_not_planned"]
+                    if row["api_name"] == "p_get"
+                )
+                self.assertEqual(child["evidence_classification"], "unclassified")
+                self.assertIsNone(child["dependency_evidence"])
+                self.assertIn(child, result["actionable_registered_not_planned"])
 
     def test_cli_reads_verified_release_and_keeps_output_outside_root(self):
         with tempfile.TemporaryDirectory() as tmp:

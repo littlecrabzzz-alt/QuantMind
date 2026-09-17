@@ -14,6 +14,9 @@ from backend.shared.tushare_pipeline import CONTRACTS, manifest_at  # noqa: E402
 from backend.shared.tushare_registry import EXTENDED_CONTRACTS  # noqa: E402
 
 
+OBSERVED_EMPTY_DEPENDENCIES = {"p_get": "p_list"}
+
+
 def _direct_capabilities(manifest):
     """Return only API-level capability rows, excluding planning gap scopes."""
     result = {}
@@ -53,7 +56,7 @@ def audit(registered, manifest, release_id):
         if assessment:
             gap_assessments.setdefault(item["api_name"], Counter())[assessment] += 1
 
-    def evidence_classification(api):
+    def direct_evidence_classification(api):
         api_capabilities = capabilities.get(api, [])
         api_gaps = gap_assessments.get(api, Counter())
         if (any(item.get("status") == "permission_denied" for item in api_capabilities)
@@ -66,6 +69,33 @@ def audit(registered, manifest, release_id):
             return "available_empty_only"
         return "unclassified"
 
+    def dependency_evidence(api):
+        parent = OBSERVED_EMPTY_DEPENDENCIES.get(api)
+        if parent is None or api in planned or parent not in planned:
+            return None
+        parent_capabilities = capabilities.get(parent, [])
+        parent_gaps = gap_assessments.get(parent, Counter())
+        if not coverage.get(parent, {}).get("empty"):
+            return None
+        if not any(item.get("status") == "available" for item in parent_capabilities):
+            return None
+        if not parent_gaps.get("empty_unverified"):
+            return None
+        return {
+            "parent_api": parent,
+            "parent_state": "available_empty_only",
+            "scope": "fixed_release_observation_only",
+            "historical_complete": False,
+        }
+
+    def evidence_classification(api):
+        direct = direct_evidence_classification(api)
+        if direct != "unclassified":
+            return direct
+        if dependency_evidence(api) is not None:
+            return "dependency_observed_empty"
+        return direct
+
     def row(api):
         return {
             "api_name": api,
@@ -73,13 +103,22 @@ def audit(registered, manifest, release_id):
             "capabilities": capabilities.get(api, []),
             "gap_assessments": dict(sorted(gap_assessments.get(api, {}).items())),
             "evidence_classification": evidence_classification(api),
+            "dependency_evidence": dependency_evidence(api),
         }
 
     missing_dataset_apis = sorted((registered & planned) - set(datasets))
     missing_dataset_evidence = Counter(evidence_classification(api) for api in missing_dataset_apis)
+    registered_not_planned = [row(api) for api in sorted(registered - planned)]
+    registered_not_planned_evidence = Counter(
+        item["evidence_classification"] for item in registered_not_planned
+    )
+    actionable_registered_not_planned = [
+        item for item in registered_not_planned
+        if item["evidence_classification"] != "dependency_observed_empty"
+    ]
 
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "release_id": release_id,
         "manifest_file_count": len(manifest.get("files", {})),
         "counts": {
@@ -88,9 +127,17 @@ def audit(registered, manifest, release_id):
             "registered_planned": len(registered & planned),
             "registered_with_published_dataset": len(registered & set(datasets)),
             "published_dataset_apis": len(datasets),
+            "registered_not_planned": len(registered_not_planned),
+            "actionable_registered_not_planned": len(
+                actionable_registered_not_planned
+            ),
         },
         "missing_dataset_evidence_counts": dict(sorted(missing_dataset_evidence.items())),
-        "registered_not_planned": [row(api) for api in sorted(registered - planned)],
+        "registered_not_planned_evidence_counts": dict(
+            sorted(registered_not_planned_evidence.items())
+        ),
+        "registered_not_planned": registered_not_planned,
+        "actionable_registered_not_planned": actionable_registered_not_planned,
         "registered_planned_without_published_dataset": [
             row(api) for api in missing_dataset_apis
         ],
@@ -106,6 +153,7 @@ def audit(registered, manifest, release_id):
             "An empty or blocked partition can legitimately have no published dataset and remains explicit in coverage.",
             "Gap assessments are retained outcomes. An api_error is distinct from permission denial and requires its raw observation to identify the supplier reason.",
             "A registered but unplanned API may be intentionally disabled pending permission or runtime validation.",
+            "Dependency-observed-empty explains why a child request could not be planned from this fixed release only; it does not prove historical or future absence, parent completeness or atomic list/member timing.",
         ],
     }
 
@@ -133,7 +181,13 @@ def main():
         "release_id": release_id,
         "counts": result["counts"],
         "missing_dataset_evidence_counts": result["missing_dataset_evidence_counts"],
+        "registered_not_planned_evidence_counts": result[
+            "registered_not_planned_evidence_counts"
+        ],
         "registered_not_planned": len(result["registered_not_planned"]),
+        "actionable_registered_not_planned": len(
+            result["actionable_registered_not_planned"]
+        ),
         "registered_planned_without_published_dataset": len(
             result["registered_planned_without_published_dataset"]
         ),
