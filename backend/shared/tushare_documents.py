@@ -1138,8 +1138,8 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
         or not 0 < max_seconds <= 300
     ):
         raise ValueError("max_seconds must be between 0 and 300")
-    if type(download_workers) is not int or download_workers not in (1, 2, 3):
-        raise ValueError("download_workers must be 1, 2, or 3")
+    if type(download_workers) is not int or download_workers not in (1, 2, 3, 4):
+        raise ValueError("download_workers must be 1, 2, 3, or 4")
     root = Path(root).resolve()
     db = _document_db(root)
     processed, started, owner = 0, time.monotonic(), uuid4().hex

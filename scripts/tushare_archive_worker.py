@@ -39,6 +39,28 @@ def document_execution(config):
     return value
 
 
+def document_limits(config):
+    count = config.get('document_worker_max_documents', 100)
+    seconds = config.get('document_worker_max_seconds', 90)
+    workers = config.get('document_download_workers', 1)
+    if (
+        isinstance(count, bool)
+        or not isinstance(count, int)
+        or not 1 <= count <= 1000
+        or isinstance(seconds, bool)
+        or not isinstance(seconds, (int, float))
+        or not 0 < seconds <= 100
+        or isinstance(workers, bool)
+        or not isinstance(workers, int)
+        or workers not in (1, 2, 3, 4)
+    ):
+        raise ValueError(
+            'Invalid document worker bounds: 1..1000 stages, '
+            '0..100 seconds, 1..4 downloads'
+        )
+    return count, float(seconds), workers
+
+
 def execute_documents(root, max_documents, max_seconds, download_workers):
     from backend.shared.tushare_documents import run_documents
     return run_documents(
@@ -97,17 +119,12 @@ def main():
                             nonlocal documents
                             if (documents is None and config.get('enable_documents')
                                     and shutil.disk_usage(root).free >= 300 * 2**30):
+                                count, seconds, workers = document_limits(config)
                                 documents = pool.submit(
                                     execute_documents, root,
-                                    max_documents=int(config.get(
-                                        'document_worker_max_documents', 100)),
-                                    max_seconds=float(config.get(
-                                        'document_worker_max_seconds', 90)),
-                                    download_workers=min(
-                                        3,
-                                        max(1, int(config.get(
-                                            'document_download_workers', 1))),
-                                    ),
+                                    max_documents=count,
+                                    max_seconds=seconds,
+                                    download_workers=workers,
                                 )
                         report['acquisition'] = tick(
                             before_nonpublication_work=start_documents

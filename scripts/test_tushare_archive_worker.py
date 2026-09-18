@@ -17,7 +17,7 @@ class WorkerStatus(unittest.TestCase):
             root = Path(directory)
             (root / 'ENABLED').touch()
             (root / 'pipeline-config.json').write_text(
-                '{"enable_documents":true,"document_download_workers":3,'
+                '{"enable_documents":true,"document_download_workers":4,'
                 '"document_worker_max_documents":240,'
                 '"document_worker_max_seconds":85}'
             )
@@ -28,7 +28,7 @@ class WorkerStatus(unittest.TestCase):
                     {
                         'max_documents': 240,
                         'max_seconds': 85.0,
-                        'download_workers': 3,
+                        'download_workers': 4,
                     },
                 )
                 started.set()
@@ -73,6 +73,30 @@ class WorkerStatus(unittest.TestCase):
         for value in (None, True, 'fork', 1):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 worker.document_execution({'document_worker_execution': value})
+
+    def test_document_limits_match_native_production_bounds(self):
+        self.assertEqual(worker.document_limits({}), (100, 90.0, 1))
+        self.assertEqual(
+            worker.document_limits({
+                'document_worker_max_documents': 600,
+                'document_worker_max_seconds': 100,
+                'document_download_workers': 4,
+            }),
+            (600, 100.0, 4),
+        )
+        for key, value in (
+            ('document_worker_max_documents', 0),
+            ('document_worker_max_documents', 1001),
+            ('document_worker_max_documents', True),
+            ('document_worker_max_seconds', 0),
+            ('document_worker_max_seconds', 101),
+            ('document_worker_max_seconds', True),
+            ('document_download_workers', 0),
+            ('document_download_workers', 5),
+            ('document_download_workers', True),
+        ):
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                worker.document_limits({key: value})
 
     def test_document_process_executes_with_task_local_database(self):
         with tempfile.TemporaryDirectory() as directory:

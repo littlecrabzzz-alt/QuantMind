@@ -146,11 +146,11 @@ class ParallelDocuments(unittest.TestCase):
         self.assertEqual(self.query("SELECT count(*) FROM document_claims")[0][0], 0)
         self.assertEqual(self.query("SELECT count(*) FROM document_attempts")[0][0], 4)
 
-    def test_three_transfers_overlap_with_the_same_durable_fences(self):
-        self.seed(3)
+    def test_four_transfers_overlap_with_the_same_durable_fences(self):
+        self.seed(4)
         active, peak = 0, 0
         lock = threading.Lock()
-        barrier = threading.Barrier(3)
+        barrier = threading.Barrier(4)
 
         def fetch(url, root, timeout, *, download_only=False):
             nonlocal active, peak
@@ -166,12 +166,12 @@ class ParallelDocuments(unittest.TestCase):
 
         with patch.object(docs, "_download_job", side_effect=fetch):
             report = docs.run_documents(
-                self.root, max_documents=3, max_seconds=2, download_workers=3
+                self.root, max_documents=4, max_seconds=2, download_workers=4
             )
-        self.assertEqual(peak, 3)
-        self.assertEqual(report["phase_counts"], {"download": 3, "parse": 0})
+        self.assertEqual(peak, 4)
+        self.assertEqual(report["phase_counts"], {"download": 4, "parse": 0})
         self.assertEqual(self.query("SELECT count(*) FROM document_claims")[0][0], 0)
-        self.assertEqual(self.query("SELECT count(*) FROM document_attempts")[0][0], 3)
+        self.assertEqual(self.query("SELECT count(*) FROM document_attempts")[0][0], 4)
 
     def test_fast_result_commits_while_peer_waits_then_peer_retries(self):
         self.seed(2)
@@ -660,7 +660,7 @@ class ParallelDocuments(unittest.TestCase):
         self.assertLess(time.monotonic() - start, 0.25)
         self.assertLessEqual(result["processed"], 3)
         self.assertEqual(peak, 2)
-        for value in (0, 4, True, 2.0):
+        for value in (0, 5, True, 2.0):
             with self.assertRaises(ValueError):
                 docs.run_documents(self.root, download_workers=value)
 
