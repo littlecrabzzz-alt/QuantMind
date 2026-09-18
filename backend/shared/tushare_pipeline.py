@@ -1848,6 +1848,129 @@ class Pipeline:
         )
         return report
 
+    def schedule_permission_reprobes(self, config, *, now=None):
+        """Recheck stale permission gaps without reopening an entire denied scope."""
+        interval = config.get("permission_reprobe_interval_seconds", 7 * 86400)
+        limit = config.get("permission_reprobe_max_scopes", 4)
+        if (
+            isinstance(interval, bool)
+            or not isinstance(interval, int)
+            or not 3600 <= interval <= 365 * 86400
+            or isinstance(limit, bool)
+            or not isinstance(limit, int)
+            or not 1 <= limit <= 16
+        ):
+            raise ValueError("Invalid permission reprobe bounds")
+        now = int(time.time()) if now is None else now
+        if isinstance(now, bool) or not isinstance(now, int) or now < 0:
+            raise ValueError("Invalid permission reprobe time")
+        report = {
+            "status": "no_action",
+            "interval_seconds": interval,
+            "max_scopes": limit,
+            "eligible_scopes": 0,
+            "already_pending_scopes": 0,
+            "missing_job_scopes": 0,
+            "scheduled": [],
+            "preserved_result_jobs": 0,
+            "preserved_attempts": 0,
+            "upstream_calls": 0,
+        }
+        selected = []
+        for row in self.db.execute(
+            "SELECT scope,checked_at FROM capability "
+            "WHERE status='permission_denied' ORDER BY checked_at,scope"
+        ):
+            try:
+                checked = datetime.fromisoformat(row["checked_at"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError("Invalid permission capability time") from exc
+            if checked.tzinfo is None:
+                raise ValueError("Naive permission capability time")
+            scope = row["scope"]
+            api_name, separator, src = scope.partition(":")
+            if not separator or not api_name:
+                raise ValueError("Invalid permission capability scope")
+            checkpoint = "permission_reprobe:" + digest(scope.encode())
+            saved = self.db.execute(
+                "SELECT value FROM scheduler_state WHERE name=?", (checkpoint,)
+            ).fetchone()
+            if saved and (
+                isinstance(saved[0], bool)
+                or not isinstance(saved[0], int)
+                or saved[0] < 0
+            ):
+                raise ValueError("Invalid permission reprobe checkpoint")
+            last = max(int(checked.timestamp()), saved[0] if saved else 0)
+            if now < last or now - last < interval:
+                continue
+            report["eligible_scopes"] += 1
+            if self.db.execute(
+                "SELECT 1 FROM jobs INDEXED BY jobs_pending "
+                "WHERE state='pending' AND json_extract(job,'$.api_name')=? "
+                "AND COALESCE(json_extract(job,'$.params.src'),'')=? LIMIT 1",
+                (api_name, src),
+            ).fetchone():
+                report["already_pending_scopes"] += 1
+                continue
+            job = self.db.execute(
+                "SELECT id,tries,result FROM jobs INDEXED BY jobs_pending "
+                "WHERE state='permission_blocked' "
+                "AND json_extract(job,'$.api_name')=? "
+                "AND COALESCE(json_extract(job,'$.params.src'),'')=? "
+                "ORDER BY (epoch='history') DESC,priority,rowid LIMIT 1",
+                (api_name, src),
+            ).fetchone()
+            if job is None:
+                report["missing_job_scopes"] += 1
+                continue
+            selected.append((scope, checkpoint, job))
+            if len(selected) == limit:
+                break
+        if not selected:
+            return report
+        attempt_counts = {
+            job["id"]: self.db.execute(
+                "SELECT count(*) FROM attempts WHERE job_id=?", (job["id"],)
+            ).fetchone()[0]
+            for _, _, job in selected
+        }
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
+            for _scope, checkpoint, job in selected:
+                changed = self.db.execute(
+                    "UPDATE jobs SET state='pending',retry_after=0 "
+                    "WHERE id=? AND state='permission_blocked'",
+                    (job["id"],),
+                ).rowcount
+                if changed != 1:
+                    raise ValueError("Permission reprobe job changed during scheduling")
+                self.db.execute(
+                    "INSERT INTO scheduler_state(name,value) VALUES(?,?) "
+                    "ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                    (checkpoint, now),
+                )
+                saved = self.db.execute(
+                    "SELECT tries,result FROM jobs WHERE id=?", (job["id"],)
+                ).fetchone()
+                if tuple(saved) != (job["tries"], job["result"]):
+                    raise ValueError("Permission reprobe changed retained evidence")
+                if self.db.execute(
+                    "SELECT count(*) FROM attempts WHERE job_id=?", (job["id"],)
+                ).fetchone()[0] != attempt_counts[job["id"]]:
+                    raise ValueError("Permission reprobe changed attempt evidence")
+            self.db.commit()
+        except BaseException:
+            self.db.rollback()
+            raise
+        report.update(
+            status="scheduled",
+            scheduled=[{"scope": scope, "job_id": job["id"]} for scope, _, job in selected],
+            preserved_result_jobs=sum(job["result"] is not None for _, _, job in selected),
+            preserved_attempts=sum(attempt_counts.values()),
+        )
+        return report
+
     def compact_stale_recent_roots(self, epoch, *, force=False):
         """Supersede older unexecuted recent roots and their private split trees.
 
@@ -4657,10 +4780,27 @@ class Pipeline:
         ) and not result.get("supplier_empty_hint"):
             # An explicit supplier no-data error stops duplicate retries,
             # but its nonzero business code does not prove API availability.
+            scope = job["api_name"] + ":" + str(job["params"].get("src", ""))
+            previous_capability = self.db.execute(
+                "SELECT status FROM capability WHERE scope=?", (scope,)
+            ).fetchone()
+            if previous_capability and previous_capability[0] == "permission_denied":
+                recovered = self.db.execute(
+                    "UPDATE jobs SET state='pending',retry_after=0 "
+                    "WHERE state='permission_blocked' "
+                    "AND json_extract(job,'$.api_name')=? "
+                    "AND COALESCE(json_extract(job,'$.params.src'),'')=?",
+                    (job["api_name"], str(job["params"].get("src", ""))),
+                ).rowcount
+                result["permission_recovery"] = {
+                    "scope": scope,
+                    "requeued_jobs": recovered,
+                    "trigger_status": status,
+                }
             self.db.execute(
                 "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
                 (
-                    job["api_name"] + ":" + str(job["params"].get("src", "")),
+                    scope,
                     "available",
                     utc_now(),
                     status,
@@ -6063,6 +6203,10 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                             pipeline.compact_stale_recent_roots(
                                 today.strftime("%Y%m%d")
                             )
+                        )
+                    with measure("permission_reprobe"):
+                        report["permission_reprobe"] = (
+                            pipeline.schedule_permission_reprobes(config)
                         )
                     with measure("fina_mainbz_vip_compaction"):
                         report["fina_mainbz_vip_compaction"] = (

@@ -229,11 +229,13 @@ class ExtendedPipeline(unittest.TestCase):
         other = p.enqueue("daily", {"trade_date": "20260101"})
         p.db.commit()
         requests = []
+        deny_sina = True
 
         def handler(request):
+            nonlocal deny_sina
             payload = json.loads(request.content)
             requests.append((payload["api_name"], payload["params"].get("src")))
-            if payload["params"].get("src") == "sina":
+            if payload["params"].get("src") == "sina" and deny_sina:
                 return httpx.Response(200, json={"code": 2002, "msg": "无权限"})
             return httpx.Response(
                 200,
@@ -274,6 +276,71 @@ class ExtendedPipeline(unittest.TestCase):
             p.db.execute("SELECT state FROM jobs WHERE id=?", (new,)).fetchone()[0],
             "permission_blocked",
         )
+        p.db.commit()
+        attempts_before = dict(
+            p.db.execute(
+                "SELECT job_id,count(*) FROM attempts WHERE job_id IN (?,?) "
+                "GROUP BY job_id",
+                jobs[:2],
+            )
+        )
+        scheduled = p.schedule_permission_reprobes(
+            {
+                "permission_reprobe_interval_seconds": 3600,
+                "permission_reprobe_max_scopes": 4,
+            },
+            now=2_000_000_000,
+        )
+        self.assertEqual(scheduled["status"], "scheduled")
+        self.assertEqual([row["scope"] for row in scheduled["scheduled"]], ["news:sina"])
+        probe = scheduled["scheduled"][0]["job_id"]
+        self.assertEqual(
+            p.db.execute("SELECT state FROM jobs WHERE id=?", (probe,)).fetchone()[0],
+            "pending",
+        )
+        self.assertEqual(
+            p.schedule_permission_reprobes(
+                {"permission_reprobe_interval_seconds": 3600}, now=2_000_000_000
+            )["status"],
+            "no_action",
+        )
+
+        deny_sina = False
+        with httpx.Client(
+            transport=httpx.MockTransport(handler), trust_env=False
+        ) as client:
+            recovered = p.run(
+                client,
+                "synthetic-test-token",
+                CONFIG,
+                max_requests=1,
+                max_seconds=2,
+                pause=0,
+            )
+        self.assertEqual(recovered["requests"], 1)
+        self.assertEqual(
+            p.db.execute(
+                "SELECT status FROM capability WHERE scope='news:sina'"
+            ).fetchone()[0],
+            "available",
+        )
+        sibling = jobs[1] if probe == jobs[0] else jobs[0]
+        self.assertEqual(
+            p.db.execute("SELECT state FROM jobs WHERE id=?", (sibling,)).fetchone()[0],
+            "pending",
+        )
+        saved_result = json.loads(
+            p.db.execute("SELECT result FROM jobs WHERE id=?", (probe,)).fetchone()[0]
+        )
+        self.assertEqual(saved_result["permission_recovery"]["requeued_jobs"], 2)
+        attempts_after = dict(
+            p.db.execute(
+                "SELECT job_id,count(*) FROM attempts WHERE job_id IN (?,?) "
+                "GROUP BY job_id",
+                jobs[:2],
+            )
+        )
+        self.assertEqual(attempts_after.get(sibling, 0), attempts_before.get(sibling, 0))
         self.assertIsNotNone(other)
         p.close()
 

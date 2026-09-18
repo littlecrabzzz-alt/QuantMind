@@ -356,6 +356,83 @@ class QueueIndexTest(unittest.TestCase):
             self.p.maintain_permission_states()["status"], "no_action"
         )
 
+    def test_permission_reprobe_is_bounded_idempotent_and_preserves_evidence(self):
+        rows = (
+            ("daily:", "daily", ""),
+            ("news:sina", "news", "sina"),
+            ("weekly:", "weekly", ""),
+        )
+        expected = {}
+        for number, (scope, api_name, src) in enumerate(rows, 1):
+            task_id = f"{number:064x}"
+            result = json.dumps(
+                {"api_name": api_name, "status": "permission_denied"}
+            )
+            self.p.db.execute(
+                "INSERT INTO jobs(id,logical_key,epoch,job,priority,state,tries,"
+                "retry_after,result,group_name) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (
+                    task_id,
+                    task_id,
+                    "history",
+                    json.dumps(
+                        {
+                            "api_name": api_name,
+                            "params": {"src": src} if src else {},
+                        }
+                    ),
+                    number,
+                    "permission_blocked",
+                    2,
+                    2_100_000_000,
+                    result,
+                    "fixture",
+                ),
+            )
+            self.p.db.execute(
+                "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+                (task_id, 1, result),
+            )
+            self.p.db.execute(
+                "INSERT INTO capability(scope,status,checked_at,reason) "
+                "VALUES(?,'permission_denied','2020-01-01T00:00:00+00:00',?)",
+                (scope, "fixture"),
+            )
+            expected[task_id] = (2, result, 1)
+        self.p.db.commit()
+
+        config = {
+            "permission_reprobe_interval_seconds": 3600,
+            "permission_reprobe_max_scopes": 2,
+        }
+        first = self.p.schedule_permission_reprobes(config, now=2_000_000_000)
+        self.assertEqual(first["status"], "scheduled")
+        self.assertEqual(first["preserved_result_jobs"], 2)
+        self.assertEqual(first["preserved_attempts"], 2)
+        self.assertEqual(
+            [row["scope"] for row in first["scheduled"]],
+            ["daily:", "news:sina"],
+        )
+        second = self.p.schedule_permission_reprobes(config, now=2_000_000_000)
+        self.assertEqual(
+            [row["scope"] for row in second["scheduled"]], ["weekly:"]
+        )
+        self.assertEqual(
+            self.p.schedule_permission_reprobes(config, now=2_000_000_000)["status"],
+            "no_action",
+        )
+        for task_id, evidence in expected.items():
+            state, tries, result = self.p.db.execute(
+                "SELECT state,tries,result FROM jobs WHERE id=?", (task_id,)
+            ).fetchone()
+            self.assertEqual((state, tries, result), ("pending", *evidence[:2]))
+            self.assertEqual(
+                self.p.db.execute(
+                    "SELECT count(*) FROM attempts WHERE job_id=?", (task_id,)
+                ).fetchone()[0],
+                evidence[2],
+            )
+
     def test_compaction_removes_duplicate_child_of_terminal_parent(self):
         params = {"trade_date": "20260910"}
         old_parent = self.p.enqueue("daily", params, 1, "20260911")
