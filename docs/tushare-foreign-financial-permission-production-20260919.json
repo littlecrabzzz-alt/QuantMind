@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "status": "production_verified_permission_denied",
+  "created_at": "2026-09-18T22:39:46Z",
+  "code_commit": "f6a96ad1e684f4e0809866a65658ac2764eed3d3",
+  "scope": {
+    "apis": [
+      "hk_income",
+      "hk_balancesheet",
+      "hk_cashflow",
+      "hk_fina_indicator",
+      "us_income",
+      "us_balancesheet",
+      "us_cashflow",
+      "us_fina_indicator"
+    ],
+    "requests_per_api": 1,
+    "max_upstream_requests": 8,
+    "history_planned": false,
+    "automatic_activation_permitted": false
+  },
+  "review_pins": {
+    "helper_sha256": "a55ee2aa447ebdd2e29c5d97f22b2557e28f95ff10491e83888d55e97133cec1",
+    "contract_sha256": "307009f6d6bc3946b9a9d82d07b0a4378a3049fd8004c053c185f805516a5866"
+  },
+  "authority": {
+    "node": "mac_archive_owner",
+    "schema_version": 6,
+    "identifier_cache_version": 4,
+    "hk_stock_count": 3547,
+    "us_stock_count": 30793,
+    "hk_seed": "00700.HK",
+    "us_seed": "AAPL"
+  },
+  "production_result": {
+    "actual_upstream_calls": 8,
+    "permission_denied": 8,
+    "activation_candidates": [],
+    "configuration_changed": false,
+    "enable_foreign_financial": false,
+    "foreign_financial_apis": [],
+    "capability_rows_permission_denied": 8,
+    "probe_jobs_permission_blocked": 8,
+    "local_receipt": "~/Library/Application Support/QuantMind/tushare/validation/foreign-financial-permission-probe-20260918T223648Z.json",
+    "local_receipt_sha256": "62810ad4e045d196d1ea93ecd0456103305b64b1e88a0d49f5381e7d00aec0dc",
+    "secret_absent_from_checked_artifacts": 17
+  },
+  "production_resume": {
+    "launch_agent": "com.quantmind.tushare-archive",
+    "pid": 383,
+    "status": "completed_cycle",
+    "updated_at": "2026-09-18T22:39:31.569148+00:00",
+    "requests": 395,
+    "documents_processed": 2500,
+    "done": 474576,
+    "empty": 393291,
+    "pending": 2689704,
+    "blocked": 781,
+    "permission_blocked": 5855,
+    "failed_stage": null,
+    "free_bytes": 2114883899392
+  },
+  "validation": {
+    "focused_tests": {
+      "passed": 44,
+      "command": "PYTHONPATH=.:scripts python -m unittest scripts.test_tushare_foreign_financial_pipeline scripts.test_tushare_foreign_financial_contracts scripts.test_tushare_rate_policy scripts.test_tushare_foreign_financial_probe"
+    },
+    "full_tushare_suite": {
+      "passed": 1389,
+      "skipped": 5,
+      "elapsed_seconds": 92.191
+    },
+    "ruff": "passed",
+    "py_compile": "passed",
+    "git_diff_check": "passed",
+    "dry_run_upstream_calls": 0
+  },
+  "conclusion": "The current account does not have the independent HK or US financial-statement permissions. Keep the family disabled and do not create the approximately 274000 root history requests. The existing local full-archive acquisition continues for all enabled and permitted families."
+}
