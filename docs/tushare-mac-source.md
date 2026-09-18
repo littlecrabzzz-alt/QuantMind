@@ -219,17 +219,23 @@ VIP 分页链做覆盖压缩：同一年、同一 P/D/I 类型的四个季度必
 轮转。共享账户/API 限速、已观察冷却、每日总量、任务重试与原始证据写入均不变；
 配置为空时调度行为完全保持原样。
 
-`acquisition_pipeline_depth` 默认 1，灰度值只能设为 2。深度 2 仍只使用一个 HTTP
+`acquisition_pipeline_depth` 默认 1，灰度值只能设为 2。默认仍只使用一个 HTTP
 执行线程：主线程在上一请求进行时等待并持久化下一条合法的账户/API 频控槽，最多预取
-一条任务，从而重叠网络时间和限速等待，不形成并发请求突发。预取任务在请求前以
+一条任务，从而重叠网络时间和限速等待。预取任务在请求前以
 `inflight` 状态和频控槽一起提交；进程异常退出后，新 owner 只把该状态恢复为
 `pending`，已提交的频控槽继续保留，因此恢复不会绕过限速。轮次报告中的
 `acquisition_pipeline` 给出深度、HTTP worker 数、队列高水位和崩溃恢复任务数。
 启用深度 2 前后须在完整生产轮次比较真实请求数、`rate_limited` 响应和失败阶段。
+`acquisition_http_workers` 默认 1、上限 2。值 2 只允许与深度 2、`thread` 捕获和显式
+账户频率同时使用；请求前的持久化账户/API 频控事务不变，实际 HTTP 开始点还经过共享
+线程门，继续分别保持账户和接口最小间隔。结果按派发顺序由主线程唯一写入，网络并发
+最多为 2。生产须先用低于官方账户上限的灰度值验收真实速率、限流响应、失败和资源，
+不能把第二个 worker 解释为放宽任何频率或权限。
 当完整轮次证明线程解释器争用使实际睡眠显著高于请求睡眠时，可将
 `acquisition_capture_execution` 从默认 `thread` 灰度设为 `process`。它只把同一个
 HTTP worker 和一条预取任务移入独立进程，Token 通过进程初始化管道传递，不进入命令
 参数、配置或报告；账户/API 频控预留、结果事务和唯一写入者仍由原主进程控制。
+切换到 `process` 前须先把 `acquisition_http_workers` 恢复为 1。
 若 `account_gate_requested_sleep` 与 `account_gate_sleep` 继续显示同进程文档线程阻塞
 限速调度，可将 `document_worker_execution` 从默认 `thread` 灰度设为 `process`。
 它不改变文档锁、任务数据库、下载并发数或采集/发布顺序，只隔离 Python 调度；worker
