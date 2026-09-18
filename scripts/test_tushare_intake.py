@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from backend.shared.tushare_intake import (
     DocParser,
     assess_response,
+    assess_success_payload,
     capture_sample,
     json_bytes,
     parse_document,
@@ -155,6 +156,39 @@ class IntakeAcceptance(unittest.TestCase):
         )
         self.assertEqual(result["status"], "sample_ok")
         self.assertFalse(result["supplier_has_more"])
+
+    def test_index_weight_uses_current_live_boundary_for_legacy_jobs(self):
+        job = {
+            "api_name": "index_weight",
+            "row_cap": 1000,
+            "fields": "index_code,con_code,trade_date,weight",
+            "required_fields": ["index_code", "con_code", "trade_date"],
+            "nullable_fields": [],
+            "positive_fields": [],
+            "params": {
+                "index_code": "000001.SH",
+                "start_date": "20240531",
+                "end_date": "20240531",
+            },
+        }
+        row = ["000001.SH", "600000.SH", "20240531", 0.1]
+        payload = {
+            "code": 0,
+            "data": {
+                "fields": job["fields"].split(","),
+                "items": [row] * 1001,
+                "has_more": False,
+            },
+        }
+        result = assess_success_payload(job, payload)
+        self.assertEqual(result["status"], "sample_ok")
+        self.assertEqual(result["row_count"], 1001)
+        self.assertFalse(result["supplier_has_more"])
+
+        payload["data"]["has_more"] = True
+        self.assertEqual(
+            assess_success_payload(job, payload)["status"], "possibly_truncated"
+        )
 
     def test_cyq_chips_exact_supplier_empty_is_narrow_and_archived(self):
         empty = {

@@ -533,7 +533,7 @@ class IndexWeightDescendantBatchTests(unittest.TestCase):
                 200,
                 json={
                     "code": 0,
-                    "data": {"fields": fields, "items": [item] * 1000, "has_more": False},
+                    "data": {"fields": fields, "items": [item] * 1000, "has_more": True},
                 },
             )
 

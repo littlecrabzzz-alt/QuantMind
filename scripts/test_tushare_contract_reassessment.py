@@ -163,6 +163,44 @@ class ContractReassessmentTest(unittest.TestCase):
             original,
         )
 
+    def test_index_weight_legacy_1000_alarm_uses_live_7000_boundary(self):
+        fields = ["index_code", "con_code", "trade_date", "weight"]
+        row = ["000001.SH", "600000.SH", "20240531", 0.1]
+        task, _, original = self.seed(
+            "index_weight",
+            fields,
+            [row] * 1001,
+            null_counts=dict.fromkeys(fields[:3], 0),
+            params={
+                "index_code": "000001.SH",
+                "start_date": "20240531",
+                "end_date": "20240531",
+            },
+            state="blocked",
+            result_status="possibly_truncated",
+            job_updates={"row_cap": 1000},
+        )
+
+        report = reassess(self.pipeline, apply=True, apis=["index_weight"])
+
+        self.assertEqual(report["promoted_by_api"], {"index_weight": 1})
+        saved = self.pipeline.db.execute(
+            "SELECT state,result FROM jobs WHERE id=?", (task,)
+        ).fetchone()
+        self.assertEqual(saved["state"], "done")
+        result = json.loads(saved["result"])
+        self.assertEqual(result["row_count"], 1001)
+        self.assertEqual(result["status"], "sample_ok")
+        self.assertEqual(result["contract_reassessment"]["previous_state"], "blocked")
+        self.assertEqual(
+            json.loads(
+                self.pipeline.db.execute(
+                    "SELECT result FROM attempts WHERE job_id=?", (task,)
+                ).fetchone()[0]
+            ),
+            original,
+        )
+
     def test_retired_replacement_parent_is_skipped_before_artifact_validation(self):
         from backend.shared.tushare_other_contracts import FIELDS
 

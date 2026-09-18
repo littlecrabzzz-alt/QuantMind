@@ -54,6 +54,9 @@ def _contract_sha(job):
                 "api_name": job["api_name"],
                 "fields": job.get("fields"),
                 "row_cap": job.get("row_cap"),
+                "assessment_row_cap": spec.get(
+                    "assessment_row_cap", job.get("row_cap")
+                ),
                 "required_fields": job.get("required_fields"),
                 "nullable_fields": spec.get(
                     "assessment_nullable_fields", job.get("nullable_fields", ())

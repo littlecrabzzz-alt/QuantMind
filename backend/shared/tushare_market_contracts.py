@@ -172,6 +172,17 @@ MARKET_CONTRACTS["fund_nav"].update(
         "historical ranges retain their existing request identities."
     ),
 )
+MARKET_CONTRACTS["index_weight"].update(
+    assessment_row_cap=7000,
+    row_cap_live_observed=True,
+    cap_note=(
+        "The public page does not publish a row limit. Production observations on "
+        "2026-09-19 found six responses with exactly 7,000 rows and has_more=true, "
+        "while 1,344 responses below 7,000 reported has_more=false. Use 7,000 as "
+        "the live-observed assessment boundary while preserving the historical "
+        "1,000-row request identity; any explicit has_more=true remains incomplete."
+    ),
+)
 MARKET_CONTRACTS["fund_share"]["history_partition"] = (
     "closed_calendar_month_range_v1"
 )

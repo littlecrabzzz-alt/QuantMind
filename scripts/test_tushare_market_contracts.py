@@ -213,6 +213,12 @@ class MarketPlanning(unittest.TestCase):
             MARKET_CONTRACTS["fund_nav"]["pagination_required_param"], "nav_date"
         )
         self.assertNotIn("saturation_param", MARKET_CONTRACTS["index_weight"])
+        self.assertEqual(MARKET_CONTRACTS["index_weight"]["row_cap"], 1000)
+        self.assertEqual(
+            MARKET_CONTRACTS["index_weight"]["assessment_row_cap"], 7000
+        )
+        self.assertTrue(MARKET_CONTRACTS["index_weight"]["row_cap_live_observed"])
+        self.assertFalse(MARKET_CONTRACTS["index_weight"]["row_cap_verified"])
 
     def test_dependencies_and_invalid_identifiers(self):
         self.assertEqual(

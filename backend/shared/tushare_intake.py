@@ -311,9 +311,10 @@ def assess_success_payload(job, payload):
     positive_fields = current_contract.get(
         "assessment_positive_fields", job.get("positive_fields", ())
     )
+    row_cap = current_contract.get("assessment_row_cap", job["row_cap"])
     assessment = assess_response(
         payload,
-        job["row_cap"],
+        row_cap,
         job["required_fields"],
         nullable_fields,
         positive_fields,
