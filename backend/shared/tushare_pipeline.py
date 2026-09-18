@@ -5439,20 +5439,53 @@ class Pipeline:
             ):
                 result = json.loads(row[0])
                 parquet = result.get("parquet")
-                marker = result.get("contract_reassessment")
+                reassessment = result.get("contract_reassessment")
+                retirement = result.get("capability_probe_retirement")
+                annotation = "contract_reassessment"
+                marker = reassessment
+                if reassessment is None and isinstance(retirement, dict):
+                    capability = retirement.get("capability")
+                    production = retirement.get("production_plan")
+                    if (
+                        retirement.get("version") != 1
+                        or retirement.get("previous_state") != "quality"
+                        or retirement.get("previous_status") != result.get("status")
+                        or retirement.get("reason")
+                        != "non_authoritative_capability_probe"
+                        or retirement.get("source_attempt_preserved") is not True
+                        or retirement.get("artifact_evidence_preserved") is not True
+                        or retirement.get("coverage_proven") is not False
+                        or retirement.get("upstream_calls") != 0
+                        or not isinstance(capability, dict)
+                        or capability.get("status") != "available"
+                        or not isinstance(capability.get("checked_at"), str)
+                        or not capability["checked_at"]
+                        or not isinstance(production, dict)
+                        or type(production.get("jobs")) is not int
+                        or production["jobs"] < 1
+                        or type(production.get("attempted_jobs")) is not int
+                        or not 1 <= production["attempted_jobs"] <= production["jobs"]
+                    ):
+                        raise ValueError("Invalid capability probe retirement overlay")
+                    annotation = "capability_probe_retirement"
+                    marker = retirement
                 if (
                     not isinstance(parquet, dict)
                     or parquet.get("path") not in active
                     or not isinstance(marker, dict)
-                    or marker.get("reassessed_status") != result.get("status")
+                    or (
+                        annotation == "contract_reassessment"
+                        and marker.get("reassessed_status") != result.get("status")
+                    )
                     or marker.get("upstream_calls") != 0
+                    or (reassessment is not None and retirement is not None)
                 ):
                     raise ValueError("Invalid contract reassessment overlay")
                 dataset = active[parquet["path"]]
                 if dataset["api_name"] != result.get("api_name"):
                     raise ValueError("Contract reassessment API mismatch")
                 dataset["quality_state"] = result["status"]
-                dataset["contract_reassessment"] = marker
+                dataset[annotation] = marker
         with measure("normalization_recovery_overlays"):
             for row in self.db.execute(
                 "SELECT r.job_id,r.normalizer_sha256,r.result,j.job,j.state,"

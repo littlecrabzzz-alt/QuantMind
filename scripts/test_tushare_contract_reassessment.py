@@ -330,6 +330,17 @@ class ContractReassessmentTest(unittest.TestCase):
             ),
             original,
         )
+        release = self.pipeline.publish()
+        manifest = manifest_at(self.root, release)
+        dataset = next(
+            item
+            for item in manifest["datasets"]
+            if item["api_name"] == "opt_basic"
+            and item.get("capability_probe_retirement")
+        )
+        self.assertEqual(dataset["quality_state"], "possibly_truncated")
+        self.assertFalse(dataset["capability_probe_retirement"]["coverage_proven"])
+        self.assertNotIn(task, {gap["id"] for gap in manifest["gaps"]})
 
     def test_capability_probe_without_production_attempt_stays_quality(self):
         from backend.shared.tushare_other_contracts import FIELDS
