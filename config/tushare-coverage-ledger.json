@@ -1039,7 +1039,8 @@
         "fina_mainbz"
       ],
       "acquisition_api_names": [
-        "fina_mainbz"
+        "fina_mainbz",
+        "fina_mainbz_vip"
       ],
       "status": "ingested_partial",
       "permission_status": "available_observed",
