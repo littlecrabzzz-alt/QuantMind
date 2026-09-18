@@ -113,7 +113,16 @@ class Rates(unittest.TestCase):
                 / "docs/tushare-general-rate-refinement.json"
             ).read_bytes()
         )["api_sets"]
-        self.assertEqual(policy.REGULAR_APIS, frozenset(evidence["regular_500"]))
+        delta = json.loads(
+            (
+                Path(__file__).resolve().parents[1]
+                / "docs/tushare-general-rate-refinement.json"
+            ).read_bytes()
+        )["catalog_delta_review"]
+        self.assertEqual(
+            policy.REGULAR_APIS,
+            frozenset(evidence["regular_500"] + delta["regular_500_added"]),
+        )
         self.assertEqual(
             policy.SPECIAL - {"broker_recommend", "cyq_chips", "report_rc", "cyq_perf"},
             set(evidence["special_300"]),

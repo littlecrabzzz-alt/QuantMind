@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "catalog_fetched_at": "2026-09-08T15:22:12.131618+00:00",
-  "catalog_index_sha256": "182240e4826c7e65a6b63ef83efdc4e14b7b3589a6249ed54cd36ac66c937dce",
-  "reviewed_at": "2026-09-10T04:36:52+00:00",
-  "entry_count": 263,
-  "scope": "Every entry in pinned official catalogue plus independently discovered linked entries. entry_count remains the immutable baseline count, not a scope ceiling. Runtime evidence controls entitlement and coverage.",
+  "catalog_fetched_at": "2026-09-18T21:13:01.541081+00:00",
+  "catalog_index_sha256": "73876a0cd68fc2df57cdce89088cf81b6d19365af5ca83169e96cc7a69aa0839",
+  "reviewed_at": "2026-09-18T21:13:01.541081+00:00",
+  "entry_count": 270,
+  "scope": "Every entry in the current official sidebar plus independently discovered linked entries. Dated evidence preserves prior catalogue baselines; runtime evidence controls entitlement and coverage.",
   "entries": [
     {
       "doc_id": "14",
@@ -1505,6 +1505,22 @@
           }
         ]
       }
+    },
+    {
+      "doc_id": "494",
+      "title": "股票增发",
+      "url": "https://tushare.pro/document/2?doc_id=494",
+      "api_names": [
+        "stk_seasoned"
+      ],
+      "acquisition_api_names": [
+        "stk_seasoned"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed contract and durable local planner implemented; bounded live permission/schema probe and historical completion evidence remain required.",
+      "contract_evidence": "docs/tushare-catalog-refresh-20260919.json",
+      "auto_acquisition": true
     },
     {
       "doc_id": "291",
@@ -3707,6 +3723,22 @@
       "next_action": "Continue persisted historical backfill, revisions and coverage validation; no completeness claim."
     },
     {
+      "doc_id": "493",
+      "title": "ETF当日集合竞价",
+      "url": "https://tushare.pro/document/2?doc_id=493",
+      "api_names": [
+        "etf_auction"
+      ],
+      "acquisition_api_names": [
+        "etf_auction"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed contract and durable local planner implemented; bounded live permission/schema probe and historical completion evidence remain required.",
+      "contract_evidence": "docs/tushare-catalog-refresh-20260919.json",
+      "auto_acquisition": true
+    },
+    {
       "doc_id": "199",
       "title": "ETF复权因子",
       "url": "https://tushare.pro/document/2?doc_id=199",
@@ -4683,6 +4715,22 @@
       }
     },
     {
+      "doc_id": "498",
+      "title": "美股恐慌指数行情",
+      "url": "https://tushare.pro/document/2?doc_id=498",
+      "api_names": [
+        "vix_index"
+      ],
+      "acquisition_api_names": [
+        "vix_index"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed contract and durable local planner implemented; bounded live permission/schema probe and historical completion evidence remain required.",
+      "contract_evidence": "docs/tushare-catalog-refresh-20260919.json",
+      "auto_acquisition": true
+    },
+    {
       "doc_id": "18",
       "title": "公募基金",
       "url": "https://tushare.pro/document/2?doc_id=18",
@@ -5202,6 +5250,54 @@
         "additional_evidence": "/data/tushare/validation/extra13-empty-discovery.json",
         "offline_release_id": "data-e3d0b8e8d539fb775b226e3e8799b131591e1b3c34965384ae7b287ef3adfcd5"
       }
+    },
+    {
+      "doc_id": "495",
+      "title": "期货交易所库存周报",
+      "url": "https://tushare.pro/document/2?doc_id=495",
+      "api_names": [
+        "fut_inv_weekly"
+      ],
+      "acquisition_api_names": [
+        "fut_inv_weekly"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed contract and durable local planner implemented; bounded live permission/schema probe and historical completion evidence remain required.",
+      "contract_evidence": "docs/tushare-catalog-refresh-20260919.json",
+      "auto_acquisition": true
+    },
+    {
+      "doc_id": "496",
+      "title": "标准仓单到期数量",
+      "url": "https://tushare.pro/document/2?doc_id=496",
+      "api_names": [
+        "fut_rcpt_mat"
+      ],
+      "acquisition_api_names": [
+        "fut_rcpt_mat"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed contract and durable local planner implemented; bounded live permission/schema probe and historical completion evidence remain required.",
+      "contract_evidence": "docs/tushare-catalog-refresh-20260919.json",
+      "auto_acquisition": true
+    },
+    {
+      "doc_id": "497",
+      "title": "期货交易参数",
+      "url": "https://tushare.pro/document/2?doc_id=497",
+      "api_names": [
+        "fut_trade_param"
+      ],
+      "acquisition_api_names": [
+        "fut_trade_param"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed contract and durable local planner implemented; bounded live permission/schema probe and historical completion evidence remain required.",
+      "contract_evidence": "docs/tushare-catalog-refresh-20260919.json",
+      "auto_acquisition": true
     },
     {
       "doc_id": "189",
@@ -6600,6 +6696,22 @@
         },
         "gap_details_evidence": "/data/tushare/validation/intake-batch-20260909T065700Z/history-minutes7-cloud-preenable.json"
       }
+    },
+    {
+      "doc_id": "383",
+      "title": "港股实时日线",
+      "url": "https://tushare.pro/document/2?doc_id=383",
+      "api_names": [
+        "rt_hk_k"
+      ],
+      "acquisition_api_names": [
+        "rt_hk_k"
+      ],
+      "status": "implementing",
+      "permission_status": "unverified",
+      "next_action": "Reviewed contract and durable local planner implemented; bounded live permission/schema probe and historical completion evidence remain required.",
+      "contract_evidence": "docs/tushare-catalog-refresh-20260919.json",
+      "auto_acquisition": true
     },
     {
       "doc_id": "389",

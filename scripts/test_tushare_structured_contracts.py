@@ -173,7 +173,7 @@ class StructuredPlanning(unittest.TestCase):
     def test_all_catalog_items_retained_and_alias_schema_resolvable(self):
         catalog = json.loads((ROOT / "config/tushare-catalog.json").read_text())
         ledger = json.loads((ROOT / "config/tushare-coverage-ledger.json").read_text())
-        self.assertEqual(len(ledger["entries"]), 263)
+        self.assertEqual(len(ledger["entries"]), 270)
         self.assertEqual(
             {e["doc_id"] for e in ledger["entries"]},
             {e["doc_id"] for e in catalog["entries"]},

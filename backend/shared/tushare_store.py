@@ -46,6 +46,7 @@ from backend.shared.tushare_other_contracts import OTHER_CONTRACTS
 from backend.shared.tushare_supplement_contracts import SUPPLEMENT_CONTRACTS
 from backend.shared.tushare_equity_event_contracts import EQUITY_EVENT_CONTRACTS
 from backend.shared.tushare_futures_extra_contracts import FUTURES_EXTRA_CONTRACTS
+from backend.shared.tushare_catalog_delta_contracts import CATALOG_DELTA_CONTRACTS
 from backend.shared.tushare_research_extra_contracts import (
     FINA_MAINBZ_VIP_CONTRACT,
     RESEARCH_EXTRA_CONTRACTS,
@@ -89,6 +90,7 @@ CONTRACTS = {
     **SUPPLEMENT_CONTRACTS,
     **EQUITY_EVENT_CONTRACTS,
     **FUTURES_EXTRA_CONTRACTS,
+    **CATALOG_DELTA_CONTRACTS,
     **RESEARCH_EXTRA_CONTRACTS,
     "fina_mainbz_vip": FINA_MAINBZ_VIP_CONTRACT,
 }

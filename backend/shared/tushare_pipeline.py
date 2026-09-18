@@ -72,6 +72,7 @@ from backend.shared.tushare_registry import (
     TECHNICAL_EXTRA_RUNTIME_CONTRACTS,
     FOREIGN_FINANCIAL_RUNTIME_CONTRACTS,
     foreign_financial_runtime_prerequisites,
+    catalog_delta_prerequisites,
 )
 
 
@@ -3598,6 +3599,7 @@ class Pipeline:
             "etf_basket": etf_basket_prerequisites,
             "credit_extra": credit_extra_prerequisites,
             "futures_extra": futures_extra_prerequisites,
+            "catalog_delta": catalog_delta_prerequisites,
             "research_extra": research_extra_prerequisites,
             "fina_mainbz_vip": fina_mainbz_vip_prerequisites,
         }[family]
@@ -3775,6 +3777,12 @@ class Pipeline:
                 "futures_extra",
                 lambda cfg, ids: self.record_extra_planning_gaps(
                     "futures_extra", cfg, ids
+                ),
+            ),
+            (
+                "catalog_delta",
+                lambda cfg, ids: self.record_extra_planning_gaps(
+                    "catalog_delta", cfg, ids
                 ),
             ),
             (

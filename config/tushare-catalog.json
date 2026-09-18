@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "fetched_at": "2026-09-08T15:22:12.131618+00:00",
+  "fetched_at": "2026-09-18T21:13:01.541081+00:00",
   "source": "https://tushare.pro/document/2",
-  "index_sha256": "182240e4826c7e65a6b63ef83efdc4e14b7b3589a6249ed54cd36ac66c937dce",
-  "entry_count": 263,
+  "index_sha256": "73876a0cd68fc2df57cdce89088cf81b6d19365af5ca83169e96cc7a69aa0839",
+  "entry_count": 270,
   "entries": [
     {
       "doc_id": "14",
@@ -2086,6 +2086,95 @@
       "coverage_status": "not_ingested"
     },
     {
+      "doc_id": "494",
+      "title": "股票增发",
+      "url": "https://tushare.pro/document/2?doc_id=494",
+      "html_sha256": "e04f3ab33f19dcd00b6adcb1ee5b6e9064d12364cb4fe1de6df6a971fcaa3beb",
+      "api_names": [
+        "stk_seasoned"
+      ],
+      "input_fields": [
+        "ts_code",
+        "ann_date",
+        "start_date",
+        "end_date"
+      ],
+      "output_fields": [
+        "ts_code",
+        "ann_date",
+        "first_ann_date",
+        "proj_info_source",
+        "board_approval_dt",
+        "sh_approval_dt",
+        "sasac_approval_dt",
+        "csrc_approval_dt",
+        "fo_type",
+        "fo_stock_type",
+        "cur_stage",
+        "valid_st_dt",
+        "valid_end_dt",
+        "plan_chg_type",
+        "plan_chg_ann_dt",
+        "pricing_method",
+        "pricing_base_dt",
+        "price_basis",
+        "fo_vol_high",
+        "fo_vol_low",
+        "fo_price_high",
+        "fo_price_low",
+        "fo_price_ratio",
+        "fo_raise_total",
+        "fo_purpose",
+        "fo_investor",
+        "sub_method",
+        "fo_price_act",
+        "fo_vol_act",
+        "fo_raise_total_act",
+        "fo_raise_net_act",
+        "fo_exp_total",
+        "uw_fee",
+        "fo_exp_audit",
+        "fo_exp_legal",
+        "fo_exp_inst",
+        "fo_exp_pub",
+        "fo_exp_reg",
+        "fo_exp_other",
+        "fo_exp_per_share",
+        "issue_obj_type",
+        "pe_issue",
+        "pub_plac_qty",
+        "onl_pch_vol",
+        "onl_pch_num",
+        "onl_pch_excess",
+        "onl_winning_rate",
+        "inst_plac_qty",
+        "inst_sub_eff_total",
+        "inst_sub_eff_cnt",
+        "inst_oversub_times",
+        "a_inv_plac_qty",
+        "b_inv_plac_qty",
+        "old_sh_pre_plac_qty",
+        "old_sh_pre_plac_ratio",
+        "clw_between_inst_pub",
+        "prospectus_pub_dt",
+        "offer_intent_pub_dt",
+        "apply_date",
+        "old_sh_pre_plac_dt",
+        "onl_issue_date",
+        "uw_start_dt",
+        "uw_end_dt",
+        "uw_mode",
+        "new_share_list_dt",
+        "list_circ_qty",
+        "right_reg_dt",
+        "ex_right_dt",
+        "update_flag"
+      ],
+      "audit_status": "schema_extracted",
+      "permission_status": "unprobed",
+      "coverage_status": "not_ingested"
+    },
+    {
       "doc_id": "291",
       "title": "特色数据",
       "url": "https://tushare.pro/document/2?doc_id=291",
@@ -4013,6 +4102,36 @@
       "coverage_status": "not_ingested"
     },
     {
+      "doc_id": "493",
+      "title": "ETF当日集合竞价",
+      "url": "https://tushare.pro/document/2?doc_id=493",
+      "html_sha256": "8bca7e147c9f37a31103778d9a4d683f8881eecabe2d91be3c15a6496832b293",
+      "api_names": [
+        "etf_auction"
+      ],
+      "input_fields": [
+        "ts_code",
+        "trade_date",
+        "start_date",
+        "end_date",
+        "ts_type"
+      ],
+      "output_fields": [
+        "ts_code",
+        "trade_date",
+        "vol",
+        "price",
+        "amount",
+        "pre_close",
+        "turnover_rate",
+        "volume_ratio",
+        "float_share"
+      ],
+      "audit_status": "schema_extracted",
+      "permission_status": "unprobed",
+      "coverage_status": "not_ingested"
+    },
+    {
       "doc_id": "199",
       "title": "ETF复权因子",
       "url": "https://tushare.pro/document/2?doc_id=199",
@@ -4943,6 +5062,31 @@
       "coverage_status": "not_ingested"
     },
     {
+      "doc_id": "498",
+      "title": "美股恐慌指数行情",
+      "url": "https://tushare.pro/document/2?doc_id=498",
+      "html_sha256": "828fbbbd243f97b5e0cdd492936146711488335c9fab09fa4e0736a0ebf02008",
+      "api_names": [
+        "vix_index"
+      ],
+      "input_fields": [
+        "trade_date",
+        "start_date",
+        "end_date"
+      ],
+      "output_fields": [
+        "trade_date",
+        "high",
+        "low",
+        "open",
+        "close",
+        "pct_change"
+      ],
+      "audit_status": "schema_extracted",
+      "permission_status": "unprobed",
+      "coverage_status": "not_ingested"
+    },
+    {
       "doc_id": "18",
       "title": "公募基金",
       "url": "https://tushare.pro/document/2?doc_id=18",
@@ -5704,6 +5848,103 @@
         "pct_chg",
         "vol",
         "amount"
+      ],
+      "audit_status": "schema_extracted",
+      "permission_status": "unprobed",
+      "coverage_status": "not_ingested"
+    },
+    {
+      "doc_id": "495",
+      "title": "期货交易所库存周报",
+      "url": "https://tushare.pro/document/2?doc_id=495",
+      "html_sha256": "cc91a765fbf64f6c96f23d0edc35357c0ad57f34b4603cdc5c37d95ee212a6de",
+      "api_names": [
+        "fut_inv_weekly"
+      ],
+      "input_fields": [
+        "trade_date",
+        "ts_code",
+        "start_date",
+        "end_date"
+      ],
+      "output_fields": [
+        "ts_code",
+        "trade_date",
+        "fut_name",
+        "exchange",
+        "area",
+        "warehouse",
+        "grade",
+        "pre_total",
+        "pre_futures",
+        "cur_total",
+        "cur_futures",
+        "chg_total",
+        "chg_futures",
+        "pre_capacity",
+        "cur_capacity",
+        "chg_capacity",
+        "unit"
+      ],
+      "audit_status": "schema_extracted",
+      "permission_status": "unprobed",
+      "coverage_status": "not_ingested"
+    },
+    {
+      "doc_id": "496",
+      "title": "标准仓单到期数量",
+      "url": "https://tushare.pro/document/2?doc_id=496",
+      "html_sha256": "b0d5c028278b46020907f32202eeac63aebea7892cda2168660ae9930b0bbb4e",
+      "api_names": [
+        "fut_rcpt_mat"
+      ],
+      "input_fields": [
+        "trade_date",
+        "ts_code",
+        "start_date",
+        "end_date"
+      ],
+      "output_fields": [
+        "trade_date",
+        "exchange",
+        "fut_code",
+        "fut_name",
+        "unit",
+        "cur_month",
+        "next_month",
+        "next_two_month"
+      ],
+      "audit_status": "schema_extracted",
+      "permission_status": "unprobed",
+      "coverage_status": "not_ingested"
+    },
+    {
+      "doc_id": "497",
+      "title": "期货交易参数",
+      "url": "https://tushare.pro/document/2?doc_id=497",
+      "html_sha256": "3205ff23587189635a7d8f3bb89410b326c777805ca2b6d1b3c19890cd2dab29",
+      "api_names": [
+        "fut_trade_param"
+      ],
+      "input_fields": [
+        "trade_date",
+        "fut_code",
+        "start_date",
+        "end_date"
+      ],
+      "output_fields": [
+        "trade_date",
+        "fut_code",
+        "exchange",
+        "trade_unit",
+        "tick_size",
+        "pre_settle_price",
+        "price_limit",
+        "position_limit",
+        "trade_limit",
+        "min_order_qty",
+        "max_limit_order_qty",
+        "max_market_order_qty"
       ],
       "audit_status": "schema_extracted",
       "permission_status": "unprobed",
@@ -6887,6 +7128,31 @@
         "open",
         "close",
         "high",
+        "low",
+        "vol",
+        "amount"
+      ],
+      "audit_status": "schema_extracted",
+      "permission_status": "unprobed",
+      "coverage_status": "not_ingested"
+    },
+    {
+      "doc_id": "383",
+      "title": "港股实时日线",
+      "url": "https://tushare.pro/document/2?doc_id=383",
+      "html_sha256": "dca6e0126732fba12f74edb59937a0976a2e618b74cd2afd9092f114b0700b2d",
+      "api_names": [
+        "rt_hk_k"
+      ],
+      "input_fields": [
+        "ts_code"
+      ],
+      "output_fields": [
+        "ts_code",
+        "pre_close",
+        "close",
+        "high",
+        "open",
         "low",
         "vol",
         "amount"

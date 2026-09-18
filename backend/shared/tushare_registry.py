@@ -26,6 +26,11 @@ from backend.shared.tushare_futures_extra_contracts import (
     FUTURES_EXTRA_CONTRACTS,
     iter_futures_extra_jobs,
 )
+from backend.shared.tushare_catalog_delta_contracts import (
+    CATALOG_DELTA_CONTRACTS,
+    catalog_delta_prerequisites,
+    iter_catalog_delta_jobs,
+)
 from backend.shared.tushare_research_extra_contracts import (
     FINA_MAINBZ_VIP_CONTRACT,
     RESEARCH_EXTRA_CONTRACTS,
@@ -893,6 +898,10 @@ EXTENDED_CONTRACTS = {
         for api, spec in FUTURES_EXTRA_CONTRACTS.items()
     },
     **{
+        api: {**spec, "group": "catalog_delta"}
+        for api, spec in CATALOG_DELTA_CONTRACTS.items()
+    },
+    **{
         api: {**spec, "group": "research_extra"}
         for api, spec in RESEARCH_EXTRA_CONTRACTS.items()
     },
@@ -960,6 +969,7 @@ PLANNERS = {
     "supplement": iter_supplement_jobs,
     "equity_event": iter_equity_event_jobs,
     "futures_extra": iter_futures_extra_jobs,
+    "catalog_delta": iter_catalog_delta_jobs,
     "research_extra": iter_research_extra_jobs,
     "fina_mainbz_vip": iter_fina_mainbz_vip_jobs,
 }
