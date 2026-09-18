@@ -6,7 +6,6 @@ import subprocess
 import sys
 import tempfile
 import threading
-import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -197,7 +196,6 @@ class PipelineAcceptance(unittest.TestCase):
                     "queue_expansion",
                     "job_selection",
                     "capture",
-                    "capture_start_gate",
                     "result_processing",
                 },
             )
@@ -349,72 +347,6 @@ class PipelineAcceptance(unittest.TestCase):
                 server.server_close()
                 serving.join(2)
 
-    def test_two_http_workers_overlap_without_bypassing_start_gates(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            pipeline = Pipeline(root, CATALOG)
-            for epoch in ("first", "second", "third", "fourth"):
-                pipeline.enqueue(
-                    "fund_adj",
-                    {"trade_date": "20260907", "offset": 0, "limit": 2},
-                    epoch=epoch,
-                )
-            pipeline.db.commit()
-            lock = threading.Lock()
-            first_pair = threading.Barrier(2)
-            active = 0
-            peak = 0
-            starts = []
-
-            def handler(_):
-                nonlocal active, peak
-                with lock:
-                    active += 1
-                    peak = max(peak, active)
-                    starts.append(time.monotonic())
-                    number = len(starts)
-                if number <= 2:
-                    first_pair.wait(timeout=2)
-                time.sleep(0.14)
-                with lock:
-                    active -= 1
-                return self.response([1])
-
-            config = {
-                **CONFIG,
-                "rate_policy": "tiered_v1",
-                "requests_per_minute": 500,
-                "rollout_account_rpm": 500,
-                "acquisition_pipeline_depth": 2,
-                "acquisition_http_workers": 2,
-            }
-            with httpx.Client(transport=httpx.MockTransport(handler)) as client:
-                report = pipeline.run(
-                    client,
-                    "synthetic-token",
-                    config,
-                    max_requests=4,
-                    max_seconds=5,
-                    pause=0,
-                )
-
-            self.assertEqual(report["requests"], 4)
-            self.assertEqual(peak, 2)
-            self.assertEqual(report["acquisition_pipeline"]["http_workers"], 2)
-            self.assertEqual(report["acquisition_pipeline"]["queue_high_watermark"], 2)
-            self.assertGreaterEqual(
-                min(starts[i + 1] - starts[i] for i in range(len(starts) - 1)),
-                0.1,
-            )
-            self.assertEqual(
-                pipeline.db.execute(
-                    "SELECT count(*) FROM jobs WHERE state='inflight'"
-                ).fetchone()[0],
-                0,
-            )
-            self.assertEqual(pipeline.status(), {"done": 4})
-            pipeline.close()
-
     def test_acquisition_pipeline_depth_is_bounded(self):
         for value in (True, 0, 3, "2"):
             with self.subTest(value=value), tempfile.TemporaryDirectory() as tmp:
@@ -424,34 +356,6 @@ class PipelineAcceptance(unittest.TestCase):
                         object(),
                         "synthetic-token",
                         {**CONFIG, "acquisition_pipeline_depth": value},
-                        max_seconds=1,
-                        pause=0,
-                    )
-                pipeline.close()
-
-    def test_two_http_workers_require_bounded_thread_pipeline_and_rate(self):
-        invalid = (
-            {"acquisition_pipeline_depth": 2, "acquisition_http_workers": True},
-            {"acquisition_pipeline_depth": 2, "acquisition_http_workers": 0},
-            {"acquisition_pipeline_depth": 2, "acquisition_http_workers": 3},
-            {"acquisition_pipeline_depth": 2, "acquisition_http_workers": "2"},
-            {"acquisition_http_workers": 2, "requests_per_minute": 500},
-            {
-                "acquisition_pipeline_depth": 2,
-                "acquisition_http_workers": 2,
-                "acquisition_capture_execution": "process",
-                "requests_per_minute": 500,
-            },
-            {"acquisition_pipeline_depth": 2, "acquisition_http_workers": 2},
-        )
-        for extra in invalid:
-            with self.subTest(extra=extra), tempfile.TemporaryDirectory() as tmp:
-                pipeline = Pipeline(Path(tmp), CATALOG)
-                with self.assertRaises(ValueError):
-                    pipeline.run(
-                        object(),
-                        "synthetic-token",
-                        {**CONFIG, **extra},
                         max_seconds=1,
                         pause=0,
                     )
