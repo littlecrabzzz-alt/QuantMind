@@ -198,7 +198,7 @@ class DocumentWorkerTest(unittest.TestCase):
         for key, value in (
             ("document_download_workers", 9),
             ("document_download_workers", True),
-            ("document_worker_max_documents", 1001),
+            ("document_worker_max_documents", 2001),
             ("document_worker_max_documents", True),
             ("document_worker_max_seconds", 101),
             ("document_worker_max_seconds", float("nan")),
@@ -216,6 +216,21 @@ class DocumentWorkerTest(unittest.TestCase):
             self.save_config()
             with self.assertRaises(ValueError):
                 self.tasks.tushare_documents()
+        self.config = {
+            "enable_documents": True,
+            "document_execution": "worker",
+            "document_worker_max_documents": 2000,
+        }
+        self.save_config()
+        self.tasks.tushare_documents()
+        self.run.assert_called_with(
+            self.root,
+            max_documents=2000,
+            max_seconds=90,
+            download_workers=1,
+            overlap_parse_download=False,
+            parse_workers=1,
+        )
         for config in (
             {"document_parse_workers": 2},
             {

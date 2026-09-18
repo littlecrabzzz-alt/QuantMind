@@ -99,7 +99,7 @@ class WorkerStatus(unittest.TestCase):
         )
         for key, value in (
             ('document_worker_max_documents', 0),
-            ('document_worker_max_documents', 1001),
+            ('document_worker_max_documents', 2001),
             ('document_worker_max_documents', True),
             ('document_worker_max_seconds', 0),
             ('document_worker_max_seconds', 101),
@@ -132,6 +132,9 @@ class WorkerStatus(unittest.TestCase):
                 'document_overlap_parse_download': True,
                 'document_download_workers': 1,
             })
+        self.assertEqual(worker.document_limits({
+            'document_worker_max_documents': 2000,
+        })[0], 2000)
 
     def test_document_process_executes_with_task_local_database(self):
         with tempfile.TemporaryDirectory() as directory:
