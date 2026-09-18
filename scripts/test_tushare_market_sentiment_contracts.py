@@ -287,6 +287,10 @@ class MarketSentiment(unittest.TestCase):
         self.assertIn("3000", C["kpl_concept_cons"]["discovery_gap"])
         self.assertEqual(C["tdx_member"]["saturation_fallback"], "tdx_indices")
         self.assertEqual(C["kpl_concept_cons"]["saturation_fallback"], "kpl_concepts")
+        self.assertTrue(C["tdx_member"]["recover_legacy_blocked_identifier_fanout"])
+        self.assertTrue(
+            C["kpl_concept_cons"]["recover_legacy_blocked_identifier_fanout"]
+        )
         for api in ("ths_hot", "dc_hot"):
             self.assertIn("22:30", C[api]["intraday_gap"])
             self.assertIn("rank_time", C[api]["keys"])

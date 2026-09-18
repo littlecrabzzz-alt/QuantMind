@@ -390,6 +390,7 @@ MARKET_SENTIMENT_CONTRACTS["tdx_index"].update(
     saturation_gap="No start_date/end_date input. A full date/type partition can fan out only observed TDX boards; same-board/day/type saturation has no documented second filter.",
 )
 MARKET_SENTIMENT_CONTRACTS["tdx_member"].update(
+    recover_legacy_blocked_identifier_fanout=True,
     date_axis_note="trade_date and start/end describe source snapshot dates; no in_date/out_date/weight or first-publication timestamp is provided. A historical snapshot is not an effective membership interval.",
     saturation_gap="Date ranges can bisect to exact dates, then observed board codes. con_code is a legal second filter but its historical member universe is unknown; generic second-dimension fanout is not implemented and must remain a gap.",
     member_namespace_note="Examples include SH/SZ/BJ members. Preserve historical/T/source-observed members without current-stock filtering; unknown future formats require validation instead of invented A-share conversion.",
@@ -425,6 +426,7 @@ MARKET_SENTIMENT_CONTRACTS["kpl_list"].update(
     saturation_gap="Legal date ranges and stock fanout preserve request tag; single-stock/day/tag saturation cannot split on output-only theme/reason/time.",
 )
 MARKET_SENTIMENT_CONTRACTS["kpl_concept_cons"].update(
+    recover_legacy_blocked_identifier_fanout=True,
     saturation_fallback="kpl_concepts",
     saturation_param="ts_code",
     saturation_dependencies=["kpl_concepts"],

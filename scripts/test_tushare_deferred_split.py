@@ -8,6 +8,8 @@ from unittest.mock import patch
 import httpx
 
 import test_tushare_observed_fanout as fixture
+from test_tushare_bond_extra_pipeline import source as bond_source
+from test_tushare_market_sentiment_pipeline import source as sentiment_source
 
 module = fixture.module
 
@@ -453,6 +455,94 @@ class DeferredSplit(unittest.TestCase):
             {"600036.SH", "600000.SH", "000001.SZ"},
         )
         self.assertEqual(self.attempts(), attempts)
+
+    def test_reviewed_legacy_family_caps_recover_from_retained_objects_without_http(self):
+        cases = (
+            ("bc_otcqt", "otc_bonds", bond_source, "200099.BC"),
+            ("tdx_member", "tdx_indices", sentiment_source, "880099.TDX"),
+            ("kpl_concept_cons", "kpl_concepts", sentiment_source, "000099.KP"),
+        )
+        for api, family, source, discovered_code in cases:
+            with self.subTest(api=api), patch.dict(
+                module.EXTENDED_CONTRACTS[api], {"row_cap": 2}
+            ):
+                parent_id = self.p.enqueue(
+                    api,
+                    {"trade_date": "20260904"},
+                    epoch="legacy-cap",
+                )
+
+                def response(request, api=api, source=source):
+                    body = json.loads(request.content)
+                    self.assertEqual(body["api_name"], api)
+                    records = [source(api), source(api, supplier_extra="second")]
+                    return httpx.Response(
+                        200,
+                        json={
+                            "code": 0,
+                            "data": {
+                                "fields": list(records[0]),
+                                "items": [
+                                    [record.get(field) for field in records[0]]
+                                    for record in records
+                                ],
+                                "has_more": True,
+                            },
+                        },
+                    )
+
+                captured = self.run_once(respond=response)
+                self.assertEqual(captured["requests"], 1)
+                before = self.stored({"id": parent_id})
+                result = json.loads(before["result"])
+                self.assertEqual(
+                    result.pop("partition_deferred"),
+                    {"version": 1, "kind": "identifier_fanout"},
+                )
+                self.p.db.execute(
+                    "UPDATE jobs SET state='blocked',result=? WHERE id=?",
+                    (json.dumps(result), parent_id),
+                )
+                self.p.db.commit()
+                attempts = self.attempts()
+                self.reopen()
+                with patch.object(
+                    self.p, "identifiers", return_value={family: [discovered_code]}
+                ):
+                    recovered = self.run_once(
+                        requests=0,
+                        respond=lambda request: self.fail(
+                            "legacy parent must not call HTTP"
+                        ),
+                    )
+                self.assertEqual(recovered["requests"], 0)
+                self.assertTrue(
+                    recovered["partition_work"]["legacy_parent_recovered"]
+                )
+                self.assertEqual(
+                    recovered["partition_work"]["discovery_family"], family
+                )
+                after = self.stored({"id": parent_id})
+                self.assertEqual(after["state"], "split_pending")
+                self.assertEqual(after["tries"], before["tries"])
+                self.assertEqual(
+                    json.loads(after["result"])["partition_recovery"][
+                        "upstream_calls"
+                    ],
+                    0,
+                )
+                self.assertIn(
+                    discovered_code,
+                    {
+                        child["ts_code"]
+                        for child in self.children({"id": parent_id})
+                    },
+                )
+                self.assertEqual(self.attempts(), attempts)
+                self.p.db.execute(
+                    "UPDATE jobs SET state='superseded' WHERE state='pending'"
+                )
+                self.p.db.commit()
 
     def test_unreviewed_legacy_blocked_fanout_is_not_reactivated(self):
         row, _ = self.parent()

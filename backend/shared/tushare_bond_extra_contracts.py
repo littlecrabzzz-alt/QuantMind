@@ -443,6 +443,7 @@ for _api in ("bc_otcqt", "bc_bestotcqt"):
     )
 
 BOND_EXTRA_CONTRACTS["bc_otcqt"].update(
+    recover_legacy_blocked_identifier_fanout=True,
     historical_quote_note="Historical date/range endpoint includes qt_time per bank; no minute subscription or live polling is introduced. Trading/quote date and within-day quote time are distinct; quote timezone and completeness/update cadence are undocumented.",
     saturation_gap="Date range/day/code filters are legal; bank is a legal further filter but complete historic bank universe and generic second-dimension split are unimplemented. qt_time is output-only, not a pagination cursor. Terminal code/day/bank saturation remains unresolved.",
     unit_note="coupon_rate/buy_yield/sell_yield are percentages. buy_price/sell_price are investor full prices; currency, face-value basis, accrued-interest convention and executable size are unspecified. Keep maturity/remain_maturity textual values.",

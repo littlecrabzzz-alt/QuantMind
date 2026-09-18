@@ -224,6 +224,9 @@ class BondContracts(unittest.TestCase):
         self.assertIn("percent rates", CONTRACTS["repo_daily"]["unit_note"])
         self.assertIn("万张", CONTRACTS["top10_cb_holders"]["unit_note"])
         self.assertIn("unimplemented", CONTRACTS["bc_otcqt"]["saturation_gap"])
+        self.assertTrue(
+            CONTRACTS["bc_otcqt"]["recover_legacy_blocked_identifier_fanout"]
+        )
         self.assertIn("unknown", CONTRACTS["yc_cb"]["saturation_gap"])
         self.assertNotIn(
             "stocks", {d for s in CONTRACTS.values() for d in s.get("dependencies", [])}
