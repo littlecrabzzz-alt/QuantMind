@@ -281,8 +281,8 @@ class OffCatalogContractsTest(unittest.TestCase):
             PORTFOLIO_READ_CONTRACTS,
             ADJACENT_API_OBLIGATIONS,
         )
-        self.assertEqual(result["counts"]["total_named_scope"], 249)
-        self.assertEqual(result["counts"]["registered_union"], 246)
+        self.assertEqual(result["counts"]["total_named_scope"], 251)
+        self.assertEqual(result["counts"]["registered_union"], 247)
         self.assertEqual(result["counts"]["not_registered_in_scope"], 4)
         remaining = {
             row["api_name"]: row["implementation"]

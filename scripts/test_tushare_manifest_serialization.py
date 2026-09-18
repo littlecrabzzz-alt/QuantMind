@@ -67,7 +67,7 @@ class ManifestSerialization(unittest.TestCase):
             self.encode(value)
 
     def test_multiple_c_chunks_and_default_python_fallback_have_exact_bytes(self):
-        value = {"rows": list(range(100001)), "last": "🙂"}
+        value = {"rows": list(range(250001)), "last": "🙂"}
         path, timing = self.encode(value)
         self.assertTrue(timing["eager_chunks"])
         self.assertGreater(timing["chunks"], 1)

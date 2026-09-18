@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ import socket
 import tempfile
 import unittest
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -36,7 +38,10 @@ class PortfolioReadBatchTest(unittest.TestCase):
         pipeline.close()
         (self.root / "pipeline.lock").touch(mode=0o600)
         (self.root / "ENABLED").write_text("enabled\n")
-        self.snapshot = "20260912T080000Z"
+        self.snapshot = (
+            datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y%m%d")
+            + "T080000Z"
+        )
         self.config = {
             "enable_portfolio_read": True,
             "portfolio_read_apis": ["p_list", "p_get"],

@@ -398,8 +398,10 @@ def atomic_bytes(path, raw):
 def serialize_manifest_file(directory, content, timing=None):
     """Write the same CPython JSON chunks without joining the whole manifest.
 
-    _one_shot=True keeps the C encoder used by json.dumps. It still builds a
-    list of chunks: this reduces peak copies, not O(manifest) memory itself.
+    _one_shot=True keeps the C encoder used by json.dumps. It still builds an
+    eager sequence, sometimes containing one manifest-sized Unicode string.
+    Bound the later UTF-8/write buffer by slicing each encoder chunk; this does
+    not change the C encoder's O(manifest) Unicode memory.
     """
     directory = Path(directory)
     if directory.is_symlink():
@@ -415,16 +417,17 @@ def serialize_manifest_file(directory, content, timing=None):
                 content, _one_shot=True
             )
             timing["chunk_generation_seconds"] = time.monotonic() - started
-            timing["eager_chunks"] = isinstance(chunks, list)
+            timing["eager_chunks"] = isinstance(chunks, (list, tuple))
             sha = hashlib.sha256()
             size, count, maximum = 0, 0, 0
             for chunk in chunks:
-                raw = chunk.encode("utf-8")
-                stream.write(raw)
-                sha.update(raw)
-                size += len(raw)
-                count += 1
-                maximum = max(maximum, len(raw))
+                for offset in range(0, len(chunk), 1 << 20):
+                    raw = chunk[offset : offset + (1 << 20)].encode("utf-8")
+                    stream.write(raw)
+                    sha.update(raw)
+                    size += len(raw)
+                    count += 1
+                    maximum = max(maximum, len(raw))
             stream.flush()
             os.fsync(stream.fileno())
             timing.update(bytes=size, chunks=count, largest_chunk_bytes=maximum)

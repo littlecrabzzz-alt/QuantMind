@@ -209,7 +209,13 @@ class ExtendedPipeline(unittest.TestCase):
                 7,
             )
             self.assertEqual(
-                p.db.execute("SELECT COUNT(*) FROM jobs").fetchone()[0], 17
+                p.db.execute(
+                    "SELECT COUNT(*) FROM jobs WHERE epoch<>'history'"
+                ).fetchone()[0],
+                5,
+            )
+            self.assertEqual(
+                p.db.execute("SELECT COUNT(*) FROM jobs").fetchone()[0], 12
             )
             p.close()
 

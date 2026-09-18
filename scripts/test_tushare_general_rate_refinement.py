@@ -46,12 +46,16 @@ class GeneralRateRefinementTests(unittest.TestCase):
         baseline = json.loads((ROOT / 'docs/tushare-rate-evidence-32fe472.json').read_bytes())
         refined = json.loads((ROOT / 'docs/tushare-general-rate-refinement.json').read_bytes())
         expected = {a for a, r in baseline['apis'].items() if r['rate_class'] == 'points_general_candidate'}
+        expected.add('fina_mainbz_vip')
         self.assertEqual(set(refined['apis']), expected)
-        self.assertEqual(refined['counts'], {'regular_500': 147, 'special_300': 3, 'uncertain': 5})
+        self.assertEqual(refined['counts'], {'regular_500': 148, 'special_300': 3, 'uncertain': 5})
         flattened = [a for names in refined['api_sets'].values() for a in names]
         self.assertEqual(len(flattened), len(set(flattened)))
         self.assertEqual(set(flattened), expected)
-        self.assertEqual(set(refined['excluded_from_refinement']), set(baseline['apis']) - expected)
+        self.assertEqual(
+            set(refined['excluded_from_refinement']),
+            set(baseline['apis']) - expected,
+        )
         self.assertNotIn('factor_value', refined['apis'])
         self.assertEqual(refined['baseline_report_sha256'], hashlib.sha256((ROOT / 'docs/tushare-rate-evidence-32fe472.json').read_bytes()).hexdigest())
 

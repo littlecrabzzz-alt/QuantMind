@@ -80,6 +80,10 @@ class FundNavEmptyReviewRunnerTests(unittest.TestCase):
             patch.object(runner.shutil, "disk_usage", return_value=disk),
             patch.object(runner.httpx, "Client", return_value=client),
             patch.object(runner.time, "sleep", return_value=None),
+            patch(
+                "backend.shared.tushare_intake.utc_now",
+                side_effect=lambda: self.now.isoformat(),
+            ),
         ):
             return self.plan(**arguments)
 

@@ -84,10 +84,10 @@ class DcExtraContracts(unittest.TestCase):
             & set(INPUT_FIELDS["dc_member"] + FIELDS["dc_member"])
         )
 
-    def test_recent_and_history_dates_are_contiguous_once_for_all_categories(self):
+    def test_recent_days_and_history_ranges_are_contiguous_for_all_categories(self):
         today, start = date(2025, 1, 5), date(2024, 12, 20)
         planned = list(jobs({"history_start": "20241220"}, today))
-        self.assertEqual(len(planned), 17 * 4)
+        self.assertEqual(len(planned), 41)
         self.assertEqual(
             len(
                 {
@@ -98,34 +98,58 @@ class DcExtraContracts(unittest.TestCase):
             len(planned),
         )
         expected = {(start + timedelta(days=i)).strftime("%Y%m%d") for i in range(17)}
-        for api in CONTRACTS:
-            actual = [j for j in planned if j["api_name"] == api]
-            self.assertEqual({j["params"]["trade_date"] for j in actual}, expected)
-            for day in expected:
-                variants = [
-                    j["params"].get("idx_type")
-                    for j in actual
-                    if j["params"]["trade_date"] == day
-                ]
-                self.assertEqual(
-                    set(variants),
-                    {v["idx_type"] for v in DAILY_VARIANTS}
-                    if api == "dc_daily"
-                    else {None},
+        members = [j for j in planned if j["api_name"] == "dc_member"]
+        self.assertEqual({j["params"]["trade_date"] for j in members}, expected)
+        daily = [j for j in planned if j["api_name"] == "dc_daily"]
+        daily_history = [j for j in daily if j["epoch"] == "history"]
+        daily_recent = [j for j in daily if j["epoch"] != "history"]
+        self.assertEqual(
+            {tuple(sorted(j["params"].items())) for j in daily_history},
+            {
+                tuple(
+                    sorted(
+                        {
+                            "start_date": "20241220",
+                            "end_date": "20241229",
+                            "idx_type": variant["idx_type"],
+                        }.items()
+                    )
                 )
-            for job in actual:
-                self.assertEqual(job["fields"], ",".join(FIELDS[api]))
-                self.assertTrue(set(job["params"]) <= set(INPUT_FIELDS[api]))
-                self.assertNotIn("ts_code", job["params"])
-                recent = job["params"]["trade_date"] >= "20241230"
-                self.assertEqual(job["priority"], 20 if recent else 55)
-                self.assertEqual(job["epoch"], "20250105" if recent else "history")
+                for variant in DAILY_VARIANTS
+            },
+        )
+        self.assertEqual(
+            {j["params"]["trade_date"] for j in daily_recent},
+            {f"2025{month_day}" for month_day in ("0101", "0102", "0103", "0104", "0105")}
+            | {"20241230", "20241231"},
+        )
+        for day in {j["params"]["trade_date"] for j in daily_recent}:
+            self.assertEqual(
+                {
+                    j["params"]["idx_type"]
+                    for j in daily_recent
+                    if j["params"]["trade_date"] == day
+                },
+                {v["idx_type"] for v in DAILY_VARIANTS},
+            )
+        for job in planned:
+            api = job["api_name"]
+            self.assertEqual(job["fields"], ",".join(FIELDS[api]))
+            self.assertTrue(set(job["params"]) <= set(INPUT_FIELDS[api]))
+            self.assertNotIn("ts_code", job["params"])
+            recent = job["epoch"] != "history"
+            self.assertEqual(job["priority"], 20 if recent else 55)
+            self.assertEqual(job["epoch"], "20250105" if recent else "history")
 
     def test_documented_floors_and_configured_scope_remain_unverified(self):
         planned = list(jobs({"history_start": "19000101"}, date(2025, 1, 1)))
         for api, floor in (("dc_member", "20241220"), ("dc_daily", "20200101")):
             self.assertEqual(
-                min(j["params"]["trade_date"] for j in planned if j["api_name"] == api),
+                min(
+                    j["params"].get("trade_date", j["params"].get("start_date"))
+                    for j in planned
+                    if j["api_name"] == api
+                ),
                 floor,
             )
         config = {
@@ -143,7 +167,7 @@ class DcExtraContracts(unittest.TestCase):
         )
         self.assertEqual(
             min(
-                j["params"]["trade_date"]
+                j["params"].get("trade_date", j["params"].get("start_date"))
                 for j in planned
                 if j["api_name"] == "dc_daily"
             ),
@@ -199,7 +223,12 @@ class DcExtraContracts(unittest.TestCase):
         )
         self.assertEqual(head[28]["params"], {"trade_date": "20241220"})
         self.assertEqual(
-            head[29]["params"], {"trade_date": "20200101", "idx_type": "概念板块"}
+            head[29]["params"],
+            {
+                "start_date": "20200101",
+                "end_date": "20200131",
+                "idx_type": "概念板块",
+            },
         )
         self.assertEqual(
             head,
