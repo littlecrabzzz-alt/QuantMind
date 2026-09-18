@@ -82,19 +82,29 @@ class FixedCoverageAuditTests(unittest.TestCase):
 
     def test_gap_outcomes_classify_missing_datasets_without_capability_rows(self):
         manifest = self.fixture()
-        manifest["scope"].extend(["api_error", "available_empty"])
+        manifest["scope"].extend(["api_error", "available_empty", "unavailable"])
         manifest["coverage_by_api"].append(
             {"api_name": "available_empty", "state": "empty", "partitions": 2}
         )
         manifest["gaps"].extend([
             {"api_name": "api_error", "assessment": "api_error"},
             {"api_name": "available_empty", "assessment": "empty_unverified"},
+            {"api_name": "unavailable", "assessment": "api_error"},
         ])
-        manifest["capabilities"].append({
-            "scope": "available_empty:", "status": "available", "checked_at": "2026-01-03",
-        })
+        manifest["capabilities"].extend([
+            {
+                "scope": "available_empty:",
+                "status": "available",
+                "checked_at": "2026-01-03",
+            },
+            {
+                "scope": "unavailable:",
+                "status": "api_unavailable",
+                "checked_at": "2026-01-04",
+            },
+        ])
         result = audit(
-            {"api_error", "available_empty", "disabled_elsewhere"},
+            {"api_error", "available_empty", "disabled_elsewhere", "unavailable"},
             manifest,
             "data-" + "1" * 64,
         )
@@ -106,10 +116,15 @@ class FixedCoverageAuditTests(unittest.TestCase):
         self.assertEqual(
             missing["available_empty"]["evidence_classification"], "available_empty_only"
         )
+        self.assertEqual(
+            missing["unavailable"]["evidence_classification"],
+            "supplier_api_unavailable",
+        )
         self.assertEqual(result["missing_dataset_evidence_counts"], {
             "api_error": 1,
             "available_empty_only": 1,
             "permission_denied": 1,
+            "supplier_api_unavailable": 1,
         })
 
     def test_audit_is_deterministic_and_offline(self):

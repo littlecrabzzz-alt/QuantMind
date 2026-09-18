@@ -111,6 +111,17 @@ class IntakeAcceptance(unittest.TestCase):
         self.assertEqual(
             assess_response({"code": 40203}, 2, [])["status"], "permission_denied"
         )
+        unavailable = assess_response(
+            {"code": 40101, "msg": "请指定正确的接口名"}, 2, []
+        )
+        self.assertEqual(unavailable["status"], "api_error")
+        self.assertEqual(unavailable["code"], 40101)
+        self.assertTrue(unavailable["supplier_api_unavailable"])
+        nearby = assess_response(
+            {"code": 40101, "msg": "请指定正确的接口参数"}, 2, []
+        )
+        self.assertEqual(nearby["status"], "api_error")
+        self.assertNotIn("supplier_api_unavailable", nearby)
 
     def test_supplier_continuation_flag_prevents_false_complete_short_page(self):
         for items in ([[1]], []):

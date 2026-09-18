@@ -486,6 +486,143 @@ os._exit(0)
                 evidence[2],
             )
 
+    def test_supplier_invalid_api_is_blocked_reprobed_and_recovers_scope(self):
+        first = self.p.enqueue("daily", {"trade_date": "20260910"})
+        second = self.p.enqueue("daily", {"trade_date": "20260911"})
+        self.p.db.execute("UPDATE jobs SET state='inflight' WHERE id=?", (first,))
+        self.p.db.commit()
+        row = self.p.db.execute("SELECT * FROM jobs WHERE id=?", (first,)).fetchone()
+        job = json.loads(row["job"])
+        work_counts = {"local_quota_deferrals": 0}
+        work_seconds = {"result_processing": 0.0}
+        self.p._apply_capture_result(
+            row,
+            job,
+            {
+                "api_name": "daily",
+                "status": "api_error",
+                "code": 40101,
+                "supplier_api_unavailable": True,
+                "object_sha256": "a" * 64,
+                "observation": "b" * 32 + ".json",
+            },
+            time.monotonic() + 1,
+            work_counts,
+            work_seconds,
+        )
+        self.assertEqual(
+            dict(self.p.db.execute("SELECT id,state FROM jobs")),
+            {first: "blocked", second: "blocked"},
+        )
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT status FROM capability WHERE scope='daily:'"
+            ).fetchone()[0],
+            "api_unavailable",
+        )
+        third = self.p.enqueue("daily", {"trade_date": "20260912"})
+        self.p.db.commit()
+        self.assertEqual(
+            self.p.db.execute("SELECT state FROM jobs WHERE id=?", (third,)).fetchone()[0],
+            "blocked",
+        )
+
+        scheduled = self.p.schedule_permission_reprobes(
+            {
+                "permission_reprobe_interval_seconds": 3600,
+                "permission_reprobe_max_scopes": 4,
+            },
+            now=2_000_000_000,
+        )
+        self.assertEqual(scheduled["status"], "scheduled")
+        self.assertEqual(scheduled["scheduled"][0]["scope"], "daily:")
+        self.assertEqual(
+            scheduled["scheduled"][0]["capability_status"], "api_unavailable"
+        )
+        probe = scheduled["scheduled"][0]["job_id"]
+        probe_row = self.p.db.execute(
+            "SELECT * FROM jobs WHERE id=?", (probe,)
+        ).fetchone()
+        self.p._apply_capture_result(
+            probe_row,
+            json.loads(probe_row["job"]),
+            {"api_name": "daily", "status": "sample_ok", "row_count": 0},
+            time.monotonic() + 1,
+            work_counts,
+            work_seconds,
+        )
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT status FROM capability WHERE scope='daily:'"
+            ).fetchone()[0],
+            "available",
+        )
+        siblings = dict(
+            self.p.db.execute(
+                "SELECT id,state FROM jobs WHERE id<>? ORDER BY id", (probe,)
+            )
+        )
+        self.assertTrue(siblings)
+        self.assertEqual(set(siblings.values()), {"pending"})
+        saved = json.loads(
+            self.p.db.execute("SELECT result FROM jobs WHERE id=?", (probe,)).fetchone()[0]
+        )
+        self.assertEqual(saved["api_unavailable_recovery"]["requeued_jobs"], 2)
+
+    def test_legacy_invalid_api_raw_response_is_indexed_without_evidence_changes(self):
+        task = self.p.enqueue("daily", {"trade_date": "20260910"})
+        payload = {"code": 40101, "msg": "请指定正确的接口名", "data": None}
+        raw = module.json_bytes(payload)
+        object_sha = module.digest(raw)
+        observation_name = "c" * 32 + ".json"
+        (self.root / "objects").mkdir()
+        (self.root / "observations").mkdir()
+        (self.root / "objects" / (object_sha + ".json")).write_bytes(raw)
+        (self.root / "observations" / observation_name).write_text(
+            json.dumps({"fetched_at": "2020-01-01T00:00:00+00:00"})
+        )
+        retained = json.dumps(
+            {
+                "api_name": "daily",
+                "status": "api_error",
+                "object_sha256": object_sha,
+                "observation": observation_name,
+            }
+        )
+        self.p.db.execute(
+            "UPDATE jobs SET state='blocked',tries=5,result=? WHERE id=?",
+            (retained, task),
+        )
+        self.p.db.execute(
+            "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+            (task, 5, retained),
+        )
+        self.p.db.commit()
+
+        report = self.p.maintain_api_unavailable_capabilities()
+
+        self.assertEqual(report["status"], "maintained")
+        self.assertEqual(report["recorded_scopes"], 1)
+        self.assertEqual(report["preserved_result_jobs"], 1)
+        self.assertEqual(report["preserved_attempts"], 1)
+        self.assertEqual(
+            tuple(
+                self.p.db.execute(
+                    "SELECT state,tries,result FROM jobs WHERE id=?", (task,)
+                ).fetchone()
+            ),
+            ("blocked", 5, retained),
+        )
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT status FROM capability WHERE scope='daily:'"
+            ).fetchone()[0],
+            "api_unavailable",
+        )
+        self.assertEqual(
+            self.p.maintain_api_unavailable_capabilities()["status"], "no_action"
+        )
+
     def test_compaction_removes_duplicate_child_of_terminal_parent(self):
         params = {"trade_date": "20260910"}
         old_parent = self.p.enqueue("daily", params, 1, "20260911")

@@ -1151,10 +1151,17 @@ class Pipeline:
             if existing:
                 return existing["id"]
         scope = api + ":" + str(params.get("src", ""))
-        denied = self.db.execute(
-            "SELECT 1 FROM capability WHERE scope=? AND status='permission_denied'",
+        capability = self.db.execute(
+            "SELECT status FROM capability WHERE scope=?",
             (scope,),
         ).fetchone()
+        initial_state = (
+            "permission_blocked"
+            if capability and capability[0] == "permission_denied"
+            else "blocked"
+            if capability and capability[0] == "api_unavailable"
+            else "pending"
+        )
         self.db.execute(
             "INSERT OR IGNORE INTO jobs(id,logical_key,epoch,job,priority,state,group_name) VALUES(?,?,?,?,?,?,?)",
             (
@@ -1163,7 +1170,7 @@ class Pipeline:
                 epoch,
                 json.dumps(job),
                 priority,
-                "permission_blocked" if denied else "pending",
+                initial_state,
                 spec.get("group", "rrg"),
             ),
         )
@@ -1877,8 +1884,129 @@ class Pipeline:
         )
         return report
 
+    def maintain_api_unavailable_capabilities(self):
+        """Index retained supplier-invalid API evidence without changing attempts."""
+        report = {
+            "status": "no_action",
+            "examined_jobs": 0,
+            "recorded_scopes": 0,
+            "preserved_result_jobs": 0,
+            "preserved_attempts": 0,
+            "upstream_calls": 0,
+        }
+        rows = self.db.execute("""
+            SELECT id,job,result,tries
+            FROM jobs INDEXED BY jobs_pending
+            WHERE state='blocked'
+              AND json_extract(result,'$.status')='api_error'
+              AND json_type(result,'$.object_sha256')='text'
+              AND json_type(result,'$.observation')='text'
+        """).fetchall()
+        report["examined_jobs"] = len(rows)
+        selected = {}
+        for row in rows:
+            job, result = json.loads(row["job"]), json.loads(row["result"])
+            object_sha = result["object_sha256"]
+            observation_name = result["observation"]
+            try:
+                payload = json.loads(
+                    (self.root / "objects" / (object_sha + ".json")).read_bytes()
+                )
+                observation = json.loads(
+                    (self.root / "observations" / observation_name).read_bytes()
+                )
+            except (OSError, TypeError, ValueError):
+                continue
+            if not (
+                isinstance(payload, dict)
+                and payload.get("code") == 40101
+                and str(payload.get("msg", "")).strip() == "请指定正确的接口名"
+                and isinstance(observation, dict)
+                and isinstance(observation.get("fetched_at"), str)
+            ):
+                continue
+            try:
+                fetched = datetime.fromisoformat(observation["fetched_at"])
+            except ValueError:
+                continue
+            if fetched.tzinfo is None:
+                continue
+            scope = job["api_name"] + ":" + str(job.get("params", {}).get("src", ""))
+            candidate = selected.get(scope)
+            if candidate is None or fetched > candidate[0]:
+                selected[scope] = (fetched, row, object_sha, observation_name)
+        if not selected:
+            return report
+        before = {
+            row["id"]: (row["tries"], row["result"])
+            for _, row, _, _ in selected.values()
+        }
+        attempts = {
+            row["id"]: self.db.execute(
+                "SELECT count(*) FROM attempts WHERE job_id=?", (row["id"],)
+            ).fetchone()[0]
+            for _, row, _, _ in selected.values()
+        }
+        recorded = 0
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
+            for scope, (fetched, _row, object_sha, observation_name) in selected.items():
+                current = self.db.execute(
+                    "SELECT status,checked_at FROM capability WHERE scope=?", (scope,)
+                ).fetchone()
+                if current is not None:
+                    try:
+                        current_at = datetime.fromisoformat(current["checked_at"])
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError("Invalid API capability time") from exc
+                    if current_at.tzinfo is None:
+                        raise ValueError("Naive API capability time")
+                    if current_at >= fetched:
+                        continue
+                reason = json.dumps(
+                    {
+                        "supplier_code": 40101,
+                        "evidence": "retained_raw_response",
+                        "object_sha256": object_sha,
+                        "observation": observation_name,
+                    },
+                    sort_keys=True,
+                )
+                self.db.execute(
+                    "INSERT INTO capability(scope,status,checked_at,reason) "
+                    "VALUES(?,'api_unavailable',?,?) ON CONFLICT(scope) DO UPDATE SET "
+                    "status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
+                    (scope, fetched.isoformat(), reason),
+                )
+                recorded += 1
+            after = {
+                row["id"]: (row["tries"], row["result"])
+                for _, row, _, _ in selected.values()
+                for row in self.db.execute(
+                    "SELECT id,tries,result FROM jobs WHERE id=?", (row["id"],)
+                )
+            }
+            if after != before:
+                raise ValueError("Unavailable API evidence changed during maintenance")
+            for _, row, _, _ in selected.values():
+                if self.db.execute(
+                    "SELECT count(*) FROM attempts WHERE job_id=?", (row["id"],)
+                ).fetchone()[0] != attempts[row["id"]]:
+                    raise ValueError("Unavailable API attempts changed during maintenance")
+            self.db.commit()
+        except BaseException:
+            self.db.rollback()
+            raise
+        report.update(
+            status="maintained" if recorded else "no_action",
+            recorded_scopes=recorded,
+            preserved_result_jobs=len(before),
+            preserved_attempts=sum(attempts.values()),
+        )
+        return report
+
     def schedule_permission_reprobes(self, config, *, now=None):
-        """Recheck stale permission gaps without reopening an entire denied scope."""
+        """Recheck stale permission and supplier-unavailable API scopes."""
         interval = config.get("permission_reprobe_interval_seconds", 7 * 86400)
         limit = config.get("permission_reprobe_max_scopes", 4)
         if (
@@ -1904,11 +2032,13 @@ class Pipeline:
             "preserved_result_jobs": 0,
             "preserved_attempts": 0,
             "upstream_calls": 0,
+            "api_unavailable_maintenance": self.maintain_api_unavailable_capabilities(),
         }
         selected = []
         for row in self.db.execute(
-            "SELECT scope,checked_at FROM capability "
-            "WHERE status='permission_denied' ORDER BY checked_at,scope"
+            "SELECT scope,status,checked_at FROM capability "
+            "WHERE status IN ('permission_denied','api_unavailable') "
+            "ORDER BY checked_at,scope"
         ):
             try:
                 checked = datetime.fromisoformat(row["checked_at"])
@@ -1920,7 +2050,17 @@ class Pipeline:
             api_name, separator, src = scope.partition(":")
             if not separator or not api_name:
                 raise ValueError("Invalid permission capability scope")
-            checkpoint = "permission_reprobe:" + digest(scope.encode())
+            capability_status = row["status"]
+            blocked_state = (
+                "permission_blocked"
+                if capability_status == "permission_denied"
+                else "blocked"
+            )
+            checkpoint = (
+                "permission_reprobe:"
+                if capability_status == "permission_denied"
+                else "api_unavailable_reprobe:"
+            ) + digest(scope.encode())
             saved = self.db.execute(
                 "SELECT value FROM scheduler_state WHERE name=?", (checkpoint,)
             ).fetchone()
@@ -1944,16 +2084,16 @@ class Pipeline:
                 continue
             job = self.db.execute(
                 "SELECT id,tries,result FROM jobs INDEXED BY jobs_pending "
-                "WHERE state='permission_blocked' "
+                "WHERE state=? "
                 "AND json_extract(job,'$.api_name')=? "
                 "AND COALESCE(json_extract(job,'$.params.src'),'')=? "
                 "ORDER BY (epoch='history') DESC,priority,rowid LIMIT 1",
-                (api_name, src),
+                (blocked_state, api_name, src),
             ).fetchone()
             if job is None:
                 report["missing_job_scopes"] += 1
                 continue
-            selected.append((scope, checkpoint, job))
+            selected.append((scope, capability_status, blocked_state, checkpoint, job))
             if len(selected) == limit:
                 break
         if not selected:
@@ -1962,18 +2102,18 @@ class Pipeline:
             job["id"]: self.db.execute(
                 "SELECT count(*) FROM attempts WHERE job_id=?", (job["id"],)
             ).fetchone()[0]
-            for _, _, job in selected
+            for _, _, _, _, job in selected
         }
         try:
             self.db.execute("BEGIN IMMEDIATE")
-            for _scope, checkpoint, job in selected:
+            for _scope, _capability_status, blocked_state, checkpoint, job in selected:
                 changed = self.db.execute(
                     "UPDATE jobs SET state='pending',retry_after=0 "
-                    "WHERE id=? AND state='permission_blocked'",
-                    (job["id"],),
+                    "WHERE id=? AND state=?",
+                    (job["id"], blocked_state),
                 ).rowcount
                 if changed != 1:
-                    raise ValueError("Permission reprobe job changed during scheduling")
+                    raise ValueError("Capability reprobe job changed during scheduling")
                 self.db.execute(
                     "INSERT INTO scheduler_state(name,value) VALUES(?,?) "
                     "ON CONFLICT(name) DO UPDATE SET value=excluded.value",
@@ -1994,8 +2134,17 @@ class Pipeline:
             raise
         report.update(
             status="scheduled",
-            scheduled=[{"scope": scope, "job_id": job["id"]} for scope, _, job in selected],
-            preserved_result_jobs=sum(job["result"] is not None for _, _, job in selected),
+            scheduled=[
+                {
+                    "scope": scope,
+                    "capability_status": capability_status,
+                    "job_id": job["id"],
+                }
+                for scope, capability_status, _, _, job in selected
+            ],
+            preserved_result_jobs=sum(
+                job["result"] is not None for _, _, _, _, job in selected
+            ),
             preserved_attempts=sum(attempt_counts.values()),
         )
         return report
@@ -4827,6 +4976,20 @@ class Pipeline:
                     "requeued_jobs": recovered,
                     "trigger_status": status,
                 }
+            elif previous_capability and previous_capability[0] == "api_unavailable":
+                recovered = self.db.execute(
+                    "UPDATE jobs SET state='pending',retry_after=0 "
+                    "WHERE state='blocked' "
+                    "AND json_extract(job,'$.api_name')=? "
+                    "AND COALESCE(json_extract(job,'$.params.src'),'')=? "
+                    "AND (result IS NULL OR json_extract(result,'$.status')='api_error')",
+                    (job["api_name"], str(job["params"].get("src", ""))),
+                ).rowcount
+                result["api_unavailable_recovery"] = {
+                    "scope": scope,
+                    "requeued_jobs": recovered,
+                    "trigger_status": status,
+                }
             self.db.execute(
                 "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) ON CONFLICT(scope) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,reason=excluded.reason",
                 (
@@ -4835,6 +4998,38 @@ class Pipeline:
                     utc_now(),
                     status,
                 ),
+            )
+        if (
+            status == "api_error"
+            and result.get("code") == 40101
+            and result.get("supplier_api_unavailable") is True
+        ):
+            state = "blocked"
+            scope = job["api_name"] + ":" + str(job["params"].get("src", ""))
+            self.db.execute(
+                "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
+                "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,"
+                "checked_at=excluded.checked_at,reason=excluded.reason",
+                (
+                    scope,
+                    "api_unavailable",
+                    utc_now(),
+                    json.dumps(
+                        {
+                            "supplier_code": 40101,
+                            "evidence": "current_raw_response",
+                            "object_sha256": result.get("object_sha256"),
+                            "observation": result.get("observation"),
+                        },
+                        sort_keys=True,
+                    ),
+                ),
+            )
+            self.db.execute(
+                "UPDATE jobs SET state='blocked' WHERE state='pending' AND id<>? "
+                "AND json_extract(job,'$.api_name')=? "
+                "AND COALESCE(json_extract(job,'$.params.src'),'')=?",
+                (row["id"], job["api_name"], str(job["params"].get("src", ""))),
             )
         if status == "permission_denied":
             state = "permission_blocked"
