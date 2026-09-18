@@ -62,6 +62,8 @@ def audit(registered, manifest, release_id):
         if (any(item.get("status") == "permission_denied" for item in api_capabilities)
                 or api_gaps.get("permission_denied")):
             return "permission_denied"
+        if any(item.get("status") == "api_unavailable" for item in api_capabilities):
+            return "supplier_api_unavailable"
         if api_gaps.get("api_error"):
             return "api_error"
         if (coverage.get(api, {}).get("empty")
@@ -151,7 +153,8 @@ def audit(registered, manifest, release_id):
             "Registration, planning and a published dataset are separate states.",
             "A published dataset does not prove complete history, fields, revisions, attachments or point-in-time validity.",
             "An empty or blocked partition can legitimately have no published dataset and remains explicit in coverage.",
-            "Gap assessments are retained outcomes. An api_error is distinct from permission denial and requires its raw observation to identify the supplier reason.",
+            "Gap assessments are retained outcomes. supplier_api_unavailable means a retained raw response identified the documented API name as invalid; it is distinct from permission denial and is periodically reprobed.",
+            "An unclassified api_error still requires its raw observation to identify the supplier reason.",
             "A registered but unplanned API may be intentionally disabled pending permission or runtime validation.",
             "Dependency-observed-empty explains why a child request could not be planned from this fixed release only; it does not prove historical or future absence, parent completeness or atomic list/member timing.",
         ],

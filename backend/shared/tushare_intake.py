@@ -158,6 +158,10 @@ def assess_response(
         return {"status": "invalid_response"}
     code = payload.get("code")
     if code != 0:
+        supplier_api_unavailable = (
+            code == 40101
+            and str(payload.get("msg", "")).strip() == "请指定正确的接口名"
+        )
         assessment = {
             "status": "rate_limited"
             if re.search(
@@ -175,6 +179,8 @@ def assess_response(
             else "api_error",
             "code": code,
         }
+        if supplier_api_unavailable:
+            assessment["supplier_api_unavailable"] = True
         # Only an explicit named interface quota can isolate its cooldown.
         # Ambiguous/provider-wide errors retain the shared account backoff.
         quota = re.search(
