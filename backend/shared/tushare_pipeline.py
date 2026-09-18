@@ -196,6 +196,7 @@ REPLACEMENT_GAPS = frozenset(
     (RANGE_REPLACEMENT_GAP, INDEX_PERIOD_REPLACEMENT_GAP)
 )
 ROOT = Path(os.getenv("QM_TUSHARE_ARCHIVE_ROOT", "/data/tushare"))
+MAX_DOCUMENT_REGISTRATION_RECORDS = 20_000
 CONTRACTS = {
     api: (spec["row_cap"], spec["required_fields"])
     for api, spec in RRG_CONTRACTS.items()
@@ -5245,7 +5246,10 @@ class Pipeline:
             or not 0 <= max_observations <= 1000
         ):
             raise ValueError("Invalid document observation limit")
-        if type(max_records) is not int or not 1 <= max_records <= 5000:
+        if (
+            type(max_records) is not int
+            or not 1 <= max_records <= MAX_DOCUMENT_REGISTRATION_RECORDS
+        ):
             raise ValueError("Invalid document record limit")
         if type(max_seconds) not in (int, float) or not 0 < max_seconds <= 20:
             raise ValueError("Invalid document registration budget")

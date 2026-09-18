@@ -198,11 +198,15 @@ class RegistrationBudget(unittest.TestCase):
         self.assertEqual(self.state(), [])
 
     def test_registration_limits_reject_unbounded_configuration(self):
+        self.assertEqual(
+            self.p.register_documents(max_records=20_000)["status"],
+            "bounded_batch_complete",
+        )
         for value in (-1, 1001, True, 1.5):
             with self.subTest(max_observations=value):
                 with self.assertRaisesRegex(ValueError, "observation limit"):
                     self.p.register_documents(max_observations=value)
-        for value in (0, 5001, True, 1.5):
+        for value in (0, 20_001, True, 1.5):
             with self.subTest(max_records=value):
                 with self.assertRaisesRegex(ValueError, "record limit"):
                     self.p.register_documents(max_records=value)
