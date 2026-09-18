@@ -16,7 +16,8 @@ FIELDS = {
     "etf_auction": "ts_code trade_date vol price amount pre_close turnover_rate volume_ratio float_share".split(),
     "stk_seasoned": """ts_code ann_date first_ann_date proj_info_source board_approval_dt sh_approval_dt sasac_approval_dt csrc_approval_dt fo_type fo_stock_type cur_stage valid_st_dt valid_end_dt plan_chg_type plan_chg_ann_dt pricing_method pricing_base_dt price_basis fo_vol_high fo_vol_low fo_price_high fo_price_low fo_price_ratio fo_raise_total fo_purpose fo_investor sub_method fo_price_act fo_vol_act fo_raise_total_act fo_raise_net_act fo_exp_total uw_fee fo_exp_audit fo_exp_legal fo_exp_inst fo_exp_pub fo_exp_reg fo_exp_other fo_exp_per_share issue_obj_type pe_issue pub_plac_qty onl_pch_vol onl_pch_num onl_pch_excess onl_winning_rate inst_plac_qty inst_sub_eff_total inst_sub_eff_cnt inst_oversub_times a_inv_plac_qty b_inv_plac_qty old_sh_pre_plac_qty old_sh_pre_plac_ratio clw_between_inst_pub prospectus_pub_dt offer_intent_pub_dt apply_date old_sh_pre_plac_dt onl_issue_date uw_start_dt uw_end_dt uw_mode new_share_list_dt list_circ_qty right_reg_dt ex_right_dt update_flag""".split(),
     "fut_inv_weekly": "ts_code trade_date fut_name exchange area warehouse grade pre_total pre_futures cur_total cur_futures chg_total chg_futures pre_capacity cur_capacity chg_capacity unit".split(),
-    "fut_rcpt_mat": "trade_date exchange fut_code fut_name unit cur_month next_month next_two_month".split(),
+    # Live explicit-field response omits the documented fut_code column.
+    "fut_rcpt_mat": "trade_date exchange fut_name unit cur_month next_month next_two_month".split(),
     "fut_trade_param": "trade_date fut_code exchange trade_unit tick_size pre_settle_price price_limit position_limit trade_limit min_order_qty max_limit_order_qty max_market_order_qty".split(),
     "vix_index": "trade_date high low open close pct_change".split(),
 }
@@ -58,7 +59,7 @@ KEYS = {
         "grade",
         "unit",
     ),
-    "fut_rcpt_mat": ("trade_date", "exchange", "fut_code", "unit"),
+    "fut_rcpt_mat": ("trade_date", "exchange", "fut_name", "unit"),
     "fut_trade_param": ("trade_date", "fut_code", "exchange"),
     "vix_index": ("trade_date",),
 }
@@ -67,7 +68,7 @@ REQUIRED = {
     "etf_auction": ("ts_code", "trade_date"),
     "stk_seasoned": ("ts_code", "ann_date"),
     "fut_inv_weekly": ("ts_code", "trade_date"),
-    "fut_rcpt_mat": ("trade_date", "exchange", "fut_code"),
+    "fut_rcpt_mat": ("trade_date", "exchange", "fut_name"),
     "fut_trade_param": ("trade_date", "fut_code", "exchange"),
     "vix_index": ("trade_date",),
 }
@@ -122,10 +123,16 @@ for _api, (_doc, _cap, _points, _start) in DOCS.items():
     )
     CATALOG_DELTA_CONTRACTS[_api] = _spec
 
+RT_HK_VERIFIED_PREFIXES = ("0", "1", "2", "4", "5", "6", "8")
 CATALOG_DELTA_CONTRACTS["rt_hk_k"].update(
     snapshot_only=True,
-    parameter_note="Use exact retained five-digit .HK supplier codes. Wildcard completeness and batching semantics are not documented well enough to synthesize a catch-all request.",
-    scope_note="A realtime snapshot cannot reconstruct history and is not a substitute for hk_daily.",
+    live_verified_prefixes=list(RT_HK_VERIFIED_PREFIXES),
+    parameter_note="One-digit wildcard requests were live-verified on 2026-09-19 for prefixes 0,1,2,4,5,6,8, each below the 5000-row cap. Prefixes 3,7,9 returned provider code 50101; exact retained codes in those prefixes remain fallback jobs.",
+    scope_note="A realtime snapshot cannot reconstruct history and is not a substitute for hk_daily. Wildcard success does not prove a complete security universe.",
+)
+CATALOG_DELTA_CONTRACTS["fut_rcpt_mat"].update(
+    documented_unavailable_fields=["fut_code"],
+    field_gap_note="The 2026-09-19 explicit live request returned 23 rows but omitted documented fut_code. Runtime requests exclude that field and use fut_name in the row identity; raw observations retain the supplier discrepancy.",
 )
 CATALOG_DELTA_CONTRACTS["etf_auction"].update(
     history_start_precision="month",
@@ -293,8 +300,12 @@ def iter_catalog_delta_jobs(config, today, identifiers=None):
         raise ValueError("History start cannot be after today")
     epoch = str(config.get("planning_epoch", today.strftime("%Y%m%d")))
     if "rt_hk_k" in enabled:
-        for code in _hk_codes(identifiers or {}):
-            yield _job("rt_hk_k", {"ts_code": code}, epoch, 20)
+        codes = _hk_codes(identifiers or {})
+        for prefix in RT_HK_VERIFIED_PREFIXES:
+            yield _job("rt_hk_k", {"ts_code": prefix + "*.HK"}, epoch, 20)
+        for code in codes:
+            if code[0] not in RT_HK_VERIFIED_PREFIXES:
+                yield _job("rt_hk_k", {"ts_code": code}, epoch, 20)
     recent_floor = today - timedelta(days=6)
     for api in enabled:
         if api == "rt_hk_k":
