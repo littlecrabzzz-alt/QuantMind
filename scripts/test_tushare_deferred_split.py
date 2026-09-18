@@ -458,11 +458,29 @@ class DeferredSplit(unittest.TestCase):
 
     def test_reviewed_legacy_family_caps_recover_from_retained_objects_without_http(self):
         cases = (
-            ("bc_otcqt", "otc_bonds", bond_source, "200099.BC"),
-            ("tdx_member", "tdx_indices", sentiment_source, "880099.TDX"),
-            ("kpl_concept_cons", "kpl_concepts", sentiment_source, "000099.KP"),
+            (
+                "bc_otcqt",
+                "otc_bonds",
+                ("bc_otcqt", "bc_bestotcqt"),
+                bond_source,
+                "200099.BC",
+            ),
+            (
+                "tdx_member",
+                "tdx_indices",
+                ("tdx_index", "tdx_member", "tdx_daily"),
+                sentiment_source,
+                "880099.TDX",
+            ),
+            (
+                "kpl_concept_cons",
+                "kpl_concepts",
+                ("kpl_concept_cons",),
+                sentiment_source,
+                "000099.KP",
+            ),
         )
-        for api, family, source, discovered_code in cases:
+        for api, family, source_apis, source, discovered_code in cases:
             with self.subTest(api=api), patch.dict(
                 module.EXTENDED_CONTRACTS[api], {"row_cap": 2}
             ):
@@ -508,13 +526,14 @@ class DeferredSplit(unittest.TestCase):
                 self.reopen()
                 with patch.object(
                     self.p, "identifiers", return_value={family: [discovered_code]}
-                ):
+                ) as discovery:
                     recovered = self.run_once(
                         requests=0,
                         respond=lambda request: self.fail(
                             "legacy parent must not call HTTP"
                         ),
                     )
+                discovery.assert_called_once_with(_source_apis=source_apis)
                 self.assertEqual(recovered["requests"], 0)
                 self.assertTrue(
                     recovered["partition_work"]["legacy_parent_recovered"]

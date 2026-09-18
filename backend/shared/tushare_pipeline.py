@@ -164,6 +164,9 @@ IDENTIFIER_SPLIT_SOURCE_APIS = {
     "stocks": STOCK_IDENTIFIER_SOURCE_APIS,
     "announcement_securities": ANNOUNCEMENT_IDENTIFIER_SOURCE_APIS,
     "dc_indices": ("dc_index", "dc_member", "dc_daily"),
+    "otc_bonds": ("bc_otcqt", "bc_bestotcqt"),
+    "tdx_indices": ("tdx_index", "tdx_member", "tdx_daily"),
+    "kpl_concepts": ("kpl_concept_cons",),
 }
 LEGACY_IDENTIFIER_RECOVERY_APIS = tuple(
     sorted(
