@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import patch
@@ -138,6 +139,57 @@ class DiscoveryTiming(unittest.TestCase):
         (self.root / "objects" / (old + ".json")).unlink()
         with self.assertRaises(FileNotFoundError):
             self.p.identifiers(_use_cache=True)
+
+    def test_cached_object_stats_use_bounded_parallel_validation(self):
+        objects = {}
+        for index in range(16):
+            sha = self.body([f"{index:06d}.SZ"])
+            stat = (self.root / "objects" / (sha + ".json")).stat()
+            objects[sha] = [
+                stat.st_dev,
+                stat.st_ino,
+                stat.st_size,
+                stat.st_mtime_ns,
+                stat.st_ctime_ns,
+            ]
+        original_stat = Path.stat
+        lock = threading.Lock()
+        release = threading.Event()
+        active = 0
+        peak = 0
+
+        def observed_stat(path, *args, **kwargs):
+            nonlocal active, peak
+            with lock:
+                active += 1
+                peak = max(peak, active)
+                if active >= 2:
+                    release.set()
+            release.wait(1)
+            try:
+                return original_stat(path, *args, **kwargs)
+            finally:
+                with lock:
+                    active -= 1
+
+        with patch.object(Path, "stat", observed_stat):
+            valid, workers, seconds = module._verify_identifier_object_stats(
+                self.root, objects
+            )
+        self.assertTrue(valid)
+        self.assertEqual(workers, 8)
+        self.assertGreaterEqual(peak, 2)
+        self.assertGreaterEqual(seconds, 0)
+
+        changed = dict(objects)
+        sha = next(iter(changed))
+        changed[sha] = [*changed[sha][:2], changed[sha][2] + 1, *changed[sha][3:]]
+        self.assertFalse(
+            module._verify_identifier_object_stats(self.root, changed)[0]
+        )
+        (self.root / "objects" / (sha + ".json")).unlink()
+        with self.assertRaises(FileNotFoundError):
+            module._verify_identifier_object_stats(self.root, objects)
 
     def test_missing_duplicate_file_not_hidden_and_errors_do_not_require_body(self):
         sha = self.body(["600000.SH"])

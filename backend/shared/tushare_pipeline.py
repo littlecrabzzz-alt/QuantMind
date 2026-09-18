@@ -2466,17 +2466,16 @@ class Pipeline:
         if retained != row["attempt_count"]:
             return None
         objects = json.loads(row["objects"])
-        for sha, expected in objects.items():
-            current = (self.root / "objects" / (sha + ".json")).stat()
-            observed = [
-                current.st_dev,
-                current.st_ino,
-                current.st_size,
-                current.st_mtime_ns,
-                current.st_ctime_ns,
-            ]
-            if observed != expected:
-                return None
+        valid, workers, seconds = _verify_identifier_object_stats(
+            self.root, objects
+        )
+        self.identifier_cache_timing = {
+            "verified_objects": len(objects),
+            "stat_workers": workers,
+            "stat_seconds": seconds,
+        }
+        if not valid:
+            return None
         return json.loads(row["result"]), row["attempt_rowid"], objects
 
     def _save_identifier_cache(self, result, attempt_rowid, attempt_count, objects):
@@ -2583,6 +2582,7 @@ class Pipeline:
         }
         # Additional sources enter only the minute projection, never an old universe.
         families = {**dict.fromkeys(MINUTE_SOURCE_FAMILIES, "minute_source_only"), **families}
+        self.identifier_cache_timing = None
         cached = self._load_identifier_cache() if _use_cache and _source_apis is None else None
         if cached:
             cached_result, cached_attempt_rowid, object_stats = cached
@@ -2651,6 +2651,7 @@ class Pipeline:
                 cached_attempt_rowid=cached_attempt_rowid,
                 cached_objects=len(object_stats),
             )
+            discovery.update(self.identifier_cache_timing or {})
         self.identifier_timing = discovery
         if cached:
             # Every new response is appended to attempts in the same transaction
@@ -5970,6 +5971,37 @@ def _planning_config_fingerprint(config):
         and key not in {"enable_documents", "documents_per_tick"}
     }
     return digest(json_bytes({"version": 2, "config": planning_config}))
+
+
+def _verify_identifier_object_stats(root, objects, max_workers=8):
+    """Validate every cached object fingerprint using bounded local I/O."""
+    started = time.monotonic()
+    items = tuple(objects.items())
+    workers = min(max_workers, len(items))
+
+    def verify(chunk):
+        for sha, expected in chunk:
+            current = (root / "objects" / (sha + ".json")).stat()
+            observed = [
+                current.st_dev,
+                current.st_ino,
+                current.st_size,
+                current.st_mtime_ns,
+                current.st_ctime_ns,
+            ]
+            if observed != expected:
+                return False
+        return True
+
+    if workers <= 1:
+        valid = verify(items)
+    else:
+        chunks = tuple(items[index::workers] for index in range(workers))
+        with ThreadPoolExecutor(
+            max_workers=workers, thread_name_prefix="tushare-identifier-stat"
+        ) as pool:
+            valid = all(list(pool.map(verify, chunks)))
+    return valid, workers, max(0.0, time.monotonic() - started)
 
 
 def _legacy_planning_config_fingerprint(config):
