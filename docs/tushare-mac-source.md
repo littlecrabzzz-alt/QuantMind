@@ -219,7 +219,7 @@ VIP 分页链做覆盖压缩：同一年、同一 P/D/I 类型的四个季度必
 轮转。共享账户/API 限速、已观察冷却、每日总量、任务重试与原始证据写入均不变；
 配置为空时调度行为完全保持原样。
 
-`acquisition_pipeline_depth` 默认 1，灰度值只能设为 2。深度 2 仍只使用一个 HTTP
+`acquisition_pipeline_depth` 默认 1，灰度值只能设为 2。深度 2 默认仍只使用一个 HTTP
 执行线程：主线程在上一请求进行时等待并持久化下一条合法的账户/API 频控槽，最多预取
 一条任务，从而重叠网络时间和限速等待，不形成并发请求突发。预取任务在请求前以
 `inflight` 状态和频控槽一起提交；进程异常退出后，新 owner 只把该状态恢复为
@@ -230,6 +230,10 @@ VIP 分页链做覆盖压缩：同一年、同一 P/D/I 类型的四个季度必
 `acquisition_capture_execution` 从默认 `thread` 灰度设为 `process`。它只把同一个
 HTTP worker 和一条预取任务移入独立进程，Token 通过进程初始化管道传递，不进入命令
 参数、配置或报告；账户/API 频控预留、结果事务和唯一写入者仍由原主进程控制。
+当单路 HTTP+原始对象落盘已成为真实瓶颈时，可在 process 模式和 depth 2 下将
+`acquisition_capture_workers` 从默认 1 灰度设为 2。主进程仍在每次提交前逐个持久化
+共享账户和 API gate，因此两个 worker 只重叠已合法预留的网络/落盘时间，不放宽分钟频次、
+接口特殊上限或每日配额。报告中的 `http_workers` 必须与实际值一致。
 若 `account_gate_requested_sleep` 与 `account_gate_sleep` 继续显示同进程文档线程阻塞
 限速调度，可将 `document_worker_execution` 从默认 `thread` 灰度设为 `process`。
 它不改变文档锁、任务数据库、下载并发数或采集/发布顺序，只隔离 Python 调度；worker

@@ -5038,8 +5038,15 @@ class Pipeline:
         capture_execution = config.get("acquisition_capture_execution", "thread")
         if capture_execution not in ("thread", "process"):
             raise ValueError("Invalid acquisition capture execution")
+        capture_workers = config.get("acquisition_capture_workers", 1)
+        if type(capture_workers) is not int or not 1 <= capture_workers <= 2:
+            raise ValueError("Invalid acquisition capture workers")
         if capture_execution == "process" and pipeline_depth != 2:
             raise ValueError("Process capture requires pipeline depth two")
+        if capture_workers > 1 and capture_execution != "process":
+            raise ValueError("Concurrent capture requires process execution")
+        if capture_workers > pipeline_depth:
+            raise ValueError("Capture workers exceed pipeline depth")
         completed = 0
         invalid_requests = 0
 
@@ -5168,7 +5175,7 @@ class Pipeline:
                 from backend.shared import tushare_intake
 
                 pool = ProcessPoolExecutor(
-                    max_workers=1,
+                    max_workers=capture_workers,
                     mp_context=multiprocessing.get_context("spawn"),
                     initializer=_initialize_capture_process,
                     initargs=(token, str(self.root), tushare_intake.API_ROOT),
@@ -5176,7 +5183,7 @@ class Pipeline:
                 capture_callable = _capture_in_process
             else:
                 pool = ThreadPoolExecutor(
-                    max_workers=1, thread_name_prefix="tushare-capture"
+                    max_workers=capture_workers, thread_name_prefix="tushare-capture"
                 )
                 capture_callable = timed_capture
             with pool:
@@ -5208,7 +5215,7 @@ class Pipeline:
                         time.sleep(pause)
             work_timing_pipeline = {
                 "depth": pipeline_depth,
-                "http_workers": 1,
+                "http_workers": capture_workers,
                 "capture_execution": capture_execution,
                 "queue_high_watermark": high_watermark,
                 "crash_recovered_jobs": self.recovered_inflight,
