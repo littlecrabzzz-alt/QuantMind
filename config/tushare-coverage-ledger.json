@@ -2,7 +2,7 @@
   "schema_version": 1,
   "catalog_fetched_at": "2026-09-18T21:13:01.541081+00:00",
   "catalog_index_sha256": "73876a0cd68fc2df57cdce89088cf81b6d19365af5ca83169e96cc7a69aa0839",
-  "reviewed_at": "2026-09-18T21:13:01.541081+00:00",
+  "reviewed_at": "2026-09-18T21:34:33.384626+00:00",
   "entry_count": 270,
   "scope": "Every entry in the current official sidebar plus independently discovered linked entries. Dated evidence preserves prior catalogue baselines; runtime evidence controls entitlement and coverage.",
   "entries": [
@@ -1516,11 +1516,22 @@
       "acquisition_api_names": [
         "stk_seasoned"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable local planner implemented; bounded live permission/schema probe and historical completion evidence remain required.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Production local acquisition is enabled and durable results are observed; continue deterministic backfill and verify history, revisions, caps, universe, known_at and PIT.",
       "contract_evidence": "docs/tushare-catalog-refresh-20260919.json",
-      "auto_acquisition": true
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "validation/catalog-delta-live-probe-20260919.json",
+        "acceptance": "docs/tushare-catalog-delta-production-20260919.json",
+        "checked_at": "2026-09-18T21:23:54.018698+00:00",
+        "status": "sample_ok",
+        "sample_rows": 1077,
+        "object_sha256": "92f2c448e49b0f4a4e9ea0a83a437fe385d1e0da25827577137382a9413a44c2",
+        "observation_sha256": "8209ea4038fb6ba6b3a41beec10fd1687a97d6ae9753c799c2c7d77b0ab00fb5"
+      },
+      "history_complete": false,
+      "pit_verified": false
     },
     {
       "doc_id": "291",
@@ -3732,11 +3743,22 @@
       "acquisition_api_names": [
         "etf_auction"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable local planner implemented; bounded live permission/schema probe and historical completion evidence remain required.",
+      "status": "permission_blocked",
+      "permission_status": "denied_observed",
+      "next_action": "Live request was denied for this account; keep disabled and retry only after entitlement changes. History, revisions and PIT remain unverified.",
       "contract_evidence": "docs/tushare-catalog-refresh-20260919.json",
-      "auto_acquisition": true
+      "auto_acquisition": false,
+      "runtime_evidence": {
+        "path": "validation/catalog-delta-live-probe-20260919.json",
+        "acceptance": "docs/tushare-catalog-delta-production-20260919.json",
+        "checked_at": "2026-09-18T21:23:54.018698+00:00",
+        "status": "permission_denied",
+        "sample_rows": 0,
+        "object_sha256": "423ecaf2928085d5728e613651c8ff6f050e5da050cf9f875a7e00878b9377a1",
+        "observation_sha256": "461518ab3bffb88b13a4d4231cee14275c4ce540df512e4ac5ba2ecda11baad8"
+      },
+      "history_complete": false,
+      "pit_verified": false
     },
     {
       "doc_id": "199",
@@ -4724,11 +4746,22 @@
       "acquisition_api_names": [
         "vix_index"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable local planner implemented; bounded live permission/schema probe and historical completion evidence remain required.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Production local acquisition is enabled and durable results are observed; continue deterministic backfill and verify history, revisions, caps, universe, known_at and PIT.",
       "contract_evidence": "docs/tushare-catalog-refresh-20260919.json",
-      "auto_acquisition": true
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "validation/catalog-delta-live-probe-20260919.json",
+        "acceptance": "docs/tushare-catalog-delta-production-20260919.json",
+        "checked_at": "2026-09-18T21:23:54.018698+00:00",
+        "status": "sample_ok",
+        "sample_rows": 13,
+        "object_sha256": "5ac8094b9355c5d1841bf300cef6ceee0dcbc233315f07353856281588f6038f",
+        "observation_sha256": "0151fef5bda5906b7ab89886b14e98d61ab1e6fa520d5a09fef238917926656a"
+      },
+      "history_complete": false,
+      "pit_verified": false
     },
     {
       "doc_id": "18",
@@ -5261,11 +5294,22 @@
       "acquisition_api_names": [
         "fut_inv_weekly"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable local planner implemented; bounded live permission/schema probe and historical completion evidence remain required.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Production local acquisition is enabled and durable results are observed; continue deterministic backfill and verify history, revisions, caps, universe, known_at and PIT.",
       "contract_evidence": "docs/tushare-catalog-refresh-20260919.json",
-      "auto_acquisition": true
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "validation/catalog-delta-live-probe-20260919.json",
+        "acceptance": "docs/tushare-catalog-delta-production-20260919.json",
+        "checked_at": "2026-09-18T21:23:54.018698+00:00",
+        "status": "sample_ok",
+        "sample_rows": 1210,
+        "object_sha256": "0a45f91e0d658545d1ceb63dbd527e70fc27aa480ce6e2ea3675149f467b5ce2",
+        "observation_sha256": "d6ff4e37e4463916e141758f270d6b09b425feef85a33ab344eecf6129232c4c"
+      },
+      "history_complete": false,
+      "pit_verified": false
     },
     {
       "doc_id": "496",
@@ -5277,11 +5321,23 @@
       "acquisition_api_names": [
         "fut_rcpt_mat"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable local planner implemented; bounded live permission/schema probe and historical completion evidence remain required.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Production local acquisition is enabled and durable results are observed; continue deterministic backfill and verify history, revisions, caps, universe, known_at and PIT.",
       "contract_evidence": "docs/tushare-catalog-refresh-20260919.json",
-      "auto_acquisition": true
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "validation/catalog-delta-live-probe-20260919.json",
+        "acceptance": "docs/tushare-catalog-delta-production-20260919.json",
+        "checked_at": "2026-09-18T21:23:54.018698+00:00",
+        "status": "schema_gap",
+        "sample_rows": 23,
+        "object_sha256": "7520fca61c4b96dfb3521a232e728fe527e14180a3890f8e35777f137706d4cb",
+        "observation_sha256": "a013221e1a0ece21f08083966f58aa36544b95c2e7273ccb7db257cedacf7248"
+      },
+      "history_complete": false,
+      "pit_verified": false,
+      "field_gap": "The provider omitted documented fut_code in the live response; runtime preserves raw evidence and uses fut_name identity."
     },
     {
       "doc_id": "497",
@@ -5293,11 +5349,22 @@
       "acquisition_api_names": [
         "fut_trade_param"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable local planner implemented; bounded live permission/schema probe and historical completion evidence remain required.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Production local acquisition is enabled and durable results are observed; continue deterministic backfill and verify history, revisions, caps, universe, known_at and PIT.",
       "contract_evidence": "docs/tushare-catalog-refresh-20260919.json",
-      "auto_acquisition": true
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "validation/catalog-delta-live-probe-20260919.json",
+        "acceptance": "docs/tushare-catalog-delta-production-20260919.json",
+        "checked_at": "2026-09-18T21:23:54.018698+00:00",
+        "status": "sample_ok",
+        "sample_rows": 243,
+        "object_sha256": "8d3137fc4d9d8cd561e9b010891a22a003aad8155da1dab70aa900f60688a5c4",
+        "observation_sha256": "746e485b90017418cc8236c36c3b70e7b67d17f43dcbab319cebbf212bd7d73a"
+      },
+      "history_complete": false,
+      "pit_verified": false
     },
     {
       "doc_id": "189",
@@ -6707,11 +6774,22 @@
       "acquisition_api_names": [
         "rt_hk_k"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable local planner implemented; bounded live permission/schema probe and historical completion evidence remain required.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Production local realtime snapshots are enabled with verified wildcard prefixes and retained-code fallback; continue universe checks. Realtime snapshots cannot reconstruct history or prove PIT.",
       "contract_evidence": "docs/tushare-catalog-refresh-20260919.json",
-      "auto_acquisition": true
+      "auto_acquisition": true,
+      "runtime_evidence": {
+        "path": "validation/catalog-delta-live-probe-20260919.json",
+        "acceptance": "docs/tushare-catalog-delta-production-20260919.json",
+        "checked_at": "2026-09-18T21:23:54.018698+00:00",
+        "status": "sample_ok",
+        "sample_rows": 1,
+        "object_sha256": "e7491b4ee6627c54bd0c0e10312af177a16b97d47723aef84bccca9702433f99",
+        "observation_sha256": "e2fb710f31e85b00b2c2dd01d8c7d6bb4e525b06ea3a1124b1a8deff07ab2417"
+      },
+      "history_complete": false,
+      "pit_verified": false
     },
     {
       "doc_id": "389",

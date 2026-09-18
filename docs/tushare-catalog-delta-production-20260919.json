@@ -1,0 +1,252 @@
+{
+  "schema": "quantmind.tushare.catalog-delta-production.v1",
+  "accepted_at": "2026-09-18T21:34:33.384626+00:00",
+  "catalog": {
+    "source": "https://tushare.pro/document/2",
+    "previous_entries": 263,
+    "current_entries": 270,
+    "current_index_sha256": "73876a0cd68fc2df57cdce89088cf81b6d19365af5ca83169e96cc7a69aa0839",
+    "added_doc_ids": [
+      383,
+      493,
+      494,
+      495,
+      496,
+      497,
+      498
+    ]
+  },
+  "code": {
+    "contract_sha256": "fff999deec31e3af4c32e2da7641f0c6549de17faae2993158de23ace7a223d8",
+    "runtime_contract_sha256": "fff999deec31e3af4c32e2da7641f0c6549de17faae2993158de23ace7a223d8",
+    "catalog_delta_master_commit": "2a70e2dab6374e019f231b221996eb0845dcb227",
+    "catalog_watch_master_commit": "693bbb29c35f6666356daa5a590198b1833e0918",
+    "catalog_watch_sha256": "a9f3c6cb798c07f524893e4219abfb38a4721488d96401487a8108e5fe1b2fc2",
+    "runtime_catalog_watch_sha256": "a9f3c6cb798c07f524893e4219abfb38a4721488d96401487a8108e5fe1b2fc2",
+    "worker_sha256": "714708809b4f19df74eebc3081776f5bd52667565da18a847f8baf56bb3557e4",
+    "runtime_worker_sha256": "714708809b4f19df74eebc3081776f5bd52667565da18a847f8baf56bb3557e4"
+  },
+  "configuration": {
+    "pipeline_config_before_sha256": "83d4e50347d2fdb32b29a441da2ba1a4fe5cdc02cf81e6ea1391088d1d820c0b",
+    "pipeline_config_mode": "0600",
+    "enabled_family": "catalog_delta",
+    "enabled_apis": [
+      "rt_hk_k",
+      "stk_seasoned",
+      "fut_inv_weekly",
+      "fut_rcpt_mat",
+      "fut_trade_param",
+      "vix_index"
+    ],
+    "excluded_permission_denied_apis": [
+      "etf_auction"
+    ],
+    "resolved_requests_per_minute": {
+      "rt_hk_k": 200,
+      "stk_seasoned": 500,
+      "fut_inv_weekly": 500,
+      "fut_rcpt_mat": 500,
+      "fut_trade_param": 500,
+      "vix_index": 500
+    },
+    "pipeline_config_catalog_delta_sha256": "0338a0564455c3599c5466af461cd78aa1fefa1f81a649612157db27f76374f8",
+    "pipeline_config_final_sha256": "a00eea1d34a4342e8e6478415b4b55942e6297bcad759aa80d18d8c962fa76fa",
+    "catalog_watch_interval_seconds": 86400
+  },
+  "permission_and_schema_probe": {
+    "archive_relative_path": "validation/catalog-delta-live-probe-20260919.json",
+    "sha256": "68e8420f7802b026c02fec586c598c34f57075003d9af710515d218f3fe63492",
+    "checked_at": "2026-09-18T21:23:54.018698+00:00",
+    "requests": 7,
+    "results": {
+      "rt_hk_k": {
+        "status": "sample_ok",
+        "http_status": 200,
+        "row_count": 1,
+        "field_coverage": "complete_for_explicit_request",
+        "requested_missing_fields": [],
+        "object_sha256": "e7491b4ee6627c54bd0c0e10312af177a16b97d47723aef84bccca9702433f99",
+        "observation_sha256": "e2fb710f31e85b00b2c2dd01d8c7d6bb4e525b06ea3a1124b1a8deff07ab2417"
+      },
+      "etf_auction": {
+        "status": "permission_denied",
+        "http_status": 200,
+        "field_coverage": "unverified_default_or_invalid",
+        "object_sha256": "423ecaf2928085d5728e613651c8ff6f050e5da050cf9f875a7e00878b9377a1",
+        "observation_sha256": "461518ab3bffb88b13a4d4231cee14275c4ce540df512e4ac5ba2ecda11baad8"
+      },
+      "stk_seasoned": {
+        "status": "sample_ok",
+        "http_status": 200,
+        "row_count": 1077,
+        "field_coverage": "complete_for_explicit_request",
+        "requested_missing_fields": [],
+        "object_sha256": "92f2c448e49b0f4a4e9ea0a83a437fe385d1e0da25827577137382a9413a44c2",
+        "observation_sha256": "8209ea4038fb6ba6b3a41beec10fd1687a97d6ae9753c799c2c7d77b0ab00fb5"
+      },
+      "fut_inv_weekly": {
+        "status": "sample_ok",
+        "http_status": 200,
+        "row_count": 1210,
+        "field_coverage": "complete_for_explicit_request",
+        "requested_missing_fields": [],
+        "object_sha256": "0a45f91e0d658545d1ceb63dbd527e70fc27aa480ce6e2ea3675149f467b5ce2",
+        "observation_sha256": "d6ff4e37e4463916e141758f270d6b09b425feef85a33ab344eecf6129232c4c"
+      },
+      "fut_rcpt_mat": {
+        "status": "schema_gap",
+        "http_status": 200,
+        "row_count": 23,
+        "field_coverage": "gap",
+        "requested_missing_fields": [
+          "fut_code"
+        ],
+        "object_sha256": "7520fca61c4b96dfb3521a232e728fe527e14180a3890f8e35777f137706d4cb",
+        "observation_sha256": "a013221e1a0ece21f08083966f58aa36544b95c2e7273ccb7db257cedacf7248"
+      },
+      "fut_trade_param": {
+        "status": "sample_ok",
+        "http_status": 200,
+        "row_count": 243,
+        "field_coverage": "complete_for_explicit_request",
+        "requested_missing_fields": [],
+        "object_sha256": "8d3137fc4d9d8cd561e9b010891a22a003aad8155da1dab70aa900f60688a5c4",
+        "observation_sha256": "746e485b90017418cc8236c36c3b70e7b67d17f43dcbab319cebbf212bd7d73a"
+      },
+      "vix_index": {
+        "status": "sample_ok",
+        "http_status": 200,
+        "row_count": 13,
+        "field_coverage": "complete_for_explicit_request",
+        "requested_missing_fields": [],
+        "object_sha256": "5ac8094b9355c5d1841bf300cef6ceee0dcbc233315f07353856281588f6038f",
+        "observation_sha256": "0151fef5bda5906b7ab89886b14e98d61ab1e6fa520d5a09fef238917926656a"
+      }
+    },
+    "fut_rcpt_mat_reconciliation": {
+      "provider_observation": "The live response omitted the documented fut_code field.",
+      "runtime_action": "The explicit field request excludes fut_code and row identity uses fut_name; raw observations retain the discrepancy.",
+      "history_complete": false
+    }
+  },
+  "production": {
+    "launch_agent": {
+      "label": "com.quantmind.tushare-archive",
+      "state": "running",
+      "runs": 1,
+      "last_exit": "never exited"
+    },
+    "cycle": {
+      "started_at": "2026-09-18T21:31:33.826253+00:00",
+      "updated_at": "2026-09-18T21:33:18.598948+00:00",
+      "status": "completed_cycle",
+      "requests": 682,
+      "done_total": 462252,
+      "empty_total": 386469,
+      "pending_total": 2687811,
+      "blocked_total": 872,
+      "permission_blocked_total": 5847,
+      "failed_stage": null,
+      "document_status": "ok",
+      "document_stages": 2400,
+      "free_bytes": 2147622264832
+    },
+    "catalog_delta_jobs": {
+      "rt_hk_k": {
+        "jobs": {
+          "done": 7
+        },
+        "rows_in_terminal_results": 20201
+      },
+      "stk_seasoned": {
+        "jobs": {
+          "pending": 31,
+          "done": 3,
+          "empty": 4
+        },
+        "rows_in_terminal_results": 23
+      },
+      "fut_inv_weekly": {
+        "jobs": {
+          "pending": 435,
+          "empty": 7
+        },
+        "rows_in_terminal_results": 0
+      },
+      "fut_rcpt_mat": {
+        "jobs": {
+          "pending": 16,
+          "empty": 7
+        },
+        "rows_in_terminal_results": 0
+      },
+      "fut_trade_param": {
+        "jobs": {
+          "done": 5,
+          "empty": 2
+        },
+        "rows_in_terminal_results": 1206
+      },
+      "vix_index": {
+        "jobs": {
+          "done": 1
+        },
+        "rows_in_terminal_results": 4
+      }
+    },
+    "catalog_delta_blocked_jobs": 0,
+    "catalog_delta_permission_blocked_jobs": 0,
+    "planning": {
+      "recent_jobs": 18,
+      "history_jobs": 500,
+      "history_stop_reason": "job_budget",
+      "full_backfill_continues": true
+    }
+  },
+  "tests": {
+    "catalog_delta_full_suite": {
+      "result": "1379 passed, 5 skipped",
+      "seconds": 106.47,
+      "log_sha256": "a831d8b135881c4556597a50d7fb28c50617edf94d5dab5c577ed34ce03c89d8"
+    },
+    "catalog_watch_full_suite": {
+      "result": "1384 passed, 5 skipped",
+      "seconds": 105.545,
+      "log_sha256": "d9fee3e10e98c00261f9f1a18bfd125131a5370e04c3f375df0bb381e13dcfb7"
+    },
+    "catalog_watch_live_public_check": "270 current, 0 changes"
+  },
+  "limitations": [
+    "Successful samples and queued partitions do not prove complete history, supplier revisions, universe completeness, known_at, or PIT correctness.",
+    "rt_hk_k is a realtime snapshot and cannot reconstruct history.",
+    "The ETF auction API remains disabled for this account after an observed permission denial.",
+    "The one-job increase in the global blocked count is outside catalog_delta; this group has no blocked or permission_blocked job in this snapshot."
+  ],
+  "raw_business_rows_included": false,
+  "secret_material_included": false,
+  "catalog_watch": {
+    "status": "current",
+    "checked_at": "2026-09-18T21:45:23.229008+00:00",
+    "baseline_entry_count": 270,
+    "current_entry_count": 270,
+    "change_count": 0,
+    "added_doc_ids": [],
+    "removed_doc_ids": [],
+    "retitled_doc_ids": [],
+    "baseline_index_sha256": "73876a0cd68fc2df57cdce89088cf81b6d19365af5ca83169e96cc7a69aa0839",
+    "current_index_sha256": "73876a0cd68fc2df57cdce89088cf81b6d19365af5ca83169e96cc7a69aa0839",
+    "local_status_sha256": "b721b1435bf4e2d59e73dcc7a2cc58788eb020479ac8ad4c409698cbc0285cf7",
+    "behavior": "Daily public sidebar identity audit; drift is observable but never auto-enabled. Failure retries after one hour and does not block acquisition.",
+    "production_cycle": {
+      "started_at": "2026-09-18T21:45:23.227708+00:00",
+      "updated_at": "2026-09-18T21:47:05.182659+00:00",
+      "status": "completed_cycle",
+      "elapsed_seconds": 101.954,
+      "requests": 542,
+      "failed_stage": null,
+      "document_status": "ok",
+      "document_stages": 2500,
+      "current_release_id": "data-fdebee7d2a2bedf86d4b7bc1a3f99684516d957c5fa58e13b69bb416000f2070"
+    }
+  }
+}

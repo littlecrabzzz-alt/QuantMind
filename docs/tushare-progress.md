@@ -1458,3 +1458,14 @@ Mac标准LaunchAgent第276轮下载6063个新增文件，全量校验983029项�
 为消化 Mac 本地约 472 万个待下载附件，已将现有有界文档下载并发的配置上限从 8 扩到 16，生产只灰度到 12。每轮 2500 阶段/100 秒、单文档 20 秒/256 MiB、持久 claim、来源保护、解析边界和 Tushare 所有限速未改。完整 Tushare 套件 1373 项及 1040 个子用例通过，Ruff、编译和 diff check 通过。
 
 8 路相邻六轮平均/中位为 2025/1997 阶段；12 路六轮共完成 14422 阶段，平均/中位 2403.667/2390，提高 18.7%/19.68%。同期 4639 次 Tushare 请求全部 HTTP 200，失败阶段和 stderr 新增均为 0，下载/解析失败率没有上升，系统无内存节流。因此保留 12 路，不直接跳到 16；全量采集继续。机器证据为 `docs/tushare-document-download12-production.json`。
+
+
+## 2026-09-19 官方目录新增接口生产接入
+
+公开目录从263项更新到270项，新增doc 383、493–498。七个接口逐一建立字段合同与确定性规划；真实权限探测中rt_hk_k、stk_seasoned、fut_inv_weekly、fut_rcpt_mat、fut_trade_param、vix_index可调用，etf_auction被供应商拒权，当前账号配置明确排除。fut_rcpt_mat真实响应缺官方文档中的fut_code，运行时不请求该列、以fut_name参与身份并保留原始差异，不伪造字段。
+
+六个可用接口已经在Mac权威归档启用。首次配置变更规划18个近期任务及500个历史任务，随后连续生产轮次产生真实HTTP请求和持久raw/observation/Parquet结果；验收快照中新增组没有blocked或permission_blocked任务。LaunchAgent为running、runs=1、never exited，文档12路链路同时正常。完整套件1379项通过、5项跳过。代码和运行时合同SHA一致，私有配置0600且不入Git。机器证据：docs/tushare-catalog-delta-production-20260919.json。
+
+本次只证明接口接入、真实权限和部分持久结果；完整历史、供应商修订、空响应完整性、港股实时全宇宙、known_at和PIT仍开放，全量补采继续在Mac本地运行。全局blocked从871增至872的新增项不属于catalog_delta，另按既有队列处理。
+
+目录遗漏保护补记：master693bbb29加入每日公开侧栏只读检查，仅比较doc ID、标题和索引哈希并写本地catalog-watch-status.json；发现变化只告警、不自动启用未知接口。网络失败不阻塞采集，一小时后重试。完整套件1384项通过、5项跳过；生产首次检查270项、变化0、索引SHA与基线一致，LaunchAgent重载后继续作为唯一Mac写入者。
