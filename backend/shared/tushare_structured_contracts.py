@@ -212,6 +212,7 @@ for _api, _evidence in FINANCIAL_VIP_PAGINATION.items():
         pagination_required_param="period",
         pagination_forbidden_params=["ts_code"],
         pagination_gap=None,
+        planning_order_version="recent_roots_before_identifier_expansion_v2",
     )
 
 
@@ -281,6 +282,29 @@ def iter_structured_jobs(config, today, identifiers=None):
             "epoch": version,
         }
 
+    def financial_vip_jobs(phase):
+        recent_phase = phase == "recent"
+        for api in sorted(enabled.intersection(FINANCIAL_VIP_PAGINATION)):
+            base = STRUCTURED_CONTRACTS[api]["catalog_api"]
+            for period in reversed(list(_quarters(start, end))):
+                if ((end - period).days <= 730) != recent_phase:
+                    continue
+                types = (
+                    range(1, 13)
+                    if base in ("income", "balancesheet", "cashflow")
+                    else [None]
+                )
+                for report_type in types:
+                    params = {"period": period.strftime("%Y%m%d")}
+                    if report_type:
+                        params["report_type"] = str(report_type)
+                    yield job(
+                        api,
+                        params,
+                        5 if recent_phase else 15,
+                        epoch if recent_phase else "history",
+                    )
+
     if "stock_basic" in enabled:
         for status in ("L", "D", "P", "G", "UN"):
             for exchange in ("SSE", "SZSE", "BSE"):
@@ -291,6 +315,9 @@ def iter_structured_jobs(config, today, identifiers=None):
     if "index_basic" in enabled:
         for market in INDEX_MARKETS:
             yield job("index_basic", {"market": market})
+    # The bounded, current financial roots must enter the queue before the
+    # per-security name history loop can consume several planning windows.
+    yield from financial_vip_jobs("recent")
     if "namechange" in enabled:
         for code in stocks:
             # Per-security full snapshot includes rows with unknown announcement date.
@@ -317,30 +344,9 @@ def iter_structured_jobs(config, today, identifiers=None):
         if left_bound > right_bound:
             continue
         priority, version = (25, epoch) if phase == "recent" else (45, "history")
-        # Live-verified exact-period pagination replaces tens of thousands of
-        # per-stock saturation leaves. Put these bounded roots before large
-        # identifier loops so a pre-existing queue cannot starve them.
-        for api in sorted(enabled.intersection(FINANCIAL_VIP_PAGINATION)):
-            base = STRUCTURED_CONTRACTS[api]["catalog_api"]
-            for period in reversed(list(_quarters(start, end))):
-                recent_report = (end - period).days <= 730
-                if recent_report != (phase == "recent"):
-                    continue
-                types = (
-                    range(1, 13)
-                    if base in ("income", "balancesheet", "cashflow")
-                    else [None]
-                )
-                for report_type in types:
-                    params = {"period": period.strftime("%Y%m%d")}
-                    if report_type:
-                        params["report_type"] = str(report_type)
-                    yield job(
-                        api,
-                        params,
-                        5 if phase == "recent" else 15,
-                        version,
-                    )
+        if phase == "history":
+            # Historical financial roots stay after all recent structured work.
+            yield from financial_vip_jobs("history")
         for api in DAY_APIS:
             if api not in enabled:
                 continue
