@@ -17,7 +17,7 @@ class WorkerStatus(unittest.TestCase):
             root = Path(directory)
             (root / 'ENABLED').touch()
             (root / 'pipeline-config.json').write_text(
-                '{"enable_documents":true,"document_download_workers":2,'
+                '{"enable_documents":true,"document_download_workers":3,'
                 '"document_worker_max_documents":240,'
                 '"document_worker_max_seconds":85}'
             )
@@ -28,7 +28,7 @@ class WorkerStatus(unittest.TestCase):
                     {
                         'max_documents': 240,
                         'max_seconds': 85.0,
-                        'download_workers': 2,
+                        'download_workers': 3,
                     },
                 )
                 started.set()

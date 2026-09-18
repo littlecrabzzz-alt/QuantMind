@@ -1105,10 +1105,10 @@ def _document_failure(job, phase, exc):
 
 
 def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
-    """Advance bounded phases; opt-in two transfers never overlap a PDF parser.
+    """Advance bounded phases; parallel transfers never overlap a PDF parser.
 
     One durable owner per document, global consumer lock, expiry after child total
-    deadline plus grace. With two workers raw results commit before local parsing.
+    deadline plus grace. With parallel workers raw results commit before parsing.
     Failed/limited phases remain visible with the existing five-attempt backoff.
     Callers enforce authority; workers=1 preserves the sequential path.
     """
@@ -1124,8 +1124,8 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
         or not 0 < max_seconds <= 300
     ):
         raise ValueError("max_seconds must be between 0 and 300")
-    if type(download_workers) is not int or download_workers not in (1, 2):
-        raise ValueError("download_workers must be 1 or 2")
+    if type(download_workers) is not int or download_workers not in (1, 2, 3):
+        raise ValueError("download_workers must be 1, 2, or 3")
     root = Path(root).resolve()
     db = _document_db(root)
     processed, started, owner = 0, time.monotonic(), uuid4().hex
@@ -1165,16 +1165,20 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                 remaining = deadline - time.monotonic()
                 phase = (
                     ("parse" if parse_turns else "download")
-                    if download_workers == 2
+                    if download_workers > 1
                     else None
                 )
-                count = min(2 if phase == "download" else 1, max_documents - processed)
+                count = min(
+                    download_workers if phase == "download" else 1,
+                    max_documents - processed,
+                )
                 seconds = min(20, remaining) if phase == "download" else remaining
                 jobs = _claim_documents(db, owner, phase, count, seconds, timing)
-                if not jobs and download_workers == 2:
+                if not jobs and download_workers > 1:
                     phase = "download" if phase == "parse" else "parse"
                     count = min(
-                        2 if phase == "download" else 1, max_documents - processed
+                        download_workers if phase == "download" else 1,
+                        max_documents - processed,
                     )
                     seconds = min(20, remaining) if phase == "download" else remaining
                     jobs = _claim_documents(db, owner, phase, count, seconds, timing)
@@ -1199,8 +1203,8 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                                 time.monotonic() - job_started,
                             )
 
-                    # Two subprocess waiters only; SQLite and parsing stay on this thread.
-                    with ThreadPoolExecutor(max_workers=2) as pool:
+                    # Bounded subprocess waiters only; SQLite and parsing stay here.
+                    with ThreadPoolExecutor(max_workers=download_workers) as pool:
                         futures = {pool.submit(transfer, job): job for job in jobs}
                         for future in as_completed(futures):
                             job = futures[future]
@@ -1221,7 +1225,7 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                     timing["download_slot_idle_seconds"] += max(
                         0.0, slot_capacity - wave_job_seconds
                     )
-                    parse_turns = 2
+                    parse_turns = download_workers
                 else:
                     job = jobs[0]
                     actual_phase = (

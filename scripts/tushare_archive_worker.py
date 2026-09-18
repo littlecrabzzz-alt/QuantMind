@@ -104,7 +104,7 @@ def main():
                                     max_seconds=float(config.get(
                                         'document_worker_max_seconds', 90)),
                                     download_workers=min(
-                                        2,
+                                        3,
                                         max(1, int(config.get(
                                             'document_download_workers', 1))),
                                     ),

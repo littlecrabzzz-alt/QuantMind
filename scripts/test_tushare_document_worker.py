@@ -176,15 +176,15 @@ class DocumentWorkerTest(unittest.TestCase):
         self.config.update(
             document_worker_max_documents=7,
             document_worker_max_seconds=12.5,
-            document_download_workers=2,
+            document_download_workers=3,
         )
         self.save_config()
         self.tasks.tushare_documents()
         self.run.assert_called_with(
-            self.root, max_documents=7, max_seconds=12.5, download_workers=2
+            self.root, max_documents=7, max_seconds=12.5, download_workers=3
         )
         for key, value in (
-            ("document_download_workers", 3),
+            ("document_download_workers", 4),
             ("document_download_workers", True),
             ("document_worker_max_documents", 101),
             ("document_worker_max_documents", True),

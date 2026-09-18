@@ -180,10 +180,10 @@ def tushare_documents():
             or not 0 < seconds <= 90
             or isinstance(workers, bool)
             or not isinstance(workers, int)
-            or workers not in (1, 2)
+            or workers not in (1, 2, 3)
         ):
             raise ValueError(
-                "Invalid document worker bounds: 1..100 stages, 0..90 seconds, 1..2 downloads"
+                "Invalid document worker bounds: 1..100 stages, 0..90 seconds, 1..3 downloads"
             )
         try:
             report = run_documents(
