@@ -164,7 +164,11 @@ class DocumentWorkerTest(unittest.TestCase):
     def test_worker_bounds_disk_guard_and_atomic_status(self):
         result = self.tasks.tushare_documents()
         self.run.assert_called_once_with(
-            self.root, max_documents=100, max_seconds=90, download_workers=1
+            self.root,
+            max_documents=100,
+            max_seconds=90,
+            download_workers=1,
+            overlap_parse_download=False,
         )
         self.assertEqual(
             json.loads((self.root / "document-worker-status.json").read_bytes()), result
@@ -177,11 +181,16 @@ class DocumentWorkerTest(unittest.TestCase):
             document_worker_max_documents=7,
             document_worker_max_seconds=12.5,
             document_download_workers=8,
+            document_overlap_parse_download=True,
         )
         self.save_config()
         self.tasks.tushare_documents()
         self.run.assert_called_with(
-            self.root, max_documents=7, max_seconds=12.5, download_workers=8
+            self.root,
+            max_documents=7,
+            max_seconds=12.5,
+            download_workers=8,
+            overlap_parse_download=True,
         )
         for key, value in (
             ("document_download_workers", 9),
@@ -190,6 +199,8 @@ class DocumentWorkerTest(unittest.TestCase):
             ("document_worker_max_documents", True),
             ("document_worker_max_seconds", 101),
             ("document_worker_max_seconds", float("nan")),
+            ("document_overlap_parse_download", 1),
+            ("document_overlap_parse_download", "true"),
         ):
             self.config = {
                 "enable_documents": True,

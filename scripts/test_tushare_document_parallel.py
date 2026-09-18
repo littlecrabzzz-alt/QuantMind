@@ -146,6 +146,73 @@ class ParallelDocuments(unittest.TestCase):
         self.assertEqual(self.query("SELECT count(*) FROM document_claims")[0][0], 0)
         self.assertEqual(self.query("SELECT count(*) FROM document_attempts")[0][0], 4)
 
+    def test_enabled_parser_overlaps_transfers_with_single_parse_and_main_db_writes(self):
+        self.seed(3)
+        with sqlite3.connect(self.root / "documents.sqlite") as db:
+            first = db.execute("SELECT id FROM documents ORDER BY id LIMIT 1").fetchone()[0]
+            db.execute(
+                "UPDATE documents SET download_status='downloaded',"
+                "parse_status='parse_pending',result=? WHERE id=?",
+                (json.dumps(self.download()), first),
+            )
+            db.commit()
+        active_downloads = 0
+        active_parses = 0
+        peak_downloads = 0
+        peak_parses = 0
+        overlapped = threading.Event()
+        barrier = threading.Barrier(3)
+        lock = threading.Lock()
+
+        def observe():
+            if active_downloads and active_parses:
+                overlapped.set()
+
+        def fetch(url, root, timeout, *, download_only=False):
+            nonlocal active_downloads, peak_downloads
+            self.assertTrue(download_only)
+            with lock:
+                active_downloads += 1
+                peak_downloads = max(peak_downloads, active_downloads)
+                observe()
+            barrier.wait(timeout=2)
+            time.sleep(0.03)
+            with lock:
+                active_downloads -= 1
+            return self.download()
+
+        def parse(root, previous, timeout):
+            nonlocal active_parses, peak_parses
+            self.assertEqual(previous["fetched_at"], self.stamp)
+            with lock:
+                active_parses += 1
+                peak_parses = max(peak_parses, active_parses)
+                observe()
+            barrier.wait(timeout=2)
+            time.sleep(0.03)
+            with lock:
+                active_parses -= 1
+            return {**previous, "parse_status": "parsed"}
+
+        with (
+            patch.object(docs, "_download_job", side_effect=fetch),
+            patch.object(docs, "_parse_saved", side_effect=parse),
+        ):
+            report = docs.run_documents(
+                self.root,
+                max_documents=3,
+                max_seconds=2,
+                download_workers=2,
+                overlap_parse_download=True,
+            )
+        self.assertTrue(overlapped.is_set())
+        self.assertEqual((peak_downloads, peak_parses), (2, 1))
+        self.assertEqual(report["phase_counts"], {"download": 2, "parse": 1})
+        self.assertTrue(report["overlap_parse_download"])
+        self.assertGreater(report["timing"]["parse_download_overlap_seconds"], 0)
+        self.assertEqual(self.query("SELECT count(*) FROM document_claims")[0][0], 0)
+        self.assertEqual(self.query("SELECT count(*) FROM document_attempts")[0][0], 3)
+
     def test_four_transfers_overlap_with_the_same_durable_fences(self):
         self.seed(4)
         active, peak = 0, 0
@@ -784,14 +851,22 @@ class ParallelDocuments(unittest.TestCase):
         start = time.monotonic()
         with patch.object(docs, "_download_job", side_effect=slow):
             result = docs.run_documents(
-                self.root, max_documents=3, max_seconds=0.09, download_workers=2
+                self.root,
+                max_documents=3,
+                max_seconds=0.09,
+                download_workers=2,
+                overlap_parse_download=True,
             )
         self.assertLess(time.monotonic() - start, 0.25)
         self.assertLessEqual(result["processed"], 3)
+        self.assertEqual(result["processed"], result["timing"]["finish_db_calls"])
         self.assertEqual(peak, 2)
         for value in (0, 9, True, 2.0):
             with self.assertRaises(ValueError):
                 docs.run_documents(self.root, download_workers=value)
+        for value in (0, 1, "true", None):
+            with self.assertRaises(ValueError):
+                docs.run_documents(self.root, overlap_parse_download=value)
 
     def test_child_absolute_deadline_is_self_enforced_without_parent_timeout(self):
         # A real isolated local child dies from its own timer; no network involved.

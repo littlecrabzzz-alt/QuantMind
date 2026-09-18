@@ -32,6 +32,7 @@ class WorkerStatus(unittest.TestCase):
                         'max_bytes': 25 * 1024 * 1024,
                         'terminal_retry_interval_seconds': 86400.0,
                         'terminal_retry_max_documents': 16,
+                        'overlap_parse_download': False,
                     },
                 )
                 started.set()
@@ -80,7 +81,7 @@ class WorkerStatus(unittest.TestCase):
     def test_document_limits_match_native_production_bounds(self):
         self.assertEqual(
             worker.document_limits({}),
-            (100, 90.0, 1, 25 * 1024 * 1024, 86400.0, 16),
+            (100, 90.0, 1, 25 * 1024 * 1024, 86400.0, 16, False),
         )
         self.assertEqual(
             worker.document_limits({
@@ -90,8 +91,9 @@ class WorkerStatus(unittest.TestCase):
                 'document_max_bytes': 256 * 1024 * 1024,
                 'document_terminal_retry_interval_seconds': 3600,
                 'document_terminal_retry_max_documents': 64,
+                'document_overlap_parse_download': True,
             }),
-            (600, 100.0, 8, 256 * 1024 * 1024, 3600.0, 64),
+            (600, 100.0, 8, 256 * 1024 * 1024, 3600.0, 64, True),
         )
         for key, value in (
             ('document_worker_max_documents', 0),
@@ -112,6 +114,8 @@ class WorkerStatus(unittest.TestCase):
             ('document_terminal_retry_max_documents', -1),
             ('document_terminal_retry_max_documents', 65),
             ('document_terminal_retry_max_documents', True),
+            ('document_overlap_parse_download', 1),
+            ('document_overlap_parse_download', 'true'),
         ):
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
                 worker.document_limits({key: value})
@@ -131,6 +135,7 @@ class WorkerStatus(unittest.TestCase):
                     25 * 1024 * 1024,
                     86400.0,
                     16,
+                    False,
                 ).result(timeout=10)
             self.assertEqual(report['status'], 'ok')
             self.assertEqual(report['processed'], 0)
@@ -160,6 +165,7 @@ class WorkerStatus(unittest.TestCase):
                         'max_bytes': 25 * 1024 * 1024,
                         'terminal_retry_interval_seconds': 86400.0,
                         'terminal_retry_max_documents': 16,
+                        'overlap_parse_download': False,
                     },
                 )
                 return {'status': 'ok', 'processed': 100}

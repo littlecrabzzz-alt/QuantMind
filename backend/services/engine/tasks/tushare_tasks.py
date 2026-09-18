@@ -171,6 +171,7 @@ def tushare_documents():
         count = config.get("document_worker_max_documents", 100)
         seconds = config.get("document_worker_max_seconds", 90)
         workers = config.get("document_download_workers", 1)
+        overlap = config.get("document_overlap_parse_download", False)
         if (
             isinstance(count, bool)
             or not isinstance(count, int)
@@ -181,6 +182,7 @@ def tushare_documents():
             or isinstance(workers, bool)
             or not isinstance(workers, int)
             or not 1 <= workers <= 8
+            or not isinstance(overlap, bool)
         ):
             raise ValueError(
                 "Invalid document worker bounds: 1..1000 stages, "
@@ -188,7 +190,11 @@ def tushare_documents():
             )
         try:
             report = run_documents(
-                ROOT, max_documents=count, max_seconds=seconds, download_workers=workers
+                ROOT,
+                max_documents=count,
+                max_seconds=seconds,
+                download_workers=workers,
+                overlap_parse_download=overlap,
             )
         except Exception as exc:
             atomic_json(

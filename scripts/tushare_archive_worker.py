@@ -46,6 +46,7 @@ def document_limits(config):
     max_bytes = config.get('document_max_bytes', 25 * 1024 * 1024)
     retry_interval = config.get('document_terminal_retry_interval_seconds', 86400)
     retry_max = config.get('document_terminal_retry_max_documents', 16)
+    overlap = config.get('document_overlap_parse_download', False)
     if (
         isinstance(count, bool)
         or not isinstance(count, int)
@@ -65,13 +66,17 @@ def document_limits(config):
         or isinstance(retry_max, bool)
         or not isinstance(retry_max, int)
         or not 0 <= retry_max <= 64
+        or not isinstance(overlap, bool)
     ):
         raise ValueError(
             'Invalid document worker bounds: 1..1000 stages, '
             '0..100 seconds, 1..8 downloads, 25..256 MiB, '
             '3600..31536000 retry seconds, 0..64 retries'
         )
-    return count, float(seconds), workers, max_bytes, float(retry_interval), retry_max
+    return (
+        count, float(seconds), workers, max_bytes, float(retry_interval), retry_max,
+        overlap,
+    )
 
 
 def execute_documents(
@@ -82,6 +87,7 @@ def execute_documents(
     max_bytes,
     terminal_retry_interval_seconds,
     terminal_retry_max_documents,
+    overlap_parse_download,
 ):
     from backend.shared.tushare_documents import run_documents
     return run_documents(
@@ -92,6 +98,7 @@ def execute_documents(
         max_bytes=max_bytes,
         terminal_retry_interval_seconds=terminal_retry_interval_seconds,
         terminal_retry_max_documents=terminal_retry_max_documents,
+        overlap_parse_download=overlap_parse_download,
     )
 
 
@@ -153,6 +160,7 @@ def main():
                                     max_bytes=limits[3],
                                     terminal_retry_interval_seconds=limits[4],
                                     terminal_retry_max_documents=limits[5],
+                                    overlap_parse_download=limits[6],
                                 )
                         report['acquisition'] = tick(
                             before_nonpublication_work=start_documents
