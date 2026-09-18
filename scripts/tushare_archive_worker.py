@@ -51,7 +51,7 @@ def document_limits(config):
     if (
         isinstance(count, bool)
         or not isinstance(count, int)
-        or not 1 <= count <= 2000
+        or not 1 <= count <= 2500
         or isinstance(seconds, bool)
         or not isinstance(seconds, (int, float))
         or not 0 < seconds <= 100
@@ -74,7 +74,7 @@ def document_limits(config):
         or parse_workers > 1 and (not overlap or workers == 1)
     ):
         raise ValueError(
-            'Invalid document worker bounds: 1..2000 stages, '
+            'Invalid document worker bounds: 1..2500 stages, '
             '0..100 seconds, 1..8 downloads, 25..256 MiB, '
             '3600..31536000 retry seconds, 0..64 retries, 1..4 parsers; '
             'multiple parsers require overlap and downloads > 1'
