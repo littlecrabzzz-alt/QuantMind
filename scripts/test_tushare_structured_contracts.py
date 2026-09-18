@@ -74,9 +74,10 @@ class StructuredPlanning(unittest.TestCase):
             iter_structured_jobs(
                 {
                     "history_start": "20200101",
-                    "structured_apis": sorted(apis),
+                    "structured_apis": sorted(apis | {"namechange"}),
                 },
                 date(2024, 4, 2),
+                {"stocks": ["000001.SZ", "600000.SH"]},
             )
         )
         financial = [job for job in jobs if job["api_name"] in apis]
@@ -100,6 +101,11 @@ class StructuredPlanning(unittest.TestCase):
             for index, job in enumerate(jobs)
             if job["api_name"] in apis and job["epoch"] == "history"
         ]
+        namechange_positions = [
+            index for index, job in enumerate(jobs) if job["api_name"] == "namechange"
+        ]
+        self.assertLess(max(recent_positions), min(namechange_positions))
+        self.assertLess(max(namechange_positions), min(history_positions))
         self.assertLess(max(recent_positions), min(history_positions))
 
     def test_discovery_missing_and_unsupported_index(self):
