@@ -349,20 +349,17 @@ class RegistrationBudget(unittest.TestCase):
             self.p.register_documents()
         self.assertEqual(self.state(), before)
 
-    def test_unrelated_attempt_tail_scans_1000_once_and_reaches_document(self):
+    def test_unrelated_attempt_tail_pages_until_it_reaches_document(self):
         self.p.db.executemany(
             "INSERT INTO attempts VALUES(?,?,?)",
             [(f"other{n}", 1, json.dumps({"api_name": "daily"})) for n in range(1500)],
         )
         self.p.db.commit()
         rowid, _ = self.seed([{"url": None}])
-        first = self.p.register_documents()
-        self.assertEqual(first["scanned_attempts"], 1000)
-        self.assertEqual(first["cursor"], 1000)
-        self.assertEqual(first["observations"], 0)
-        second = self.p.register_documents()
-        self.assertEqual(second["cursor"], rowid)
-        self.assertEqual(second["observations"], 1)
+        result = self.p.register_documents()
+        self.assertEqual(result["scanned_attempts"], 1501)
+        self.assertEqual(result["cursor"], rowid)
+        self.assertEqual(result["observations"], 1)
         self.assertEqual(len(self.inventory()["document_refs"]), 1)
 
     def test_empty_and_duplicate_observations_preserve_explicit_refs_and_reuse(self):

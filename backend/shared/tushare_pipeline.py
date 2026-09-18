@@ -5333,15 +5333,32 @@ class Pipeline:
                 partial_attempt=int(partial.split(":")[1]) if partial else None,
                 record_offset=offset,
             )
-            # Scan a bounded contiguous attempt range instead of filtering through
-            # an unbounded tail of unrelated source results on every invocation.
-            rows = self.db.execute(
-                "SELECT rowid,result FROM attempts WHERE rowid>? ORDER BY rowid LIMIT 1000",
-                (cursor,),
-            ).fetchall()
-            if not rows and partial:
-                raise ValueError("Partial document attempt is missing")
-            for row in rows:
+            def attempt_rows():
+                """Page the contiguous attempt tail within the existing hard budget."""
+                scan_after = cursor
+                while True:
+                    if (
+                        time.monotonic() >= deadline
+                        or report["observations"] >= max_observations
+                        or report["processed_records"] >= max_records
+                    ):
+                        report["status"] = "deferred_budget"
+                        return
+                    rows = self.db.execute(
+                        "SELECT rowid,result FROM attempts "
+                        "WHERE rowid>? ORDER BY rowid LIMIT 1000",
+                        (scan_after,),
+                    ).fetchall()
+                    if not rows:
+                        if partial:
+                            raise ValueError("Partial document attempt is missing")
+                        return
+                    yield from rows
+                    if cursor != report["cursor"]:
+                        checkpoint(cursor, partial, offset)
+                    scan_after = rows[-1]["rowid"]
+
+            for row in attempt_rows():
                 if (
                     time.monotonic() >= deadline
                     or report["observations"] >= max_observations
