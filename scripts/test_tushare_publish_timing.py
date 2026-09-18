@@ -1,10 +1,12 @@
 """Publish substage timing, immutable output and error reporting; fixtures only."""
 
 from contextlib import ExitStack
+import hashlib
 import json
 from pathlib import Path
 import sys
 import tempfile
+import threading
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -108,6 +110,72 @@ class PublishTimingTest(unittest.TestCase):
         timing = self.assert_timing("scan_attempts_and_stat")
         self.assertEqual(timing["completed_stages"], ["read_current", "scan_gaps"])
         self.assertFalse((self.root / "CURRENT.json").exists())
+
+    def test_attempt_artifact_stats_are_bounded_and_parallel(self):
+        tracked = set()
+        for index in range(16):
+            observation_raw = f"observation-{index}".encode()
+            observation_sha = hashlib.sha256(observation_raw).hexdigest()
+            observation = self.root / "observations" / (observation_sha + ".json")
+            observation.parent.mkdir(exist_ok=True)
+            observation.write_bytes(observation_raw)
+            object_raw = f"object-{index}".encode()
+            object_sha = hashlib.sha256(object_raw).hexdigest()
+            saved_object = self.root / "objects" / (object_sha + ".json")
+            saved_object.parent.mkdir(exist_ok=True)
+            saved_object.write_bytes(object_raw)
+            tracked.update((observation, saved_object))
+            self.p.db.execute(
+                "INSERT INTO attempts VALUES(?,?,?)",
+                (
+                    f"fixture-{index}",
+                    1,
+                    json.dumps(
+                        {
+                            "api_name": "daily",
+                            "status": "sample_ok",
+                            "observation": observation.name,
+                            "observation_sha256": observation_sha,
+                            "object_sha256": object_sha,
+                        }
+                    ),
+                ),
+            )
+        self.p.db.commit()
+        original_stat = Path.stat
+        lock = threading.Lock()
+        release = threading.Event()
+        active = 0
+        peak = 0
+
+        def observed_stat(path, *args, **kwargs):
+            nonlocal active, peak
+            if path not in tracked:
+                return original_stat(path, *args, **kwargs)
+            with lock:
+                active += 1
+                peak = max(peak, active)
+                if active >= 2:
+                    release.set()
+            release.wait(1)
+            try:
+                return original_stat(path, *args, **kwargs)
+            finally:
+                with lock:
+                    active -= 1
+
+        with (
+            patch.object(module, "PUBLISH_ATTEMPT_STAT_BATCH", 8),
+            patch.object(Path, "stat", observed_stat),
+        ):
+            self.p.publish()
+        scan = self.p.publish_timing["attempt_scan"]
+        self.assertEqual(scan["attempts_scanned"], 16)
+        self.assertEqual(scan["artifacts_checked"], 32)
+        self.assertEqual(scan["stat_batches"], 4)
+        self.assertEqual(scan["stat_workers"], 8)
+        self.assertGreaterEqual(scan["elapsed_seconds"], 0)
+        self.assertGreaterEqual(peak, 2)
 
     def test_retention_failure_keeps_current_and_resets_on_retry(self):
         first = self.p.publish()

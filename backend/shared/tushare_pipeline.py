@@ -5602,36 +5602,14 @@ class Pipeline:
         with measure("scan_attempts_and_stat"):
             # Repeated attempts and prior revisions remain queryable in the latest
             # release; migration can recover only the attempts v1 had retained.
-            for row in self.db.execute(
-                "SELECT result FROM attempts ORDER BY job_id,attempt"
-            ):
-                result = json.loads(row[0])
-                if "observation" in result:
-                    paths = [
-                        (
-                            "observations/" + result["observation"],
-                            result["observation_sha256"],
-                        ),
-                        (
-                            "objects/" + result["object_sha256"] + ".json",
-                            result["object_sha256"],
-                        ),
-                    ]
-                    if "parquet" in result:
-                        paths.append(
-                            (result["parquet"]["path"], result["parquet"]["sha256"])
-                        )
-                    for name, sha in paths:
-                        files[name] = {
-                            "sha256": sha,
-                            "bytes": (self.root / name).stat().st_size,
-                        }
-                if "parquet" in result:
-                    active[result["parquet"]["path"]] = {
-                        "api_name": result["api_name"],
-                        "quality_state": result["status"],
-                        **result["parquet"],
-                    }
+            timing["attempt_scan"] = _scan_attempt_artifacts(
+                self.root,
+                self.db.execute(
+                    "SELECT result FROM attempts ORDER BY job_id,attempt"
+                ),
+                files,
+                active,
+            )
         with measure("contract_reassessment_overlays"):
             for row in self.db.execute(
                 "SELECT result FROM contract_reassessments ORDER BY job_id"
@@ -5988,6 +5966,96 @@ def _planning_config_fingerprint(config):
         and key not in {"enable_documents", "documents_per_tick"}
     }
     return digest(json_bytes({"version": 2, "config": planning_config}))
+
+
+PUBLISH_ATTEMPT_STAT_WORKERS = 8
+PUBLISH_ATTEMPT_STAT_BATCH = 8192
+
+
+def _scan_attempt_artifacts(
+    root, rows, files, active, *, max_workers=None, batch_size=None
+):
+    """Rebuild the complete attempt inventory with bounded parallel stat calls."""
+    started = time.monotonic()
+    if max_workers is None:
+        max_workers = PUBLISH_ATTEMPT_STAT_WORKERS
+    if batch_size is None:
+        batch_size = PUBLISH_ATTEMPT_STAT_BATCH
+    if type(max_workers) is not int or max_workers < 1:
+        raise ValueError("max_workers must be positive")
+    if type(batch_size) is not int or batch_size < 1:
+        raise ValueError("batch_size must be positive")
+    pending = []
+    attempts_scanned = 0
+    artifacts_checked = 0
+    stat_batches = 0
+    stat_workers = 0
+
+    def stat_chunk(chunk):
+        return [(name, sha, (root / name).stat().st_size) for name, sha in chunk]
+
+    def flush(pool):
+        nonlocal artifacts_checked, stat_batches, stat_workers
+        if not pending:
+            return
+        workers = min(max_workers, len(pending))
+        width = (len(pending) + workers - 1) // workers
+        chunks = [
+            pending[start : start + width]
+            for start in range(0, len(pending), width)
+        ]
+        results = (
+            (stat_chunk(pending),)
+            if workers == 1
+            else pool.map(stat_chunk, chunks)
+        )
+        for chunk in results:
+            for name, sha, size in chunk:
+                files[name] = {"sha256": sha, "bytes": size}
+        artifacts_checked += len(pending)
+        stat_batches += 1
+        stat_workers = max(stat_workers, workers)
+        pending.clear()
+
+    with ThreadPoolExecutor(
+        max_workers=max_workers, thread_name_prefix="tushare-publish-stat"
+    ) as pool:
+        for row in rows:
+            attempts_scanned += 1
+            result = json.loads(row[0])
+            if "observation" in result:
+                pending.extend(
+                    (
+                        (
+                            "observations/" + result["observation"],
+                            result["observation_sha256"],
+                        ),
+                        (
+                            "objects/" + result["object_sha256"] + ".json",
+                            result["object_sha256"],
+                        ),
+                    )
+                )
+                if "parquet" in result:
+                    pending.append(
+                        (result["parquet"]["path"], result["parquet"]["sha256"])
+                    )
+                if len(pending) >= batch_size:
+                    flush(pool)
+            if "parquet" in result:
+                active[result["parquet"]["path"]] = {
+                    "api_name": result["api_name"],
+                    "quality_state": result["status"],
+                    **result["parquet"],
+                }
+        flush(pool)
+    return {
+        "attempts_scanned": attempts_scanned,
+        "artifacts_checked": artifacts_checked,
+        "stat_batches": stat_batches,
+        "stat_workers": stat_workers,
+        "elapsed_seconds": max(0.0, time.monotonic() - started),
+    }
 
 
 def _verify_identifier_object_stats(root, objects, max_workers=8):
