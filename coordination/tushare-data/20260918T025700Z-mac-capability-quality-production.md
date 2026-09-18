@@ -1,0 +1,7 @@
+# Capability-probe quality retirement production result
+
+- Code: `fbc77abc128353ec76b317fee4e05e43c40052f4` on `master`/`origin/master` extends the existing retained-quality reassessment path. It only retires negative-priority `capability-*` caps after verifying the retained object, observation request, Parquet, current capability availability, a legal pagination/fanout contract, and attempted non-capability production jobs.
+- Validation: 36 focused reassessment, text, other-contract and other-pipeline tests passed; `ruff check` and `git diff --check` passed. A production read-only projection verified all 12 candidate artifacts and prerequisites without a write lock.
+- Production dry-run: candidate states were 12 `quality` probes plus 858 real blocked caps. Exactly 12 probes projected to retirement, 0 results projected to promotion, 858 blocked caps remained unchanged, and upstream calls were 0.
+- Production apply: exactly 12 probes moved to `superseded`; their result status remains `possibly_truncated` and the marker explicitly records `coverage_proven=false`. All 553692 attempt rows and all source artifacts were preserved. The quality-state count is now 0; real blocked gaps remain blocked.
+- Receipt: `contract-reassessment-v1.a5e60ae0794630daef79a49fa86659fc89e67dee0a9988e58fd3c5312fe9e006.json`; its content SHA-256 matches the filename. Production `PRAGMA quick_check` returned `ok` and the Mac archive worker restarted normally.
