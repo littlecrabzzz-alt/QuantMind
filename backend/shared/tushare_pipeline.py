@@ -5033,16 +5033,16 @@ class Pipeline:
         else:
             partition_reconciliation = None
         pipeline_depth = config.get("acquisition_pipeline_depth", 1)
-        if type(pipeline_depth) is not int or not 1 <= pipeline_depth <= 2:
+        if type(pipeline_depth) is not int or not 1 <= pipeline_depth <= 3:
             raise ValueError("Invalid acquisition pipeline depth")
         capture_execution = config.get("acquisition_capture_execution", "thread")
         if capture_execution not in ("thread", "process"):
             raise ValueError("Invalid acquisition capture execution")
         capture_workers = config.get("acquisition_capture_workers", 1)
-        if type(capture_workers) is not int or not 1 <= capture_workers <= 2:
+        if type(capture_workers) is not int or not 1 <= capture_workers <= 3:
             raise ValueError("Invalid acquisition capture workers")
-        if capture_execution == "process" and pipeline_depth != 2:
-            raise ValueError("Process capture requires pipeline depth two")
+        if capture_execution == "process" and pipeline_depth == 1:
+            raise ValueError("Process capture requires pipeline depth above one")
         if capture_workers > 1 and capture_execution != "process":
             raise ValueError("Concurrent capture requires process execution")
         if capture_workers > pipeline_depth:
