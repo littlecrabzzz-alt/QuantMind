@@ -55,7 +55,7 @@ def document_limits(config):
         or not 0 < seconds <= 100
         or isinstance(workers, bool)
         or not isinstance(workers, int)
-        or workers not in (1, 2, 3, 4)
+        or not 1 <= workers <= 8
         or isinstance(max_bytes, bool)
         or not isinstance(max_bytes, int)
         or not 25 * 1024 * 1024 <= max_bytes <= 256 * 1024 * 1024
@@ -68,7 +68,7 @@ def document_limits(config):
     ):
         raise ValueError(
             'Invalid document worker bounds: 1..1000 stages, '
-            '0..100 seconds, 1..4 downloads, 25..256 MiB, '
+            '0..100 seconds, 1..8 downloads, 25..256 MiB, '
             '3600..31536000 retry seconds, 0..64 retries'
         )
     return count, float(seconds), workers, max_bytes, float(retry_interval), retry_max

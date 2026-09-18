@@ -5923,6 +5923,26 @@ class Pipeline:
         return release
 
 
+def _planning_config_fingerprint(config):
+    """Hash only settings that can change acquisition planning.
+
+    Document consumption owns a separate queue and lock. Changing its bounded
+    runtime controls must not consume an acquisition cycle rebuilding the same
+    Tushare job plan.
+    """
+    planning_config = {
+        key: value
+        for key, value in config.items()
+        if not key.startswith("document_")
+        and key not in {"enable_documents", "documents_per_tick"}
+    }
+    return digest(json_bytes({"version": 2, "config": planning_config}))
+
+
+def _legacy_planning_config_fingerprint(config):
+    return digest(json_bytes({"version": 1, "config": config}))
+
+
 def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None):
     from contextlib import contextmanager
 
@@ -6139,13 +6159,17 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                 planning_due = not planning_interval
                 if planning_interval:
                     with measure("planning_check"):
-                        # Fingerprint the whole effective config without discovering
-                        # identifiers. Only our last successful policy is retained;
+                        # Document consumption has its own durable queue. Its bounded
+                        # controls cannot change the acquisition plan and are excluded
+                        # so a throughput change does not discard one API cycle.
+                        # Only our last successful planning policy is retained;
                         # A -> B -> A must not reuse A's old successful checkpoint.
-                        fingerprint = digest(
-                            json_bytes({"version": 1, "config": config})
-                        )
+                        fingerprint = _planning_config_fingerprint(config)
                         checkpoint_name = "planning_success:" + fingerprint
+                        legacy_checkpoint_name = (
+                            "planning_success:"
+                            + _legacy_planning_config_fingerprint(config)
+                        )
                         saved = pipeline.db.execute(
                             "SELECT name,value FROM scheduler_state "
                             "WHERE name GLOB 'planning_success:*'"
@@ -6162,6 +6186,27 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                                 or last_success < 0
                             ):
                                 raise ValueError("Invalid planning checkpoint")
+                            if (
+                                name == legacy_checkpoint_name
+                                and name != checkpoint_name
+                            ):
+                                # A v1 checkpoint matching the exact current config
+                                # proves this is only a fingerprint-scope migration.
+                                # Preserve its clock and do not manufacture a plan.
+                                with pipeline.db:
+                                    pipeline.db.execute(
+                                        "DELETE FROM scheduler_state WHERE name=?",
+                                        (name,),
+                                    )
+                                    pipeline.db.execute(
+                                        "INSERT INTO scheduler_state(name,value) "
+                                        "VALUES(?,?)",
+                                        (checkpoint_name, last_success),
+                                    )
+                                name = checkpoint_name
+                                planning_cadence["checkpoint_migration"] = (
+                                    "whole_config_v1_to_planning_config_v2"
+                                )
                             elapsed = time.time() - last_success
                             planning_cadence.update(
                                 last_success_at=last_success,

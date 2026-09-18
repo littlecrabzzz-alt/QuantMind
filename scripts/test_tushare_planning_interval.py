@@ -86,6 +86,58 @@ class PlanningInterval(unittest.TestCase):
         self.assertEqual(self.planning_checkpoint()[0][0], first)
         self.assertEqual(len(self.planning_checkpoint()), 1)
 
+    def test_document_runtime_change_does_not_replan_acquisition(self):
+        self.published()
+        self.tick(1)
+        checkpoint = self.planning_checkpoint()
+        acquisitions = self.acquisitions
+        self.config.update(
+            document_download_workers=6,
+            document_max_bytes=256 * 1024 * 1024,
+            document_terminal_retry_max_documents=32,
+            enable_documents=False,
+            documents_per_tick=99,
+        )
+        with (
+            patch.object(module.Pipeline, "initialize", side_effect=AssertionError),
+            patch.object(module.Pipeline, "plan_extended", side_effect=AssertionError),
+        ):
+            result = self.tick(1)
+        self.assertNotEqual(result.get("status"), "planning_only")
+        self.assertEqual(
+            result["planning_cadence"]["reason"], "interval_not_due"
+        )
+        self.assertEqual(self.planning_checkpoint(), checkpoint)
+        self.assertEqual(self.acquisitions, acquisitions + 1)
+
+    def test_matching_legacy_whole_config_checkpoint_migrates_without_plan(self):
+        self.published()
+        effective = dict(self.config)
+        effective.setdefault("requests_per_minute", 240)
+        legacy = module._legacy_planning_config_fingerprint(effective)
+        with sqlite3.connect(self.root / "pipeline.sqlite") as db:
+            db.execute(
+                "INSERT INTO scheduler_state VALUES(?,?)",
+                ("planning_success:" + legacy, self.now),
+            )
+        with (
+            patch.object(module.Pipeline, "initialize", side_effect=AssertionError),
+            patch.object(module.Pipeline, "plan_extended", side_effect=AssertionError),
+        ):
+            result = self.tick(1)
+        self.assertNotEqual(result.get("status"), "planning_only")
+        self.assertEqual(
+            result["planning_cadence"]["checkpoint_migration"],
+            "whole_config_v1_to_planning_config_v2",
+        )
+        checkpoint = self.planning_checkpoint()
+        self.assertEqual(checkpoint[0][1], self.now - 1)
+        self.assertEqual(
+            checkpoint[0][0],
+            "planning_success:"
+            + module._planning_config_fingerprint(effective),
+        )
+
     def test_clock_rollback_and_failed_planning_keep_old_checkpoint(self):
         self.published()
         self.tick(10)
@@ -226,7 +278,7 @@ class PlanningInterval(unittest.TestCase):
                 ).fetchone()[0],
                 17,
             )
-        # Whole effective config is hashed, not persisted in the new status field.
+        # The planning-effective config is hashed, not persisted in the status.
         self.assertNotIn("config", self.saved()["planning_cadence"])
         json.dumps(self.saved())
 

@@ -1468,8 +1468,8 @@ def run_documents(
         or not 0 < max_seconds <= 300
     ):
         raise ValueError("max_seconds must be between 0 and 300")
-    if type(download_workers) is not int or download_workers not in (1, 2, 3, 4):
-        raise ValueError("download_workers must be 1, 2, 3, or 4")
+    if type(download_workers) is not int or not 1 <= download_workers <= 8:
+        raise ValueError("download_workers must be between 1 and 8")
     if (
         type(max_bytes) is not int
         or not DEFAULT_DOCUMENT_MAX_BYTES <= max_bytes <= MAX_DOCUMENT_MAX_BYTES

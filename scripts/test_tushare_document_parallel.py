@@ -173,6 +173,33 @@ class ParallelDocuments(unittest.TestCase):
         self.assertEqual(self.query("SELECT count(*) FROM document_claims")[0][0], 0)
         self.assertEqual(self.query("SELECT count(*) FROM document_attempts")[0][0], 4)
 
+    def test_eight_transfers_respect_the_expanded_bounded_limit(self):
+        self.seed(8)
+        active, peak = 0, 0
+        lock = threading.Lock()
+        barrier = threading.Barrier(8)
+
+        def fetch(url, root, timeout, *, download_only=False):
+            nonlocal active, peak
+            self.assertTrue(download_only)
+            with lock:
+                active += 1
+                peak = max(peak, active)
+            barrier.wait(timeout=2)
+            time.sleep(0.02)
+            with lock:
+                active -= 1
+            return self.download()
+
+        with patch.object(docs, "_download_job", side_effect=fetch):
+            report = docs.run_documents(
+                self.root, max_documents=8, max_seconds=2, download_workers=8
+            )
+        self.assertEqual(peak, 8)
+        self.assertEqual(report["phase_counts"], {"download": 8, "parse": 0})
+        self.assertEqual(self.query("SELECT count(*) FROM document_claims")[0][0], 0)
+        self.assertEqual(self.query("SELECT count(*) FROM document_attempts")[0][0], 8)
+
     def test_fast_result_commits_while_peer_waits_then_peer_retries(self):
         self.seed(2)
         barrier = threading.Barrier(2)
@@ -762,7 +789,7 @@ class ParallelDocuments(unittest.TestCase):
         self.assertLess(time.monotonic() - start, 0.25)
         self.assertLessEqual(result["processed"], 3)
         self.assertEqual(peak, 2)
-        for value in (0, 5, True, 2.0):
+        for value in (0, 9, True, 2.0):
             with self.assertRaises(ValueError):
                 docs.run_documents(self.root, download_workers=value)
 
