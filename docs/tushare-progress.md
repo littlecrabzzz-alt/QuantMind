@@ -1443,3 +1443,12 @@ Mac标准LaunchAgent第276轮下载6063个新增文件，全量校验983029项�
 同一窗口fresh index_daily第23批固定360个CSI指数任务，排除CFX/SI/SW，全部pristine；与前22份唯一manifest/7620任务四层零重叠，plan-only五项false。44.584秒完成360请求，342 done、18 empty、82871行；1062引用/17631521字节通过。两批合计720请求/90.566秒、2100唯一引用/51735732字节，跨批重复0。当前beb5固定版负对照缺全部2100项，证明仍待正常发布，不提前声明Mac可用。
 
 完整材料create-only归档于validation/fund-nav-batch-20260913/batch-10、validation/index-daily-batch-20260913/batch-23及validation/pending-release-20260913/fund-nav10-index23。worker/Beat已恢复，五个服务healthy/restart0/OOM false，QuantDB从未停止；云盘可用326870327296字节，距100GiB线219496144896字节。下一正常发布点为01:30:13，发布后需对同一2100项做云端精确验证、Mac标准镜像、本地精确验证及空Token禁网读取。完整历史、空响应完整性、供应商修订、known_at/PIT和RRG结论继续开放，总目标active。
+
+
+## 2026-09-19 财务 VIP 分页与旧队列压缩生产验收
+
+当前账号实测确认 `income_vip`、`balancesheet_vip`、`cashflow_vip`、`forecast_vip` 的精确季度全市场请求支持 `limit=1000` 和连续 `offset`。20260630 样本的默认响应分别比完整分页少 1604、4187、4155、2 行；代码只对含 `period` 且不含 `ts_code` 的根任务启用该能力，逐股票任务和未实测接口不类推。连续 offset、字段一致、所有页终态及不足 1000 行尾页全部成立后才允许覆盖压缩。
+
+近期生产计划共 296 个根范围，得到 174 个非空完整链和 122 个 `empty_unverified` 根范围；650 页合计 528374 行，最大 offset 11000，分页错误、重复页、缺页和 schema 变化均为 0。下一次自动规划跨已有结果审计 953 页、确认 212 个完整范围、`invalid_pages=0`，将 133173 个同范围同字段的旧 pending 逐股票任务及 23 个旧 `split_pending` 根任务标记为 `superseded`；终态任务不改，attempt/result 全保留。压缩后同轮继续 240 次真实请求，blocked 仍为 871，pending 降至 2693767。
+
+实现、优先规划和可观察性提交均已进入 master、本机运行时和云端工作树；完整 Tushare 套件 1373 项通过、5 项跳过。云端继续仅运行研究缓存 timer，全量写入进程为 0、迁移标记 `source_paused=true`。本地全量历史与文档采集继续；空响应完整性、开放历史链、修订、`known_at` 和 PIT 尚未闭合。机器证据为 `docs/tushare-financial-vip-pagination-live-evidence.json`。

@@ -89,5 +89,120 @@
     "This verifies the current account and one exact quarter; runtime closure checks remain mandatory for every planned scope.",
     "No pagination capability is inferred for fina_indicator_vip or express_vip.",
     "Complete historical revisions, known_at, and PIT availability are not established by pagination."
-  ]
+  ],
+  "production_acceptance": {
+    "accepted_at": "2026-09-18T20:31:20.943025+00:00",
+    "archive_owner": "mac",
+    "deployed_master_code_commits": [
+      "79310fc5",
+      "e9c99af8",
+      "4c000bda"
+    ],
+    "planning_epoch": "20260919",
+    "recent_scope_audit": {
+      "status": "passed",
+      "planned_root_scopes": 296,
+      "complete_nonempty_scopes": 174,
+      "empty_unverified_root_scopes": 122,
+      "pages": 650,
+      "rows": 528374,
+      "audit_sha256": "aee5b1353cbdf8da08bb941c0110fcc8f07431d6b01d5f331bcbf8e1cf080f58",
+      "apis": {
+        "income_vip": {
+          "planned_root_scopes": 96,
+          "complete_nonempty_scopes": 66,
+          "empty_unverified_root_scopes": 30,
+          "pages": 242,
+          "rows": 197358,
+          "min_scope_rows": 1,
+          "max_scope_rows": 10604,
+          "max_offset": 10000,
+          "errors": []
+        },
+        "balancesheet_vip": {
+          "planned_root_scopes": 96,
+          "complete_nonempty_scopes": 36,
+          "empty_unverified_root_scopes": 60,
+          "pages": 135,
+          "rows": 107439,
+          "min_scope_rows": 1,
+          "max_scope_rows": 11187,
+          "max_offset": 11000,
+          "errors": []
+        },
+        "cashflow_vip": {
+          "planned_root_scopes": 96,
+          "complete_nonempty_scopes": 64,
+          "empty_unverified_root_scopes": 32,
+          "pages": 257,
+          "rows": 212928,
+          "min_scope_rows": 1,
+          "max_scope_rows": 10806,
+          "max_offset": 10000,
+          "errors": []
+        },
+        "forecast_vip": {
+          "planned_root_scopes": 8,
+          "complete_nonempty_scopes": 8,
+          "empty_unverified_root_scopes": 0,
+          "pages": 16,
+          "rows": 10649,
+          "min_scope_rows": 181,
+          "max_scope_rows": 3179,
+          "max_offset": 3000,
+          "errors": []
+        }
+      },
+      "audit_file": "docs/tushare-financial-vip-pagination-production-audit.json"
+    },
+    "automatic_compaction": {
+      "status": "compacted",
+      "pagination_pages": 953,
+      "complete_scopes": 212,
+      "open_chains": 265,
+      "invalid_pages": 0,
+      "superseded_leaf_jobs": 133173,
+      "superseded_legacy_roots": 23,
+      "terminal_jobs_action": "unchanged",
+      "attempts_action": "preserved"
+    },
+    "worker_after_compaction": {
+      "status": "completed_cycle",
+      "requests": 240,
+      "pending": 2693767,
+      "blocked": 871,
+      "split_pending": 10390,
+      "permission_blocked": 5847,
+      "free_bytes": 2169381883904
+    },
+    "rate_acceptance": {
+      "mode": "tiered_v1",
+      "account_ceiling_rpm": 500,
+      "financial_vip_fast_lane": true,
+      "unexpected_attempt_statuses": 0,
+      "pagination_errors": 0
+    },
+    "runtime_integrity": {
+      "enabled_sha256": "6b45163b577df25f4e6842501fc95128649c5b129daddf3958224864008eda40",
+      "enabled_mode": "0600",
+      "pipeline_config_sha256": "d1c92a20063797e4ea8c3a16f4baec51f583e381a4008a5c4c9e8129ca3faaf7",
+      "pipeline_config_mode": "0600",
+      "pipeline_sha256": "3831dc733e2bcd13ef2f38e1d0c7838fac8d137571315169e2b92de4e182419e",
+      "structured_contracts_sha256": "ce65587c429fda1973b420b7ca265c01703f68b395473a694bfea03b1bdd2efe",
+      "archive_worker_sha256": "35d156ab5379ffe9b329f22d60d219d9fba6f76ceb852c8f2225413c5fc50185"
+    },
+    "cloud_role_acceptance": {
+      "git_head": "4c000bdaf66988226d20e05372374557eaf225c5",
+      "origin_master": "4c000bdaf66988226d20e05372374557eaf225c5",
+      "research_cache_timer": "active",
+      "full_archive_writer_processes": 0,
+      "source_paused": true
+    },
+    "tests": {
+      "full_tushare_suite": "1373 passed, 5 skipped",
+      "full_suite_seconds": 121.79,
+      "observability_targeted_tests": 22
+    },
+    "continuation": "Full local history and document acquisition remain active; empty roots, open historical chains, revisions, known_at, and PIT completeness remain explicit obligations."
+  }
 }
