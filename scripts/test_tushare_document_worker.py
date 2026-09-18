@@ -181,7 +181,7 @@ class DocumentWorkerTest(unittest.TestCase):
         self.config.update(
             document_worker_max_documents=7,
             document_worker_max_seconds=12.5,
-            document_download_workers=8,
+            document_download_workers=16,
             document_overlap_parse_download=True,
             document_parse_workers=2,
         )
@@ -191,12 +191,12 @@ class DocumentWorkerTest(unittest.TestCase):
             self.root,
             max_documents=7,
             max_seconds=12.5,
-            download_workers=8,
+            download_workers=16,
             overlap_parse_download=True,
             parse_workers=2,
         )
         for key, value in (
-            ("document_download_workers", 9),
+            ("document_download_workers", 17),
             ("document_download_workers", True),
             ("document_worker_max_documents", 2001),
             ("document_worker_max_documents", True),

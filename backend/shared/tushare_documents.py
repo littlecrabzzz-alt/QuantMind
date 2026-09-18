@@ -1650,8 +1650,8 @@ def run_documents(
         or not 0 < max_seconds <= 300
     ):
         raise ValueError("max_seconds must be between 0 and 300")
-    if type(download_workers) is not int or not 1 <= download_workers <= 8:
-        raise ValueError("download_workers must be between 1 and 8")
+    if type(download_workers) is not int or not 1 <= download_workers <= 16:
+        raise ValueError("download_workers must be between 1 and 16")
     if type(overlap_parse_download) is not bool:
         raise ValueError("overlap_parse_download must be a boolean")
     if type(parse_workers) is not int or not 1 <= parse_workers <= 4:

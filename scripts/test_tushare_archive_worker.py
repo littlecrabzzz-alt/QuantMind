@@ -217,14 +217,14 @@ class WorkerStatus(unittest.TestCase):
             worker.document_limits({
                 'document_worker_max_documents': 600,
                 'document_worker_max_seconds': 100,
-                'document_download_workers': 8,
+                'document_download_workers': 16,
                 'document_max_bytes': 256 * 1024 * 1024,
                 'document_terminal_retry_interval_seconds': 3600,
                 'document_terminal_retry_max_documents': 64,
                 'document_overlap_parse_download': True,
                 'document_parse_workers': 2,
             }),
-            (600, 100.0, 8, 256 * 1024 * 1024, 3600.0, 64, True, 2),
+            (600, 100.0, 16, 256 * 1024 * 1024, 3600.0, 64, True, 2),
         )
         for key, value in (
             ('document_worker_max_documents', 0),
@@ -234,7 +234,7 @@ class WorkerStatus(unittest.TestCase):
             ('document_worker_max_seconds', 101),
             ('document_worker_max_seconds', True),
             ('document_download_workers', 0),
-            ('document_download_workers', 9),
+            ('document_download_workers', 17),
             ('document_download_workers', True),
             ('document_max_bytes', 25 * 1024 * 1024 - 1),
             ('document_max_bytes', 256 * 1024 * 1024 + 1),
