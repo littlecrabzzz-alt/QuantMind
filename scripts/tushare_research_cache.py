@@ -25,6 +25,7 @@ from backend.shared.tushare_pipeline import atomic_json, atomic_bytes, manifest_
 DEFAULT_APIS = ('daily', 'index_daily', 'fund_daily', 'adj_factor', 'daily_basic',
                 'index_weight', 'ci_daily', 'sw_daily', 'stock_basic', 'index_basic',
                 'fund_basic', 'trade_cal')
+PREPARE_TIMEOUT_SECONDS = 30 * 60
 FILE = re.compile(r'(?:parquet|observations|schemas)/[a-f0-9]+\.(?:parquet|json)')
 RELEASE = re.compile(r'data-[a-f0-9]{64}')
 
@@ -168,7 +169,9 @@ def pull(root, url, budget, reserve):
         raise ValueError('Refusing acquisition store as cache')
     with (root / '.cache.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        with urlopen(url + '/CURRENT.json', timeout=600) as response:
+        with urlopen(
+            url + '/CURRENT.json', timeout=PREPARE_TIMEOUT_SECONDS
+        ) as response:
             pointer = json.loads(response.read(4096))
         release = pointer['release_id']
         if not RELEASE.fullmatch(release) or pointer['manifest_sha256'] != release[5:]:
