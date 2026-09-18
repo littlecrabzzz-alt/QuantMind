@@ -1204,7 +1204,7 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                     wave_job_seconds = 0.0
                     # Refill each slot within a short burst, then drain parses.
                     wave_job_limit = min(
-                        download_workers * 4, max_documents - processed
+                        download_workers * 8, max_documents - processed
                     )
                     wave_job_count = 0
 
