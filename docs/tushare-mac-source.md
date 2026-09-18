@@ -238,8 +238,8 @@ HTTP worker 和一条预取任务移入独立进程，Token 通过进程初始�
 预算、单下载 20 秒预算、256 MiB 上限、磁盘保护或终态冷却。生产只能从已验收档位
 逐级灰度，并同时比较完成下载数、失败分类、结构化采集请求数、CPU 与磁盘余量。
 `document_overlap_parse_download` 默认关闭。启用时 PDF 解析可与现有有界下载槽重叠；
-`document_parse_workers` 默认 1、上限 2，只有重叠已启用且下载 worker 大于 1 时才允许
-双路解析。每个解析子进程继续独立承受 1 GiB 常驻内存、15 秒 CPU、5000 页和输出上限；
+`document_parse_workers` 默认 1、上限 3，只有重叠已启用且下载 worker 大于 1 时才允许
+多路解析。每个解析子进程继续独立承受 1 GiB 常驻内存、15 秒 CPU、5000 页和输出上限；
 SQLite claim、attempt 和完成事务仍只由主线程写入，每轮阶段总数与截止时间覆盖全部在途
 任务。下载采用四批槽位的有限领先量，避免以扩大未解析积压换取表面吞吐。状态中的
 `parse_workers`、`overlap_parse_download` 和 `parse_download_overlap_seconds` 用于生产

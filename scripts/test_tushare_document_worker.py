@@ -205,7 +205,7 @@ class DocumentWorkerTest(unittest.TestCase):
             ("document_overlap_parse_download", 1),
             ("document_overlap_parse_download", "true"),
             ("document_parse_workers", 0),
-            ("document_parse_workers", 3),
+            ("document_parse_workers", 4),
             ("document_parse_workers", True),
         ):
             self.config = {

@@ -186,13 +186,13 @@ def tushare_documents():
             or not isinstance(overlap, bool)
             or isinstance(parse_workers, bool)
             or not isinstance(parse_workers, int)
-            or not 1 <= parse_workers <= 2
+            or not 1 <= parse_workers <= 3
             or parse_workers > 1 and (not overlap or workers == 1)
         ):
             raise ValueError(
                 "Invalid document worker bounds: 1..2000 stages, "
-                "0..100 seconds, 1..8 downloads, 1..2 parsers; "
-                "two parsers require overlap and downloads > 1"
+                "0..100 seconds, 1..8 downloads, 1..3 parsers; "
+                "multiple parsers require overlap and downloads > 1"
             )
         try:
             report = run_documents(

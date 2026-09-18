@@ -1641,8 +1641,8 @@ def run_documents(
         raise ValueError("download_workers must be between 1 and 8")
     if type(overlap_parse_download) is not bool:
         raise ValueError("overlap_parse_download must be a boolean")
-    if type(parse_workers) is not int or not 1 <= parse_workers <= 2:
-        raise ValueError("parse_workers must be between 1 and 2")
+    if type(parse_workers) is not int or not 1 <= parse_workers <= 3:
+        raise ValueError("parse_workers must be between 1 and 3")
     if parse_workers > 1 and (
         not overlap_parse_download or download_workers == 1
     ):

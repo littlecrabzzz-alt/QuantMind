@@ -282,6 +282,70 @@ class ParallelDocuments(unittest.TestCase):
         self.assertEqual(self.query("SELECT count(*) FROM document_claims")[0][0], 0)
         self.assertEqual(self.query("SELECT count(*) FROM document_attempts")[0][0], 4)
 
+    def test_three_parsers_and_transfers_remain_bounded(self):
+        self.seed(6)
+        with sqlite3.connect(self.root / "documents.sqlite") as db:
+            ids = [
+                row[0]
+                for row in db.execute(
+                    "SELECT id FROM documents ORDER BY id LIMIT 3"
+                ).fetchall()
+            ]
+            db.executemany(
+                "UPDATE documents SET download_status='downloaded',"
+                "parse_status='parse_pending',result=? WHERE id=?",
+                [(json.dumps(self.download()), ident) for ident in ids],
+            )
+            db.commit()
+        active_downloads = 0
+        active_parses = 0
+        peak_downloads = 0
+        peak_parses = 0
+        barrier = threading.Barrier(6)
+        lock = threading.Lock()
+
+        def fetch(url, root, timeout, *, download_only=False):
+            nonlocal active_downloads, peak_downloads
+            self.assertTrue(download_only)
+            with lock:
+                active_downloads += 1
+                peak_downloads = max(peak_downloads, active_downloads)
+            barrier.wait(timeout=2)
+            time.sleep(0.03)
+            with lock:
+                active_downloads -= 1
+            return self.download()
+
+        def parse(root, previous, timeout):
+            nonlocal active_parses, peak_parses
+            with lock:
+                active_parses += 1
+                peak_parses = max(peak_parses, active_parses)
+            barrier.wait(timeout=2)
+            time.sleep(0.03)
+            with lock:
+                active_parses -= 1
+            return {**previous, "parse_status": "parsed"}
+
+        with (
+            patch.object(docs, "_download_job", side_effect=fetch),
+            patch.object(docs, "_parse_saved", side_effect=parse),
+        ):
+            report = docs.run_documents(
+                self.root,
+                max_documents=6,
+                max_seconds=2,
+                download_workers=3,
+                overlap_parse_download=True,
+                parse_workers=3,
+            )
+        self.assertEqual((peak_downloads, peak_parses), (3, 3))
+        self.assertEqual(report["phase_counts"], {"download": 3, "parse": 3})
+        self.assertEqual(report["parse_workers"], 3)
+        self.assertEqual(report["processed"], report["timing"]["finish_db_calls"])
+        self.assertEqual(self.query("SELECT count(*) FROM document_claims")[0][0], 0)
+        self.assertEqual(self.query("SELECT count(*) FROM document_attempts")[0][0], 6)
+
     def test_four_transfers_overlap_with_the_same_durable_fences(self):
         self.seed(4)
         active, peak = 0, 0
@@ -936,7 +1000,7 @@ class ParallelDocuments(unittest.TestCase):
         for value in (0, 1, "true", None):
             with self.assertRaises(ValueError):
                 docs.run_documents(self.root, overlap_parse_download=value)
-        for value in (0, 3, True, 1.5):
+        for value in (0, 4, True, 1.5):
             with self.assertRaises(ValueError):
                 docs.run_documents(self.root, parse_workers=value)
         with self.assertRaises(ValueError):
