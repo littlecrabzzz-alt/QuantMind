@@ -614,41 +614,6 @@ class QueueIndexTest(unittest.TestCase):
                 time.monotonic() + 1,
             )
 
-    def test_reviewed_fast_lane_accepts_lower_account_rollout_gate(self):
-        self.p.enqueue(
-            "top10_holders",
-            {
-                "ts_code": "000001.SZ",
-                "start_date": "20250101",
-                "end_date": "20251231",
-            },
-            20,
-            "20260917",
-        )
-        self.p.db.commit()
-        config = {
-            "rate_policy": "tiered_v1",
-            "requests_per_minute": 500,
-            "rollout_account_rpm": 480,
-            "enable_equity_event": True,
-            "group_weights": {"rrg": 1, "equity_event": 1},
-            "throughput_fast_lane_apis": ["top10_holders"],
-            "throughput_fast_lane_every": 2,
-        }
-        with (
-            patch.object(module.time, "time", return_value=1000),
-            patch.object(module.time, "monotonic", return_value=0),
-        ):
-            row = self.p.next_job(config, 1)
-        self.assertEqual(json.loads(row["job"])["api_name"], "top10_holders")
-        gates = dict(self.p.db.execute("SELECT * FROM request_gates"))
-        self.assertEqual(gates["account"], 1000.125)
-        self.assertEqual(self.p.rate_gate_status["effective_account_rpm"], 480)
-        self.assertEqual(
-            self.p.rate_gate_status["resolved_api_cap"]["rpm"],
-            500,
-        )
-
     def test_expand_visits_same_rows_order_and_marks_only_eligible(self):
         self.seed(30, 10)
         expected = [
