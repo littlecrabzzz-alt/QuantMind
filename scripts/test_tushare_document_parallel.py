@@ -311,7 +311,7 @@ class ParallelDocuments(unittest.TestCase):
         )
         self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 3)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 2
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 3
         )
         db.close()
 
@@ -373,6 +373,19 @@ class ParallelDocuments(unittest.TestCase):
         detail = [item[3] for item in plan]
         self.assertTrue(any("document_pending_claim_order" in item for item in detail))
         self.assertFalse(any("TEMP B-TREE" in item for item in detail))
+        parse_plan = db.execute(
+            "EXPLAIN QUERY PLAN SELECT * FROM documents INDEXED BY "
+            "document_parse_claim_order WHERE download_status='downloaded' "
+            "AND parse_status IN ('parse_pending','parse_unavailable',"
+            "'parse_failed','parse_timeout') AND parse_tries<5 "
+            "AND parse_retry_after<=? AND NOT EXISTS(SELECT 1 FROM "
+            "document_claims c WHERE c.document_id=documents.id) "
+            "ORDER BY id LIMIT ?",
+            (now, 2),
+        ).fetchall()
+        parse_detail = [item[3] for item in parse_plan]
+        self.assertTrue(any("document_parse_claim_order" in item for item in parse_detail))
+        self.assertFalse(any("TEMP B-TREE" in item for item in parse_detail))
         db.close()
 
     def test_claim_v1_migration_is_transactional_and_observable(self):
@@ -380,6 +393,7 @@ class ParallelDocuments(unittest.TestCase):
         docs._claims_setup(db)
         with db:
             db.execute("DROP INDEX document_pending_claim_order")
+            db.execute("DROP INDEX document_parse_claim_order")
             db.execute("UPDATE document_claim_meta SET version=1")
         db.set_authorizer(
             lambda action, *_: (
@@ -403,7 +417,7 @@ class ParallelDocuments(unittest.TestCase):
         timing = {}
         docs._claims_setup(db, timing)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 2
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 3
         )
         self.assertTrue(
             db.execute(
@@ -411,9 +425,52 @@ class ParallelDocuments(unittest.TestCase):
                 "WHERE type='index' AND name='document_pending_claim_order'"
             ).fetchone()
         )
+        self.assertTrue(
+            db.execute(
+                "SELECT 1 FROM sqlite_master "
+                "WHERE type='index' AND name='document_parse_claim_order'"
+            ).fetchone()
+        )
         self.assertEqual(timing["setup_db_calls"], 1)
         self.assertGreaterEqual(
             timing["setup_db_total_seconds"], timing["setup_db_wait_seconds"]
+        )
+        db.close()
+
+    def test_claim_v2_migration_adds_parse_order_atomically(self):
+        db = docs._document_db(self.root)
+        docs._claims_setup(db)
+        with db:
+            db.execute("DROP INDEX document_parse_claim_order")
+            db.execute("UPDATE document_claim_meta SET version=2")
+        db.set_authorizer(
+            lambda action, *_: (
+                sqlite3.SQLITE_DENY
+                if action == sqlite3.SQLITE_CREATE_INDEX
+                else sqlite3.SQLITE_OK
+            )
+        )
+        with self.assertRaises(sqlite3.DatabaseError):
+            docs._claims_setup(db)
+        db.set_authorizer(lambda *_: sqlite3.SQLITE_OK)
+        self.assertEqual(
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 2
+        )
+        self.assertFalse(
+            db.execute(
+                "SELECT 1 FROM sqlite_master "
+                "WHERE type='index' AND name='document_parse_claim_order'"
+            ).fetchone()
+        )
+        docs._claims_setup(db)
+        self.assertEqual(
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 3
+        )
+        self.assertTrue(
+            db.execute(
+                "SELECT 1 FROM sqlite_master "
+                "WHERE type='index' AND name='document_parse_claim_order'"
+            ).fetchone()
         )
         db.close()
 
