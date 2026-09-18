@@ -163,6 +163,7 @@ MARKET_CONTRACTS["fund_nav"].update(
     },
     pagination_live_verified=True,
     pagination_required_param="nav_date",
+    recent_planner_version=1,
     pagination_note=(
         "The public page documents nav_date but omits pagination parameters. "
         "A production-authority probe on 2026-09-18 verified stable 1,000-row "
@@ -277,6 +278,14 @@ def iter_market_jobs(config, today, identifiers=None):
             yield job(api, {})
     if "fund_manager" in enabled:
         yield job("fund_manager", {"offset": 0, "limit": 1000})
+    if "fund_nav" in enabled and fund_nav_date_pagination and recent <= end:
+        day = end
+        while day >= recent:
+            yield job(
+                "fund_nav",
+                {"nav_date": day.strftime("%Y%m%d")},
+            )
+            day -= timedelta(days=1)
     if "index_classify" in enabled:
         for src in ("SW2014", "SW2021"):
             for level in ("L1", "L2", "L3"):
@@ -309,15 +318,6 @@ def iter_market_jobs(config, today, identifiers=None):
         for api, family in (("fund_nav", "funds"), ("cb_share", "bonds")):
             if api in enabled:
                 if api == "fund_nav" and phase == "recent" and fund_nav_date_pagination:
-                    day = right
-                    while day >= left:
-                        yield job(
-                            api,
-                            {"nav_date": day.strftime("%Y%m%d")},
-                            priority,
-                            version,
-                        )
-                        day -= timedelta(days=1)
                     continue
                 for code in codes[family]:
                     # One full interval; the shared collector bisects capped windows.

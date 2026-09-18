@@ -106,6 +106,20 @@ class MarketPlanning(unittest.TestCase):
             },
         )
 
+        ordered = list(
+            iter_market_jobs(
+                {
+                    "history_start": "20240227",
+                    "market_apis": ["fund_nav", "fund_div"],
+                    "fund_nav_recent_date_pagination": True,
+                },
+                date(2024, 3, 12),
+                {"funds": [f"{number:06d}.OF" for number in range(1000)]},
+            )
+        )
+        self.assertTrue(all(job["api_name"] == "fund_nav" for job in ordered[:7]))
+        self.assertEqual(ordered[7]["api_name"], "fund_div")
+
     def test_fund_nav_recent_date_pagination_flag_must_be_boolean(self):
         with self.assertRaisesRegex(ValueError, "must be boolean"):
             list(
