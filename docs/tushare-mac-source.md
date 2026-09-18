@@ -241,6 +241,11 @@ worker 只重叠已合法预留的网络/落盘时间，不放宽分钟频次、
 并发池按最先完成的响应回收并补入下一条已合法预留的请求，避免慢队头让其他已完成
 响应和空闲槽等待；提交顺序可以变化，但每个 response 的 attempt/job 事务仍由主进程
 逐条完成。状态中的 `completion_order=first_completed` 用于核对实际运行策略。
+本机 `pipeline.sqlite` 与 `documents.sqlite` 默认使用 `WAL + FULL`：WAL 减少高频小事务
+反复创建和删除回滚日志的成本，FULL 保留请求前 gate 和响应后结果提交的断电耐久边界。
+迁移到不支持 SQLite WAL 共享内存语义的 NAS 文件系统前，必须先停唯一写入者并验证挂载；
+需要回退时在节点私有环境设置 `QM_TUSHARE_SQLITE_JOURNAL_MODE=DELETE`，不能在进程运行中
+切换，也不能用降低 `synchronous` 换取吞吐。
 若 `account_gate_requested_sleep` 与 `account_gate_sleep` 继续显示同进程文档线程阻塞
 限速调度，可将 `document_worker_execution` 从默认 `thread` 灰度设为 `process`。
 它不改变文档锁、任务数据库、下载并发数或采集/发布顺序，只隔离 Python 调度；worker

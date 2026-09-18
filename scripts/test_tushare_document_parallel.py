@@ -867,7 +867,7 @@ class ParallelDocuments(unittest.TestCase):
         )
         db.close()
 
-    def test_short_audit_reader_uses_existing_busy_timeout(self):
+    def test_wal_reader_does_not_delay_claim_writer(self):
         self.seed(1)
         db = docs._document_db(self.root, timeout=0.2)
         docs._claims_setup(db)
@@ -876,15 +876,10 @@ class ParallelDocuments(unittest.TestCase):
         )
         reader.execute("BEGIN")
         reader.execute("SELECT count(*) FROM documents").fetchone()
-        release = self.release_later(reader)
         timing = {}
         jobs = docs._claim_documents(db, "owner", "download", 1, 20, timing)
-        release.join()
         self.assertEqual(len(jobs), 1)
-        self.assertGreaterEqual(timing["claim_db_total_seconds"], 0.01)
-        self.assertLess(
-            timing["claim_db_wait_seconds"], timing["claim_db_total_seconds"]
-        )
+        self.assertLess(timing["claim_db_wait_seconds"], 0.01)
         self.assertEqual(
             db.execute(
                 "SELECT count(*) FROM document_claims WHERE owner='owner'"
@@ -933,8 +928,7 @@ class ParallelDocuments(unittest.TestCase):
         db = docs._document_db(self.root, timeout=0.02)
         docs._claims_setup(db)
         reader = sqlite3.connect(self.root / "documents.sqlite")
-        reader.execute("BEGIN")
-        reader.execute("SELECT count(*) FROM documents").fetchone()
+        reader.execute("BEGIN IMMEDIATE")
         timing = {}
         with self.assertRaisesRegex(sqlite3.OperationalError, "database is locked"):
             docs._claim_documents(db, "owner", "download", 1, 20, timing)
@@ -976,8 +970,7 @@ class ParallelDocuments(unittest.TestCase):
         docs._claims_setup(db)
         job = docs._claim_documents(db, "owner", "download", 1, 20)[0]
         reader = sqlite3.connect(self.root / "documents.sqlite")
-        reader.execute("BEGIN")
-        reader.execute("SELECT count(*) FROM documents").fetchone()
+        reader.execute("BEGIN IMMEDIATE")
         result = {
             "status": "downloaded",
             "mime": "application/pdf",

@@ -691,9 +691,22 @@ def _document_db(root, *, timeout=10, deadline=None):
     if path.is_symlink():
         raise DocumentError("unsafe_storage_path")
     db = sqlite3.connect(path, timeout=timeout)
-    if deadline is not None:
-        db.set_progress_handler(lambda: int(time.monotonic() >= deadline), 1000)
     try:
+        requested_journal = os.getenv(
+            "QM_TUSHARE_SQLITE_JOURNAL_MODE", "WAL"
+        ).strip().upper()
+        if requested_journal not in ("WAL", "DELETE"):
+            raise ValueError("Invalid Tushare SQLite journal mode")
+        journal = db.execute("PRAGMA journal_mode").fetchone()[0]
+        if str(journal).upper() != requested_journal:
+            journal = db.execute(
+                "PRAGMA journal_mode=" + requested_journal
+            ).fetchone()[0]
+        db.execute("PRAGMA synchronous=FULL")
+        if str(journal).upper() != requested_journal:
+            raise ValueError("Tushare SQLite journal mode unavailable")
+        if deadline is not None:
+            db.set_progress_handler(lambda: int(time.monotonic() >= deadline), 1000)
         db.row_factory = sqlite3.Row
         version = db.execute("PRAGMA user_version").fetchone()[0]
         if version not in (0, 1, 2, 3):
