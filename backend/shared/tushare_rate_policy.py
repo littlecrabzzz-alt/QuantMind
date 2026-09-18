@@ -25,7 +25,7 @@ PAGE_RPM = {
 }
 # Explicit category audit, never the complement of the registered API set.
 # docs/tushare-general-rate-refinement.json SHA256
-# 4ce2c4d26aa3ca5ed77fd1ee624439bc8223aaad7914b895c1bb93f15be1d7eb
+# 507749f2dd03ec4ed650c500a3fa34f9e86b8e420023bc64cbfc84d86bddc3a4
 REGULAR_APIS = frozenset(
     [
         "adj_factor",
@@ -89,8 +89,11 @@ REGULAR_APIS = frozenset(
         "fut_daily_adj",
         "fut_holding",
         "fut_index_daily",
+        "fut_inv_weekly",
+        "fut_rcpt_mat",
         "fut_mapping",
         "fut_settle",
+        "fut_trade_param",
         "fut_trade_cal",
         "fut_weekly_detail",
         "fut_wsr",
@@ -148,6 +151,7 @@ REGULAR_APIS = frozenset(
         "stk_limit",
         "stk_managers",
         "stk_rewards",
+        "stk_seasoned",
         "stk_shock",
         "stk_week_month_adj",
         "stk_weekly_monthly",
@@ -174,6 +178,7 @@ REGULAR_APIS = frozenset(
         "us_trltr",
         "us_trycr",
         "us_tycr",
+        "vix_index",
         "weekly",
         "wz_index",
     ]

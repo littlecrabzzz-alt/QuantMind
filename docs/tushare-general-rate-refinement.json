@@ -4583,5 +4583,22 @@
     "8100 is conditional on the user-declared tranche dates and no other balance change. Expiry clock/timezone/renewal not inspected.",
     "Special300 eligibility requires review when the 10000 tier ends; null at8100 means no rate authorization from this audit, not necessarily no supplier access.",
     "Official category and leaf statements are dated evidence, not permanent API rights."
-  ]
+  ],
+  "catalog_delta_review": {
+    "reviewed_at": "2026-09-19",
+    "catalog_index_sha256": "73876a0cd68fc2df57cdce89088cf81b6d19365af5ca83169e96cc7a69aa0839",
+    "regular_500_added": [
+      "fut_inv_weekly",
+      "fut_rcpt_mat",
+      "fut_trade_param",
+      "stk_seasoned",
+      "vix_index"
+    ],
+    "independent_permission_excluded": [
+      "etf_auction",
+      "rt_hk_k"
+    ],
+    "permission_grant": false,
+    "source_evidence": "docs/tushare-catalog-refresh-20260919.json"
+  }
 }

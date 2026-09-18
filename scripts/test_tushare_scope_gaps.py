@@ -92,7 +92,7 @@ class ScopeAuditTests(unittest.TestCase):
             result = json.loads(output.read_bytes())
             source = json.loads((ROOT / "config/tushare-coverage-ledger.json").read_bytes())
             self.assertEqual(result["source_ledger"], source)
-            self.assertEqual(result["counts"]["baseline_pages"], 263)
+            self.assertEqual(result["counts"]["baseline_pages"], 270)
             self.assertEqual(result["registered_without_reader"], [])
             self.assertEqual(result["registered_outside_named_scope"], [])
 
