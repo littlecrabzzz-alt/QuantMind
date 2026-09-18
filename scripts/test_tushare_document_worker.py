@@ -169,6 +169,7 @@ class DocumentWorkerTest(unittest.TestCase):
             max_seconds=90,
             download_workers=1,
             overlap_parse_download=False,
+            parse_workers=1,
         )
         self.assertEqual(
             json.loads((self.root / "document-worker-status.json").read_bytes()), result
@@ -182,6 +183,7 @@ class DocumentWorkerTest(unittest.TestCase):
             document_worker_max_seconds=12.5,
             document_download_workers=8,
             document_overlap_parse_download=True,
+            document_parse_workers=2,
         )
         self.save_config()
         self.tasks.tushare_documents()
@@ -191,6 +193,7 @@ class DocumentWorkerTest(unittest.TestCase):
             max_seconds=12.5,
             download_workers=8,
             overlap_parse_download=True,
+            parse_workers=2,
         )
         for key, value in (
             ("document_download_workers", 9),
@@ -201,11 +204,30 @@ class DocumentWorkerTest(unittest.TestCase):
             ("document_worker_max_seconds", float("nan")),
             ("document_overlap_parse_download", 1),
             ("document_overlap_parse_download", "true"),
+            ("document_parse_workers", 0),
+            ("document_parse_workers", 3),
+            ("document_parse_workers", True),
         ):
             self.config = {
                 "enable_documents": True,
                 "document_execution": "worker",
                 key: value,
+            }
+            self.save_config()
+            with self.assertRaises(ValueError):
+                self.tasks.tushare_documents()
+        for config in (
+            {"document_parse_workers": 2},
+            {
+                "document_parse_workers": 2,
+                "document_overlap_parse_download": True,
+                "document_download_workers": 1,
+            },
+        ):
+            self.config = {
+                "enable_documents": True,
+                "document_execution": "worker",
+                **config,
             }
             self.save_config()
             with self.assertRaises(ValueError):

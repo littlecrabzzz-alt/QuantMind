@@ -93,6 +93,7 @@ class PlanningInterval(unittest.TestCase):
         acquisitions = self.acquisitions
         self.config.update(
             document_download_workers=6,
+            document_parse_workers=2,
             document_max_bytes=256 * 1024 * 1024,
             document_terminal_retry_max_documents=32,
             enable_documents=False,

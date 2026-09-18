@@ -1446,36 +1446,41 @@ def _run_documents_overlapped(
     max_documents,
     deadline,
     download_workers,
+    parse_workers,
     max_bytes,
     phase_counts,
     timing,
 ):
-    """Overlap bounded transfers with one parser; keep every DB write here."""
+    """Overlap bounded transfers/parsers; keep every DB write here."""
     processed = 0
     download_futures = {}
-    parse_future = None
-    parse_job = None
+    parse_futures = {}
     parse_exhausted = False
     download_exhausted = False
     download_admitted = 0
+    parse_admitted = 0
     parse_completed = 0
     download_window = download_workers * 4
     overlap_seconds = 0.0
     download_active_seconds = 0.0
+    parse_active_seconds = 0.0
     state_started = time.monotonic()
 
     def account_state():
         nonlocal state_started, overlap_seconds, download_active_seconds
+        nonlocal parse_active_seconds
         now = time.monotonic()
         elapsed = now - state_started
-        if parse_future is not None and download_futures:
+        if parse_futures and download_futures:
             overlap_seconds += elapsed
         if download_futures:
             download_active_seconds += elapsed
+        if parse_futures:
+            parse_active_seconds += elapsed
         state_started = now
 
     def reserved():
-        return len(download_futures) + (parse_future is not None)
+        return len(download_futures) + len(parse_futures)
 
     def transfer(job):
         budget = min(20, max(0.001, deadline - time.monotonic()))
@@ -1500,26 +1505,26 @@ def _run_documents_overlapped(
 
     with (
         ThreadPoolExecutor(max_workers=download_workers) as download_pool,
-        ThreadPoolExecutor(max_workers=1) as parse_pool,
+        ThreadPoolExecutor(max_workers=parse_workers) as parse_pool,
     ):
 
-        def start_parse():
-            nonlocal parse_future, parse_job, parse_exhausted
-            if (
-                parse_future is not None
-                or parse_exhausted
-                or processed + reserved() >= max_documents
-                or time.monotonic() >= deadline
+        def fill_parses():
+            nonlocal parse_exhausted, parse_admitted
+            while (
+                not parse_exhausted
+                and len(parse_futures) < parse_workers
+                and processed + reserved() < max_documents
+                and time.monotonic() < deadline
             ):
-                return
-            remaining = deadline - time.monotonic()
-            jobs = _claim_documents(db, owner, "parse", 1, remaining, timing)
-            if not jobs:
-                parse_exhausted = True
-                return
-            account_state()
-            parse_job = jobs[0]
-            parse_future = parse_pool.submit(parse, parse_job)
+                remaining = deadline - time.monotonic()
+                jobs = _claim_documents(db, owner, "parse", 1, remaining, timing)
+                if not jobs:
+                    parse_exhausted = True
+                    return
+                account_state()
+                job = jobs[0]
+                parse_futures[parse_pool.submit(parse, job)] = job
+                parse_admitted += 1
 
         def fill_downloads():
             nonlocal download_exhausted, download_admitted
@@ -1548,19 +1553,15 @@ def _run_documents_overlapped(
                 if download_admitted > download_workers:
                     timing["download_refills"] += 1
 
-        start_parse()
+        fill_parses()
         fill_downloads()
-        while parse_future is not None or download_futures:
-            futures = set(download_futures)
-            if parse_future is not None:
-                futures.add(parse_future)
+        while parse_futures or download_futures:
+            futures = set(download_futures) | set(parse_futures)
             completed, _ = wait(futures, return_when=FIRST_COMPLETED)
             for future in completed:
                 account_state()
-                if future is parse_future:
-                    job = parse_job
-                    parse_future = None
-                    parse_job = None
+                if future in parse_futures:
+                    job = parse_futures.pop(future)
                     result, job_error, job_seconds = future.result()
                     if job_error is not None:
                         result = _document_failure(job, "parse", job_error)
@@ -1582,11 +1583,18 @@ def _run_documents_overlapped(
                     processed += 1
                     # A successful transfer may have created a parseable row.
                     parse_exhausted = False
-            start_parse()
+            fill_parses()
             fill_downloads()
         account_state()
 
     timing["parse_download_overlap_seconds"] += overlap_seconds
+    if parse_admitted:
+        timing["parse_active_seconds"] += parse_active_seconds
+        parse_capacity = min(parse_workers, parse_admitted) * parse_active_seconds
+        timing["parse_slot_capacity_seconds"] += parse_capacity
+        timing["parse_slot_idle_seconds"] += max(
+            0.0, parse_capacity - timing["parse_job_seconds"]
+        )
     if download_admitted:
         timing["download_waves"] += 1
         timing["download_wave_seconds"] += download_active_seconds
@@ -1608,6 +1616,7 @@ def run_documents(
     terminal_retry_interval_seconds=86400,
     terminal_retry_max_documents=16,
     overlap_parse_download=False,
+    parse_workers=1,
 ):
     """Advance bounded phases with optional transfer/parser overlap.
 
@@ -1632,6 +1641,14 @@ def run_documents(
         raise ValueError("download_workers must be between 1 and 8")
     if type(overlap_parse_download) is not bool:
         raise ValueError("overlap_parse_download must be a boolean")
+    if type(parse_workers) is not int or not 1 <= parse_workers <= 2:
+        raise ValueError("parse_workers must be between 1 and 2")
+    if parse_workers > 1 and (
+        not overlap_parse_download or download_workers == 1
+    ):
+        raise ValueError(
+            "parallel parsers require transfer/parser overlap and downloads > 1"
+        )
     if (
         type(max_bytes) is not int
         or not DEFAULT_DOCUMENT_MAX_BYTES <= max_bytes <= MAX_DOCUMENT_MAX_BYTES
@@ -1681,6 +1698,9 @@ def run_documents(
         "download_slot_idle_seconds": 0.0,
         "parse_jobs": 0,
         "parse_job_seconds": 0.0,
+        "parse_active_seconds": 0.0,
+        "parse_slot_capacity_seconds": 0.0,
+        "parse_slot_idle_seconds": 0.0,
         "parse_download_overlap_seconds": 0.0,
     }
     try:
@@ -1709,6 +1729,7 @@ def run_documents(
                     max_documents,
                     deadline,
                     download_workers,
+                    parse_workers,
                     max_bytes,
                     phase_counts,
                     timing,
@@ -1850,6 +1871,7 @@ def run_documents(
             "processed": processed,
             "counts": _document_counts(db),
             "download_workers": download_workers,
+            "parse_workers": parse_workers,
             "overlap_parse_download": overlap_parse_download,
             "max_bytes": max_bytes,
             "terminal_recovery": terminal_recovery,

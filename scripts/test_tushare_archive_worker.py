@@ -33,6 +33,7 @@ class WorkerStatus(unittest.TestCase):
                         'terminal_retry_interval_seconds': 86400.0,
                         'terminal_retry_max_documents': 16,
                         'overlap_parse_download': False,
+                        'parse_workers': 1,
                     },
                 )
                 started.set()
@@ -81,7 +82,7 @@ class WorkerStatus(unittest.TestCase):
     def test_document_limits_match_native_production_bounds(self):
         self.assertEqual(
             worker.document_limits({}),
-            (100, 90.0, 1, 25 * 1024 * 1024, 86400.0, 16, False),
+            (100, 90.0, 1, 25 * 1024 * 1024, 86400.0, 16, False, 1),
         )
         self.assertEqual(
             worker.document_limits({
@@ -92,8 +93,9 @@ class WorkerStatus(unittest.TestCase):
                 'document_terminal_retry_interval_seconds': 3600,
                 'document_terminal_retry_max_documents': 64,
                 'document_overlap_parse_download': True,
+                'document_parse_workers': 2,
             }),
-            (600, 100.0, 8, 256 * 1024 * 1024, 3600.0, 64, True),
+            (600, 100.0, 8, 256 * 1024 * 1024, 3600.0, 64, True, 2),
         )
         for key, value in (
             ('document_worker_max_documents', 0),
@@ -116,9 +118,20 @@ class WorkerStatus(unittest.TestCase):
             ('document_terminal_retry_max_documents', True),
             ('document_overlap_parse_download', 1),
             ('document_overlap_parse_download', 'true'),
+            ('document_parse_workers', 0),
+            ('document_parse_workers', 3),
+            ('document_parse_workers', True),
         ):
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
                 worker.document_limits({key: value})
+        with self.assertRaises(ValueError):
+            worker.document_limits({'document_parse_workers': 2})
+        with self.assertRaises(ValueError):
+            worker.document_limits({
+                'document_parse_workers': 2,
+                'document_overlap_parse_download': True,
+                'document_download_workers': 1,
+            })
 
     def test_document_process_executes_with_task_local_database(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -136,6 +149,7 @@ class WorkerStatus(unittest.TestCase):
                     86400.0,
                     16,
                     False,
+                    1,
                 ).result(timeout=10)
             self.assertEqual(report['status'], 'ok')
             self.assertEqual(report['processed'], 0)
@@ -166,6 +180,7 @@ class WorkerStatus(unittest.TestCase):
                         'terminal_retry_interval_seconds': 86400.0,
                         'terminal_retry_max_documents': 16,
                         'overlap_parse_download': False,
+                        'parse_workers': 1,
                     },
                 )
                 return {'status': 'ok', 'processed': 100}

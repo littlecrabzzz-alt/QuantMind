@@ -47,6 +47,7 @@ def document_limits(config):
     retry_interval = config.get('document_terminal_retry_interval_seconds', 86400)
     retry_max = config.get('document_terminal_retry_max_documents', 16)
     overlap = config.get('document_overlap_parse_download', False)
+    parse_workers = config.get('document_parse_workers', 1)
     if (
         isinstance(count, bool)
         or not isinstance(count, int)
@@ -67,15 +68,20 @@ def document_limits(config):
         or not isinstance(retry_max, int)
         or not 0 <= retry_max <= 64
         or not isinstance(overlap, bool)
+        or isinstance(parse_workers, bool)
+        or not isinstance(parse_workers, int)
+        or not 1 <= parse_workers <= 2
+        or parse_workers > 1 and (not overlap or workers == 1)
     ):
         raise ValueError(
             'Invalid document worker bounds: 1..1000 stages, '
             '0..100 seconds, 1..8 downloads, 25..256 MiB, '
-            '3600..31536000 retry seconds, 0..64 retries'
+            '3600..31536000 retry seconds, 0..64 retries, 1..2 parsers; '
+            'two parsers require overlap and downloads > 1'
         )
     return (
         count, float(seconds), workers, max_bytes, float(retry_interval), retry_max,
-        overlap,
+        overlap, parse_workers,
     )
 
 
@@ -88,6 +94,7 @@ def execute_documents(
     terminal_retry_interval_seconds,
     terminal_retry_max_documents,
     overlap_parse_download,
+    parse_workers,
 ):
     from backend.shared.tushare_documents import run_documents
     return run_documents(
@@ -99,6 +106,7 @@ def execute_documents(
         terminal_retry_interval_seconds=terminal_retry_interval_seconds,
         terminal_retry_max_documents=terminal_retry_max_documents,
         overlap_parse_download=overlap_parse_download,
+        parse_workers=parse_workers,
     )
 
 
@@ -161,6 +169,7 @@ def main():
                                     terminal_retry_interval_seconds=limits[4],
                                     terminal_retry_max_documents=limits[5],
                                     overlap_parse_download=limits[6],
+                                    parse_workers=limits[7],
                                 )
                         report['acquisition'] = tick(
                             before_nonpublication_work=start_documents
