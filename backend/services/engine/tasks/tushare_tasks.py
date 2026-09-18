@@ -182,7 +182,7 @@ def tushare_documents():
             or not 0 < seconds <= 100
             or isinstance(workers, bool)
             or not isinstance(workers, int)
-            or not 1 <= workers <= 8
+            or not 1 <= workers <= 16
             or not isinstance(overlap, bool)
             or isinstance(parse_workers, bool)
             or not isinstance(parse_workers, int)
@@ -191,7 +191,7 @@ def tushare_documents():
         ):
             raise ValueError(
                 "Invalid document worker bounds: 1..2000 stages, "
-                "0..100 seconds, 1..8 downloads, 1..4 parsers; "
+                "0..100 seconds, 1..16 downloads, 1..4 parsers; "
                 "multiple parsers require overlap and downloads > 1"
             )
         try:

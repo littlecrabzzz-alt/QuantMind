@@ -437,11 +437,11 @@ class ParallelDocuments(unittest.TestCase):
         self.assertEqual(self.query("SELECT count(*) FROM document_claims")[0][0], 0)
         self.assertEqual(self.query("SELECT count(*) FROM document_attempts")[0][0], 4)
 
-    def test_eight_transfers_respect_the_expanded_bounded_limit(self):
-        self.seed(8)
+    def test_sixteen_transfers_respect_the_expanded_bounded_limit(self):
+        self.seed(16)
         active, peak = 0, 0
         lock = threading.Lock()
-        barrier = threading.Barrier(8)
+        barrier = threading.Barrier(16)
 
         def fetch(url, root, timeout, *, download_only=False):
             nonlocal active, peak
@@ -457,12 +457,12 @@ class ParallelDocuments(unittest.TestCase):
 
         with patch.object(docs, "_download_job", side_effect=fetch):
             report = docs.run_documents(
-                self.root, max_documents=8, max_seconds=2, download_workers=8
+                self.root, max_documents=16, max_seconds=2, download_workers=16
             )
-        self.assertEqual(peak, 8)
-        self.assertEqual(report["phase_counts"], {"download": 8, "parse": 0})
+        self.assertEqual(peak, 16)
+        self.assertEqual(report["phase_counts"], {"download": 16, "parse": 0})
         self.assertEqual(self.query("SELECT count(*) FROM document_claims")[0][0], 0)
-        self.assertEqual(self.query("SELECT count(*) FROM document_attempts")[0][0], 8)
+        self.assertEqual(self.query("SELECT count(*) FROM document_attempts")[0][0], 16)
 
     def test_fast_result_commits_while_peer_waits_then_peer_retries(self):
         self.seed(2)
@@ -1051,7 +1051,7 @@ class ParallelDocuments(unittest.TestCase):
         self.assertLessEqual(result["processed"], 3)
         self.assertEqual(result["processed"], result["timing"]["finish_db_calls"])
         self.assertEqual(peak, 2)
-        for value in (0, 9, True, 2.0):
+        for value in (0, 17, True, 2.0):
             with self.assertRaises(ValueError):
                 docs.run_documents(self.root, download_workers=value)
         for value in (0, 1, "true", None):
