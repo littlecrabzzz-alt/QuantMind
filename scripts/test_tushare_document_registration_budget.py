@@ -202,11 +202,15 @@ class RegistrationBudget(unittest.TestCase):
             self.p.register_documents(max_records=20_000)["status"],
             "bounded_batch_complete",
         )
+        self.assertEqual(
+            self.p.register_documents(max_records=100_000)["budget"]["chunk_records"],
+            1_000,
+        )
         for value in (-1, 1001, True, 1.5):
             with self.subTest(max_observations=value):
                 with self.assertRaisesRegex(ValueError, "observation limit"):
                     self.p.register_documents(max_observations=value)
-        for value in (0, 20_001, True, 1.5):
+        for value in (0, 100_001, True, 1.5):
             with self.subTest(max_records=value):
                 with self.assertRaisesRegex(ValueError, "record limit"):
                     self.p.register_documents(max_records=value)
@@ -214,6 +218,26 @@ class RegistrationBudget(unittest.TestCase):
             with self.subTest(max_seconds=value):
                 with self.assertRaisesRegex(ValueError, "registration budget"):
                     self.p.register_documents(max_seconds=value)
+
+    def test_registration_commits_at_most_one_thousand_records_per_chunk(self):
+        self.seed(
+            [
+                {"url": f"https://example.com/{n}.pdf", "title": f"source {n}"}
+                for n in range(1205)
+            ]
+        )
+        original = docs.enqueue_documents
+        chunks = []
+
+        def capture_chunk(*args, **kwargs):
+            chunks.append(len(args[3]))
+            return original(*args, **kwargs)
+
+        with patch.object(docs, "enqueue_documents", side_effect=capture_chunk):
+            result = self.p.register_documents(max_records=20_000)
+        self.assertEqual(result["processed_records"], 1205)
+        self.assertEqual(result["observations"], 1)
+        self.assertEqual(chunks, [1000, 205])
 
     def test_busy_writer_defers_in_under_one_second_and_restarts(self):
         rowid, _ = self.seed([{"url": "https://example.com/a.pdf"}])

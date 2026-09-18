@@ -196,7 +196,8 @@ REPLACEMENT_GAPS = frozenset(
     (RANGE_REPLACEMENT_GAP, INDEX_PERIOD_REPLACEMENT_GAP)
 )
 ROOT = Path(os.getenv("QM_TUSHARE_ARCHIVE_ROOT", "/data/tushare"))
-MAX_DOCUMENT_REGISTRATION_RECORDS = 20_000
+MAX_DOCUMENT_REGISTRATION_RECORDS = 100_000
+DOCUMENT_REGISTRATION_CHUNK_RECORDS = 1_000
 CONTRACTS = {
     api: (spec["row_cap"], spec["required_fields"])
     for api, spec in RRG_CONTRACTS.items()
@@ -5265,6 +5266,7 @@ class Pipeline:
                 "max_observations": max_observations,
                 "max_records": max_records,
                 "max_seconds": max_seconds,
+                "chunk_records": DOCUMENT_REGISTRATION_CHUNK_RECORDS,
             },
             "observations": 0,
             "processed_records": 0,
@@ -5380,7 +5382,10 @@ class Pipeline:
                         return report
                     chunk = records[
                         offset : offset
-                        + min(100, max_records - report["processed_records"])
+                        + min(
+                            DOCUMENT_REGISTRATION_CHUNK_RECORDS,
+                            max_records - report["processed_records"],
+                        )
                     ]
                     done = enqueue_documents(
                         self.root,

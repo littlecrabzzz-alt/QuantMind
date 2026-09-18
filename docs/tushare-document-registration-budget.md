@@ -23,7 +23,8 @@ existing count-only return and transaction behavior.
 
 `Pipeline.register_documents(max_observations=20, *, max_records=500,
 max_seconds=5)` scans at most 1,000 consecutive attempts and processes at most 500
-source records by default. Each document transaction contains at most 100 records.
+source records by default. Explicit catch-up runs may process at most 100,000
+records, while each document transaction contains at most 1,000 records.
 Its monotonic deadline covers the whole invocation; SQLite gets a 50 ms maximum
 busy wait and a deadline progress handler, including old document-schema setup.
 The pipeline connection's prior busy timeout is restored afterwards.
@@ -57,6 +58,24 @@ for an empty response. Unrelated attempts advance the scanned cursor without
 changing their raw/observation/attempt rows. New future attachment contracts may
 require an explicit historical registration backfill, as with the existing cursor
 model; this change does not claim that future schemas are already registered.
+
+## Transaction batching
+
+The production archive later accumulated a durable attachment-registration tail.
+The reference loop was reopening and committing the document database every 100
+source rows even though the deadline handler already checks every row and every
+SQLite statement. Registration now commits at most 1,000 rows per transaction;
+the ordinary 500-record default is unchanged, and explicit catch-up runs remain
+bounded by 100,000 records and 20 seconds. A crash may replay at most one larger
+chunk, but deterministic reference IDs preserve the existing no-duplicate and
+no-skip behavior.
+
+An offline benchmark used one retained 6,000-row `anns_d` response, empty
+temporary databases, no credentials and no network. Five interleaved runs reduced
+median registration time from 0.479 to 0.186 seconds (2.57x), and every baseline
+and candidate logical document/reference inventory had the same SHA-256. This is
+candidate evidence; live large-database throughput still requires a bounded
+production rollout before increasing the existing 20,000-record/5-second config.
 
 ## Boundaries
 
