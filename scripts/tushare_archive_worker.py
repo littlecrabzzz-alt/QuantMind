@@ -55,6 +55,7 @@ def planning_preflight(report):
         for key in (
             'status', 'requests', 'planning_cadence', 'planning',
             'queue_compaction', 'permission_reprobe',
+            'financial_vip_compaction',
             'fina_mainbz_vip_compaction', 'timing',
         )
         if key in report

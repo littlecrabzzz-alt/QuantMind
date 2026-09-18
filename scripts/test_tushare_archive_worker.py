@@ -143,6 +143,10 @@ class WorkerStatus(unittest.TestCase):
                 'requests': 0,
                 'planning_cadence': {'status': 'planned'},
                 'planning': {'history:global': {'new_jobs': 500}},
+                'financial_vip_compaction': {
+                    'status': 'compacted',
+                    'superseded_leaf_jobs': 123,
+                },
                 'timing': {'total_elapsed_seconds': 40.0},
             }
             acquired = {'requests': 321, 'done': 1000, 'pending': 2000}
@@ -183,6 +187,12 @@ class WorkerStatus(unittest.TestCase):
                     'total_elapsed_seconds'
                 ],
                 40.0,
+            )
+            self.assertEqual(
+                report['acquisition']['planning_preflight'][
+                    'financial_vip_compaction'
+                ]['superseded_leaf_jobs'],
+                123,
             )
             self.assertTrue(
                 worker.cycle_log(report)['acquisition']['planning_followup']
