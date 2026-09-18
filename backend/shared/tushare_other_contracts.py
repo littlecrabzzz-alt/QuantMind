@@ -311,9 +311,16 @@ for _api in ("wz_index", "gz_index"):
     OTHER_CONTRACTS[_api].update(
         cap_note="Officially unlimited whole-history response; 10000 is an operational saturation alarm, not a supplier cap.",
         full_history_discovery=True,
+        unfiltered_discovery_when_history_unbounded=True,
     )
 OTHER_CONTRACTS["wz_index"]["history_note"] = (
-    "2012-12-07 is the index publication date in docs, not an asserted first retained observation. Use unfiltered discovery and inspect earliest returned date."
+    "2012-12-07 is the index publication date in docs, not an asserted first retained observation. With an explicit history scope, bounded ranges cover that scope and replace the unfiltered request; dates before the configured start remain unproven. Without an explicit scope, retain unfiltered discovery and inspect the earliest returned date."
+)
+OTHER_CONTRACTS["wz_index"]["cap_note"] = (
+    "Docs describe an unlimited whole-history response, but the retained "
+    "2026-09-18 observation returned supplier has_more=true at 3000 rows. "
+    "Treat supplier has_more=true as truncation and use bounded ranges for an "
+    "explicit history scope."
 )
 OTHER_CONTRACTS["us_tycr"]["field_history_start"] = {"m4": "20221019"}
 OTHER_CONTRACTS["us_tbr"]["field_history_start"] = {
@@ -453,7 +460,9 @@ def iter_other_jobs(config, today, identifiers=None):
     epoch = str(config.get("planning_epoch", today.strftime("%Y%m%d")))
     recent = today - timedelta(days=6)
     for api in enabled:
-        if api in BASICS or api in ("wz_index", "gz_index"):
+        if api in BASICS or (
+            api in ("wz_index", "gz_index") and starts[api] is None
+        ):
             yield _job(api, {}, epoch, 20)
         if api == "opt_basic":
             for exchange in OPTION_EXCHANGES:

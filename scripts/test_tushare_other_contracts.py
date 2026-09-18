@@ -208,6 +208,37 @@ class OtherContracts(unittest.TestCase):
             "configured_scope_does_not_prove_earlier_history_absent",
         )
 
+    def test_scoped_wz_and_gz_use_complete_ranges_without_unfiltered_request(self):
+        start = date(2023, 12, 29)
+        today = date(2024, 3, 9)
+        jobs = list(
+            iter_other_jobs(
+                {
+                    "other_apis": ["wz_index", "gz_index"],
+                    "other_history_start": start.strftime("%Y%m%d"),
+                },
+                today,
+            )
+        )
+        expected = {
+            start + timedelta(days=offset)
+            for offset in range((today - start).days + 1)
+        }
+        for api in ("wz_index", "gz_index"):
+            api_jobs = [job for job in jobs if job["api_name"] == api]
+            self.assertNotIn({}, [job["params"] for job in api_jobs])
+            actual = []
+            for job in api_jobs:
+                params = job["params"]
+                first = datetime.strptime(params["start_date"], "%Y%m%d").date()
+                last = datetime.strptime(params["end_date"], "%Y%m%d").date()
+                actual.extend(
+                    first + timedelta(days=offset)
+                    for offset in range((last - first).days + 1)
+                )
+            self.assertEqual(set(actual), expected)
+            self.assertEqual(len(actual), len(expected))
+
     def test_known_history_defaults_efficiency_and_raw_identifiers(self):
         jobs = list(
             iter_other_jobs({"other_apis": ["libor", "hibor"]}, date(2026, 9, 9))
