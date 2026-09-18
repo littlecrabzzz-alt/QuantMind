@@ -1,0 +1,52 @@
+{
+  "schema": "quantmind.tushare.financial-vip-production-audit.v1",
+  "audited_at": "2026-09-18T20:24:56.381861+00:00",
+  "epoch": "20260919",
+  "apis": {
+    "income_vip": {
+      "planned_root_scopes": 96,
+      "complete_nonempty_scopes": 66,
+      "empty_unverified_root_scopes": 30,
+      "pages": 242,
+      "rows": 197358,
+      "min_scope_rows": 1,
+      "max_scope_rows": 10604,
+      "max_offset": 10000,
+      "errors": []
+    },
+    "balancesheet_vip": {
+      "planned_root_scopes": 96,
+      "complete_nonempty_scopes": 36,
+      "empty_unverified_root_scopes": 60,
+      "pages": 135,
+      "rows": 107439,
+      "min_scope_rows": 1,
+      "max_scope_rows": 11187,
+      "max_offset": 11000,
+      "errors": []
+    },
+    "cashflow_vip": {
+      "planned_root_scopes": 96,
+      "complete_nonempty_scopes": 64,
+      "empty_unverified_root_scopes": 32,
+      "pages": 257,
+      "rows": 212928,
+      "min_scope_rows": 1,
+      "max_scope_rows": 10806,
+      "max_offset": 10000,
+      "errors": []
+    },
+    "forecast_vip": {
+      "planned_root_scopes": 8,
+      "complete_nonempty_scopes": 8,
+      "empty_unverified_root_scopes": 0,
+      "pages": 16,
+      "rows": 10649,
+      "min_scope_rows": 181,
+      "max_scope_rows": 3179,
+      "max_offset": 3000,
+      "errors": []
+    }
+  },
+  "status": "passed"
+}
