@@ -347,6 +347,89 @@ class PipelineAcceptance(unittest.TestCase):
                 server.server_close()
                 serving.join(2)
 
+    def test_depth_two_process_capture_can_use_two_workers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            calls = []
+            active = 0
+            peak = 0
+            lock = threading.Lock()
+            both_started = threading.Event()
+            overlap_failed = []
+
+            class Handler(BaseHTTPRequestHandler):
+                def do_POST(self):
+                    nonlocal active, peak
+                    size = int(self.headers["Content-Length"])
+                    api = json.loads(self.rfile.read(size))["api_name"]
+                    with lock:
+                        calls.append(api)
+                        active += 1
+                        peak = max(peak, active)
+                        if active == 2:
+                            both_started.set()
+                    if not both_started.wait(2):
+                        overlap_failed.append(api)
+                    body = json.dumps(
+                        {
+                            "code": 0,
+                            "data": {
+                                "fields": ["ts_code", "trade_date", "adj_factor"],
+                                "items": [["510300.SH", "20260907", 1]],
+                            },
+                        }
+                    ).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    with lock:
+                        active -= 1
+
+                def log_message(self, *_):
+                    pass
+
+            server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            serving = threading.Thread(target=server.serve_forever, daemon=True)
+            serving.start()
+            original_api_root = tushare_intake.API_ROOT
+            tushare_intake.API_ROOT = f"http://127.0.0.1:{server.server_address[1]}/api"
+            try:
+                pipeline = Pipeline(Path(tmp), CATALOG)
+                for epoch in ("first", "second"):
+                    pipeline.enqueue(
+                        "fund_adj",
+                        {"trade_date": "20260907", "offset": 0, "limit": 2},
+                        epoch=epoch,
+                    )
+                pipeline.db.commit()
+                report = pipeline.run(
+                    object(),
+                    "synthetic-token",
+                    {
+                        **CONFIG,
+                        "acquisition_pipeline_depth": 2,
+                        "acquisition_capture_execution": "process",
+                        "acquisition_capture_workers": 2,
+                    },
+                    max_requests=2,
+                    max_seconds=5,
+                    pause=0,
+                )
+                self.assertEqual(report["requests"], 2)
+                self.assertEqual(calls, ["fund_adj", "fund_adj"])
+                self.assertEqual(peak, 2)
+                self.assertEqual(overlap_failed, [])
+                self.assertEqual(report["acquisition_pipeline"]["http_workers"], 2)
+                self.assertEqual(pipeline.status(), {"done": 2})
+                self.assertEqual(len(list((Path(tmp) / "observations").iterdir())), 2)
+                pipeline.close()
+            finally:
+                tushare_intake.API_ROOT = original_api_root
+                server.shutdown()
+                server.server_close()
+                serving.join(2)
+
     def test_acquisition_pipeline_depth_is_bounded(self):
         for value in (True, 0, 3, "2"):
             with self.subTest(value=value), tempfile.TemporaryDirectory() as tmp:
@@ -360,6 +443,41 @@ class PipelineAcceptance(unittest.TestCase):
                         pause=0,
                     )
                 pipeline.close()
+
+    def test_acquisition_capture_workers_are_bounded_and_process_only(self):
+        for value in (True, 0, 3, "2"):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as tmp:
+                pipeline = Pipeline(Path(tmp), CATALOG)
+                with self.assertRaises(ValueError):
+                    pipeline.run(
+                        object(),
+                        "synthetic-token",
+                        {
+                            **CONFIG,
+                            "acquisition_pipeline_depth": 2,
+                            "acquisition_capture_execution": "process",
+                            "acquisition_capture_workers": value,
+                        },
+                        max_seconds=1,
+                        pause=0,
+                    )
+                pipeline.close()
+        with tempfile.TemporaryDirectory() as tmp:
+            pipeline = Pipeline(Path(tmp), CATALOG)
+            with self.assertRaises(ValueError):
+                pipeline.run(
+                    object(),
+                    "synthetic-token",
+                    {
+                        **CONFIG,
+                        "acquisition_pipeline_depth": 2,
+                        "acquisition_capture_execution": "thread",
+                        "acquisition_capture_workers": 2,
+                    },
+                    max_seconds=1,
+                    pause=0,
+                )
+            pipeline.close()
 
     def test_process_capture_requires_depth_two(self):
         with tempfile.TemporaryDirectory() as tmp:
