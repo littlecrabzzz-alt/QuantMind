@@ -2,9 +2,11 @@
 
 from contextlib import ExitStack
 import json
+import os
 from pathlib import Path
 import sqlite3
 import statistics
+import subprocess
 import sys
 import tempfile
 import time
@@ -60,6 +62,57 @@ class QueueIndexTest(unittest.TestCase):
             rows(),
         )
         self.p.db.commit()
+
+    def test_pipeline_defaults_to_wal_full_and_supports_nas_fallback(self):
+        self.assertEqual(self.p.db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
+        self.assertEqual(self.p.db.execute("PRAGMA synchronous").fetchone()[0], 2)
+        self.p.close()
+        with patch.dict(os.environ, {"QM_TUSHARE_SQLITE_JOURNAL_MODE": "DELETE"}):
+            self.p = module.Pipeline(self.root, {"entries": []})
+        self.assertEqual(
+            self.p.db.execute("PRAGMA journal_mode").fetchone()[0], "delete"
+        )
+        self.assertEqual(self.p.db.execute("PRAGMA synchronous").fetchone()[0], 2)
+
+    def test_invalid_journal_mode_fails_closed(self):
+        self.p.close()
+        with (
+            patch.dict(os.environ, {"QM_TUSHARE_SQLITE_JOURNAL_MODE": "MEMORY"}),
+            self.assertRaisesRegex(ValueError, "Invalid Tushare SQLite journal mode"),
+        ):
+            module.Pipeline(self.root, {"entries": []})
+        self.p = module.Pipeline(self.root, {"entries": []})
+
+    def test_committed_wal_gate_survives_unclean_process_exit(self):
+        self.p.close()
+        code = """
+import os
+from pathlib import Path
+import sys
+sys.path.insert(0, sys.argv[1])
+from backend.shared.tushare_pipeline import Pipeline
+p = Pipeline(Path(sys.argv[2]), {'entries': []})
+p.db.execute("INSERT INTO request_gates(scope,next_at) VALUES('account',123.5)")
+p.db.commit()
+os._exit(0)
+"""
+        subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                code,
+                str(Path(__file__).resolve().parents[1]),
+                str(self.root),
+            ],
+            check=True,
+        )
+        self.p = module.Pipeline(self.root, {"entries": []})
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT next_at FROM request_gates WHERE scope='account'"
+            ).fetchone()[0],
+            123.5,
+        )
 
     def to_v4(self):
         self.p.db.executescript(

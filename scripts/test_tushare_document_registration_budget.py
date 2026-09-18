@@ -261,7 +261,7 @@ class RegistrationBudget(unittest.TestCase):
         self.assertEqual(self.p.register_documents()["cursor"], rowid)
         self.assertEqual(len(self.inventory()["document_refs"]), 1)
 
-    def test_busy_reader_at_document_commit_rolls_back_chunk(self):
+    def test_wal_reader_does_not_block_document_commit(self):
         self.seed([{"url": "https://example.com/a.pdf"}])
         lock = docs._document_db(self.root)
         self.addCleanup(lock.close)
@@ -270,12 +270,11 @@ class RegistrationBudget(unittest.TestCase):
         started = time.monotonic()
         result = self.p.register_documents(max_seconds=0.3)
         self.assertLess(time.monotonic() - started, 1)
-        self.assertEqual(result["status"], "deferred_database_busy")
-        self.assertEqual(result["processed_records"], 0)
-        self.assertEqual(result["cursor"], 0)
+        self.assertEqual(result["status"], "bounded_batch_complete")
+        self.assertEqual(result["processed_records"], 1)
+        self.assertEqual(result["observations"], 1)
         lock.rollback()
-        self.assertEqual(self.inventory()["document_refs"], [])
-        self.assertEqual(self.p.register_documents()["observations"], 1)
+        self.assertEqual(len(self.inventory()["document_refs"]), 1)
 
     def test_mid_chunk_deadline_commits_only_completed_records_not_fake_empty(self):
         rows = [{"url": f"https://example.com/{n}"} for n in range(20)]

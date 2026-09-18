@@ -465,6 +465,25 @@ class Pipeline:
         self.root.mkdir(parents=True, exist_ok=True)
         self.catalog = catalog
         self.db = sqlite3.connect(self.root / "pipeline.sqlite", timeout=10)
+        requested_journal = os.getenv(
+            "QM_TUSHARE_SQLITE_JOURNAL_MODE", "WAL"
+        ).strip().upper()
+        if requested_journal not in ("WAL", "DELETE"):
+            self.db.close()
+            raise ValueError("Invalid Tushare SQLite journal mode")
+        try:
+            journal = self.db.execute("PRAGMA journal_mode").fetchone()[0]
+            if str(journal).upper() != requested_journal:
+                journal = self.db.execute(
+                    "PRAGMA journal_mode=" + requested_journal
+                ).fetchone()[0]
+            self.db.execute("PRAGMA synchronous=FULL")
+        except BaseException:
+            self.db.close()
+            raise
+        if str(journal).upper() != requested_journal:
+            self.db.close()
+            raise ValueError("Tushare SQLite journal mode unavailable")
         self.db.row_factory = sqlite3.Row
         version = self.db.execute("pragma user_version").fetchone()[0]
         if version not in (0, 1, 2, 3, 4, 5, 6):

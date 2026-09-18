@@ -74,6 +74,24 @@ class Documents(unittest.TestCase):
             result = docs.fetch_document(url, self.root, **options)
         return result, conn
 
+    def test_document_queue_defaults_to_wal_full_and_supports_nas_fallback(self):
+        db = docs._document_db(self.root)
+        self.assertEqual(db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
+        self.assertEqual(db.execute("PRAGMA synchronous").fetchone()[0], 2)
+        db.execute("BEGIN IMMEDIATE")
+        reader = docs._document_db(self.root, timeout=0)
+        self.assertEqual(reader.execute("PRAGMA journal_mode").fetchone()[0], "wal")
+        reader.close()
+        db.rollback()
+        db.close()
+        with patch.dict(
+            docs.os.environ, {"QM_TUSHARE_SQLITE_JOURNAL_MODE": "DELETE"}
+        ):
+            db = docs._document_db(self.root)
+        self.addCleanup(db.close)
+        self.assertEqual(db.execute("PRAGMA journal_mode").fetchone()[0], "delete")
+        self.assertEqual(db.execute("PRAGMA synchronous").fetchone()[0], 2)
+
     def test_real_pdf_pages_and_immutable_repeats(self):
         body = pdf()
         first, conn = self.fetch(
