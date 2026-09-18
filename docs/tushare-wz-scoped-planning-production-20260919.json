@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "captured_at": "2026-09-19T06:59:29+08:00",
+  "master_commit": "6c3c913f54e78578a1baad29ac9ac0f391a86c21",
+  "change": {
+    "apis": [
+      "wz_index",
+      "gz_index"
+    ],
+    "behavior": "an explicit history start uses bounded date ranges without a redundant unfiltered request",
+    "unbounded_behavior_preserved": true,
+    "history_before_configured_start_proven_absent": false
+  },
+  "validation": {
+    "focused_tests": 12,
+    "full_tushare_tests": 1394,
+    "full_tushare_failures": 0,
+    "ruff": "passed",
+    "compile": "passed",
+    "git_diff_check": "passed"
+  },
+  "migration": {
+    "status": "applied",
+    "upstream_calls": 0,
+    "configured_start": "19900101",
+    "through": "20260919",
+    "artifacts_sha256_checked": 180,
+    "candidate_jobs": 1,
+    "superseded_jobs": 1,
+    "source_results_preserved": 1,
+    "source_attempts_preserved": 1,
+    "candidate_ids_sha256": "88597207e782b64b3c0226bcf972bf5d77561e7990a53eaf5880dfee1763a42a",
+    "receipt": "other-unfiltered-retirement-v1.dbeb4530d06f42b4276203835a7520a62ba04eb2cbae097310b358ddc8feaff7.json",
+    "coverage": {
+      "wz_index": {
+        "range_jobs": 39,
+        "range_job_ids_sha256": "b703a2bc25bcd3f13edea8a1e891ddf488a92722d044c637a92374e2964bdafd"
+      },
+      "gz_index": {
+        "range_jobs": 39,
+        "range_job_ids_sha256": "ca5cdd84eeb87c28a5325bcbc14d922ec51a6033eec2be87f104307861cba116"
+      }
+    }
+  },
+  "deployment": {
+    "repository_contract_sha256": "4c6c674786c7e05c2ba76adbf92cfc558b7d0bba72629063e2438dba46dcd4d3",
+    "runtime_contract_sha256": "4c6c674786c7e05c2ba76adbf92cfc558b7d0bba72629063e2438dba46dcd4d3",
+    "worker_pid": 28775,
+    "worker_state": "running",
+    "worker_last_exit": "never_exited"
+  },
+  "first_completed_cycle": {
+    "started_at": "2026-09-18T22:57:37.203985+00:00",
+    "updated_at": "2026-09-18T22:59:29.834527+00:00",
+    "elapsed_seconds": 112.639,
+    "requests": 771,
+    "done": 478930,
+    "empty": 395679,
+    "pending": 2686507,
+    "blocked": 780,
+    "split_pending": 10587,
+    "permission_blocked": 5855,
+    "resolved": 5827,
+    "documents_processed": 1760,
+    "free_bytes": 2105775136768
+  },
+  "current_epoch_requests": {
+    "wz_index": {
+      "params": {
+        "start_date": "20260913",
+        "end_date": "20260919"
+      },
+      "state": "done",
+      "status": "sample_ok"
+    },
+    "gz_index": {
+      "params": {
+        "start_date": "20260913",
+        "end_date": "20260919"
+      },
+      "state": "empty",
+      "status": "empty_unverified"
+    },
+    "unfiltered_jobs": 0
+  }
+}
