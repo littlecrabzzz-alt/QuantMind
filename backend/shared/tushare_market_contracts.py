@@ -163,7 +163,7 @@ MARKET_CONTRACTS["fund_nav"].update(
     },
     pagination_live_verified=True,
     pagination_required_param="nav_date",
-    recent_planner_version=1,
+    recent_planner_version=2,
     pagination_note=(
         "The public page documents nav_date but omits pagination parameters. "
         "A production-authority probe on 2026-09-18 verified stable 1,000-row "
@@ -284,6 +284,7 @@ def iter_market_jobs(config, today, identifiers=None):
             yield job(
                 "fund_nav",
                 {"nav_date": day.strftime("%Y%m%d")},
+                priority=5,
             )
             day -= timedelta(days=1)
     if "index_classify" in enabled:

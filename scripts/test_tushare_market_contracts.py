@@ -96,6 +96,7 @@ class MarketPlanning(unittest.TestCase):
             {f"202403{day:02d}" for day in range(5, 12)},
         )
         self.assertTrue(all(set(job["params"]) == {"nav_date"} for job in recent))
+        self.assertEqual({job["priority"] for job in recent}, {5})
         self.assertEqual(len(history), 1)
         self.assertEqual(
             history[0]["params"],
@@ -118,6 +119,7 @@ class MarketPlanning(unittest.TestCase):
             )
         )
         self.assertTrue(all(job["api_name"] == "fund_nav" for job in ordered[:7]))
+        self.assertEqual({job["priority"] for job in ordered[:7]}, {5})
         self.assertEqual(ordered[7]["api_name"], "fund_div")
 
     def test_fund_nav_recent_date_pagination_flag_must_be_boolean(self):
