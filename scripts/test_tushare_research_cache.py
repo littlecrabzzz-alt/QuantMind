@@ -56,9 +56,11 @@ class ResearchCache(unittest.TestCase):
             manifest = json.loads(manifest_path.read_bytes())
             self.assertEqual({d['api_name'] for d in manifest['datasets']}, {'daily'})
             self.assertEqual(len(manifest['files']), 2)
+            current_timeouts = []
             def request(url, **kwargs):
                 name = url.split(':18765/', 1)[1]
                 if name == 'CURRENT.json':
+                    current_timeouts.append(kwargs['timeout'])
                     raw = json.dumps(pointer).encode()
                 elif name.startswith('releases/'):
                     raw = manifest_path.read_bytes()
@@ -82,6 +84,9 @@ class ResearchCache(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'checksum'):
                     cache.pull(target, 'http://127.0.0.1:18765', 1024**2, 0)
                 self.assertEqual((target / 'CURRENT.json').read_bytes(), old)
+            self.assertGreaterEqual(len(current_timeouts), 5)
+            self.assertEqual(set(current_timeouts), {cache.PREPARE_TIMEOUT_SECONDS})
+            self.assertEqual(cache.PREPARE_TIMEOUT_SECONDS, 30 * 60)
             with self.assertRaisesRegex(ValueError, 'loopback'):
                 cache.pull(target, 'http://example.com:80', 1024, 0)
 
