@@ -153,7 +153,27 @@ class TickTimingTest(unittest.TestCase):
             pause=0,
         )
         self.documents.assert_not_called()
+        self.pipeline.register_documents.assert_called_once_with(
+            max_observations=20,
+            max_records=500,
+            max_seconds=5,
+        )
         self.pipeline.reconcile_partitions.assert_not_called()
+
+    def test_document_registration_budget_is_explicitly_configurable(self):
+        config = json.loads((self.root / "pipeline-config.json").read_text())
+        config.update(
+            document_registration_max_observations=100,
+            document_registration_max_records=5000,
+            document_registration_max_seconds=10,
+        )
+        (self.root / "pipeline-config.json").write_text(json.dumps(config))
+        module.tick()
+        self.pipeline.register_documents.assert_called_once_with(
+            max_observations=100,
+            max_records=5000,
+            max_seconds=10,
+        )
 
     def test_each_stage_error_keeps_completed_timings_and_exception(self):
         stages = [

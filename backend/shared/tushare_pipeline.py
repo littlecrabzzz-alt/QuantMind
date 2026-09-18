@@ -5100,7 +5100,10 @@ class Pipeline:
     def register_documents(self, max_observations=20, *, max_records=500, max_seconds=5):
         from backend.shared.tushare_documents import enqueue_documents
 
-        if type(max_observations) is not int or max_observations < 0:
+        if (
+            type(max_observations) is not int
+            or not 0 <= max_observations <= 1000
+        ):
             raise ValueError("Invalid document observation limit")
         if type(max_records) is not int or not 1 <= max_records <= 5000:
             raise ValueError("Invalid document record limit")
@@ -5114,6 +5117,11 @@ class Pipeline:
             if spec.get("attachment_fields")
         }
         report = {
+            "budget": {
+                "max_observations": max_observations,
+                "max_records": max_records,
+                "max_seconds": max_seconds,
+            },
             "observations": 0,
             "processed_records": 0,
             "scanned_attempts": 0,
@@ -6108,7 +6116,17 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                         )
                 if config.get("enable_documents", False):
                     with measure("document_registration"):
-                        report["document_registration"] = pipeline.register_documents()
+                        report["document_registration"] = pipeline.register_documents(
+                            max_observations=config.get(
+                                "document_registration_max_observations", 20
+                            ),
+                            max_records=config.get(
+                                "document_registration_max_records", 500
+                            ),
+                            max_seconds=config.get(
+                                "document_registration_max_seconds", 5
+                            ),
+                        )
                     if config.get("document_execution") != "worker":
                         with measure("documents"):
                             from backend.shared.tushare_documents import run_documents

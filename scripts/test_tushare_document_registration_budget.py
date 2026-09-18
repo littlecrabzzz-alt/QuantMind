@@ -197,6 +197,20 @@ class RegistrationBudget(unittest.TestCase):
         self.assertEqual(result["observations"], 0)
         self.assertEqual(self.state(), [])
 
+    def test_registration_limits_reject_unbounded_configuration(self):
+        for value in (-1, 1001, True, 1.5):
+            with self.subTest(max_observations=value):
+                with self.assertRaisesRegex(ValueError, "observation limit"):
+                    self.p.register_documents(max_observations=value)
+        for value in (0, 5001, True, 1.5):
+            with self.subTest(max_records=value):
+                with self.assertRaisesRegex(ValueError, "record limit"):
+                    self.p.register_documents(max_records=value)
+        for value in (0, 21, True, "5"):
+            with self.subTest(max_seconds=value):
+                with self.assertRaisesRegex(ValueError, "registration budget"):
+                    self.p.register_documents(max_seconds=value)
+
     def test_busy_writer_defers_in_under_one_second_and_restarts(self):
         rowid, _ = self.seed([{"url": "https://example.com/a.pdf"}])
         lock = docs._document_db(self.root)
