@@ -196,8 +196,14 @@ Mac 使用 `--action verify-preserved --root <完整归档> --checkpoint <其冻
 每轮先持锁而让发布永久延后、采集连续返回 0 请求。
 
 `planning_only` 是持久化扩展全量任务队列的周期，不是 dry-run；该周期不访问
-Tushare，成功后由原生 worker 最少等待 5 秒便进入下一次真实采集。`fina_mainbz_vip`
-与逐股票 `fina_mainbz` 的历史任务可能暂时并存。每次规划后只对 10,000 行合同的
+Tushare，成功后由原生 worker 最少等待 5 秒便进入下一次真实采集。
+原生 Mac 归档 worker 可启用 `archive_worker_acquire_after_planning`；规划成功且
+当前 worker 周期仍剩至少 1 秒安全预算时，它重新进入原 `tick` 并只用
+剩余预算执行真实采集。第一步仍是 0 上游请求的独立持久规划事务；
+发布优先级、规划断点、请求频控与失败恢复语义不变。预算不足时保持
+`planning_only` 并按原 5 秒最小延迟进入下轮。
+
+`fina_mainbz_vip` 与逐股票 `fina_mainbz` 的历史任务可能暂时并存。每次规划后只对 10,000 行合同的
 VIP 分页链做覆盖压缩：同一年、同一 P/D/I 类型的四个季度必须均以连续 offset
 分页到不足 10,000 行的终页，才将同字段的逐股票完整年度待采任务标记为
 `superseded`。空根、缺页、异常页、部分年度、近期周更、已有结果和历史尝试均保留。

@@ -92,6 +92,7 @@ class PlanningInterval(unittest.TestCase):
         checkpoint = self.planning_checkpoint()
         acquisitions = self.acquisitions
         self.config.update(
+            archive_worker_acquire_after_planning=True,
             document_download_workers=6,
             document_parse_workers=2,
             document_max_bytes=256 * 1024 * 1024,

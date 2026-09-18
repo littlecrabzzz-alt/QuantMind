@@ -6177,7 +6177,11 @@ def _planning_config_fingerprint(config):
         key: value
         for key, value in config.items()
         if not key.startswith("document_")
-        and key not in {"enable_documents", "documents_per_tick"}
+        and key not in {
+            "enable_documents",
+            "documents_per_tick",
+            "archive_worker_acquire_after_planning",
+        }
     }
     return digest(json_bytes({"version": 2, "config": planning_config}))
 

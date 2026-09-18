@@ -116,6 +116,78 @@ class WorkerStatus(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 worker.cycle_seconds({'archive_worker_cycle_seconds': value})
 
+    def test_planning_followup_uses_only_safe_cycle_remainder(self):
+        self.assertFalse(worker.acquire_after_planning({}))
+        self.assertTrue(worker.acquire_after_planning({
+            'archive_worker_acquire_after_planning': True,
+        }))
+        with self.assertRaises(ValueError):
+            worker.acquire_after_planning({
+                'archive_worker_acquire_after_planning': 1,
+            })
+        self.assertIsNone(worker.planning_followup_seconds(False, 105, 40))
+        self.assertEqual(worker.planning_followup_seconds(True, 105, 40), 60)
+        self.assertEqual(worker.planning_followup_seconds(True, 300, 40), 100)
+        self.assertIsNone(worker.planning_followup_seconds(True, 105, 100))
+
+    def test_planning_followup_acquires_without_starting_second_document_worker(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'ENABLED').touch()
+            (root / 'pipeline-config.json').write_text(
+                '{"archive_worker_acquire_after_planning":true,'
+                '"enable_documents":true}'
+            )
+            planning = {
+                'status': 'planning_only',
+                'requests': 0,
+                'planning_cadence': {'status': 'planned'},
+                'planning': {'history:global': {'new_jobs': 500}},
+                'timing': {'total_elapsed_seconds': 40.0},
+            }
+            acquired = {'requests': 321, 'done': 1000, 'pending': 2000}
+            document_calls = []
+
+            def tick(*args, **kwargs):
+                kwargs['before_nonpublication_work']()
+                if not args and 'max_seconds' not in kwargs:
+                    return planning
+                self.assertEqual(kwargs['max_seconds'], 42)
+                return dict(acquired)
+
+            def documents(*args, **kwargs):
+                document_calls.append((args, kwargs))
+                return {'status': 'ok', 'processed': 17}
+
+            with patch.dict(os.environ), \
+                    patch('sys.argv', ['worker', '--root', str(root), '--once']), \
+                    patch.object(tushare_pipeline, 'authority'), \
+                    patch.object(tushare_pipeline, 'tick', side_effect=tick) as called, \
+                    patch.object(tushare_documents, 'run_documents', side_effect=documents), \
+                    patch.object(worker, 'planning_followup_seconds', return_value=42), \
+                    patch.object(worker.shutil, 'disk_usage', return_value=SimpleNamespace(free=2**40)), \
+                    patch('builtins.print'):
+                self.assertEqual(worker.main(), 0)
+            self.assertEqual(called.call_count, 2)
+            self.assertEqual(len(document_calls), 1)
+            report = json.loads((root / 'archive-worker-status.json').read_bytes())
+            self.assertEqual(report['status'], 'completed_cycle')
+            self.assertEqual(report['acquisition']['requests'], 321)
+            self.assertEqual(report['documents']['processed'], 17)
+            self.assertEqual(
+                report['acquisition']['planning_preflight']['status'],
+                'planning_only',
+            )
+            self.assertEqual(
+                report['acquisition']['planning_preflight']['timing'][
+                    'total_elapsed_seconds'
+                ],
+                40.0,
+            )
+            self.assertTrue(
+                worker.cycle_log(report)['acquisition']['planning_followup']
+            )
+
     def test_document_execution_is_bounded(self):
         self.assertEqual(worker.document_execution({}), 'thread')
         self.assertEqual(

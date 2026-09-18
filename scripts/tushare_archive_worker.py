@@ -33,6 +33,34 @@ def next_cycle_delay(interval, elapsed, acquisition_status, worker_status=None):
     return max(minimum, interval - elapsed)
 
 
+def acquire_after_planning(config):
+    value = config.get('archive_worker_acquire_after_planning', False)
+    if not isinstance(value, bool):
+        raise ValueError('archive_worker_acquire_after_planning must be a boolean')
+    return value
+
+
+def planning_followup_seconds(enabled, interval, elapsed):
+    """Use only the safe remainder of a native worker cycle for acquisition."""
+    if not enabled:
+        return None
+    remaining = min(100.0, interval - elapsed - 5.0)
+    return remaining if remaining >= 1.0 else None
+
+
+def planning_preflight(report):
+    """Preserve the durable planning result when the same cycle then acquires."""
+    return {
+        key: report[key]
+        for key in (
+            'status', 'requests', 'planning_cadence', 'planning',
+            'queue_compaction', 'permission_reprobe',
+            'fina_mainbz_vip_compaction', 'timing',
+        )
+        if key in report
+    }
+
+
 def document_execution(config):
     value = config.get('document_worker_execution', 'thread')
     if value not in ('thread', 'process'):
@@ -139,6 +167,14 @@ def cycle_log(report):
             summary['acquisition']['planning_status'] = planning.get('status')
             if planning.get('reason') is not None:
                 summary['acquisition']['planning_reason'] = planning['reason']
+        preflight = acquisition.get('planning_preflight')
+        if isinstance(preflight, dict):
+            summary['acquisition']['planning_followup'] = True
+            preflight_timing = preflight.get('timing')
+            if isinstance(preflight_timing, dict):
+                summary['acquisition']['planning_preflight_seconds'] = (
+                    preflight_timing.get('total_elapsed_seconds')
+                )
         timing = acquisition.get('timing')
         if isinstance(timing, dict) and timing.get('failed_stage') is not None:
             summary['acquisition']['failed_stage'] = timing['failed_stage']
@@ -191,6 +227,7 @@ def main():
                     authority()
                     config = json.loads((root / 'pipeline-config.json').read_bytes())
                     interval = cycle_seconds(config)
+                    follow_planning = acquire_after_planning(config)
                     report['cycle_interval_seconds'] = interval
                     # The cloud already used independent acquisition/document workers.
                     # Keep one archive owner and wait for both bounded phases before
@@ -227,6 +264,21 @@ def main():
                         report['acquisition'] = tick(
                             before_nonpublication_work=start_documents
                         )
+                        remaining = planning_followup_seconds(
+                            follow_planning,
+                            interval,
+                            time.monotonic() - start,
+                        )
+                        if (
+                            report['acquisition'].get('status') == 'planning_only'
+                            and remaining is not None
+                        ):
+                            planned = planning_preflight(report['acquisition'])
+                            report['acquisition'] = tick(
+                                max_seconds=remaining,
+                                before_nonpublication_work=start_documents,
+                            )
+                            report['acquisition']['planning_preflight'] = planned
                         if report['acquisition'].get('status') != 'publish_deferred_documents_active':
                             start_documents()
                         if documents is not None:
