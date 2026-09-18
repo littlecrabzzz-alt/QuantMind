@@ -203,21 +203,21 @@ class RegistrationBudget(unittest.TestCase):
             "bounded_batch_complete",
         )
         self.assertEqual(
-            self.p.register_documents(max_records=100_000)["budget"]["chunk_records"],
+            self.p.register_documents(max_records=200_000)["budget"]["chunk_records"],
             1_000,
         )
         self.assertEqual(
-            self.p.register_documents(max_seconds=60)["budget"]["max_seconds"], 60
+            self.p.register_documents(max_seconds=90)["budget"]["max_seconds"], 90
         )
         for value in (-1, 1001, True, 1.5):
             with self.subTest(max_observations=value):
                 with self.assertRaisesRegex(ValueError, "observation limit"):
                     self.p.register_documents(max_observations=value)
-        for value in (0, 100_001, True, 1.5):
+        for value in (0, 200_001, True, 1.5):
             with self.subTest(max_records=value):
                 with self.assertRaisesRegex(ValueError, "record limit"):
                     self.p.register_documents(max_records=value)
-        for value in (0, 61, True, "5"):
+        for value in (0, 91, True, "5"):
             with self.subTest(max_seconds=value):
                 with self.assertRaisesRegex(ValueError, "registration budget"):
                     self.p.register_documents(max_seconds=value)
