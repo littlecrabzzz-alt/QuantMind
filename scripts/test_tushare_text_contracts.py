@@ -158,9 +158,22 @@ class TextPlans(unittest.TestCase):
             self.assertTrue(
                 TEXT_CONTRACTS[api]["recover_legacy_blocked_identifier_fanout"]
             )
-        self.assertNotIn("saturation_partition_axes", TEXT_CONTRACTS["npr"])
-        self.assertNotIn(
-            "recover_legacy_blocked_observed_fanout", TEXT_CONTRACTS["npr"]
+        self.assertEqual(
+            TEXT_CONTRACTS["npr"]["saturation_partition_axes"],
+            [
+                {
+                    "param": "org",
+                    "output_field": "puborg",
+                    "values": [],
+                    "value_kind": "supplier_text",
+                }
+            ],
+        )
+        self.assertTrue(
+            TEXT_CONTRACTS["npr"]["recover_legacy_blocked_observed_fanout"]
+        )
+        self.assertTrue(
+            TEXT_CONTRACTS["npr"]["recover_legacy_blocked_date_bisection"]
         )
         self.assertIn(
             "ptype fanout is disabled",

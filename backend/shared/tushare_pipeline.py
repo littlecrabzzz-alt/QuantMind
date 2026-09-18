@@ -182,6 +182,13 @@ LEGACY_OBSERVED_RECOVERY_APIS = tuple(
         if spec.get("recover_legacy_blocked_observed_fanout")
     )
 )
+LEGACY_DATE_RECOVERY_APIS = tuple(
+    sorted(
+        api
+        for api, spec in EXTENDED_CONTRACTS.items()
+        if spec.get("recover_legacy_blocked_date_bisection")
+    )
+)
 IDENTIFIER_CACHE_VERSION = 4
 RANGE_REPLACEMENT_GAP = "replaced_by_stock_range_plan_v1"
 INDEX_PERIOD_REPLACEMENT_GAP = "replaced_by_index_period_plan_v1"
@@ -215,16 +222,20 @@ def _saturation_partition_axis(spec, params):
     for index, axis in enumerate(axes):
         if not isinstance(axis, dict) or set(axis) - {
             "param",
+            "output_field",
             "values",
             "value_kind",
         }:
             raise ValueError("Invalid saturation partition axis")
         param = axis.get("param")
+        output_field = axis.get("output_field", param)
         values = axis.get("values", [])
         value_kind = axis.get("value_kind", "code")
         if (
             not isinstance(param, str)
             or not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", param)
+            or not isinstance(output_field, str)
+            or not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", output_field)
             or param in seen
             or not isinstance(values, (list, tuple))
             or value_kind not in ("code", "supplier_text")
@@ -234,6 +245,7 @@ def _saturation_partition_axis(spec, params):
         normalized.append(
             {
                 "param": param,
+                "output_field": output_field,
                 "values": values,
                 "value_kind": value_kind,
                 "index": index,
@@ -3839,6 +3851,7 @@ class Pipeline:
         partition_axis = _saturation_partition_axis(spec, params)
         if partition_axis:
             partition_param = partition_axis["param"]
+            output_field = partition_axis["output_field"]
             saved = result if result is not None else json.loads(row["result"] or "{}")
             if saved.get("object_sha256"):
                 configured = partition_axis["values"]
@@ -3863,8 +3876,8 @@ class Pipeline:
                 ):
                     raise ValueError("Invalid saturation partition values")
                 observed, invalid = set(), 0
-                for record in self.records(saved, fields={partition_param}):
-                    value = record.get(partition_param)
+                for record in self.records(saved, fields={output_field}):
+                    value = record.get(output_field)
                     if valid_partition_value(value):
                         observed.add(value)
                     else:
@@ -3890,6 +3903,7 @@ class Pipeline:
                     evidence = {
                         "origin": "documented_union_parent_observation",
                         "partition_param": partition_param,
+                        "output_field": output_field,
                         "configured_values": list(configured),
                         "observed_values": sorted(observed),
                         "value_kind": value_kind,
@@ -4427,6 +4441,10 @@ class Pipeline:
             and result.get("object_sha256")
         ):
             return "observed_value_fanout"
+        if spec.get("recover_legacy_blocked_date_bisection") and self.date_children(
+            job
+        ):
+            return "date_bisection"
         return None
 
     def resume_identifier_split(self, deadline, config):
@@ -4449,20 +4467,31 @@ class Pipeline:
                         "eco_cal",
                         *LEGACY_IDENTIFIER_RECOVERY_APIS,
                         *LEGACY_OBSERVED_RECOVERY_APIS,
+                        *LEGACY_DATE_RECOVERY_APIS,
                     )
                 )
             )
             placeholders = ",".join("?" for _ in legacy_apis)
-            row = self.db.execute(
+            candidates = self.db.execute(
                 "SELECT * FROM jobs WHERE state='blocked' "
                 f"AND json_extract(job,'$.api_name') IN ({placeholders}) "
                 "AND json_extract(result,'$.status')='possibly_truncated' "
                 "AND json_type(result,'$.object_sha256')='text' "
                 "AND json_type(result,'$.observation')='text' "
-                "ORDER BY priority,rowid LIMIT 1",
+                "ORDER BY priority,rowid",
                 legacy_apis,
-            ).fetchone()
-            recovered_legacy = row is not None
+            ).fetchall()
+            for candidate in candidates:
+                candidate_job = json.loads(candidate["job"])
+                candidate_result = json.loads(candidate["result"])
+                if self.deferred_split_kind(
+                    candidate_job,
+                    candidate_result,
+                    epoch=candidate["epoch"],
+                ):
+                    row = candidate
+                    recovered_legacy = True
+                    break
         if row is None:
             return None
         if time.monotonic() >= deadline:

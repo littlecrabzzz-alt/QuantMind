@@ -168,6 +168,18 @@ for _api in ("irm_qa_sh", "irm_qa_sz"):
         saturation_param="ts_code",
         recover_legacy_blocked_identifier_fanout=True,
     )
+TEXT_CONTRACTS["npr"].update(
+    saturation_partition_axes=[
+        {
+            "param": "org",
+            "output_field": "puborg",
+            "values": [],
+            "value_kind": "supplier_text",
+        }
+    ],
+    recover_legacy_blocked_observed_fanout=True,
+    recover_legacy_blocked_date_bisection=True,
+)
 
 
 def normalize_anns_d_ts_code(value):
@@ -249,8 +261,9 @@ TEXT_CONTRACT_NOTES = {
         "source_status": "omit org and ptype to cover all; docs only give partial category examples",
         "coverage_gaps": [
             "2026-09-18 live probes returned explicit empty results for documented ptype leaf values, returned group-path values and org+ptype combinations across exact-second, daily and unbounded requests; ptype fanout is disabled",
-            "an org-only daily probe still returned 500 rows with has_more=true, so organization filtering does not close the terminal historical window",
-            "HTML may contain linked attachments that need independent discovery"
+            "retained unfiltered caps fan out by observed puborg values through the documented org input, but the supplier publishes no closed organization universe",
+            "an org-only daily probe still returned 500 rows with has_more=true; time bisection recovers narrower windows while an exact-second organization cap remains an explicit unresolved gap",
+            "HTML may contain linked attachments that need independent discovery",
         ],
     },
     "research_report": {

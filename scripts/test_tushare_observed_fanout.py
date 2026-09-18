@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -48,6 +49,25 @@ class ObservedFanout(unittest.TestCase):
         (self.root / "objects").mkdir(exist_ok=True)
         (self.root / "objects" / (sha + ".json")).write_bytes(raw)
         return {"object_sha256": sha, "observation": "test-observation.json"}
+
+    def legacy_cap(self, params, values, *, priority=5):
+        key = self.p.enqueue("npr", params, priority, "legacy-npr")
+        result = {
+            **self.source(values, "puborg"),
+            "status": "possibly_truncated",
+            "row_count": len(values),
+        }
+        encoded = json.dumps(result)
+        self.p.db.execute(
+            "UPDATE jobs SET state='blocked',tries=1,result=? WHERE id=?",
+            (encoded, key),
+        )
+        self.p.db.execute(
+            "INSERT INTO attempts(job_id,attempt,result) VALUES(?,?,?)",
+            (key, 1, encoded),
+        )
+        self.p.db.commit()
+        return self.p.db.execute("SELECT * FROM jobs WHERE id=?", (key,)).fetchone()
 
     def children(self, parent):
         return [
@@ -201,6 +221,95 @@ class ObservedFanout(unittest.TestCase):
         self.assertEqual(result["method"], "date_bisection")
         self.assertEqual(again["children"], 2)
         self.assertTrue(again["universe_complete"])
+
+    def test_response_field_can_map_to_a_different_request_parameter(self):
+        row, job = self.parent(
+            "npr",
+            start_date="2008-03-28 08:00:00",
+            end_date="2008-03-28 08:00:00",
+        )
+        result = self.p.split_request(
+            row,
+            job,
+            self.source(["国务院", "国务院办公厅", "国务院"], "puborg"),
+        )
+
+        self.assertEqual(result["method"], "observed_value_fanout")
+        self.assertEqual(
+            {child["org"] for child in self.children(row)},
+            {"国务院", "国务院办公厅"},
+        )
+        self.assertTrue(
+            all(
+                child["start_date"] == child["end_date"] for child in self.children(row)
+            )
+        )
+        split, evidence = self.evidence(row)
+        self.assertEqual(split["coverage_proven"], 0)
+        self.assertEqual(evidence["partition_param"], "org")
+        self.assertEqual(evidence["output_field"], "puborg")
+
+    def test_legacy_npr_caps_recover_locally_and_terminal_shape_is_skipped(self):
+        terminal = self.legacy_cap(
+            {
+                "start_date": "2008-03-28 08:00:00",
+                "end_date": "2008-03-28 08:00:00",
+                "org": "国务院",
+            },
+            ["国务院", "国务院"],
+            priority=1,
+        )
+        ranged = self.legacy_cap(
+            {
+                "start_date": "2008-03-28 00:00:00",
+                "end_date": "2008-03-29 00:00:00",
+                "org": "国务院",
+            },
+            ["国务院", "国务院"],
+            priority=2,
+        )
+        observed = self.legacy_cap(
+            {
+                "start_date": "2008-03-28 08:00:00",
+                "end_date": "2008-03-28 08:00:00",
+            },
+            ["国务院", "国务院办公厅"],
+            priority=3,
+        )
+        attempts = list(self.p.db.execute("SELECT * FROM attempts ORDER BY job_id"))
+
+        first = self.p.resume_identifier_split(time.monotonic() + 10, {})
+        second = self.p.resume_identifier_split(time.monotonic() + 10, {})
+        none_left = self.p.resume_identifier_split(time.monotonic() + 10, {})
+
+        self.assertEqual(first["split"]["method"], "date_bisection")
+        self.assertFalse(first["local_only"])
+        self.assertEqual(second["split"]["method"], "observed_value_fanout")
+        self.assertTrue(second["local_only"])
+        self.assertEqual(first["upstream_calls"], 0)
+        self.assertEqual(second["upstream_calls"], 0)
+        self.assertIsNone(none_left)
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (terminal["id"],)
+            ).fetchone()[0],
+            "blocked",
+        )
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (ranged["id"],)
+            ).fetchone()[0],
+            "split_pending",
+        )
+        self.assertEqual(
+            self.p.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (observed["id"],)
+            ).fetchone()[0],
+            "split_pending",
+        )
+        self.assertEqual(
+            list(self.p.db.execute("SELECT * FROM attempts ORDER BY job_id")), attempts
+        )
 
     def test_run_resumes_captured_parent_without_repeating_http(self):
         spec = module.EXTENDED_CONTRACTS["moneyflow_dc"]
