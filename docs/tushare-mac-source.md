@@ -221,8 +221,8 @@ VIP 分页链做覆盖压缩：同一年、同一 P/D/I 类型的四个季度必
 轮转。共享账户/API 限速、已观察冷却、每日总量、任务重试与原始证据写入均不变；
 配置为空时调度行为完全保持原样。
 
-`acquisition_pipeline_depth` 默认 1，有界灰度值可设为 2 或 3。深度大于 1 时默认仍
-只使用一个 HTTP 执行线程：主线程在上一请求进行时等待并持久化下一条合法的
+`acquisition_pipeline_depth` 默认 1，有界在线验收值可设为 2、3 或 4。
+深度大于 1 时默认仍只使用一个 HTTP 执行线程：主线程在上一请求进行时等待并持久化下一条合法的
 账户/API 频控槽，最多预取 `depth - 1` 条任务，从而重叠网络时间和限速等待，
 不形成未经频控预留的请求突发。预取任务在请求前以
 `inflight` 状态和频控槽一起提交；进程异常退出后，新 owner 只把该状态恢复为
@@ -234,8 +234,8 @@ VIP 分页链做覆盖压缩：同一年、同一 P/D/I 类型的四个季度必
 HTTP worker 和一条预取任务移入独立进程，Token 通过进程初始化管道传递，不进入命令
 参数、配置或报告；账户/API 频控预留、结果事务和唯一写入者仍由原主进程控制。
 当 HTTP+原始对象落盘已成为真实瓶颈时，可在 process 模式下将
-`acquisition_capture_workers` 从默认 1 逐级灰度设为 2 或 3，且 worker 不得超过
-pipeline depth。主进程仍在每次提交前逐个持久化共享账户和 API gate，因此并发
+`acquisition_capture_workers` 从默认 1 逐级在线验收为 2、3 或 4，且 worker
+不得超过 pipeline depth。主进程仍在每次提交前逐个持久化共享账户和 API gate，因此并发
 worker 只重叠已合法预留的网络/落盘时间，不放宽分钟频次、
 接口特殊上限或每日配额。报告中的 `http_workers` 必须与实际值一致。
 若 `account_gate_requested_sleep` 与 `account_gate_sleep` 继续显示同进程文档线程阻塞
