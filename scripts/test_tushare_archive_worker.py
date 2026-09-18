@@ -119,7 +119,7 @@ class WorkerStatus(unittest.TestCase):
             ('document_overlap_parse_download', 1),
             ('document_overlap_parse_download', 'true'),
             ('document_parse_workers', 0),
-            ('document_parse_workers', 4),
+            ('document_parse_workers', 5),
             ('document_parse_workers', True),
         ):
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
@@ -138,8 +138,8 @@ class WorkerStatus(unittest.TestCase):
         self.assertEqual(worker.document_limits({
             'document_download_workers': 6,
             'document_overlap_parse_download': True,
-            'document_parse_workers': 3,
-        })[-1], 3)
+            'document_parse_workers': 4,
+        })[-1], 4)
 
     def test_document_process_executes_with_task_local_database(self):
         with tempfile.TemporaryDirectory() as directory:
