@@ -27,3 +27,7 @@ v4 在 Linux 保留 1 GiB `RLIMIT_AS`，在 macOS 由父进程通过 `libproc` �
 按前三轮 497 次解析/307.105 秒的实测速度，当前约 2.25 万个旧环境失败预计约 3.9 小时完成重跑，实际会受新文档注册和文件复杂度影响。该估计只针对旧 PDF 文本缺口；第三轮仍有 1,620,644 个待下载文档和 82,624 个 `parse_pending`，全量本地化任务继续运行，不能声明全部完成。
 
 `planning_only` 是历史内部状态名，表示持久化扩展生产任务队列，不是 dry-run 或演练；该轮不调用 Tushare，但同一 worker 仍执行正式文档下载与解析。没有凭据、Token 或订单信息写入本记录。
+
+## 云端边界与同步
+
+双端 `handoff --align-git mac` 已先完成工作文件和 Git HEAD 快进；命令随后只因 Mac 本地沙盒 API `127.0.0.1:8000` 未启动而在服务预检返回连接拒绝。云端物理项目仍为 `/root/data/disk/quantmind/project`，HEAD、`origin/master` 和 Mac 当时均为 `b7342846`，解析器 SHA 与 Mac 相同。云端全量归档 worker 数为 0，`data/tushare/ARCHIVE_RELOCATED.json` 存在，未恢复 Tushare Pro 写入。`tushare-research-cache.timer` 保持 enabled/active，13:43:06 CST 最近一次执行 `Result=success`、退出码 0，下一次为 13:58:25 CST。云端只继续取得经校验的研究子集，因此本次无需重启业务服务或部署全量解析 worker。
