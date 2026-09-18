@@ -884,7 +884,7 @@ class Pipeline:
                         and not config.get("enable_" + spec["group"])
                     )
                     or resolved.get("review_required")
-                    or resolved.get("rpm") != int(rpm)
+                    or resolved.get("rpm", 0) < int(rpm)
                 ):
                     raise ValueError(
                         "Throughput fast lane requires reviewed account-rate APIs"
