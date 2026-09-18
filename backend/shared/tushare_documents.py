@@ -24,7 +24,7 @@ import sys
 import tempfile
 import time
 from datetime import date, datetime, timezone
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from uuid import uuid4
 from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 
@@ -1156,6 +1156,7 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
         "finish_db_wait_seconds": 0.0,
         "finish_db_total_seconds": 0.0,
         "download_jobs": 0,
+        "download_refills": 0,
         "download_job_seconds": 0.0,
         "download_waves": 0,
         "download_wave_seconds": 0.0,
@@ -1201,6 +1202,11 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                 if phase == "download":
                     wave_started = time.monotonic()
                     wave_job_seconds = 0.0
+                    # Refill each slot within a short burst, then drain parses.
+                    wave_job_limit = min(
+                        download_workers * 4, max_documents - processed
+                    )
+                    wave_job_count = 0
 
                     def transfer(job):
                         budget = min(20, max(0.001, deadline - time.monotonic()))
@@ -1220,26 +1226,52 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                     # Bounded subprocess waiters only; SQLite and parsing stay here.
                     with ThreadPoolExecutor(max_workers=download_workers) as pool:
                         futures = {pool.submit(transfer, job): job for job in jobs}
-                        for future in as_completed(futures):
-                            job = futures[future]
-                            result, job_error, job_seconds = future.result()
-                            timing["download_jobs"] += 1
-                            timing["download_job_seconds"] += job_seconds
-                            wave_job_seconds += job_seconds
-                            if job_error is not None:
-                                result = _document_failure(job, "download", job_error)
-                            _finish_document(db, owner, job, result, "download", timing)
-                            phase_counts["download"] += 1
-                            processed += 1
+                        claimed = len(jobs)
+                        while futures:
+                            completed, _ = wait(
+                                futures, return_when=FIRST_COMPLETED
+                            )
+                            for future in completed:
+                                job = futures.pop(future)
+                                result, job_error, job_seconds = future.result()
+                                timing["download_jobs"] += 1
+                                timing["download_job_seconds"] += job_seconds
+                                wave_job_seconds += job_seconds
+                                if job_error is not None:
+                                    result = _document_failure(
+                                        job, "download", job_error
+                                    )
+                                _finish_document(
+                                    db, owner, job, result, "download", timing
+                                )
+                                phase_counts["download"] += 1
+                                processed += 1
+                                wave_job_count += 1
+                                remaining = deadline - time.monotonic()
+                                if claimed >= wave_job_limit or remaining <= 0:
+                                    continue
+                                replacement = _claim_documents(
+                                    db,
+                                    owner,
+                                    "download",
+                                    1,
+                                    min(20, remaining),
+                                    timing,
+                                )
+                                if replacement:
+                                    next_job = replacement[0]
+                                    futures[pool.submit(transfer, next_job)] = next_job
+                                    claimed += 1
+                                    timing["download_refills"] += 1
                     wave_seconds = time.monotonic() - wave_started
-                    slot_capacity = len(jobs) * wave_seconds
+                    slot_capacity = min(download_workers, claimed) * wave_seconds
                     timing["download_waves"] += 1
                     timing["download_wave_seconds"] += wave_seconds
                     timing["download_slot_capacity_seconds"] += slot_capacity
                     timing["download_slot_idle_seconds"] += max(
                         0.0, slot_capacity - wave_job_seconds
                     )
-                    parse_turns = download_workers
+                    parse_turns = wave_job_count
                 else:
                     job = jobs[0]
                     actual_phase = (

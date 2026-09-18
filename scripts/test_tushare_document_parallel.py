@@ -211,6 +211,36 @@ class ParallelDocuments(unittest.TestCase):
             1,
         )
 
+    def test_fast_slot_refills_before_slow_peer_finishes(self):
+        self.seed(5)
+        initial = threading.Barrier(2)
+        refill_started = threading.Event()
+        call_lock = threading.Lock()
+        calls = 0
+
+        def fetch(url, root, timeout, *, download_only=False):
+            nonlocal calls
+            with call_lock:
+                calls += 1
+                call_number = calls
+            if call_number <= 2:
+                initial.wait(timeout=2)
+            if call_number == 1:
+                self.assertTrue(refill_started.wait(timeout=2))
+            elif call_number >= 3:
+                refill_started.set()
+            return self.download(parse="not_applicable")
+
+        with patch.object(docs, "_download_job", side_effect=fetch):
+            report = docs.run_documents(
+                self.root, max_documents=5, max_seconds=2, download_workers=2
+            )
+        self.assertEqual(report["phase_counts"], {"download": 5, "parse": 0})
+        self.assertEqual(report["timing"]["download_refills"], 3)
+        self.assertEqual(report["timing"]["download_waves"], 1)
+        self.assertEqual(self.query("SELECT count(*) FROM document_claims")[0][0], 0)
+        self.assertEqual(self.query("SELECT count(*) FROM document_attempts")[0][0], 5)
+
     def test_download_wave_timing_exposes_idle_slot(self):
         self.seed(2)
         barrier = threading.Barrier(2)
