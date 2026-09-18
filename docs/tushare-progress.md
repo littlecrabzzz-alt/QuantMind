@@ -1452,3 +1452,9 @@ Mac标准LaunchAgent第276轮下载6063个新增文件，全量校验983029项�
 近期生产计划共 296 个根范围，得到 174 个非空完整链和 122 个 `empty_unverified` 根范围；650 页合计 528374 行，最大 offset 11000，分页错误、重复页、缺页和 schema 变化均为 0。下一次自动规划跨已有结果审计 953 页、确认 212 个完整范围、`invalid_pages=0`，将 133173 个同范围同字段的旧 pending 逐股票任务及 23 个旧 `split_pending` 根任务标记为 `superseded`；终态任务不改，attempt/result 全保留。压缩后同轮继续 240 次真实请求，blocked 仍为 871，pending 降至 2693767。
 
 实现、优先规划和可观察性提交均已进入 master、本机运行时和云端工作树；完整 Tushare 套件 1373 项通过、5 项跳过。云端继续仅运行研究缓存 timer，全量写入进程为 0、迁移标记 `source_paused=true`。本地全量历史与文档采集继续；空响应完整性、开放历史链、修订、`known_at` 和 PIT 尚未闭合。机器证据为 `docs/tushare-financial-vip-pagination-live-evidence.json`。
+
+## 2026-09-19 本地文档 12 路下载生产验收
+
+为消化 Mac 本地约 472 万个待下载附件，已将现有有界文档下载并发的配置上限从 8 扩到 16，生产只灰度到 12。每轮 2500 阶段/100 秒、单文档 20 秒/256 MiB、持久 claim、来源保护、解析边界和 Tushare 所有限速未改。完整 Tushare 套件 1373 项及 1040 个子用例通过，Ruff、编译和 diff check 通过。
+
+8 路相邻六轮平均/中位为 2025/1997 阶段；12 路六轮共完成 14422 阶段，平均/中位 2403.667/2390，提高 18.7%/19.68%。同期 4639 次 Tushare 请求全部 HTTP 200，失败阶段和 stderr 新增均为 0，下载/解析失败率没有上升，系统无内存节流。因此保留 12 路，不直接跳到 16；全量采集继续。机器证据为 `docs/tushare-document-download12-production.json`。

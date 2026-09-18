@@ -1,0 +1,101 @@
+{
+  "accepted_at": "2026-09-18T21:00:11.104738+00:00",
+  "baseline_8_workers": {
+    "cycles": 6,
+    "document_attempts": {
+      "download": {
+        "download_error": 2,
+        "download_timeout": 31,
+        "downloaded": 6101,
+        "http_error": 18,
+        "pdf_content_mismatch": 4,
+        "unsupported_or_invalid_document": 3
+      },
+      "parse": {
+        "encrypted": 178,
+        "no_text": 192,
+        "parse_failed": 14,
+        "parse_timeout": 24,
+        "parsed": 5583
+      },
+      "rows": 12150
+    },
+    "mean_documents_per_cycle": 2025.0,
+    "median_documents_per_cycle": 1997.0,
+    "mean_tushare_requests_per_cycle": 719.667
+  },
+  "code": {
+    "candidate_commit": "42622309",
+    "master_commit": "cf541531ac41b71e5570f5b249fe92320141f762",
+    "runtime_documents_sha256": "f5b87f9d0febeff5f16457d214b05e91d5025b588487733bb57a206e0806b8b1",
+    "runtime_worker_sha256": "b2fccebdf9123fa46e1ad9e165189ecd9494888e35c15b89c153df52a7125dc2"
+  },
+  "configuration": {
+    "accepted_download_workers": 12,
+    "configured_upper_bound": 16,
+    "enabled_mode": "0600",
+    "enabled_sha256": "6b45163b577df25f4e6842501fc95128649c5b129daddf3958224864008eda40",
+    "pipeline_config_after_sha256": "83d4e50347d2fdb32b29a441da2ba1a4fe5cdc02cf81e6ea1391088d1d820c0b",
+    "pipeline_config_before_sha256": "d1c92a20063797e4ea8c3a16f4baec51f583e381a4008a5c4c9e8129ca3faaf7",
+    "pipeline_config_mode": "0600"
+  },
+  "gray_12_workers": {
+    "cycles": 6,
+    "document_attempts": {
+      "download": {
+        "download_error": 1,
+        "download_timeout": 20,
+        "downloaded": 7294,
+        "http_error": 13,
+        "pdf_content_mismatch": 9,
+        "unsupported_or_invalid_document": 6
+      },
+      "parse": {
+        "encrypted": 210,
+        "no_text": 252,
+        "parse_failed": 17,
+        "parse_timeout": 15,
+        "parsed": 6585
+      },
+      "rows": 14422
+    },
+    "documents": 14422,
+    "download_jobs": 7343,
+    "failed_stages": 0,
+    "max_rss_kib": 167808,
+    "mean_documents_per_cycle": 2403.667,
+    "mean_gain_percent": 18.7,
+    "mean_tushare_requests_per_cycle": 773.167,
+    "median_documents_per_cycle": 2390.0,
+    "median_gain_percent": 19.68,
+    "parse_jobs": 7079,
+    "stderr_growth_bytes": 0,
+    "tushare_attempts": {
+      "http_200": 4639,
+      "statuses": {
+        "empty_unverified": 1694,
+        "possibly_truncated": 202,
+        "sample_ok": 2743
+      }
+    },
+    "tushare_requests": 4639
+  },
+  "limits_unchanged": [
+    "2500 document stages per cycle",
+    "100 second document deadline",
+    "20 second per-download deadline",
+    "256 MiB per-document limit",
+    "durable claims and retries",
+    "source validation and private-address rejection",
+    "Tushare account, API and daily quota gates"
+  ],
+  "raw_business_rows_included": false,
+  "schema": "quantmind.tushare.document-download-gray.v1",
+  "secret_material_included": false,
+  "tests": {
+    "full_suite": "1373 passed, 1040 subtests passed",
+    "full_suite_seconds": 99.86,
+    "full_suite_sha256": "058174712c61fdfe31cc14cac56bc0130b59a32a250560ba288866ef7b2623cf",
+    "targeted": "48 passed, 31 subtests passed"
+  }
+}
