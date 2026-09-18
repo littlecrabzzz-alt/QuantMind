@@ -79,6 +79,46 @@ class MarketPlanning(unittest.TestCase):
             expected,
         )
 
+    def test_fund_nav_recent_date_pagination_is_opt_in_and_history_is_unchanged(self):
+        config = {
+            "history_start": "20240227",
+            "market_apis": ["fund_nav"],
+            "fund_nav_recent_date_pagination": True,
+        }
+        ids = {"funds": [{"ts_code": "000001.OF", "status": "L"}]}
+        jobs = list(iter_market_jobs(config, date(2024, 3, 12), ids))
+        recent = [job for job in jobs if job["epoch"] != "history"]
+        history = [job for job in jobs if job["epoch"] == "history"]
+
+        self.assertEqual(len(recent), 7)
+        self.assertEqual(
+            {job["params"]["nav_date"] for job in recent},
+            {f"202403{day:02d}" for day in range(5, 12)},
+        )
+        self.assertTrue(all(set(job["params"]) == {"nav_date"} for job in recent))
+        self.assertEqual(len(history), 1)
+        self.assertEqual(
+            history[0]["params"],
+            {
+                "ts_code": "000001.OF",
+                "start_date": "20240227",
+                "end_date": "20240304",
+            },
+        )
+
+    def test_fund_nav_recent_date_pagination_flag_must_be_boolean(self):
+        with self.assertRaisesRegex(ValueError, "must be boolean"):
+            list(
+                iter_market_jobs(
+                    {
+                        "history_start": "20240101",
+                        "market_apis": ["fund_nav"],
+                        "fund_nav_recent_date_pagination": "yes",
+                    },
+                    date(2024, 1, 3),
+                )
+            )
+
     def test_all_foundation_variants_and_old_unknown_statuses(self):
         config = {
             "history_start": "20240101",
@@ -153,6 +193,9 @@ class MarketPlanning(unittest.TestCase):
             {"offset_param": "offset", "limit_param": "limit", "page_size": 15000},
         )
         self.assertTrue(MARKET_CONTRACTS["fund_basic"]["pagination_live_verified"])
+        self.assertEqual(
+            MARKET_CONTRACTS["fund_nav"]["pagination_required_param"], "nav_date"
+        )
         self.assertNotIn("saturation_param", MARKET_CONTRACTS["index_weight"])
 
     def test_dependencies_and_invalid_identifiers(self):

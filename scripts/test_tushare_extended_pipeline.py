@@ -578,6 +578,134 @@ class ExtendedPipeline(unittest.TestCase):
                 )
                 p.close()
 
+    def test_fund_nav_date_pagination_does_not_change_per_fund_history(self):
+        p = self.pipeline()
+        recent_id = p.enqueue("fund_nav", {"nav_date": "20260917"})
+        history_id = p.enqueue(
+            "fund_nav",
+            {
+                "ts_code": "000001.OF",
+                "start_date": "20200101",
+                "end_date": "20260917",
+            },
+            epoch="history",
+        )
+        p.db.commit()
+        recent = json.loads(
+            p.db.execute("SELECT job FROM jobs WHERE id=?", (recent_id,)).fetchone()[0]
+        )
+        history = json.loads(
+            p.db.execute("SELECT job FROM jobs WHERE id=?", (history_id,)).fetchone()[0]
+        )
+        self.assertEqual(recent["params"]["limit"], 1000)
+        self.assertNotIn("limit", history["params"])
+        self.assertNotIn("offset", history["params"])
+        p.close()
+
+        offsets = []
+
+        def handler(request):
+            payload = json.loads(request.content)
+            params = payload["params"]
+            offsets.append(params.get("offset", 0))
+            values = (
+                [
+                    {"ts_code": "000001.OF", "nav_date": "20260917"},
+                    {"ts_code": "000002.OF", "nav_date": "20260917"},
+                ]
+                if params.get("offset", 0) == 0
+                else [{"ts_code": "000003.OF", "nav_date": "20260917"}]
+            )
+            fields = payload["fields"].split(",")
+            return httpx.Response(
+                200,
+                json={
+                    "code": 0,
+                    "data": {
+                        "fields": fields,
+                        "items": [
+                            [row.get(field) for field in fields] for row in values
+                        ],
+                    },
+                },
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            p = module.Pipeline(tmp, CATALOG)
+            p.enqueue(
+                "fund_nav",
+                {"nav_date": "20260917", "limit": 2},
+                epoch="20260918",
+            )
+            p.db.commit()
+            with httpx.Client(
+                transport=httpx.MockTransport(handler), trust_env=False
+            ) as client:
+                report = p.run(
+                    client,
+                    "synthetic-test-token",
+                    CONFIG,
+                    max_requests=5,
+                    max_seconds=2,
+                    pause=0,
+                )
+            self.assertEqual(report["requests"], 2)
+            self.assertEqual(offsets, [0, 2])
+            self.assertEqual(p.status(), {"done": 2})
+            tail = json.loads(
+                p.db.execute(
+                    "SELECT result FROM jobs "
+                    "WHERE json_extract(job,'$.params.offset')=2"
+                ).fetchone()[0]
+            )
+            self.assertTrue(tail["pagination_end"])
+            p.close()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            p = module.Pipeline(tmp, CATALOG)
+            p.enqueue(
+                "fund_nav",
+                {
+                    "ts_code": "000001.OF",
+                    "start_date": "20200101",
+                    "end_date": "20260917",
+                },
+                epoch="history",
+            )
+            p.db.commit()
+
+            def history_handler(request):
+                payload = json.loads(request.content)
+                self.assertNotIn("limit", payload["params"])
+                self.assertNotIn("offset", payload["params"])
+                fields = payload["fields"].split(",")
+                row = {"ts_code": "000001.OF", "nav_date": "20260917"}
+                return httpx.Response(
+                    200,
+                    json={
+                        "code": 0,
+                        "data": {
+                            "fields": fields,
+                            "items": [[row.get(field) for field in fields]],
+                        },
+                    },
+                )
+
+            with httpx.Client(
+                transport=httpx.MockTransport(history_handler), trust_env=False
+            ) as client:
+                report = p.run(
+                    client,
+                    "synthetic-test-token",
+                    CONFIG,
+                    max_requests=1,
+                    max_seconds=2,
+                    pause=0,
+                )
+            self.assertEqual(report["requests"], 1)
+            self.assertEqual(p.status(), {"done": 1})
+            p.close()
+
     def test_v1_and_v2_migrations_preserve_jobs_attempts_and_gates(self):
         for version in (1, 2):
             with self.subTest(version=version), tempfile.TemporaryDirectory() as tmp:

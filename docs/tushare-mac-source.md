@@ -203,6 +203,14 @@ Tushare，成功后由原生 worker 最少等待 5 秒便进入下一次真实�
 发布优先级、规划断点、请求频控与失败恢复语义不变。预算不足时保持
 `planning_only` 并按原 5 秒最小延迟进入下轮。
 
+`fund_nav_recent_date_pagination` 默认关闭。启用后，近期七天的基金净值按精确
+`nav_date` 生成根任务，并使用已在 Mac 权威归档上实测通过的 1,000 行
+`limit/offset` 分页链；历史范围仍按每只基金的 `ts_code + start_date/end_date`
+补采。分页只对含 `nav_date` 的新任务生效，既有逐基金任务、结果和尝试均保留并
+正常排空，不以一次近期分页探针替代历史完整性。脱敏证据见
+`docs/tushare-fund-nav-pagination-live-evidence.json`；官方参数表未列出分页参数，
+因此该能力必须保留为可回退的灰度开关。
+
 `fina_mainbz_vip` 与逐股票 `fina_mainbz` 的历史任务可能暂时并存。每次规划后只对 10,000 行合同的
 VIP 分页链做覆盖压缩：同一年、同一 P/D/I 类型的四个季度必须均以连续 offset
 分页到不足 10,000 行的终页，才将同字段的逐股票完整年度待采任务标记为

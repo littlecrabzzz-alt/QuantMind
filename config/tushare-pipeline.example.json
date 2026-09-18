@@ -24,6 +24,7 @@
   "enable_text": true,
   "enable_structured": true,
   "enable_market": true,
+  "fund_nav_recent_date_pagination": false,
   "enable_fina_mainbz_vip": false,
   "fina_mainbz_vip_history_start": "19900101",
   "text_history_window": "month",

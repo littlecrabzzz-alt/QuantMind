@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "api_name": "fund_nav",
+  "source_document": "https://tushare.pro/document/2?doc_id=119",
+  "observed_at": "2026-09-18T18:54:00+08:00",
+  "authority": "mac_local_archive_owner",
+  "probe": {
+    "params": {
+      "nav_date": "20260917",
+      "limit": 1000,
+      "offset_sequence": "0..24000"
+    },
+    "pages": 25,
+    "rows": 24354,
+    "tail_rows": 354,
+    "page_overlap_rows": 0,
+    "first_page_refetch_stable": true,
+    "verified_observations": 26,
+    "release_id": "probe-675278ec417347e48eb6d29eb0e98f1b"
+  },
+  "private_evidence": {
+    "filename": "fund-nav-pagination-probe-v1.b00e69a0b8fc2a6520835ebfecd83678cc26b22aeeb30a726a71614af07583a7.json",
+    "sha256": "b00e69a0b8fc2a6520835ebfecd83678cc26b22aeeb30a726a71614af07583a7"
+  },
+  "decision": {
+    "recent_jobs": "opt_in_exact_nav_date_limit_offset",
+    "historical_jobs": "unchanged_per_fund_date_ranges",
+    "existing_jobs": "preserved_until_normal_drain_or_separate_coverage_reconciliation"
+  },
+  "limitations": [
+    "The public parameter table does not document limit or offset.",
+    "The live proof covers one recent nav_date and a 1000-row page size.",
+    "This evidence does not prove that per-fund historical ranges can be retired."
+  ]
+}

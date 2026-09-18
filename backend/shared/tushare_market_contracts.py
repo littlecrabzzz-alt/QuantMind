@@ -155,6 +155,22 @@ MARKET_CONTRACTS["fund_basic"].update(
         "pages and a finite has_more=false tail."
     ),
 )
+MARKET_CONTRACTS["fund_nav"].update(
+    pagination={
+        "offset_param": "offset",
+        "limit_param": "limit",
+        "page_size": 1000,
+    },
+    pagination_live_verified=True,
+    pagination_required_param="nav_date",
+    pagination_note=(
+        "The public page documents nav_date but omits pagination parameters. "
+        "A production-authority probe on 2026-09-18 verified stable 1,000-row "
+        "limit/offset pages and a finite short tail for one exact nav_date. "
+        "Pagination is therefore limited to opt-in nav_date jobs; per-fund "
+        "historical ranges retain their existing request identities."
+    ),
+)
 MARKET_CONTRACTS["fund_share"]["history_partition"] = (
     "closed_calendar_month_range_v1"
 )
@@ -225,6 +241,9 @@ def iter_market_jobs(config, today, identifiers=None):
     enabled = set(config.get("market_apis", MARKET_CONTRACTS))
     if enabled - MARKET_CONTRACTS.keys():
         raise ValueError("Unknown market API")
+    fund_nav_date_pagination = config.get("fund_nav_recent_date_pagination", False)
+    if not isinstance(fund_nav_date_pagination, bool):
+        raise ValueError("fund_nav_recent_date_pagination must be boolean")
     ids = identifiers or {}
     codes = {
         family: _codes(ids, family) for family in ("funds", "indexes", "bonds", "sw_l3")
@@ -289,6 +308,17 @@ def iter_market_jobs(config, today, identifiers=None):
         priority, version = (25, epoch) if phase == "recent" else (45, "history")
         for api, family in (("fund_nav", "funds"), ("cb_share", "bonds")):
             if api in enabled:
+                if api == "fund_nav" and phase == "recent" and fund_nav_date_pagination:
+                    day = right
+                    while day >= left:
+                        yield job(
+                            api,
+                            {"nav_date": day.strftime("%Y%m%d")},
+                            priority,
+                            version,
+                        )
+                        day -= timedelta(days=1)
+                    continue
                 for code in codes[family]:
                     # One full interval; the shared collector bisects capped windows.
                     params = {

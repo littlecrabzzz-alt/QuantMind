@@ -316,6 +316,8 @@ def _planning_inputs(family, config, identifiers):
     if family == "market_members":
         dependencies.update(MARKET_MEMBER_DEPENDENCIES[api] for api in contracts)
     keys = {"history_start", family + "_apis"}
+    if family == "market":
+        keys.add("fund_nav_recent_date_pagination")
     if family == "portfolio_read":
         keys = {"portfolio_read_apis", "portfolio_read_snapshot_epoch"}
     if family == "market_members":
@@ -1100,11 +1102,14 @@ class Pipeline:
         reuse_recent_open=False,
     ):
         spec = contract_for(api)
-        if spec.get("pagination") and (
+        pagination = spec.get("pagination")
+        required_param = spec.get("pagination_required_param")
+        if pagination and required_param and required_param not in params:
+            pagination = None
+        if pagination and (
             spec.get("group") == "global" or spec.get("pagination_live_verified")
         ):
             params = dict(params)
-            pagination = spec["pagination"]
             params.setdefault(pagination["limit_param"], pagination["page_size"])
         cap, required = (
             CONTRACTS[api]
@@ -5064,7 +5069,11 @@ class Pipeline:
                 if split:
                     result["split"] = split
                     state = "split_pending"
-        pagination = contract_for(job["api_name"]).get("pagination")
+        spec = contract_for(job["api_name"])
+        pagination = spec.get("pagination")
+        required_param = spec.get("pagination_required_param")
+        if pagination and required_param and required_param not in job["params"]:
+            pagination = None
         if job["api_name"] == "fund_adj":
             pagination = {"offset_param": "offset", "limit_param": "limit"}
         if pagination:
@@ -5109,11 +5118,12 @@ class Pipeline:
                         if status in ("sample_ok", "possibly_truncated")
                         else "quality"
                     )
-            elif offset > 0 and count < limit and status in (
+            elif count < limit and status in (
                 "sample_ok",
                 "empty_unverified",
             ):
-                state = "done"
+                if offset > 0:
+                    state = "done"
                 result["pagination_end"] = True
         if result.get("row_count", 0) and status not in (
             "invalid_response",
