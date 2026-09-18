@@ -43,6 +43,9 @@ def document_limits(config):
     count = config.get('document_worker_max_documents', 100)
     seconds = config.get('document_worker_max_seconds', 90)
     workers = config.get('document_download_workers', 1)
+    max_bytes = config.get('document_max_bytes', 25 * 1024 * 1024)
+    retry_interval = config.get('document_terminal_retry_interval_seconds', 86400)
+    retry_max = config.get('document_terminal_retry_max_documents', 16)
     if (
         isinstance(count, bool)
         or not isinstance(count, int)
@@ -53,21 +56,42 @@ def document_limits(config):
         or isinstance(workers, bool)
         or not isinstance(workers, int)
         or workers not in (1, 2, 3, 4)
+        or isinstance(max_bytes, bool)
+        or not isinstance(max_bytes, int)
+        or not 25 * 1024 * 1024 <= max_bytes <= 256 * 1024 * 1024
+        or isinstance(retry_interval, bool)
+        or not isinstance(retry_interval, (int, float))
+        or not 3600 <= retry_interval <= 365 * 86400
+        or isinstance(retry_max, bool)
+        or not isinstance(retry_max, int)
+        or not 0 <= retry_max <= 64
     ):
         raise ValueError(
             'Invalid document worker bounds: 1..1000 stages, '
-            '0..100 seconds, 1..4 downloads'
+            '0..100 seconds, 1..4 downloads, 25..256 MiB, '
+            '3600..31536000 retry seconds, 0..64 retries'
         )
-    return count, float(seconds), workers
+    return count, float(seconds), workers, max_bytes, float(retry_interval), retry_max
 
 
-def execute_documents(root, max_documents, max_seconds, download_workers):
+def execute_documents(
+    root,
+    max_documents,
+    max_seconds,
+    download_workers,
+    max_bytes,
+    terminal_retry_interval_seconds,
+    terminal_retry_max_documents,
+):
     from backend.shared.tushare_documents import run_documents
     return run_documents(
         root,
         max_documents=max_documents,
         max_seconds=max_seconds,
         download_workers=download_workers,
+        max_bytes=max_bytes,
+        terminal_retry_interval_seconds=terminal_retry_interval_seconds,
+        terminal_retry_max_documents=terminal_retry_max_documents,
     )
 
 
@@ -119,12 +143,16 @@ def main():
                             nonlocal documents
                             if (documents is None and config.get('enable_documents')
                                     and shutil.disk_usage(root).free >= 300 * 2**30):
-                                count, seconds, workers = document_limits(config)
+                                limits = document_limits(config)
+                                count, seconds, workers = limits[:3]
                                 documents = pool.submit(
                                     execute_documents, root,
                                     max_documents=count,
                                     max_seconds=seconds,
                                     download_workers=workers,
+                                    max_bytes=limits[3],
+                                    terminal_retry_interval_seconds=limits[4],
+                                    terminal_retry_max_documents=limits[5],
                                 )
                         report['acquisition'] = tick(
                             before_nonpublication_work=start_documents

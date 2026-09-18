@@ -34,6 +34,8 @@ MAX_PARSE_PAGES = 5000
 MAX_PARSE_TEXT_BYTES = 8 * 1024 * 1024
 MAX_PARSE_OUTPUT_BYTES = 32 * 1024 * 1024
 MAX_PARSE_RESIDENT_BYTES = 1024**3
+DEFAULT_DOCUMENT_MAX_BYTES = 25 * 1024 * 1024
+MAX_DOCUMENT_MAX_BYTES = 256 * 1024 * 1024
 
 
 class DocumentError(ValueError):
@@ -436,7 +438,7 @@ def _parse_pdf(path, timeout):
 
 
 def fetch_document(
-    url, root, max_bytes=25 * 1024 * 1024, timeout=20, download_only=False
+    url, root, max_bytes=DEFAULT_DOCUMENT_MAX_BYTES, timeout=20, download_only=False
 ):
     """Download one public PDF/HTML; no redirect, size or parse failure loses state.
 
@@ -459,6 +461,7 @@ def fetch_document(
         "status": "pending",
         "parse_status": "not_attempted",
         "source_url": url,
+        "max_bytes": max_bytes,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "files": [],
         "redirects": [],
@@ -466,7 +469,10 @@ def fetch_document(
         "received_bytes": 0,
     }
     root = Path(root).resolve()
-    current = url
+    current = url.strip(" ") if isinstance(url, str) else url
+    if current != url:
+        result["normalized_source_url"] = current
+        result["source_url_normalization"] = "trim_ascii_space"
     try:
         for redirects in range(MAX_REDIRECTS + 1):
             current, scheme, host, port, target, address = _target(current)
@@ -554,9 +560,9 @@ def fetch_document(
                         for u in (url, current)
                     )
                 )
-                is_pdf = payload.startswith(b"%PDF-") and payload.rstrip().endswith(
-                    b"%%EOF"
-                )
+                pdf_prefix = payload.startswith(b"%PDF-")
+                pdf_eof = payload.rstrip().endswith(b"%%EOF")
+                is_pdf = pdf_prefix
                 is_html = bool(
                     re.search(
                         rb"<(?:!doctype\s+html|html|head|body|div|p)(?:\s|>)",
@@ -594,11 +600,11 @@ def fetch_document(
                     else "script_challenge"
                     if is_challenge
                     else "pdf_envelope"
-                    if is_pdf
+                    if pdf_prefix and pdf_eof
+                    else "pdf_prefix"
+                    if pdf_prefix
                     else "html"
                     if is_html
-                    else "malformed_pdf_envelope"
-                    if payload.startswith(b"%PDF-")
                     else "unknown"
                 )
                 reason = (
@@ -640,7 +646,9 @@ def fetch_document(
                 )
                 result["files"].append(artifact)
                 if is_pdf:
-                    result["validation_status"] = "pdf_envelope_only"
+                    result["validation_status"] = (
+                        "pdf_envelope_only" if pdf_eof else "pdf_prefix_only"
+                    )
                     if download_only:
                         result["parse_status"] = "parse_pending"
                         return result
@@ -967,7 +975,14 @@ def enqueue_documents(root, observation, api_name, records, fields, *, deadline=
             db.close()
 
 
-def _download_job(url, root, timeout, *, download_only=False):
+def _download_job(
+    url,
+    root,
+    timeout,
+    *,
+    download_only=False,
+    max_bytes=DEFAULT_DOCUMENT_MAX_BYTES,
+):
     """Bound the complete download (including DNS/redirects and PDF subprocess)."""
     deadline_at = time.time() + timeout
     worker = subprocess.Popen(
@@ -986,6 +1001,7 @@ def _download_job(url, root, timeout, *, download_only=False):
                     "root": str(root),
                     "timeout": min(20, timeout),
                     "download_only": download_only,
+                    "max_bytes": max_bytes,
                     "deadline_at": deadline_at,
                 }
             ),
@@ -1155,6 +1171,129 @@ def _claims_setup(db, timing=None):
         _add_elapsed(timing, "setup_db_total_seconds", started)
 
 
+def _schedule_terminal_retries(
+    db,
+    *,
+    now,
+    interval_seconds,
+    max_documents,
+    max_bytes,
+):
+    """Reopen bounded transient terminal gaps without erasing their evidence."""
+    buckets = {
+        "normalized_url": [],
+        "larger_size_limit": [],
+        "source_challenge": [],
+        "content_recheck": [],
+        "transient_failure": [],
+    }
+    rows = db.execute(
+        "SELECT id,url,download_tries,retry_after,result FROM documents "
+        "INDEXED BY document_status_counts WHERE download_status='blocked' "
+        "ORDER BY parse_status,id"
+    ).fetchall()
+    cutoff = now - interval_seconds
+    for row in rows:
+        result = json.loads(row["result"])
+        attempted_at = result.get("attempted_at") or result.get("fetched_at")
+        if attempted_at is not None:
+            try:
+                attempted = datetime.fromisoformat(attempted_at)
+            except (TypeError, ValueError) as exc:
+                raise DocumentError("invalid_document_attempt_time") from exc
+            if attempted.tzinfo is None:
+                raise DocumentError("naive_document_attempt_time")
+            last_attempt = attempted.timestamp()
+        else:
+            last_attempt = row["retry_after"]
+        if last_attempt > cutoff:
+            continue
+        status = result.get("status")
+        category = None
+        if status == "invalid_url" and row["url"].strip(" ") != row["url"]:
+            category = "normalized_url"
+        elif status == "size_limit":
+            previous_limit = result.get("max_bytes", DEFAULT_DOCUMENT_MAX_BYTES)
+            declared = (result.get("response_headers") or {}).get("content-length")
+            if (
+                type(previous_limit) is int
+                and previous_limit < max_bytes
+                and (
+                    declared is None
+                    or (isinstance(declared, str) and declared.isdecimal() and int(declared) <= max_bytes)
+                )
+            ):
+                category = "larger_size_limit"
+        elif status == "source_challenge":
+            category = "source_challenge"
+        elif status == "pdf_content_mismatch":
+            category = "content_recheck"
+        elif status in {"download_timeout", "download_error", "http_error"}:
+            category = "transient_failure"
+        if category is not None:
+            buckets[category].append(row)
+
+    selected = []
+    categories = tuple(buckets)
+    while len(selected) < max_documents:
+        progressed = False
+        for category in categories:
+            if buckets[category] and len(selected) < max_documents:
+                selected.append((category, buckets[category].pop(0)))
+                progressed = True
+        if not progressed:
+            break
+    report = {
+        "status": "no_action",
+        "interval_seconds": interval_seconds,
+        "max_documents": max_documents,
+        "eligible": sum(len(values) for values in buckets.values()) + len(selected),
+        "scheduled": [],
+        "preserved_attempts": 0,
+        "upstream_calls": 0,
+    }
+    if not selected:
+        return report
+    attempts = {
+        row["id"]: db.execute(
+            "SELECT count(*) FROM document_attempts WHERE document_id=?", (row["id"],)
+        ).fetchone()[0]
+        for _, row in selected
+    }
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        for category, row in selected:
+            changed = db.execute(
+                "UPDATE documents SET download_status='retry',retry_after=0 "
+                "WHERE id=? AND download_status='blocked' "
+                "AND download_tries=? AND result=?",
+                (row["id"], row["download_tries"], row["result"]),
+            ).rowcount
+            if changed != 1:
+                raise DocumentError("terminal_document_changed_during_recovery")
+            saved = db.execute(
+                "SELECT download_tries,result FROM documents WHERE id=?", (row["id"],)
+            ).fetchone()
+            if tuple(saved) != (row["download_tries"], row["result"]):
+                raise DocumentError("terminal_document_evidence_changed")
+            if db.execute(
+                "SELECT count(*) FROM document_attempts WHERE document_id=?", (row["id"],)
+            ).fetchone()[0] != attempts[row["id"]]:
+                raise DocumentError("terminal_document_attempts_changed")
+            report["scheduled"].append(
+                {"document_id": row["id"], "category": category}
+            )
+        db.commit()
+    except BaseException:
+        db.rollback()
+        raise
+    report.update(
+        status="scheduled",
+        preserved_attempts=sum(attempts.values()),
+    )
+    return report
+
+
 def _eligible_documents(db, phase, now, limit):
     rows = []
     unclaimed = (
@@ -1261,6 +1400,9 @@ def _finish_document(db, owner, job, result, phase, timing=None):
             ).fetchone()
             if not claim or claim[0] != owner:
                 raise DocumentError("stale_document_claim")
+            result["attempted_at"] = datetime.fromtimestamp(
+                claim[1], timezone.utc
+            ).isoformat()
             db.execute(
                 "INSERT INTO document_attempts(document_id,phase,result,created_at) VALUES(?,?,?,?)",
                 (job["id"], phase, json.dumps(result), claim[1]),
@@ -1297,7 +1439,16 @@ def _document_failure(job, phase, exc):
     }
 
 
-def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
+def run_documents(
+    root,
+    max_documents=1,
+    max_seconds=30,
+    *,
+    download_workers=1,
+    max_bytes=DEFAULT_DOCUMENT_MAX_BYTES,
+    terminal_retry_interval_seconds=86400,
+    terminal_retry_max_documents=16,
+):
     """Advance bounded phases; parallel transfers never overlap a PDF parser.
 
     One durable owner per document, global consumer lock, expiry after child total
@@ -1319,11 +1470,36 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
         raise ValueError("max_seconds must be between 0 and 300")
     if type(download_workers) is not int or download_workers not in (1, 2, 3, 4):
         raise ValueError("download_workers must be 1, 2, 3, or 4")
+    if (
+        type(max_bytes) is not int
+        or not DEFAULT_DOCUMENT_MAX_BYTES <= max_bytes <= MAX_DOCUMENT_MAX_BYTES
+    ):
+        raise ValueError("max_bytes must be between 25 MiB and 256 MiB")
+    if (
+        type(terminal_retry_interval_seconds) not in (int, float)
+        or isinstance(terminal_retry_interval_seconds, bool)
+        or not 3600 <= terminal_retry_interval_seconds <= 365 * 86400
+    ):
+        raise ValueError("terminal_retry_interval_seconds must be 3600..31536000")
+    if (
+        type(terminal_retry_max_documents) is not int
+        or not 0 <= terminal_retry_max_documents <= 64
+    ):
+        raise ValueError("terminal_retry_max_documents must be 0..64")
     root = Path(root).resolve()
     db = _document_db(root)
     processed, started, owner = 0, time.monotonic(), uuid4().hex
     deadline = started + max_seconds
     phase_counts = {"download": 0, "parse": 0}
+    terminal_recovery = {
+        "status": "no_action",
+        "interval_seconds": terminal_retry_interval_seconds,
+        "max_documents": terminal_retry_max_documents,
+        "eligible": 0,
+        "scheduled": [],
+        "preserved_attempts": 0,
+        "upstream_calls": 0,
+    }
     timing = {
         "setup_db_calls": 0,
         "setup_db_wait_seconds": 0.0,
@@ -1354,6 +1530,14 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
             except BlockingIOError:
                 return {"status": "already_running", "processed": 0}
             _claims_setup(db, timing)
+            if max_documents and terminal_retry_max_documents:
+                terminal_recovery = _schedule_terminal_retries(
+                    db,
+                    now=time.time(),
+                    interval_seconds=terminal_retry_interval_seconds,
+                    max_documents=terminal_retry_max_documents,
+                    max_bytes=max_bytes,
+                )
             parse_turns = 1  # Finish old pending parses before admitting more raw PDFs.
             while processed < max_documents and time.monotonic() < deadline:
                 remaining = deadline - time.monotonic()
@@ -1391,9 +1575,10 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                         budget = min(20, max(0.001, deadline - time.monotonic()))
                         job_started = time.monotonic()
                         try:
-                            result = _download_job(
-                                job["url"], root, budget, download_only=True
-                            )
+                            options = {"download_only": True}
+                            if max_bytes != DEFAULT_DOCUMENT_MAX_BYTES:
+                                options["max_bytes"] = max_bytes
+                            result = _download_job(job["url"], root, budget, **options)
                             return result, None, time.monotonic() - job_started
                         except Exception as download_error:
                             return (
@@ -1464,7 +1649,16 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
                         result = (
                             _parse_saved(root, json.loads(job["result"]), remaining)
                             if actual_phase == "parse"
-                            else _download_job(job["url"], root, remaining)
+                            else _download_job(
+                                job["url"],
+                                root,
+                                remaining,
+                                **(
+                                    {"max_bytes": max_bytes}
+                                    if max_bytes != DEFAULT_DOCUMENT_MAX_BYTES
+                                    else {}
+                                ),
+                            )
                         )
                     except Exception as exc:
                         result = _document_failure(job, actual_phase, exc)
@@ -1479,6 +1673,8 @@ def run_documents(root, max_documents=1, max_seconds=30, *, download_workers=1):
             "processed": processed,
             "counts": _document_counts(db),
             "download_workers": download_workers,
+            "max_bytes": max_bytes,
+            "terminal_recovery": terminal_recovery,
             "phase_counts": phase_counts,
             "timing": {
                 key: round(value, 6) if key.endswith("_seconds") else value

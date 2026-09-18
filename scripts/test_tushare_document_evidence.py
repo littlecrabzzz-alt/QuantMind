@@ -87,7 +87,7 @@ class Evidence(unittest.TestCase):
         self.assertEqual(len(long_header["response_headers"]["content-type"]), 1024)
         self.assertEqual(long_header["response_headers_truncated"], ["content-type"])
 
-    def test_encoded_and_malformed_pdf_remain_uninterpreted(self):
+    def test_encoded_stays_uninterpreted_and_pdf_prefix_enters_bounded_parser(self):
         compressed = gzip.compress(b"%PDF-fixture\n%%EOF")
         for encoding in ("gzip", "identity"):
             result = self.fetch(
@@ -102,9 +102,16 @@ class Evidence(unittest.TestCase):
             )
         malformed = b"%PDF-1.7\ntruncated or malformed file"
         result = self.fetch(Response(malformed, Content_Type="application/pdf"))
-        self.assert_evidence(
-            result, malformed, "pdf_content_mismatch", "malformed_pdf_envelope"
+        self.assertEqual(result["status"], "downloaded")
+        self.assertEqual(result["content_kind"], "pdf_prefix")
+        self.assertEqual(result["parse_status"], "parse_pending")
+        self.assertEqual(result["validation_status"], "pdf_prefix_only")
+        self.assertEqual(result["mime"], "application/pdf")
+        self.assertEqual(
+            result["files"][0]["path"],
+            "attachments/" + hashlib.sha256(malformed).hexdigest() + ".pdf",
         )
+        self.assertEqual((self.root / result["files"][0]["path"]).read_bytes(), malformed)
         binary = b"unrecognized binary\x00"
         result = self.fetch(Response(binary, Content_Type="application/pdf"))
         self.assert_evidence(result, binary, "pdf_content_mismatch", "unknown")

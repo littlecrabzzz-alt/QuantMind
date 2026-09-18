@@ -29,6 +29,9 @@ class WorkerStatus(unittest.TestCase):
                         'max_documents': 240,
                         'max_seconds': 85.0,
                         'download_workers': 4,
+                        'max_bytes': 25 * 1024 * 1024,
+                        'terminal_retry_interval_seconds': 86400.0,
+                        'terminal_retry_max_documents': 16,
                     },
                 )
                 started.set()
@@ -75,14 +78,20 @@ class WorkerStatus(unittest.TestCase):
                 worker.document_execution({'document_worker_execution': value})
 
     def test_document_limits_match_native_production_bounds(self):
-        self.assertEqual(worker.document_limits({}), (100, 90.0, 1))
+        self.assertEqual(
+            worker.document_limits({}),
+            (100, 90.0, 1, 25 * 1024 * 1024, 86400.0, 16),
+        )
         self.assertEqual(
             worker.document_limits({
                 'document_worker_max_documents': 600,
                 'document_worker_max_seconds': 100,
                 'document_download_workers': 4,
+                'document_max_bytes': 256 * 1024 * 1024,
+                'document_terminal_retry_interval_seconds': 3600,
+                'document_terminal_retry_max_documents': 64,
             }),
-            (600, 100.0, 4),
+            (600, 100.0, 4, 256 * 1024 * 1024, 3600.0, 64),
         )
         for key, value in (
             ('document_worker_max_documents', 0),
@@ -94,6 +103,15 @@ class WorkerStatus(unittest.TestCase):
             ('document_download_workers', 0),
             ('document_download_workers', 5),
             ('document_download_workers', True),
+            ('document_max_bytes', 25 * 1024 * 1024 - 1),
+            ('document_max_bytes', 256 * 1024 * 1024 + 1),
+            ('document_max_bytes', True),
+            ('document_terminal_retry_interval_seconds', 3599),
+            ('document_terminal_retry_interval_seconds', 365 * 86400 + 1),
+            ('document_terminal_retry_interval_seconds', True),
+            ('document_terminal_retry_max_documents', -1),
+            ('document_terminal_retry_max_documents', 65),
+            ('document_terminal_retry_max_documents', True),
         ):
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
                 worker.document_limits({key: value})
@@ -110,6 +128,9 @@ class WorkerStatus(unittest.TestCase):
                     0,
                     1.0,
                     1,
+                    25 * 1024 * 1024,
+                    86400.0,
+                    16,
                 ).result(timeout=10)
             self.assertEqual(report['status'], 'ok')
             self.assertEqual(report['processed'], 0)
@@ -136,6 +157,9 @@ class WorkerStatus(unittest.TestCase):
                         'max_documents': 100,
                         'max_seconds': 90.0,
                         'download_workers': 1,
+                        'max_bytes': 25 * 1024 * 1024,
+                        'terminal_retry_interval_seconds': 86400.0,
+                        'terminal_retry_max_documents': 16,
                     },
                 )
                 return {'status': 'ok', 'processed': 100}
