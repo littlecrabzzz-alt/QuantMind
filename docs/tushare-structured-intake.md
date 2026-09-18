@@ -8,7 +8,7 @@
 |---|---|---|
 | 股票主数据 | stock_basic、stock_company、namechange | 股票 L/D/P/G/UN × SSE/SZSE/BSE；公司按三交易所；历史名称按已发现全部股票保留完整快照 |
 | 股票行情与制度 | daily、adj_factor、daily_basic、stk_limit、suspend_d、moneyflow | 配置历史起点至昨日逐日请求；资金流从官方 2010 起点开始；日历未验完整前不据其删除日期 |
-| 财务 | income_vip、balancesheet_vip、cashflow_vip、fina_indicator_vip、forecast_vip、express_vip | 所有已结束季度；三大表显式请求 1–12 全部报表类型；近两年季度复查，其余稳定历史队列 |
+| 财务 | income_vip、balancesheet_vip、cashflow_vip、fina_indicator_vip、forecast_vip、express_vip | 所有已结束季度；三大表显式请求 1–12 全部报表类型；近两年季度复查，其余稳定历史队列；已实测四个季度全市场接口的 offset/limit 分页 |
 | 指数 | index_basic、index_daily | 枚举 MSCI/CSI/SSE/SZSE/CICC/SW/OTH；行情按已发现指数分年；SW 不由 index_daily 支持，保持显式待接入项 |
 | 宏观 | cn_gdp、cn_cpi、cn_ppi、cn_m、cn_pmi、sf_month | 从配置起点请求季度/月度全序列，每日刷新可捕获既往修订；不伪造历史发布日期 |
 | 利率 | shibor、shibor_quote、shibor_lpr | 分年历史和近期复查；含全部数值期限字段 |
@@ -27,7 +27,9 @@ structured_prerequisites(identifiers=None)
 
 数据正确性与待实际验证项：
 
-- 财务文档说明 VIP 支持按季度全市场，最低 5000 积分；本批仍需账号真实探测。VIP 行数上限没有独立文档证明，契约采用 100 行保守告警并 `row_cap_verified=false`，绝不能把响应小于告警值解释为历史完整。饱和后先按全部已发现股票 `ts_code` 扇出，再按日期细分；没有完整股票集合或仍无法缩小时，保存父响应并登记缺口。
+- 2026-09-19 使用当前归档账号实测 `income_vip`、`balancesheet_vip`、`cashflow_vip`、`forecast_vip`：精确 `period=20260630` 的全市场请求支持 `limit=1000` 与连续 `offset`，各页无精确重复，重复请求首页稳定，并以不足 1000 行的末页闭合。完整链分别为 10604、11187、10555、1918 行；旧默认响应分别只有 9000、7000、6400、1916 行。证据只保留参数、计数、内容哈希与发布引用，不包含 Token 或原始业务行。
+- 分页只应用于含精确 `period` 且不含 `ts_code` 的四个接口根任务；三大表仍显式请求 1–12 全部报表类型。连续 offset、字段 schema、终态和明确末页全部成立后，才把同范围、同字段的旧逐股票待办和旧饱和根任务标记为 `superseded`；已完成、失败、空结果、未闭合链和请求尝试均保留。`fina_indicator_vip`、`express_vip` 没有从这四项类推分页能力。
+- VIP 行数上限仍没有独立文档证明，`row_cap_verified=false` 继续表示默认响应不等于供应商最大值。四个已验证根任务的近期季度优先级为 5、历史季度为 15；其他 VIP 接口保留原饱和告警和逐股票兜底。
 - 三大表/预告/快报 start_date/end_date 是公告日期，fina_indicator 是报告期日期；`split_axis` 明确区别。初始季度请求不加公告日限制，以免遗漏公告日期为空的行；财务发布日期为空只影响 PIT 可用性，不应抛弃原始记录。近两年之外的迟到修订尚需低频全历史复查作业，当前代码不能证明覆盖此类修订。
 - `namechange`、`adj_factor`、`suspend_d`、`index_daily` 等当前页缺少明确上限，`row_cap_verified=false` 保留不确定性。单日请求饱和不能仅按日期二分；需要标的扇出。`stk_limit` 含 A/B 股和基金，不能只拿 A 股集合来宣称完成其标的扇出。
 - `index_daily` 不提供申万行业行情，SW 主数据照常保留，行情另走后续申万接口。当前股票和指数名单未证明穷尽供应商的历史标的；未知代码/停止维护端点继续列为缺口。

@@ -63,6 +63,45 @@ class StructuredPlanning(unittest.TestCase):
         )
         self.assertIn("5y", STRUCTURED_CONTRACTS["shibor_lpr"]["extra_fields"])
 
+    def test_live_verified_financial_roots_precede_other_work(self):
+        apis = {
+            "income_vip",
+            "balancesheet_vip",
+            "cashflow_vip",
+            "forecast_vip",
+        }
+        jobs = list(
+            iter_structured_jobs(
+                {
+                    "history_start": "20200101",
+                    "structured_apis": sorted(apis),
+                },
+                date(2024, 4, 2),
+            )
+        )
+        financial = [job for job in jobs if job["api_name"] in apis]
+        self.assertTrue(financial)
+        self.assertFalse(any("ts_code" in job["params"] for job in financial))
+        self.assertEqual(
+            {job["priority"] for job in financial if job["epoch"] != "history"},
+            {5},
+        )
+        self.assertEqual(
+            {job["priority"] for job in financial if job["epoch"] == "history"},
+            {15},
+        )
+        recent_positions = [
+            index
+            for index, job in enumerate(jobs)
+            if job["api_name"] in apis and job["epoch"] != "history"
+        ]
+        history_positions = [
+            index
+            for index, job in enumerate(jobs)
+            if job["api_name"] in apis and job["epoch"] == "history"
+        ]
+        self.assertLess(max(recent_positions), min(history_positions))
+
     def test_discovery_missing_and_unsupported_index(self):
         self.assertEqual(len(structured_prerequisites()), 2)
         # Supplier codes here are deliberately confined to outbound API fixtures.

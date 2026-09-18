@@ -1,0 +1,93 @@
+{
+  "schema": "quantmind.tushare.financial-vip-pagination-evidence.v1",
+  "observed_at": "2026-09-19",
+  "account_scope": "current_archive_account",
+  "secret_material_included": false,
+  "raw_business_rows_included": false,
+  "probe": {
+    "period": "20260630",
+    "page_size": 1000,
+    "stability_check": "refetch_first_page",
+    "overlap_check": "exact_rows_between_pages"
+  },
+  "apis": {
+    "income_vip": {
+      "source_document": "https://tushare.pro/document/2?doc_id=33",
+      "report_type": "1",
+      "default_rows": 9000,
+      "paginated_rows": 10604,
+      "additional_rows": 1604,
+      "pages": 11,
+      "tail_rows": 604,
+      "exact_overlap_rows": 0,
+      "first_page_stable": true
+    },
+    "balancesheet_vip": {
+      "source_document": "https://tushare.pro/document/2?doc_id=36",
+      "report_type": "1",
+      "default_rows": 7000,
+      "paginated_rows": 11187,
+      "additional_rows": 4187,
+      "pages": 12,
+      "tail_rows": 187,
+      "exact_overlap_rows": 0,
+      "first_page_stable": true
+    },
+    "cashflow_vip": {
+      "source_document": "https://tushare.pro/document/2?doc_id=44",
+      "report_type": "1",
+      "default_rows": 6400,
+      "paginated_rows": 10555,
+      "additional_rows": 4155,
+      "pages": 11,
+      "tail_rows": 555,
+      "exact_overlap_rows": 0,
+      "first_page_stable": true
+    },
+    "forecast_vip": {
+      "source_document": "https://tushare.pro/document/2?doc_id=45",
+      "report_type": null,
+      "default_rows": 1916,
+      "paginated_rows": 1918,
+      "additional_rows": 2,
+      "pages": 2,
+      "tail_rows": 918,
+      "exact_overlap_rows": 0,
+      "first_page_stable": true
+    }
+  },
+  "private_evidence": [
+    {
+      "filename": "financial-vip-pagination-probe-v1.7158586de526c9001a97e94d461fed98cb9d1d9b420c0ecc07e21344babdbad8.json",
+      "sha256": "7158586de526c9001a97e94d461fed98cb9d1d9b420c0ecc07e21344babdbad8",
+      "probe_release": "probe-848b6221a9154f049aef0cf157eefead",
+      "manifest_sha256": "52b157f4dd101a9f0fe61a8c4bde79b029a0c4d47c479ffa56d9e1f1413278f9"
+    },
+    {
+      "filename": "financial-vip-pagination-probe-v1.cd3f8fae370bcfd6bad2a457fa6776219e3e6b6946be09c82fecffc0159a868d.json",
+      "sha256": "cd3f8fae370bcfd6bad2a457fa6776219e3e6b6946be09c82fecffc0159a868d",
+      "probe_release": "probe-162908aa203c405a9cfcec5821bfa079",
+      "manifest_sha256": "3c9317bec388451ae23b6dfd8da1f6964e951cec8afc94d12449a535e90c4845"
+    }
+  ],
+  "production_rule": {
+    "eligible_root": "exact period without ts_code",
+    "page_size": 1000,
+    "completion": "contiguous offsets, identical requested fields, all pages done, final page below page size with pagination_end=true",
+    "compaction": "supersede only matching pending per-stock leaves and matching legacy split_pending roots",
+    "preserve": [
+      "terminal jobs",
+      "attempts",
+      "results",
+      "incomplete chains",
+      "empty roots",
+      "other field schemas",
+      "other report types"
+    ]
+  },
+  "limitations": [
+    "This verifies the current account and one exact quarter; runtime closure checks remain mandatory for every planned scope.",
+    "No pagination capability is inferred for fina_indicator_vip or express_vip.",
+    "Complete historical revisions, known_at, and PIT availability are not established by pagination."
+  ]
+}
