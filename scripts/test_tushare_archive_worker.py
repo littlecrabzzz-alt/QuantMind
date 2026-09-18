@@ -164,8 +164,18 @@ class WorkerStatus(unittest.TestCase):
             self.assertTrue((Path(directory) / 'documents.sqlite').exists())
 
     def test_planning_only_resumes_acquisition_after_minimum_delay(self):
-        self.assertEqual(worker.next_cycle_delay(105, 58, 'planning_only'), 5)
-        self.assertEqual(worker.next_cycle_delay(105, 58, None), 47)
+        self.assertEqual(
+            worker.next_cycle_delay(105, 58, 'planning_only', 'completed_cycle'),
+            5,
+        )
+        self.assertEqual(
+            worker.next_cycle_delay(105, 58, None, 'completed_cycle'), 47
+        )
+        self.assertEqual(
+            worker.next_cycle_delay(105, 104.5, None, 'completed_cycle'), 1
+        )
+        self.assertEqual(worker.next_cycle_delay(105, 104.5, None, 'failed'), 5)
+        self.assertEqual(worker.next_cycle_delay(105, 104.5, None), 5)
 
     def test_due_publication_runs_before_documents(self):
         with tempfile.TemporaryDirectory() as directory:
