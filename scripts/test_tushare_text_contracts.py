@@ -148,6 +148,10 @@ class TextPlans(unittest.TestCase):
             TEXT_CONTRACT_NOTES["research_report"]["coverage_gaps"][0],
         )
         self.assertIn("_source", TEXT_CONTRACTS["news"]["keys"])
+        for api in ("news", "major_news", "cctv_news"):
+            self.assertIn(
+                "content", TEXT_CONTRACTS[api]["assessment_nullable_fields"]
+            )
         for api in ("irm_qa_sh", "irm_qa_sz"):
             self.assertEqual(TEXT_CONTRACTS[api]["saturation_fallback"], "stocks")
             self.assertEqual(TEXT_CONTRACTS[api]["saturation_param"], "ts_code")

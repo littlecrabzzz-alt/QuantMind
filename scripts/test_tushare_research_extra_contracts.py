@@ -54,6 +54,9 @@ class ResearchExtraContracts(unittest.TestCase):
         )
         self.assertEqual(CONTRACTS["stk_surv"]["hidden_fields"], ["content"])
         self.assertIsNone(CONTRACTS["fina_audit"]["documented_row_cap"])
+        self.assertIn(
+            "ann_date", CONTRACTS["fina_audit"]["assessment_nullable_fields"]
+        )
 
     def test_publication_report_survey_and_month_axes_are_distinct(self):
         scope = {"research_extra_history_start": "20260801"}

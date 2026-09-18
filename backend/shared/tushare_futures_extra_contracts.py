@@ -151,8 +151,12 @@ FUTURES_EXTRA_CONTRACTS["fut_index_daily"].update(
     unit_note="Index point levels; vol is contracts and amount is thousand CNY, unlike the ten-thousand CNY futures-bar amount.",
 )
 FUTURES_EXTRA_CONTRACTS["fut_weekly_detail"].update(
+    assessment_nullable_fields=[
+        *FUTURES_EXTRA_CONTRACTS["fut_weekly_detail"]["nullable_fields"],
+        "week_date",
+    ],
     history_start_precision="month",
-    week_note="Supplier year/week ordinal, not a proven ISO calendar. Query every ordinal 01..53 for a selected year, without deriving dates or skipping holidays. Preserve raw week (official examples include 20199) and week_date; no zero-padding rewrite. Year edges and formatting equivalence need source verification.",
+    week_note="Supplier year/week ordinal, not a proven ISO calendar. Query every ordinal 01..53 for a selected year, without deriving dates or skipping holidays. Preserve raw week (official examples include 20199) and nullable week_date; do not manufacture a date or zero-pad the label. Year edges and formatting equivalence need source verification.",
     partition_note="Explicit exact-week requests. No generic day split for start_week/end_week; a saturated week needs observed exchange/prd subdivision, never guessed offsets.",
     discovery_gap="Only major products are in this CSRC series; no claim to all futures contracts/exchanges. Historical product universe and supplier week convention remain unverified.",
     refresh_gap="Refresh current and previous supplier years (all 01..53), since precise current week mapping is not verified. Future/holiday empty responses stay unverified; older revisions need an audit.",

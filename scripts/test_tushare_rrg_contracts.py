@@ -253,6 +253,7 @@ class RRGContracts(unittest.TestCase):
 
     def test_fund_portfolio_supplier_false_terminates_unverified_local_alarm(self):
         spec = RRG_CONTRACTS["fund_portfolio"]
+        self.assertIn("mkv", spec["assessment_nullable_fields"])
         fields = FIELDS["fund_portfolio"]
         job = {
             "api_name": "fund_portfolio",

@@ -78,6 +78,9 @@ class StockContext(unittest.TestCase):
         self.assertTrue(all(j["epoch"] == "fixed" for j in rewards))
         self.assertEqual(CONTRACTS["stk_rewards"]["date_field"], "ann_date")
         self.assertIsNone(CONTRACTS["stk_rewards"]["split"])
+        self.assertIn(
+            "ann_date", CONTRACTS["stk_rewards"]["assessment_nullable_fields"]
+        )
         self.assertIn("REPORT PERIOD", CONTRACTS["stk_rewards"]["date_axis_note"])
         self.assertIn("ANNOUNCEMENT", CONTRACTS["stk_managers"]["date_axis_note"])
 

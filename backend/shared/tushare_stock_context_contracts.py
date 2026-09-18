@@ -226,13 +226,17 @@ STOCK_CONTEXT_CONTRACTS["stk_managers"].update(
     multi_code_note="Comma-separated ts_code is explicitly supported, but this planner uses all-market exact announcement days and legal single-code saturation fallback, without guessing multi-code count limits.",
 )
 STOCK_CONTEXT_CONTRACTS["stk_rewards"].update(
+    assessment_nullable_fields=[
+        *STOCK_CONTEXT_CONTRACTS["stk_rewards"]["nullable_fields"],
+        "ann_date",
+    ],
     supplier_has_more_false_terminal=True,
     date_axis_note="Only ts_code (required) and optional end_date REPORT PERIOD are legal inputs. Output ann_date is publication date; end_date is the financial period, never a request interval end. Store default ann_date for availability-oriented filtering, explicit end_date for report cohorts.",
     dependencies=["stocks", "reward_periods"],
     history_request="observed_single_stock_report_periods",
     recent_request="unbounded_single_stock_and_latest_observed_period_each_epoch",
     history_gap="No start or announcement-range input and no oldest date is documented. One code-only request returns supplier-available periods without invented quarterly coverage or local date clipping; configuration scopes cannot trim it.",
-    unit_note="reward is CNY yuan, hold_vol shares. Unknown/unreported reward is nullable; zero holdings is a valid value, not missing. Annualization, currencies for unusual entities and retrospective revisions need evidence.",
+    unit_note="reward is CNY yuan, hold_vol shares. Unknown/unreported reward and publication date are nullable; zero holdings is a valid value, not missing. Preserve end_date when ann_date is absent instead of inventing publication time. Annualization, currencies for unusual entities and retrospective revisions need evidence.",
     saturation_gap="Code-only request has no legal start_date/offset partition. end_date can filter an actually observed stock/report-period pair. Supplemental period jobs do not partition or complete the code-only parent: the period inventory is incomplete, and capped parents or individual periods remain blocked.",
     identity_gap="Same name/title across periods or revisions is not a globally unique manager; preserve distinct source rows and avoid inferring individual identity or an exhaustive payroll census.",
 )

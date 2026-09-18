@@ -38,6 +38,7 @@ class ContractReassessmentTest(unittest.TestCase):
         state="quality",
         result_status="schema_gap",
         job_updates=None,
+        legacy_response_metadata=False,
     ):
         task = self.pipeline.enqueue(
             api,
@@ -55,7 +56,27 @@ class ContractReassessmentTest(unittest.TestCase):
         sha = digest(raw)
         (self.root / "objects").mkdir(exist_ok=True)
         (self.root / "objects" / f"{sha}.json").write_bytes(raw)
-        observation_body = json_bytes({"fixture": task})
+        observation_body = json_bytes(
+            {
+                "schema_version": 1,
+                "request": {
+                    "api_name": api,
+                    "fields": job["fields"],
+                    "params": job["params"],
+                },
+                "object_sha256": sha,
+                "assessment": {
+                    "status": result_status,
+                    "row_count": len(items),
+                    "null_counts": null_counts,
+                },
+                "response_redacted": False,
+                "requested_at": "2026-09-08T00:00:00+00:00",
+                "fetched_at": "2026-09-08T00:00:01+00:00",
+            }
+            if legacy_response_metadata
+            else {"fixture": task}
+        )
         observation_sha = digest(observation_body)
         (self.root / "observations").mkdir(exist_ok=True)
         observation = task[:32] + ".json"
@@ -89,6 +110,9 @@ class ContractReassessmentTest(unittest.TestCase):
                 "bytes": len(parquet_body),
             },
         }
+        if legacy_response_metadata:
+            for field in ("response_complete", "response_format", "http_status"):
+                result.pop(field)
         encoded = json.dumps(result, sort_keys=True)
         self.pipeline.db.execute(
             "UPDATE jobs SET state=?,tries=1,job=?,result=? WHERE id=?",
@@ -243,7 +267,7 @@ class ContractReassessmentTest(unittest.TestCase):
         )
         self.assertNotIn(task, {gap["id"] for gap in manifest["gaps"]})
 
-    def test_current_contract_keeps_real_null_gap_unchanged(self):
+    def test_current_contract_accepts_observed_nullable_text_content(self):
         task, _, _ = self.seed(
             "cctv_news",
             ["content", "date", "title"],
@@ -251,8 +275,81 @@ class ContractReassessmentTest(unittest.TestCase):
             null_counts={"content": 1, "date": 0, "title": 0},
         )
         report = reassess(self.pipeline, apply=True)
+        self.assertEqual(report["promoted_by_api"], {"cctv_news": 1})
+        self.assertEqual(
+            self.pipeline.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (task,)
+            ).fetchone()[0],
+            "done",
+        )
+
+    def test_legacy_response_metadata_uses_verified_code_zero_terminal_evidence(self):
+        task, _, original = self.seed(
+            "cctv_news",
+            ["content", "date", "title"],
+            [[None, "20260911", "title"]],
+            null_counts={"content": 1, "date": 0, "title": 0},
+            params={"date": "20260911"},
+            legacy_response_metadata=True,
+        )
+
+        report = reassess(self.pipeline, apply=True, apis=["cctv_news"])
+
+        self.assertEqual(report["legacy_response_promoted_by_api"], {"cctv_news": 1})
+        row = self.pipeline.db.execute(
+            "SELECT state,result FROM jobs WHERE id=?", (task,)
+        ).fetchone()
+        result = json.loads(row["result"])
+        self.assertEqual(row["state"], "done")
+        self.assertEqual(
+            result["contract_reassessment"]["response_evidence"],
+            "legacy_code_zero_json_has_more_false",
+        )
+        self.assertEqual(
+            result["response_metadata_recovery"]["http_status"], "not_recorded"
+        )
+        self.assertEqual(
+            json.loads(
+                self.pipeline.db.execute(
+                    "SELECT result FROM attempts WHERE job_id=?", (task,)
+                ).fetchone()[0]
+            ),
+            original,
+        )
+
+    def test_legacy_response_with_mismatched_observation_stays_quality(self):
+        task, _, result = self.seed(
+            "cctv_news",
+            ["content", "date", "title"],
+            [[None, "20260911", "title"]],
+            null_counts={"content": 1, "date": 0, "title": 0},
+            params={"date": "20260911"},
+            legacy_response_metadata=True,
+        )
+        observation_path = self.root / "observations" / result["observation"]
+        observation = json.loads(observation_path.read_bytes())
+        observation["request"]["params"] = {"date": "20260910"}
+        body = json_bytes(observation)
+        observation_path.write_bytes(body)
+        result["observation_sha256"] = digest(body)
+        self.pipeline.db.execute(
+            "UPDATE jobs SET result=? WHERE id=?", (json.dumps(result), task)
+        )
+        self.pipeline.db.commit()
+
+        report = reassess(self.pipeline, apply=True, apis=["cctv_news"])
+
         self.assertEqual(report["promoted_jobs"], 0)
-        self.assertEqual(report["unchanged_jobs"], 1)
+        self.assertEqual(
+            report["unchanged_by_api_and_status"],
+            [
+                {
+                    "api_name": "cctv_news",
+                    "status": "legacy_response_unverified",
+                    "jobs": 1,
+                }
+            ],
+        )
         self.assertEqual(
             self.pipeline.db.execute(
                 "SELECT state FROM jobs WHERE id=?", (task,)

@@ -71,7 +71,7 @@ TEXT_CONTRACTS = {
         1500,
         "datetime content title channels",
         "_source datetime title content",
-        nullable=("title", "channels"),
+        nullable=("content", "title", "channels"),
         rpm=400,
         precision="second",
     ),
@@ -79,7 +79,7 @@ TEXT_CONTRACTS = {
         400,
         "title content pub_time src",
         "src pub_time title content",
-        nullable=("src",),
+        nullable=("content", "src"),
         rpm=400,
         precision="second",
     ),
@@ -87,6 +87,7 @@ TEXT_CONTRACTS = {
         1000,
         "date title content",
         "date title content",
+        nullable=("content",),
         rpm=400,
         history="20170101",
         split=False,
@@ -148,6 +149,12 @@ TEXT_CONTRACTS = {
     ),
 }
 TEXT_CONTRACTS["research_report"]["optional_requested_fields"] = ["file_name"]
+for _api in ("news", "major_news", "cctv_news"):
+    # Older queued jobs retain their original nullable_fields. Reassessment and
+    # new captures use the reviewed source-observed nullability instead.
+    TEXT_CONTRACTS[_api]["assessment_nullable_fields"] = TEXT_CONTRACTS[_api][
+        "nullable_fields"
+    ]
 TEXT_CONTRACTS["anns_d"].update(
     saturation_fallback="announcement_securities",
     saturation_param="ts_code",
@@ -180,7 +187,10 @@ TEXT_CONTRACT_NOTES = {
         "history_status": "unknown_exact_start; description says over 6 years",
         "source_status": "nine documented sources; per-source live permission unverified",
         "hidden_fields": ["channels"],
-        "coverage_gaps": ["supplier has no stable news id or independent total"],
+        "coverage_gaps": [
+            "supplier has no stable news id or independent total",
+            "live rows can omit content while retaining datetime/source/title; preserve the null row and raw object instead of rejecting the response",
+        ],
     },
     "major_news": {
         "doc_id": "195",
@@ -188,14 +198,18 @@ TEXT_CONTRACT_NOTES = {
         "source_status": "nine listed sources plus unfiltered sweep; examples contain other sources",
         "hidden_fields": ["content"],
         "coverage_gaps": [
-            "sample uses src_site but output table uses src; inspect returned schema"
+            "sample uses src_site but output table uses src; inspect returned schema",
+            "live rows can omit content while retaining source/publication/title; preserve the null row and raw object instead of rejecting the response",
         ],
     },
     "cctv_news": {
         "doc_id": "154",
         "history_status": "documented year 2017; first actual day unknown",
         "row_cap_status": "undocumented; 1000 is a conservative truncation alarm, not vendor limit",
-        "coverage_gaps": ["date-only API cannot split a capped single day"],
+        "coverage_gaps": [
+            "date-only API cannot split a capped single day",
+            "live daily responses contain occasional title/date rows with null content; content absence is retained as a source gap, not a failed capture",
+        ],
     },
     "anns_d": {
         "doc_id": "176",

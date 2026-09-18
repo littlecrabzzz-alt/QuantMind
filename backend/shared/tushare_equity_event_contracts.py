@@ -222,6 +222,13 @@ EQUITY_EVENT_CONTRACTS["dividend"].update(
 EQUITY_EVENT_CONTRACTS["stk_holdernumber"]["parameter_note"] = (
     "Input enddate means observation cutoff; input start_date/end_date bound announcements. Output end_date means cutoff, not the announcement-window end."
 )
+EQUITY_EVENT_CONTRACTS["stk_holdernumber"].update(
+    assessment_nullable_fields=[
+        *EQUITY_EVENT_CONTRACTS["stk_holdernumber"]["nullable_fields"],
+        "end_date",
+    ],
+    source_null_note="Live rows can omit output end_date while retaining ts_code and ann_date. Preserve the row and unknown cutoff; never fill it from the request window or announcement date.",
+)
 EQUITY_EVENT_CONTRACTS["stk_holdertrade"].update(
     hidden_fields=["begin_date", "close_date"],
     parameter_note="Input trade_type is IN/DE while output is in_de. Leave trade_type and holder_type unfiltered to include all reported types.",

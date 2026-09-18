@@ -153,6 +153,12 @@ class EquityEvents(unittest.TestCase):
             "announcement_date",
         )
         self.assertIn("enddate", INPUT_FIELDS["stk_holdernumber"])
+        self.assertIn(
+            "end_date",
+            EQUITY_EVENT_CONTRACTS["stk_holdernumber"][
+                "assessment_nullable_fields"
+            ],
+        )
 
     def test_report_history_plus_400_day_refresh_have_exact_report_coverage(self):
         begin, today = date(2023, 1, 1), date(2025, 3, 9)

@@ -67,6 +67,29 @@ def _contract_sha(job):
     )
 
 
+def _legacy_complete_response(job, saved, observation, payload):
+    """Validate the pre-transport-metadata capture shape without inventing HTTP facts."""
+    if any(
+        field in saved
+        for field in ("response_complete", "response_format", "http_status")
+    ):
+        return False
+    request = observation.get("request") if isinstance(observation, dict) else None
+    data = payload.get("data") if isinstance(payload, dict) else None
+    return bool(
+        observation.get("schema_version") == 1
+        and observation.get("response_redacted") is False
+        and observation.get("object_sha256") == saved.get("object_sha256")
+        and isinstance(request, dict)
+        and request.get("api_name") == job.get("api_name")
+        and request.get("params") == job.get("params")
+        and request.get("fields") == job.get("fields")
+        and payload.get("code") == 0
+        and isinstance(data, dict)
+        and data.get("has_more") is False
+    )
+
+
 def reassess(pipeline, *, apply=False, apis=None):
     """Promote only artifact-verified results accepted by the current contract."""
     db = pipeline.db
@@ -77,6 +100,7 @@ def reassess(pipeline, *, apply=False, apis=None):
         raise ValueError("Invalid API reassessment filter")
     attempts_before = db.execute("SELECT count(*) FROM attempts").fetchone()[0]
     promoted = Counter()
+    legacy_promoted = Counter()
     unchanged = Counter()
     try:
         db.execute("BEGIN IMMEDIATE")
@@ -115,11 +139,16 @@ def reassess(pipeline, *, apply=False, apis=None):
                 ):
                     unchanged[(api, "retired_replacement")] += 1
                     continue
-            if (
-                saved.get("response_complete") is not True
-                or saved.get("response_format") != "json"
-                or saved.get("http_status") != 200
-            ):
+            current_response_metadata = (
+                saved.get("response_complete") is True
+                and saved.get("response_format") == "json"
+                and saved.get("http_status") == 200
+            )
+            legacy_response_metadata = all(
+                field not in saved
+                for field in ("response_complete", "response_format", "http_status")
+            )
+            if not current_response_metadata and not legacy_response_metadata:
                 unchanged[(api, "ineligible_response")] += 1
                 continue
             sha = saved.get("object_sha256")
@@ -141,13 +170,20 @@ def reassess(pipeline, *, apply=False, apis=None):
             ):
                 raise ValueError("Quality result has invalid artifact references")
             raw = _verified_bytes(pipeline.root / "objects" / f"{sha}.json", sha)
-            _verified_bytes(
+            observation_body = _verified_bytes(
                 pipeline.root / "observations" / observation, observation_sha
             )
             _verified_bytes(
                 pipeline.root / parquet["path"], parquet["sha256"], parquet["bytes"]
             )
-            assessment = assess_success_payload(job, json.loads(raw))
+            payload = json.loads(raw)
+            observation_payload = json.loads(observation_body)
+            if legacy_response_metadata and not _legacy_complete_response(
+                job, saved, observation_payload, payload
+            ):
+                unchanged[(api, "legacy_response_unverified")] += 1
+                continue
+            assessment = assess_success_payload(job, payload)
             if assessment.get("row_count") != saved.get("row_count"):
                 raise ValueError("Reassessment row count changed")
             if assessment.get("status") != "sample_ok":
@@ -162,8 +198,21 @@ def reassess(pipeline, *, apply=False, apis=None):
                 "contract_sha256": _contract_sha(job),
                 "source_attempt_preserved": True,
                 "upstream_calls": 0,
+                "response_evidence": (
+                    "recorded_http_200_complete_json"
+                    if current_response_metadata
+                    else "legacy_code_zero_json_has_more_false"
+                ),
             }
             updated = {**saved, **assessment, "contract_reassessment": marker}
+            if legacy_response_metadata:
+                updated["response_metadata_recovery"] = {
+                    "version": 1,
+                    "response_format": "json_derived_from_verified_object",
+                    "supplier_has_more": False,
+                    "http_status": "not_recorded",
+                    "upstream_calls": 0,
+                }
             encoded = json.dumps(updated, sort_keys=True)
             changed = db.execute(
                 "UPDATE jobs SET state='done',result=? WHERE id=? AND state=?",
@@ -182,6 +231,8 @@ def reassess(pipeline, *, apply=False, apis=None):
                 ),
             )
             promoted[api] += 1
+            if legacy_response_metadata:
+                legacy_promoted[api] += 1
         if db.execute("SELECT count(*) FROM attempts").fetchone()[0] != attempts_before:
             raise ValueError("Attempt ledger changed during contract reassessment")
         report = {
@@ -193,6 +244,8 @@ def reassess(pipeline, *, apply=False, apis=None):
             ),
             "promoted_jobs": sum(promoted.values()),
             "promoted_by_api": dict(sorted(promoted.items())),
+            "legacy_response_promoted_jobs": sum(legacy_promoted.values()),
+            "legacy_response_promoted_by_api": dict(sorted(legacy_promoted.items())),
             "unchanged_jobs": sum(unchanged.values()),
             "unchanged_by_api_and_status": [
                 {"api_name": api, "status": status, "jobs": count}

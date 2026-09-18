@@ -235,6 +235,10 @@ class FuturesExtra(unittest.TestCase):
         )
         self.assertTrue(all(set(j["params"]) == {"week"} for j in planned))
         self.assertIsNone(CONTRACTS["fut_weekly_detail"]["split"])
+        self.assertIn(
+            "week_date",
+            CONTRACTS["fut_weekly_detail"]["assessment_nullable_fields"],
+        )
         self.assertIn("20199", CONTRACTS["fut_weekly_detail"]["week_note"])
         self.assertIn("amout_yoy", FIELDS["fut_weekly_detail"])
         self.assertNotIn("amount_yoy", FIELDS["fut_weekly_detail"])

@@ -139,11 +139,15 @@ for _api, (_doc, _guard, _cap, _points, _required, _keys) in _DOCS.items():
     RESEARCH_EXTRA_CONTRACTS[_api] = _spec
 
 RESEARCH_EXTRA_CONTRACTS["fina_audit"].update(
+    assessment_nullable_fields=[
+        *RESEARCH_EXTRA_CONTRACTS["fina_audit"]["nullable_fields"],
+        "ann_date",
+    ],
     split_axis="announcement_date",
     date_field="ann_date",
     parameter_note="ts_code is required. start_date/end_date bound announcements; output end_date and input period mean report period.",
     cap_note="The page publishes no maximum rows. 100 is an operational alarm, not evidence of a supplier cap or of completeness below it.",
-    history_scope_note="One stock-only initial request preserves all available supplier history, including records earlier than a configured scope. A capped response without a documented lower bound remains a gap.",
+    history_scope_note="One stock-only initial request preserves all available supplier history, including records earlier than a configured scope. A capped response without a documented lower bound remains a gap. Live rows can omit ann_date; keep the report end_date and unknown publication date without substitution.",
     units={"audit_fees": "CNY"},
 )
 RESEARCH_EXTRA_CONTRACTS["fina_mainbz"].update(
