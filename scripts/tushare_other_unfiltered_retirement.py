@@ -19,8 +19,6 @@ from zoneinfo import ZoneInfo
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from backend.shared.tushare_pipeline import Pipeline, authority  # noqa: E402
-
 APIS = ("wz_index", "gz_index")
 TERMINAL = {("done", "sample_ok"), ("empty", "empty_unverified")}
 
@@ -302,6 +300,8 @@ def main():
         _regular(root / name, name)
     os.environ["QM_NODE_ROLE"] = "archive"
     os.environ["QM_TUSHARE_ARCHIVE_ROOT"] = str(root)
+    from backend.shared.tushare_pipeline import Pipeline, authority
+
     authority()
     with ExitStack() as stack:
         for name in (".archive-worker.lock", "pipeline.lock"):
