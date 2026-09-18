@@ -283,6 +283,34 @@ class DocumentIndex(unittest.TestCase):
         self.db.commit()
         self.assertEqual(self.index()[0]["rebuilt_shards"], 1)
 
+    def test_original_file_batches_keep_orphans_and_reject_symlinks(self):
+        attachment = docs._save(
+            self.root,
+            "attachments",
+            ".bin",
+            b"unreferenced attachment",
+            "application/octet-stream",
+        )
+        extracted = docs._save(
+            self.root,
+            "extracted",
+            ".json",
+            b'{"unreferenced":true}',
+            "application/json",
+        )
+        with patch.object(docs, "INDEX_FILE_BATCH_ROWS", 1):
+            saved, _ = self.index()
+        paths = {item["path"] for item in saved["files"]}
+        self.assertIn(attachment["path"], paths)
+        self.assertIn(extracted["path"], paths)
+
+        outside = self.root / "outside.html"
+        outside.write_bytes(b"outside")
+        unsafe = self.root / "attachments" / (sha("unsafe-link") + ".html")
+        unsafe.symlink_to(outside)
+        with self.assertRaisesRegex(docs.DocumentError, "unsafe_storage_path"):
+            self.index()
+
 
 if __name__ == "__main__":
     unittest.main()
