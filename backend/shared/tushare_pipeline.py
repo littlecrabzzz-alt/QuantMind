@@ -5252,7 +5252,7 @@ class Pipeline:
             or not 1 <= max_records <= MAX_DOCUMENT_REGISTRATION_RECORDS
         ):
             raise ValueError("Invalid document record limit")
-        if type(max_seconds) not in (int, float) or not 0 < max_seconds <= 20:
+        if type(max_seconds) not in (int, float) or not 0 < max_seconds <= 60:
             raise ValueError("Invalid document registration budget")
         started = time.monotonic()
         deadline = started + max_seconds
