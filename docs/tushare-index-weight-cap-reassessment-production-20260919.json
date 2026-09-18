@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "status": "index_weight_live_cap_reassessment_production_accepted",
+  "observed_at": "2026-09-19T06:09:56+08:00",
+  "official_source": {
+    "url": "https://tushare.pro/document/2?doc_id=96",
+    "published_row_limit": false,
+    "published_pagination": false,
+    "published_constituent_filter": false
+  },
+  "production_observations_before_change": {
+    "result_bearing_jobs": 8208,
+    "responses_at_7000_with_has_more_true": 6,
+    "responses_below_7000_with_has_more_false_and_old_cap_alarm": 1344,
+    "blocked_exact_day_jobs": 91,
+    "single_day_audit": "docs/tushare-index-weight-single-day-audit-20260912.evidence.json"
+  },
+  "reviewed_contract": {
+    "historical_request_identity_row_cap": 1000,
+    "assessment_row_cap": 7000,
+    "request_identity_preserved": true,
+    "explicit_has_more_true_remains_incomplete": true,
+    "history_complete_claimed": false,
+    "pit_verified_claimed": false
+  },
+  "zero_request_reassessment": {
+    "receipt_sha256": "cdfbf8d733c8ffde11186b7ded711e1282c8d84518c00d65c55c3a345867411d",
+    "candidate_jobs": 91,
+    "candidate_states": {
+      "blocked": 91
+    },
+    "promoted_jobs": 91,
+    "unchanged_jobs": 0,
+    "attempts_preserved_at_transaction": 879531,
+    "source_attempt_action": "unchanged",
+    "artifact_action": "verified_unchanged",
+    "upstream_calls": 0
+  },
+  "post_reassessment_state": {
+    "index_weight": {
+      "blocked": 0,
+      "done": 4478,
+      "empty": 2481,
+      "pending": 82042,
+      "split_pending": 1259,
+      "superseded": 57055,
+      "responses_with_has_more_true": 6
+    },
+    "overall": {
+      "blocked": 781,
+      "done": 468461,
+      "empty": 389521,
+      "pending": 2693552,
+      "permission_blocked": 5847,
+      "resolved": 5818,
+      "split_pending": 10472
+    }
+  },
+  "validation": {
+    "targeted_tests": "53 passed",
+    "full_suite": "1386 passed, 5 skipped",
+    "full_suite_seconds": 117.482,
+    "full_suite_log_sha256": "31a64f357e3c559e6807570f093843bbe6fddeba8340cf42e2450c3986389fe5",
+    "ruff": "passed",
+    "py_compile": "passed",
+    "git_diff_check": "passed"
+  },
+  "deployment": {
+    "candidate_commit": "e502af9ec4a72c9e96680a5af0b7dd00b0f32bcd",
+    "master_commit": "14541c199891205b78690969a952cae15567e9bc",
+    "worker_pid": 61201,
+    "worker_runs": 1,
+    "worker_last_exit": "never exited",
+    "enabled_sha256": "6b45163b577df25f4e6842501fc95128649c5b129daddf3958224864008eda40",
+    "enabled_mode": "0600",
+    "source_runtime_sha256": {
+      "backend/shared/tushare_intake.py": "6f1a7d6fccf4bc14e0c1b940c1d3a1153126a752537dbb9171f8f2fa9e871210",
+      "backend/shared/tushare_market_contracts.py": "6b2fb18c3c8648684c759baa0b8274c10a03500de13d573694c2688222982d9b",
+      "scripts/tushare_reassess_saved_quality.py": "ce6a26bfa464c8bb9940d5e9cd43ea44cb889536d117bc6538a60bed28c6d0f2"
+    }
+  },
+  "first_deployed_cycle": {
+    "status": "completed_cycle",
+    "started_at": "2026-09-18T22:08:11.340679+00:00",
+    "completed_at": "2026-09-18T22:09:56.320777+00:00",
+    "elapsed_seconds": 104.869,
+    "tushare_requests": 764,
+    "document_tasks": 1232,
+    "failed_stage": null,
+    "current_release_id": "data-fdebee7d2a2bedf86d4b7bc1a3f99684516d957c5fa58e13b69bb416000f2070"
+  },
+  "storage": {
+    "filesystem_size": "3.6 TiB",
+    "used": "1.6 TiB",
+    "available": "1.9 TiB"
+  },
+  "boundaries": {
+    "token_or_order_details_in_git": false,
+    "raw_business_rows_in_git": false,
+    "complete_index_history_claimed": false,
+    "empty_response_completeness_claimed": false,
+    "supplier_revision_completeness_claimed": false,
+    "known_at_or_pit_claimed": false,
+    "cloud_full_writer_enabled": false
+  }
+}

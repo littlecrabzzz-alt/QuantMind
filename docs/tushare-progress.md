@@ -1469,3 +1469,9 @@ Mac标准LaunchAgent第276轮下载6063个新增文件，全量校验983029项�
 本次只证明接口接入、真实权限和部分持久结果；完整历史、供应商修订、空响应完整性、港股实时全宇宙、known_at和PIT仍开放，全量补采继续在Mac本地运行。全局blocked从871增至872的新增项不属于catalog_delta，另按既有队列处理。
 
 目录遗漏保护补记：master693bbb29加入每日公开侧栏只读检查，仅比较doc ID、标题和索引哈希并写本地catalog-watch-status.json；发现变化只告警、不自动启用未知接口。网络失败不阻塞采集，一小时后重试。完整套件1384项通过、5项跳过；生产首次检查270项、变化0、索引SHA与基线一致，LaunchAgent重载后继续作为唯一Mac写入者。
+
+## 2026-09-19 index_weight 旧阈值误报重评
+
+当前官方页面没有公开 `index_weight` 的行数上限、分页或成分股过滤参数。生产库中有6个响应恰好7000行且 `has_more=true`，另有1344个低于7000行且 `has_more=false`；既有单日审计还确认91个最终阻塞响应无重复自然键、权重和约为100。由此保留旧任务的1000行请求身份和哈希，仅把当前评估边界改为实测7000；显式 `has_more=true` 仍不视为完整。
+
+生产停窗等待原周期自然完成，没有强杀。91个旧blocked任务逐项验证原始对象、observation和Parquet后零请求重评为done，attempt总数在事务内保持879531；`index_weight` blocked变为0，6个真实续页信号仍保留。完整套件1386项通过、5项跳过；新运行副本首轮104.869秒完成764次Tushare请求和1232个文档任务，失败阶段为空。完整历史、空响应确认、供应商修订、known_at和PIT仍开放。机器证据为 `docs/tushare-index-weight-cap-reassessment-production-20260919.json`。
