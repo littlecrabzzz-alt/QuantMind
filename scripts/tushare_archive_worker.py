@@ -26,10 +26,11 @@ def cycle_seconds(config):
     return float(value)
 
 
-def next_cycle_delay(interval, elapsed, acquisition_status):
+def next_cycle_delay(interval, elapsed, acquisition_status, worker_status=None):
     if acquisition_status == 'planning_only':
         return 5
-    return max(5, interval - elapsed)
+    minimum = 1 if worker_status == 'completed_cycle' else 5
+    return max(minimum, interval - elapsed)
 
 
 def document_execution(config):
@@ -193,6 +194,7 @@ def main():
                 interval,
                 time.monotonic() - start,
                 report.get('acquisition', {}).get('status'),
+                report.get('status'),
             ))
 
 
