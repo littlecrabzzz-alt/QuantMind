@@ -248,7 +248,7 @@ SQLite claim、attempt 和完成事务仍只由主线程写入，每轮阶段总
 任务。下载采用四批槽位的有限领先量，避免以扩大未解析积压换取表面吞吐。状态中的
 `parse_workers`、`overlap_parse_download` 和 `parse_download_overlap_seconds` 用于生产
 灰度验收；下载 worker 为 1 时保持原串行路径。
-`document_worker_max_documents` 的配置上限为 2000；它只限制一轮内完成并提交的下载与
+`document_worker_max_documents` 的配置上限为 2500；它只限制一轮内完成并提交的下载与
 解析阶段数，仍受 100 秒总截止和全部资源边界约束。生产从已验收的 1000 逐步灰度，
 不能把提高阶段上限解释为延长运行时间或放松单文件限制。
 文档注册记录上限允许 1 到 20,000，但仍受独立的最长 20 秒配置校验、生产
