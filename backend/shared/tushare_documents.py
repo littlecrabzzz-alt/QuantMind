@@ -1982,6 +1982,7 @@ def document_inventory(root):
 
 
 INDEX_SHARD_ROWS = 1000
+INDEX_FILE_BATCH_ROWS = 4096
 
 
 def _index_setup(db):
@@ -2103,24 +2104,41 @@ def _index_original_files(root, db):
             raise DocumentError("unsafe_storage_path")
         if not parent.exists():
             continue
-        for path in parent.iterdir():
-            if path.name.startswith(".document-"):
-                continue
-            if (
-                path.is_symlink()
-                or not path.is_file()
-                or not re.fullmatch(r"[a-f0-9]{64}\.(pdf|html|bin|json)", path.name)
-                or path.suffix[1:] not in extensions
-            ):
-                raise DocumentError("unsafe_storage_path")
-            db.execute(
+        pending = []
+        with os.scandir(parent) as entries:
+            for entry in entries:
+                if entry.name.startswith(".document-"):
+                    continue
+                match = re.fullmatch(
+                    r"([a-f0-9]{64})\.(pdf|html|bin|json)", entry.name
+                )
+                if (
+                    match is None
+                    or match.group(2) not in extensions
+                    or not entry.is_file(follow_symlinks=False)
+                ):
+                    raise DocumentError("unsafe_storage_path")
+                metadata = entry.stat(follow_symlinks=False)
+                if not stat.S_ISREG(metadata.st_mode):
+                    raise DocumentError("unsafe_storage_path")
+                pending.append(
+                    (
+                        directory + "/" + entry.name,
+                        match.group(1),
+                        metadata.st_size,
+                        extensions[match.group(2)],
+                    )
+                )
+                if len(pending) >= INDEX_FILE_BATCH_ROWS:
+                    db.executemany(
+                        "INSERT INTO document_index_files VALUES(?,?,?,?) ON CONFLICT(path) DO NOTHING",
+                        pending,
+                    )
+                    pending.clear()
+        if pending:
+            db.executemany(
                 "INSERT INTO document_index_files VALUES(?,?,?,?) ON CONFLICT(path) DO NOTHING",
-                (
-                    str(path.relative_to(root)),
-                    path.stem,
-                    path.stat().st_size,
-                    extensions[path.suffix[1:]],
-                ),
+                pending,
             )
 
 
