@@ -12,6 +12,49 @@ from backend.shared import tushare_documents
 
 
 class WorkerStatus(unittest.TestCase):
+    def test_cycle_log_is_compact_and_keeps_operational_counts(self):
+        report = {
+            'started_at': '2026-09-18T17:40:02+00:00',
+            'updated_at': '2026-09-18T17:41:56+00:00',
+            'status': 'completed_cycle',
+            'elapsed_seconds': 114.393,
+            'free_bytes': 2**40,
+            'acquisition': {
+                'requests': 633,
+                'done': 413195,
+                'empty': 352331,
+                'pending': 2835888,
+                'blocked': 871,
+                'split_pending': 10297,
+                'permission_blocked': 5847,
+                'planning_cadence': {
+                    'status': 'deferred',
+                    'reason': 'interval_not_due',
+                    'large_internal_state': 'x' * 100000,
+                },
+                'archive': {'archived_releases': ['x' * 100000]},
+                'timing': {'failed_stage': None, 'large_internal_state': 'x' * 100000},
+            },
+            'documents': {
+                'status': 'ok',
+                'processed': 2221,
+                'elapsed_seconds': 102.677,
+                'counts': [
+                    {'download_status': 'pending', 'parse_status': 'not_attempted', 'documents': 4820134},
+                    {'download_status': 'downloaded', 'parse_status': 'parsed', 'documents': 311799},
+                ],
+                'terminal_recovery': {'scheduled': ['x' * 100000]},
+            },
+        }
+        summary = worker.cycle_log(report)
+        self.assertEqual(summary['acquisition']['requests'], 633)
+        self.assertEqual(summary['acquisition']['planning_status'], 'deferred')
+        self.assertEqual(summary['documents']['pending_download'], 4820134)
+        self.assertEqual(summary['documents']['parsed'], 311799)
+        self.assertNotIn('archive', summary['acquisition'])
+        self.assertNotIn('counts', summary['documents'])
+        self.assertLess(len(json.dumps(summary)), 2048)
+
     def test_documents_overlap_acquisition_and_finish_before_cycle_returns(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -44,13 +87,13 @@ class WorkerStatus(unittest.TestCase):
                 before_nonpublication_work()
                 self.assertTrue(started.wait(2), 'documents must start before acquisition ends')
                 captured.set()
-                return {'requests': 1}
+                return {'requests': 1, 'archive': {'archived_releases': ['large']}}
             with patch.dict(os.environ), patch('sys.argv', ['worker', '--root', str(root), '--once']), \
                     patch.object(tushare_pipeline, 'authority'), \
                     patch.object(tushare_pipeline, 'tick', side_effect=acquire), \
                     patch.object(tushare_documents, 'run_documents', side_effect=documents), \
                     patch.object(worker.shutil, 'disk_usage', return_value=SimpleNamespace(free=2**40)), \
-                    patch('builtins.print'):
+                    patch('builtins.print') as printed:
                 self.assertEqual(worker.main(), 0)
             self.assertTrue(finished.is_set())
             report = json.loads((root / 'archive-worker-status.json').read_text())
@@ -59,6 +102,10 @@ class WorkerStatus(unittest.TestCase):
             self.assertEqual(report['cycle_interval_seconds'], 120.0)
             self.assertGreaterEqual(report['updated_at'], report['started_at'])
             self.assertGreaterEqual(report['elapsed_seconds'], 0)
+            logged = json.loads(printed.call_args.args[0])
+            self.assertEqual(logged['acquisition']['requests'], 1)
+            self.assertEqual(logged['documents']['processed'], 100)
+            self.assertNotIn('archive', logged['acquisition'])
 
     def test_configurable_cycle_interval_is_bounded(self):
         self.assertEqual(worker.cycle_seconds({}), 120.0)

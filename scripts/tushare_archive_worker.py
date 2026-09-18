@@ -111,6 +111,58 @@ def execute_documents(
     )
 
 
+def cycle_log(report):
+    """Return the small operational subset written to the append-only log."""
+    acquisition = report.get('acquisition', {})
+    documents = report.get('documents', {})
+    summary = {
+        key: report[key]
+        for key in (
+            'started_at', 'updated_at', 'status', 'elapsed_seconds', 'free_bytes',
+            'nas_migration_warning', 'cycle_interval_seconds', 'document_execution',
+            'error_type',
+        )
+        if key in report
+    }
+    if acquisition:
+        summary['acquisition'] = {
+            key: acquisition[key]
+            for key in (
+                'status', 'requests', 'done', 'empty', 'pending', 'blocked',
+                'split_pending', 'permission_blocked', 'resolved',
+                'snapshot_disabled', 'deferred_legacy_period_plan',
+            )
+            if key in acquisition
+        }
+        planning = acquisition.get('planning_cadence')
+        if isinstance(planning, dict):
+            summary['acquisition']['planning_status'] = planning.get('status')
+            if planning.get('reason') is not None:
+                summary['acquisition']['planning_reason'] = planning['reason']
+        timing = acquisition.get('timing')
+        if isinstance(timing, dict) and timing.get('failed_stage') is not None:
+            summary['acquisition']['failed_stage'] = timing['failed_stage']
+    if documents:
+        summary['documents'] = {
+            key: documents[key]
+            for key in ('status', 'processed', 'elapsed_seconds')
+            if key in documents
+        }
+        counts = documents.get('counts')
+        if isinstance(counts, list):
+            summary['documents']['pending_download'] = sum(
+                row.get('documents', 0)
+                for row in counts
+                if isinstance(row, dict) and row.get('download_status') == 'pending'
+            )
+            summary['documents']['parsed'] = sum(
+                row.get('documents', 0)
+                for row in counts
+                if isinstance(row, dict) and row.get('parse_status') == 'parsed'
+            )
+    return summary
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
@@ -187,7 +239,7 @@ def main():
                 report.update(status='failed', error_type=type(exc).__name__)
             report.update(updated_at=utc_now(), elapsed_seconds=round(time.monotonic() - start, 3))
             atomic_json(root / 'archive-worker-status.json', report)
-            print(json.dumps(report), flush=True)
+            print(json.dumps(cycle_log(report)), flush=True)
             if args.once:
                 return 0 if report['status'] == 'completed_cycle' else 2
             time.sleep(next_cycle_delay(
