@@ -347,7 +347,7 @@ class PipelineAcceptance(unittest.TestCase):
                 server.server_close()
                 serving.join(2)
 
-    def test_process_capture_can_use_two_or_three_workers(self):
+    def test_process_capture_can_use_two_three_or_four_workers(self):
         def handler_for(state):
             class Handler(BaseHTTPRequestHandler):
                 def do_POST(self):
@@ -383,7 +383,7 @@ class PipelineAcceptance(unittest.TestCase):
 
             return Handler
 
-        for workers in (2, 3):
+        for workers in (2, 3, 4):
             with self.subTest(workers=workers), tempfile.TemporaryDirectory() as tmp:
                 state = {
                     "workers": workers,
@@ -444,7 +444,7 @@ class PipelineAcceptance(unittest.TestCase):
                     serving.join(2)
 
     def test_acquisition_pipeline_depth_is_bounded(self):
-        for value in (True, 0, 4, "2"):
+        for value in (True, 0, 5, "2"):
             with self.subTest(value=value), tempfile.TemporaryDirectory() as tmp:
                 pipeline = Pipeline(Path(tmp), CATALOG)
                 with self.assertRaises(ValueError):
@@ -458,7 +458,7 @@ class PipelineAcceptance(unittest.TestCase):
                 pipeline.close()
 
     def test_acquisition_capture_workers_are_bounded_and_process_only(self):
-        for value in (True, 0, 4, "2"):
+        for value in (True, 0, 5, "2"):
             with self.subTest(value=value), tempfile.TemporaryDirectory() as tmp:
                 pipeline = Pipeline(Path(tmp), CATALOG)
                 with self.assertRaises(ValueError):
