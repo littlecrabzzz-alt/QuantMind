@@ -135,6 +135,24 @@ VIP_OBSERVED_ROWS = {
     "forecast": 1913,
     "express": 66,
 }
+FINANCIAL_VIP_PAGINATION = {
+    "income_vip": {
+        "document": "https://tushare.pro/document/2?doc_id=33",
+        "verified_rows": 10604,
+    },
+    "balancesheet_vip": {
+        "document": "https://tushare.pro/document/2?doc_id=36",
+        "verified_rows": 11187,
+    },
+    "cashflow_vip": {
+        "document": "https://tushare.pro/document/2?doc_id=44",
+        "verified_rows": 10555,
+    },
+    "forecast_vip": {
+        "document": "https://tushare.pro/document/2?doc_id=45",
+        "verified_rows": 1918,
+    },
+}
 
 for _base in (
     "income",
@@ -173,6 +191,27 @@ for _base in (
         [str(n) for n in range(1, 13)]
         if _base in ("income", "balancesheet", "cashflow")
         else []
+    )
+
+for _api, _evidence in FINANCIAL_VIP_PAGINATION.items():
+    STRUCTURED_CONTRACTS[_api].update(
+        pagination={
+            "offset_param": "offset",
+            "limit_param": "limit",
+            "page_size": 1000,
+        },
+        pagination_live_verified={
+            "verified_at": "2026-09-19",
+            "account_scope": "current_archive_account",
+            "period": "20260630",
+            "report_type": "1" if _api != "forecast_vip" else None,
+            "page_size": 1000,
+            "verified_rows": _evidence["verified_rows"],
+            "source_document": _evidence["document"],
+        },
+        pagination_required_param="period",
+        pagination_forbidden_params=["ts_code"],
+        pagination_gap=None,
     )
 
 
@@ -278,6 +317,30 @@ def iter_structured_jobs(config, today, identifiers=None):
         if left_bound > right_bound:
             continue
         priority, version = (25, epoch) if phase == "recent" else (45, "history")
+        # Live-verified exact-period pagination replaces tens of thousands of
+        # per-stock saturation leaves. Put these bounded roots before large
+        # identifier loops so a pre-existing queue cannot starve them.
+        for api in sorted(enabled.intersection(FINANCIAL_VIP_PAGINATION)):
+            base = STRUCTURED_CONTRACTS[api]["catalog_api"]
+            for period in reversed(list(_quarters(start, end))):
+                recent_report = (end - period).days <= 730
+                if recent_report != (phase == "recent"):
+                    continue
+                types = (
+                    range(1, 13)
+                    if base in ("income", "balancesheet", "cashflow")
+                    else [None]
+                )
+                for report_type in types:
+                    params = {"period": period.strftime("%Y%m%d")}
+                    if report_type:
+                        params["report_type"] = str(report_type)
+                    yield job(
+                        api,
+                        params,
+                        5 if phase == "recent" else 15,
+                        version,
+                    )
         for api in DAY_APIS:
             if api not in enabled:
                 continue
@@ -316,7 +379,7 @@ def iter_structured_jobs(config, today, identifiers=None):
                     if params is not None:
                         yield job(api, params, priority, version)
         for api in sorted(enabled):
-            if not api.endswith("_vip"):
+            if not api.endswith("_vip") or api in FINANCIAL_VIP_PAGINATION:
                 continue
             base = STRUCTURED_CONTRACTS[api]["catalog_api"]
             for period in reversed(list(_quarters(start, end))):

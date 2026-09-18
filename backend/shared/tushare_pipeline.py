@@ -116,6 +116,19 @@ def _capture_in_process(job):
         _CAPTURE_PROCESS_ROOT,
     )
     return result, time.perf_counter() - started
+
+
+def _pagination_for_params(spec, params):
+    pagination = spec.get("pagination")
+    required = spec.get("pagination_required_param")
+    if pagination and required and required not in params:
+        return None
+    forbidden = spec.get("pagination_forbidden_params", ())
+    if pagination and any(name in params for name in forbidden):
+        return None
+    return pagination
+
+
 from backend.shared.tushare_global_contracts import (
     GLOBAL_CONTRACTS,
     global_prerequisites,
@@ -1102,10 +1115,7 @@ class Pipeline:
         reuse_recent_open=False,
     ):
         spec = contract_for(api)
-        pagination = spec.get("pagination")
-        required_param = spec.get("pagination_required_param")
-        if pagination and required_param and required_param not in params:
-            pagination = None
+        pagination = _pagination_for_params(spec, params)
         if pagination and (
             spec.get("group") == "global" or spec.get("pagination_live_verified")
         ):
@@ -2344,6 +2354,219 @@ class Pipeline:
             "announcement_saturation": announcement_saturation,
             "permission_states": permission_states,
         }
+
+    def compact_financial_vip_coverage(self):
+        """Retire exact per-stock leaves only after a complete VIP page chain."""
+        apis = (
+            "income_vip",
+            "balancesheet_vip",
+            "cashflow_vip",
+            "forecast_vip",
+        )
+        page_size = 1000
+        rows = []
+        for api in apis:
+            rows.extend(
+                self.db.execute(
+                    "SELECT id,epoch,state,job,result FROM jobs "
+                    "INDEXED BY jobs_discovery_api "
+                    "WHERE json_extract(job,'$.api_name')=? AND result IS NOT NULL "
+                    "AND json_extract(job,'$.params.limit')=? "
+                    "AND json_type(job,'$.params.ts_code') IS NULL",
+                    (api, page_size),
+                ).fetchall()
+            )
+
+        chains, invalid = {}, 0
+        for row in rows:
+            try:
+                job = json.loads(row["job"])
+                params = job["params"]
+                api = job["api_name"]
+                period = params["period"]
+                report_type = params.get("report_type")
+                offset = params.get("offset", 0)
+                expected = {"period", "limit"}
+                if api != "forecast_vip":
+                    expected.add("report_type")
+                if "offset" in params:
+                    expected.add("offset")
+                parsed = datetime.strptime(period, "%Y%m%d").date()
+                if (
+                    api not in apis
+                    or set(params) != expected
+                    or params["limit"] != page_size
+                    or (
+                        api != "forecast_vip"
+                        and report_type not in {str(n) for n in range(1, 13)}
+                    )
+                    or (api == "forecast_vip" and report_type is not None)
+                    or (parsed.month, parsed.day)
+                    not in ((3, 31), (6, 30), (9, 30), (12, 31))
+                    or isinstance(offset, bool)
+                    or not isinstance(offset, int)
+                    or offset < 0
+                    or offset % page_size
+                ):
+                    raise ValueError
+                key = (api, row["epoch"], period, report_type, offset)
+                if key in chains:
+                    chains[key] = None
+                    invalid += 1
+                    continue
+                chains[key] = row
+            except (KeyError, TypeError, ValueError):
+                invalid += 1
+
+        complete, open_chains = {}, 0
+        roots = {
+            (api, epoch, period, report_type)
+            for api, epoch, period, report_type, offset in chains
+            if offset == 0
+        }
+        invalid += sum(
+            offset > 0 and (api, epoch, period, report_type, 0) not in chains
+            for api, epoch, period, report_type, offset in chains
+        )
+        for api, epoch, period, report_type in roots:
+            offset, fields = 0, None
+            while True:
+                row = chains.get((api, epoch, period, report_type, offset))
+                if row is None or row["state"] != "done" or not row["result"]:
+                    open_chains += 1
+                    break
+                try:
+                    job = json.loads(row["job"])
+                    result = json.loads(row["result"])
+                    count = result["row_count"]
+                    if fields is None:
+                        fields = job["fields"]
+                    elif fields != job["fields"]:
+                        raise ValueError
+                except (KeyError, TypeError, ValueError):
+                    invalid += 1
+                    open_chains += 1
+                    break
+                if (
+                    isinstance(count, bool)
+                    or not isinstance(count, int)
+                    or not 0 <= count <= page_size
+                ):
+                    invalid += 1
+                    open_chains += 1
+                    break
+                if count == page_size:
+                    if result.get("pagination_end"):
+                        invalid += 1
+                        open_chains += 1
+                        break
+                    offset += page_size
+                    continue
+                if result.get("pagination_end") is not True or any(
+                    saved_api == api
+                    and saved_epoch == epoch
+                    and saved_period == period
+                    and saved_type == report_type
+                    and saved_offset > offset
+                    for saved_api, saved_epoch, saved_period, saved_type, saved_offset in chains
+                ):
+                    invalid += 1
+                    open_chains += 1
+                    break
+                complete.setdefault((api, period, report_type), set()).add(fields)
+                break
+
+        report = {
+            "status": "no_complete_scopes",
+            "pagination_pages": len(rows),
+            "complete_scopes": len(complete),
+            "open_chains": open_chains,
+            "invalid_pages": invalid,
+            "superseded_leaf_jobs": 0,
+            "superseded_legacy_roots": 0,
+            "terminal_jobs_action": "unchanged",
+            "attempts_action": "preserved",
+        }
+        if not complete:
+            return report
+
+        leaves, legacy = [], []
+        for api in apis:
+            for row in self.db.execute(
+                "SELECT id,job FROM jobs INDEXED BY jobs_ready_api_history "
+                "WHERE state='pending' AND group_name='structured' "
+                "AND json_extract(job,'$.api_name')=?",
+                (api,),
+            ):
+                try:
+                    job = json.loads(row["job"])
+                    params = job["params"]
+                    report_type = params.get("report_type")
+                    expected = {"period", "ts_code"}
+                    if api != "forecast_vip":
+                        expected.add("report_type")
+                    scopes = complete.get((api, params["period"], report_type), set())
+                    if set(params) == expected and job.get("fields") in scopes:
+                        leaves.append(row["id"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+            for row in self.db.execute(
+                "SELECT id,job FROM jobs INDEXED BY jobs_pending "
+                "WHERE state='split_pending' "
+                "AND json_extract(job,'$.api_name')=?",
+                (api,),
+            ):
+                try:
+                    job = json.loads(row["job"])
+                    params = job["params"]
+                    report_type = params.get("report_type")
+                    expected = {"period"}
+                    if api != "forecast_vip":
+                        expected.add("report_type")
+                    scopes = complete.get((api, params["period"], report_type), set())
+                    if set(params) == expected and job.get("fields") in scopes:
+                        legacy.append(row["id"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+
+        with self.db:
+            self.db.executemany(
+                "UPDATE jobs SET state='superseded' WHERE id=? AND state='pending'",
+                ((job_id,) for job_id in leaves),
+            )
+            self.db.executemany(
+                "UPDATE jobs SET state='superseded' WHERE id=? AND state='split_pending'",
+                ((job_id,) for job_id in legacy),
+            )
+            now = utc_now()
+            for api in apis:
+                api_scopes = sum(1 for scope in complete if scope[0] == api)
+                if not api_scopes:
+                    continue
+                self.db.execute(
+                    "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?) "
+                    "ON CONFLICT(scope) DO UPDATE SET status=excluded.status,"
+                    "checked_at=excluded.checked_at,reason=excluded.reason",
+                    (
+                        f"planning:structured:{api}:legacy_fanout",
+                        "replaced_by_verified_pagination",
+                        now,
+                        json.dumps(
+                            {
+                                "complete_scopes": api_scopes,
+                                "page_size": page_size,
+                                "upstream_calls": 0,
+                            },
+                            sort_keys=True,
+                        ),
+                    ),
+                )
+        report.update(
+            status="compacted" if leaves or legacy else "covered_no_open_jobs",
+            superseded_leaf_jobs=len(leaves),
+            superseded_legacy_roots=len(legacy),
+        )
+        return report
 
     def compact_fina_mainbz_vip_coverage(self):
         """Retire covered legacy VIP roots and full-year stock jobs."""
@@ -5052,7 +5275,9 @@ class Pipeline:
                 "UPDATE jobs SET state='permission_blocked' WHERE state='pending' AND id<>? AND json_extract(job,'$.api_name')=? AND COALESCE(json_extract(job,'$.params.src'),'')=?",
                 (row["id"], job["api_name"], str(job["params"].get("src", ""))),
             )
-        if status == "possibly_truncated":
+        spec = contract_for(job["api_name"])
+        pagination = _pagination_for_params(spec, job["params"])
+        if status == "possibly_truncated" and not pagination:
             state = "blocked"
             if self.identifier_split_needs_discovery(
                 job, epoch=row["epoch"]
@@ -5069,11 +5294,6 @@ class Pipeline:
                 if split:
                     result["split"] = split
                     state = "split_pending"
-        spec = contract_for(job["api_name"])
-        pagination = spec.get("pagination")
-        required_param = spec.get("pagination_required_param")
-        if pagination and required_param and required_param not in job["params"]:
-            pagination = None
         if job["api_name"] == "fund_adj":
             pagination = {"offset_param": "offset", "limit_param": "limit"}
         if pagination:
@@ -6630,6 +6850,10 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                     with measure("permission_reprobe"):
                         report["permission_reprobe"] = (
                             pipeline.schedule_permission_reprobes(config)
+                        )
+                    with measure("financial_vip_compaction"):
+                        report["financial_vip_compaction"] = (
+                            pipeline.compact_financial_vip_coverage()
                         )
                     with measure("fina_mainbz_vip_compaction"):
                         report["fina_mainbz_vip_compaction"] = (
