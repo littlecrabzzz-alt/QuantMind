@@ -74,19 +74,27 @@ def _legacy_complete_response(job, saved, observation, payload):
         for field in ("response_complete", "response_format", "http_status")
     ):
         return False
-    request = observation.get("request") if isinstance(observation, dict) else None
     data = payload.get("data") if isinstance(payload, dict) else None
     return bool(
-        observation.get("schema_version") == 1
+        _verified_capture_request(job, saved, observation, payload)
+        and payload.get("code") == 0
+        and isinstance(data, dict)
+        and data.get("has_more") is False
+    )
+
+
+def _verified_capture_request(job, saved, observation, payload):
+    request = observation.get("request") if isinstance(observation, dict) else None
+    return bool(
+        isinstance(payload, dict)
+        and isinstance(observation, dict)
+        and observation.get("schema_version") == 1
         and observation.get("response_redacted") is False
         and observation.get("object_sha256") == saved.get("object_sha256")
         and isinstance(request, dict)
         and request.get("api_name") == job.get("api_name")
         and request.get("params") == job.get("params")
         and request.get("fields") == job.get("fields")
-        and payload.get("code") == 0
-        and isinstance(data, dict)
-        and data.get("has_more") is False
     )
 
 
@@ -101,6 +109,7 @@ def reassess(pipeline, *, apply=False, apis=None):
     attempts_before = db.execute("SELECT count(*) FROM attempts").fetchone()[0]
     promoted = Counter()
     legacy_promoted = Counter()
+    retired = Counter()
     unchanged = Counter()
     try:
         db.execute("BEGIN IMMEDIATE")
@@ -112,18 +121,51 @@ def reassess(pipeline, *, apply=False, apis=None):
             else ""
         )
         rows = db.execute(
-            "SELECT id,state,job,result FROM jobs WHERE ("
+            "SELECT id,state,epoch,priority,job,result FROM jobs WHERE ("
             "(state='quality' AND json_extract(result,'$.status') "
             "IN ('schema_gap','invalid_values')) OR "
+            "(state='quality' AND epoch GLOB 'capability-*' AND priority<0 "
+            "AND json_extract(result,'$.status')='possibly_truncated') OR "
             "(state='blocked' AND json_extract(result,'$.status')="
             "'possibly_truncated'))"
             + api_filter
             + " ORDER BY rowid",
             apis,
         ).fetchall()
+        capability_probe_apis = tuple(
+            sorted(
+                {
+                    json.loads(row["job"])["api_name"]
+                    for row in rows
+                    if row["state"] == "quality"
+                    and row["epoch"].startswith("capability-")
+                    and row["priority"] < 0
+                    and json.loads(row["result"]).get("status")
+                    == "possibly_truncated"
+                }
+            )
+        )
+        production = {}
+        if capability_probe_apis:
+            placeholders = ",".join("?" for _ in capability_probe_apis)
+            for api, jobs, attempted in db.execute(
+                "SELECT json_extract(job,'$.api_name'),count(*),sum(tries>0) "
+                "FROM jobs WHERE epoch NOT GLOB 'capability-*' "
+                f"AND json_extract(job,'$.api_name') IN ({placeholders}) "
+                "AND state IN ('pending','done','empty','blocked','split_pending','resolved') "
+                "GROUP BY json_extract(job,'$.api_name')",
+                capability_probe_apis,
+            ):
+                production[api] = {"jobs": jobs, "attempted_jobs": attempted}
         for row in rows:
             job, saved = json.loads(row["job"]), json.loads(row["result"])
             api = job["api_name"]
+            capability_probe = bool(
+                row["state"] == "quality"
+                and row["epoch"].startswith("capability-")
+                and row["priority"] < 0
+                and saved.get("status") == "possibly_truncated"
+            )
             if row["state"] == "blocked":
                 split = db.execute(
                     "SELECT status,gap,evidence FROM partition_splits WHERE parent_id=?",
@@ -178,6 +220,81 @@ def reassess(pipeline, *, apply=False, apis=None):
             )
             payload = json.loads(raw)
             observation_payload = json.loads(observation_body)
+            if capability_probe:
+                if not _verified_capture_request(
+                    job, saved, observation_payload, payload
+                ):
+                    unchanged[(api, "capability_probe_capture_unverified")] += 1
+                    continue
+                data = payload.get("data")
+                if (
+                    payload.get("code") != 0
+                    or not isinstance(data, dict)
+                    or not isinstance(data.get("items"), list)
+                    or len(data["items"]) != saved.get("row_count")
+                ):
+                    unchanged[(api, "capability_probe_payload_unverified")] += 1
+                    continue
+                spec = contract_for(api)
+                if not any(
+                    spec.get(key)
+                    for key in (
+                        "pagination",
+                        "saturation_fallback",
+                        "saturation_partition_axes",
+                    )
+                ):
+                    unchanged[(api, "capability_probe_without_partition_strategy")] += 1
+                    continue
+                capability = db.execute(
+                    "SELECT status,checked_at,reason FROM capability WHERE scope=?",
+                    (api + ":",),
+                ).fetchone()
+                if not capability or capability["status"] != "available":
+                    unchanged[(api, "capability_probe_not_currently_available")] += 1
+                    continue
+                plan = production.get(api)
+                if not plan or not plan["attempted_jobs"]:
+                    unchanged[(api, "capability_probe_without_production_attempt")] += 1
+                    continue
+                marker = {
+                    "version": 1,
+                    "previous_state": row["state"],
+                    "previous_status": saved["status"],
+                    "retired_at": utc_now(),
+                    "reason": "non_authoritative_capability_probe",
+                    "contract_sha256": _contract_sha(job),
+                    "source_attempt_preserved": True,
+                    "artifact_evidence_preserved": True,
+                    "coverage_proven": False,
+                    "upstream_calls": 0,
+                    "capability": {
+                        "status": capability["status"],
+                        "checked_at": capability["checked_at"],
+                    },
+                    "production_plan": plan,
+                }
+                updated = {**saved, "capability_probe_retirement": marker}
+                encoded = json.dumps(updated, sort_keys=True)
+                changed = db.execute(
+                    "UPDATE jobs SET state='superseded',result=? "
+                    "WHERE id=? AND state='quality'",
+                    (encoded, row["id"]),
+                ).rowcount
+                if changed != 1:
+                    raise ValueError("Capability probe changed during retirement")
+                db.execute(
+                    "INSERT INTO contract_reassessments "
+                    "(job_id,reassessed_at,contract_sha256,result) VALUES(?,?,?,?)",
+                    (
+                        row["id"],
+                        marker["retired_at"],
+                        marker["contract_sha256"],
+                        encoded,
+                    ),
+                )
+                retired[api] += 1
+                continue
             if legacy_response_metadata and not _legacy_complete_response(
                 job, saved, observation_payload, payload
             ):
@@ -246,6 +363,8 @@ def reassess(pipeline, *, apply=False, apis=None):
             "promoted_by_api": dict(sorted(promoted.items())),
             "legacy_response_promoted_jobs": sum(legacy_promoted.values()),
             "legacy_response_promoted_by_api": dict(sorted(legacy_promoted.items())),
+            "retired_capability_probe_jobs": sum(retired.values()),
+            "retired_capability_probe_by_api": dict(sorted(retired.items())),
             "unchanged_jobs": sum(unchanged.values()),
             "unchanged_by_api_and_status": [
                 {"api_name": api, "status": status, "jobs": count}

@@ -39,10 +39,16 @@ class ContractReassessmentTest(unittest.TestCase):
         result_status="schema_gap",
         job_updates=None,
         legacy_response_metadata=False,
+        epoch="default",
+        priority=100,
     ):
         task = self.pipeline.enqueue(
             api,
-            params or {"start_date": "20260911", "end_date": "20260911"},
+            params
+            if params is not None
+            else {"start_date": "20260911", "end_date": "20260911"},
+            priority,
+            epoch,
         )
         job = json.loads(
             self.pipeline.db.execute(
@@ -74,8 +80,6 @@ class ContractReassessmentTest(unittest.TestCase):
                 "requested_at": "2026-09-08T00:00:00+00:00",
                 "fetched_at": "2026-09-08T00:00:01+00:00",
             }
-            if legacy_response_metadata
-            else {"fixture": task}
         )
         observation_sha = digest(observation_body)
         (self.root / "observations").mkdir(exist_ok=True)
@@ -266,6 +270,108 @@ class ContractReassessmentTest(unittest.TestCase):
             dataset["contract_reassessment"]["previous_status"], "schema_gap"
         )
         self.assertNotIn(task, {gap["id"] for gap in manifest["gaps"]})
+
+    def test_capability_probe_retires_without_claiming_coverage(self):
+        from backend.shared.tushare_other_contracts import FIELDS
+
+        fields = list(FIELDS["opt_basic"])
+        item = ["IO2609-C-4000.CFX" if field == "ts_code" else None for field in fields]
+        task, _, original = self.seed(
+            "opt_basic",
+            fields,
+            [item],
+            null_counts={field: int(field != "ts_code") for field in fields},
+            params={},
+            state="quality",
+            result_status="possibly_truncated",
+            epoch="capability-other-test",
+            priority=-100,
+        )
+        production = self.pipeline.enqueue(
+            "opt_basic", {"exchange": "CFFEX"}, 5, "history"
+        )
+        self.pipeline.db.execute(
+            "UPDATE jobs SET state='done',tries=1 WHERE id=?", (production,)
+        )
+        self.pipeline.db.execute(
+            "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?)",
+            ("opt_basic:", "available", "2026-09-18T00:00:00+00:00", "sample_ok"),
+        )
+        self.pipeline.db.commit()
+
+        planned = reassess(self.pipeline, apply=False, apis=["opt_basic"])
+        self.assertEqual(planned["retired_capability_probe_jobs"], 1)
+        self.assertEqual(
+            self.pipeline.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (task,)
+            ).fetchone()[0],
+            "quality",
+        )
+        applied = reassess(self.pipeline, apply=True, apis=["opt_basic"])
+
+        self.assertEqual(
+            applied["retired_capability_probe_by_api"], {"opt_basic": 1}
+        )
+        row = self.pipeline.db.execute(
+            "SELECT state,result FROM jobs WHERE id=?", (task,)
+        ).fetchone()
+        result = json.loads(row["result"])
+        self.assertEqual(row["state"], "superseded")
+        self.assertEqual(result["status"], "possibly_truncated")
+        marker = result["capability_probe_retirement"]
+        self.assertFalse(marker["coverage_proven"])
+        self.assertEqual(marker["upstream_calls"], 0)
+        self.assertEqual(marker["production_plan"]["attempted_jobs"], 1)
+        self.assertEqual(
+            json.loads(
+                self.pipeline.db.execute(
+                    "SELECT result FROM attempts WHERE job_id=?", (task,)
+                ).fetchone()[0]
+            ),
+            original,
+        )
+
+    def test_capability_probe_without_production_attempt_stays_quality(self):
+        from backend.shared.tushare_other_contracts import FIELDS
+
+        fields = list(FIELDS["opt_basic"])
+        item = ["IO2609-C-4000.CFX" if field == "ts_code" else None for field in fields]
+        task, _, _ = self.seed(
+            "opt_basic",
+            fields,
+            [item],
+            null_counts={field: int(field != "ts_code") for field in fields},
+            params={},
+            state="quality",
+            result_status="possibly_truncated",
+            epoch="capability-other-test",
+            priority=-100,
+        )
+        self.pipeline.db.execute(
+            "INSERT INTO capability(scope,status,checked_at,reason) VALUES(?,?,?,?)",
+            ("opt_basic:", "available", "2026-09-18T00:00:00+00:00", "sample_ok"),
+        )
+        self.pipeline.db.commit()
+
+        report = reassess(self.pipeline, apply=True, apis=["opt_basic"])
+
+        self.assertEqual(report["retired_capability_probe_jobs"], 0)
+        self.assertEqual(
+            report["unchanged_by_api_and_status"],
+            [
+                {
+                    "api_name": "opt_basic",
+                    "status": "capability_probe_without_production_attempt",
+                    "jobs": 1,
+                }
+            ],
+        )
+        self.assertEqual(
+            self.pipeline.db.execute(
+                "SELECT state FROM jobs WHERE id=?", (task,)
+            ).fetchone()[0],
+            "quality",
+        )
 
     def test_current_contract_accepts_observed_nullable_text_content(self):
         task, _, _ = self.seed(
