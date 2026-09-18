@@ -197,6 +197,16 @@ def cycle_log(report):
                 for row in counts
                 if isinstance(row, dict) and row.get('parse_status') == 'parsed'
             )
+    catalog_watch = report.get('catalog_watch')
+    if isinstance(catalog_watch, dict):
+        summary['catalog_watch'] = {
+            key: catalog_watch[key]
+            for key in (
+                'status', 'last_status', 'last_checked_at', 'current_entry_count',
+                'change_count', 'added_doc_ids', 'removed_doc_ids', 'error_type',
+            )
+            if key in catalog_watch
+        }
     return summary
 
 
@@ -230,6 +240,8 @@ def main():
                     interval = cycle_seconds(config)
                     follow_planning = acquire_after_planning(config)
                     report['cycle_interval_seconds'] = interval
+                    from backend.shared.tushare_catalog_watch import run_catalog_watch
+                    report['catalog_watch'] = run_catalog_watch(root, config)
                     # The cloud already used independent acquisition/document workers.
                     # Keep one archive owner and wait for both bounded phases before
                     # another cycle or shutdown; SQLite connections stay task-local.
