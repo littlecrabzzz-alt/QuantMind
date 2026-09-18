@@ -39,11 +39,11 @@ result = fetch_document(source_url, "/data/tushare", max_bytes=25 * 1024 * 1024,
 
 `validation_status=pdf_envelope_only` 表示只有 `%PDF-` 与结束标记检查；不能证明 PDF 完整有效。解析器成功打开之后才是 `pdf_structure_valid`。HTML 使用 `html_content_unverified`：HTTP 200 的登录页/错误页仍可能是合法 HTML，须在业务侧核对是否为所需原文。PDF 签名正常但解析失败也保留原始字节，避免解析器兼容问题导致原文丢失。
 
-PDF 提取在独立 Python 进程中完成，生产路径尝试限制 1 GiB 地址空间、15 秒 CPU、5000 页和 8 MiB 提取文本，另有父进程超时；子进程只保留最少环境变量，不继承 token 或代理配置。资源限制无法设置时返回不可用，不退回无边界解析。这是资源隔离，不是针对任意解析器漏洞的完整 OS 安全沙盒。
+PDF 提取在独立 Python 进程中完成。Linux 使用 1 GiB `RLIMIT_AS`；macOS 因 Darwin 不能对当前 Python 进程可靠设置 `RLIMIT_AS`，由父进程通过 `libproc` 轮询子进程常驻内存并在超过 1 GiB 时终止。两端都限制 15 秒 CPU、32 MiB 子进程输出、5000 页和 8 MiB 提取文本，另有父进程墙钟超时；子进程只保留最少环境变量，不继承 token 或代理配置。资源监控无法建立时返回不可用，不退回无边界解析。这是资源隔离，不是针对任意解析器漏洞的完整 OS 安全沙盒。
 
 [pypdf 文档](https://pypdf.readthedocs.io/en/5.7.0/user/extract-text.html) 提醒压缩 PDF 的展开和文本提取可能消耗大量内存，并且不提供 OCR。文本结果不能替代版面核对，也不能把抓取时间当历史发布时间。
 
-依赖现状：主项目 requirements 未声明 pypdf；`rd-agent/requirements.txt` 已列出，Mac 本次可导入。本组件不安装依赖或改 requirements；云端主执行者需核对实际环境。Mac 的 RLIMIT_AS 不可设置，本次真实隔离调用返回 `parse_unavailable/resource_limits_unavailable`，符合保守边界；仅在测试中对自行生成的已知 PDF 直接运行提取核心，以验证页码和原始文件关联。正式非可信 PDF 不使用此测试绕行。
+依赖现状：主项目 requirements 未声明 pypdf；`rd-agent/requirements.txt` 已列出，Mac 私有采集运行时当前安装 pypdf 6.17.0。本组件不在线安装依赖；安装器负责构建固定的私有运行时。2026-09-18 的 macOS 路径改为父进程常驻内存监控，并只把历史上精确标记为 `resource_limits_unavailable` 的解析尝试归零重排；原始 PDF、其他失败类型和尝试记录均不删除。
 
 ## 集成和未完成项
 

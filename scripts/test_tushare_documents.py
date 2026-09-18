@@ -7,6 +7,7 @@ import io
 import json
 from pathlib import Path
 import re
+import signal
 import socket
 import subprocess
 import sys
@@ -82,33 +83,19 @@ class Documents(unittest.TestCase):
         )
         self.assertEqual(first["status"], "downloaded")
         if first["parse_status"] == "parse_unavailable":
-            if first["parse_detail"]["reason"] == "pypdf_not_installed":
-                self.assertEqual(len(first["files"]), 1)
-                self.skipTest("pypdf not installed; graceful preservation checked")
-            # macOS does not implement RLIMIT_AS. Only this known generated
-            # fixture may exercise the extraction core without the worker;
-            # production keeps parse_unavailable instead of weakening limits.
             self.assertEqual(
-                first["parse_detail"]["reason"], "resource_limits_unavailable"
+                first["parse_detail"]["reason"], "pypdf_not_installed"
             )
-            with patch.object(
-                docs,
-                "_parse_pdf",
-                side_effect=lambda path, timeout: docs._extract_pdf(path),
-            ):
-                first, conn = self.fetch(Response(body, Content_Type="application/pdf"))
+            self.assertEqual(len(first["files"]), 1)
+            self.skipTest("pypdf not installed; graceful preservation checked")
         self.assertEqual(first["parse_status"], "parsed", first)
         self.assertEqual(len(first["files"]), 2)
         pages = json.loads((self.root / first["files"][1]["path"]).read_text())["pages"]
         self.assertEqual([p["page_number"] for p in pages], [1, 2])
         self.assertIn("fixture page 2", pages[1]["text"])
         self.assertNotIn("parser_mode", first["parse_detail"])
-        with patch.object(
-            docs,
-            "_parse_pdf",
-            side_effect=lambda path, timeout: docs._extract_pdf(path),
-        ):
-            second, _ = self.fetch(Response(body, Content_Type="application/pdf"))
+        self.assertEqual(first["parse_detail"]["memory_limit_bytes"], 1024**3)
+        second, _ = self.fetch(Response(body, Content_Type="application/pdf"))
         self.assertEqual(first["files"], second["files"])
         for item in first["files"]:
             content = (self.root / item["path"]).read_bytes()
@@ -290,12 +277,116 @@ class Documents(unittest.TestCase):
             self.assertEqual(result["status"], "downloaded")
             self.assertEqual(result["parse_status"], state)
             self.assertEqual(len(result["files"]), 1)
-        with patch.object(
-            docs.subprocess, "run", side_effect=subprocess.TimeoutExpired("parser", 1)
+        with (
+            patch.object(docs.sys, "platform", "linux"),
+            patch.object(
+                docs.subprocess,
+                "run",
+                side_effect=subprocess.TimeoutExpired("parser", 1),
+            ),
         ):
             self.assertEqual(
                 docs._parse_pdf(self.root / "dummy", 1)["parse_status"], "parse_timeout"
             )
+
+    def test_darwin_parser_monitor_limits_and_monitor_failure(self):
+        class Worker:
+            pid = 123456
+            returncode = None
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self, timeout=None):
+                if self.returncode is None:
+                    self.returncode = -signal.SIGKILL
+                return self.returncode
+
+            def kill(self):
+                self.returncode = -signal.SIGKILL
+
+        for resident, expected in (
+            (docs.MAX_PARSE_RESIDENT_BYTES + 1, ("parse_limit", "memory_limit")),
+            (OSError("unavailable"), ("parse_unavailable", "resource_monitor_unavailable")),
+        ):
+            worker = Worker()
+            monitor = (
+                patch.object(docs, "_darwin_resident_bytes", side_effect=resident)
+                if isinstance(resident, Exception)
+                else patch.object(docs, "_darwin_resident_bytes", return_value=resident)
+            )
+            with (
+                patch.object(docs.subprocess, "Popen", return_value=worker),
+                patch.object(docs.os, "killpg") as kill,
+                monitor,
+            ):
+                result = docs._parse_pdf_darwin(self.root / "unused.pdf", 1)
+            self.assertEqual(
+                (result["parse_status"], result["reason"]), expected
+            )
+            kill.assert_called_once_with(worker.pid, signal.SIGKILL)
+
+        worker = Worker()
+        with (
+            patch.object(docs.subprocess, "Popen", return_value=worker),
+            patch.object(docs.os, "killpg") as kill,
+            patch.object(docs.time, "monotonic", side_effect=(0, 2)),
+        ):
+            result = docs._parse_pdf_darwin(self.root / "unused.pdf", 1)
+        self.assertEqual(result["parse_status"], "parse_timeout")
+        kill.assert_called_once_with(worker.pid, signal.SIGKILL)
+
+    @unittest.skipUnless(sys.platform == "darwin", "Darwin libproc only")
+    def test_darwin_monitor_treats_exited_process_as_complete(self):
+        self.assertIsNone(docs._darwin_resident_bytes(2_000_000_000))
+
+    def test_parse_worker_selects_platform_memory_guard(self):
+        import resource
+
+        with (
+            patch.object(docs.sys, "platform", "darwin"),
+            patch.object(resource, "setrlimit") as limit,
+            patch.object(docs, "_extract_pdf", return_value={"parse_status": "parsed"}),
+        ):
+            result = docs._parse_worker(self.root / "unused.pdf")
+        self.assertEqual(result["resource_guard"], "darwin_parent_resident_monitor")
+        self.assertEqual(
+            [call.args[0] for call in limit.call_args_list],
+            [resource.RLIMIT_CPU, resource.RLIMIT_FSIZE],
+        )
+
+        with (
+            patch.object(docs.sys, "platform", "linux"),
+            patch.object(resource, "setrlimit") as limit,
+            patch.object(docs, "_extract_pdf", return_value={"parse_status": "parsed"}),
+        ):
+            result = docs._parse_worker(self.root / "unused.pdf")
+        self.assertEqual(result["resource_guard"], "rlimit_as")
+        self.assertEqual(
+            [call.args[0] for call in limit.call_args_list],
+            [resource.RLIMIT_CPU, resource.RLIMIT_FSIZE, resource.RLIMIT_AS],
+        )
+
+    def test_parser_cleanup_falls_back_when_group_kill_is_denied(self):
+        class Worker:
+            pid = 123456
+            returncode = None
+            killed = False
+
+            def poll(self):
+                return self.returncode
+
+            def kill(self):
+                self.killed = True
+                self.returncode = -signal.SIGKILL
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+        worker = Worker()
+        with patch.object(docs.os, "killpg", side_effect=PermissionError):
+            docs._kill_parser(worker)
+        self.assertTrue(worker.killed)
 
     def test_html_and_existing_corruption_or_symlink(self):
         body = b"<!DOCTYPE html><html><body>Original policy</body></html>"

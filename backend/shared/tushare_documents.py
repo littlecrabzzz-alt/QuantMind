@@ -6,6 +6,7 @@ A separate SQLite queue owns document retries; callers enforce authority and pub
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import fcntl
 import http.client
@@ -31,6 +32,8 @@ from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 MAX_REDIRECTS = 3
 MAX_PARSE_PAGES = 5000
 MAX_PARSE_TEXT_BYTES = 8 * 1024 * 1024
+MAX_PARSE_OUTPUT_BYTES = 32 * 1024 * 1024
+MAX_PARSE_RESIDENT_BYTES = 1024**3
 
 
 class DocumentError(ValueError):
@@ -168,13 +171,29 @@ def _parse_worker(path):
 
     try:
         resource.setrlimit(resource.RLIMIT_CPU, (15, 15))
-        resource.setrlimit(resource.RLIMIT_AS, (1024**3, 1024**3))
+        resource.setrlimit(
+            resource.RLIMIT_FSIZE,
+            (MAX_PARSE_OUTPUT_BYTES, MAX_PARSE_OUTPUT_BYTES),
+        )
+        if sys.platform != "darwin":
+            resource.setrlimit(
+                resource.RLIMIT_AS,
+                (MAX_PARSE_RESIDENT_BYTES, MAX_PARSE_RESIDENT_BYTES),
+            )
     except (ValueError, OSError):
         return {
             "parse_status": "parse_unavailable",
             "reason": "resource_limits_unavailable",
         }
-    return _extract_pdf(path)
+    return {
+        **_extract_pdf(path),
+        "resource_guard": (
+            "darwin_parent_resident_monitor"
+            if sys.platform == "darwin"
+            else "rlimit_as"
+        ),
+        "memory_limit_bytes": MAX_PARSE_RESIDENT_BYTES,
+    }
 
 
 def _extract_pdf_reader(pypdf, path, *, strict):
@@ -236,7 +255,159 @@ def _extract_pdf(path):
         return {"parse_status": "parse_failed", "error_type": type(exc).__name__}
 
 
+_DARWIN_RESIDENT_READER = None
+
+
+def _darwin_resident_bytes(pid):
+    global _DARWIN_RESIDENT_READER
+    if _DARWIN_RESIDENT_READER is None:
+        import ctypes
+
+        class ProcTaskInfo(ctypes.Structure):
+            _fields_ = [
+                ("virtual_size", ctypes.c_uint64),
+                ("resident_size", ctypes.c_uint64),
+                ("total_user", ctypes.c_uint64),
+                ("total_system", ctypes.c_uint64),
+                ("threads_user", ctypes.c_uint64),
+                ("threads_system", ctypes.c_uint64),
+                ("policy", ctypes.c_int32),
+                ("faults", ctypes.c_int32),
+                ("pageins", ctypes.c_int32),
+                ("cow_faults", ctypes.c_int32),
+                ("messages_sent", ctypes.c_int32),
+                ("messages_received", ctypes.c_int32),
+                ("syscalls_mach", ctypes.c_int32),
+                ("syscalls_unix", ctypes.c_int32),
+                ("context_switches", ctypes.c_int32),
+                ("thread_count", ctypes.c_int32),
+                ("running_threads", ctypes.c_int32),
+                ("priority", ctypes.c_int32),
+            ]
+
+        library = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
+        library.proc_pidinfo.argtypes = [
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_uint64,
+            ctypes.c_void_p,
+            ctypes.c_int,
+        ]
+        library.proc_pidinfo.restype = ctypes.c_int
+
+        def read_resident_bytes(target_pid):
+            info = ProcTaskInfo()
+            size = ctypes.sizeof(info)
+            ctypes.set_errno(0)
+            returned = library.proc_pidinfo(
+                target_pid, 4, 0, ctypes.byref(info), size
+            )
+            if returned != size:
+                error = ctypes.get_errno()
+                if error in (0, errno.ESRCH):
+                    return None
+                raise OSError(error, os.strerror(error))
+            return int(info.resident_size)
+
+        _DARWIN_RESIDENT_READER = read_resident_bytes
+    return _DARWIN_RESIDENT_READER(pid)
+
+
+def _kill_parser(worker):
+    if worker.poll() is None:
+        try:
+            os.killpg(worker.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        except PermissionError:
+            try:
+                worker.kill()
+            except ProcessLookupError:
+                pass
+    try:
+        worker.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        try:
+            worker.kill()
+        except ProcessLookupError:
+            pass
+        worker.wait()
+
+
+def _parse_pdf_darwin(path, timeout):
+    with tempfile.TemporaryFile() as output:
+        try:
+            worker = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-I",
+                    str(Path(__file__).resolve()),
+                    "--parse-pdf",
+                    str(path),
+                    str(time.time() + timeout),
+                ],
+                stdout=output,
+                stderr=subprocess.DEVNULL,
+                env={"PATH": os.defpath, "LANG": "C.UTF-8"},
+                start_new_session=True,
+            )
+        except (ValueError, OSError):
+            return {"parse_status": "parse_failed", "reason": "parser_process_error"}
+        deadline = time.monotonic() + timeout
+        result = None
+        try:
+            while worker.poll() is None:
+                if time.monotonic() >= deadline:
+                    result = {"parse_status": "parse_timeout"}
+                    _kill_parser(worker)
+                    break
+                try:
+                    resident = _darwin_resident_bytes(worker.pid)
+                except OSError:
+                    result = {
+                        "parse_status": "parse_unavailable",
+                        "reason": "resource_monitor_unavailable",
+                    }
+                    _kill_parser(worker)
+                    break
+                if resident is not None and resident > MAX_PARSE_RESIDENT_BYTES:
+                    result = {
+                        "parse_status": "parse_limit",
+                        "reason": "memory_limit",
+                        "resident_bytes": resident,
+                    }
+                    _kill_parser(worker)
+                    break
+                time.sleep(min(0.01, max(0.001, deadline - time.monotonic())))
+            if worker.poll() is None:
+                _kill_parser(worker)
+            if result is not None:
+                return result
+            if worker.returncode == -signal.SIGALRM:
+                return {"parse_status": "parse_timeout"}
+            if worker.returncode:
+                return {
+                    "parse_status": "parse_failed",
+                    "reason": "parser_process_failed",
+                }
+            output.seek(0)
+            payload = output.read(MAX_PARSE_OUTPUT_BYTES + 1)
+            if len(payload) > MAX_PARSE_OUTPUT_BYTES:
+                return {
+                    "parse_status": "parse_limit",
+                    "reason": "parser_output_limit",
+                }
+            return json.loads(payload)
+        except (UnicodeDecodeError, ValueError, OSError):
+            return {"parse_status": "parse_failed", "reason": "parser_process_error"}
+        finally:
+            if worker.poll() is None:
+                _kill_parser(worker)
+
+
 def _parse_pdf(path, timeout):
+    if sys.platform == "darwin":
+        return _parse_pdf_darwin(path, timeout)
     try:
         worker = subprocess.run(
             [
@@ -933,9 +1104,9 @@ def _claims_setup(db, timing=None):
             "SELECT 1 FROM sqlite_master WHERE name='document_claim_meta'"
         ).fetchone():
             row = db.execute("SELECT version FROM document_claim_meta").fetchone()
-            if row is None or row[0] not in (1, 2, 3):
+            if row is None or row[0] not in (1, 2, 3, 4):
                 raise DocumentError("unsupported_document_claim_schema")
-            if row[0] == 3:
+            if row[0] == 4:
                 return
             with db:
                 _timed_begin(db, timing, "setup")
@@ -944,13 +1115,21 @@ def _claims_setup(db, timing=None):
                         "CREATE INDEX IF NOT EXISTS document_pending_claim_order "
                         "ON documents(id) WHERE download_status='pending'"
                     )
+                if row[0] in (1, 2):
+                    db.execute(
+                        "CREATE INDEX document_parse_claim_order ON documents(id) "
+                        "WHERE download_status='downloaded' AND parse_status IN "
+                        "('parse_pending','parse_unavailable','parse_failed',"
+                        "'parse_timeout') AND parse_tries<5"
+                    )
                 db.execute(
-                    "CREATE INDEX document_parse_claim_order ON documents(id) "
-                    "WHERE download_status='downloaded' AND parse_status IN "
-                    "('parse_pending','parse_unavailable','parse_failed',"
-                    "'parse_timeout') AND parse_tries<5"
+                    "UPDATE documents SET parse_tries=0,parse_retry_after=0 "
+                    "WHERE download_status='downloaded' "
+                    "AND parse_status='parse_unavailable' "
+                    "AND json_extract(result,'$.parse_detail.reason')="
+                    "'resource_limits_unavailable'"
                 )
-                db.execute("UPDATE document_claim_meta SET version=3")
+                db.execute("UPDATE document_claim_meta SET version=4")
             return
         with db:
             _timed_begin(db, timing, "setup")
@@ -971,7 +1150,7 @@ def _claims_setup(db, timing=None):
                 "('parse_pending','parse_unavailable','parse_failed',"
                 "'parse_timeout') AND parse_tries<5"
             )
-            db.execute("INSERT INTO document_claim_meta VALUES(3)")
+            db.execute("INSERT INTO document_claim_meta VALUES(4)")
     finally:
         _add_elapsed(timing, "setup_db_total_seconds", started)
 

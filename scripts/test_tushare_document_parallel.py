@@ -341,7 +341,7 @@ class ParallelDocuments(unittest.TestCase):
         )
         self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 3)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 3
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 4
         )
         db.close()
 
@@ -447,7 +447,7 @@ class ParallelDocuments(unittest.TestCase):
         timing = {}
         docs._claims_setup(db, timing)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 3
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 4
         )
         self.assertTrue(
             db.execute(
@@ -494,13 +494,85 @@ class ParallelDocuments(unittest.TestCase):
         )
         docs._claims_setup(db)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 3
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 4
         )
         self.assertTrue(
             db.execute(
                 "SELECT 1 FROM sqlite_master "
                 "WHERE type='index' AND name='document_parse_claim_order'"
             ).fetchone()
+        )
+        db.close()
+
+    def test_claim_v3_requeues_only_darwin_resource_limit_failures(self):
+        db = docs._document_db(self.root)
+        docs._claims_setup(db)
+        cases = (
+            (0, "parse_unavailable", "resource_limits_unavailable", 5, 0),
+            (1, "parse_unavailable", "resource_limits_unavailable", 2, 0),
+            (2, "parse_unavailable", "pypdf_not_installed", 5, 5),
+            (3, "parse_failed", "resource_limits_unavailable", 5, 5),
+        )
+        with db:
+            for number, status, reason, tries, _ in cases:
+                db.execute(
+                    "INSERT INTO documents(id,observation,url,download_status,"
+                    "parse_status,parse_tries,parse_retry_after,result) "
+                    "VALUES(?,?,?,?,?,?,?,?)",
+                    (
+                        f"{number:064x}",
+                        "migration",
+                        f"https://example.com/{number}.pdf",
+                        "downloaded",
+                        status,
+                        tries,
+                        time.time() + 3600,
+                        json.dumps({"parse_detail": {"reason": reason}}),
+                    ),
+                )
+            db.execute("UPDATE document_claim_meta SET version=3")
+
+        db.set_authorizer(
+            lambda action, table, *_: (
+                sqlite3.SQLITE_DENY
+                if action == sqlite3.SQLITE_UPDATE and table == "documents"
+                else sqlite3.SQLITE_OK
+            )
+        )
+        with self.assertRaises(sqlite3.DatabaseError):
+            docs._claims_setup(db)
+        db.set_authorizer(lambda *_: sqlite3.SQLITE_OK)
+        self.assertEqual(
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 3
+        )
+        self.assertEqual(
+            [
+                tuple(row)
+                for row in db.execute(
+                    "SELECT parse_tries FROM documents ORDER BY id"
+                ).fetchall()
+            ],
+            [(case[3],) for case in cases],
+        )
+
+        docs._claims_setup(db)
+        self.assertEqual(
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 4
+        )
+        self.assertEqual(
+            [
+                tuple(row)
+                for row in db.execute(
+                    "SELECT parse_tries FROM documents ORDER BY id"
+                ).fetchall()
+            ],
+            [(case[4],) for case in cases],
+        )
+        self.assertEqual(
+            db.execute(
+                "SELECT count(*) FROM documents WHERE parse_retry_after=0"
+            ).fetchone()[0],
+            2,
         )
         db.close()
 
@@ -723,7 +795,10 @@ class ParallelDocuments(unittest.TestCase):
                 docs._download_job("https://example.com/1", self.root, 2)["status"],
                 "download_timeout",
             )
-        with patch.object(docs.subprocess, "run", return_value=worker):
+        with (
+            patch.object(docs.sys, "platform", "linux"),
+            patch.object(docs.subprocess, "run", return_value=worker),
+        ):
             self.assertEqual(
                 docs._parse_pdf(self.root / "unused.pdf", 2)["parse_status"],
                 "parse_timeout",
