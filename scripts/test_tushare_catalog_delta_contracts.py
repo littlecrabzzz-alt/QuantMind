@@ -51,7 +51,11 @@ class CatalogDeltaContractsTest(unittest.TestCase):
     def test_planner_is_deterministic_recent_first_and_honors_floor(self):
         jobs = list(iter_catalog_delta_jobs(self.config, date(2026, 9, 19), self.identifiers))
         self.assertEqual(jobs, list(iter_catalog_delta_jobs(self.config, date(2026, 9, 19), self.identifiers)))
-        self.assertEqual([j["api_name"] for j in jobs[:2]], ["rt_hk_k", "rt_hk_k"])
+        snapshots = [j for j in jobs if j["api_name"] == "rt_hk_k"]
+        self.assertEqual(
+            [j["params"]["ts_code"] for j in snapshots],
+            ["0*.HK", "1*.HK", "2*.HK", "4*.HK", "5*.HK", "6*.HK", "8*.HK"],
+        )
         self.assertTrue(all(j["priority"] == 20 for j in jobs if j["epoch"] != "history"))
         self.assertTrue(all(j["priority"] == 40 for j in jobs if j["epoch"] == "history"))
         etf = [j for j in jobs if j["api_name"] == "etf_auction" and j["epoch"] == "history"]
@@ -61,6 +65,17 @@ class CatalogDeltaContractsTest(unittest.TestCase):
         self.assertTrue(all(set(j["params"]) == {"start_date", "end_date"} for j in years))
         exact = [j for j in jobs if j["api_name"] == "fut_trade_param"]
         self.assertTrue(all(set(j["params"]) == {"trade_date"} for j in exact))
+
+
+    def test_rt_hk_keeps_exact_fallback_for_unverified_prefixes(self):
+        cfg = {"catalog_delta_apis": ["rt_hk_k"], "planning_epoch": "slot"}
+        ids = {"hk_stocks": ["30000.HK", "70000.HK", "90000.HK"]}
+        jobs = list(iter_catalog_delta_jobs(cfg, date(2026, 9, 19), ids))
+        self.assertEqual(
+            [j["params"]["ts_code"] for j in jobs[-3:]],
+            ["30000.HK", "70000.HK", "90000.HK"],
+        )
+        self.assertTrue(all(j["epoch"] == "slot" for j in jobs))
 
     def test_unknown_history_is_a_gap_and_produces_only_recent(self):
         cfg = {"catalog_delta_apis": ["stk_seasoned"]}
