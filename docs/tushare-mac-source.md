@@ -238,6 +238,9 @@ HTTP worker 和一条预取任务移入独立进程，Token 通过进程初始�
 不得超过 pipeline depth。主进程仍在每次提交前逐个持久化共享账户和 API gate，因此并发
 worker 只重叠已合法预留的网络/落盘时间，不放宽分钟频次、
 接口特殊上限或每日配额。报告中的 `http_workers` 必须与实际值一致。
+并发池按最先完成的响应回收并补入下一条已合法预留的请求，避免慢队头让其他已完成
+响应和空闲槽等待；提交顺序可以变化，但每个 response 的 attempt/job 事务仍由主进程
+逐条完成。状态中的 `completion_order=first_completed` 用于核对实际运行策略。
 若 `account_gate_requested_sleep` 与 `account_gate_sleep` 继续显示同进程文档线程阻塞
 限速调度，可将 `document_worker_execution` 从默认 `thread` 灰度设为 `process`。
 它不改变文档锁、任务数据库、下载并发数或采集/发布顺序，只隔离 Python 调度；worker

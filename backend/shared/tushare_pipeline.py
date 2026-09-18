@@ -18,7 +18,12 @@ import sqlite3
 import stat
 import time
 from collections import deque
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import (
+    FIRST_COMPLETED,
+    ProcessPoolExecutor,
+    ThreadPoolExecutor,
+    wait,
+)
 import multiprocessing
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -5169,7 +5174,7 @@ class Pipeline:
                 if pause:
                     time.sleep(pause)
         else:
-            pending_captures = deque()
+            pending_captures = []
             dispatch_open = True
             high_watermark = 0
             if capture_execution == "process":
@@ -5206,7 +5211,15 @@ class Pipeline:
                         high_watermark = max(high_watermark, len(pending_captures))
                     if not pending_captures:
                         break
-                    row, job, future = pending_captures.popleft()
+                    done, _ = wait(
+                        (item[2] for item in pending_captures),
+                        return_when=FIRST_COMPLETED,
+                    )
+                    finished = next(
+                        item for item in pending_captures if item[2] in done
+                    )
+                    pending_captures.remove(finished)
+                    row, job, future = finished
                     result = record_capture(future.result())
                     if self._apply_capture_result(
                         row, job, result, deadline, work_counts, work_seconds
@@ -5218,6 +5231,7 @@ class Pipeline:
                 "depth": pipeline_depth,
                 "http_workers": capture_workers,
                 "capture_execution": capture_execution,
+                "completion_order": "first_completed",
                 "queue_high_watermark": high_watermark,
                 "crash_recovered_jobs": self.recovered_inflight,
             }

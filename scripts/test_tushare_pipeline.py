@@ -443,6 +443,109 @@ class PipelineAcceptance(unittest.TestCase):
                     server.server_close()
                     serving.join(2)
 
+    def test_process_capture_refills_after_first_completed_response(self):
+        state = {
+            "calls": [],
+            "lock": threading.Lock(),
+            "slow_started": threading.Event(),
+            "third_started": threading.Event(),
+            "slow_saw_third": [],
+            "second_saw_slow": [],
+        }
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                size = int(self.headers["Content-Length"])
+                params = json.loads(self.rfile.read(size))["params"]
+                trade_date = params["trade_date"]
+                with state["lock"]:
+                    state["calls"].append(trade_date)
+                if trade_date == "20260901":
+                    state["slow_started"].set()
+                    state["slow_saw_third"].append(
+                        state["third_started"].wait(2)
+                    )
+                elif trade_date == "20260902":
+                    state["second_saw_slow"].append(
+                        state["slow_started"].wait(2)
+                    )
+                else:
+                    state["third_started"].set()
+                body = json.dumps(
+                    {
+                        "code": 0,
+                        "data": {
+                            "fields": ["ts_code", "trade_date", "adj_factor"],
+                            "items": [["510300.SH", trade_date, 1]],
+                        },
+                    }
+                ).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_):
+                pass
+
+        with tempfile.TemporaryDirectory() as tmp:
+            server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            serving = threading.Thread(target=server.serve_forever, daemon=True)
+            serving.start()
+            original_api_root = tushare_intake.API_ROOT
+            tushare_intake.API_ROOT = (
+                f"http://127.0.0.1:{server.server_address[1]}/api"
+            )
+            try:
+                pipeline = Pipeline(Path(tmp), CATALOG)
+                for index, trade_date in enumerate(
+                    ("20260901", "20260902", "20260903")
+                ):
+                    pipeline.enqueue(
+                        "fund_adj",
+                        {"trade_date": trade_date, "offset": 0, "limit": 2},
+                        epoch=f"epoch-{index}",
+                    )
+                pipeline.db.commit()
+                report = pipeline.run(
+                    object(),
+                    "synthetic-token",
+                    {
+                        **CONFIG,
+                        "acquisition_pipeline_depth": 2,
+                        "acquisition_capture_execution": "process",
+                        "acquisition_capture_workers": 2,
+                    },
+                    max_requests=3,
+                    max_seconds=5,
+                    pause=0,
+                )
+                self.assertEqual(report["requests"], 3)
+                self.assertEqual(state["slow_saw_third"], [True])
+                self.assertEqual(state["second_saw_slow"], [True])
+                self.assertEqual(
+                    set(state["calls"]),
+                    {"20260901", "20260902", "20260903"},
+                )
+                self.assertEqual(
+                    report["acquisition_pipeline"]["completion_order"],
+                    "first_completed",
+                )
+                self.assertEqual(pipeline.status(), {"done": 3})
+                self.assertEqual(
+                    pipeline.db.execute(
+                        "SELECT count(*) FROM jobs WHERE state='inflight'"
+                    ).fetchone()[0],
+                    0,
+                )
+                pipeline.close()
+            finally:
+                tushare_intake.API_ROOT = original_api_root
+                server.shutdown()
+                server.server_close()
+                serving.join(2)
+
     def test_acquisition_pipeline_depth_is_bounded(self):
         for value in (True, 0, 5, "2"):
             with self.subTest(value=value), tempfile.TemporaryDirectory() as tmp:
