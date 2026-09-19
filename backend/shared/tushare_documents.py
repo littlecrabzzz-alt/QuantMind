@@ -1143,9 +1143,9 @@ def _claims_setup(db, timing=None):
             "SELECT 1 FROM sqlite_master WHERE name='document_claim_meta'"
         ).fetchone():
             row = db.execute("SELECT version FROM document_claim_meta").fetchone()
-            if row is None or row[0] not in (1, 2, 3, 4, 5):
+            if row is None or row[0] not in (1, 2, 3, 4, 5, 6):
                 raise DocumentError("unsupported_document_claim_schema")
-            if row[0] == 5:
+            if row[0] == 6:
                 return
             with db:
                 _timed_begin(db, timing, "setup")
@@ -1169,14 +1169,26 @@ def _claims_setup(db, timing=None):
                         "AND json_extract(result,'$.parse_detail.reason')="
                         "'resource_limits_unavailable'"
                     )
+                if row[0] in (1, 2, 3, 4):
+                    db.execute(
+                        "UPDATE documents SET parse_tries=0,parse_retry_after=0 "
+                        "WHERE download_status='downloaded' "
+                        "AND parse_status='parse_failed' "
+                        "AND json_extract(result,'$.parse_detail.reason')="
+                        "'parser_process_failed'"
+                    )
                 db.execute(
-                    "UPDATE documents SET parse_tries=0,parse_retry_after=0 "
-                    "WHERE download_status='downloaded' "
-                    "AND parse_status='parse_failed' "
-                    "AND json_extract(result,'$.parse_detail.reason')="
-                    "'parser_process_failed'"
+                    "CREATE INDEX document_parse_retry_claim_order ON documents(id) "
+                    "WHERE download_status='downloaded' AND parse_status IN "
+                    "('parse_unavailable','parse_failed','parse_timeout') "
+                    "AND parse_tries<5"
                 )
-                db.execute("UPDATE document_claim_meta SET version=5")
+                db.execute(
+                    "CREATE INDEX document_parse_pending_claim_order ON documents(id) "
+                    "WHERE download_status='downloaded' "
+                    "AND parse_status='parse_pending' AND parse_tries<5"
+                )
+                db.execute("UPDATE document_claim_meta SET version=6")
             return
         with db:
             _timed_begin(db, timing, "setup")
@@ -1197,7 +1209,18 @@ def _claims_setup(db, timing=None):
                 "('parse_pending','parse_unavailable','parse_failed',"
                 "'parse_timeout') AND parse_tries<5"
             )
-            db.execute("INSERT INTO document_claim_meta VALUES(5)")
+            db.execute(
+                "CREATE INDEX document_parse_retry_claim_order ON documents(id) "
+                "WHERE download_status='downloaded' AND parse_status IN "
+                "('parse_unavailable','parse_failed','parse_timeout') "
+                "AND parse_tries<5"
+            )
+            db.execute(
+                "CREATE INDEX document_parse_pending_claim_order ON documents(id) "
+                "WHERE download_status='downloaded' "
+                "AND parse_status='parse_pending' AND parse_tries<5"
+            )
+            db.execute("INSERT INTO document_claim_meta VALUES(6)")
     finally:
         _add_elapsed(timing, "setup_db_total_seconds", started)
 
@@ -1353,18 +1376,36 @@ def _eligible_documents(db, phase, now, limit):
     if phase in (None, "parse"):
         rows.extend(
             db.execute(
-                "SELECT * FROM documents INDEXED BY document_parse_claim_order "
+                "SELECT * FROM documents INDEXED BY document_parse_retry_claim_order "
                 "WHERE download_status='downloaded' "
-                "AND parse_status IN ('parse_pending','parse_unavailable',"
-                "'parse_failed','parse_timeout') AND parse_tries<5 "
+                "AND parse_status IN ('parse_unavailable','parse_failed',"
+                "'parse_timeout') AND parse_tries<5 "
                 "AND parse_retry_after<=?" + unclaimed,
                 (now, limit),
             ).fetchall()
         )
-    # Due retries are attempt-bounded. Do not strand recovered files behind
-    # millions of lexicographically earlier pending IDs.
+        rows.extend(
+            db.execute(
+                "SELECT * FROM documents INDEXED BY document_parse_pending_claim_order "
+                "WHERE download_status='downloaded' "
+                "AND parse_status='parse_pending' AND parse_tries<5 "
+                "AND parse_retry_after<=?" + unclaimed,
+                (now, limit),
+            ).fetchall()
+        )
+    # Due retries are attempt-bounded. Do not strand recovered downloads or
+    # parses behind millions of lexicographically earlier pending IDs.
     return sorted(
-        rows, key=lambda row: (row["download_status"] != "retry", row["id"])
+        rows,
+        key=lambda row: (
+            0
+            if row["download_status"] == "retry"
+            else 1
+            if row["download_status"] == "downloaded"
+            and row["parse_status"] != "parse_pending"
+            else 2,
+            row["id"],
+        ),
     )[:limit]
 
 

@@ -669,7 +669,7 @@ class ParallelDocuments(unittest.TestCase):
         )
         self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 3)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 5
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 6
         )
         db.close()
 
@@ -701,6 +701,9 @@ class ParallelDocuments(unittest.TestCase):
         due_retry = row(3, "retry", retry=now - 1)
         due_parse = row(4, "downloaded", "parse_pending", parse_retry=now - 1)
         due_pending = row(5, "pending")
+        due_parse_retry = row(
+            6, "downloaded", "parse_failed", parse_retry=now - 1
+        )
         db.execute(
             "INSERT INTO document_claims VALUES(?,?,?,?,?)",
             (claimed_pending, "other", "download", now, now + 3600),
@@ -708,7 +711,9 @@ class ParallelDocuments(unittest.TestCase):
         db.commit()
 
         jobs = docs._claim_documents(db, "mixed", None, 2, 20)
-        self.assertEqual([job["id"] for job in jobs], [due_retry, due_parse])
+        self.assertEqual(
+            [job["id"] for job in jobs], [due_retry, due_parse_retry]
+        )
         with db:
             db.execute("DELETE FROM document_claims WHERE owner='mixed'")
         jobs = docs._claim_documents(db, "download", "download", 2, 20)
@@ -716,8 +721,9 @@ class ParallelDocuments(unittest.TestCase):
         with db:
             db.execute("DELETE FROM document_claims WHERE owner='download'")
         jobs = docs._claim_documents(db, "parse", "parse", 1, 20)
-        self.assertEqual([job["id"] for job in jobs], [due_parse])
+        self.assertEqual([job["id"] for job in jobs], [due_parse_retry])
         selected = {job["id"] for job in jobs}
+        self.assertNotIn(due_parse, selected)
         self.assertFalse(
             selected & {future_pending, future_retry, claimed_pending}
         )
@@ -733,17 +739,32 @@ class ParallelDocuments(unittest.TestCase):
         self.assertFalse(any("TEMP B-TREE" in item for item in detail))
         parse_plan = db.execute(
             "EXPLAIN QUERY PLAN SELECT * FROM documents INDEXED BY "
-            "document_parse_claim_order WHERE download_status='downloaded' "
-            "AND parse_status IN ('parse_pending','parse_unavailable',"
-            "'parse_failed','parse_timeout') AND parse_tries<5 "
+            "document_parse_pending_claim_order WHERE download_status='downloaded' "
+            "AND parse_status='parse_pending' AND parse_tries<5 "
             "AND parse_retry_after<=? AND NOT EXISTS(SELECT 1 FROM "
             "document_claims c WHERE c.document_id=documents.id) "
             "ORDER BY id LIMIT ?",
             (now, 2),
         ).fetchall()
         parse_detail = [item[3] for item in parse_plan]
-        self.assertTrue(any("document_parse_claim_order" in item for item in parse_detail))
+        self.assertTrue(
+            any("document_parse_pending_claim_order" in item for item in parse_detail)
+        )
         self.assertFalse(any("TEMP B-TREE" in item for item in parse_detail))
+        retry_plan = db.execute(
+            "EXPLAIN QUERY PLAN SELECT * FROM documents INDEXED BY "
+            "document_parse_retry_claim_order WHERE download_status='downloaded' "
+            "AND parse_status IN ('parse_unavailable','parse_failed',"
+            "'parse_timeout') AND parse_tries<5 AND parse_retry_after<=? "
+            "AND NOT EXISTS(SELECT 1 FROM document_claims c WHERE "
+            "c.document_id=documents.id) ORDER BY id LIMIT ?",
+            (now, 2),
+        ).fetchall()
+        retry_detail = [item[3] for item in retry_plan]
+        self.assertTrue(
+            any("document_parse_retry_claim_order" in item for item in retry_detail)
+        )
+        self.assertFalse(any("TEMP B-TREE" in item for item in retry_detail))
         db.close()
 
     def test_claim_v1_migration_is_transactional_and_observable(self):
@@ -752,6 +773,8 @@ class ParallelDocuments(unittest.TestCase):
         with db:
             db.execute("DROP INDEX document_pending_claim_order")
             db.execute("DROP INDEX document_parse_claim_order")
+            db.execute("DROP INDEX document_parse_retry_claim_order")
+            db.execute("DROP INDEX document_parse_pending_claim_order")
             db.execute("UPDATE document_claim_meta SET version=1")
         db.set_authorizer(
             lambda action, *_: (
@@ -775,7 +798,7 @@ class ParallelDocuments(unittest.TestCase):
         timing = {}
         docs._claims_setup(db, timing)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 5
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 6
         )
         self.assertTrue(
             db.execute(
@@ -789,6 +812,18 @@ class ParallelDocuments(unittest.TestCase):
                 "WHERE type='index' AND name='document_parse_claim_order'"
             ).fetchone()
         )
+        self.assertTrue(
+            db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='index' "
+                "AND name='document_parse_retry_claim_order'"
+            ).fetchone()
+        )
+        self.assertTrue(
+            db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='index' "
+                "AND name='document_parse_pending_claim_order'"
+            ).fetchone()
+        )
         self.assertEqual(timing["setup_db_calls"], 1)
         self.assertGreaterEqual(
             timing["setup_db_total_seconds"], timing["setup_db_wait_seconds"]
@@ -800,6 +835,8 @@ class ParallelDocuments(unittest.TestCase):
         docs._claims_setup(db)
         with db:
             db.execute("DROP INDEX document_parse_claim_order")
+            db.execute("DROP INDEX document_parse_retry_claim_order")
+            db.execute("DROP INDEX document_parse_pending_claim_order")
             db.execute("UPDATE document_claim_meta SET version=2")
         db.set_authorizer(
             lambda action, *_: (
@@ -822,7 +859,7 @@ class ParallelDocuments(unittest.TestCase):
         )
         docs._claims_setup(db)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 5
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 6
         )
         self.assertTrue(
             db.execute(
@@ -842,6 +879,8 @@ class ParallelDocuments(unittest.TestCase):
             (3, "parse_failed", "resource_limits_unavailable", 5, 5),
         )
         with db:
+            db.execute("DROP INDEX document_parse_retry_claim_order")
+            db.execute("DROP INDEX document_parse_pending_claim_order")
             for number, status, reason, tries, _ in cases:
                 db.execute(
                     "INSERT INTO documents(id,observation,url,download_status,"
@@ -885,7 +924,7 @@ class ParallelDocuments(unittest.TestCase):
 
         docs._claims_setup(db)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 5
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 6
         )
         self.assertEqual(
             [
@@ -914,6 +953,8 @@ class ParallelDocuments(unittest.TestCase):
             (3, "parse_unavailable", "parser_process_failed", 5, 5),
         )
         with db:
+            db.execute("DROP INDEX document_parse_retry_claim_order")
+            db.execute("DROP INDEX document_parse_pending_claim_order")
             for number, status, reason, tries, _ in cases:
                 db.execute(
                     "INSERT INTO documents(id,observation,url,download_status,"
@@ -952,7 +993,7 @@ class ParallelDocuments(unittest.TestCase):
 
         docs._claims_setup(db)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 5
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 6
         )
         self.assertEqual(
             [row[0] for row in db.execute("SELECT parse_tries FROM documents ORDER BY id")],
@@ -963,6 +1004,55 @@ class ParallelDocuments(unittest.TestCase):
                 "SELECT count(*) FROM documents WHERE parse_retry_after=0"
             ).fetchone()[0],
             1,
+        )
+        db.close()
+
+    def test_claim_v5_adds_retry_order_without_replaying_cpu_recovery(self):
+        db = docs._document_db(self.root)
+        docs._claims_setup(db)
+        with db:
+            db.execute("DROP INDEX document_parse_retry_claim_order")
+            db.execute("DROP INDEX document_parse_pending_claim_order")
+            db.execute(
+                "INSERT INTO documents(id,observation,url,download_status,"
+                "parse_status,parse_tries,parse_retry_after,result) "
+                "VALUES(?,?,?,?,?,?,?,?)",
+                (
+                    "f" * 64,
+                    "migration",
+                    "https://example.com/retry.pdf",
+                    "downloaded",
+                    "parse_failed",
+                    3,
+                    time.time() + 3600,
+                    json.dumps(
+                        {"parse_detail": {"reason": "parser_process_failed"}}
+                    ),
+                ),
+            )
+            db.execute("UPDATE document_claim_meta SET version=5")
+
+        docs._claims_setup(db)
+        self.assertEqual(
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 6
+        )
+        self.assertTrue(
+            db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='index' "
+                "AND name='document_parse_retry_claim_order'"
+            ).fetchone()
+        )
+        self.assertTrue(
+            db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='index' "
+                "AND name='document_parse_pending_claim_order'"
+            ).fetchone()
+        )
+        self.assertEqual(
+            db.execute(
+                "SELECT parse_tries FROM documents WHERE id=?", ("f" * 64,)
+            ).fetchone()[0],
+            3,
         )
         db.close()
 
