@@ -170,6 +170,7 @@ from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.tushare_intake import (
     capture_sample, digest, json_bytes, utc_now, validate_request_shape,
 )
+from backend.shared.tushare_market_contracts import iter_market_date_refresh
 from backend.shared.tushare_rrg_contracts import RRG_CONTRACTS
 from backend.shared.tushare_stock_lifecycle import valid_date
 from backend.shared.tushare_text_contracts import normalize_anns_d_ts_code
@@ -3842,6 +3843,27 @@ class Pipeline:
         ):
             raise ValueError("Invalid historical planner time limit")
         stats = {}
+        if (
+            "market" in PLANNERS
+            and config.get("enable_market")
+            and "market" not in blocked_families
+        ):
+            self.planning_timing["active_stage"] = "recent_dates:market"
+            recent = {"planned": 0, "new_jobs": 0, "promoted_jobs": 0}
+            for job in iter_market_date_refresh(config, today):
+                before = self.db.total_changes
+                key = self.enqueue(
+                    job["api_name"], job["params"], 5, job["epoch"],
+                    reuse_recent_open=True,
+                )
+                recent["new_jobs"] += self.db.total_changes - before
+                recent["promoted_jobs"] += self.db.execute(
+                    "UPDATE jobs SET priority=5 WHERE id=? AND state='pending' AND priority>5",
+                    (key,),
+                ).rowcount
+                recent["planned"] += 1
+            self.db.commit()
+            stats["recent_dates:market"] = recent
         # Commit observed-period supplements before expensive ordinary families.
         # Repeated dictionary keys keep their first insertion position.
         priority_append = {

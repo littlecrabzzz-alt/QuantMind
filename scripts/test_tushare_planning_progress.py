@@ -86,6 +86,43 @@ class PlanningProgress(unittest.TestCase):
             for r in self.p.db.execute("SELECT job,epoch,state FROM jobs")
         ]
 
+    def test_market_date_refresh_bypasses_identifier_backlog_without_reset(self):
+        config = {
+            "enable_market": True, "market_apis": ["fund_div", "sw_daily"],
+            "history_start": "20200101", "plan_jobs_per_tick": 1,
+        }
+        ids = {"funds": [f"{i:06d}.OF" for i in range(100)]}
+        with patch.object(self.p, "identifiers", return_value=ids):
+            first = self.p.plan_extended(config, date(2026, 9, 19))
+            old = self.state("recent:market")
+            self.assertFalse(old["done"])
+            self.assertEqual(first["recent_dates:market"]["new_jobs"], 7)
+            again = self.p.plan_extended(config, date(2026, 9, 19))
+            self.assertEqual(again["recent_dates:market"]["new_jobs"], 0)
+            self.p.plan_extended(config, date(2026, 9, 20))
+        current = self.state("recent:market")
+        self.assertEqual(current["anchor"], old["anchor"])
+        self.assertGreater(current["offset"], old["offset"])
+        rows = self.p.db.execute(
+            "SELECT job,priority FROM jobs WHERE json_extract(job,'$.api_name')='sw_daily'"
+        ).fetchall()
+        self.assertTrue(any(json.loads(row[0])["params"] == {"trade_date": "20260919"}
+                            and row[1] == 5 for row in rows))
+
+    def test_market_date_refresh_respects_selection_and_promotes_existing_task(self):
+        config = {"enable_market": True, "market_apis": ["sw_daily"],
+                  "history_start": "20260918", "plan_jobs_per_tick": 1}
+        key = self.p.enqueue("sw_daily", {"trade_date": "20260918"}, 25, "20260918")
+        with patch.object(self.p, "identifiers", return_value={}):
+            result = self.p.plan_extended(config, date(2026, 9, 19))
+        self.assertEqual(result["recent_dates:market"],
+                         {"planned": 1, "new_jobs": 0, "promoted_jobs": 1})
+        self.assertEqual(self.p.db.execute("SELECT priority FROM jobs WHERE id=?", (key,)).fetchone()[0], 5)
+        with patch.object(self.p, "identifiers", return_value={}):
+            off = self.p.plan_extended({**config, "enable_market": False}, date(2026, 9, 20))
+        self.assertNotIn("recent_dates:market", off)
+        self.assertEqual({json.loads(row[0])["api_name"] for row in self.p.db.execute("SELECT job FROM jobs")}, {"sw_daily"})
+
     def test_unrelated_family_contract_config_and_discovery_do_not_reset(self):
         self.tick()
         old = self.state()

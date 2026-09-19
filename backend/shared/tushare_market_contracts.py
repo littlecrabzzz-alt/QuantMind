@@ -418,6 +418,23 @@ def iter_market_jobs(config, today, identifiers=None):
                 day -= timedelta(days=1)
 
 
+def iter_market_date_refresh(config, today):
+    """Bounded current-date intake independent of large identifier snapshots."""
+    if isinstance(today, datetime):
+        today = today.date()
+    selected = set(config.get("market_apis", MARKET_CONTRACTS)).intersection(
+        ("fund_share", "sw_daily", "cb_daily", "fut_daily", "fut_mapping",
+         "fut_settle", "fut_wsr")
+    )
+    if not selected:
+        return
+    start = max(_parse(config["history_start"]), today - timedelta(days=7))
+    yield from iter_market_jobs(
+        {**config, "market_apis": sorted(selected), "history_start": start.strftime("%Y%m%d")},
+        today,
+    )
+
+
 def market_prerequisites(identifiers=None, enabled_apis=None):
     """Return missing discovery dependencies without declaring empty coverage."""
     ids, enabled = (
