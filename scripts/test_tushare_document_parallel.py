@@ -669,7 +669,7 @@ class ParallelDocuments(unittest.TestCase):
         )
         self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 3)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 4
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 5
         )
         db.close()
 
@@ -775,7 +775,7 @@ class ParallelDocuments(unittest.TestCase):
         timing = {}
         docs._claims_setup(db, timing)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 4
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 5
         )
         self.assertTrue(
             db.execute(
@@ -822,7 +822,7 @@ class ParallelDocuments(unittest.TestCase):
         )
         docs._claims_setup(db)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 4
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 5
         )
         self.assertTrue(
             db.execute(
@@ -885,7 +885,7 @@ class ParallelDocuments(unittest.TestCase):
 
         docs._claims_setup(db)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 4
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 5
         )
         self.assertEqual(
             [
@@ -901,6 +901,68 @@ class ParallelDocuments(unittest.TestCase):
                 "SELECT count(*) FROM documents WHERE parse_retry_after=0"
             ).fetchone()[0],
             2,
+        )
+        db.close()
+
+    def test_claim_v4_requeues_only_cpu_limited_parser_failures(self):
+        db = docs._document_db(self.root)
+        docs._claims_setup(db)
+        cases = (
+            (0, "parse_failed", "parser_process_failed", 5, 0),
+            (1, "parse_failed", "parser_process_error", 5, 5),
+            (2, "parse_timeout", "parser_process_failed", 5, 5),
+            (3, "parse_unavailable", "parser_process_failed", 5, 5),
+        )
+        with db:
+            for number, status, reason, tries, _ in cases:
+                db.execute(
+                    "INSERT INTO documents(id,observation,url,download_status,"
+                    "parse_status,parse_tries,parse_retry_after,result) "
+                    "VALUES(?,?,?,?,?,?,?,?)",
+                    (
+                        f"{number:064x}",
+                        "migration",
+                        f"https://example.com/{number}.pdf",
+                        "downloaded",
+                        status,
+                        tries,
+                        time.time() + 3600,
+                        json.dumps({"parse_detail": {"reason": reason}}),
+                    ),
+                )
+            db.execute("UPDATE document_claim_meta SET version=4")
+
+        db.set_authorizer(
+            lambda action, table, *_: (
+                sqlite3.SQLITE_DENY
+                if action == sqlite3.SQLITE_UPDATE and table == "documents"
+                else sqlite3.SQLITE_OK
+            )
+        )
+        with self.assertRaises(sqlite3.DatabaseError):
+            docs._claims_setup(db)
+        db.set_authorizer(lambda *_: sqlite3.SQLITE_OK)
+        self.assertEqual(
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 4
+        )
+        self.assertEqual(
+            [row[0] for row in db.execute("SELECT parse_tries FROM documents ORDER BY id")],
+            [case[3] for case in cases],
+        )
+
+        docs._claims_setup(db)
+        self.assertEqual(
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 5
+        )
+        self.assertEqual(
+            [row[0] for row in db.execute("SELECT parse_tries FROM documents ORDER BY id")],
+            [case[4] for case in cases],
+        )
+        self.assertEqual(
+            db.execute(
+                "SELECT count(*) FROM documents WHERE parse_retry_after=0"
+            ).fetchone()[0],
+            1,
         )
         db.close()
 

@@ -1143,9 +1143,9 @@ def _claims_setup(db, timing=None):
             "SELECT 1 FROM sqlite_master WHERE name='document_claim_meta'"
         ).fetchone():
             row = db.execute("SELECT version FROM document_claim_meta").fetchone()
-            if row is None or row[0] not in (1, 2, 3, 4):
+            if row is None or row[0] not in (1, 2, 3, 4, 5):
                 raise DocumentError("unsupported_document_claim_schema")
-            if row[0] == 4:
+            if row[0] == 5:
                 return
             with db:
                 _timed_begin(db, timing, "setup")
@@ -1161,14 +1161,22 @@ def _claims_setup(db, timing=None):
                         "('parse_pending','parse_unavailable','parse_failed',"
                         "'parse_timeout') AND parse_tries<5"
                     )
+                if row[0] in (1, 2, 3):
+                    db.execute(
+                        "UPDATE documents SET parse_tries=0,parse_retry_after=0 "
+                        "WHERE download_status='downloaded' "
+                        "AND parse_status='parse_unavailable' "
+                        "AND json_extract(result,'$.parse_detail.reason')="
+                        "'resource_limits_unavailable'"
+                    )
                 db.execute(
                     "UPDATE documents SET parse_tries=0,parse_retry_after=0 "
                     "WHERE download_status='downloaded' "
-                    "AND parse_status='parse_unavailable' "
+                    "AND parse_status='parse_failed' "
                     "AND json_extract(result,'$.parse_detail.reason')="
-                    "'resource_limits_unavailable'"
+                    "'parser_process_failed'"
                 )
-                db.execute("UPDATE document_claim_meta SET version=4")
+                db.execute("UPDATE document_claim_meta SET version=5")
             return
         with db:
             _timed_begin(db, timing, "setup")
@@ -1189,7 +1197,7 @@ def _claims_setup(db, timing=None):
                 "('parse_pending','parse_unavailable','parse_failed',"
                 "'parse_timeout') AND parse_tries<5"
             )
-            db.execute("INSERT INTO document_claim_meta VALUES(4)")
+            db.execute("INSERT INTO document_claim_meta VALUES(5)")
     finally:
         _add_elapsed(timing, "setup_db_total_seconds", started)
 
