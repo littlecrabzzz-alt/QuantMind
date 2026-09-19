@@ -1362,7 +1362,12 @@ def _claim_documents(db, owner, phase, limit, seconds, timing=None):
     try:
         with db:
             _timed_begin(db, timing, "claim")
-            db.execute("DELETE FROM document_claims WHERE lease_until<=?", (now,))
+            # The exclusive consumer lock keeps this owner's tasks live even
+            # after a clock jump; only reclaim expired claims from older owners.
+            db.execute(
+                "DELETE FROM document_claims WHERE lease_until<=? AND owner<>?",
+                (now, owner),
+            )
             rows = _eligible_documents(db, phase, now, limit)
             claimed_at = time.time()
             for row in rows:

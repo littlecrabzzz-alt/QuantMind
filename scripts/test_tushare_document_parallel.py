@@ -616,6 +616,22 @@ class ParallelDocuments(unittest.TestCase):
         self.assertGreater(retry, time.time())
         fetch.assert_called_once()
 
+    def test_live_owner_keeps_expired_claim_during_refill(self):
+        self.seed(2)
+        db = docs._document_db(self.root)
+        self.addCleanup(db.close)
+        docs._claims_setup(db)
+        with patch.object(docs.time, "time", return_value=1000):
+            first = docs._claim_documents(db, "live-owner", "download", 1, 20)[0]
+        # A wake/clock jump must not reclaim the running owner's other slot.
+        with patch.object(docs.time, "time", return_value=2000):
+            second = docs._claim_documents(db, "live-owner", "download", 1, 20)[0]
+            self.assertNotEqual(first["id"], second["id"])
+            docs._finish_document(db, "live-owner", first, self.download(), "download")
+            docs._finish_document(db, "live-owner", second, self.download(), "download")
+        self.assertEqual(db.execute("SELECT count(*) FROM document_attempts").fetchone()[0], 2)
+        self.assertEqual(db.execute("SELECT count(*) FROM document_claims").fetchone()[0], 0)
+
     def test_claim_expiry_and_stale_result_fence(self):
         self.seed(1)
         db = docs._document_db(self.root)
