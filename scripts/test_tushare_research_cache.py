@@ -22,16 +22,21 @@ class ResearchCache(unittest.TestCase):
             with self.assertRaises(ValueError):
                 deployed_read_root()
 
-    def fixture(self, root):
+    def fixture(self, root, repeated_provenance=False):
         files, datasets = {}, []
         for api in ('daily', 'fund_daily'):
-            raw = json.dumps({'request': {'api_name': api, 'params': {}}}).encode()
-            sha = hashlib.sha256(raw).hexdigest()
-            obs = 'observations/' + sha + '.json'
-            cache.atomic_bytes(root / obs, raw)
-            files[obs] = {'sha256': sha, 'bytes': len(raw)}
-            table = pa.table({'ts_code': ['000001.SZ'], 'trade_date': ['20260915'],
-                              '_observation': [sha + '.json'], '_fetched_at': ['2026-09-16T00:00:00Z']})
+            observations = []
+            for revision in range(2 if repeated_provenance else 1):
+                raw = json.dumps({'request': {'api_name': api, 'params': {}}, 'revision': revision}).encode()
+                sha = hashlib.sha256(raw).hexdigest()
+                obs = 'observations/' + sha + '.json'
+                cache.atomic_bytes(root / obs, raw)
+                files[obs] = {'sha256': sha, 'bytes': len(raw)}
+                observations.append(sha + '.json')
+            observations *= 100 if repeated_provenance else 1
+            count = len(observations)
+            table = pa.table({'ts_code': ['000001.SZ'] * count, 'trade_date': ['20260915'] * count,
+                              '_observation': observations, '_fetched_at': ['2026-09-16T00:00:00Z'] * count})
             tmp = root / 'data.parquet'
             pq.write_table(table, tmp)
             raw = tmp.read_bytes()
@@ -45,6 +50,27 @@ class ResearchCache(unittest.TestCase):
         sha = hashlib.sha256(raw).hexdigest()
         cache.atomic_bytes(root / 'releases' / ('data-' + sha) / 'manifest.json', raw)
         cache.atomic_json(root / 'CURRENT.json', {'release_id': 'data-' + sha, 'manifest_sha256': sha})
+
+    def test_repeated_provenance_retains_all_sources_and_rejects_corruption(self):
+        for corrupt in (False, True):
+            with self.subTest(corrupt=corrupt), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                self.fixture(root, repeated_provenance=True)
+                references = {
+                    'observations/' + p.name
+                    for p in (root / 'observations').iterdir()
+                    if json.loads(p.read_bytes())['request']['api_name'] == 'daily'
+                }
+                self.assertEqual(len(references), 2)
+                if corrupt:
+                    (root / sorted(references)[-1]).write_bytes(b'corrupt')
+                    with self.assertRaisesRegex(ValueError, 'checksum'):
+                        cache.prepare(root, ['daily'])
+                else:
+                    pointer = cache.prepare(root, ['daily'])
+                    manifest = json.loads((root / '.research-exports' / pointer['release_id'] / 'manifest.json').read_bytes())
+                    self.assertEqual({name for name in manifest['files'] if name.startswith('observations/')}, references)
+                    self.assertEqual(len(manifest['files']), 3)
 
     def test_subset_integrity_budget_and_atomic_pointer(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -67,7 +67,7 @@ def prepare(root, apis):
         path = checked(root, name, manifest['files'][name])
         names.add(name)
         for batch in pq.ParquetFile(path).iter_batches(columns=['_observation']):
-            for observation in batch.column(0).to_pylist():
+            for observation in batch.column(0).unique().to_pylist():
                 relative = 'observations/' + observation
                 if not FILE.fullmatch(relative) or relative not in manifest['files']:
                     raise ValueError('Observation missing from source release')
