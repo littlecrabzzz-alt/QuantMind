@@ -78,6 +78,7 @@ def document_disk_budget(count, max_bytes, free_bytes):
 
 
 def document_limits(config):
+    from backend.shared.tushare_documents import MAX_DOCUMENT_MAX_BYTES
     count = config.get('document_worker_max_documents', 100)
     seconds = config.get('document_worker_max_seconds', 90)
     workers = config.get('document_download_workers', 1)
@@ -98,7 +99,7 @@ def document_limits(config):
         or not 1 <= workers <= 16
         or isinstance(max_bytes, bool)
         or not isinstance(max_bytes, int)
-        or not 25 * 1024 * 1024 <= max_bytes <= 256 * 1024 * 1024
+        or not 25 * 1024 * 1024 <= max_bytes <= MAX_DOCUMENT_MAX_BYTES
         or isinstance(retry_interval, bool)
         or not isinstance(retry_interval, (int, float))
         or not 3600 <= retry_interval <= 365 * 86400
@@ -113,7 +114,7 @@ def document_limits(config):
     ):
         raise ValueError(
             'Invalid document worker bounds: 1..2500 stages, '
-            '0..100 seconds, 1..16 downloads, 25..256 MiB, '
+            f'0..100 seconds, 1..16 downloads, 25..{MAX_DOCUMENT_MAX_BYTES // 1024**2} MiB, '
             '3600..31536000 retry seconds, 0..64 retries, 1..4 parsers; '
             'multiple parsers require overlap and downloads > 1'
         )

@@ -35,7 +35,7 @@ MAX_PARSE_TEXT_BYTES = 8 * 1024 * 1024
 MAX_PARSE_OUTPUT_BYTES = 32 * 1024 * 1024
 MAX_PARSE_RESIDENT_BYTES = 1024**3
 DEFAULT_DOCUMENT_MAX_BYTES = 25 * 1024 * 1024
-MAX_DOCUMENT_MAX_BYTES = 256 * 1024 * 1024
+MAX_DOCUMENT_MAX_BYTES = 320 * 1024 * 1024
 
 
 class DocumentError(ValueError):
@@ -1219,8 +1219,6 @@ def _schedule_terminal_retries(
             last_attempt = attempted.timestamp()
         else:
             last_attempt = row["retry_after"]
-        if last_attempt > cutoff:
-            continue
         status = result.get("status")
         category = None
         if status == "invalid_url" and row["url"].strip(" ") != row["url"]:
@@ -1243,7 +1241,11 @@ def _schedule_terminal_retries(
             category = "content_recheck"
         elif status in {"download_timeout", "download_error", "http_error"}:
             category = "transient_failure"
-        if category is not None:
+        # A raised local size limit changes the failed precondition immediately;
+        # source failures still observe their existing cooldown.
+        if category is not None and (
+            last_attempt <= cutoff or category == "larger_size_limit"
+        ):
             buckets[category].append(row)
 
     selected = []
@@ -1666,7 +1668,7 @@ def run_documents(
         type(max_bytes) is not int
         or not DEFAULT_DOCUMENT_MAX_BYTES <= max_bytes <= MAX_DOCUMENT_MAX_BYTES
     ):
-        raise ValueError("max_bytes must be between 25 MiB and 256 MiB")
+        raise ValueError(f"max_bytes must be between 25 MiB and {MAX_DOCUMENT_MAX_BYTES // 1024**2} MiB")
     if (
         type(terminal_retry_interval_seconds) not in (int, float)
         or isinstance(terminal_retry_interval_seconds, bool)

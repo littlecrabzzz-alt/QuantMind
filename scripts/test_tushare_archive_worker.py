@@ -230,7 +230,7 @@ class WorkerStatus(unittest.TestCase):
 
     def test_document_disk_budget_preserves_reserve_for_maximum_payloads(self):
         reserve = 300 * 2**30
-        payload = 256 * 2**20
+        payload = tushare_documents.MAX_DOCUMENT_MAX_BYTES
         stage_bytes = payload + tushare_documents.MAX_PARSE_OUTPUT_BYTES
         for free in (reserve - 1, reserve, reserve + stage_bytes - 1,
                      reserve + stage_bytes, reserve + 100 * 2**30, 2**41):
@@ -243,6 +243,7 @@ class WorkerStatus(unittest.TestCase):
         self.assertEqual(worker.document_disk_budget(2500, payload, 2**41), 2500)
 
     def test_document_limits_match_native_production_bounds(self):
+        self.assertEqual(worker.document_limits({'document_max_bytes': 320 * 2**20})[3], 320 * 2**20)
         self.assertEqual(
             worker.document_limits({}),
             (100, 90.0, 1, 25 * 1024 * 1024, 86400.0, 16, False, 1),
@@ -271,7 +272,7 @@ class WorkerStatus(unittest.TestCase):
             ('document_download_workers', 17),
             ('document_download_workers', True),
             ('document_max_bytes', 25 * 1024 * 1024 - 1),
-            ('document_max_bytes', 256 * 1024 * 1024 + 1),
+            ('document_max_bytes', tushare_documents.MAX_DOCUMENT_MAX_BYTES + 1),
             ('document_max_bytes', True),
             ('document_terminal_retry_interval_seconds', 3599),
             ('document_terminal_retry_interval_seconds', 365 * 86400 + 1),

@@ -129,6 +129,34 @@ class TerminalDocumentRecovery(unittest.TestCase):
             "no_action",
         )
 
+    def test_increased_size_limit_retries_immediately_without_reopening_other_failures(self):
+        now = 2_000_000_000
+        self.seed(1, "size_limit", retry_after=now, extra={
+            "max_bytes": 256 * 1024**2,
+            "response_headers": {"content-length": "297216747"},
+        })
+        self.seed(2, "download_timeout", retry_after=now)
+        self.seed(3, "size_limit", retry_after=now, extra={
+            "max_bytes": docs.MAX_DOCUMENT_MAX_BYTES,
+            "response_headers": {"content-length": "297216747"},
+        })
+        self.seed(4, "size_limit", retry_after=now - 86401, extra={
+            "max_bytes": 256 * 1024**2,
+            "response_headers": {"content-length": str(400 * 1024**2)},
+        })
+        report = docs._schedule_terminal_retries(
+            self.db, now=now, interval_seconds=86400, max_documents=4,
+            max_bytes=docs.MAX_DOCUMENT_MAX_BYTES,
+        )
+        self.assertEqual(len(report["scheduled"]), 1)
+        self.assertEqual(report["scheduled"][0]["category"], "larger_size_limit")
+        states = [row[0] for row in self.db.execute("SELECT download_status FROM documents ORDER BY id")]
+        self.assertEqual(states, ["retry", "blocked", "blocked", "blocked"])
+        self.assertEqual(docs._schedule_terminal_retries(
+            self.db, now=now, interval_seconds=86400, max_documents=4,
+            max_bytes=docs.MAX_DOCUMENT_MAX_BYTES,
+        )["status"], "no_action")
+
     def test_source_challenge_cools_down_after_a_repeat(self):
         now = 2_000_000_000
         ident, raw = self.seed(
