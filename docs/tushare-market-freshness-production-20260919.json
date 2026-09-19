@@ -1,0 +1,303 @@
+{
+  "after_market": {
+    "anchor": "20260919",
+    "done": 0,
+    "name": "recent:market",
+    "offset": 6500
+  },
+  "before_market": {
+    "anchor": "20260919",
+    "done": 0,
+    "name": "recent:market",
+    "offset": 6000
+  },
+  "elapsed_seconds": 24.86,
+  "recent_market_dates": {
+    "new_jobs": 154,
+    "planned": 161,
+    "promoted_jobs": 0
+  },
+  "unfinished_cursor_regressions": [],
+  "verified_at": "2026-09-19T02:59:00.418294+00:00",
+  "acquisition_verified_at": "2026-09-19T03:00:22.499041+00:00",
+  "code_commit": "cc667ec0",
+  "tests_passed": 93,
+  "worker_pid": 45320,
+  "scope": "Seven configured market date APIs; finite identifier/history snapshots remain independent.",
+  "live_states": [
+    {
+      "api": "cb_daily",
+      "state": "done",
+      "count": 5
+    },
+    {
+      "api": "cb_daily",
+      "state": "pending",
+      "count": 2
+    },
+    {
+      "api": "fund_share",
+      "state": "done",
+      "count": 4
+    },
+    {
+      "api": "fund_share",
+      "state": "pending",
+      "count": 10
+    },
+    {
+      "api": "fut_daily",
+      "state": "done",
+      "count": 6
+    },
+    {
+      "api": "fut_daily",
+      "state": "pending",
+      "count": 36
+    },
+    {
+      "api": "fut_mapping",
+      "state": "done",
+      "count": 5
+    },
+    {
+      "api": "fut_mapping",
+      "state": "empty",
+      "count": 1
+    },
+    {
+      "api": "fut_mapping",
+      "state": "pending",
+      "count": 1
+    },
+    {
+      "api": "fut_settle",
+      "state": "done",
+      "count": 6
+    },
+    {
+      "api": "fut_settle",
+      "state": "pending",
+      "count": 36
+    },
+    {
+      "api": "fut_wsr",
+      "state": "done",
+      "count": 4
+    },
+    {
+      "api": "fut_wsr",
+      "state": "empty",
+      "count": 2
+    },
+    {
+      "api": "fut_wsr",
+      "state": "pending",
+      "count": 36
+    },
+    {
+      "api": "sw_daily",
+      "state": "done",
+      "count": 5
+    },
+    {
+      "api": "sw_daily",
+      "state": "empty",
+      "count": 2
+    }
+  ],
+  "latest_day_examples": [
+    {
+      "api": "fund_share",
+      "params": {
+        "market": "SH",
+        "trade_date": "20260918"
+      },
+      "row_count": 997,
+      "object_sha256": "97663194c295bfe20871f4a93bf511a47b987d58f647dd9da8097a6dd4bd7be4"
+    },
+    {
+      "api": "fund_share",
+      "params": {
+        "market": "SZ",
+        "trade_date": "20260918"
+      },
+      "row_count": 765,
+      "object_sha256": "56dc9689ed5f4b82f6e9efa68c495f59f770fcb5e1dbe4a9bf262d7495218e73"
+    },
+    {
+      "api": "sw_daily",
+      "params": {
+        "trade_date": "20260918"
+      },
+      "row_count": 439,
+      "object_sha256": "61728d89801010ceb0c7f0e8d4ff8ab24a86be3457e58069aa48e06924ffba14"
+    },
+    {
+      "api": "cb_daily",
+      "params": {
+        "trade_date": "20260918"
+      },
+      "row_count": 314,
+      "object_sha256": "1782a6b968852ed8b7d733f0d61d8141ad88d0e9c4c7d28db9245b61f369a318"
+    },
+    {
+      "api": "fut_daily",
+      "params": {
+        "exchange": "CFFEX",
+        "trade_date": "20260918"
+      },
+      "row_count": 64,
+      "object_sha256": "cb6ca2a82fd47fd9d938c3809bbea6c601b02df266ef91eb2af3623f99ef0c54"
+    },
+    {
+      "api": "fut_daily",
+      "params": {
+        "exchange": "DCE",
+        "trade_date": "20260918"
+      },
+      "row_count": 302,
+      "object_sha256": "7511796ee8a59d8d95bbe361afb34dc53becbfc9b32b7628f2f69917fb128a66"
+    },
+    {
+      "api": "fut_daily",
+      "params": {
+        "exchange": "CZCE",
+        "trade_date": "20260918"
+      },
+      "row_count": 295,
+      "object_sha256": "1c107ba62cae2609e8def221910b0ecbc6eb95847c734551d51f708907e1c108"
+    },
+    {
+      "api": "fut_daily",
+      "params": {
+        "exchange": "SHFE",
+        "trade_date": "20260918"
+      },
+      "row_count": 278,
+      "object_sha256": "b1abea16d97548c1ddfa01f6ea740cdb7892cae2d961f56d33a613158c2ed508"
+    },
+    {
+      "api": "fut_daily",
+      "params": {
+        "exchange": "INE",
+        "trade_date": "20260918"
+      },
+      "row_count": 78,
+      "object_sha256": "f7625277d12e395202b1f1f16aa1edcd427b95a418dbf5057cd7f007629008a5"
+    },
+    {
+      "api": "fut_daily",
+      "params": {
+        "exchange": "GFEX",
+        "trade_date": "20260918"
+      },
+      "row_count": 58,
+      "object_sha256": "d716e25f97e7cfc201f62b7ee76524d0aec073e6df31a8631e1b4b81c09881e4"
+    },
+    {
+      "api": "fut_mapping",
+      "params": {
+        "trade_date": "20260918"
+      },
+      "row_count": 202,
+      "object_sha256": "0c77cdab4fe0d5666ab198502f3e5dc8cc84a5ad1a8764734420503c81ea0735"
+    },
+    {
+      "api": "fut_settle",
+      "params": {
+        "exchange": "CFFEX",
+        "trade_date": "20260918"
+      },
+      "row_count": 28,
+      "object_sha256": "616f151a18772f6b3cdd2ad157d59fbbd96fa3245f168a2f67327fc379f6b0b0"
+    },
+    {
+      "api": "fut_settle",
+      "params": {
+        "exchange": "DCE",
+        "trade_date": "20260918"
+      },
+      "row_count": 250,
+      "object_sha256": "7e5de3d67ef90b9e2504715507ff34338ae4dbe9185e3db96f79bdea3c2fd06a"
+    },
+    {
+      "api": "fut_settle",
+      "params": {
+        "exchange": "CZCE",
+        "trade_date": "20260918"
+      },
+      "row_count": 243,
+      "object_sha256": "a88dae4962e475eadfc48b6823752df020cfb29d571c87b7c881a7291b5a1eae"
+    },
+    {
+      "api": "fut_settle",
+      "params": {
+        "exchange": "SHFE",
+        "trade_date": "20260918"
+      },
+      "row_count": 238,
+      "object_sha256": "f3ddf6c3133feb3d6125f63fa479ac9e7a9a345ec31068fed6622929ce0c11e5"
+    },
+    {
+      "api": "fut_settle",
+      "params": {
+        "exchange": "INE",
+        "trade_date": "20260918"
+      },
+      "row_count": 63,
+      "object_sha256": "5fa8aa11833949a3de20a7b8c56bb51917f42664122c76c52ee737682fa320c6"
+    },
+    {
+      "api": "fut_settle",
+      "params": {
+        "exchange": "GFEX",
+        "trade_date": "20260918"
+      },
+      "row_count": 48,
+      "object_sha256": "8cb2c2cf1b5720701f779fd7eed3fefb9c565333dbc14843bc71f973d2046328"
+    },
+    {
+      "api": "fut_wsr",
+      "params": {
+        "exchange": "DCE",
+        "trade_date": "20260918"
+      },
+      "row_count": 199,
+      "object_sha256": "6cf6c733ec89ef2a7914a05fe342fdaa68c79137855e87aa1ee9523d6ec382d6"
+    },
+    {
+      "api": "fut_wsr",
+      "params": {
+        "exchange": "CZCE",
+        "trade_date": "20260918"
+      },
+      "row_count": 720,
+      "object_sha256": "8009bedb7ab4b187ac3fb193b0b952698a07309458ca57922d94aef04eb1f33d"
+    },
+    {
+      "api": "fut_wsr",
+      "params": {
+        "exchange": "SHFE",
+        "trade_date": "20260918"
+      },
+      "row_count": 406,
+      "object_sha256": "9c8840c4b472993885c284be46ab3b4cbc587ca0318b723f5f002a1d2e72c285"
+    },
+    {
+      "api": "fut_wsr",
+      "params": {
+        "exchange": "GFEX",
+        "trade_date": "20260918"
+      },
+      "row_count": 84,
+      "object_sha256": "0585e72867044a472a37631256324f8716512d5dddf5217f46dd4bedda6ee8c6"
+    }
+  ],
+  "returned_trade_date_mismatches": [],
+  "full_history_complete": false,
+  "deployed_hashes": {
+    "backend/shared/tushare_pipeline.py": "379e0d7836cf15ae09fdb6b0821e6f2df1a4585ea1436331af75c0b3d6f97e96",
+    "backend/shared/tushare_market_contracts.py": "bc8fc716afae8ab22fcc425907ae455d2c95b985ee859181fa016de17c9829fd"
+  }
+}
