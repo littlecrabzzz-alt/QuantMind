@@ -1,0 +1,29 @@
+{
+  "verified_at": "2026-09-19T03:52:26.045005+00:00",
+  "code_commit": "47cc50ed",
+  "tests_passed": 101,
+  "archive_pid": 6433,
+  "runtime_sha256": "349d0822f64ca9a97efa326c5b338b74b4d608073dbdf38fff55c54989433d1c",
+  "worker_status": "completed_cycle",
+  "worker_updated_at": "2026-09-19T03:52:25.318746+00:00",
+  "documents": [
+    {
+      "document_id": "1b603aa9cc3664c62b454f69ea8b9eec9f746eaaae57ba9d4526424c280fe9dd",
+      "declared_bytes": 286872349,
+      "download_status": "retry",
+      "tries": 3,
+      "retry_at": "2026-09-19T03:56:48.403007+00:00",
+      "last_result": "download_error"
+    },
+    {
+      "document_id": "194763dba4bc1fbce49e99ab967cab0f678bc249a078cc651b064e7291e40655",
+      "declared_bytes": 297216747,
+      "download_status": "retry",
+      "tries": 3,
+      "retry_at": "2026-09-19T03:56:48.352974+00:00",
+      "last_result": "download_timeout"
+    }
+  ],
+  "full_archive_complete": false,
+  "next_action": "Verify next due retries under the new cycle-bounded transfer deadline; no failed result counted complete."
+}
