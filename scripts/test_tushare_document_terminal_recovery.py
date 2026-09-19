@@ -9,6 +9,12 @@ from scripts.test_tushare_documents import Response, connection, resolution
 
 
 class TerminalDocumentRecovery(unittest.TestCase):
+    def test_large_download_budget_keeps_cycle_deadline(self):
+        self.assertEqual(docs._download_budget(docs.DEFAULT_DOCUMENT_MAX_BYTES, 100), 20)
+        self.assertEqual(docs._download_budget(docs.MAX_DOCUMENT_MAX_BYTES, 100), 100)
+        self.assertEqual(docs._download_budget(docs.MAX_DOCUMENT_MAX_BYTES, 500), 120)
+        self.assertEqual(docs._download_budget(docs.MAX_DOCUMENT_MAX_BYTES, 3), 3)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="qm-document-terminal-")
         self.addCleanup(self.temp.cleanup)

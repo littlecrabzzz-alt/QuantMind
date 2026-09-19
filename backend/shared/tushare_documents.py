@@ -988,6 +988,12 @@ def enqueue_documents(root, observation, api_name, records, fields, *, deadline=
             db.close()
 
 
+def _download_budget(max_bytes, remaining):
+    # Larger archives can need multiple socket reads; retain the cycle deadline.
+    ceiling = 120 if max_bytes > DEFAULT_DOCUMENT_MAX_BYTES else 20
+    return min(ceiling, max(0.001, remaining))
+
+
 def _download_job(
     url,
     root,
@@ -1502,7 +1508,7 @@ def _run_documents_overlapped(
         return len(download_futures) + len(parse_futures)
 
     def transfer(job):
-        budget = min(20, max(0.001, deadline - time.monotonic()))
+        budget = _download_budget(max_bytes, deadline - time.monotonic())
         job_started = time.monotonic()
         try:
             options = {"download_only": True}
@@ -1560,7 +1566,7 @@ def _run_documents_overlapped(
                     return
                 remaining = deadline - time.monotonic()
                 jobs = _claim_documents(
-                    db, owner, "download", 1, min(20, remaining), timing
+                    db, owner, "download", 1, _download_budget(max_bytes, remaining), timing
                 )
                 if not jobs:
                     download_exhausted = True
@@ -1767,7 +1773,7 @@ def run_documents(
                     download_workers if phase == "download" else 1,
                     max_documents - processed,
                 )
-                seconds = min(20, remaining) if phase == "download" else remaining
+                seconds = _download_budget(max_bytes, remaining) if phase == "download" else remaining
                 jobs = _claim_documents(db, owner, phase, count, seconds, timing)
                 if not jobs and download_workers > 1:
                     phase = "download" if phase == "parse" else "parse"
@@ -1775,7 +1781,7 @@ def run_documents(
                         download_workers if phase == "download" else 1,
                         max_documents - processed,
                     )
-                    seconds = min(20, remaining) if phase == "download" else remaining
+                    seconds = _download_budget(max_bytes, remaining) if phase == "download" else remaining
                     jobs = _claim_documents(db, owner, phase, count, seconds, timing)
                 if not jobs:
                     break
@@ -1789,7 +1795,7 @@ def run_documents(
                     wave_job_count = 0
 
                     def transfer(job):
-                        budget = min(20, max(0.001, deadline - time.monotonic()))
+                        budget = _download_budget(max_bytes, deadline - time.monotonic())
                         job_started = time.monotonic()
                         try:
                             options = {"download_only": True}
@@ -1836,7 +1842,7 @@ def run_documents(
                                     owner,
                                     "download",
                                     1,
-                                    min(20, remaining),
+                                    _download_budget(max_bytes, remaining),
                                     timing,
                                 )
                                 if replacement:
@@ -1869,7 +1875,7 @@ def run_documents(
                             else _download_job(
                                 job["url"],
                                 root,
-                                remaining,
+                                _download_budget(max_bytes, remaining),
                                 **(
                                     {"max_bytes": max_bytes}
                                     if max_bytes != DEFAULT_DOCUMENT_MAX_BYTES

@@ -36,6 +36,27 @@ class ParallelDocuments(unittest.TestCase):
         )
         self.stamp = "2026-09-08T10:00:00+00:00"
 
+    def test_large_transfer_budget_and_claim_match_in_all_modes(self):
+        for workers, overlap in [(1, False), (2, False), (2, True)]:
+            with self.subTest(workers=workers, overlap=overlap):
+                self.seed(1)
+                def fetch(url, root, timeout, **kwargs):
+                    self.assertGreater(timeout, 80)
+                    self.assertLessEqual(timeout, 90)
+                    lease = self.query("SELECT lease_until FROM document_claims")[0][0]
+                    self.assertGreater(lease, time.time() + timeout)
+                    return self.download()
+                with patch.object(docs, "_download_job", side_effect=fetch) as call:
+                    report = docs.run_documents(
+                        self.root, max_documents=1, max_seconds=90,
+                        download_workers=workers, overlap_parse_download=overlap,
+                        max_bytes=docs.MAX_DOCUMENT_MAX_BYTES,
+                    )
+                self.assertEqual(call.call_count, 1)
+                self.assertEqual(report["phase_counts"]["download"], 1)
+                with sqlite3.connect(self.root / "documents.sqlite") as db:
+                    db.execute("DELETE FROM documents")
+
     def tearDown(self):
         self.no_network.assert_not_called()
         self.no_dns.assert_not_called()
