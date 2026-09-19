@@ -1,0 +1,33 @@
+{
+  "verified_at": "2026-09-19T04:11:39.000385+00:00",
+  "jobs": 442,
+  "states": {
+    "empty": 50,
+    "pending": 392
+  },
+  "samples": [],
+  "source_url": "https://tushare.pro/document/2?doc_id=496",
+  "code_commit": "4f06e209",
+  "tests_passed": 7,
+  "full_archive_complete": false,
+  "live_field_probe": {
+    "observation": "abccc4a28fe14209ad0c0b91d596702b.json",
+    "object_sha256": "6261ccbe9155e3fd6e96636bc9909ac1aa0184fb01b78c26df199c3c5921398f",
+    "row_count": 23,
+    "rows_with_ts_code": 23,
+    "returned_fields": [
+      "trade_date",
+      "exchange",
+      "ts_code",
+      "fut_name",
+      "unit",
+      "cur_month",
+      "next_month",
+      "next_two_month"
+    ],
+    "requested_missing_fields": [
+      "fut_code"
+    ]
+  },
+  "note": "Keep fut_code schema gap; request actual ts_code in addition. Raw response retained, no synthesized code or history completeness claim."
+}
