@@ -66,7 +66,7 @@ def create_views(con: duckdb.DuckDBPyConnection, data_dir: Path) -> duckdb.DuckD
     if _available(data_dir, DATASET_DIRS["daily_unadjusted"]):
         con.execute(f"""
             CREATE VIEW IF NOT EXISTS qdb_daily_unadjusted AS
-            SELECT symbol, dt, time, open, high, low, close, volume, amount, vol_in_stock
+            SELECT symbol, dt, time, open, high, low, close, volume, amount
             FROM read_parquet('{_partition_glob(data_dir, DATASET_DIRS["daily_unadjusted"])}',
                               hive_partitioning=1, union_by_name=true)
         """)
@@ -74,7 +74,7 @@ def create_views(con: duckdb.DuckDBPyConnection, data_dir: Path) -> duckdb.DuckD
     if _available(data_dir, DATASET_DIRS["index_daily"]):
         con.execute(f"""
             CREATE VIEW IF NOT EXISTS qdb_index_daily AS
-            SELECT symbol, dt, time, open, high, low, close, volume, amount, Category
+            SELECT symbol, dt, time, open, high, low, close, volume, amount
             FROM read_parquet('{_partition_glob(data_dir, DATASET_DIRS["index_daily"])}',
                               hive_partitioning=1, union_by_name=true)
         """)
