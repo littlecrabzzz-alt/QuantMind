@@ -27,6 +27,22 @@ class WorkerStatus(unittest.TestCase):
                 'blocked': 871,
                 'split_pending': 10297,
                 'permission_blocked': 5847,
+                'blocked_obligations': {
+                    'total': 871,
+                    'by_kind': {
+                        'replacement_plan_retained_parent': {
+                            'jobs': 800,
+                            'apis': {'dc_member': 800},
+                        },
+                        'unclassified': {
+                            'jobs': 71,
+                            'apis': {'synthetic': 71},
+                        },
+                    },
+                    'unclassified': 71,
+                    'all_blocked_jobs_classified': False,
+                    'changes_job_state': False,
+                },
                 'planning_cadence': {
                     'status': 'deferred',
                     'reason': 'interval_not_due',
@@ -49,6 +65,9 @@ class WorkerStatus(unittest.TestCase):
         summary = worker.cycle_log(report)
         self.assertEqual(summary['acquisition']['requests'], 633)
         self.assertEqual(summary['acquisition']['planning_status'], 'deferred')
+        self.assertEqual(
+            summary['acquisition']['blocked_obligations']['unclassified'], 71
+        )
         self.assertEqual(summary['documents']['pending_download'], 4820134)
         self.assertEqual(summary['documents']['parsed'], 311799)
         self.assertNotIn('archive', summary['acquisition'])

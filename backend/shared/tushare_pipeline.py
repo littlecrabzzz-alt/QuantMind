@@ -476,6 +476,54 @@ def authority():
         raise ValueError("Acquisition requires the verified cloud authority mount")
 
 
+def blocked_obligations_status(db):
+    """Classify retained blocked jobs without changing their evidence."""
+    rows = db.execute(
+        """
+        SELECT json_extract(job.job,'$.api_name') AS api_name,
+               CASE
+                 WHEN split.status='blocked'
+                      AND split.gap GLOB 'replaced_by_*'
+                   THEN 'replacement_plan_retained_parent'
+                 WHEN json_extract(job.result,'$.status')='api_error'
+                      AND json_extract(job.result,'$.code')=40101
+                      AND json_extract(job.result,'$.supplier_api_unavailable')=1
+                   THEN 'supplier_api_unavailable'
+                 WHEN json_extract(job.result,'$.status')='rate_limited'
+                   THEN 'retained_rate_limit_probe'
+                 WHEN json_extract(job.result,'$.status')='possibly_truncated'
+                      AND split.gap IS NOT NULL
+                   THEN 'retained_partition_gap'
+                 WHEN json_extract(job.result,'$.status')='possibly_truncated'
+                   THEN 'unsplittable_source_cap'
+                 ELSE 'unclassified'
+               END AS kind,
+               count(*) AS jobs
+        FROM jobs AS job INDEXED BY jobs_pending
+        LEFT JOIN partition_splits AS split ON split.parent_id=job.id
+        WHERE job.state='blocked'
+        GROUP BY api_name,kind
+        ORDER BY kind,api_name
+        """
+    )
+    by_kind = {}
+    total = 0
+    for row in rows:
+        jobs = row["jobs"]
+        total += jobs
+        group = by_kind.setdefault(row["kind"], {"jobs": 0, "apis": {}})
+        group["jobs"] += jobs
+        group["apis"][row["api_name"]] = jobs
+    unclassified = by_kind.get("unclassified", {}).get("jobs", 0)
+    return {
+        "total": total,
+        "by_kind": by_kind,
+        "unclassified": unclassified,
+        "all_blocked_jobs_classified": unclassified == 0,
+        "changes_job_state": False,
+    }
+
+
 class Pipeline:
     def __init__(self, root, catalog):
         self.root = Path(root)
@@ -6051,6 +6099,9 @@ class Pipeline:
             r[0]: r[1]
             for r in self.db.execute("SELECT state,count(*) FROM jobs GROUP BY state")
         }
+
+    def blocked_obligations(self):
+        return blocked_obligations_status(self.db)
 
     def _publication_intent(self, release_id):
         """Commit identity before exposing CURRENT; caller holds pipeline.lock."""

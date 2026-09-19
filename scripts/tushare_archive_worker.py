@@ -9,6 +9,7 @@ import multiprocessing
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import sys
 import time
 
@@ -188,6 +189,9 @@ def cycle_log(report):
         timing = acquisition.get('timing')
         if isinstance(timing, dict) and timing.get('failed_stage') is not None:
             summary['acquisition']['failed_stage'] = timing['failed_stage']
+        blocked_obligations = acquisition.get('blocked_obligations')
+        if isinstance(blocked_obligations, dict):
+            summary['acquisition']['blocked_obligations'] = blocked_obligations
     if documents:
         summary['documents'] = {
             key: documents[key]
@@ -217,6 +221,24 @@ def cycle_log(report):
             if key in catalog_watch
         }
     return summary
+
+
+def read_blocked_obligations(root):
+    """Read blocked-job classes after the acquisition writer has closed."""
+    from backend.shared.tushare_pipeline import blocked_obligations_status
+
+    database = (root / 'pipeline.sqlite').resolve()
+    try:
+        db = sqlite3.connect(
+            f'file:{database}?mode=ro', uri=True, timeout=5,
+        )
+    except sqlite3.Error as exc:
+        return {'status': 'unavailable', 'error_type': type(exc).__name__}
+    try:
+        db.row_factory = sqlite3.Row
+        return blocked_obligations_status(db)
+    finally:
+        db.close()
 
 
 def main():
@@ -315,6 +337,9 @@ def main():
                             start_documents()
                         if documents is not None:
                             report['documents'] = documents.result()
+                    report['acquisition']['blocked_obligations'] = (
+                        read_blocked_obligations(root)
+                    )
                     acquisition_status = report['acquisition'].get('status', '')
                     report['status'] = (acquisition_status if acquisition_status.startswith('blocked')
                                         or acquisition_status in ('disabled', 'already_running')
