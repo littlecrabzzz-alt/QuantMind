@@ -299,5 +299,91 @@
   "deployed_hashes": {
     "backend/shared/tushare_pipeline.py": "379e0d7836cf15ae09fdb6b0821e6f2df1a4585ea1436331af75c0b3d6f97e96",
     "backend/shared/tushare_market_contracts.py": "bc8fc716afae8ab22fcc425907ae455d2c95b985ee859181fa016de17c9829fd"
+  },
+  "priority_queue_completion": {
+    "verified_at": "2026-09-19T03:26:26.372482+00:00",
+    "states": {
+      "done": 105,
+      "empty": 56
+    },
+    "result_statuses": {
+      "sample_ok": 105,
+      "empty_unverified": 56
+    },
+    "all_161_responses_retained_locally": true,
+    "per_api": [
+      {
+        "api": "cb_daily",
+        "state": "done",
+        "count": 5
+      },
+      {
+        "api": "cb_daily",
+        "state": "empty",
+        "count": 2
+      },
+      {
+        "api": "fund_share",
+        "state": "done",
+        "count": 10
+      },
+      {
+        "api": "fund_share",
+        "state": "empty",
+        "count": 4
+      },
+      {
+        "api": "fut_daily",
+        "state": "done",
+        "count": 30
+      },
+      {
+        "api": "fut_daily",
+        "state": "empty",
+        "count": 12
+      },
+      {
+        "api": "fut_mapping",
+        "state": "done",
+        "count": 5
+      },
+      {
+        "api": "fut_mapping",
+        "state": "empty",
+        "count": 2
+      },
+      {
+        "api": "fut_settle",
+        "state": "done",
+        "count": 30
+      },
+      {
+        "api": "fut_settle",
+        "state": "empty",
+        "count": 12
+      },
+      {
+        "api": "fut_wsr",
+        "state": "done",
+        "count": 20
+      },
+      {
+        "api": "fut_wsr",
+        "state": "empty",
+        "count": 22
+      },
+      {
+        "api": "sw_daily",
+        "state": "done",
+        "count": 5
+      },
+      {
+        "api": "sw_daily",
+        "state": "empty",
+        "count": 2
+      }
+    ],
+    "empty_is_not_completeness_proof": true,
+    "cloud_release_is_a_separate_publication_boundary": true
   }
 }
