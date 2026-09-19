@@ -1,0 +1,54 @@
+{
+  "verified_at": "2026-09-19T04:01:28.610871+00:00",
+  "files": [
+    {
+      "document_id": "1b603aa9cc3664c62b454f69ea8b9eec9f746eaaae57ba9d4526424c280fe9dd",
+      "status": "downloaded",
+      "raw_complete": true,
+      "received_bytes": 286872349,
+      "files": [
+        {
+          "path": "attachments/1a095149c1bc3f205e1cd01afc22b5724690a28e4e707fa55c7f037fba733ad9.pdf",
+          "bytes": 286872349,
+          "sha256": "1a095149c1bc3f205e1cd01afc22b5724690a28e4e707fa55c7f037fba733ad9",
+          "matches_recorded_sha256": true
+        }
+      ],
+      "budget_seconds": 120,
+      "database_status": {
+        "download_status": "downloaded",
+        "download_tries": 5,
+        "parse_status": "parse_pending"
+      },
+      "preserved_download_attempts": 5
+    },
+    {
+      "document_id": "194763dba4bc1fbce49e99ab967cab0f678bc249a078cc651b064e7291e40655",
+      "status": "downloaded",
+      "raw_complete": true,
+      "received_bytes": 297216747,
+      "files": [
+        {
+          "path": "attachments/f9ff152dc13ba9a652eae7b6ce22bbb0e8f9d250c010e424c04d1274e138e9b2.pdf",
+          "bytes": 297216747,
+          "sha256": "f9ff152dc13ba9a652eae7b6ce22bbb0e8f9d250c010e424c04d1274e138e9b2",
+          "matches_recorded_sha256": true
+        }
+      ],
+      "budget_seconds": 120,
+      "database_status": {
+        "download_status": "downloaded",
+        "download_tries": 5,
+        "parse_status": "parse_pending"
+      },
+      "preserved_download_attempts": 5
+    }
+  ],
+  "scope": "Two known files rejected by former 256 MiB cap; exact-ID recovery used existing exclusive document lock, durable claims, isolated download child and standard finish path. Historical attempts retained.",
+  "max_bytes": 335544320,
+  "budget_seconds": 120,
+  "sha256_verified": true,
+  "full_archive_complete": false,
+  "remaining_limitation": "Normal cycle remaining time can shorten large transfer budgets; these two raw gaps are recovered, not a proof that all large downloads or PDF parsing are complete.",
+  "free_gib": 1897.4
+}
