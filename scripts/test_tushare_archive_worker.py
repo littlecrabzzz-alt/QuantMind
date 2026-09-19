@@ -208,6 +208,40 @@ class WorkerStatus(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 worker.document_execution({'document_worker_execution': value})
 
+    def test_worker_passes_reduced_batch_to_documents_when_disk_is_low(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'ENABLED').touch()
+            (root / 'pipeline-config.json').write_text(json.dumps({
+                'enable_documents': True, 'document_worker_max_documents': 2500,
+                'document_max_bytes': 256 * 2**20,
+            }))
+            free = 300 * 2**30 + 2 * (256 * 2**20 + tushare_documents.MAX_PARSE_OUTPUT_BYTES)
+            with patch.dict(os.environ), patch('sys.argv', ['worker', '--root', str(root), '--once']), \
+                    patch.object(tushare_pipeline, 'authority'), \
+                    patch.object(tushare_pipeline, 'tick', return_value={'requests': 1}), \
+                    patch.object(tushare_documents, 'run_documents', return_value={'status': 'ok'}) as run, \
+                    patch.object(worker.shutil, 'disk_usage', return_value=SimpleNamespace(free=free)), \
+                    patch('builtins.print'):
+                self.assertEqual(worker.main(), 0)
+            self.assertEqual(run.call_args.kwargs['max_documents'], 2)
+            report = json.loads((root / 'archive-worker-status.json').read_text())
+            self.assertEqual(report['document_disk_budget']['admitted_stages'], 2)
+
+    def test_document_disk_budget_preserves_reserve_for_maximum_payloads(self):
+        reserve = 300 * 2**30
+        payload = 256 * 2**20
+        stage_bytes = payload + tushare_documents.MAX_PARSE_OUTPUT_BYTES
+        for free in (reserve - 1, reserve, reserve + stage_bytes - 1,
+                     reserve + stage_bytes, reserve + 100 * 2**30, 2**41):
+            with self.subTest(free=free):
+                count = worker.document_disk_budget(2500, payload, free)
+                self.assertGreaterEqual(count, 0)
+                self.assertLessEqual(count, 2500)
+                self.assertLessEqual(count * stage_bytes, max(0, free - reserve))
+        self.assertEqual(worker.document_disk_budget(2500, payload, reserve), 0)
+        self.assertEqual(worker.document_disk_budget(2500, payload, 2**41), 2500)
+
     def test_document_limits_match_native_production_bounds(self):
         self.assertEqual(
             worker.document_limits({}),

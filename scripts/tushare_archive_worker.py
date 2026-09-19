@@ -69,6 +69,14 @@ def document_execution(config):
     return value
 
 
+def document_disk_budget(count, max_bytes, free_bytes):
+    from backend.shared.tushare_documents import MAX_PARSE_OUTPUT_BYTES
+    # Reserve space for acquisition/SQLite too; each stage is bounded even if
+    # every admitted download reaches its maximum and also produces parsed text.
+    headroom = max(0, free_bytes - 300 * 2**30)
+    return min(count, headroom // (max_bytes + MAX_PARSE_OUTPUT_BYTES))
+
+
 def document_limits(config):
     count = config.get('document_worker_max_documents', 100)
     seconds = config.get('document_worker_max_seconds', 90)
@@ -263,9 +271,19 @@ def main():
                                     and shutil.disk_usage(root).free >= 300 * 2**30):
                                 limits = document_limits(config)
                                 count, seconds, workers = limits[:3]
+                                free_now = shutil.disk_usage(root).free
+                                admitted = document_disk_budget(count, limits[3], free_now)
+                                report['document_disk_budget'] = {
+                                    'free_bytes': free_now,
+                                    'reserve_bytes': 300 * 2**30,
+                                    'requested_stages': count,
+                                    'admitted_stages': admitted,
+                                }
+                                if not admitted:
+                                    return
                                 documents = pool.submit(
                                     execute_documents, root,
-                                    max_documents=count,
+                                    max_documents=admitted,
                                     max_seconds=seconds,
                                     download_workers=workers,
                                     max_bytes=limits[3],
