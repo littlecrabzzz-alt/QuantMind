@@ -1,0 +1,270 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-09-19T08:22:48.837515+00:00",
+  "authority": {
+    "node": "mac",
+    "archive_root": "~/Library/Application Support/QuantMind/tushare",
+    "worker_pid": 54716,
+    "worker_script_sha256": "062d91dcc8cf60b44907391088cf5dda1beb1f7ae0b628352c58e24e22f338ba"
+  },
+  "scope": "Read-only production evidence for the nine independently purchased Tushare endpoints.",
+  "source": {
+    "database": "pipeline.sqlite",
+    "query_index": "jobs_discovery_api",
+    "secret_material_included": false
+  },
+  "doc_id_to_api": {
+    "143": "news",
+    "195": "major_news",
+    "154": "cctv_news",
+    "176": "anns_d",
+    "366": "irm_qa_sh",
+    "367": "irm_qa_sz",
+    "406": "npr",
+    "415": "research_report",
+    "465": "monetary_policy"
+  },
+  "apis": {
+    "news": {
+      "states": {
+        "done": {
+          "jobs": 2849,
+          "reported_rows": 1442202,
+          "nonempty_jobs": 2849
+        },
+        "empty": {
+          "jobs": 4188,
+          "reported_rows": 0,
+          "nonempty_jobs": 0
+        },
+        "resolved": {
+          "jobs": 179,
+          "reported_rows": 268500,
+          "nonempty_jobs": 179
+        },
+        "split_pending": {
+          "jobs": 1564,
+          "reported_rows": 2346000,
+          "nonempty_jobs": 1564
+        },
+        "superseded": {
+          "jobs": 36,
+          "reported_rows": 54000,
+          "nonempty_jobs": 36
+        }
+      },
+      "successful_nonempty_jobs": 4628,
+      "done_reported_rows": 1442202,
+      "permission_blocked_jobs": 0
+    },
+    "major_news": {
+      "states": {
+        "done": {
+          "jobs": 3572,
+          "reported_rows": 580530,
+          "nonempty_jobs": 3572
+        },
+        "empty": {
+          "jobs": 3209,
+          "reported_rows": 0,
+          "nonempty_jobs": 0
+        },
+        "resolved": {
+          "jobs": 1332,
+          "reported_rows": 806654,
+          "nonempty_jobs": 1332
+        },
+        "split_pending": {
+          "jobs": 1287,
+          "reported_rows": 998004,
+          "nonempty_jobs": 1287
+        },
+        "superseded": {
+          "jobs": 128,
+          "reported_rows": 83437,
+          "nonempty_jobs": 128
+        }
+      },
+      "successful_nonempty_jobs": 6319,
+      "done_reported_rows": 580530,
+      "permission_blocked_jobs": 0
+    },
+    "cctv_news": {
+      "states": {
+        "done": {
+          "jobs": 7465,
+          "reported_rows": 111265,
+          "nonempty_jobs": 7465
+        },
+        "empty": {
+          "jobs": 88,
+          "reported_rows": 0,
+          "nonempty_jobs": 0
+        }
+      },
+      "successful_nonempty_jobs": 7465,
+      "done_reported_rows": 111265,
+      "permission_blocked_jobs": 0
+    },
+    "anns_d": {
+      "states": {
+        "done": {
+          "jobs": 1918,
+          "reported_rows": 830647,
+          "nonempty_jobs": 1918
+        },
+        "empty": {
+          "jobs": 4925,
+          "reported_rows": 0,
+          "nonempty_jobs": 0
+        },
+        "resolved": {
+          "jobs": 1,
+          "reported_rows": 2791,
+          "nonempty_jobs": 1
+        },
+        "split_pending": {
+          "jobs": 1815,
+          "reported_rows": 10613099,
+          "nonempty_jobs": 1815
+        },
+        "superseded": {
+          "jobs": 21,
+          "reported_rows": 46368,
+          "nonempty_jobs": 21
+        }
+      },
+      "successful_nonempty_jobs": 3755,
+      "done_reported_rows": 830647,
+      "permission_blocked_jobs": 0
+    },
+    "irm_qa_sh": {
+      "states": {
+        "done": {
+          "jobs": 10703,
+          "reported_rows": 932821,
+          "nonempty_jobs": 10703
+        },
+        "empty": {
+          "jobs": 53935,
+          "reported_rows": 0,
+          "nonempty_jobs": 0
+        },
+        "resolved": {
+          "jobs": 215,
+          "reported_rows": 645000,
+          "nonempty_jobs": 215
+        },
+        "split_pending": {
+          "jobs": 152,
+          "reported_rows": 456000,
+          "nonempty_jobs": 152
+        }
+      },
+      "successful_nonempty_jobs": 11070,
+      "done_reported_rows": 932821,
+      "permission_blocked_jobs": 0
+    },
+    "irm_qa_sz": {
+      "states": {
+        "done": {
+          "jobs": 2019,
+          "reported_rows": 1788085,
+          "nonempty_jobs": 2019
+        },
+        "empty": {
+          "jobs": 339,
+          "reported_rows": 0,
+          "nonempty_jobs": 0
+        },
+        "resolved": {
+          "jobs": 648,
+          "reported_rows": 1944000,
+          "nonempty_jobs": 648
+        }
+      },
+      "successful_nonempty_jobs": 2667,
+      "done_reported_rows": 1788085,
+      "permission_blocked_jobs": 0
+    },
+    "npr": {
+      "states": {
+        "blocked": {
+          "jobs": 2,
+          "reported_rows": 1000,
+          "nonempty_jobs": 2
+        },
+        "done": {
+          "jobs": 934,
+          "reported_rows": 19650,
+          "nonempty_jobs": 934
+        },
+        "empty": {
+          "jobs": 558,
+          "reported_rows": 0,
+          "nonempty_jobs": 0
+        },
+        "resolved": {
+          "jobs": 8,
+          "reported_rows": 4000,
+          "nonempty_jobs": 8
+        },
+        "split_pending": {
+          "jobs": 51,
+          "reported_rows": 25500,
+          "nonempty_jobs": 51
+        }
+      },
+      "successful_nonempty_jobs": 993,
+      "done_reported_rows": 19650,
+      "permission_blocked_jobs": 0
+    },
+    "research_report": {
+      "states": {
+        "done": {
+          "jobs": 1346,
+          "reported_rows": 384175,
+          "nonempty_jobs": 1346
+        },
+        "empty": {
+          "jobs": 52,
+          "reported_rows": 0,
+          "nonempty_jobs": 0
+        },
+        "resolved": {
+          "jobs": 373,
+          "reported_rows": 373000,
+          "nonempty_jobs": 373
+        }
+      },
+      "successful_nonempty_jobs": 1719,
+      "done_reported_rows": 384175,
+      "permission_blocked_jobs": 0
+    },
+    "monetary_policy": {
+      "states": {
+        "done": {
+          "jobs": 28,
+          "reported_rows": 103,
+          "nonempty_jobs": 28
+        },
+        "empty": {
+          "jobs": 1034,
+          "reported_rows": 0,
+          "nonempty_jobs": 0
+        }
+      },
+      "successful_nonempty_jobs": 28,
+      "done_reported_rows": 103,
+      "permission_blocked_jobs": 0
+    }
+  },
+  "boundaries": {
+    "permission_observed_only": true,
+    "history_complete": false,
+    "pit_complete": false,
+    "revision_complete": false,
+    "field_complete": false,
+    "pending_and_split_work_remains": true
+  }
+}

@@ -7923,9 +7923,14 @@
       "acquisition_api_names": [
         "npr"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue the Mac authority durable planner, partition reconciliation, attachment downloads, and fixed-release offline verification. Successful production rows prove current permission only; historical bounds, revisions, field completeness, known-at, and PIT remain open.",
+      "runtime_evidence": {
+        "path": "docs/tushare-purchased-permissions-production-20260919.json",
+        "checked_at": "2026-09-19T08:22:48.837515+00:00",
+        "scope": "Current permission and persisted nonempty production results observed on the Mac authority; completeness is not established."
+      }
     },
     {
       "doc_id": "415",
@@ -7937,9 +7942,9 @@
       "acquisition_api_names": [
         "research_report"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required.",
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue the Mac authority durable planner, partition reconciliation, attachment downloads, and fixed-release offline verification. Successful production rows prove current permission only; historical bounds, revisions, field completeness, known-at, and PIT remain open.",
       "known_field_gaps": [
         {
           "field": "file_name",
@@ -7962,7 +7967,12 @@
           "field_coverage": "gap",
           "reason": "Exact official-example date with normal explicit 11-field request still returned 10 columns without file_name. Not solely a range-request or 1000-row saturation artifact; keep raw data and field obligation."
         }
-      ]
+      ],
+      "runtime_evidence": {
+        "path": "docs/tushare-purchased-permissions-production-20260919.json",
+        "checked_at": "2026-09-19T08:22:48.837515+00:00",
+        "scope": "Current permission and persisted nonempty production results observed on the Mac authority; completeness is not established."
+      }
     },
     {
       "doc_id": "465",
@@ -7974,9 +7984,14 @@
       "acquisition_api_names": [
         "monetary_policy"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue the Mac authority durable planner, partition reconciliation, attachment downloads, and fixed-release offline verification. Successful production rows prove current permission only; historical bounds, revisions, field completeness, known-at, and PIT remain open.",
+      "runtime_evidence": {
+        "path": "docs/tushare-purchased-permissions-production-20260919.json",
+        "checked_at": "2026-09-19T08:22:48.837515+00:00",
+        "scope": "Current permission and persisted nonempty production results observed on the Mac authority; completeness is not established."
+      }
     },
     {
       "doc_id": "143",
@@ -7988,9 +8003,14 @@
       "acquisition_api_names": [
         "news"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue the Mac authority durable planner, partition reconciliation, attachment downloads, and fixed-release offline verification. Successful production rows prove current permission only; historical bounds, revisions, field completeness, known-at, and PIT remain open.",
+      "runtime_evidence": {
+        "path": "docs/tushare-purchased-permissions-production-20260919.json",
+        "checked_at": "2026-09-19T08:22:48.837515+00:00",
+        "scope": "Current permission and persisted nonempty production results observed on the Mac authority; completeness is not established."
+      }
     },
     {
       "doc_id": "195",
@@ -8002,9 +8022,14 @@
       "acquisition_api_names": [
         "major_news"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue the Mac authority durable planner, partition reconciliation, attachment downloads, and fixed-release offline verification. Successful production rows prove current permission only; historical bounds, revisions, field completeness, known-at, and PIT remain open.",
+      "runtime_evidence": {
+        "path": "docs/tushare-purchased-permissions-production-20260919.json",
+        "checked_at": "2026-09-19T08:22:48.837515+00:00",
+        "scope": "Current permission and persisted nonempty production results observed on the Mac authority; completeness is not established."
+      }
     },
     {
       "doc_id": "154",
@@ -8016,9 +8041,14 @@
       "acquisition_api_names": [
         "cctv_news"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue the Mac authority durable planner, partition reconciliation, attachment downloads, and fixed-release offline verification. Successful production rows prove current permission only; historical bounds, revisions, field completeness, known-at, and PIT remain open.",
+      "runtime_evidence": {
+        "path": "docs/tushare-purchased-permissions-production-20260919.json",
+        "checked_at": "2026-09-19T08:22:48.837515+00:00",
+        "scope": "Current permission and persisted nonempty production results observed on the Mac authority; completeness is not established."
+      }
     },
     {
       "doc_id": "176",
@@ -8030,9 +8060,14 @@
       "acquisition_api_names": [
         "anns_d"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue the Mac authority durable planner, partition reconciliation, attachment downloads, and fixed-release offline verification. Successful production rows prove current permission only; historical bounds, revisions, field completeness, known-at, and PIT remain open.",
+      "runtime_evidence": {
+        "path": "docs/tushare-purchased-permissions-production-20260919.json",
+        "checked_at": "2026-09-19T08:22:48.837515+00:00",
+        "scope": "Current permission and persisted nonempty production results observed on the Mac authority; completeness is not established."
+      }
     },
     {
       "doc_id": "366",
@@ -8044,9 +8079,14 @@
       "acquisition_api_names": [
         "irm_qa_sh"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue the Mac authority durable planner, partition reconciliation, attachment downloads, and fixed-release offline verification. Successful production rows prove current permission only; historical bounds, revisions, field completeness, known-at, and PIT remain open.",
+      "runtime_evidence": {
+        "path": "docs/tushare-purchased-permissions-production-20260919.json",
+        "checked_at": "2026-09-19T08:22:48.837515+00:00",
+        "scope": "Current permission and persisted nonempty production results observed on the Mac authority; completeness is not established."
+      }
     },
     {
       "doc_id": "367",
@@ -8058,9 +8098,14 @@
       "acquisition_api_names": [
         "irm_qa_sz"
       ],
-      "status": "implementing",
-      "permission_status": "unverified",
-      "next_action": "Reviewed contract and durable planner implemented; cloud permission/cap/field probes and full-history acceptance remain required."
+      "status": "ingested_partial",
+      "permission_status": "available_observed",
+      "next_action": "Continue the Mac authority durable planner, partition reconciliation, attachment downloads, and fixed-release offline verification. Successful production rows prove current permission only; historical bounds, revisions, field completeness, known-at, and PIT remain open.",
+      "runtime_evidence": {
+        "path": "docs/tushare-purchased-permissions-production-20260919.json",
+        "checked_at": "2026-09-19T08:22:48.837515+00:00",
+        "scope": "Current permission and persisted nonempty production results observed on the Mac authority; completeness is not established."
+      }
     },
     {
       "doc_id": "485",

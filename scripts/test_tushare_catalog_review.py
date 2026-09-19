@@ -8,6 +8,40 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CatalogReview(unittest.TestCase):
+    def test_purchased_permissions_use_current_mac_production_evidence(self):
+        ledger = json.loads((ROOT / "config/tushare-coverage-ledger.json").read_bytes())
+        by_doc = {row["doc_id"]: row for row in ledger["entries"]}
+        evidence_path = "docs/tushare-purchased-permissions-production-20260919.json"
+        evidence = json.loads((ROOT / evidence_path).read_bytes())
+        expected = {
+            "143": "news",
+            "154": "cctv_news",
+            "176": "anns_d",
+            "195": "major_news",
+            "366": "irm_qa_sh",
+            "367": "irm_qa_sz",
+            "406": "npr",
+            "415": "research_report",
+            "465": "monetary_policy",
+        }
+
+        self.assertEqual(evidence["doc_id_to_api"], expected)
+        self.assertEqual(evidence["authority"]["node"], "mac")
+        self.assertFalse(evidence["boundaries"]["history_complete"])
+        self.assertFalse(evidence["boundaries"]["pit_complete"])
+        for doc_id, api in expected.items():
+            row = by_doc[doc_id]
+            observed = evidence["apis"][api]
+            self.assertEqual(row["status"], "ingested_partial")
+            self.assertEqual(row["permission_status"], "available_observed")
+            self.assertEqual(row["runtime_evidence"]["path"], evidence_path)
+            self.assertEqual(
+                row["runtime_evidence"]["checked_at"], evidence["checked_at"]
+            )
+            self.assertGreater(observed["successful_nonempty_jobs"], 0)
+            self.assertGreater(observed["done_reported_rows"], 0)
+            self.assertEqual(observed["permission_blocked_jobs"], 0)
+
     def test_all_special_pages_and_outgoing_links_remain_tracked(self):
         ledger = json.loads((ROOT / "config/tushare-coverage-ledger.json").read_bytes())
         baseline = {r["doc_id"]: r for r in ledger["entries"]}
