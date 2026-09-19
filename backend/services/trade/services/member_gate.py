@@ -1,15 +1,12 @@
 """
-持仓实时行情会员门控
+持仓实时行情会员门控（遗留模块）
 
 定义谁能用: QuantDB 付费会员在期 = user_subscriptions 存在 status='active'
 且 end_date > now() 且对应套餐价格 > 0(subscription_plans.price) 的记录。
 免费套餐(price=0)不计入付费会员; 过期/取消/未订阅一律拒绝。
 
-应用位置:
-- 路由层: tdx_quote_feed 全部 4 个端点走 require_paid_member 依赖, 非会员 403
-- Feed 层: 账户非会员时停止拉行情/写 Redis/写 tick/触发提醒, 周期性重试
-
-查询结果缓存 Redis 60s, 避免每 3s 循环打库; 查询异常按非会员处理(收费功能 fail-closed)。
+通达信内网桥行情 Feed 已下线；本模块保留供其它收费能力复用。
+查询结果缓存 Redis 60s；查询异常按非会员处理(收费功能 fail-closed)。
 """
 import logging
 import time

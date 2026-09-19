@@ -131,29 +131,23 @@ def _get_realtime_price(symbol: str) -> float | None:
     return _get_quantdb_last_close(symbol)
 
 
-_local_market_data = None
-
-
 def _get_quantdb_last_close(symbol: str) -> float | None:
     """从 QuantDB 本地日线读取最近交易日收盘价（与模拟撮合同源）。
 
-    复用模块级 LocalMarketData 实例：其内部按日缓存全市场日线，
+    复用进程内共享的 LocalMarketData 实例：其内部按日缓存全市场日线与交易日，
     避免逐股新建实例重复扫描全市场 parquet（pred.parquet 回退场景下
     批量取价是预览耗时数十秒的主因）。
     """
-    global _local_market_data
     try:
         from backend.services.simulation.services.local_market_data import (
-            LocalMarketData,
+            get_local_market_data,
         )
         from backend.shared.stock_utils import StockCodeUtil
 
         suffix = StockCodeUtil.to_suffix(symbol)
         if not suffix:
             return None
-        if _local_market_data is None:
-            _local_market_data = LocalMarketData()
-        market_data = _local_market_data
+        market_data = get_local_market_data()
         latest_date = market_data.latest_trade_date()
         if latest_date is None:
             return None
@@ -215,6 +209,32 @@ def _normalize_trading_mode(value: Any) -> str:
     if mode not in {"REAL", "SHADOW", "SIMULATION"}:
         raise HTTPException(status_code=400, detail=f"unsupported trading_mode: {mode}")
     return mode
+
+
+def _resolve_pool_id_from_prepared(
+    prepared: PreparedManualExecution,
+) -> str | None:
+    """从执行上下文里取全局股票池引用（P3）。
+
+    优先级：`live_trade_config.pool_id`（策略上保存的持仓池配置）→
+    `request_payload.pool_id`（本次请求显式指定）。
+    两者都没有则返回 None（保持旧行为：不做池过滤）。
+    """
+    strategy = prepared.strategy if isinstance(prepared.strategy, dict) else {}
+    cfg = strategy.get("live_trade_config")
+    if isinstance(cfg, str) and cfg.strip():
+        try:
+            cfg = json.loads(cfg)
+        except Exception:  # noqa: BLE001
+            cfg = None
+    if isinstance(cfg, dict):
+        pool_ref = str(cfg.get("pool_id") or "").strip()
+        if pool_ref:
+            return pool_ref
+
+    payload = prepared.request_payload if isinstance(prepared.request_payload, dict) else {}
+    pool_ref = str(payload.get("pool_id") or "").strip()
+    return pool_ref or None
 
 
 def _to_float(value: Any, default: float = 0.0) -> float:
@@ -391,22 +411,9 @@ def _floor_board_lot(quantity: float, lot_size: int = 100) -> int:
 
 
 def _resolve_board_lot_size(symbol: str) -> int:
-    s = str(symbol or "").strip().upper()
-    code = s.split(".", 1)[0]
-    if code.startswith("SH") and len(code) > 2:
-        code = code[2:]
-    elif code.startswith("SZ") and len(code) > 2:
-        code = code[2:]
-    elif code.startswith("BJ") and len(code) > 2:
-        code = code[2:]
+    from backend.services.simulation.services.market_rules import lot_size_for_symbol
 
-    if code.startswith("688"):
-        return max(1, int(getattr(settings, "MIN_LOT_STAR_BOARD", 200)))
-    if code.startswith("30"):
-        return max(1, int(getattr(settings, "MIN_LOT_GEM_BOARD", 100)))
-    if s.endswith(".BJ") or code.startswith(("8", "9")):
-        return max(1, int(getattr(settings, "MIN_LOT_BJ_BOARD", 100)))
-    return max(1, int(getattr(settings, "MIN_LOT_MAIN_BOARD", 100)))
+    return max(1, int(lot_size_for_symbol(symbol)))
 
 
 def _build_preview_hash(payload: dict[str, Any]) -> str:
@@ -1412,6 +1419,11 @@ class ManualExecutionService:
             _pred_rows = await _asyncio.to_thread(
                 _read_model_pred_day, _storage_path, dtd
             )
+            # 写入端已原子 rename，读取到半写文件时仅本次返回空，下次调度重试
+            logger.warning(
+                "pred.parquet 回退命中 tenant=%s user=%s model=%s date=%s rows=%d storage=%s",
+                tenant_id, user_id, model, dtd, len(_pred_rows), _storage_path,
+            )
             return [
                 {
                     "symbol": _normalize_to_broker_symbol(_pr.get("symbol") or ""),
@@ -1429,11 +1441,66 @@ class ManualExecutionService:
             ]
         except Exception as exc:  # pragma: no cover - pred.parquet fallback
             logger.warning(
-                "pred.parquet 截面读取失败 model=%s date=%s: %s", model, dtd, exc
+                "pred.parquet 截面读取失败 tenant=%s user=%s model=%s date=%s err=%s",
+                tenant_id, user_id, model, dtd, exc,
             )
             return []
 
     async def _load_signal_rows(
+        self,
+        *,
+        tenant_id: str,
+        user_id: str,
+        run_id: str,
+        model_id: str | None = None,
+        data_trade_date: str | None = None,
+        pool_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """取信号行，并按全局股票池裁剪（P3）。
+
+        池解析为空或零命中 → 返回空列表并**由调用方判为空信号**（实盘不会下单），
+        不会退化成「全市场信号」。
+        """
+        rows = await self._load_signal_rows_raw(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            run_id=run_id,
+            model_id=model_id,
+            data_trade_date=data_trade_date,
+        )
+        if not pool_id or not rows:
+            return rows
+
+        from backend.shared.stock_pool.filters import filter_signals_by_pool
+        from backend.shared.stock_pool.resolver import (
+            ResolveContext,
+            resolver as pool_resolver,
+        )
+
+        snapshot = await pool_resolver.resolve(
+            str(pool_id),
+            ResolveContext(tenant_id=tenant_id, user_id=user_id),
+        )
+        outcome = filter_signals_by_pool(rows, snapshot)
+        if outcome.empty_pool or outcome.empty_result:
+            logger.error(
+                "实盘信号池过滤：池为空或零命中，拒绝下单 pool_id=%s tenant=%s user=%s reason=%s",
+                pool_id,
+                tenant_id,
+                user_id,
+                "; ".join(outcome.warnings),
+            )
+            return []
+        logger.info(
+            "实盘信号池过滤 pool_id=%s checksum=%s kept=%d dropped=%d",
+            outcome.pool_id,
+            outcome.pool_checksum,
+            len(outcome.kept),
+            outcome.dropped,
+        )
+        return outcome.kept
+
+    async def _load_signal_rows_raw(
         self,
         *,
         tenant_id: str,
@@ -1488,11 +1555,14 @@ class ManualExecutionService:
         )
         if fallback_rows:
             normalized.extend(fallback_rows)
-            logger.info(
-                "手动任务信号表为空，已从 pred.parquet 回退 %d 条截面 run_id=%s date=%s",
-                len(fallback_rows),
-                run_id,
-                str(data_trade_date)[:10],
+            logger.warning(
+                "手动任务信号回退命中 tenant=%s user=%s model=%s run_id=%s date=%s rows=%d",
+                tenant_id, user_id, model_id, run_id, str(data_trade_date)[:10], len(fallback_rows),
+            )
+        else:
+            logger.warning(
+                "手动任务信号回退为空 tenant=%s user=%s model=%s run_id=%s date=%s",
+                tenant_id, user_id, model_id, run_id, str(data_trade_date)[:10],
             )
         return normalized
 
@@ -1637,6 +1707,7 @@ class ManualExecutionService:
             run_id=prepared.run_id,
             model_id=prepared.model_id,
             data_trade_date=prepared.run.get("data_trade_date"),
+            pool_id=_resolve_pool_id_from_prepared(prepared),
         )
         if not signal_rows:
             raise HTTPException(status_code=400, detail="当前推理批次无可用信号明细")
@@ -2089,6 +2160,7 @@ class ManualExecutionService:
             run_id=prepared.run_id,
             model_id=prepared.model_id,
             data_trade_date=prepared.run.get("data_trade_date"),
+            pool_id=_resolve_pool_id_from_prepared(prepared),
         )
         strategy_params = _normalize_strategy_params(prepared.strategy)
         execution_plan = _build_execution_plan_from_signals(
@@ -2476,6 +2548,7 @@ class ManualExecutionService:
                     run_id=run_id,
                     model_id=prepared.model_id,
                     data_trade_date=prepared.run.get("data_trade_date"),
+                    pool_id=_resolve_pool_id_from_prepared(prepared),
                 )
                 if not signal_rows:
                     error_msg = "推理结果无可执行信号"

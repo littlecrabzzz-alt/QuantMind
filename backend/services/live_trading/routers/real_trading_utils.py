@@ -3,7 +3,7 @@ import json
 import logging
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional
@@ -225,8 +225,45 @@ def get_strategy_path(user_id: str):
 
 
 def _active_strategy_key(tenant_id: str, user_id: str) -> str:
-    tenant = (tenant_id or "").strip() or "default"
-    return f"trade:active_strategy:{tenant}:{str(user_id).zfill(8)}"
+    # 唯一口径见 shared/simulation_account_keys：管理员族 10000001，其它数字补零 8 位。
+    # 禁止手写 zfill(8)——曾导致 admin 被写成 000admin，重启恢复与状态查询分裂。
+    from backend.shared.simulation_account_keys import active_strategy_key
+
+    return active_strategy_key(tenant_id, user_id)
+
+
+def _read_active_strategy_raw(redis: RedisClient, tenant_id: str, user_id: str):
+    """读 active_strategy，命中历史别名时回写规范键。"""
+    from backend.shared.simulation_account_keys import active_strategy_lookup_keys
+
+    client = getattr(redis, "client", None)
+    if client is None:
+        return None
+    canonical = _active_strategy_key(tenant_id, user_id)
+    for key in active_strategy_lookup_keys(tenant_id, user_id):
+        raw = client.get(key)
+        if not raw:
+            continue
+        if key != canonical:
+            try:
+                client.set(canonical, raw)
+            except Exception:
+                pass
+        return raw
+    return None
+
+
+def _delete_active_strategy_aliases(redis: RedisClient, tenant_id: str, user_id: str) -> None:
+    from backend.shared.simulation_account_keys import active_strategy_lookup_keys
+
+    client = getattr(redis, "client", None)
+    if client is None:
+        return
+    for key in active_strategy_lookup_keys(tenant_id, user_id):
+        try:
+            client.delete(key)
+        except Exception:
+            continue
 
 
 def _normalize_identity(
@@ -236,7 +273,7 @@ def _normalize_identity(
 ) -> tuple[str, str]:
     """
     统一身份来源：JWT 为准；兼容传参时必须与 JWT 一致。
-    数字 user_id 按 8 位补零（兼容历史整数 ID），非数字（如 admin）保持原样，
+    数字 user_id 按 8 位补零（兼容历史整数 ID）；管理员族收口 10000001。
     避免与 qm_user_models 中存储的原始 user_id 不一致导致默认模型查询失败。
     """
     token_user_id = str(auth.user_id).strip()
@@ -253,7 +290,9 @@ def _normalize_identity(
             detail="Forbidden tenant_id override",
         )
 
-    normalized_user = token_user_id.zfill(8) if token_user_id.isdigit() else token_user_id
+    from backend.shared.simulation_account_keys import normalize_runtime_user
+
+    normalized_user = normalize_runtime_user(token_user_id)
     return normalized_user, token_tenant_id
 
 
@@ -322,21 +361,13 @@ async def _fetch_active_portfolio_snapshot(
     )
     daily_pnl = _decimal_to_float(getattr(portfolio, "daily_pnl", None), 0.0)
     total_value = _decimal_to_float(getattr(portfolio, "total_value", None), 0.0)
-    available_cash = _decimal_to_float(getattr(portfolio, "available_cash", None), 0.0)
-    frozen_cash = _decimal_to_float(getattr(portfolio, "frozen_cash", None), 0.0)
-    # 持仓市值 = 总资产 - 可用现金 - 冻结资金 (简化计算，也可根据 positions 累加)
-    market_value = total_value - available_cash - frozen_cash
 
-    # 重新计算当日收益率以确保实时性 (优先使用持仓市值作为分母)
-    if market_value > 0:
-        raw_daily_return = daily_pnl / market_value
+    # 当日收益率统一口径：当日盈亏 / 初始资金（与模拟账户 daily_return_ratio、
+    # 前端 requireDerived 一致）。此前用持仓市值做分母，空仓/轻仓时失真且三处对不上。
+    if initial_capital > 0:
+        raw_daily_return = daily_pnl / initial_capital
     else:
-        # 兜底逻辑：若无持仓市值，尝试从数据库获取或使用初始资金计算
-        raw_daily_return = getattr(portfolio, "daily_return", 0.0)
-        if (not raw_daily_return or raw_daily_return == 0) and initial_capital > 0:
-            raw_daily_return = daily_pnl / initial_capital
-        elif not raw_daily_return:
-            raw_daily_return = 0.0
+        raw_daily_return = _decimal_to_float(getattr(portfolio, "daily_return", 0.0), 0.0)
 
     total_pnl = _decimal_to_float(getattr(portfolio, "total_pnl", None), 0.0)
     total_return = _decimal_to_float(getattr(portfolio, "total_return", None), 0.0)
@@ -819,7 +850,7 @@ def _normalize_execution_config(user_exec_cfg: dict, base_exec_cfg: dict) -> dic
         except (TypeError, ValueError):
             raise HTTPException(
                 status_code=400, detail="execution_config.max_buy_drop 非法"
-            )
+            ) from None
         if not (-0.10 <= max_buy_drop <= -0.01):
             raise HTTPException(
                 status_code=400,
@@ -834,7 +865,7 @@ def _normalize_execution_config(user_exec_cfg: dict, base_exec_cfg: dict) -> dic
         except (TypeError, ValueError):
             raise HTTPException(
                 status_code=400, detail="execution_config.stop_loss 非法"
-            )
+            ) from None
         if not (-0.20 <= stop_loss <= -0.03):
             raise HTTPException(
                 status_code=400,
@@ -869,10 +900,78 @@ def _normalize_live_trade_config(user_live_cfg: dict, base_live_cfg: dict) -> di
     merged.update(base_live_cfg or {})
     merged.update(user_live_cfg or {})
 
+    # 先裁 HH:MM，再按时点对齐时段，最后做 schema 校验。
+    # 前端偶发只改了 14:xx 却仍提交 AM，后端在此自动补 PM，避免误拒。
+    session_ranges = {
+        "AM": ("09:30", "11:30"),
+        "PM": ("13:00", "15:00"),
+    }
+
+    def _hhmm(value: object) -> str:
+        text = str(value or "").strip()
+        if len(text) >= 5 and text[2] == ":":
+            return text[:5]
+        return text
+
+    def _sessions_covering(hhmm: str) -> list[str]:
+        return [
+            name
+            for name, (start, end) in session_ranges.items()
+            if start <= hhmm <= end
+        ]
+
+    for key in ("sell_time", "buy_time"):
+        if key in merged and merged[key] is not None:
+            merged[key] = _hhmm(merged[key])
+
+    enabled_sessions = [
+        str(item).upper() for item in (merged.get("enabled_sessions") or [])
+    ]
+    sell_hhmm = _hhmm(merged.get("sell_time"))
+    buy_hhmm = _hhmm(merged.get("buy_time"))
+    for label, hhmm in (("sell_time", sell_hhmm), ("buy_time", buy_hhmm)):
+        covering = _sessions_covering(hhmm)
+        if hhmm and not covering:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"live_trade_config.{label}={hhmm} 不在任何交易时段内"
+                    f"（AM 09:30-11:30 / PM 13:00-15:00）"
+                ),
+            )
+    needed = list(
+        dict.fromkeys(_sessions_covering(sell_hhmm) + _sessions_covering(buy_hhmm))
+    )
+    sell_ok = any(
+        start <= sell_hhmm <= end
+        for start, end in (
+            session_ranges[s] for s in enabled_sessions if s in session_ranges
+        )
+    )
+    buy_ok = any(
+        start <= buy_hhmm <= end
+        for start, end in (
+            session_ranges[s] for s in enabled_sessions if s in session_ranges
+        )
+    )
+    if needed and not (sell_ok and buy_ok):
+        healed = list(dict.fromkeys([*enabled_sessions, *needed]))
+        logger.info(
+            "live_trade_config auto-heal enabled_sessions %s -> %s (sell=%s buy=%s)",
+            enabled_sessions,
+            healed,
+            sell_hhmm,
+            buy_hhmm,
+        )
+        enabled_sessions = healed
+        merged["enabled_sessions"] = healed
+
     try:
         LiveTradeConfigSchema.model_validate(merged)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"live_trade_config 非法: {exc}")
+        raise HTTPException(
+            status_code=400, detail=f"live_trade_config 非法: {exc}"
+        ) from exc
 
     normalized = dict(merged)
     normalized["schedule_type"] = str(
@@ -881,7 +980,7 @@ def _normalize_live_trade_config(user_live_cfg: dict, base_live_cfg: dict) -> di
     normalized["trade_weekdays"] = [
         str(item).upper() for item in (normalized.get("trade_weekdays") or [])
     ]
-    normalized["enabled_sessions"] = [
+    normalized["enabled_sessions"] = enabled_sessions or [
         str(item).upper() for item in (normalized.get("enabled_sessions") or [])
     ]
     normalized["order_type"] = str(normalized.get("order_type") or "MARKET").upper()
@@ -896,10 +995,9 @@ def _normalize_live_trade_config(user_live_cfg: dict, base_live_cfg: dict) -> di
     ):
         normalized["max_price_deviation"] = float(normalized["max_price_deviation"])
 
-    session_ranges = {
-        "AM": ("09:30", "11:30"),
-        "PM": ("13:00", "15:00"),
-    }
+    for key in ("sell_time", "buy_time"):
+        normalized[key] = _hhmm(normalized.get(key))
+
     enabled_sessions = normalized.get("enabled_sessions") or []
     for key in ("sell_time", "buy_time"):
         target = str(normalized.get(key) or "")
@@ -910,9 +1008,18 @@ def _normalize_live_trade_config(user_live_cfg: dict, base_live_cfg: dict) -> di
             )
         )
         if not in_session:
+            ranges_text = ", ".join(
+                f"{s}={session_ranges[s][0]}-{session_ranges[s][1]}"
+                for s in enabled_sessions
+                if s in session_ranges
+            ) or "未选择时段"
             raise HTTPException(
                 status_code=400,
-                detail=f"live_trade_config.{key} 必须落在已选执行时段内",
+                detail=(
+                    f"live_trade_config.{key}={target} 必须落在已选执行时段内"
+                    f"（当前 {ranges_text}）。"
+                    f"若要用下午时点请勾选 PM/下午；若只跑上午请把时点改到 09:30-11:30。"
+                ),
             )
 
     return normalized
@@ -1007,15 +1114,51 @@ def _resolve_runner_image_for_mode() -> tuple[str, str]:
     return default_image, "default"
 
 
+def _get_remote_quote_redis_config() -> tuple[str, int, str | None, int]:
+    """远端行情快照 Redis 配置（与 stream / 模拟撮合对齐）。
+
+    默认写死全市场库 quantmindai.cn db3；可用 REMOTE_QUOTE_REDIS_* 覆盖。
+    """
+    from backend.shared.quote_redis_config import (
+        DEFAULT_REMOTE_QUOTE_REDIS_DB,
+        DEFAULT_REMOTE_QUOTE_REDIS_HOST,
+        DEFAULT_REMOTE_QUOTE_REDIS_PASSWORD,
+        DEFAULT_REMOTE_QUOTE_REDIS_PORT,
+    )
+
+    host = _get_env_with_root_fallback(
+        "REMOTE_QUOTE_REDIS_HOST",
+        DEFAULT_REMOTE_QUOTE_REDIS_HOST,
+    )
+    port = int(
+        _get_env_with_root_fallback(
+            "REMOTE_QUOTE_REDIS_PORT",
+            str(DEFAULT_REMOTE_QUOTE_REDIS_PORT),
+        )
+        or str(DEFAULT_REMOTE_QUOTE_REDIS_PORT)
+    )
+    if "REMOTE_QUOTE_REDIS_PASSWORD" in os.environ:
+        password = _get_env_with_root_fallback("REMOTE_QUOTE_REDIS_PASSWORD", "") or None
+    else:
+        password = DEFAULT_REMOTE_QUOTE_REDIS_PASSWORD
+    db = int(
+        _get_env_with_root_fallback(
+            "REMOTE_QUOTE_REDIS_DB",
+            str(DEFAULT_REMOTE_QUOTE_REDIS_DB),
+        )
+        or str(DEFAULT_REMOTE_QUOTE_REDIS_DB)
+    )
+    return host, port, password, db
+
+
 def _get_stream_series_redis_client():
     """
     Stream 行情时序 Redis（quote->series）客户端。
-    OSS 版本使用统一 Redis 实例 (REDIS_DB_MARKET)。
+
+    优先直连 REMOTE_QUOTE_REDIS_*（与 quantmind-stream 的 quote->series
+    写入端一致），远端探测异常时由调用方降级到交易 Redis。
     """
-    host = _get_env_with_root_fallback("REDIS_HOST", "localhost")
-    port = int(_get_env_with_root_fallback("REDIS_PORT", "6379") or "6379")
-    password = _get_env_with_root_fallback("REDIS_PASSWORD", "") or None
-    db = int(_get_env_with_root_fallback("REDIS_DB_MARKET", "3"))
+    host, port, password, db = _get_remote_quote_redis_config()
     client = redis_lib.Redis(
         host=host,
         port=port,
@@ -1037,10 +1180,12 @@ def _check_quantdb_latest_daily(market: str = "CN") -> tuple[bool, str]:
     market_upper = str(market or "CN").upper()
     try:
         from backend.services.simulation.services.local_market_data import (
-            LocalMarketData,
+            get_local_market_data,
         )
 
-        market_data = LocalMarketData(market=market_upper)
+        # 必须走进程内共享实例：每次 new 一个 LocalMarketData 会丢掉交易日与
+        # 按日行情缓存，健康检查就会反复重新枚举交易日（旧实现每次都付全表扫描）。
+        market_data = get_local_market_data(market_upper)
         latest_date = market_data.latest_trade_date()
         if latest_date is None:
             return False, f"{market_upper} 市场数据库无可用日线"
@@ -1090,6 +1235,8 @@ def check_stream_series_freshness(
 
     matched_symbol = None
     latest_age_sec = None
+    remote_probe_error = ""
+    used_fallback = False
     try:
         stream_redis.ping()
         for symbol in stream_symbols:
@@ -1102,10 +1249,12 @@ def check_stream_series_freshness(
                 if latest_age_sec is None or age < latest_age_sec:
                     matched_symbol = normalized
                     latest_age_sec = age
-    except Exception:
-        # 降级：尝试本地/交易 Redis
+    except Exception as exc:
+        # 远端探测异常时降级到交易 Redis，并在 details 回显原因
+        remote_probe_error = str(exc)
         if redis_client:
             try:
+                used_fallback = True
                 for symbol in stream_symbols:
                     normalized = StockCodeUtil.to_prefix(symbol)
                     key = f"market:series:{normalized}"
@@ -1156,6 +1305,8 @@ def check_stream_series_freshness(
             "age_seconds": latest_age_sec,
             "threshold_seconds": threshold_sec,
             "series_redis": f"{stream_redis_host}:{stream_redis_port}",
+            "remote_probe_error": remote_probe_error,
+            "used_fallback": used_fallback,
         },
     }
 
@@ -1170,16 +1321,22 @@ def check_stream_quote_persist_rate(
     最近交易日日线是否可用，模拟撮合引擎直读 QuantDB 可正常撮合。
     """
     try:
-        # 获取落库监控 Key (由 stream 服务定时写入)
+        # 获取落库监控 Key (由 stream 服务写入远端行情 Redis)
+        # 优先直连远端（与写入端一致），异常时降级到交易 Redis
         key = "market:stream:persist_stats"
         stats_raw = None
-        if redis_client:
-            stats_raw = redis_client.get(key)
-
-        if not stats_raw:
-            # 尝试从行情 Redis 获取
+        remote_probe_error = ""
+        try:
             stream_redis, _, _ = _get_stream_series_redis_client()
             stats_raw = stream_redis.get(key)
+        except Exception as exc:
+            remote_probe_error = str(exc)
+
+        if not stats_raw and redis_client:
+            try:
+                stats_raw = redis_client.get(key)
+            except Exception:
+                pass
 
         if not stats_raw:
             if allow_quantdb_fallback:
@@ -1217,7 +1374,7 @@ def check_stream_quote_persist_rate(
             "ok": ok,
             "message": message,
             "source": "stream_persist" if ok else "stale",
-            "details": stats,
+            "details": {**stats, "remote_probe_error": remote_probe_error},
         }
     except Exception as e:
         return {"ok": False, "message": f"行情落库检测异常: {e}", "details": {}}

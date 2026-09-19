@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import time
@@ -21,14 +22,32 @@ from backend.shared.trade_redis_keys import (
 
 
 def _build_check(key: str, label: str, passed: bool, detail: str) -> dict[str, Any]:
-
-
     return {
         "key": key,
         "label": label,
         "passed": bool(passed),
         "detail": detail,
     }
+
+
+def _is_cn_trading_hours() -> bool:
+    try:
+        from zoneinfo import ZoneInfo
+
+        now = datetime.now(ZoneInfo("Asia/Shanghai"))
+    except Exception:
+        now = datetime.now()
+    return (
+        now.weekday() < 5
+        and (
+            (now.hour == 9 and now.minute >= 15)
+            or (10 <= now.hour < 11)
+            or (now.hour == 11 and now.minute <= 35)
+            or (now.hour == 12 and now.minute >= 55)
+            or (13 <= now.hour < 15)
+            or (now.hour == 15 and now.minute == 0)
+        )
+    )
 
 
 def _resolve_runner_image() -> tuple[str, str]:
@@ -66,10 +85,38 @@ def _get_env_with_root_fallback(key: str, default: str = "") -> str:
 
 
 def _get_stream_series_redis_client():
-    host = _get_env_with_root_fallback("REDIS_HOST", "localhost")
-    port = int(_get_env_with_root_fallback("REDIS_PORT", "6379") or "6379")
-    password = _get_env_with_root_fallback("REDIS_PASSWORD", "") or None
-    db = int(_get_env_with_root_fallback("REDIS_DB_MARKET", "3"))
+    # 与 live_trading.real_trading_utils 对齐：优先直连远端行情 Redis
+    # （默认 quantmindai.cn db3，与模拟撮合同源）。
+    # 此函数当前无调用方，保留仅为避免外部导入 break。
+    from backend.shared.quote_redis_config import (
+        DEFAULT_REMOTE_QUOTE_REDIS_DB,
+        DEFAULT_REMOTE_QUOTE_REDIS_HOST,
+        DEFAULT_REMOTE_QUOTE_REDIS_PASSWORD,
+        DEFAULT_REMOTE_QUOTE_REDIS_PORT,
+    )
+
+    host = _get_env_with_root_fallback(
+        "REMOTE_QUOTE_REDIS_HOST",
+        DEFAULT_REMOTE_QUOTE_REDIS_HOST,
+    )
+    port = int(
+        _get_env_with_root_fallback(
+            "REMOTE_QUOTE_REDIS_PORT",
+            str(DEFAULT_REMOTE_QUOTE_REDIS_PORT),
+        )
+        or str(DEFAULT_REMOTE_QUOTE_REDIS_PORT)
+    )
+    if "REMOTE_QUOTE_REDIS_PASSWORD" in os.environ:
+        password = _get_env_with_root_fallback("REMOTE_QUOTE_REDIS_PASSWORD", "") or None
+    else:
+        password = DEFAULT_REMOTE_QUOTE_REDIS_PASSWORD
+    db = int(
+        _get_env_with_root_fallback(
+            "REMOTE_QUOTE_REDIS_DB",
+            str(DEFAULT_REMOTE_QUOTE_REDIS_DB),
+        )
+        or str(DEFAULT_REMOTE_QUOTE_REDIS_DB)
+    )
     client = redis_lib.Redis(
         host=host,
         port=port,
@@ -332,9 +379,225 @@ async def run_trading_readiness_precheck(
     if normalized_mode not in {"REAL", "SHADOW", "SIMULATION"}:
         raise ValueError(f"unsupported trading mode: {mode}")
 
-    checks: list[dict[str, Any]] = []
+    if normalized_mode == "SIMULATION":
+        # 模拟盘精简自检：只保留决定能否启动/自动成交的 5 项。
+        # 去掉 Redis 单列、推理文件警告、融资/TDX/Stream 落库·K 线等噪音。
+        checks = []
 
-    expected_trade_date = _previous_trading_day(date.today())
+        # 1) PostgreSQL + 模拟盘关键表
+        try:
+            await db.execute(text("SELECT 1"))
+            table_probe_sql = text("""
+                SELECT
+                    to_regclass('public.sim_orders') IS NOT NULL AS sim_orders,
+                    to_regclass('public.sim_trades') IS NOT NULL AS sim_trades,
+                    to_regclass('public.simulation_fund_snapshots') IS NOT NULL AS simulation_fund_snapshots
+                """)
+            table_probe_row = (await db.execute(table_probe_sql)).mappings().one()
+            missing_tables = [
+                name
+                for name in ("sim_orders", "sim_trades", "simulation_fund_snapshots")
+                if not bool(table_probe_row.get(name))
+            ]
+            tables_ok = len(missing_tables) == 0
+            checks.append(
+                _build_check(
+                    "db",
+                    "数据库",
+                    tables_ok,
+                    (
+                        "PostgreSQL 与模拟盘表已就绪"
+                        if tables_ok
+                        else f"缺少模拟盘关键表: {', '.join(missing_tables)}"
+                    ),
+                )
+            )
+        except Exception as exc:
+            checks.append(
+                _build_check("db", "数据库", False, f"数据库自检失败: {exc}")
+            )
+            await db.rollback()
+
+        # 2) 默认模型
+        try:
+            from backend.shared.model_registry import model_registry_service
+
+            default_model = await model_registry_service.get_default_model(
+                tenant_id=tenant_id,
+                user_id=user_id,
+            )
+            if not default_model:
+                try:
+                    candidates = await model_registry_service.list_models(
+                        tenant_id=tenant_id, user_id=user_id, include_archived=False
+                    )
+                    avail = [
+                        m
+                        for m in candidates
+                        if str(m.get("status") or "").lower() in {"ready", "active"}
+                    ]
+                    chosen = (avail or candidates[:1] or [None])[0]
+                    if chosen and chosen.get("model_id"):
+                        try:
+                            default_model = await model_registry_service.set_default_model(
+                                tenant_id=tenant_id,
+                                user_id=user_id,
+                                model_id=str(chosen.get("model_id")),
+                            )
+                        except Exception:
+                            default_model = chosen
+                except Exception:
+                    pass
+            model_configured = bool(default_model)
+            checks.append(
+                _build_check(
+                    "default_model_configured",
+                    "默认模型已配置",
+                    model_configured,
+                    (
+                        f"默认模型已配置 (model_id={default_model.get('model_id')})"
+                        if model_configured
+                        else "未配置默认模型，请先在模型管理中设置默认模型"
+                    ),
+                )
+            )
+        except Exception as exc:
+            checks.append(
+                _build_check(
+                    "default_model_configured",
+                    "默认模型已配置",
+                    False,
+                    f"default_model_check_error={exc}",
+                )
+            )
+
+        # 3) 沙箱进程池
+        try:
+            from backend.services.trade.sandbox.manager import sandbox_manager
+
+            workers = list(getattr(sandbox_manager, "_workers", {}).values())
+            worker_total = len(workers)
+            alive_total = sum(1 for proc in workers if bool(proc and proc.is_alive()))
+            pool_ok = alive_total > 0
+            checks.append(
+                _build_check(
+                    "simulation_sandbox_pool",
+                    "模拟盘进程池",
+                    pool_ok,
+                    (
+                        f"进程池可用（alive={alive_total}/{worker_total}）"
+                        if pool_ok
+                        else "进程池不可用（无存活 worker）"
+                    ),
+                )
+            )
+        except Exception as exc:
+            checks.append(
+                _build_check(
+                    "simulation_sandbox_pool",
+                    "模拟盘进程池",
+                    False,
+                    f"process_pool_error={exc}",
+                )
+            )
+
+        # 4) 远程全市场行情（与 SimulationEngine 同源；盘中无新鲜 tick 则阻断）
+        try:
+            from backend.services.live_trading.routers.real_trading_utils import (
+                check_stream_series_freshness,
+            )
+
+            res = await asyncio.to_thread(
+                check_stream_series_freshness,
+                redis_client=redis_client,
+                allow_quantdb_fallback=False,
+                market=market,
+            )
+            is_trading_hours = _is_cn_trading_hours()
+            if res.get("ok"):
+                quote_ok = True
+                quote_detail = str(res.get("message") or "远程行情新鲜")
+            elif is_trading_hours:
+                quote_ok = False
+                quote_detail = (
+                    f"[阻断] {res.get('message') or '远程行情不可用'}；"
+                    "盘中自动成交需要新鲜 market:series"
+                )
+            else:
+                quote_ok = True
+                quote_detail = (
+                    f"[WARNING] {res.get('message') or '远程行情暂不新鲜'}；"
+                    "非交易时段可启动，开盘后需行情恢复才会自动成交"
+                )
+            checks.append(
+                _build_check(
+                    "stream_series_freshness",
+                    "行情就绪",
+                    quote_ok,
+                    quote_detail,
+                )
+            )
+        except Exception as exc:
+            is_trading_hours = _is_cn_trading_hours()
+            checks.append(
+                _build_check(
+                    "stream_series_freshness",
+                    "行情就绪",
+                    not is_trading_hours,
+                    (
+                        f"[阻断] quote_probe_error={exc}"
+                        if is_trading_hours
+                        else f"[WARNING] quote_probe_error={exc}"
+                    ),
+                )
+            )
+
+        # 5) 信号可交易（观察态不阻断）
+        try:
+            signal_readiness = await signal_readiness_service.evaluate(
+                db,
+                redis_client=redis_client,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                mode=normalized_mode,
+            )
+        except Exception as exc:
+            signal_readiness = {
+                "available": False,
+                "status": "check_error",
+                "message": f"读取默认模型信号就绪状态失败: {exc}",
+                "trading_permission": "observe_only",
+                "blocking": False,
+            }
+            await db.rollback()
+        signal_passed = not bool(signal_readiness.get("blocking"))
+        checks.append(
+            _build_check(
+                "signal_readiness",
+                "信号可交易",
+                signal_passed,
+                (
+                    str(signal_readiness.get("message") or "信号状态正常")
+                    if signal_readiness.get("available")
+                    else (
+                        f"[阻断] {signal_readiness.get('message')}"
+                        if signal_readiness.get("blocking")
+                        else f"[观察态] {signal_readiness.get('message')}"
+                    )
+                ),
+            )
+        )
+
+        return {
+            "passed": all(bool(item.get("passed")) for item in checks),
+            "checked_at": datetime.now().isoformat(),
+            "items": checks,
+            "signal_readiness": signal_readiness,
+            "trading_permission": signal_readiness.get("trading_permission"),
+        }
+
+    # 以下为 REAL / SHADOW（保留原完整检查）
+    checks: list[dict[str, Any]] = []
 
     try:
         redis_ok = bool(redis_client.ping())
@@ -393,145 +656,6 @@ async def run_trading_readiness_precheck(
         )
     )
 
-    if normalized_mode == "SIMULATION":
-        # 默认模型检测：单模型/多模型均必须有默认模型（阻断项）
-        # 未设置时自动尝试分配最新可用模型，仍无则阻断并提示去模型管理设置
-        try:
-            from backend.shared.model_registry import model_registry_service
-
-            default_model = await model_registry_service.get_default_model(
-                tenant_id=tenant_id,
-                user_id=user_id,
-            )
-            if not default_model:
-                # 自动分配：优先取用户最新 ready/active 模型
-                try:
-                    candidates = await model_registry_service.list_models(
-                        tenant_id=tenant_id, user_id=user_id, include_archived=False
-                    )
-                    avail = [m for m in candidates if str(m.get("status") or "").lower() in {"ready", "active"}]
-                    chosen = (avail or candidates[:1] or [None])[0]
-                    if chosen and chosen.get("model_id"):
-                        try:
-                            default_model = await model_registry_service.set_default_model(
-                                tenant_id=tenant_id, user_id=user_id, model_id=str(chosen.get("model_id"))
-                            )
-                        except Exception:
-                            default_model = chosen
-                except Exception:
-                    pass
-            model_configured = bool(default_model)
-            checks.append(
-                _build_check(
-                    "default_model_configured",
-                    "默认模型已配置",
-                    model_configured,
-                    (
-                        f"默认模型已配置 (model_id={default_model.get('model_id')})"
-                        if model_configured
-                        else "未配置默认模型（单模型/多模型均需设置默认模型），请先在模型管理中设置默认模型后再启动模拟盘"
-                    ),
-                )
-            )
-        except Exception as exc:
-            checks.append(
-                _build_check(
-                    "default_model_configured",
-                    "默认模型已配置",
-                    False,
-                    f"default_model_check_error={exc}",
-                )
-            )
-
-        try:
-            model_ok, model_detail = _check_inference_model_exists()
-            # SIMULATION 模式推理模型仅警告，允许用户先配置系统
-            checks.append(
-                _build_check(
-                    "inference_database_ready",
-                    "推理模型已就绪",
-                    True,  # 仅警告，不阻断
-                    model_detail if model_ok else f"[WARNING] {model_detail}",
-                )
-            )
-        except Exception as exc:
-            checks.append(
-                _build_check(
-                    "inference_database_ready",
-                    "推理模型已就绪",
-                    True,  # 仅警告，不阻断
-                    f"[WARNING] model_check_error={exc}",
-                )
-            )
-
-        try:
-            from backend.services.trade.sandbox.manager import sandbox_manager
-
-            workers = list(getattr(sandbox_manager, "_workers", {}).values())
-            worker_total = len(workers)
-            alive_total = sum(1 for proc in workers if bool(proc and proc.is_alive()))
-            pool_ok = alive_total > 0
-            checks.append(
-                _build_check(
-                    "simulation_sandbox_pool",
-                    "模拟盘进程池",
-                    pool_ok,
-                    (
-                        f"进程池可用（alive={alive_total}/{worker_total}）"
-                        if pool_ok
-                        else "进程池不可用（无存活 worker）"
-                    ),
-                )
-            )
-        except Exception as exc:
-            checks.append(
-                _build_check(
-                    "simulation_sandbox_pool",
-                    "模拟盘进程池",
-                    False,
-                    f"process_pool_error={exc}",
-                )
-            )
-
-        try:
-            from backend.services.live_trading.routers.real_trading_utils import check_stream_series_freshness
-            res = check_stream_series_freshness(
-                redis_client=redis_client,
-                allow_quantdb_fallback=(normalized_mode == "SIMULATION"),
-                market=market,
-            )
-            # 模拟盘该项仅警告，不阻断：Redis 不可用时回退 QuantDB 日线以开盘价撮合
-            is_sim = normalized_mode == "SIMULATION"
-            checks.append(
-                _build_check(
-                    "stream_series_freshness",
-                    "实时行情服务已就绪",
-                    True if is_sim else res["ok"],
-                    res["message"] if res["ok"] else f"[WARNING] {res['message']}（已回退日线开盘价撮合，不阻断模拟盘）" if is_sim else res["message"],
-                )
-            )
-        except Exception as exc:
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
-            is_trading_hours = (
-                now.weekday() < 5
-                and ((now.hour == 9 and now.minute >= 15) or (now.hour >= 10 and now.hour < 15))
-            )
-            checks.append(
-                _build_check(
-                    "stream_series_freshness",
-                    "实时行情服务已就绪",
-                    not is_trading_hours,
-                    f"[阻断] stream_probe_error={exc}" if is_trading_hours else f"[WARNING] stream_probe_error={exc}",
-                )
-            )
-        return {
-            "passed": all(bool(item.get("passed")) for item in checks),
-            "checked_at": datetime.now().isoformat(),
-            "items": checks,
-            "signal_readiness": signal_readiness,
-            "trading_permission": signal_readiness.get("trading_permission"),
-        }
-
     # REAL/SHADOW 模式：推理模型检查
     try:
         model_ok, model_detail = _check_inference_model_exists()
@@ -577,8 +701,11 @@ async def run_trading_readiness_precheck(
 
     from backend.services.live_trading.routers.real_trading_utils import check_stream_series_freshness
     # REAL 模式同样回退 QuantDB 日线兜底：TDX 通道无实时行情流时仍可交易
-    res = check_stream_series_freshness(
-        redis_client=redis_client, allow_quantdb_fallback=True, market=market
+    res = await asyncio.to_thread(
+        check_stream_series_freshness,
+        redis_client=redis_client,
+        allow_quantdb_fallback=True,
+        market=market,
     )
     checks.append(
         _build_check(
@@ -593,18 +720,6 @@ async def run_trading_readiness_precheck(
         qmt_ok, qmt_detail = await _check_qmt_agent_online(
             db, redis_client, tenant_id, user_id
         )
-        if not qmt_ok:
-            # QMT Agent 未就绪时回退通达信桥（用户使用 TDX 通道）
-            from backend.services.live_trading.routers.real_trading_utils import (
-                check_tdx_bridge_online,
-            )
-
-            tdx_online, tdx_detail = check_tdx_bridge_online()
-            if tdx_online:
-                qmt_ok = True
-                qmt_detail = f"{tdx_detail}（QMT Agent 未接入: {qmt_detail}）"
-            else:
-                qmt_detail = f"{qmt_detail}；且 {tdx_detail}"
         checks.append(
             _build_check(
                 "qmt_agent_online",

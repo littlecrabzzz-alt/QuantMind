@@ -16,7 +16,7 @@ import { SectorExplorer } from '../components/SectorExplorer';
 import { MarketOverview } from '../components/MarketOverview';
 import StrategyLabSignalCard from '../components/StrategyLabSignalCard';
 import { dataDashboardService, KlineItem } from '../services/dataDashboardService';
-import { researchService } from '../../../services/researchService';
+import { listUserPoolSymbols, USER_POOL_FAVORITES } from '../../../services/userStockPoolService';
 import { useAppDispatch, useAppSelector } from '../../../store';
 import { selectCurrentMarket, setMarket, AppMarket } from '../../../store/slices/uiSlice';
 import { isMarketEnabled } from '../../../config/marketFlags';
@@ -61,16 +61,18 @@ const DashboardPage: React.FC = () => {
     const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
     const [watchlistLoading, setWatchlistLoading] = useState(false);
 
-    // Load watchlist from research platform
+    // Load favorites user stock pool
     const loadWatchlist = useCallback(async () => {
         setWatchlistLoading(true);
         try {
-            const result = await researchService.getWatchlist(100, 0);
-            setWatchlist(result.items.map((item: any) => ({
-                symbol: item.symbol,
-                stockName: item.stockName,
-                tags: item.tags || [],
-            })));
+            const symbols = await listUserPoolSymbols(USER_POOL_FAVORITES);
+            setWatchlist(
+                symbols.map((symbol) => ({
+                    symbol: String(symbol).toUpperCase(),
+                    stockName: null,
+                    tags: [],
+                })),
+            );
         } catch {
             setWatchlist([]);
         } finally {
@@ -231,7 +233,7 @@ const DashboardPage: React.FC = () => {
                             style={{ padding: '20px 0' }}
                         >
                             <Text type="secondary" style={{ fontSize: 11 }}>
-                                去投研平台添加自选
+                                去股票终端或投研加入自选池
                             </Text>
                         </Empty>
                     ) : (

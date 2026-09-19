@@ -43,12 +43,13 @@ DEFAULT_SCHEDULE = {
 #   HK       23:50  雅虎/akshare/CCASS 晚间陆续就绪，晚间错峰
 #   US       05:30  美股收盘(北京约 04:00/05:00)后，EOD 数据已稳定
 #   BC       04:15  加密市场全天候交易，选凌晨低谷时段拉取
-#   FUTURES  18:00  日盘收盘结算发布后、夜盘主力时段前
-MARKET_DEFAULT_SCHEDULES: dict[str, dict[str, Any]] = {
-    "HK": {"enabled": True, "time": "23:50"},
-    "US": {"enabled": True, "time": "05:30"},
-    "BC": {"enabled": True, "time": "04:15"},
-    "FUTURES": {"enabled": True, "time": "18:00"},
+#   US       05:30  美股收盘(北京约 04:00/05:00)后，EOD 数据已稳定
+MARKET_SUGGESTED_TIMES: dict[str, str] = {
+    "A": "01:00",
+    "HK": "02:00",
+    "FUTURES": "03:00",
+    "BC": "04:15",
+    "US": "05:30",
 }
 
 
@@ -62,8 +63,9 @@ def _redis():
 
 def _normalize(cfg: dict[str, Any] | None, market: str | None = None) -> dict[str, Any]:
     out = dict(DEFAULT_SCHEDULE)
-    if market is not None:
-        out.update(MARKET_DEFAULT_SCHEDULES.get(market, {}))
+    # 建议时间只用于预填，不会把 enabled 置为 True
+    if market is not None and market in MARKET_SUGGESTED_TIMES:
+        out["time"] = MARKET_SUGGESTED_TIMES[market]
     for k in out:
         if k in (cfg or {}):
             out[k] = cfg[k]
@@ -183,14 +185,38 @@ def run_market_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
     result["result"] = run(**kwargs)
 
     if with_qlib:
-        try:
-            from backend.services.engine.qlib_data_builder import ensure_qlib_cache
+        # 数据拉取阶段若被上游限流拖长，再重建 qlib 缓存会超出任务硬超时被 SIGKILL。
+        # 这里按已耗时判断剩余时间是否够用，不够则跳过并在结果里标记 skipped。
+        elapsed = (datetime.now() - datetime.fromisoformat(result["started"])).total_seconds()
+        budget = float(os.getenv("MARKET_SYNC_SOFT_TIME_LIMIT", "1800"))
+        if elapsed > budget * 0.5:
+            logger.error(
+                "[SyncSchedule] %s 数据拉取已耗时 %.0fs，超过预算 %.0fs 的一半，跳过 qlib 缓存重建",
+                market,
+                elapsed,
+                budget,
+            )
+            result["qlib"] = {
+                "status": "skipped",
+                "reason": f"data stage took {elapsed:.0f}s, too long to rebuild qlib cache",
+            }
+        else:
+            try:
+                from backend.services.engine.qlib_data_builder import ensure_qlib_cache
 
-            qlib_market = {"US": "US", "HK": "HK", "BC": "CRYPTO", "FUTURES": "FUTURES"}[market]
-            result["qlib"] = {"status": "ok", "provider_uri": ensure_qlib_cache(market=qlib_market)}
-        except Exception as exc:  # noqa: BLE001
-            logger.error("%s 定时同步 qlib 缓存失败: %s", market, exc, exc_info=True)
-            result["qlib"] = {"status": "error", "reason": str(exc)}
+                qlib_market = {
+                    "US": "US",
+                    "HK": "HK",
+                    "BC": "CRYPTO",
+                    "FUTURES": "FUTURES",
+                }[market]
+                result["qlib"] = {
+                    "status": "ok",
+                    "provider_uri": ensure_qlib_cache(market=qlib_market),
+                }
+            except Exception as exc:  # noqa: BLE001
+                logger.error("%s 定时同步 qlib 缓存失败: %s", market, exc, exc_info=True)
+                result["qlib"] = {"status": "error", "reason": str(exc)}
 
     result["status"] = "partial" if _has_sync_errors(result) else "completed"
     result["finished"] = datetime.now().isoformat()

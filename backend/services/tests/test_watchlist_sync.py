@@ -101,23 +101,30 @@ async def test_sync_positions_service_upserts_with_names(monkeypatch):
         return ["SH600000", "SH600036"]
 
     monkeypatch.setattr(research_service, "_fetch_simulation_positions", _fake_fetch)
-    monkeypatch.setattr(
-        research_service,
-        "_get_quantdb_stock_names",
-        lambda: {"600036.SH": "招商银行", "600000.SH": "浦发银行"},
-    )
 
-    async def _fake_upsert(tid, uid, symbol, stock_name):
-        called.append((tid, uid, symbol, stock_name))
+    class _FakeSession:
+        async def __aenter__(self):
+            return self
 
-    monkeypatch.setattr(research_service, "_upsert_watchlist_position", _fake_upsert)
+        async def __aexit__(self, *args):
+            return False
+
+    monkeypatch.setattr(research_service, "get_session", lambda: _FakeSession())
+
+    async def _fake_add(session, *, code, symbol, user_id, tenant_id, actor=None):
+        called.append((tenant_id, user_id, symbol, code))
+        return {"added": True, "symbol": symbol}
+
+    import backend.shared.stock_pool.user_pools as user_pools
+
+    monkeypatch.setattr(user_pools, "add_symbol_to_user_pool", _fake_add)
 
     result = await research_service.sync_watchlist_positions_service("default", "u1", "Bearer x")
 
     assert result == {"code": 200, "data": {"positions": ["SH600000", "SH600036"]}}
     assert called == [
-        ("default", "u1", "SH600000", "浦发银行"),
-        ("default", "u1", "SH600036", "招商银行"),
+        ("default", "u1", "SH600000", "favorites"),
+        ("default", "u1", "SH600036", "favorites"),
     ]
 
 
@@ -126,15 +133,17 @@ async def test_sync_positions_service_fails_soft_with_no_upserts(monkeypatch):
     called = []
 
     async def _fake_fetch(_auth, _uid, _tid):
-        # 资产不可达 / 模拟账号未初始化时 _fetch 返回空列表
         return []
 
     monkeypatch.setattr(research_service, "_fetch_simulation_positions", _fake_fetch)
 
-    async def _fake_upsert(tid, uid, symbol, stock_name):
-        called.append((tid, uid, symbol, stock_name))
+    async def _fake_add(*args, **kwargs):
+        called.append(True)
+        return {"added": True}
 
-    monkeypatch.setattr(research_service, "_upsert_watchlist_position", _fake_upsert)
+    import backend.shared.stock_pool.user_pools as user_pools
+
+    monkeypatch.setattr(user_pools, "add_symbol_to_user_pool", _fake_add)
 
     result = await research_service.sync_watchlist_positions_service("default", "u1", "Bearer x")
 

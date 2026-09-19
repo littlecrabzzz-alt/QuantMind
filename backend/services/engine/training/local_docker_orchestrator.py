@@ -43,6 +43,13 @@ from backend.services.engine.data_platform.quantdb_factor_reader import (
 
 logger = logging.getLogger(__name__)
 
+
+def _training_pool_fields(payload: dict) -> dict:
+    """训练池字段（P3）：解析失败/空池时抛错，拒绝提交。"""
+    from backend.services.engine.training.pool_binding import resolve_training_pool
+
+    return resolve_training_pool(payload)
+
 _TRAINING_IMAGE = (os.getenv("TRAINING_IMAGE") or "quantmind-trainer:latest").strip()
 # 训练容器启动前补齐的依赖（空格分隔的包名）。训练镜像可能落后于仓库依赖
 # （如 QuantDB 因子目录读取所需的 duckdb），缺失会在 load_data 时 ImportError 秒挂。
@@ -165,6 +172,27 @@ _TRAINING_SCRIPT_HOST_PATH = str(_HOST_PROJECT_PATH / "docker" / "training" / "t
 _PREPROCESSING_HOST_PATH = str(_HOST_PROJECT_PATH / "docker" / "training" / "preprocessing.py")
 # 多核因子筛选：train.py 顶层 `from parallel_utils import ...`，需与 train.py 一并挂载
 _PARALLEL_UTILS_HOST_PATH = str(_HOST_PROJECT_PATH / "docker" / "training" / "parallel_utils.py")
+# 模型训练器包：train.py 顶层 `from model_trainers... import ...`，整目录挂载
+_TRAINERS_HOST_PATH = str(_HOST_PROJECT_PATH / "docker" / "training" / "model_trainers")
+# 训练诊断包：train.py 顶层 `from diagnostics... import ...`，整目录挂载
+_DIAGNOSTICS_HOST_PATH = str(_HOST_PROJECT_PATH / "docker" / "training" / "diagnostics")
+# 训练数据包：train.py 顶层 `from data... import ...`，整目录挂载
+_DATA_HOST_PATH = str(_HOST_PROJECT_PATH / "docker" / "training" / "data")
+
+def _validate_config_dict(run_id: str, config: dict) -> dict:
+    """B1 schema 门：config.yaml 经 TrainingConfig 校验后返回契约字典。
+
+    - 校验通过：返回 dump_contract_dict（parsed 与输入相等；key 顺序/整数浮点写法
+      可能不同，消费者一律 yaml.safe_load，不影响）。
+    - 校验失败：记 warning 并回退原手拼 dict（fail-open，行为不变；B2 再收紧）。
+    """
+    try:
+        from backend.shared.training.schemas import TrainingConfig, dump_contract_dict
+
+        return dump_contract_dict(TrainingConfig.from_dict(config))
+    except Exception as exc:
+        logger.warning("[%s] TrainingConfig validation failed, fallback legacy dict: %s", run_id, exc)
+        return config
 
 
 class LocalDockerOrchestrator(TrainingOrchestrator):
@@ -484,115 +512,129 @@ class LocalDockerOrchestrator(TrainingOrchestrator):
         payload["_valid_features"] = valid_features
         payload["_missing_features"] = missing_features
 
-        config: dict[str, Any] = {
-            "run_id": run_id,
-            "job_name": payload.get("job_name", "unnamed"),
-            "data": {
-                "train_start": payload.get("train_start", "2022-01-01"),
-                "train_end": payload.get("train_end", "2024-12-31"),
-                "features": valid_features,
-                "source_mode": data_source_mode,
-                "local_dir": market_mount_dir if factor_source else (
-                    _LOCAL_DATA_MOUNT_DIR if data_source_mode == "LOCAL" else None
-                ),
-                "factor_source": factor_source or None,
-                "factor_catalog_version": str(payload.get("factor_catalog_version") or "") or None,
-                "factor_schema_hash": source_status.schema_hash if factor_source else None,
-                "factor_field_sources": dict(payload.get("factor_field_sources") or {}),
-                "factor_catalog_published_at": str(payload.get("factor_catalog_published_at") or "") or None,
-                "factor_coverage": dict(payload.get("factor_coverage") or {}),
-                "quantdb_dir": market_mount_dir if factor_source else None,
-            },
-            "model": {
-                "type": payload.get("model_type", "lightgbm"),
-                "types": payload.get("model_types"),
-                "ensemble": payload.get("ensemble", "none"),
-                "prediction_mode": payload.get("prediction_mode", "point"),
-                "num_boost_round": payload.get("num_boost_round", 1000),
-                "early_stopping_rounds": payload.get("early_stopping_rounds", 100),
-                "val_ratio": payload.get("val_ratio", 0.15),
-                "params": payload.get("lgb_params", {}),
-                "xgb_params": {
-                    k: v
-                    for k, v in payload.get("xgb_params", {}).items()
-                    # LightGBM max_depth=-1 convention is invalid for XGBoost; drop it
-                    if not (k == "max_depth" and isinstance(v, (int, float)) and v < 0)
-                },
-                "catboost_params": payload.get("catboost_params", {}),
-                "dl_params": payload.get("dl_params", {}),
-            },
-            "label": {
-                "target_horizon_days": payload.get("target_horizon_days", 1),
-                "target_mode": payload.get("target_mode", "return"),
-                "label_formula": payload.get("label_formula", ""),
-                "effective_trade_date": payload.get("effective_trade_date", ""),
-                "training_window": payload.get("training_window", ""),
-            },
-            "context": {
-                "initial_capital": context.get("initial_capital", 1_000_000),
-                "benchmark": context.get("benchmark", "SH000300"),
-                "commission_rate": context.get("commission_rate", 0.00025),
-                "slippage": context.get("slippage", 0.0005),
-                "deal_price": context.get("deal_price", "close"),
-                "market": context.get("market", "CN"),
-                "industry_as_feature": context.get("industry_as_feature", False),
-            },
-            "explain": payload.get("explain", DEFAULT_EXPLAIN_CFG),
-            "output": {
-                "result_path": "/workspace/result.json",
-                "required_artifacts": payload.get(
-                    "required_artifacts",
-                    ["model.lgb", "pred.pkl", "metadata.json", "result.json"],
-                ),
-            },
-            "callback": {
-                "url": f"{self.api_base}/api/v1/models/training-runs/{run_id}/complete",
-                "secret": self.internal_secret,
-            },
-            "cache": {"dir": "/tmp" if data_source_mode == "LOCAL" else None},
-        }
-        # 显式时间段切分（valid_start/end 优先于 val_ratio）
-        split_fields: list[str] = ["valid_start", "valid_end", "test_start", "test_end"]
-        if all(payload.get(k) for k in split_fields):
-            config["split"] = {
-                "train": [payload.get("train_start"), payload.get("train_end")],
-                "valid": [payload.get("valid_start"), payload.get("valid_end")],
-                "test": [payload.get("test_start"), payload.get("test_end")],
-            }
-            config["model"]["val_ratio"] = None
-
-        # WFA 稳定性诊断配置（可选，透传给训练脚本）
-        if payload.get("wfa") and isinstance(payload.get("wfa"), dict):
-            config["wfa"] = payload["wfa"]
-
-        # 训练时长预算（分钟），透传给训练脚本供阶段级超时检查
-        try:
-            config["max_time_minutes"] = max(10, int(payload.get("max_time_minutes") or 120))
-        except Exception:
-            config["max_time_minutes"] = 120
+        from backend.shared.training.schemas import (
+            CallbackCfg,
+            ContextCfg,
+            DataCfg,
+            LabelCfg,
+            ModelCfg,
+            OutputCfg,
+            SplitCfg,
+            TrainingConfig,
+            dump_contract_dict,
+        )
 
         # 特征准入自动化：默认启用 IC/ICIR 因子筛选（剔除无信号特征），
         # 前端/请求显式指定 factor_selection 时以显式配置为准。
         fs_cfg = payload.get("factor_selection")
         if isinstance(fs_cfg, dict):
-            config["factor_selection"] = fs_cfg
+            factor_selection = fs_cfg
         elif str(payload.get("auto_feature_filter", "true")).lower() in ("1", "true", "yes", "on"):
-            config["factor_selection"] = {
+            factor_selection = {
                 "method": "ic_icir",
                 "n_top": 80,
                 "ic_threshold": 0.01,
                 "icir_threshold": 0.15,
                 "correlation_threshold": 0.9,
             }
+        else:
+            factor_selection = None
 
         # 特征截面预处理配置（P1）：默认关闭，兼容旧模型；显式开启后
         # train.py 对特征做 per-(trade_date,feature) 中位数填充+缩尾+Z-score。
         pp_cfg = payload.get("preprocessing")
         if isinstance(pp_cfg, dict):
-            config["preprocessing"] = pp_cfg
+            preprocessing = pp_cfg
         elif str(payload.get("enable_cross_sectional_prep", "false")).lower() in ("1", "true", "yes", "on"):
-            config["preprocessing"] = {"enabled": True, "winsor": True}
-        return config
+            preprocessing = {"enabled": True, "winsor": True}
+        else:
+            preprocessing = None
+
+        # 收尾 1 纯 schema 产出：config.yaml 一律由 TrainingConfig 构造 + 序列化，
+        # 手拼 dict 已删除。非法输入在此 fail-fast（422 上游已保证合法）。
+        try:
+            training_config = TrainingConfig(
+                run_id=run_id,
+                job_name=payload.get("job_name", "unnamed"),
+                data=DataCfg(
+                    train_start=payload.get("train_start", "2022-01-01"),
+                    train_end=payload.get("train_end", "2024-12-31"),
+                    features=valid_features,
+                    source_mode=data_source_mode,
+                    local_dir=market_mount_dir if factor_source else (
+                        _LOCAL_DATA_MOUNT_DIR if data_source_mode == "LOCAL" else None
+                    ),
+                    factor_source=factor_source or None,
+                    factor_catalog_version=str(payload.get("factor_catalog_version") or "") or None,
+                    factor_schema_hash=source_status.schema_hash if factor_source else None,
+                    factor_field_sources=dict(payload.get("factor_field_sources") or {}),
+                    factor_catalog_published_at=str(payload.get("factor_catalog_published_at") or "") or None,
+                    factor_coverage=dict(payload.get("factor_coverage") or {}),
+                    quantdb_dir=market_mount_dir if factor_source else None,
+                    # 全局股票池（P3）：容器无 DB，池成分在这里解析后传入
+                    **_training_pool_fields(payload),
+                ),
+                model=ModelCfg(
+                    type=payload.get("model_type", "lightgbm"),
+                    types=payload.get("model_types"),
+                    ensemble=payload.get("ensemble", "none"),
+                    prediction_mode=payload.get("prediction_mode", "point"),
+                    num_boost_round=payload.get("num_boost_round", 1000),
+                    early_stopping_rounds=payload.get("early_stopping_rounds", 100),
+                    val_ratio=payload.get("val_ratio", 0.15),
+                    params=payload.get("lgb_params", {}),
+                    xgb_params=payload.get("xgb_params", {}),
+                    catboost_params=payload.get("catboost_params", {}),
+                    dl_params=payload.get("dl_params", {}),
+                ),
+                label=LabelCfg(
+                    target_horizon_days=payload.get("target_horizon_days", 1),
+                    target_mode=payload.get("target_mode", "return"),
+                    label_formula=payload.get("label_formula", ""),
+                    effective_trade_date=payload.get("effective_trade_date", ""),
+                    training_window=payload.get("training_window", ""),
+                ),
+                context=ContextCfg(
+                    initial_capital=context.get("initial_capital", 1_000_000),
+                    benchmark=context.get("benchmark", "SH000300"),
+                    commission_rate=context.get("commission_rate", 0.00025),
+                    slippage=context.get("slippage", 0.0005),
+                    deal_price=context.get("deal_price", "close"),
+                    market=context.get("market", "CN"),
+                    industry_as_feature=context.get("industry_as_feature", False),
+                ),
+                explain=payload.get("explain", DEFAULT_EXPLAIN_CFG),
+                output=OutputCfg(
+                    result_path="/workspace/result.json",
+                    required_artifacts=payload.get(
+                        "required_artifacts",
+                        ["model.lgb", "pred.pkl", "metadata.json", "result.json"],
+                    ),
+                ),
+                callback=CallbackCfg(
+                    url=f"{self.api_base}/api/v1/models/training-runs/{run_id}/complete",
+                    secret=self.internal_secret,
+                ),
+                cache={"dir": "/tmp" if data_source_mode == "LOCAL" else None},
+                wfa=payload.get("wfa") if isinstance(payload.get("wfa"), dict) else None,
+                max_time_minutes=payload.get("max_time_minutes"),
+                factor_selection=factor_selection,
+                preprocessing=preprocessing,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"[{run_id}] TrainingConfig construction failed: {exc}") from exc
+        config = dump_contract_dict(training_config)
+        # 显式时间段切分（valid_start/end 优先于 val_ratio）
+        split_fields: list[str] = ["valid_start", "valid_end", "test_start", "test_end"]
+        if all(payload.get(k) for k in split_fields):
+            config["split"] = SplitCfg(
+                train=[payload.get("train_start"), payload.get("train_end")],
+                valid=[payload.get("valid_start"), payload.get("valid_end")],
+                test=[payload.get("test_start"), payload.get("test_end")],
+            ).model_dump()
+            config["model"]["val_ratio"] = None
+        # 收尾门：复核最终形状（构造即契约，此处恒通过；保留作回归哨兵）。
+        return _validate_config_dict(run_id, config)
 
     # ── 启动训练任务 ─────────────────────────────────────────────────────────────
     async def launch_training_job(self, run_id: str, payload: dict = None) -> None:
@@ -774,6 +816,25 @@ class LocalDockerOrchestrator(TrainingOrchestrator):
         # 多核因子筛选；与 train.py 一样无条件挂载（路径可见性限制同上）。
         volumes[str(_PARALLEL_UTILS_HOST_PATH)] = {
             "bind": "/app/parallel_utils.py",
+            "mode": "ro",
+        }
+        # model_trainers/ 包与 train.py 同目录导入（`from model_trainers... import ...`）；
+        # 整目录无条件挂载（路径可见性限制同上，目录不存在时 Docker 会创建空目录，
+        # 此时训练容器 import 失败 fail-fast，见 train.py 顶层 import）。
+        volumes[str(_TRAINERS_HOST_PATH)] = {
+            "bind": "/app/model_trainers",
+            "mode": "ro",
+        }
+        # diagnostics/ 包与 train.py 同目录导入（`from diagnostics... import ...`）；
+        # 整目录无条件挂载（与 model_trainers 同理）。
+        volumes[str(_DIAGNOSTICS_HOST_PATH)] = {
+            "bind": "/app/diagnostics",
+            "mode": "ro",
+        }
+        # data/ 包与 train.py 同目录导入（`from data... import ...`）；
+        # 整目录无条件挂载（与 model_trainers 同理）。
+        volumes[str(_DATA_HOST_PATH)] = {
+            "bind": "/app/data",
             "mode": "ro",
         }
         # backend 代码同步挂载：训练镜像内 bake 的 backend 落后于仓库时会缺新模块
@@ -994,10 +1055,53 @@ class LocalDockerOrchestrator(TrainingOrchestrator):
                 user_id=user_id,
                 work_dir=container_work_dir,
                 max_time_minutes=max_time_minutes,
-            )
+            ),
+            run_id=run_id,
         )
 
     # ── 轮询容器状态 ─────────────────────────────────────────────────────────────
+    async def _cancel_container(
+        self,
+        run_id: str,
+        container_id: str,
+        tenant_id: str,
+        user_id: str,
+    ) -> bool:
+        """用户取消：优雅停 + 删容器，落 cancelled 状态并清理取消标记。"""
+        try:
+            c = self.docker.containers.get(container_id)
+            c.reload()
+            if c.attrs["State"].get("Status") in ("running", "created", "paused"):
+                await asyncio.to_thread(c.stop, timeout=20)
+            await asyncio.to_thread(c.remove, force=True, v=True)
+        except docker.errors.NotFound:
+            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[%s] cancel stop container failed; will retry: %s", run_id, exc)
+            return False
+
+        from backend.services.api.routers.admin.db import TrainingJobRecord
+        from backend.shared.database_manager_v2 import get_session
+
+        async with get_session() as db:
+            r = await db.get(TrainingJobRecord, run_id)
+            if r and str(r.status or "") not in ("completed", "failed"):
+                r.status = "cancelled"
+                r.logs = (r.logs or "") + "[SYSTEM] 训练已被用户取消，容器已停止\n"
+                r.progress = max(int(r.progress or 0), 0)
+                await db.commit()
+        self.log_stream.append_log(
+            run_id=run_id,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            line="[SYSTEM] 训练已被用户取消，容器已停止",
+            status="cancelled",
+            progress=0,
+            container_id=container_id[:12],
+        )
+        self.log_stream.clear_cancel(run_id)
+        return True
+
     async def _poll_container(
         self,
         run_id: str,
@@ -1041,6 +1145,11 @@ class LocalDockerOrchestrator(TrainingOrchestrator):
 
         while time.time() < deadline:
             await asyncio.sleep(_POLL_INTERVAL)
+            if self.log_stream.is_cancel_requested(run_id):
+                if await self._cancel_container(run_id, container_id, tenant_id, user_id):
+                    await _try_resume()
+                    return
+                continue
             try:
                 c = self.docker.containers.get(container_id)
                 c.reload()
@@ -1118,6 +1227,25 @@ class LocalDockerOrchestrator(TrainingOrchestrator):
                     callback_received = False
                     while time.time() < callback_deadline:
                         await asyncio.sleep(max(1, _CALLBACK_CHECK_INTERVAL))
+                        if self.log_stream.is_cancel_requested(run_id):
+                            # waiting_callback 阶段用户取消：容器已退出，仅落 cancelled 状态
+                            async with get_session() as db:
+                                r = await db.get(TrainingJobRecord, run_id)
+                                if r and r.status not in ("completed", "failed"):
+                                    r.status = "cancelled"
+                                    r.logs = (r.logs or "") + "[SYSTEM] 训练已被用户取消\n"
+                                    await db.commit()
+                            self.log_stream.append_log(
+                                run_id=run_id,
+                                tenant_id=tenant_id,
+                                user_id=user_id,
+                                line="[SYSTEM] 训练已被用户取消",
+                                status="cancelled",
+                                container_id=container_id[:12],
+                            )
+                            self.log_stream.clear_cancel(run_id)
+                            await _try_resume()
+                            return
                         async with get_session(read_only=True) as db:
                             r = await db.get(TrainingJobRecord, run_id)
                             if r and str(r.status or "") in {"completed", "failed"}:
@@ -1204,7 +1332,7 @@ class LocalDockerOrchestrator(TrainingOrchestrator):
                     run_id, container_id[:12],
                 )
                 await asyncio.to_thread(c.kill)
-                await asyncio.to_thread(c.remove, {"force": True, "v": True})
+                await asyncio.to_thread(c.remove, force=True, v=True)
         except docker.errors.NotFound:
             pass
         except Exception as kill_err:
@@ -1227,193 +1355,3 @@ class LocalDockerOrchestrator(TrainingOrchestrator):
                     container_id=container_id[:12],
                 )
         await _try_resume()
-
-
-    # ── 多周期训练编排（一次训练产出多周期模型 + 自动融合）───────────────────────
-    async def launch_multi_horizon_job(
-        self,
-        parent_run_id: str,
-        child_run_ids: list[str],
-        payload: dict,
-    ) -> None:
-        """串行跑多个周期的训练任务，全部成功后自动创建 ICIR 加权融合模型。
-
-        每个 child 是一个独立单周期训练任务（已有完整 Docker 容器 + 回调闭环）。
-        编排器按顺序依次启动，等待每个 child 完成（或失败），再推进下一个。
-        全部成功 → 调 register_ensemble_model 生成「多周期融合模型」。
-        """
-        from backend.shared.database_manager_v2 import get_session
-        from backend.services.api.routers.admin.db import TrainingJobRecord
-        from backend.shared.model_registry import model_registry_service
-
-        tenant_id = str(payload.get("_tenant_id") or "")
-        user_id = str(payload.get("_user_id") or "")
-        # 从 parent record 读取归属
-        if not tenant_id or not user_id:
-            async with get_session() as db:
-                parent_rec = await db.get(TrainingJobRecord, parent_run_id)
-                if parent_rec:
-                    tenant_id = str(parent_rec.tenant_id or "default")
-                    user_id = str(parent_rec.user_id or "")
-        display_name = str(payload.get("display_name") or "multi_horizon")
-
-        async def _set_parent(status: str, progress: int, log_line: str) -> None:
-            async with get_session() as db:
-                r = await db.get(TrainingJobRecord, parent_run_id)
-                if r:
-                    r.status = status
-                    r.progress = progress
-                    r.logs = (r.logs or "") + log_line
-                    await db.commit()
-                self.log_stream.append_log(
-                    run_id=parent_run_id,
-                    tenant_id=tenant_id,
-                    user_id=user_id,
-                    line=log_line.strip(),
-                    status=status,
-                    progress=progress,
-                )
-
-        try:
-            await _set_parent("provisioning", 5, f"[MH] 多周期训练启动，共 {len(child_run_ids)} 个周期\n")
-
-            completed_model_ids: list[str] = []
-            completed_run_ids: set[str] = set()
-            horizon_labels: list[str] = []
-            n_total = len(child_run_ids)
-
-            for idx, child_run_id in enumerate(child_run_ids):
-                # 读取 child payload（含固定 target_horizon_days）
-                async with get_session() as db:
-                    child_rec = await db.get(TrainingJobRecord, child_run_id)
-                    if child_rec is None:
-                        raise RuntimeError(f"child run not found: {child_run_id}")
-                    child_payload = (
-                        child_rec.request_payload
-                        if isinstance(child_rec.request_payload, dict)
-                        else {}
-                    )
-                horizon = int(child_payload.get("target_horizon_days") or 0)
-                horizon_labels.append(f"T{horizon}")
-
-                base_progress = 5 + int((idx / n_total) * 90)
-                await _set_parent(
-                    "running",
-                    base_progress,
-                    f"[MH] ({idx + 1}/{n_total}) 训练 T+{horizon} 模型…\n",
-                )
-
-                # 启动 child 训练（内部会启容器 + 等回调 + 注册模型）
-                await self.launch_training_job(run_id=child_run_id, payload=child_payload)
-
-                # 等待 child 完成
-                # 等待上限跟随 child 的时长预算（+10min 冗余）：
-                # 原硬编码 7200s 会在大预算 child（如 12h）超 2h 时被误判超时
-                try:
-                    child_budget_minutes = max(10, int(child_payload.get("max_time_minutes") or 120))
-                except Exception:
-                    child_budget_minutes = 120
-                child_deadline = time.time() + (child_budget_minutes + 10) * 60
-                while time.time() < child_deadline:
-                    await asyncio.sleep(_POLL_INTERVAL)
-                    async with get_session(read_only=True) as db:
-                        r = await db.get(TrainingJobRecord, child_run_id)
-                        if r is None:
-                            # 回调正在并发更新该行时的瞬时读异常：按未完成继续轮询
-                            # （与 _poll_container 回调等待的容忍语义一致）。
-                            # 此前直接 break 会在 child 刚完成的提交瞬间把暂时
-                            # 读不到的记录误判为超时，导致 multi-horizon 首个
-                            # child 完成后必然失败（实测两天两例同款）
-                            continue
-                        st = str(r.status or "")
-                        if st == "completed":
-                            completed_model_ids.append(
-                                model_registry_service.build_model_id_from_run(child_run_id)
-                            )
-                            completed_run_ids.add(child_run_id)
-                            break
-                        if st == "failed":
-                            raise RuntimeError(
-                                f"child T+{horizon} training failed: {(r.result or {}).get('error') or (r.logs or '')[-300:]}"
-                            )
-
-                # 注意用 run_id 判断完成：completed_model_ids 里存的是模型 ID
-                # （mdl_cn_...），此前拿 child_run_id 与之比较恒不相等，
-                # 导致首个 child 成功后必然误报 "timed out"
-                if child_run_id not in completed_run_ids:
-                    raise RuntimeError(f"child T+{horizon} timed out waiting for completion")
-
-                await _set_parent(
-                    "running",
-                    5 + int(((idx + 1) / n_total) * 90),
-                    f"[MH] T+{horizon} 模型训练完成（{idx + 1}/{n_total}）\n",
-                )
-
-            # ── 全部完成 → 创建融合模型 ──
-            if len(completed_model_ids) < 2:
-                raise RuntimeError("multi-horizon requires at least 2 completed models")
-
-            fusion_name = f"{display_name}_MultiHorizon"
-            fusion = await model_registry_service.register_ensemble_model(
-                tenant_id=tenant_id,
-                user_id=user_id,
-                source_model_ids=completed_model_ids,
-                display_name=fusion_name,
-                weight_strategy="icir",
-            )
-            fusion_model_id = str(fusion.get("model_id") or "")
-
-            await _set_parent(
-                "completed",
-                100,
-                f"[MH] 融合模型已创建: {fusion_model_id}（ICIR 加权，周期: {'+'.join(horizon_labels)}）\n",
-            )
-
-            # 把融合模型信息 + 最丰富的一个 child 完整结果写入 parent result，
-            # 保证前端 parseTrainingResult 能正常解析（metrics + artifacts 必需）
-            async with get_session() as db:
-                r = await db.get(TrainingJobRecord, parent_run_id)
-                if r:
-                    child_results = []
-                    for child_run_id in child_run_ids:
-                        child_rec = await db.get(TrainingJobRecord, child_run_id)
-                        if child_rec and isinstance(child_rec.result, dict):
-                            child_results.append(
-                                {
-                                    "run_id": child_run_id,
-                                    "target_horizon_days": int(
-                                        (child_rec.request_payload or {}).get("target_horizon_days") or 0
-                                    ),
-                                    "result": child_rec.result,
-                                }
-                            )
-                    # 选 metrics 最完整的 child 作为展示基底
-                    base_result: dict = {}
-                    for cr in child_results:
-                        m = (cr.get("result") or {}).get("metrics") or {}
-                        if m.get("train") and m.get("val") and m.get("test"):
-                            base_result = cr["result"]
-                            break
-                    parent_result = dict(base_result)
-                    parent_result["status"] = "completed"
-                    parent_result["multi_horizon"] = {
-                        "horizons": horizon_labels,
-                        "child_run_ids": child_run_ids,
-                        "child_model_ids": completed_model_ids,
-                        "fusion_model_id": fusion_model_id,
-                        "child_results": child_results,
-                    }
-                    if isinstance(parent_result.get("metadata"), dict):
-                        parent_result["metadata"]["multi_horizon"] = {
-                            "horizons": horizon_labels,
-                            "fusion_model_id": fusion_model_id,
-                        }
-                    r.result = parent_result
-                    await db.commit()
-        except Exception as exc:  # noqa: BLE001
-            logger.error("[%s] multi-horizon orchestration failed: %s", parent_run_id, exc)
-            await _set_parent(
-                "failed",
-                100,
-                f"[MH] 多周期训练失败: {exc}\n",
-            )

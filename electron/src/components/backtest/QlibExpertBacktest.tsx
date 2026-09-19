@@ -6,7 +6,9 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import Editor from '@monaco-editor/react';
-import { Play, RefreshCw, Code2, Settings2, BarChart3, Info, AlertCircle, Upload, Cloud, CalendarRange } from 'lucide-react';
+import { Play, RefreshCw, Code2, Settings2, BarChart3, Info, AlertCircle, Upload, Cloud, CalendarRange, Layers } from 'lucide-react';
+import type { StockPoolOption } from '../../services/stockPoolOptionService';
+import { StockPoolPickerModal } from './StockPoolPickerModal';
 
 import type { BacktestConfig, BacktestResult } from '../../services/backtestService';
 import { strategyManagementService } from '../../services/strategyManagementService';
@@ -22,13 +24,14 @@ import { selectCurrentMarket } from '../../store/slices/uiSlice';
 import { getMarketConfig } from '../../config/marketConfig';
 import { message } from 'antd';
 
-const MARKET_UNIVERSE_PRESETS: Record<string, { label: string; value: string }[]> = {
+const MARKET_UNIVERSE_PRESETS: Record<string, { label: string; value: string; custom?: boolean }[]> = {
   CN: [
     { label: '全部', value: 'all' },
     { label: '沪深300', value: 'csi300' },
     { label: '中证500', value: 'csi500' },
     { label: '中证800', value: 'csi800' },
     { label: '中证1000', value: 'csi1000' },
+    { label: '自定义', value: '__custom__', custom: true },
   ],
   HK: [
     { label: '全部港股', value: 'all' },
@@ -41,6 +44,37 @@ const MARKET_UNIVERSE_PRESETS: Record<string, { label: string; value: string }[]
     { label: 'Layer 1', value: 'layer1' },
   ],
 };
+
+const DATE_RE = '\\d{4}-\\d{2}-\\d{2}';
+
+/** 从策略代码提取回测日期（代码优先，与后端 extract_backtest_dates 口径一致） */
+export function extractDatesFromCode(code: string): { start_date: string; end_date: string } | null {
+  const pick = (re: RegExp): string | null => {
+    const m = code.match(re);
+    return m && m[1] ? m[1] : null;
+  };
+  // 1. BACKTEST_CONFIG = {"start_date": ..., "end_date": ...}（键也接受 start/end）
+  const cfgBlock = code.match(/BACKTEST_CONFIG\s*=\s*\{([\s\S]*?)\}/);
+  if (cfgBlock) {
+    const body = cfgBlock[1];
+    const s = pick(new RegExp(`["'](?:start_date|start)["']\\s*:\\s*["'](${DATE_RE})["']`));
+    const e = pick(new RegExp(`["'](?:end_date|end)["']\\s*:\\s*["'](${DATE_RE})["']`));
+    if (s && e) return { start_date: s, end_date: e };
+  }
+  // 2. get_backtest_config() 内 return 的字典
+  const fnBlock = code.match(/def\s+get_backtest_config\s*\([\s\S]*?return\s*\{([\s\S]*?)\}/);
+  if (fnBlock) {
+    const body = fnBlock[1];
+    const s = pick(new RegExp(`["'](?:start_date|start)["']\\s*:\\s*["'](${DATE_RE})["']`));
+    const e = pick(new RegExp(`["'](?:end_date|end)["']\\s*:\\s*["'](${DATE_RE})["']`));
+    if (s && e) return { start_date: s, end_date: e };
+  }
+  // 3. START_DATE / END_DATE 成对常量
+  const s = pick(new RegExp(`^START_DATE\\s*=\\s*["'](${DATE_RE})["']`, 'm'));
+  const e = pick(new RegExp(`^END_DATE\\s*=\\s*["'](${DATE_RE})["']`, 'm'));
+  if (s && e) return { start_date: s, end_date: e };
+  return null;
+}
 
 export const QlibExpertBacktest: React.FC = () => {
   const stopPollingRef = useRef<(() => void) | null>(null);
@@ -114,6 +148,9 @@ export const QlibExpertBacktest: React.FC = () => {
 
   // 基础配置
   const [universePath, setUniversePath] = useState<string>('all');
+  const [customPoolOpen, setCustomPoolOpen] = useState(false);
+  const [selectedCustomPool, setSelectedCustomPool] = useState<StockPoolOption | null>(null);
+  const customPoolActive = universePath.startsWith('pool:');
   const [startDate, setStartDate] = useState<string>(BACKTEST_CONFIG.QLIB.DEFAULT_START);
   const [endDate, setEndDate] = useState<string>(BACKTEST_CONFIG.QLIB.DEFAULT_END);
   const [initialCapital, setInitialCapital] = useState(1000000);
@@ -192,14 +229,24 @@ export const QlibExpertBacktest: React.FC = () => {
       const resolvedUserId = storedUser?.id ?? storedUser?.user_id;
       if (!resolvedUserId) throw new Error('未登录或用户信息缺失');
 
+      // 专家模式代码优先：代码中指定了回测日期则覆盖 UI 输入（后端同样会解析覆盖）
+      const codeDates = extractDatesFromCode(codeToRun);
+      const effectiveStart = codeDates?.start_date ?? startDate;
+      const effectiveEnd = codeDates?.end_date ?? endDate;
+      if (codeDates) {
+        if (codeDates.start_date !== startDate) setStartDate(codeDates.start_date);
+        if (codeDates.end_date !== endDate) setEndDate(codeDates.end_date);
+      }
+
       const config: BacktestConfig = {
         symbol: universePath,
-        start_date: startDate,
-        end_date: endDate,
+        start_date: effectiveStart,
+        end_date: effectiveEnd,
         initial_capital: initialCapital,
         user_id: normalizeUserId(resolvedUserId),
+        pool_id: universePath.startsWith('pool:') ? universePath : undefined,
         strategy_type: 'CustomStrategy',
-        strategy_params: { topk: 50, n_drop: 5 }, // 专家模式默认参数
+        // 专家模式代码优先：不传 strategy_params，后端以 STRATEGY_CONFIG 为准补全缺失项
         benchmark_symbol: benchmark,
         strategy_code: codeToRun,
         commission: 0.00025,
@@ -389,21 +436,33 @@ export const QlibExpertBacktest: React.FC = () => {
 
           <div>
             <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2">股票池 (Symbols)</label>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {UNIVERSE_PRESETS.map((preset) => {
-                const active = universePath === preset.value;
+                const active = preset.custom
+                  ? customPoolActive
+                  : universePath === preset.value;
                 return (
                   <button
                     key={preset.value}
                     type="button"
-                    onClick={() => setUniversePath(preset.value)}
-                    className={`px-2 py-2 text-[10px] font-bold rounded-xl border transition-all ${
+                    onClick={() => {
+                      if (preset.custom) {
+                        setCustomPoolOpen(true);
+                        return;
+                      }
+                      setSelectedCustomPool(null);
+                      setUniversePath(preset.value);
+                    }}
+                    className={`px-2 py-2 text-[10px] font-bold rounded-xl border transition-all flex items-center justify-center gap-1 ${
                       active
                         ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
                         : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-600'
                     }`}
                   >
-                    {preset.label}
+                    {preset.custom && <Layers className="w-3 h-3" />}
+                    {preset.custom && customPoolActive && selectedCustomPool
+                      ? selectedCustomPool.name
+                      : preset.label}
                   </button>
                 );
               })}
@@ -536,6 +595,18 @@ export const QlibExpertBacktest: React.FC = () => {
           </motion.div>
         </div>
       )}
+      <StockPoolPickerModal
+        open={customPoolOpen}
+        onClose={() => setCustomPoolOpen(false)}
+        selectedPoolId={selectedCustomPool?.pool_id}
+        market={currentMarket === 'CN' ? 'CN' : undefined}
+        title="专家回测股票池"
+        onSelect={(pool) => {
+          setSelectedCustomPool(pool);
+          setUniversePath(`pool:${pool.code}`);
+          setCustomPoolOpen(false);
+        }}
+      />
     </motion.div>
   );
 };
@@ -544,10 +615,11 @@ const DEFAULT_EXPERT_CODE = `"""
 QUANTMIND QLIB 策略开发规范
 ===================================
 
-口径说明：
-- 当前系统是云端 AI-IDE + 回测中心的组合，不再要求固定函数名或固定模板结构。
-- 专家模式支持 STRATEGY_CONFIG / get_strategy_config() / get_strategy_instance()。
-- 前端显式参数优先，后端会做补全、修复与兼容适配。
+ 口径说明：
+ - 当前系统是云端 AI-IDE + 回测中心的组合，不再要求固定函数名或固定模板结构。
+ - 专家模式支持 STRATEGY_CONFIG / get_strategy_config() / get_strategy_instance()。
+ - 专家模式代码优先：代码中写的 topk/n_drop 等参数以代码为准，不会被前端覆盖；
+   代码缺失的参数后端会自动补全。回测日期也可在代码中指定（见下），不指定默认近一年。
 
 1. 推荐策略结构
 ----------------
@@ -569,7 +641,13 @@ Qlib 引擎会优先解析 STRATEGY_CONFIG 或 get_strategy_config()。
 - 初始资金：专家模式 UI 默认 100 万；若走后端接口，请显式传入 initial_capital。
 - 基准指数：默认 SH000300。
 - 成交价格：后端默认 close；若要降低前视偏差，建议显式切换为 open。
-- 交易参数：topk=50、n_drop=5、rebalance_days=3 是常见默认值，但前端显式输入优先。
+- 交易参数：topk=50、n_drop=5、rebalance_days=3 是常见默认值，代码中显式写出即以代码为准。
+- 回测日期：如需固定区间，在代码中二选一写出（写出即覆盖 UI 日期）：
+    BACKTEST_CONFIG = {"start_date": "2024-01-01", "end_date": "2024-12-31"}
+  或：
+    START_DATE = "2024-01-01"
+    END_DATE = "2024-12-31"
+  不写则默认近一年。
 
 3. 推荐模板
 -----------

@@ -4,6 +4,7 @@ Simulation Engine - 统一模拟盘引擎
 """
 
 import asyncio
+import json
 import logging
 import math
 import os
@@ -14,6 +15,9 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.services.trade_shared.redis_client import RedisClient
+from backend.services.live_trading.services.real_mirror_service import (
+    mirror_virtual_fill,
+)
 from backend.services.simulation.services.execution_engine import (
     ExecutionResult,
     SimulationExecutionEngine,
@@ -44,9 +48,11 @@ from backend.services.simulation.services.signal_loader import (
 )
 from backend.services.simulation.services.simulation_manager import (
     SimulationAccountManager,
+    canonical_sim_uid,
 )
 from backend.services.trade_shared.trade_config import settings
-from backend.shared.database_manager_v2 import get_db_manager
+from backend.shared.database_manager_v2 import get_session
+from backend.shared.stock_utils import StockCodeUtil
 from backend.shared.strategy_storage import get_strategy_storage_service
 
 logger = logging.getLogger(__name__)
@@ -93,6 +99,18 @@ class SimulationEngine:
         self.rebalance_calculator = RebalanceCalculator()
         self._market_data = market_data or get_local_market_data()
 
+    def _ensure_redis(self) -> None:
+        """模块级单例默认是未 connect 的 RedisClient，bootstrap 必须接到 trade Redis。"""
+        if getattr(self.redis, "client", None) is not None:
+            return
+        from backend.services.trade_shared.redis_client import get_redis
+
+        connected = get_redis()
+        if getattr(connected, "client", None) is None:
+            return
+        self.redis = connected
+        self.account_manager = SimulationAccountManager(self.redis)
+
     async def run_cycle(
         self,
         tenant_id: str,
@@ -100,6 +118,8 @@ class SimulationEngine:
         strategy_id: str,
         run_id: str | None = None,
         params_override: dict[str, Any] | None = None,
+        pool_id: str | None = None,
+        signal_run_id: str | None = None,
     ) -> ExecutionReport:
         """
         执行一次模拟盘调仓周期。
@@ -108,7 +128,8 @@ class SimulationEngine:
             tenant_id: 租户 ID
             user_id: 用户 ID
             strategy_id: 策略 ID
-            run_id: 指定信号批次 ID，若 None 则取最新
+            run_id: 本轮执行 ID（订单备注/任务追踪），不是推理批次
+            signal_run_id: 指定推理信号批次；None 则取最新截面
             params_override: 前端传递的策略参数覆盖
 
         Returns:
@@ -128,14 +149,13 @@ class SimulationEngine:
         )
 
         try:
-            db_manager = get_db_manager()
-            async with db_manager.session() as db:
+            async with get_session() as db:
                 # 1. 加载信号
                 signals = await self.signal_loader.load_latest_signals(
                     db=db,
                     tenant_id=tenant,
                     user_id=uid,
-                    run_id=run_id,
+                    run_id=signal_run_id,
                 )
                 report.signal_count = len(signals)
 
@@ -158,6 +178,55 @@ class SimulationEngine:
                     len(signals),
                 )
 
+                # 1.6 全局股票池过滤（P3）：严格语义，池为空或零命中即终止本轮，
+                # 绝不放行全市场信号（否则模拟盘会买进池外标的）。
+                override_pool = (
+                    params_override.get("pool_id")
+                    if isinstance(params_override, dict)
+                    else None
+                )
+                effective_pool_id = pool_id or override_pool
+                if effective_pool_id:
+                    from backend.shared.stock_pool.filters import (
+                        filter_signals_by_pool,
+                    )
+                    from backend.shared.stock_pool.resolver import (
+                        ResolveContext,
+                        resolver as pool_resolver,
+                    )
+
+                    pool_snapshot = await pool_resolver.resolve(
+                        str(effective_pool_id),
+                        ResolveContext(tenant_id=tenant, user_id=uid),
+                    )
+                    outcome = filter_signals_by_pool(
+                        [
+                            {"symbol": s.symbol, "score": getattr(s, "score", 0.0), "_ref": s}
+                            for s in signals
+                        ],
+                        pool_snapshot,
+                    )
+                    if outcome.empty_pool or outcome.empty_result:
+                        reason = "; ".join(outcome.warnings) or "池过滤后无信号"
+                        logger.error(
+                            "SimulationEngine: 池过滤失败 pool_id=%s tenant=%s user=%s: %s",
+                            effective_pool_id,
+                            tenant,
+                            uid,
+                            reason,
+                        )
+                        report.error = f"股票池过滤失败: {reason}"
+                        return report
+                    signals = [row["_ref"] for row in outcome.kept]
+                    report.signal_count = len(signals)
+                    logger.info(
+                        "SimulationEngine: 池过滤 pool_id=%s kept=%d dropped=%d checksum=%s",
+                        outcome.pool_id,
+                        len(outcome.kept),
+                        outcome.dropped,
+                        outcome.pool_checksum,
+                    )
+
                 # 2. 加载策略配置
                 strategy_config = await self._load_strategy_config(
                     db=db,
@@ -167,13 +236,10 @@ class SimulationEngine:
                     market=market,
                 )
 
-                # 3. 批量获取行情（按市场选择行情源）
-                symbols = [s.symbol for s in signals]
-                quotes = await self._fetch_quotes(symbols, market=market)
-
-                # 4. 获取当前账户状态（按市场隔离）
+                # 3. 获取当前账户状态（按市场隔离）
+                self._ensure_redis()
                 account_data = await self.account_manager.get_account(
-                    user_id=int(uid) if uid.isdigit() else 0,
+                    user_id=canonical_sim_uid(uid),
                     tenant_id=tenant,
                     market=market.value,
                 )
@@ -189,12 +255,34 @@ class SimulationEngine:
 
                 account = self._build_account(account_data)
 
+                # 4. 批量获取行情（信号 + 现有持仓，一次分区直读）
+                position_symbols = [
+                    str(sym)
+                    for sym, pos in (account.positions or {}).items()
+                    if int(float((pos or {}).get("volume") or 0)) > 0
+                ]
+                symbols = list(dict.fromkeys([s.symbol for s in signals] + position_symbols))
+                quotes, live_ticks = await self._load_live_quotes(symbols)
+                if not live_ticks:
+                    report.error = "realtime_quote_unavailable"
+                    logger.error(
+                        "SimulationEngine: no fresh realtime quote; cycle rejected "
+                        "tenant=%s user=%s symbols=%d",
+                        tenant,
+                        uid,
+                        len(symbols),
+                    )
+                    return report
+
                 # 5. 调仓计算
                 orders = self.rebalance_calculator.calculate(
                     signals=signals,
                     strategy=strategy_config,
                     quotes=quotes,
                     account=account,
+                )
+                orders = self._apply_risk_buy_locks(
+                    orders, tenant=tenant, user_id=uid, trade_date=datetime.now().date()
                 )
                 report.order_count = len(orders)
 
@@ -206,7 +294,7 @@ class SimulationEngine:
                     )
                     return report
 
-                # 6. 模拟撮合
+                # 6. 模拟撮合（ashare_matcher + 当日不复权日 K）
                 exec_engine = SimulationExecutionEngine(db, self.account_manager)
                 for order in orders:
                     result = await self._execute_order(
@@ -217,6 +305,8 @@ class SimulationEngine:
                         user_id=uid,
                         strategy_id=strategy_id,
                         market=market,
+                        run_id=exec_run_id,
+                        live_tick=self._tick_for_symbol(live_ticks, order.symbol),
                     )
                     report.orders.append(self._order_to_dict(order, result))
                     if result.success:
@@ -232,7 +322,7 @@ class SimulationEngine:
 
                 # 8. 更新账户快照
                 updated_account = await self.account_manager.get_account(
-                    user_id=int(uid) if uid.isdigit() else 0,
+                    user_id=canonical_sim_uid(uid),
                     tenant_id=tenant,
                     market=market.value,
                 )
@@ -326,20 +416,65 @@ class SimulationEngine:
         as_of: date | None = None,
         market: Any = None,
     ) -> dict[str, Quote]:
-        """从本地市场数据批量获取行情（一次 DuckDB 扫描替代逐 symbol HTTP）。
+        """从本地市场数据批量获取行情（一次分区直读替代逐 symbol HTTP）。
 
         as_of 指定基准交易日，仅时光回放会传；不传即按今天，活路径行为不变。
         """
         if not symbols:
             return {}
+        bars = await self._load_bars(symbols, as_of=as_of, market=market)
+        return self._quotes_from_bars(bars)
 
+    async def _load_bars(
+        self,
+        symbols: list[str],
+        as_of: date | None = None,
+        market: Any = None,
+    ) -> dict[str, Any]:
+        if not symbols:
+            return {}
         market_data = get_local_market_data(market)
         trade_date = as_of or datetime.now().date()
-        bars = market_data.load_date(trade_date, symbols=symbols)
+        latest = await asyncio.to_thread(market_data.latest_trade_date, trade_date)
+        if latest is not None:
+            trade_date = latest
+        return await asyncio.to_thread(market_data.load_date, trade_date, symbols)
 
+    async def _load_live_quotes(
+        self, symbols: list[str]
+    ) -> tuple[dict[str, Quote], dict[str, dict[str, Any]]]:
+        from backend.services.simulation.services.redis_series_quote import (
+            fetch_series_ticks,
+        )
+
+        ticks = await fetch_series_ticks(symbols)
+        quotes: dict[str, Quote] = {}
+        indexed_ticks: dict[str, dict[str, Any]] = {}
+        for symbol, tick in ticks.items():
+            price = float(tick.get("price") or 0.0)
+            if price <= 0:
+                continue
+            quote = Quote(symbol=symbol, current_price=price)
+            for key in {
+                symbol,
+                StockCodeUtil.to_prefix(symbol),
+                StockCodeUtil.to_suffix(symbol),
+            }:
+                if key:
+                    quotes[key] = quote
+                    indexed_ticks[key] = tick
+        logger.info(
+            "SimulationEngine: fresh realtime quotes %d/%d",
+            len(ticks),
+            len(symbols),
+        )
+        return quotes, indexed_ticks
+
+    @staticmethod
+    def _quotes_from_bars(bars: dict[str, Any]) -> dict[str, Quote]:
         quotes: dict[str, Quote] = {}
         for sym, bar in bars.items():
-            quotes[sym] = Quote(
+            quote = Quote(
                 symbol=sym,
                 current_price=bar.close,
                 is_limit_up=(bar.close >= bar.limit_up) if math.isfinite(bar.limit_up) else False,
@@ -347,9 +482,32 @@ class SimulationEngine:
                 is_suspended=bar.suspended,
                 pre_close=bar.pre_close if bar.pre_close > 0 else None,
             )
-
-        logger.info("SimulationEngine: 本地行情 %d/%d", len(quotes), len(symbols))
+            quotes[sym] = quote
+            prefix = StockCodeUtil.to_prefix(sym)
+            if prefix and prefix != sym:
+                quotes[prefix] = quote
+        logger.info("SimulationEngine: 本地行情 %d bars", len(bars))
         return quotes
+
+    @staticmethod
+    def _bar_for_symbol(bars: dict[str, Any], symbol: str) -> Any:
+        if symbol in bars:
+            return bars[symbol]
+        suffix = StockCodeUtil.to_suffix(symbol)
+        if suffix in bars:
+            return bars[suffix]
+        prefix = StockCodeUtil.to_prefix(symbol)
+        return bars.get(prefix)
+
+    @staticmethod
+    def _tick_for_symbol(
+        ticks: dict[str, dict[str, Any]], symbol: str
+    ) -> dict[str, Any] | None:
+        return (
+            ticks.get(symbol)
+            or ticks.get(StockCodeUtil.to_suffix(symbol))
+            or ticks.get(StockCodeUtil.to_prefix(symbol))
+        )
 
     def _build_account(self, data: dict[str, Any]) -> SimulationAccount:
         """构建账户对象"""
@@ -358,6 +516,39 @@ class SimulationEngine:
             total_asset=float(data.get("total_asset", 0)),
             positions=data.get("positions", {}) or {},
         )
+
+    def _apply_risk_buy_locks(
+        self,
+        orders: list[Order],
+        *,
+        tenant: str,
+        user_id: str,
+        trade_date: date,
+    ) -> list[Order]:
+        """Drop strategy buys blocked by an intraday risk lock."""
+        try:
+            from backend.services.live_trading.services.risk_lock import (
+                filter_buy_orders,
+                load_risk_locks,
+            )
+
+            locks = load_risk_locks(self.redis, tenant, user_id, trade_date)
+            if not locks.account_frozen and not locks.symbols:
+                return orders
+            kept = filter_buy_orders(orders, locks)
+            dropped = len(orders) - len(kept)
+            if dropped:
+                logger.info(
+                    "SimulationEngine: 风控禁买过滤 tenant=%s user=%s dropped=%d frozen=%s",
+                    tenant,
+                    user_id,
+                    dropped,
+                    locks.account_frozen,
+                )
+            return kept
+        except Exception as exc:
+            logger.warning("SimulationEngine: 读取风控禁买锁失败: %s", exc)
+            return orders
 
     async def _execute_order(
         self,
@@ -368,8 +559,10 @@ class SimulationEngine:
         user_id: str,
         strategy_id: str,
         market: Any = None,
+        run_id: str = "",
+        live_tick: dict[str, Any] | None = None,
     ) -> ExecutionResult:
-        """执行单个订单"""
+        """执行单个订单（虚拟撮合；成功后按开关镜像一笔真单到 QMT）"""
         from backend.services.simulation.models.order import (
             OrderSide,
             OrderType,
@@ -379,23 +572,99 @@ class SimulationEngine:
         # 创建订单对象
         sim_order = SimOrder(
             tenant_id=tenant_id,
-            user_id=int(user_id) if user_id.isdigit() else 0,
+            user_id=canonical_sim_uid(user_id),
             symbol=order.symbol,
             side=OrderSide.BUY if order.side == "BUY" else OrderSide.SELL,
             order_type=OrderType.MARKET,
             quantity=order.quantity,
             price=order.price,
             strategy_id=int(strategy_id) if strategy_id.isdigit() else None,
+            remarks=(str(order.reason).strip()[:500] if getattr(order, "reason", None) else None)
+            or "策略托管自动调仓",
         )
         db.add(sim_order)
         await db.flush()
+        from backend.services.simulation.models.order_v2 import SimulationOrderV2
 
-        # 执行订单（按市场规则决定佣金/T+1/账户维度）
+        db.add(
+            SimulationOrderV2(
+                order_id=sim_order.order_id,
+                tenant_id=tenant_id,
+                user_id=str(sim_order.user_id),
+                strategy_id=strategy_id or None,
+                account_id=f"sim:{tenant_id}:{sim_order.user_id}",
+                portfolio_id=int(sim_order.portfolio_id or 0),
+                legacy_order_id=sim_order.id,
+                symbol=sim_order.symbol,
+                side=sim_order.side.value,
+                position_side=str(
+                    getattr(
+                        getattr(sim_order, "position_side", "long"),
+                        "value",
+                        getattr(sim_order, "position_side", "long"),
+                    )
+                    or "long"
+                ),
+                trade_action=getattr(sim_order, "trade_action", None),
+                order_type=sim_order.order_type.value,
+                time_in_force="DAY",
+                quantity=float(sim_order.quantity or 0.0),
+                price=sim_order.price,
+                trigger_source="hosted",
+                status=sim_order.status.value,
+            )
+        )
+        await db.flush()
+
+        session_decision = await exec_engine.assess_execution_window(sim_order)
+        if not session_decision.can_execute:
+            result = ExecutionResult(
+                success=False,
+                message=str(session_decision.message or "outside trading session"),
+            )
+            await exec_engine.mark_rejected(sim_order, result.message)
+            return result
+
+        snapshot = (
+            exec_engine.market_snapshot_from_tick(order.symbol, live_tick)
+            if live_tick
+            else None
+        )
         result = await exec_engine.execute_order(
-            sim_order, market=getattr(market, "value", None)
+            sim_order,
+            market=getattr(market, "value", None),
+            snapshot=snapshot,
         )
         if result.success:
             await exec_engine.apply_filled(sim_order, result)
+            if result.quantity + 1e-6 < float(order.quantity or 0.0):
+                from backend.services.simulation.services.order_service import (
+                    SimOrderService,
+                )
+
+                await SimOrderService(db).queue_order(
+                    sim_order,
+                    "partially_filled; remainder queued for current DAY session",
+                    trading_session_date=session_decision.target_trade_date,
+                )
+            # 双轨镜像：虚拟成交已生效，按开关/白名单/限额向大 QMT 补一笔真单。
+            # 用独立会话（db=None），避免真单写入提前提交本周期未完成的虚拟账本；
+            # mirror_virtual_fill 自身吞掉全部异常，不影响上面的虚拟成交。
+            await mirror_virtual_fill(
+                db=None,
+                redis=self.redis,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                symbol=order.symbol,
+                side=order.side,
+                quantity=result.quantity,
+                price=float(result.price or order.price or 0),
+                sim_order_id=str(sim_order.order_id or ""),
+                run_id=run_id,
+                strategy_id=strategy_id,
+                market=str(getattr(market, "value", market) or ""),
+                source="simulation_engine",
+            )
         else:
             await exec_engine.mark_rejected(sim_order, result.message)
 

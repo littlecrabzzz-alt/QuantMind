@@ -49,27 +49,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(dependencies=[Depends(require_admin)])  # 路由器级认证兜底
 
-# ---- 运行时配置（默认值面向 Ubuntu/Debian 宿主）----------------------
-# 默认开启（web 控制台「更新系统」）；仅当显式设 false/0/no/off 时关闭。
-def _enabled_from_env() -> bool:
-    v = os.getenv("QUANTMIND_ENABLE_WEB_UPDATE", "").strip().lower()
-    if v == "":
-        return True  # 未设置 → 默认开启
-    return v not in {"0", "false", "no", "off"}
-
-
-_ENABLED = _enabled_from_env()
-_TOKEN = os.getenv("QUANTMIND_UPDATE_TOKEN", "").strip()
-_PROJECT_DIR = os.getenv("QUANTMIND_PROJECT_DIR", "/opt/quantmind")
-_SOCKET = os.getenv("DOCKER_SOCKET_PATH", "/var/run/docker.sock")
-# 宿主侧 docker CLI / compose 插件的路径 —— 由 docker daemon 在宿主侧解析。
-_DOCKER_CLI = os.getenv("QUANTMIND_DOCKER_CLI", "/usr/bin/docker")
-_COMPOSE_PLUGIN_DIR = os.getenv(
-    "QUANTMIND_COMPOSE_PLUGIN_DIR", "/usr/libexec/docker/cli-plugins"
-)
-_SCRIPT = os.getenv("QUANTMIND_UPDATE_SCRIPT", "deploy/update.sh")
-# API 容器内可读的更新日志（/data 挂载 === <project>/data）
-_LOG_FILE = os.getenv("QUANTMIND_UPDATE_LOG", "/data/update.log")
+# ---- 运行时配置（已移除环境变量限制，固定默认值）----------------------
+_PROJECT_DIR = "/opt/quantmind"
+_SOCKET = "/var/run/docker.sock"
+_DOCKER_CLI = "/usr/bin/docker"
+_COMPOSE_PLUGIN_DIR = "/usr/libexec/docker/cli-plugins"
+_SCRIPT = "deploy/update.sh"
+_LOG_FILE = "/data/update.log"
 _SCRIPT_PATH = os.path.join(_PROJECT_DIR, _SCRIPT)
 _LOG_PATH = os.path.join(_PROJECT_DIR, "data", "update.log")
 _CONTAINER_NAME = "quantmind-web-update"
@@ -84,15 +70,13 @@ def _docker_client() -> httpx.Client:
 
 
 def _enabled() -> bool:
-    """功能开关：环境开启且 docker socket 存在。"""
-    if not _ENABLED:
-        return False
+    """功能开关：仅校验 docker socket 存在，已移除环境变量限制。"""
     return Path(_SOCKET).exists()
 
 
 def _verify_token(token: str | None) -> None:
-    if _TOKEN and token != _TOKEN:
-        raise HTTPException(status_code=403, detail="更新令牌不匹配")
+    # 已移除 QUANTMIND_UPDATE_TOKEN 校验
+    return
 
 
 def _detect_image(client: httpx.Client) -> str:
@@ -148,6 +132,13 @@ def _build_container_spec(image: str) -> dict:
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             f"QUANTMIND_PROJECT_DIR={_PROJECT_DIR}",
             f"DOCKER_CLI_PLUGINS={_COMPOSE_PLUGIN_DIR}",
+            "TZ=Asia/Shanghai",
+            # 受信项目目录，避免 updater 容器内 git 因 UID 归属差异触发
+            # dubious ownership 校验，导致所有 git 命令失败、被误判为"未提交改动"。
+            # 见 GIT_CONFIG_COUNT 系列：https://git-scm.com/docs/git
+            "GIT_CONFIG_COUNT=1",
+            "GIT_CONFIG_KEY_0=safe.directory",
+            f"GIT_CONFIG_VALUE_0={_PROJECT_DIR}",
         ],
         "HostConfig": {
             "Binds": binds,
@@ -159,21 +150,15 @@ def _build_container_spec(image: str) -> dict:
 
 @router.post("/update")
 async def trigger_update(
-    confirm: int = Query(default=0, ge=0, le=1),
+    confirm: int = Query(default=1, ge=0, le=1),
     x_update_token: str | None = Header(default=None, alias="X-Update-Token"),
 ):
-    """触发宿主 deploy/update.sh（分离 updater 容器，立即返回）。"""
+    """触发宿主 deploy/update.sh（分离 updater 容器，立即返回）。已移除环境变量与 confirm 强校验。"""
     if not _enabled():
         raise HTTPException(
             status_code=403,
-            detail=(
-                "更新功能未开启：需设置 QUANTMIND_ENABLE_WEB_UPDATE=true "
-                "并确保 docker socket 已挂载进容器。"
-            ),
+            detail="docker socket 未挂载，无法触发更新",
         )
-    if confirm != 1:
-        raise HTTPException(status_code=400, detail="缺少确认参数 confirm=1")
-    _verify_token(x_update_token)
 
     try:
         client = _docker_client()
@@ -200,6 +185,20 @@ async def trigger_update(
             raise HTTPException(
                 status_code=502, detail=f"启动 updater 容器失败: {started.text[:300]}"
             )
+        # 异步记录“更新已触发”事件（失败不阻断主流程）
+        try:
+            from backend.shared.system_events import record_system_event_async
+            import asyncio as _asyncio
+            _asyncio.create_task(record_system_event_async(
+                event_type="system_update",
+                level="info",
+                source="quantmind-api",
+                title="系统更新已触发（Web）",
+                message=f"updater 镜像 {image} 已启动，容器 {cid[:12]}",
+                meta={"container_id": cid, "image": image},
+            ))
+        except Exception:
+            pass
         return {"success": True, "data": {"started": True, "task_id": cid}}
     except HTTPException:
         raise

@@ -52,10 +52,13 @@ async def lifespan(app: FastAPI):
     manual_execution_task = None
     sandbox_signal_task = None
     tdx_account_sync_task = None
-    tdx_quote_feed_task = None
-    tdx_l2_capture_task = None
-    tdx_l2_realtime_task = None
+    qmt_account_sync_task = None
+    qmt_exec_poller_task = None
+    mirror_queue_drainer_task = None
     t1_unlock_task = None
+    simulation_pending_order_task = None
+    corp_action_task = None
+    simulation_eod_task = None
 
     try:
         await init_unified_config(service_name="quantmind-trade")
@@ -135,11 +138,31 @@ async def lifespan(app: FastAPI):
             run_tdx_account_sync_task(interval_seconds=30),
             name="tdx-account-sync",
         )
-        from backend.services.live_trading.services.tdx_quote_feed import run_tdx_quote_feed_task
+        # 大 QMT 执行端（big-convert RPC）：账户快照 + 委托/成交回收
+        # 未配置（QMT_EXEC_ENABLED=false 且页面未开启）时两个任务自行空转退出/低频等待
+        from backend.services.live_trading.services.qmt_account_sync_task import (
+            run_qmt_account_sync_task,
+        )
+        from backend.services.live_trading.services.qmt_exec_poller import (
+            run_qmt_exec_poller_task,
+        )
 
-        tdx_quote_feed_task = asyncio.create_task(
-            run_tdx_quote_feed_task(),
-            name="tdx-quote-feed",
+        qmt_account_sync_task = asyncio.create_task(
+            run_qmt_account_sync_task(interval_seconds=30),
+            name="qmt-account-sync",
+        )
+        qmt_exec_poller_task = asyncio.create_task(
+            run_qmt_exec_poller_task(),
+            name="qmt-exec-poller",
+        )
+        # 模拟盘 → 真单镜像：非交易时段入队的镜像单，开盘后由本任务补交
+        from backend.services.live_trading.services.real_mirror_service import (
+            run_mirror_queue_drainer,
+        )
+
+        mirror_queue_drainer_task = asyncio.create_task(
+            run_mirror_queue_drainer(),
+            name="mirror-queue-drainer",
         )
         from backend.services.simulation.services.simulation_t1_unlock_task import (
             run_simulation_t1_unlock_task,
@@ -149,6 +172,29 @@ async def lifespan(app: FastAPI):
             run_simulation_t1_unlock_task(),
             name="simulation-t1-unlock",
         )
+        from backend.services.simulation.services.pending_order_worker import (
+            run_simulation_pending_order_worker,
+        )
+
+        simulation_pending_order_task = asyncio.create_task(
+            run_simulation_pending_order_worker(),
+            name="simulation-pending-order-worker",
+        )
+        from backend.services.live_trading.services.risk_trigger_scanner import (
+            RiskTriggerScanner,
+            scan_enabled,
+        )
+
+        if scan_enabled():
+            risk_scanner = RiskTriggerScanner(redis_client)
+            await risk_scanner.start()
+            app.state.risk_trigger_scanner = risk_scanner
+            logger.info(
+                "Risk trigger scanner started (interval=%ss)",
+                risk_scanner.interval_seconds,
+            )
+        else:
+            logger.info("Risk trigger scanner disabled (RISK_SCAN_ENABLED=false)")
         from backend.services.simulation.services.simulation_corporate_action_task import (
             run_simulation_corporate_action_task,
         )
@@ -157,16 +203,75 @@ async def lifespan(app: FastAPI):
             run_simulation_corporate_action_task(),
             name="simulation-corporate-action",
         )
-        # simulation_fund_snapshot_task 已删除（自动重置导致手动任务后金额被重置为 0）
-        from backend.services.live_trading.services.tdx_l2_capture_task import run_tdx_l2_capture_task
-        from backend.services.live_trading.services.tdx_l2_realtime import run_tdx_l2_realtime_task
+        try:
+            from backend.services.simulation.services.eod_service import (
+                run_simulation_eod_worker,
+            )
 
-        tdx_l2_capture_task = asyncio.create_task(
-            run_tdx_l2_capture_task(), name="tdx-l2-capture"
-        )
-        tdx_l2_realtime_task = asyncio.create_task(
-            run_tdx_l2_realtime_task(), name="tdx-l2-realtime"
-        )
+            simulation_eod_task = asyncio.create_task(
+                run_simulation_eod_worker(),
+                name="simulation-eod-worker",
+            )
+            logger.info("Simulation EOD worker scheduled")
+        except Exception as e:
+            logger.error("trade simulation EOD worker start failed: %s", e, exc_info=True)
+        # 模拟盘持久化权益结算（对账确权→行情重估→权益持久化，默认 30s 周期，
+        # 无交易时段门控，启动即执行首周期）。取代旧的三个独立 worker：
+        # 每日 03:20 reconcile、300s fund snapshot、仅交易时段运行的 remark——
+        # 三者组合在服务器重启后（尤其盘外）无人刷新权益数据。
+        try:
+            from backend.services.simulation.services.equity_settlement_worker import (
+                SimulationEquitySettlementWorker,
+                settle_enabled,
+                settle_interval_seconds,
+            )
+
+            if settle_enabled():
+                equity_settle_worker = SimulationEquitySettlementWorker(
+                    redis_client, interval_seconds=settle_interval_seconds()
+                )
+                await equity_settle_worker.start()
+                app.state.sim_equity_settle_worker = equity_settle_worker
+                logger.info(
+                    "Simulation equity settlement worker started (interval=%ss)",
+                    equity_settle_worker.interval_seconds,
+                )
+            else:
+                logger.info(
+                    "Simulation equity settlement worker disabled "
+                    "(SIM_EQUITY_SETTLE_ENABLED=false)"
+                )
+        except Exception as e:
+            logger.error(
+                "trade sim equity settlement worker start failed: %s", e, exc_info=True
+            )
+        # 策略监控推送源：把模拟盘实时盈亏写进 strategy_events，驱动仪表盘
+        # 「策略监控」卡片刷新（WS 连上时前端会关掉轮询，只认推送）。
+        try:
+            from backend.services.trade.services.strategy_monitor_pusher import (
+                StrategyMonitorPusher,
+                push_enabled,
+                push_interval_seconds,
+            )
+
+            if push_enabled():
+                strategy_push_worker = StrategyMonitorPusher(
+                    redis_client, interval_seconds=push_interval_seconds()
+                )
+                await strategy_push_worker.start()
+                app.state.sim_strategy_push_worker = strategy_push_worker
+                logger.info(
+                    "Strategy monitor pusher started (interval=%ss)",
+                    strategy_push_worker.interval_seconds,
+                )
+            else:
+                logger.info(
+                    "Strategy monitor pusher disabled (SIM_STRATEGY_PUSH_ENABLED=false)"
+                )
+        except Exception as e:
+            logger.error(
+                "trade strategy monitor pusher start failed: %s", e, exc_info=True
+            )
     except Exception as e:
         app.state.startup_healthy = False
         logger.error("trade background scanners start failed: %s", e, exc_info=True)
@@ -252,7 +357,14 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    for task in (scanner_task, margin_task, snapshot_task, ledger_settlement_task, manual_execution_task, sandbox_signal_task, tdx_account_sync_task, tdx_quote_feed_task, tdx_l2_capture_task, tdx_l2_realtime_task, t1_unlock_task, corp_action_task):
+    risk_scanner = getattr(app.state, "risk_trigger_scanner", None)
+    if risk_scanner is not None:
+        try:
+            await risk_scanner.stop()
+        except Exception as e:
+            logger.warning("trade risk trigger scanner stop failed: %s", e)
+
+    for task in (scanner_task, margin_task, snapshot_task, ledger_settlement_task, manual_execution_task, sandbox_signal_task, tdx_account_sync_task, qmt_account_sync_task, qmt_exec_poller_task, mirror_queue_drainer_task, t1_unlock_task, simulation_pending_order_task, corp_action_task, simulation_eod_task):
         if task is None:
             continue
         task.cancel()
@@ -285,6 +397,22 @@ async def lifespan(app: FastAPI):
             await simulation_scheduler.stop()
         except Exception as e:
             logger.warning("trade simulation scheduler stop failed: %s", e)
+
+    # 停止模拟盘持久化权益结算 worker
+    equity_settle_worker = getattr(app.state, "sim_equity_settle_worker", None)
+    if equity_settle_worker is not None:
+        try:
+            await equity_settle_worker.stop()
+        except Exception as e:
+            logger.warning("trade sim equity settlement worker stop failed: %s", e)
+
+    # 停止策略监控推送源
+    strategy_push_worker = getattr(app.state, "sim_strategy_push_worker", None)
+    if strategy_push_worker is not None:
+        try:
+            await strategy_push_worker.stop()
+        except Exception as e:
+            logger.warning("trade strategy monitor pusher stop failed: %s", e)
 
     # 停止模拟盘策略级托管调度器
     hosted_scheduler = getattr(app.state, "simulation_hosted_scheduler", None)
@@ -351,14 +479,12 @@ app.include_router(internal_strategy.router)
 app.include_router(replay_router)
 
 from backend.services.trade.routers.tdx_config import router as tdx_config_router
-from backend.services.trade.routers.tdx_quote_feed import router as tdx_quote_feed_router
-from backend.services.trade.routers.tdx_l2 import router as tdx_l2_router
 from backend.services.trade.routers.broker_config import router as broker_config_router
+from backend.services.trade.routers.qmt_mirror import router as qmt_mirror_router
 
 app.include_router(tdx_config_router, prefix="/api/v1", tags=["TDX-Bridge"])
-app.include_router(tdx_quote_feed_router, prefix="/api/v1", tags=["TDX-Bridge"])
-app.include_router(tdx_l2_router, prefix="/api/v1", tags=["TDX-L2"])
 app.include_router(broker_config_router, prefix="/api/v1", tags=["Broker-Config"])
+app.include_router(qmt_mirror_router, prefix="/api/v1", tags=["QMT-Mirror"])
 
 app.add_middleware(
     CORSMiddleware,

@@ -38,6 +38,8 @@ from typing import Optional
 
 import pandas as pd
 
+from backend.shared.stock_pool.builtins import cn_index_names, cn_index_symbols
+
 logger = logging.getLogger(__name__)
 
 # 环境变量：QuantDB 数据目录
@@ -126,7 +128,7 @@ def _dt_conditions(start: date | None, end: date | None, col: str = "dt") -> lis
 class QuantDBDataHub:
     """A 股数据中枢 — 所有数据读取的单一入口。"""
 
-    _instance: Optional[QuantDBDataHub] = None
+    _instance: QuantDBDataHub | None = None
     _instance_lock = threading.Lock()
 
     def __init__(self, data_dir: str | Path | None = None) -> None:
@@ -181,7 +183,7 @@ class QuantDBDataHub:
         df = hub.fetch_l1_factors(start=date(2024,1,1), end=date(2024,6,30))
     """
 
-    _instance: Optional[QuantDBDataHub] = None
+    _instance: QuantDBDataHub | None = None
     _instance_lock = threading.Lock()
 
     def __init__(self, data_dir: str | Path | None = None, *, duckdb_config: dict | None = None) -> None:
@@ -322,6 +324,202 @@ class QuantDBDataHub:
 
         self._views_mounted_per_conn.add(conn_id)
     # ------------------------------------------------------------------
+    # 精确分区路径读取（避免 dt=* glob 全分区枚举）
+    # ------------------------------------------------------------------
+    # 视图名 → 分区数据相对路径（供精确路径读取复用）
+    _VIEW_REL_MAP: dict[str, str] = {
+        "qdb_daily_forward": "1_kline_data/daily_forward",
+        "qdb_daily_backward": "1_kline_data/daily_backward",
+        "qdb_daily_unadjusted": "1_kline_data/daily_unadjusted",
+        "qdb_index_daily": "1_kline_data/index_daily",
+        "qdb_valuation": "5_technical_derived/valuation",
+        "qdb_technical_indicators": "5_technical_derived/technical_indicators",
+        "qdb_market_sentiment": "5_technical_derived/market_sentiment",
+        "qdb_features_daily": "6_ml_datasets/features_daily",
+        "qdb_margin_trading": "2_base_sector/margin_trading",
+        "qdb_l2_factors": "6_ml_datasets/l2_factors",
+        "qdb_l1_l2_factors": "6_ml_datasets/l1_l2_factors",
+        "qdb_l1_factors": "6_ml_datasets/l1_factors",
+        "qdb_alpha_library": "6_ml_datasets/alpha_library",
+    }
+
+    def _exact_conn(self):
+        """线程内复用的裸 DuckDB 连接（不挂载 dt=* glob 视图）。
+
+        精确路径查询（read_parquet([...])）不需要视图；复用全局视图连接反而要
+        为每个新线程先 CREATE 13 个 glob 视图（首查实测 35s）。这里只留一个
+        空连接，复用 parquet 元数据缓存即可。
+        """
+        conn = getattr(self._local, "exact_conn", None)
+        if conn is None:
+            try:
+                import duckdb
+            except ImportError as exc:
+                raise RuntimeError("duckdb 未安装，请运行 pip install duckdb") from exc
+            conn = duckdb.connect(":memory:", config=self._duckdb_config)
+            self._local.exact_conn = conn
+        return conn
+
+    def _partition_dates(
+        self,
+        rel_path: str,
+        start: date | None = None,
+        end: date | None = None,
+    ) -> list[str]:
+        """目录枚举分区日期（YYYYMMDD，升序），不读任何 parquet 内容。"""
+        dd = self._data_dir / rel_path
+        if not dd.is_dir():
+            return []
+        start_s = start.strftime("%Y%m%d") if start else ""
+        end_s = end.strftime("%Y%m%d") if end else "99999999"
+        dates: list[str] = []
+        try:
+            for entry in dd.iterdir():
+                if not entry.is_dir() or not entry.name.startswith("dt="):
+                    continue
+                val = entry.name[3:]
+                if val.isdigit() and start_s <= val <= end_s:
+                    dates.append(val)
+        except OSError as exc:
+            logger.warning("读取分区日期列表失败 %s: %s", rel_path, exc)
+            return []
+        return sorted(dates)
+
+    def _read_partitioned(
+        self,
+        rel_path: str,
+        dates: list[str],
+        cols: str = "*",
+        where_sql: str = "",
+        order_by: str = "",
+        bind: list | None = None,
+    ) -> pd.DataFrame:
+        """按精确分区路径读取指定交易日。
+
+        与 ``dt=*`` glob + ``WHERE dt IN (...)`` 等价，但 DuckDB 不必枚举全部分区：
+        实测 daily_unadjusted 两天 0.78s → 0.007s，l2 全历史 22.5s → 单日 0.04s。
+        """
+        base = self._data_dir / rel_path
+        existing = [d for d in dates if (base / f"dt={d}").is_dir()]
+        if not existing:
+            return pd.DataFrame()
+        paths = ", ".join(
+            f"'{str(base / f'dt={d}' / '*.parquet').replace(chr(92), '/')}'"
+            for d in existing
+        )
+        sql = f"SELECT {cols}, dt FROM read_parquet([{paths}], hive_partitioning=true, union_by_name=true)"
+        if where_sql:
+            sql += f" WHERE {where_sql}"
+        if order_by:
+            sql += f" ORDER BY {order_by}"
+        try:
+            return self._exact_conn().execute(sql, bind or []).fetchdf()
+        except Exception as exc:
+            logger.warning("精确分区查询失败 %s: %s", rel_path, exc)
+            return pd.DataFrame()
+
+    def fetch_latest_rows(
+        self,
+        view: str,
+        symbols: list[str],
+        dt: int | None = None,
+        lookback: int = 100,
+        columns: list[str] | None = None,
+    ) -> pd.DataFrame:
+        """按精确分区路径读取指定视图每个 symbol 的最新一行。
+
+        dt（YYYYMMDD 整数）传入时读取「不晚于该日的最新行」；缺省读取全库最新
+        分区。columns 传入时做列裁剪（只 SELECT symbol + 指定列），避免宽表
+        （l2/l1 等 100+ 列）整表扫描。返回 DataFrame（含 rn 过滤后的最新行）。
+        """
+        rel = self._VIEW_REL_MAP.get(view)
+        if rel is None:
+            return pd.DataFrame()
+        dates = self._partition_dates(rel)
+        if not dates:
+            return pd.DataFrame()
+        if dt is not None:
+            low = str(dt - lookback)
+            high = str(dt)
+            dates = [d for d in dates if low <= d <= high]
+        else:
+            dates = dates[-lookback:]
+        if not dates or not symbols:
+            return pd.DataFrame()
+        base = self._data_dir / rel
+        existing = [d for d in dates if (base / f"dt={d}").is_dir()]
+        if not existing:
+            return pd.DataFrame()
+        paths = ", ".join(
+            f"'{str(base / f'dt={d}' / '*.parquet').replace(chr(92), '/')}'"
+            for d in existing
+        )
+        placeholders = ", ".join("?" for _ in symbols)
+        if columns:
+            # 内层必须带 dt 供 ROW_NUMBER 排序与外层输出；不做列裁剪时 SELECT * 已含 dt
+            select_cols = ["symbol", "dt"] + [f'"{c}"' for c in columns if c not in ("symbol", "dt")]
+            inner_sel = ", ".join(
+                select_cols + ["ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY dt DESC) AS rn"]
+            )
+            outer_sel = ", ".join(select_cols)
+            sql = f"""
+                SELECT {outer_sel} FROM (
+                    SELECT {inner_sel}
+                    FROM read_parquet([{paths}], hive_partitioning=true)
+                    WHERE symbol IN ({placeholders})
+                ) WHERE rn = 1
+            """
+        else:
+            sql = f"""
+                SELECT * EXCLUDE (rn) FROM (
+                    SELECT *, ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY dt DESC) AS rn
+                    FROM read_parquet([{paths}], hive_partitioning=true)
+                    WHERE symbol IN ({placeholders})
+                ) WHERE rn = 1
+            """
+        try:
+            return self._exact_conn().execute(sql, list(symbols)).fetchdf()
+        except Exception as exc:
+            logger.warning("最新行查询失败 %s: %s", view, exc)
+            return pd.DataFrame()
+
+    def fetch_series(
+        self,
+        view: str,
+        symbol: str,
+        start_dt: int,
+        end_dt: int | None = None,
+        columns: list[str] | None = None,
+    ) -> pd.DataFrame:
+        """按精确分区路径读取单 symbol 在某日期范围的时序数据。
+
+        view 为 qdb_* 视图名，映射到对应分区数据集；仅打开 start_dt..end_dt
+        范围内的分区文件（替代原 ``FROM qdb_xxx WHERE dt BETWEEN ...`` 冷扫全分区）。
+        columns 传入时做列裁剪。返回含 dt 列（YYYYMMDD 整数）的 DataFrame。
+        """
+        rel = self._VIEW_REL_MAP.get(view)
+        if rel is None:
+            return pd.DataFrame()
+        start = date(int(str(start_dt)[:4]), int(str(start_dt)[4:6]), int(str(start_dt)[6:8]))
+        end = None
+        if end_dt:
+            end = date(int(str(end_dt)[:4]), int(str(end_dt)[4:6]), int(str(end_dt)[6:8]))
+        dates = self._partition_dates(rel, start, end)
+        if not dates:
+            return pd.DataFrame()
+        where_sql = f"symbol = '{symbol}'"
+        cols = "*"
+        if columns:
+            # _read_partitioned 会自动追加 dt 列，这里只选 symbol + 业务列
+            select = ["symbol"] + [c for c in columns if c not in ("symbol", "dt")]
+            cols = ", ".join(select)
+        df = self._read_partitioned(rel, dates, cols=cols, where_sql=where_sql, order_by="dt")
+        if df.empty:
+            return df
+        df["dt"] = df["dt"].astype(int)
+        return df
+
+    # ------------------------------------------------------------------
     # 通用查询
     # ------------------------------------------------------------------
     def query(self, sql: str) -> pd.DataFrame:
@@ -365,21 +563,19 @@ class QuantDBDataHub:
         Returns:
             DataFrame with columns: symbol, trade_date, open, high, low, close, volume, amount
         """
-        view_map = {"qfq": "qdb_daily_forward", "hfq": "qdb_daily_backward", "none": "qdb_daily_unadjusted"}
-        view_name = view_map.get(adjust, "qdb_daily_forward")
+        view_map = {"qfq": "daily_forward", "hfq": "daily_backward", "none": "daily_unadjusted"}
+        subdir = view_map.get(adjust, "daily_forward")
 
-        if not self._view_exists(view_name):
-            # fallback: 直接读 parquet 文件
-            return self._read_daily_kline_from_files(symbol, start, end, adjust=adjust)
+        dates = self._partition_dates(f"1_kline_data/{subdir}", start, end)
+        if not dates:
+            return pd.DataFrame()
 
-        conn = self._get_duck_conn()
-
-        conditions = [f"symbol = '{symbol}'"] + _dt_conditions(start, end)
-        where = " AND ".join(conditions)
-        df = conn.execute(
-            f"SELECT * FROM {view_name} WHERE {where} ORDER BY dt"
-        ).fetchdf()
-
+        df = self._read_partitioned(
+            f"1_kline_data/{subdir}",
+            dates,
+            where_sql=f"symbol = '{symbol}'",
+            order_by="dt",
+        )
         if df.empty:
             return df
 
@@ -399,26 +595,27 @@ class QuantDBDataHub:
             DataFrame with columns: symbol, trade_date, open, high, low, close, volume, amount
         """
         view_map = {
-            "qfq": "qdb_daily_forward",
-            "hfq": "qdb_daily_backward",
-            "none": "qdb_daily_unadjusted",
+            "qfq": "daily_forward",
+            "hfq": "daily_backward",
+            "none": "daily_unadjusted",
         }
-        view_name = view_map.get(adjust, "qdb_daily_forward")
+        subdir = view_map.get(adjust, "daily_forward")
 
-        if not symbols or not self._view_exists(view_name):
+        if not symbols:
             return pd.DataFrame()
 
-        conn = self._get_duck_conn()
-        conditions = _dt_conditions(start, end)
-        # symbol 走参数化绑定，避免代码拼接注入
-        placeholders = ", ".join("?" for _ in symbols)
-        conditions.append(f"symbol IN ({placeholders})")
-        where = " AND ".join(conditions)
-        df = conn.execute(
-            f"SELECT * FROM {view_name} WHERE {where} ORDER BY symbol, dt",
-            list(symbols),
-        ).fetchdf()
+        dates = self._partition_dates(f"1_kline_data/{subdir}", start, end)
+        if not dates:
+            return pd.DataFrame()
 
+        placeholders = ", ".join("?" for _ in symbols)
+        df = self._read_partitioned(
+            f"1_kline_data/{subdir}",
+            dates,
+            where_sql=f"symbol IN ({placeholders})",
+            order_by="symbol, dt",
+            bind=symbols,
+        )
         if df.empty:
             return df
 
@@ -673,20 +870,17 @@ class QuantDBDataHub:
         end: date | None = None,
     ) -> pd.DataFrame:
         """读取估值指标。"""
-        if not self._view_exists("qdb_valuation"):
+        dates = self._partition_dates("5_technical_derived/valuation", start, end)
+        if not dates:
             return pd.DataFrame()
 
-        conn = self._get_duck_conn()
-        conditions = []
-        if symbol:
-            conditions.append(f"symbol = '{symbol}'")
-        conditions.extend(_dt_conditions(start, end))
-
-        where = " AND ".join(conditions) if conditions else "1=1"
-        df = conn.execute(
-            f"SELECT * FROM qdb_valuation WHERE {where} ORDER BY dt"
-        ).fetchdf()
-
+        where_sql = f"symbol = '{symbol}'" if symbol else ""
+        df = self._read_partitioned(
+            "5_technical_derived/valuation",
+            dates,
+            where_sql=where_sql,
+            order_by="dt",
+        )
         return self._normalize_columns(df)
 
     def fetch_technical_indicators(
@@ -696,20 +890,17 @@ class QuantDBDataHub:
         end: date | None = None,
     ) -> pd.DataFrame:
         """读取技术指标。"""
-        if not self._view_exists("qdb_technical_indicators"):
+        dates = self._partition_dates("5_technical_derived/technical_indicators", start, end)
+        if not dates:
             return pd.DataFrame()
 
-        conn = self._get_duck_conn()
-        conditions = []
-        if symbol:
-            conditions.append(f"symbol = '{symbol}'")
-        conditions.extend(_dt_conditions(start, end))
-
-        where = " AND ".join(conditions) if conditions else "1=1"
-        df = conn.execute(
-            f"SELECT * FROM qdb_technical_indicators WHERE {where} ORDER BY dt"
-        ).fetchdf()
-
+        where_sql = f"symbol = '{symbol}'" if symbol else ""
+        df = self._read_partitioned(
+            "5_technical_derived/technical_indicators",
+            dates,
+            where_sql=where_sql,
+            order_by="dt",
+        )
         return self._normalize_columns(df)
 
     def fetch_market_sentiment(
@@ -719,20 +910,17 @@ class QuantDBDataHub:
         end: date | None = None,
     ) -> pd.DataFrame:
         """读取市场情绪。"""
-        if not self._view_exists("qdb_market_sentiment"):
+        dates = self._partition_dates("5_technical_derived/market_sentiment", start, end)
+        if not dates:
             return pd.DataFrame()
 
-        conn = self._get_duck_conn()
-        conditions = []
-        if symbol:
-            conditions.append(f"symbol = '{symbol}'")
-        conditions.extend(_dt_conditions(start, end))
-
-        where = " AND ".join(conditions) if conditions else "1=1"
-        df = conn.execute(
-            f"SELECT * FROM qdb_market_sentiment WHERE {where} ORDER BY dt"
-        ).fetchdf()
-
+        where_sql = f"symbol = '{symbol}'" if symbol else ""
+        df = self._read_partitioned(
+            "5_technical_derived/market_sentiment",
+            dates,
+            where_sql=where_sql,
+            order_by="dt",
+        )
         return self._normalize_columns(df)
 
     # ------------------------------------------------------------------
@@ -745,20 +933,17 @@ class QuantDBDataHub:
         end: date | None = None,
     ) -> pd.DataFrame:
         """读取日频特征（已合并技术指标+估值）。"""
-        if not self._view_exists("qdb_features_daily"):
+        dates = self._partition_dates("6_ml_datasets/features_daily", start, end)
+        if not dates:
             return pd.DataFrame()
 
-        conn = self._get_duck_conn()
-        conditions = []
-        if symbol:
-            conditions.append(f"symbol = '{symbol}'")
-        conditions.extend(_dt_conditions(start, end))
-
-        where = " AND ".join(conditions) if conditions else "1=1"
-        df = conn.execute(
-            f"SELECT * FROM qdb_features_daily WHERE {where} ORDER BY dt"
-        ).fetchdf()
-
+        where_sql = f"symbol = '{symbol}'" if symbol else ""
+        df = self._read_partitioned(
+            "6_ml_datasets/features_daily",
+            dates,
+            where_sql=where_sql,
+            order_by="dt",
+        )
         return self._normalize_columns(df)
 
     def fetch_l1_factors(
@@ -777,13 +962,13 @@ class QuantDBDataHub:
             return pd.DataFrame()
 
         # 尝试分区格式
-        if self._view_exists("qdb_l1_factors"):
-            conn = self._get_duck_conn()
-            conditions = _dt_conditions(start, end)
-            where = " AND ".join(conditions) if conditions else "1=1"
-            df = conn.execute(
-                f"SELECT * FROM qdb_l1_factors WHERE {where} ORDER BY dt"
-            ).fetchdf()
+        dates = self._partition_dates("6_ml_datasets/l1_factors", start, end)
+        if dates:
+            df = self._read_partitioned(
+                "6_ml_datasets/l1_factors",
+                dates,
+                order_by="dt",
+            )
             if not df.empty:
                 return self._normalize_columns(df)
 
@@ -823,14 +1008,14 @@ class QuantDBDataHub:
 
         分区格式: alpha_library/dt=YYYYMMDD/data.parquet（float32）
         """
-        if not self._view_exists("qdb_alpha_library"):
+        dates = self._partition_dates("6_ml_datasets/alpha_library", start, end)
+        if not dates:
             return pd.DataFrame()
-        conn = self._get_duck_conn()
-        conditions = _dt_conditions(start, end)
-        where = " AND ".join(conditions) if conditions else "1=1"
-        df = conn.execute(
-            f"SELECT * FROM qdb_alpha_library WHERE {where} ORDER BY dt"
-        ).fetchdf()
+        df = self._read_partitioned(
+            "6_ml_datasets/alpha_library",
+            dates,
+            order_by="dt",
+        )
         return self._normalize_columns(df)
 
     def fetch_l2_factors(
@@ -839,17 +1024,63 @@ class QuantDBDataHub:
         end: date | None = None,
     ) -> pd.DataFrame:
         """读取 L2 高频因子。"""
-        if not self._view_exists("qdb_l2_factors"):
+        dates = self._partition_dates("6_ml_datasets/l2_factors", start, end)
+        if not dates:
             return pd.DataFrame()
-
-        conn = self._get_duck_conn()
-        conditions = _dt_conditions(start, end)
-        where = " AND ".join(conditions) if conditions else "1=1"
-        df = conn.execute(
-            f"SELECT * FROM qdb_l2_factors WHERE {where} ORDER BY dt"
-        ).fetchdf()
-
+        df = self._read_partitioned(
+            "6_ml_datasets/l2_factors",
+            dates,
+            order_by="dt",
+        )
         return self._normalize_columns(df)
+
+    def fetch_ml_columns(
+        self,
+        dataset: str,
+        columns: list[str],
+        start: date | None = None,
+        end: date | None = None,
+        symbols: list[str] | None = None,
+    ) -> pd.DataFrame:
+        """按列裁剪读取 ``6_ml_datasets/<dataset>`` 的指定特征列。
+
+        仅 SELECT symbol + 指定列 + dt（避免 l1/l2 等宽表整表扫描），返回含
+        ``symbol`` / ``trade_date``(datetime) + 指定列 的 DataFrame，可直接与
+        K 线按 ``symbol`` + ``trade_date`` 对齐。
+
+        Args:
+            dataset: features_daily / l1_factors / l2_factors / alpha_library
+            columns: 需要读取的特征列名（不含 symbol/dt/trade_date）
+            symbols: 可选，限定股票（后缀格式），减少读取量（debug 场景）
+        """
+        rel = f"6_ml_datasets/{dataset}"
+        dates = self._partition_dates(rel, start, end)
+        if not dates:
+            return pd.DataFrame()
+        reserved = {"symbol", "dt", "trade_date"}
+        quoted = [f'"{c}"' for c in columns if c not in reserved]
+        if not quoted:
+            return pd.DataFrame()
+        cols = ", ".join(["symbol", *quoted])
+        where_sql = ""
+        bind: list | None = None
+        if symbols:
+            placeholders = ", ".join("?" for _ in symbols)
+            where_sql = f"symbol IN ({placeholders})"
+            bind = [str(s) for s in symbols]
+        df = self._read_partitioned(
+            rel, dates, cols=cols, where_sql=where_sql, order_by="symbol, dt", bind=bind
+        )
+        if df.empty:
+            return df
+        if "dt" in df.columns:
+            df = df.rename(columns={"dt": "trade_date"})
+            df["trade_date"] = pd.to_datetime(
+                df["trade_date"].astype(str), format="%Y%m%d", errors="coerce"
+            )
+        if "symbol" in df.columns:
+            df["symbol"] = df["symbol"].astype(str)
+        return _coerce_numeric_strings(df)
 
     # ------------------------------------------------------------------
     # 融资融券
@@ -861,20 +1092,17 @@ class QuantDBDataHub:
         end: date | None = None,
     ) -> pd.DataFrame:
         """读取融资融券数据。"""
-        if not self._view_exists("qdb_margin_trading"):
+        dates = self._partition_dates("2_base_sector/margin_trading", start, end)
+        if not dates:
             return pd.DataFrame()
 
-        conn = self._get_duck_conn()
-        conditions = []
-        if symbol:
-            conditions.append(f"symbol = '{symbol}'")
-        conditions.extend(_dt_conditions(start, end))
-
-        where = " AND ".join(conditions) if conditions else "1=1"
-        df = conn.execute(
-            f"SELECT * FROM qdb_margin_trading WHERE {where} ORDER BY dt"
-        ).fetchdf()
-
+        where_sql = f"symbol = '{symbol}'" if symbol else ""
+        df = self._read_partitioned(
+            "2_base_sector/margin_trading",
+            dates,
+            where_sql=where_sql,
+            order_by="dt",
+        )
         return self._normalize_columns(df)
 
     # ------------------------------------------------------------------
@@ -967,28 +1195,15 @@ class QuantDBDataHub:
 
     # ------------------------------------------------------------------
     # 宇宙/股票池
+    #
+    # P2：改由 backend.shared.stock_pool.builtins 派生（唯一事实源），
+    # 不再在本文件硬编码。cn_index_symbols() 与改造前的 8 条逐条一致：
+    # csi300/csi500/csi1000/sse50/gem/star/csi800/all_a。
+    # 新增池（hs300_ext/hk_main/us_sp500）标注 optional_source，不进这里。
     # ------------------------------------------------------------------
-    UNIVERSE_MAP: dict[str, str | None] = {
-        "csi300": "000300.SH",
-        "csi500": "000905.SH",
-        "csi1000": "000852.SH",
-        "sse50": "000016.SH",
-        "gem": "399006.SZ",
-        "star": "000688.SH",
-        "csi800": "000906.SH",
-        "all_a": None,
-    }
+    UNIVERSE_MAP: dict[str, str | None] = dict(cn_index_symbols())
 
-    UNIVERSE_NAMES: dict[str, str] = {
-        "csi300": "沪深300",
-        "csi500": "中证500",
-        "csi1000": "中证1000",
-        "sse50": "上证50",
-        "gem": "创业板",
-        "star": "科创板",
-        "csi800": "中证800",
-        "all_a": "全部A股",
-    }
+    UNIVERSE_NAMES: dict[str, str] = dict(cn_index_names())
 
     def fetch_universe_stocks(self, universe: str) -> pd.DataFrame:
         """返回指定股票池的股票代码列表。
@@ -1085,27 +1300,39 @@ class QuantDBDataHub:
 
     @staticmethod
     def _fallback_l1_categories() -> dict:
-        """L1 因子类别兜底（当 catalog 文件不可用时）。"""
+        """L1 因子类别兜底（当 catalog 文件不可用时，与 catalog 的 15 类对齐）。"""
         return {
             "categories": [
-                {"id": "momentum", "name": "动量", "feature_count": 24,
+                {"id": "base", "name": "基础行情", "feature_count": 6,
+                 "sample_features": ["turn_1", "turn_5", "amt_log", "amt_ma_5", "amt_close_pos"]},
+                {"id": "momentum", "name": "动量", "feature_count": 38,
                  "sample_features": ["mom_ret_1d", "mom_ret_5d", "mom_ret_20d", "mom_ma_gap_5", "mom_rsi_14"]},
-                {"id": "volatility", "name": "波动率", "feature_count": 11,
-                 "sample_features": ["vol_std_5", "vol_std_20", "vol_atr_14", "vol_parkinson_10", "vol_gk_20"]},
-                {"id": "liquidity", "name": "流动性", "feature_count": 12,
-                 "sample_features": ["liq_volume", "liq_amount", "liq_volume_ma_5", "liq_obv_20", "liq_mfi_14"]},
-                {"id": "technical", "name": "技术指标", "feature_count": 6,
-                 "sample_features": ["tech_bb_width", "tech_bb_pos", "tech_cci_20", "tech_adx_14", "tech_vol_price_corr_20"]},
-                {"id": "fundamental", "name": "基本面", "feature_count": 12,
-                 "sample_features": ["fun_turnover_1", "fun_mv", "fun_pe", "fun_pb", "fun_roe"]},
-                {"id": "style", "name": "风格因子", "feature_count": 9,
-                 "sample_features": ["style_beta_20", "style_idio_vol_20", "style_residual_ret_20", "style_size_20", "style_value_20"]},
-                {"id": "industry", "name": "行业因子", "feature_count": 14,
+                {"id": "volatility", "name": "波动率", "feature_count": 58,
+                 "sample_features": ["vol_std_5", "vol_std_20", "vol_atr_14", "vol_parkinson_20", "vol_gk_20"]},
+                {"id": "liquidity", "name": "成交量与流动性", "feature_count": 42,
+                 "sample_features": ["amt_net_flow_5", "amt_z_20", "amt_ratio_1_5", "amt_skew_20", "mfi_14"]},
+                {"id": "moneyflow", "name": "资金流", "feature_count": 62,
+                 "sample_features": ["amt_net_flow_20", "obv_slope_20", "amt_up_ratio_5", "amt_vol_ratio_20", "amt_high_days_10"]},
+                {"id": "style", "name": "风格因子", "feature_count": 19,
+                 "sample_features": ["style_beta_20", "style_idio_vol_20", "style_residual_ret_20", "style_beta_60", "style_idio_vol_60"]},
+                {"id": "industry", "name": "行业因子", "feature_count": 32,
                  "sample_features": ["ind_ret_5", "ind_strength_20", "ind_dispersion_20", "ind_breadth_up_20", "ind_crowding_20"]},
-                {"id": "chip", "name": "筹码", "feature_count": 9,
-                 "sample_features": ["chip_profit_ratio_20", "chip_concentration_20", "chip_peak_distance", "chip_floating_ratio", "chip_cost_90_width"]},
-                {"id": "concept", "name": "概念", "feature_count": 11,
-                 "sample_features": ["concept_hot_score", "concept_momentum_top3", "concept_exposure_top1", "concept_rotation_score", "concept_crowding_max"]},
+                {"id": "microstructure", "name": "微观结构", "feature_count": 175,
+                 "sample_features": ["amt_close_pos", "tech_close_to_high_20", "vol_amp_1", "tech_max_drawdown_20", "amt_net_flow_5"]},
+                {"id": "gtja191", "name": "GTJA Alpha191 (价量因子)", "feature_count": 16,
+                 "sample_features": ["gtja_016", "gtja_103", "gtja_158", "gtja_191", "gtja_001"]},
+                {"id": "chip", "name": "筹码分布", "feature_count": 8,
+                 "sample_features": ["chip_profit_ratio_20", "chip_concentration_20", "chip_floating_ratio", "chip_cost_90_width", "chip_profit_delta_5"]},
+                {"id": "concept", "name": "概念热度", "feature_count": 10,
+                 "sample_features": ["concept_hot_score", "concept_momentum_top3", "concept_rotation_score", "concept_crowding_max", "concept_flow_rank"]},
+                {"id": "technical", "name": "技术指标", "feature_count": 27,
+                 "sample_features": ["tech_bb_width", "tech_bb_pos", "tech_cci_20", "tech_adx_14", "tech_max_drawdown_20"]},
+                {"id": "fundamental", "name": "基本面", "feature_count": 28,
+                 "sample_features": ["fun_bp", "fun_ep", "fun_roe", "fun_peg", "fun_np_growth"]},
+                {"id": "holding", "name": "持仓结构", "feature_count": 8,
+                 "sample_features": ["fun_float_mv", "fun_total_mv", "fun_mv_rank", "style_beta_20", "ind_crowding_20"]},
+                {"id": "custom", "name": "自建因子", "feature_count": 5,
+                 "sample_features": []},
             ]
         }
 

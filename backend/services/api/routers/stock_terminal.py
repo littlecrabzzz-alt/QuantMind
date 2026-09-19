@@ -361,7 +361,7 @@ L2_RECOMMENDED_FACTORS: list[dict[str, Any]] = [
 def _l2_partitions() -> tuple[str, ...]:
     """L2 因子分区目录（dt=YYYYMMDD）升序。"""
     d = _quantdb_dir() / "6_ml_datasets" / "l2_factors"
-    parts = sorted((p.name for p in d.glob("dt=*")))
+    parts = sorted(p.name for p in d.glob("dt=*"))
     return tuple(parts)
 
 
@@ -1217,19 +1217,13 @@ async def stock_series(
     if cached_df is not None:
         df = cached_df
     else:
-        col_list = ", ".join(cols)
-        sql = (
-            f"SELECT dt, {col_list} FROM {view} "
-            f"WHERE symbol = '{sym}' AND dt >= {start_dt}"
-            + (f" AND dt <= {end_dt}" if end_dt else "")
-            + " ORDER BY dt"
-        )
-
         def _run() -> pd.DataFrame:
             from backend.services.engine.data_platform.quantdb_hub import QuantDBDataHub
 
             try:
-                return QuantDBDataHub.get_instance().query(sql)
+                return QuantDBDataHub.get_instance().fetch_series(
+                    view, sym, int(start_dt), int(end_dt) if end_dt else None, columns=cols
+                )
             except Exception as exc:  # noqa: BLE001
                 logger.warning("series query %s %s failed: %s", group, sym, exc)
                 return pd.DataFrame()

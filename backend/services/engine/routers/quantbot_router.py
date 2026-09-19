@@ -17,6 +17,7 @@ from backend.services.engine.auth_context import get_authenticated_identity
 from backend.services.engine.quantbot import tushare_tool
 
 from backend.services.engine.quantbot.intent_parser import parse_intent
+from backend.services.engine.alpha_agent.hw_lock import HardwareLockError
 from backend.services.engine.alpha_agent.launcher import get_launcher as get_alpha_agent_launcher
 from backend.services.engine.quantbot.task_store import QuantBotTaskStore
 
@@ -140,12 +141,15 @@ async def _handle_factor_evolution(
 
     # 异步启动演化 (AlphaAgent)
     alpha_launcher = get_alpha_agent_launcher()
-    alpha_task_id = await alpha_launcher.start_evolution(
-        user_id,
-        universe=intent.get("constraints", {}).get("universe", "csi300"),
-        loop_n=int(intent.get("constraints", {}).get("loop_n", 3)),
-        direction=intent.get("description", item.message),
-    )
+    try:
+        alpha_task_id = await alpha_launcher.start_evolution(
+            user_id,
+            universe=intent.get("constraints", {}).get("universe", "csi300"),
+            loop_n=int(intent.get("constraints", {}).get("loop_n", 3)),
+            direction=intent.get("description", item.message),
+        )
+    except HardwareLockError as exc:
+        raise HTTPException(status_code=412, detail=str(exc)) from exc
 
     return {
         "intent": "factor_evolution",
@@ -331,6 +335,11 @@ async def _handle_chat_stream(
 
     async def event_generator():
         try:
+            from backend.services.engine.alpha_agent.llm_client import (
+                env_extra_headers,
+                openai_chat_url,
+            )
+
             async with httpx.AsyncClient(timeout=300.0) as client:
                 if tushare_release:
                     for _round in range(2):
@@ -370,10 +379,11 @@ async def _handle_chat_stream(
                         yield f"data: {json.dumps({'tool_result': result}, ensure_ascii=False)}\n\n"
                 async with client.stream(
                     "POST",
-                    f"{base_url}/chat/completions",
+                    openai_chat_url(base_url),
                     headers={
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
+                        **env_extra_headers(),
                     },
                     json={
                         "model": model,

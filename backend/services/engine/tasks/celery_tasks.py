@@ -889,6 +889,7 @@ def backfill_inference_quality(horizon_days: int = 5, limit: int = 500) -> dict[
     data_trade_date <= 当前- horizon 且未在 qm_model_inference_quality 的日期。
     """
     from datetime import timedelta
+    from sqlalchemy import text
     from backend.services.engine.inference.inference_quality_backfill import (
         inference_quality_backfill,
     )
@@ -926,30 +927,11 @@ def backfill_inference_quality(horizon_days: int = 5, limit: int = 500) -> dict[
                 )
                 results.append(res)
             ok = [r for r in results if r.get("status") == "ok"]
-
-            # 刷新 recent_ic 融合模型的动态权重（扫描 models/users 下融合模型目录）
-            ensemble_updates = []
-            try:
-                from pathlib import Path as _Path
-                models_root = _Path(os.getenv("USER_MODELS_ROOT", "models/users"))
-                if not models_root.is_absolute():
-                    models_root = _Path("/app") / models_root
-                for cfg_path in models_root.glob("*/*/*/ensemble_config.json"):
-                    try:
-                        up = await inference_quality_backfill.refresh_ensemble_weights(cfg_path.parent)
-                        if up.get("status") == "ok":
-                            ensemble_updates.append(up)
-                    except Exception as exc:
-                        logger.warning("[QualityBackfill] 刷新融合权重失败 %s: %s", cfg_path.parent, exc)
-            except Exception as exc:
-                logger.warning("[QualityBackfill] 扫描融合模型失败: %s", exc)
-
             return {
                 "status": "completed",
                 "scanned": len(rows),
                 "ok": len(ok),
                 "samples": results[:5],
-                "ensemble_weight_refreshed": len(ensemble_updates),
             }
 
         loop = asyncio.new_event_loop()
@@ -959,109 +941,6 @@ def backfill_inference_quality(horizon_days: int = 5, limit: int = 500) -> dict[
             loop.close()
     except Exception as e:
         logger.exception("[QualityBackfill] 失败: %s", e)
-        return {"status": "failed", "error": str(e)}
-
-
-@celery_app.task(name="engine.tasks.build_smooth_history")
-def build_smooth_history(lookback_days: int = 5) -> dict[str, Any]:
-    """构建融合模型的时间平滑历史：聚合各子模型近 N 日分数 → 截面 rank 化。
-
-    推理模板融合时读 smooth_history.json 做指数加权平滑（0.6^d），
-    降低单日推理噪声。每日 03:00 执行。
-    """
-    try:
-        import pandas as pd
-        from pathlib import Path as _Path
-        import json as _json
-
-        def _smooth_async():
-            async def _run():
-                from sqlalchemy import text as _text
-                from backend.services.engine.inference.inference_quality_backfill import (
-                    inference_quality_backfill,
-                )
-                await inference_quality_backfill.ensure_tables()
-
-                models_root = _Path(os.getenv("USER_MODELS_ROOT", "models/users"))
-                if not models_root.is_absolute():
-                    models_root = _Path("/app") / models_root
-
-                updated = 0
-                for cfg_path in models_root.glob("*/*/*/ensemble_config.json"):
-                    try:
-                        with open(cfg_path, encoding="utf-8") as f:
-                            config = _json.load(f)
-                        sub_models = [str(m.get("model_id") or "") for m in (config.get("models") or []) if m.get("model_id")]
-                        if not sub_models:
-                            continue
-
-                        # 聚合各子模型近 N 日分数（engine_signal_scores via run 定位）
-                        history: dict[str, dict] = {}
-                        async with get_session(read_only=True) as session:
-                            for mid in sub_models:
-                                # 找该模型最近的 run（按 trade_date）
-                                runs = (
-                                    await session.execute(
-                                        _text(
-                                            """
-                                            SELECT DISTINCT ON (data_trade_date) run_id, data_trade_date
-                                            FROM qm_model_inference_runs
-                                            WHERE model_id = :mid AND status = 'completed' AND signals_count > 0
-                                            ORDER BY data_trade_date DESC
-                                            LIMIT :n
-                                            """
-                                        ),
-                                        {"mid": mid, "n": int(lookback_days)},
-                                    )
-                                ).mappings().all()
-                                day_scores: dict[str, list[float]] = {}
-                                for run in runs:
-                                    rows = (
-                                        await session.execute(
-                                            _text(
-                                                """
-                                                SELECT symbol, fusion_score
-                                                FROM engine_signal_scores
-                                                WHERE run_id = :run_id
-                                                """
-                                            ),
-                                            {"run_id": run["run_id"]},
-                                        )
-                                    ).mappings().all()
-                                    for r in rows:
-                                        sym = str(r["symbol"])
-                                        val = r["fusion_score"]
-                                        if val is None:
-                                            continue
-                                        day_scores.setdefault(sym, []).append(float(val))
-
-                                # 每 symbol 取多日平均，再整体截面 rank 化
-                                if day_scores:
-                                    sym_avg = {sym: sum(vs) / len(vs) for sym, vs in day_scores.items()}
-                                    vals = pd.Series(list(sym_avg.values()))
-                                    ranks = vals.rank(method="average", pct=True)
-                                    history[mid] = {
-                                        sym: float(ranks.iloc[i]) for i, sym in enumerate(sym_avg.keys())
-                                    }
-
-                        if history:
-                            (cfg_path.parent / "smooth_history.json").write_text(
-                                _json.dumps(history, ensure_ascii=False), encoding="utf-8"
-                            )
-                            updated += 1
-                    except Exception as exc:
-                        logger.warning("[SmoothHistory] %s 失败: %s", cfg_path.parent, exc)
-                return {"status": "completed", "updated": updated}
-
-            loop = asyncio.new_event_loop()
-            try:
-                return asyncio.run(_run())
-            finally:
-                loop.close()
-
-        return _smooth_async()
-    except Exception as e:
-        logger.exception("[SmoothHistory] 失败: %s", e)
         return {"status": "failed", "error": str(e)}
 
 
@@ -1080,7 +959,16 @@ def dispatch_market_sync() -> dict[str, Any]:
         return {"status": "failed", "error": str(e)}
 
 
-@celery_app.task(name="engine.tasks.run_market_scheduled_sync", acks_late=False, reject_on_worker_lost=False)
+@celery_app.task(
+    name="engine.tasks.run_market_scheduled_sync",
+    # 上游数据源（yfinance 等）被限流时会把单个 ticker 拖到分钟级，整体超过全局
+    # 3600s 硬限制 → 进程被 SIGKILL；叠加 acks_late 会导致任务重新入队、再次超时，
+    # 形成死循环。这里收紧独立超时，并在派发即 ack，保证一次调度最多失败一次。
+    soft_time_limit=int(os.getenv("MARKET_SYNC_SOFT_TIME_LIMIT", "1800")),
+    time_limit=int(os.getenv("MARKET_SYNC_TIME_LIMIT", "2100")),
+    acks_late=False,
+    reject_on_worker_lost=False,
+)
 def run_market_scheduled_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
     """执行某市场的定时同步（由 dispatch_market_sync 派发）。"""
     try:
@@ -1092,12 +980,56 @@ def run_market_scheduled_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any
         return {"market": market, "status": "failed", "error": str(e)}
 
 
+# 与 compute.py 同口径的轻量新鲜度检查（只读目录与 latest.json，不引重型依赖）。
+# 快照分区目录：<data_dir>/1_kline_data/daily_unadjusted/dt=YYYYMMDD
+_SNAPSHOT_PARTITION_REL = "1_kline_data/daily_unadjusted"
+
+
+def _snapshot_source_state(data_dir: str, out_dir: str) -> tuple[str | None, str | None]:
+    """返回 (库内最大分区日期, latest.json 的 trade_date)，均为 YYYYMMDD 或 None。"""
+    import json as _json
+    from pathlib import Path as _P
+
+    max_part: str | None = None
+    part_root = _P(data_dir) / _SNAPSHOT_PARTITION_REL
+    try:
+        if part_root.is_dir():
+            dates = [
+                e.name.split("=", 1)[1]
+                for e in part_root.iterdir()
+                if e.is_dir()
+                and e.name.startswith("dt=")
+                and "=" in e.name
+                and e.name.split("=", 1)[1].isdigit()
+            ]
+            max_part = max(dates) if dates else None
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[MarketSnapshot] 扫描分区失败: %s", exc)
+
+    latest_td: str | None = None
+    latest_path = _P(out_dir) / "latest.json"
+    try:
+        if latest_path.is_file():
+            td = str(_json.loads(latest_path.read_text(encoding="utf-8")).get("trade_date") or "")
+            td = td.strip().replace("-", "")
+            if len(td) == 8 and td.isdigit():
+                latest_td = td
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[MarketSnapshot] 读取 latest.json 失败: %s", exc)
+    return max_part, latest_td
+
+
 @celery_app.task(name="engine.tasks.market_snapshot")
 def run_market_snapshot() -> dict[str, Any]:
     """在服务器容器内计算市场分析快照，写入 QM_MARKET_SNAPSHOT_DIR。
 
     服务器即生产环境：数据(读取容器 /data/quantdb)与脚本都在容器内。
     交易日盘后由 beat 触发，API 通过 QM_MARKET_SNAPSHOT_DIR=/data/market-analysis 读取。
+
+    新鲜度门控：仅当库内最大分区比线上快照（latest.json 的 trade_date）更新时
+    才真正计算并覆盖 latest；否则直接跳过（同步还没跑完或今日无新数据），
+    避免用过期数据静默覆盖线上快照。beat 在 04:00–05:50 每 10 分钟触发一次，
+    给用户配置时间的同步留足完成窗口；节假日无新分区时全天跳过属正常行为。
     """
     try:
         from backend.scripts.market_snapshot.compute import refresh_snapshot

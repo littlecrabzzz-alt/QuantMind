@@ -73,9 +73,9 @@ def _get_model_data_dir(model_dir: Path) -> str:
             data_source = str(meta.get("data_source", "")).lower()
             if data_source == "quantdb_factors":
                 from backend.services.engine.inference.script_runner import (
-                    _resolve_quantdb_data_dir,
+                    _resolve_market_factor_data_dir,
                 )
-                return _resolve_quantdb_data_dir()
+                return _resolve_market_factor_data_dir(meta)
             if data_source == "qlib":
                 from backend.shared.qlib_paths import resolve_qlib_provider_uri
                 return resolve_qlib_provider_uri()
@@ -495,6 +495,8 @@ class InferenceRouterService:
         resolved_model: dict[str, Any] | None = None,
         redis_client=None,
         symbols: list[str] | None = None,
+        persist: bool = True,
+        pool_id: str | None = None,
     ) -> ExecutionResult:
         if resolved_model is not None:
             resolved = dict(resolved_model)
@@ -559,7 +561,7 @@ class InferenceRouterService:
             fallback_model_id=fallback_id,
             enable_fallback=not independent_execution,
         )
-        result = runner.execute(date, tenant_id=tenant_id, user_id=user_id, redis_client=redis_client, symbols=symbols)
+        result = runner.execute(date, tenant_id=tenant_id, user_id=user_id, redis_client=redis_client, symbols=symbols, persist=persist, pool_id=pool_id)
         execution_meta = _build_execution_meta(
             fallback_used=bool(result.fallback_used),
             fallback_reason=result.fallback_reason or fallback_reason,
@@ -574,10 +576,12 @@ class InferenceRouterService:
 
         # 两套推理数据一致性：用户模型全市场推理成功后，把真实分数回写
         # 该模型目录的 pred.parquet（coverage 缺口判定与个股分数曲线的
-        # 数据源）。单股推理（symbols 非空，仅个别标的）与 alpha158 兜底
-        # 不回写，避免残缺日期污染历史分数序列。
+        # 数据源）。单股推理（symbols 非空，仅个别标的）与兜底结果
+        # 不回写，避免残缺日期污染历史分数序列；persist=False（个股独立
+        # 轻路线）同样不回写，结果只在前端缓存。
         if (
             result.success
+            and persist
             and not result.fallback_used
             and explicit_storage_dir
             and symbols is None
@@ -604,44 +608,7 @@ class InferenceRouterService:
                     exc,
                 )
 
-        # 仅共享系统链路保留最终 alpha158 补位；独立模型不参与模型间 fallback。
-        if (
-            not independent_execution
-            and not result.success
-            and primary_id not in {self.primary_model_id, self.fallback_model_id}
-        ):
-            final_runner = InferenceScriptRunner(
-                primary_model_dir=self.fallback_model_dir,
-                fallback_model_dir=self.fallback_model_dir,
-                primary_data_dir=self.fallback_data_source,
-                fallback_data_dir=self.fallback_data_source,
-                primary_model_id=self.fallback_model_id,
-                fallback_model_id=self.fallback_model_id,
-                enable_fallback=False,
-            )
-            final_result = final_runner.execute(date, tenant_id=tenant_id, user_id=user_id, redis_client=redis_client, symbols=symbols)
-            if final_result.success:
-                final_result.fallback_used = True
-                reason = fallback_reason or result.fallback_reason or result.error or "fallback to alpha158"
-                final_result.fallback_reason = reason
-                final_result.active_model_id = self.fallback_model_id
-                final_meta = _build_execution_meta(
-                    fallback_used=True,
-                    fallback_reason=reason,
-                    active_model_id=self.fallback_model_id,
-                    effective_model_id=effective_model_id,
-                    model_source=model_source,
-                    independent_execution=False,
-                )
-                final_result.execution_mode = str(final_meta["execution_mode"])
-                final_result.model_switch_used = bool(
-                    final_meta["model_switch_used"]
-                )
-                final_result.model_switch_reason = str(
-                    final_meta["model_switch_reason"]
-                )
-                return final_result
-
+        # 系统内置 model_qlib/alpha158 兜底链已废弃：用户模型失败时不再补位。
         if result.success and model_source in _INDEPENDENT_MODEL_SOURCES:
             result.active_model_id = effective_model_id
             if (

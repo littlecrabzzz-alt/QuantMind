@@ -8,12 +8,14 @@ import logging
 import os
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from backend.services.engine.alpha_agent.hw_lock import HardwareLockError
 from backend.services.engine.alpha_agent.launcher import get_launcher
 from backend.services.engine.auth_context import (
     assert_identity_not_spoofed,
@@ -22,11 +24,57 @@ from backend.services.engine.auth_context import (
 from backend.services.engine.qlib_app.services.rd_agent_persistence import (
     RDAgentFactorPersistence,
 )
+from backend.shared.stock_pool.builtins import cn_index_symbols
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/alpha-agent", tags=["AlphaAgent"])
 persistence = RDAgentFactorPersistence()
+
+# P2：CN 可选股票池由 shared.stock_pool.builtins 派生（唯一事实源），
+# 与 quantdb_hub.UNIVERSE_MAP / Strategy Lab 白名单同源，不再各写一份。
+_VALID_CN_UNIVERSES: list[str] = list(cn_index_symbols().keys())
+
+
+def _normalize_pool_ref(universe: str) -> str:
+    u = (universe or "").strip()
+    if not u:
+        return "pool:csi300"
+    if u.startswith(("pool:", "pool_id:", "list:", "file:")):
+        return u
+    return f"pool:{u}"
+
+
+def _universe_is_valid(universe: str) -> bool:
+    if universe in _VALID_CN_UNIVERSES:
+        return True
+    try:
+        from backend.shared.stock_pool.resolver import resolve_pool_sync
+
+        snap = resolve_pool_sync(_normalize_pool_ref(universe))
+        return bool(snap.unfiltered or snap.symbols)
+    except Exception:
+        return False
+
+
+def _resolve_custom_pool_instruments(universe: str) -> list[str] | None:
+    """非内置 code 时尝试全局股票池解析；内置池返回 None 走原逻辑。"""
+    if universe in _VALID_CN_UNIVERSES:
+        return None
+    try:
+        from backend.shared.stock_pool.resolver import resolve_pool_sync
+        from backend.shared.stock_utils import StockCodeUtil
+
+        snap = resolve_pool_sync(_normalize_pool_ref(universe))
+        if snap.unfiltered:
+            return None
+        if not snap.symbols:
+            return []
+        return sorted({StockCodeUtil.to_prefix(s) for s in snap.symbols})
+    except Exception as e:
+        logger.warning("custom pool %s resolve failed: %s", universe, e)
+        return None
+
 
 _running_backtests: set[str] = set()
 # 回测子进程句柄 + 取消标记：cancel 接口据此真正 kill 子进程
@@ -39,7 +87,11 @@ async def _fetch_profile_llm_config(user_id: str, tenant_id: str):
 
     与 AI-IDE 共享同一份凭证。无有效 Key 返回 None。
     """
-    from backend.services.engine.alpha_agent.llm_client import LLMConfig, _is_placeholder
+    from backend.services.engine.alpha_agent.llm_client import (
+        LLMConfig,
+        _is_placeholder,
+        parse_extra_headers,
+    )
 
     try:
         from backend.shared.auth import get_internal_call_secret
@@ -61,24 +113,36 @@ async def _fetch_profile_llm_config(user_id: str, tenant_id: str):
         key = (data.get("api_key") or "").strip()
         if not key or _is_placeholder(key):
             return None
-        base = (data.get("llm_base_url") or "").strip() or "https://dashscope.aliyuncs.com/compatible-mode/v1"
-        model = (data.get("llm_model") or "").strip() or "qwen-plus"
-        return LLMConfig(api_key=key, base_url=base, model=model, protocol="openai")
+        base = (data.get("llm_base_url") or "").strip()
+        model = (data.get("llm_model") or "").strip()
+        # 以用户设置为准：base/model 缺失视为未配置，回退 env 兜底
+        if not base or not model:
+            return None
+        base = base.rstrip("/")
+        # DeepSeek 等 Anthropic 兼容端点（.../anthropic）走 Anthropic 协议
+        protocol = "anthropic" if "/anthropic" in base or model.lower().startswith("astron") else "openai"
+        # OpenAI 兼容端点统一保留 /v1（实际调用/RD-Agent 子进程都按 {base}/chat/completions 拼接）
+        if protocol == "openai" and not base.endswith("/v1"):
+            base += "/v1"
+        headers = parse_extra_headers(data.get("llm_extra_headers"))
+        return LLMConfig(
+            api_key=key, base_url=base, model=model, protocol=protocol, headers=headers
+        )
     except Exception:
         logger.exception("[alpha-agent] fetch profile llm config failed")
         return None
 
 
 async def _resolve_effective_llm_config(user_id: str, tenant_id: str):
-    """环境变量（平台级）优先；无有效 Key 时回退当前用户 Profile 的 AI-IDE 配置。"""
+    """以用户设置为准：优先当前用户 Profile 的「AI 服务配置」，环境变量仅作兜底。"""
     from backend.services.engine.alpha_agent.llm_client import resolve_llm_config
 
-    cfg = resolve_llm_config()
-    if cfg is not None:
-        return cfg, "env"
     cfg = await _fetch_profile_llm_config(user_id, tenant_id)
     if cfg is not None:
         return cfg, "user_profile"
+    cfg = resolve_llm_config()
+    if cfg is not None:
+        return cfg, "env"
     return None, "none"
 
 
@@ -160,11 +224,13 @@ async def list_markets():
 @router.post("/evolve")
 async def start_evolution(
     request: Request,
-    user_id: Optional[str] = Query(None, description="已废弃：身份取自 JWT，仅用于防伪校验"),
+    user_id: str | None = Query(None, description="已废弃：身份取自 JWT，仅用于防伪校验"),
     market: str = Query("a_share", description="市场: a_share, crypto, hong_kong, us_stock"),
     universe: str = Query("csi300", description="股票池: csi300, csi500, csi1000, sse50, gem, star, csi800, all_a"),
     loop_n: int = Query(5, ge=1, le=20, description="演化轮数"),
     direction: str = Query("", description="因子挖掘方向/假设"),
+    directions: list[str] = Query(default=[], description="L1 因子类别方向列表（多选）"),
+    direction_mode: str = Query("selected", description="类别选择模式: selected=取第一条, random=随机一条"),
     data_source: str = Query("", description="数据源: qlib_bin, parquet, pg (留空使用默认)"),
 ):
     """启动因子演化任务"""
@@ -186,12 +252,15 @@ async def start_evolution(
             detail=f"Unknown market: {market}. Available: {available}",
         ) from e
 
-    # Validate universe
-    valid_universes = ["csi300", "csi500", "csi1000", "sse50", "gem", "star", "csi800", "all_a"]
-    if universe not in valid_universes:
+    # Validate universe（内置指数 + 全局自定义股票池）
+    if market == "a_share" and not _universe_is_valid(universe):
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown universe: {universe}. Available: {valid_universes}",
+            detail=(
+                f"Unknown universe: {universe}. "
+                f"Available builtins: {_VALID_CN_UNIVERSES}, "
+                "or any active global/custom pool code from /stock-pools/options"
+            ),
         )
 
     llm_config, llm_source = await _resolve_effective_llm_config(auth_user_id, auth_tenant_id)
@@ -202,6 +271,19 @@ async def start_evolution(
             "或在服务器 .env 配置 DEEPSEEK_API_KEY / AI_IDE_LLM_API_KEY / OPENAI_API_KEY。",
         )
     logger.info("[alpha-agent] evolve llm source=%s model=%s", llm_source, llm_config.model)
+
+    # 类别方向下发：前端传多选类别 + 模式，服务端解析成单条 direction
+    clean_dirs = [d.strip() for d in directions if isinstance(d, str) and d.strip()]
+    if clean_dirs:
+        import random as _random
+
+        direction = (
+            _random.choice(clean_dirs) if direction_mode == "random" else clean_dirs[0]
+        )
+        logger.info(
+            "[alpha-agent] evolve directions=%d mode=%s -> %s",
+            len(clean_dirs), direction_mode, direction,
+        )
 
     launcher = get_launcher()
     # 并发上限：每个任务是 RD-Agent 子进程（烧 LLM token + Qlib 回测），
@@ -220,15 +302,18 @@ async def start_evolution(
             status_code=429,
             detail=f"当前全平台挖掘任务数已达上限（{max_global}），请稍后再试。",
         )
-    task_id = await launcher.start_evolution(
-        auth_user_id,
-        market=market,
-        universe=universe,
-        loop_n=loop_n,
-        direction=direction or None,
-        data_source=data_source or None,
-        llm_overrides=llm_config.llm_env_overrides(),
-    )
+    try:
+        task_id = await launcher.start_evolution(
+            auth_user_id,
+            market=market,
+            universe=universe,
+            loop_n=loop_n,
+            direction=direction or None,
+            data_source=data_source or None,
+            llm_overrides=llm_config.llm_env_overrides(),
+        )
+    except HardwareLockError as exc:
+        raise HTTPException(status_code=412, detail=str(exc)) from exc
     return {
         "code": 200,
         "data": {
@@ -299,8 +384,8 @@ async def get_task_log(
 @router.get("/tasks")
 async def list_tasks(
     request: Request,
-    user_id: Optional[str] = Query(None, description="已废弃：身份取自 JWT，仅用于防伪校验"),
-    market: Optional[str] = Query(None, description="按市场过滤"),
+    user_id: str | None = Query(None, description="已废弃：身份取自 JWT，仅用于防伪校验"),
+    market: str | None = Query(None, description="按市场过滤"),
 ):
     """列出当前用户的演化任务"""
     auth_user_id, auth_tenant_id = get_authenticated_identity(request)
@@ -319,10 +404,10 @@ async def list_tasks(
 @router.get("/factors")
 async def list_factors(
     request: Request,
-    user_id: Optional[str] = Query(None, description="已废弃：身份取自 JWT，仅用于防伪校验"),
-    market: Optional[str] = Query(None, description="按市场过滤"),
-    universe: Optional[str] = Query(None, description="按股票池过滤"),
-    status: Optional[str] = Query(None, description="按状态过滤: pending/backtesting/completed/failed"),
+    user_id: str | None = Query(None, description="已废弃：身份取自 JWT，仅用于防伪校验"),
+    market: str | None = Query(None, description="按市场过滤"),
+    universe: str | None = Query(None, description="按股票池过滤"),
+    status: str | None = Query(None, description="按状态过滤: pending/backtesting/completed/failed"),
     limit: int = Query(50, ge=1, le=200),
 ):
     """列出当前用户已生成的因子"""
@@ -343,6 +428,75 @@ async def get_factor(factor_id: str, request: Request):
     """获取单个因子详情"""
     factor = await _require_owned_factor(factor_id, request)
     return {"code": 200, "data": factor}
+
+
+def _resolve_factory_manifest() -> Path:
+    """因子工厂 MANIFEST.csv 路径（quantcustom 用户自定义数据集）。"""
+    root = os.getenv("QM_QUANTCUSTOM_DATA_DIR") or "/data/quantcustom"
+    return Path(root) / "6_ml_datasets" / "l1_factors" / "MANIFEST.csv"
+
+
+def _to_float(value: object) -> float | None:
+    try:
+        f = float(value)  # type: ignore[arg-type]
+        return f if f == f else None  # 过滤 NaN
+    except (TypeError, ValueError):
+        return None
+
+
+@router.get("/factory-factors")
+async def list_factory_factors(request: Request):
+    """列出因子工厂产出的表达式因子（只读，来自 quantcustom MANIFEST.csv）。
+
+    工厂因子是共享的批量产出（不属某个用户），只展示、不提供回测/训练操作。
+    """
+    import csv
+
+    get_authenticated_identity(request)  # 复用统一鉴权（与 /factors 一致）
+
+    manifest = _resolve_factory_manifest()
+    if not manifest.is_file():
+        return {"code": 200, "data": {"factors": [], "total": 0, "generated_at": None}}
+
+    factors: list[dict] = []
+    with manifest.open(encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            name = (row.get("factor_name") or "").strip()
+            if not name:
+                continue
+            expr = (row.get("expression") or "").strip()
+            factors.append({
+                "factor_id": f"factory:{name}",
+                "factor_name": name,
+                "factor_expression": expr,
+                "factor_formulation": expr,
+                "factor_code": "",
+                "ic_value": _to_float(row.get("ic")),
+                "icir": _to_float(row.get("icir")),
+                "coverage": _to_float(row.get("coverage")),
+                "rank_ic": None,
+                "status": "completed",
+                "market": "a_share",
+                "universe": "all_a",
+                "source": "factor_factory",
+                "read_only": True,
+                "metadata": {
+                    "source": "factor_factory",
+                    "read_only": True,
+                    "field": row.get("field") or "",
+                    "icir": _to_float(row.get("icir")),
+                    "coverage": _to_float(row.get("coverage")),
+                },
+            })
+    factors.sort(key=lambda x: abs(x.get("ic_value") or 0.0), reverse=True)
+    return {
+        "code": 200,
+        "data": {
+            "factors": factors,
+            "total": len(factors),
+            "generated_at": datetime.fromtimestamp(manifest.stat().st_mtime).isoformat(),
+        },
+    }
 
 
 @router.post("/factors/{factor_id}/explain")
@@ -406,10 +560,10 @@ async def explain_factor(factor_id: str, request: Request):
 async def backtest_factor(
     factor_id: str,
     request: Request,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    universe: Optional[str] = Query("csi300", description="回测股票池: csi300, csi500, csi1000, sse50, gem, star, csi800, all_a"),
-    data_source: Optional[str] = Query("qlib_bin", description="回测数据源: qlib_bin(默认) | h5"),
+    start_date: str | None = None,
+    end_date: str | None = None,
+    universe: str | None = Query("csi300", description="回测股票池: csi300, csi500, csi1000, sse50, gem, star, csi800, all_a"),
+    data_source: str | None = Query("qlib_bin", description="回测数据源: qlib_bin(默认) | h5"),
 ):
     """对因子发起轻量验证（多市场 + 数据源可选）
 
@@ -552,7 +706,7 @@ async def export_factor_to_ide(
 @router.get("/stats")
 async def get_stats(
     request: Request,
-    market: Optional[str] = Query(None, description="按市场过滤统计"),
+    market: str | None = Query(None, description="按市场过滤统计"),
 ):
     """当前用户的因子统计信息"""
     from sqlalchemy import text
@@ -622,17 +776,69 @@ async def get_factor_categories():
 
 
 @router.get("/universes")
-async def get_universes():
-    """返回可用股票池及股票数"""
+async def get_universes(request: Request):
+    """返回可用股票池及股票数（内置指数 + 用户可见的全局自定义池）"""
+    universes: dict[str, dict] = {}
     try:
         from backend.services.engine.data_platform.quantdb_hub import QuantDBDataHub
+
         hub = QuantDBDataHub.get_instance()
         summary = hub.get_data_summary()
-        universes = summary.get("universes", {})
-        return {"code": 200, "data": {"universes": universes}}
+        for code, meta in (summary.get("universes") or {}).items():
+            universes[code] = {
+                "count": meta.get("count", 0) if isinstance(meta, dict) else 0,
+                "indexSymbol": meta.get("indexSymbol") if isinstance(meta, dict) else None,
+                "is_system": True,
+            }
     except Exception as e:
-        logger.warning("Failed to get universes: %s", e)
-        return {"code": 200, "data": {"universes": {}}}
+        logger.warning("Failed to get builtin universes: %s", e)
+
+    try:
+        from sqlalchemy import text
+
+        from backend.shared.database_manager_v2 import get_session
+        from backend.shared.stock_pool import repository as pool_repo
+
+        user_id, tenant_id = get_authenticated_identity(request)
+        async with get_session() as session:
+            await pool_repo.ensure_tables(session)
+            rows = (
+                (
+                    await session.execute(
+                        text(
+                            """
+                    SELECT code, name, symbol_count, is_system
+                      FROM qm_stock_pool
+                     WHERE status <> 'archived'
+                       AND market = 'CN'
+                       AND (
+                            scope = 'global'
+                            OR (scope = 'tenant' AND tenant_id = :tenant_id)
+                            OR (scope = 'user' AND owner_user_id = :user_id)
+                       )
+                     ORDER BY is_system DESC, code ASC
+                    """
+                        ),
+                        {"tenant_id": tenant_id, "user_id": user_id},
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        for row in rows:
+            code = str(row["code"])
+            if code in universes and row["is_system"]:
+                continue
+            universes[code] = {
+                "count": int(row["symbol_count"] or 0),
+                "indexSymbol": None,
+                "is_system": bool(row["is_system"]),
+                "name": str(row["name"] or code),
+            }
+    except Exception as e:
+        logger.warning("Failed to merge custom stock pools: %s", e)
+
+    return {"code": 200, "data": {"universes": universes}}
 
 
 @router.get("/llm-config")
@@ -644,11 +850,11 @@ async def get_llm_config(request: Request):
     from backend.services.engine.alpha_agent.llm_client import resolve_llm_config
 
     auth_user_id, auth_tenant_id = get_authenticated_identity(request)
-    cfg = resolve_llm_config()
-    source = "env"
+    cfg = await _fetch_profile_llm_config(auth_user_id, auth_tenant_id)
+    source = "user_profile"
     if cfg is None:
-        cfg = await _fetch_profile_llm_config(auth_user_id, auth_tenant_id)
-        source = "user_profile"
+        cfg = resolve_llm_config()
+        source = "env"
     if cfg is None:
         return {
             "code": 200,
@@ -785,6 +991,9 @@ def _resolve_instruments_for_universe(
     from qlib.data import D
 
     if market_upper == "CN":
+        custom = _resolve_custom_pool_instruments(universe)
+        if custom is not None:
+            return custom
         if universe in _QLIB_NATIVE_UNIVERSES:
             return D.instruments(market=universe)
         try:
@@ -803,14 +1012,36 @@ def _resolve_instruments_for_universe(
     return D.instruments(market="all")
 
 
+def _default_backtest_window(market: str = "a_share") -> tuple[str, str]:
+    """默认回测窗口：近一年（end=数据最新交易日，start=end 往前一年）。"""
+    import pandas as pd
+
+    end_ts = None
+    try:
+        if market == "a_share":
+            from backend.services.engine.data_platform.quantdb_hub import QuantDBDataHub
+
+            cal = QuantDBDataHub.get_instance().fetch_calendar()
+            if cal is not None and not cal.empty:
+                for col in ("trade_date", "date", "time", "cal_date", "TradingDate"):
+                    if col in cal.columns:
+                        end_ts = pd.to_datetime(cal[col]).max()
+                        break
+    except Exception as exc:
+        logger.warning("[alpha-backtest] resolve default window failed: %s", exc)
+    if end_ts is None or pd.isna(end_ts):
+        end_ts = pd.Timestamp.today().normalize()
+    return (end_ts - pd.DateOffset(years=1)).strftime("%Y-%m-%d"), end_ts.strftime("%Y-%m-%d")
+
+
 async def _run_factor_backtest(
     factor_id: str,
     factor_code: str,
     market: str = "a_share",
     data_source: str = "qlib_bin",
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    universe: Optional[str] = "csi300",
+    start_date: str | None = None,
+    end_date: str | None = None,
+    universe: str | None = "csi300",
 ) -> None:
     """统一回测入口（多市场 + 数据源可选）。
 
@@ -819,8 +1050,9 @@ async def _run_factor_backtest(
         data_source: 'qlib_bin' (默认) | 'h5'
     """
     market_upper = _MARKET_TO_QLIB.get(market, "CN")
-    end = end_date or "2024-12-31"
-    start = start_date or "2024-01-01"
+    _default_start, _default_end = _default_backtest_window(market)
+    end = end_date or _default_end
+    start = start_date or _default_start
 
     try:
         kind = _detect_factor_kind(factor_code)
@@ -1210,9 +1442,9 @@ def _resolve_factor_h5_path_for_market(market: str) -> str | None:
 async def _run_lightweight_backtest(
     factor_id: str,
     factor_code: str,
-    start_date: Optional[str],
-    end_date: Optional[str],
-    universe: Optional[str] = "csi300",
+    start_date: str | None,
+    end_date: str | None,
+    universe: str | None = "csi300",
 ) -> None:
     """轻量回测（支持多股票池）"""
     try:
@@ -1229,8 +1461,9 @@ async def _run_lightweight_backtest(
         if kind != "factor_class":
             raise RuntimeError("因子代码中未找到可调用的 Factor 类")
 
-        end = end_date or "2024-12-31"
-        start = start_date or "2024-01-01"
+        _default_start, _default_end = _default_backtest_window("a_share")
+        end = end_date or _default_end
+        start = start_date or _default_start
 
         # Universes with a native Qlib instruments file can be passed straight through;
         # the rest (sse50, gem, star, all_a) are resolved from QuantDB index weights.
@@ -1377,9 +1610,9 @@ async def _run_lightweight_backtest(
 async def _backtest_functional_factor(
     factor_id: str,
     factor_code: str,
-    start_date: Optional[str],
-    end_date: Optional[str],
-    universe: Optional[str] = "csi300",
+    start_date: str | None,
+    end_date: str | None,
+    universe: str | None = "csi300",
 ) -> None:
     """回测 RD-Agent 函数式因子（calculate_* 返回 DataFrame，读 daily_pv.h5）。
 
@@ -1391,8 +1624,9 @@ async def _backtest_functional_factor(
         import sys as _sys
         from pathlib import Path
 
-        end = end_date or "2024-12-31"
-        start = start_date or "2024-01-01"
+        _default_start, _default_end = _default_backtest_window("a_share")
+        start = start_date or _default_start
+        end = end_date or _default_end
 
         # 市场 → H5 数据文件（因子代码读 daily_pv.h5，subprocess chdir 到 /tmp）
         data_path = _resolve_factor_h5_path(universe)
@@ -1431,6 +1665,18 @@ try:
     if factor_df.empty:
         print("EMPTY_FACTOR"); sys.exit(1)
     price_df = pd.read_hdf({repr(str(data_path))})
+    # 切片到回测窗口（默认近一年，由调用方解析）
+    _start = {start!r}
+    _end = {end!r}
+    if _start or _end:
+        _di = price_df.index.get_level_values(0)
+        if _start:
+            price_df = price_df[_di >= pd.Timestamp(_start)]
+            _di = price_df.index.get_level_values(0)
+        if _end:
+            price_df = price_df[_di <= pd.Timestamp(_end)]
+        if price_df.empty:
+            print("EMPTY_WINDOW"); sys.exit(1)
     if 'close' in price_df.columns.get_level_values(0):
         close = price_df['close']
     elif '$close' in price_df.columns.get_level_values(0):

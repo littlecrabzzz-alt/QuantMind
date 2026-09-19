@@ -20,9 +20,9 @@ def test_parse_dsl_supports_single_equals() -> None:
 
 
 def test_factor_mapping_uses_new_snapshot_columns() -> None:
-    assert FACTOR_COLUMN_MAP["amount"] == "amount"
-    assert FACTOR_COLUMN_MAP["is_hs300"] == "idx_hs300"
-    assert FACTOR_COLUMN_MAP["is_csi1000"] == "idx_zz1000"
+    assert FACTOR_COLUMN_MAP["amount"] == ("quantdb_daily", "amount")
+    assert FACTOR_COLUMN_MAP["is_hs300"] == ("quantdb_stock_list", "idx_hs300")
+    assert FACTOR_COLUMN_MAP["is_csi1000"] == ("quantdb_stock_list", "idx_zz1000")
 
 
 def test_inject_trade_date_filter_for_raw_sql() -> None:

@@ -4,8 +4,9 @@ SQLAlchemy base model for simulation.
 
 from datetime import datetime
 
-from sqlalchemy import DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from backend.shared.utc_datetime import UtcDateTime, utc_now
 
 
 class Base(DeclarativeBase):
@@ -14,8 +15,8 @@ class Base(DeclarativeBase):
 
 class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+        UtcDateTime, default=utc_now, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        UtcDateTime, default=utc_now, onupdate=utc_now, nullable=False
     )

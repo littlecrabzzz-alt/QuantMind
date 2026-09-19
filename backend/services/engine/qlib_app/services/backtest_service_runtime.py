@@ -7,7 +7,7 @@ import os
 import random
 import time
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -26,7 +26,10 @@ from backend.services.engine.qlib_app.services.market_state_service import (
     MarketStateService,
 )
 from backend.services.engine.qlib_app.services.risk_analyzer import RiskAnalyzer
-from backend.services.engine.qlib_app.services.strategy_builder import StrategyFactory
+from backend.services.engine.qlib_app.services.strategy_builder import (
+    StrategyFactory,
+    extract_backtest_dates,
+)
 from backend.services.engine.qlib_app.services.strategy_templates import (
     get_template_by_id,
 )
@@ -75,6 +78,21 @@ PROJECT_ROOT = _find_project_root()
 task_logger.info(
     "project_root_resolved", "Project root resolved", root=str(PROJECT_ROOT)
 )
+
+
+def _qlib_universe(universe):
+    """Qlib universe 兼容层：池 instruments 文件路径 → 符号列表。
+
+    - qlib 的 `D.instruments(str)` 只认市场短名（csi300/all/…），不认任意
+      文件路径；池物化文件又是 `sym\\tSTART\\tEND` 标准格式，整行不能当代码。
+    - 文件路径一律经 `read_instruments_file` 只取首列转成 list（qlib 原生支持
+      list）；市场名 / 'all' 原样透传，走 qlib 原生路径。
+    """
+    if universe and isinstance(universe, str) and os.path.isfile(universe):
+        from backend.shared.stock_pool.materializer import read_instruments_file
+
+        return read_instruments_file(universe)
+    return universe
 
 
 class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
@@ -139,6 +157,64 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                 region=getattr(request, "qlib_region", None),
             )
             self._set_deterministic_seed(self._resolve_seed(request.seed))
+
+            # --- Global Stock Pool Resolution [START] ---
+            # P3：pool_id 优先于 universe。解析 → 物化 instruments 文件 →
+            # 覆盖 universe（后续 isfile 分支与 SimpleSignal 都能直接吃文件路径）。
+            # 成员来自池 TXT（保存即生效）。空池**必须显式失败**，
+            # 不能静默退化成全市场（那正是改造前的坑）。
+            if getattr(request, "pool_id", None):
+                from backend.shared.stock_pool.materializer import (
+                    materialize_snapshot,
+                )
+                from backend.shared.stock_pool.resolver import (
+                    ResolveContext,
+                    resolver as pool_resolver,
+                )
+
+                snapshot = await pool_resolver.resolve(
+                    request.pool_id,
+                    ResolveContext(
+                        tenant_id=getattr(request, "tenant_id", None),
+                        user_id=getattr(request, "user_id", None),
+                    ),
+                    strict=True,
+                )
+                request.pool_checksum = snapshot.checksum
+                request.pool_warnings = list(snapshot.warnings or [])
+
+                if snapshot.unfiltered:
+                    task_log.info(
+                        "pool_resolved_unfiltered",
+                        "股票池解析为不过滤（等价 universe=all）",
+                        pool_id=request.pool_id,
+                    )
+                else:
+                    pool_path = materialize_snapshot(
+                        snapshot,
+                        start_date=request.start_date,
+                        end_date=request.end_date,
+                    )
+                    if not pool_path:
+                        raise ValueError(
+                            f"股票池 {request.pool_id} 解析为空池，拒绝回测"
+                            "（避免静默退化为全市场）。"
+                            f"告警: {'; '.join(snapshot.warnings) or '无'}"
+                        )
+                    request.universe = pool_path
+                    task_log.info(
+                        "pool_resolved",
+                        "股票池已物化并覆盖 universe",
+                        pool_id=request.pool_id,
+                        pool_code=snapshot.code,
+                        symbol_count=len(snapshot.symbols),
+                        checksum=snapshot.checksum,
+                        instruments_path=pool_path,
+                    )
+
+                for _w in request.pool_warnings:
+                    task_log.warning("pool_warning", _w, pool_id=request.pool_id)
+            # --- Global Stock Pool Resolution [END] ---
 
             # --- Storage Resolution [START] ---
             try:
@@ -240,6 +316,47 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                             error=pool_err,
                         )
             # --- Pool File Resolution [END] ---
+
+            # --- Backtest Date Resolution [START] ---
+            # 专家模式 / AI-IDE 代码优先：策略代码可通过 BACKTEST_CONFIG /
+            # START_DATE+END_DATE / get_backtest_config() 指定回测区间，
+            # 有则覆盖请求参数；请求与代码均未指定时默认近一年。
+            if request.strategy_content:
+                try:
+                    code_dates = extract_backtest_dates(request.strategy_content)
+                    if code_dates:
+                        task_log.info(
+                            "code_dates_applied",
+                            "策略代码指定回测日期，覆盖请求参数",
+                            old_start=request.start_date,
+                            old_end=request.end_date,
+                            new_start=code_dates["start_date"],
+                            new_end=code_dates["end_date"],
+                        )
+                        request.start_date = code_dates["start_date"]
+                        request.end_date = code_dates["end_date"]
+                except ValueError:
+                    raise
+                except Exception as date_err:
+                    task_log.warning(
+                        "code_dates_parse_failed",
+                        "策略代码日期解析失败，使用请求参数",
+                        error=str(date_err),
+                    )
+            if not request.start_date or not request.end_date:
+                default_end = datetime.now().strftime("%Y-%m-%d")
+                default_start = (datetime.now() - timedelta(days=365)).strftime(
+                    "%Y-%m-%d"
+                )
+                task_log.info(
+                    "default_dates_applied",
+                    "未指定回测日期，默认近一年",
+                    start=default_start,
+                    end=default_end,
+                )
+                request.start_date = request.start_date or default_start
+                request.end_date = request.end_date or default_end
+            # --- Backtest Date Resolution [END] ---
 
             task_log.info(
                 "signal_raw",
@@ -363,18 +480,17 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                         end_ts = signal_ts
 
                 # 2. Qlib 物理日历边界检查
-                # 边界语义：cal_max_ts 是日历最后一天，若请求终点 >= cal_max_ts，
-                # 则实际终点收缩到 cal_max_ts 本身（可用数据最后一天），而不是
-                # 倒数第二天 full_cal[-2]。
-                # 否则会污染两个下游环节：
-                #   a) signal_end_date_truncated（上方）：信号只覆盖到 cal_max_ts，
-                #      但 request.end_date 被写成 cal_max_ts-1，导致 rows_in_range
-                #      少算一天；
-                #   b) qlib.backtest() 以 request.end_date 作为终点：当日历完全
-                #      不覆盖区间时 qlib 静默用工作日日历补 44 天空转（0 成交、
-                #      全部指标 0），而收缩到 cal_max_ts 后即可正常出信号。
+                # qlib TradeCalendar.get_step_time 会取 calendar[i+1] 做
+                # trade_end_time，终点顶到日历最后一天必报
+                # IndexError: index N out of bounds for axis 0 with size N。
+                # 因此 end >= cal_max 时必须留一根 bar，回退到倒数第二个交易日
+                # full_cal[-2]，而不是 cal_max 本身。
                 if end_ts >= cal_max_ts:
-                    actual_end_date = str(cal_max_ts.date())
+                    if len(full_cal) >= 2:
+                        safe_end_ts = pd.Timestamp(full_cal[-2].date())
+                    else:
+                        safe_end_ts = cal_max_ts - pd.Timedelta(days=1)
+                    actual_end_date = str(safe_end_ts.date())
                     task_log.info(
                         "calendar_limit_reached",
                         "检测到目标日期达到日历边界，执行安全回退",
@@ -456,7 +572,20 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                     or curr_signal == "<PRED>"
                     or (isinstance(curr_signal, str) and curr_signal.startswith("$"))
                 ) and signal_data is not None:
-                    strategy["kwargs"]["signal"] = signal_data
+                    strategy_signal = signal_data
+                    if isinstance(strategy_signal, (pd.DataFrame, pd.Series)):
+                        # step 引擎：qlib 策略已用 get_step_time(step, shift=1) 实现一天滞后，
+                        # 信号层只补剩余 (signal_lag_days - 1) 天，避免双重滞后。
+                        # 向量化引擎不经过这里（走 _materialize_signal_dataframe 完整滞后）。
+                        residual_lag = max(
+                            0, int(getattr(request, "signal_lag_days", 1) or 0) - 1
+                        )
+                        if residual_lag > 0:
+                            strategy_signal = self._lag_signal_frame(
+                                strategy_signal, residual_lag
+                            )
+                    # list 信号（多信号）原样透传，保持既有行为
+                    strategy["kwargs"]["signal"] = strategy_signal
 
                 # --- 信号实例化保障 [START] ---
                 # qlib create_signal_from() 不接受 dict 类型，必须在此统一实例化。
@@ -641,7 +770,7 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                         : int(os.getenv("QLIB_SIGNAL_MAX_INSTRUMENTS", "2000"))
                     ]
                 else:
-                    vectorized_universe = D.instruments(request.universe)
+                    vectorized_universe = D.instruments(_qlib_universe(request.universe))
 
                 price_df = D.features(
                     vectorized_universe,
@@ -1104,7 +1233,7 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
         raw_prefix = {self._to_qlib_prefix_code(c) for c in pred_codes}
         try:
             qlib_instruments = D.list_instruments(
-                D.instruments(str(request.universe) or "all"), as_list=True
+                D.instruments(_qlib_universe(str(request.universe) or "all")), as_list=True
             )
         except Exception:
             qlib_instruments = []
@@ -1182,9 +1311,14 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
         """
         lag_days = int(getattr(request, "signal_lag_days", 1) or 0)
         if isinstance(signal_data, pd.Series):
-            return signal_data.to_frame("score")
+            frame = signal_data.to_frame("score")
+            return self._lag_signal_frame(frame, lag_days) if lag_days > 0 else frame
         if isinstance(signal_data, pd.DataFrame):
-            return signal_data
+            return (
+                self._lag_signal_frame(signal_data, lag_days)
+                if lag_days > 0
+                else signal_data
+            )
         if isinstance(signal_data, dict):
             pred_path = (signal_data.get("kwargs") or {}).get("pred_path")
             if pred_path and os.path.exists(pred_path):
@@ -1338,13 +1472,16 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
             return "US"
         if "BTC" in benchmark or "ETH" in benchmark:
             return "CRYPTO"
-        # 3. 从 universe 路径推断
+        # 3. 从 universe 路径推断（禁止对 "us"/"hk" 做子串匹配：
+        # custom / quantcustom / __custom__ 都含 "us"，会误判为美股）
         universe = str(getattr(request, "universe", "") or "").lower()
-        if "hk" in universe:
+        universe_tokens = {p for p in universe.replace("\\", "/").replace("-", "_").split("/") if p}
+        universe_tokens |= {p for p in universe.replace("\\", "/").replace("/", "_").split("_") if p}
+        if "hk_data" in universe or universe in {"hk", "hong_kong"} or "hk" in universe_tokens:
             return "HK"
-        if "us" in universe:
+        if "us_data" in universe or universe in {"us", "us_stock"} or universe_tokens & {"us", "us_stock"}:
             return "US"
-        if "crypto" in universe:
+        if "crypto_data" in universe or universe in {"crypto"} or "crypto" in universe_tokens:
             return "CRYPTO"
         # 默认 A 股
         return "CN"
@@ -1364,9 +1501,11 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
         context = meta.get("context") or {}
         if isinstance(context, dict):
             market = str(context.get("market") or "").upper().strip()
+            if market in ("CUSTOM", "自定义"):
+                return "CN"
             if market in ("HK", "HONG_KONG", "港股"):
                 return "HK"
-            if market in ("US", "美股"):
+            if market in ("US", "US_STOCK", "美股"):
                 return "US"
             if market in ("CRYPTO", "加密"):
                 return "CRYPTO"
@@ -1583,28 +1722,6 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                 meta["resolved_pred_path"] = str(candidate)
                 return str(candidate), meta
 
-        # 融合模型（model_file=ensemble_config.json）无 pred.pkl 时，
-        # 自动用子模型 pred 融合生成，避免 AI-IDE 回测因缺信号失败。
-        model_file = str(meta.get("model_file") or "").strip()
-        if "ensemble_config" in model_file:
-            try:
-                from backend.services.engine.services.prediction_artifact import (
-                    generate_ensemble_pred,
-                )
-
-                generated = generate_ensemble_pred(model_dir=storage)
-                meta["resolved_pred_path"] = str(generated)
-                meta["ensemble_pred_generated"] = True
-                return str(generated), meta
-            except Exception as gen_err:
-                task_logger.warning(
-                    "ensemble_pred_generation_failed",
-                    "融合模型 pred 自动生成失败",
-                    model_dir=str(storage),
-                    error=str(gen_err),
-                )
-                meta["ensemble_pred_generation_error"] = str(gen_err)
-
         meta["resolved_pred_path"] = str(candidate_paths[0]) if candidate_paths else ""
         meta["fallback_reason"] = "pred_pkl_not_found_in_model_storage"
         return None, meta
@@ -1720,14 +1837,10 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
             feature = f"${feature}"
 
         try:
-            # If universe is a local file path, read instruments directly
+            # universe 是池文件路径时走兼容层解析（只取首列符号）；
+            # 市场名 / 'all' 原样走 qlib 原生路径
             if request.universe and os.path.isfile(request.universe):
-                instrument_list = []
-                with open(request.universe, encoding="utf-8") as fp:
-                    for line in fp:
-                        code = line.strip()
-                        if code and not code.startswith("#"):
-                            instrument_list.append(code)
+                instrument_list = _qlib_universe(request.universe)
                 instrument_list = exclude_bj_instruments(instrument_list)
                 task_logger.info(
                     "pool_loaded",
@@ -1750,7 +1863,10 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
             if df is None or df.empty:
                 raise ValueError("signal data is empty")
             lag_days = int(getattr(request, "signal_lag_days", 1) or 0)
-            df = self._lag_signal_frame(df, lag_days)
+            # 注意：这里返回「未滞后」的特征信号，滞后由引擎各自补齐——
+            # step 引擎由 qlib 策略的 shift=1 + SimpleSignal 残差实现，
+            # 向量化引擎由 _materialize_signal_dataframe 一次性应用完整 lag_days。
+            # 若在此处预先滞后，step 路径会与 qlib 的 shift 叠加成双重滞后。
             return df, {
                 "source": "feature_field",
                 "feature": feature,

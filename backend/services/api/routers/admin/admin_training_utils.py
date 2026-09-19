@@ -22,33 +22,24 @@ from backend.services.engine.training.training_log_stream import TrainingRunLogS
 from backend.services.engine.data_platform.quantdb_factor_reader import QuantDBFactorReader
 from backend.shared.database_manager_v2 import get_session
 from backend.shared.model_registry import model_registry_service
+from backend.shared.training.request import (
+    ALLOWED_TARGET_MODE as _ALLOWED_TARGET_MODE,
+    clamp_int as _clamp_int,
+    coerce_float as _coerce_float,
+    parse_date as _parse_date,
+    resolve_market as _resolve_market,
+)
 
 router = APIRouter(dependencies=[Depends(require_admin)])  # 路由器级认证兜底
 logger = logging.getLogger(__name__)
 _FEATURE_CATALOG_FALLBACK = Path(os.getcwd()) / "config" / "features" / "model_training_feature_catalog_v1.json"
-_ALLOWED_TARGET_MODE = {"return", "classification"}
-_ALLOWED_DEAL_PRICE = {"open", "close"}
-_ALLOWED_MODEL_TYPES = {
-    # Tree models (Tier 1) — share same tabular data pipeline
-    "lightgbm", "xgboost", "catboost", "linear", "random_forest",
-    # Deep learning models (Tier 2) — require sequential data / Qlib
-    "gru", "lstm", "alstm", "transformer", "tabnet", "tcn",
-    # Custom DL models (Tier 3) — non-Qlib PyTorch models
-    "nativetft", "mlp", "hybrid_gru_tree",
-}
-_TREE_MODEL_TYPES = {"lightgbm", "xgboost", "catboost", "linear", "random_forest"}
-_DL_MODEL_TYPES = {"gru", "lstm", "alstm", "transformer", "tabnet", "tcn", "nativetft", "mlp", "hybrid_gru_tree"}
+# NOTE：_TREE/_DL 类型集合已删除，唯一来源为 backend.shared.training.request.ALLOWED_MODEL_TYPES
+#（此前两处各一份，hybrid 剔除时曾漏改——单源杜绝此类漂移）。
 # 市场 → exchange_calendars 日历名。CRYPTO 为 7x24 无休市，不在此映射中。
 _MARKET_TO_XCAL = {"CN": "XSHG", "US": "XNYS", "HK": "XHKG"}
 
 
-def _clamp_int(value: Any, default: int, lo: int, hi: int) -> int:
-    """安全地把输入转成 int 并 clamp 到 [lo, hi]。"""
-    try:
-        n = int(value)
-    except Exception:
-        n = default
-    return max(lo, min(hi, n))
+# _clamp_int 下沉至 backend.shared.training.request（单源），此处 import 复用。
 
 
 def _shift_trading_days_back(anchor: datetime, n_days: int, market: str) -> tuple[datetime, bool]:
@@ -114,23 +105,7 @@ def _resolve_admin_scope(
     return resolved_tenant, resolved_user
 
 
-def _parse_date(date_str: str, field: str) -> datetime:
-    try:
-        return datetime.fromisoformat(date_str)
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=422, detail=f"Invalid date for {field}: {date_str}") from exc
-
-
-def _coerce_float(value: Any) -> float | None:
-    try:
-        if value is None:
-            return None
-        f = float(value)
-        if f != f or f in (float("inf"), float("-inf")):  # NaN/Inf 视为无效
-            return None
-        return f
-    except Exception:
-        return None
+# _parse_date / _coerce_float 下沉至 backend.shared.training.request（单源），此处 import 复用。
 
 
 def _feature_market_declarations() -> dict[str, list[str]]:
@@ -260,104 +235,41 @@ async def _load_allowed_features(market: str | None = None) -> list[str]:
     return _load_allowed_features_from_file(market=market)
 
 
-def _normalize_context(context: dict[str, Any]) -> dict[str, Any]:
-    if not isinstance(context, dict):
-        raise HTTPException(status_code=422, detail="context must be an object")
-
-    initial_capital = _coerce_float(context.get("initial_capital"))
-    if initial_capital is None:
-        initial_capital = _coerce_float(context.get("initialCapital"))
-    initial_capital = initial_capital if initial_capital is not None else 1_000_000.0
-    if initial_capital <= 0:
-        raise HTTPException(status_code=422, detail="context.initial_capital must be > 0")
-
-    benchmark = str(context.get("benchmark") or "SH000300").strip() or "SH000300"
-
-    commission_rate = _coerce_float(context.get("commission_rate"))
-    if commission_rate is None:
-        commission_rate = _coerce_float(context.get("commissionRate"))
-    commission_rate = commission_rate if commission_rate is not None else 0.00025
-    if commission_rate < 0:
-        raise HTTPException(status_code=422, detail="context.commission_rate must be >= 0")
-
-    slippage = _coerce_float(context.get("slippage"))
-    slippage = slippage if slippage is not None else 0.0005
-    if slippage < 0:
-        raise HTTPException(status_code=422, detail="context.slippage must be >= 0")
-
-    deal_price = str(context.get("deal_price") or context.get("dealPrice") or "close").strip().lower()
-    if deal_price not in _ALLOWED_DEAL_PRICE:
-        raise HTTPException(status_code=422, detail="context.deal_price must be one of: open, close")
-
-    market = _resolve_market(context.get("market"), benchmark)
-    return {
-        "initial_capital": initial_capital,
-        "benchmark": benchmark,
-        "commission_rate": commission_rate,
-        "slippage": slippage,
-        "deal_price": deal_price,
-        "market": market,
-        "industry_as_feature": bool(context.get("industry_as_feature", False)),
-    }
-
-
-def _resolve_market(raw_market: Any, benchmark: str) -> str:
-    """解析目标市场。
-
-    优先使用显式 market 字段；缺失或非法时从 benchmark 推断，
-    最终回退到 CN（A股），保持向后兼容。
-    """
-    market = str(raw_market or "").strip().upper()
-    if market in ("CN", "US", "HK", "CRYPTO", "FUTURES"):
-        return market
-    _BENCHMARK_MARKET = {
-        "HSI": "HK", "HSCEI": "HK", "HSTECH": "HK",
-        "SPX": "US", "NDX": "US", "DJI": "US", "IXIC": "US",
-        "BTC": "CRYPTO", "ETH": "CRYPTO",
-        "CL": "FUTURES", "RB": "FUTURES", "AU": "FUTURES", "CU": "FUTURES",
-    }
-    return _BENCHMARK_MARKET.get(str(benchmark or "").upper(), "CN")
-
-
-def _normalize_prediction_mode(raw: Any) -> str:
-    """归一化分位推理模式；非法值回落 point。"""
-    mode = str(raw or "point").strip().lower()
-    return mode if mode in ("point", "quantile") else "point"
+# _normalize_context / _resolve_market / _normalize_prediction_mode 已下沉至
+# backend.shared.training.request（单源），此处 import 复用；context 清洗走 req.context。
 
 
 def _normalize_payload(payload: dict[str, Any], allowed_features: list[str]) -> dict[str, Any]:
-    if not isinstance(payload, dict):
-        raise HTTPException(status_code=422, detail="Payload must be a JSON object")
+    from backend.shared.training.request import TrainingRequest
 
-    model_type = str(payload.get("model_type", "lightgbm")).strip().lower()
-    if model_type not in _ALLOWED_MODEL_TYPES:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Unsupported model_type: {model_type}. Allowed: {sorted(_ALLOWED_MODEL_TYPES)}",
-        )
+    # 收尾 2：纯输入校验收敛进 TrainingRequest（422 与现状逐字相同）；
+    # 本函数只做 DB 耦合校验与推导装配。
+    req = TrainingRequest.validate_request(payload)
 
-    # 多模型支持：model_types 列表
-    model_types: list[str] | None = None
-    raw_model_types = payload.get("model_types")
-    if raw_model_types and isinstance(raw_model_types, list):
-        model_types = [str(t).strip().lower() for t in raw_model_types if str(t).strip()]
-        for mt in model_types:
-            if mt not in _ALLOWED_MODEL_TYPES:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Unsupported model_type in model_types: {mt}. Allowed: {sorted(_ALLOWED_MODEL_TYPES)}",
-                )
-        # 多模型时，model_type 取第一个作为主模型（向后兼容）
-        if model_types:
-            model_type = model_types[0]
+    if allowed_features:
+        allowed_set = set(allowed_features)
+        invalid = [feature for feature in req.features if feature not in allowed_set]
+        if invalid:
+            sample = ", ".join(invalid[:8])
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unknown features: {sample}. Please refresh feature catalog and retry.",
+            )
 
-    ensemble_method = str(payload.get("ensemble", "none")).strip().lower()
-    if ensemble_method not in ("none", "stacking", "blending", "voting"):
-        ensemble_method = "none"
+    # 多模型支持：model_types[0] 作为主模型（向后兼容）
+    model_type = req.model_type
+    model_types = req.model_types
+    if model_types:
+        model_type = model_types[0]
+
+    # LightGBM max_depth=-1 convention is invalid for XGBoost; strip it
+    xgb_params = dict(req.xgb_params)
+    if isinstance(xgb_params.get("max_depth"), (int, float)) and xgb_params["max_depth"] < 0:
+        xgb_params = {k: v for k, v in xgb_params.items() if k != "max_depth"}
 
     # ── WFA 稳定性诊断配置（可选） ──
     wfa_config = None
-    raw_wfa = payload.get("wfa")
+    raw_wfa = req.wfa
     if raw_wfa:
         if not isinstance(raw_wfa, dict):
             raise HTTPException(status_code=422, detail="wfa must be an object")
@@ -376,105 +288,20 @@ def _normalize_payload(payload: dict[str, Any], allowed_features: list[str]) -> 
             "max_train_end": str(raw_wfa.get("max_train_end") or "").strip(),
         }
 
-    display_name = str(payload.get("display_name") or payload.get("job_name") or "unnamed").strip() or "unnamed"
-    if len(display_name) > 128:
-        raise HTTPException(status_code=422, detail="display_name must be at most 128 characters")
-
-    train_start = str(payload.get("train_start", "2023-01-11")).strip()
-    train_end = str(payload.get("train_end", "2024-12-31")).strip()
-    dt_train_start = _parse_date(train_start, "train_start")
-    dt_train_end = _parse_date(train_end, "train_end")
-    if dt_train_start >= dt_train_end:
-        raise HTTPException(status_code=422, detail="train_start must be earlier than train_end")
-
-    val_ratio = float(payload.get("val_ratio", 0.15))
-    if not (0.01 <= val_ratio <= 0.5):
-        raise HTTPException(status_code=422, detail="val_ratio must be between 0.01 and 0.5")
-
-    num_boost_round = int(payload.get("num_boost_round", 1000))
-    if not (10 <= num_boost_round <= 20000):
-        raise HTTPException(status_code=422, detail="num_boost_round must be between 10 and 20000")
-
-    early_stopping_rounds = int(payload.get("early_stopping_rounds", 100))
-    if not (1 <= early_stopping_rounds <= 5000):
-        raise HTTPException(status_code=422, detail="early_stopping_rounds must be between 1 and 5000")
-
-    raw_features = payload.get("features", []) or []
-    if not isinstance(raw_features, list):
-        raise HTTPException(status_code=422, detail="features must be a string array")
-    features: list[str] = []
-    for item in raw_features:
-        val = str(item).strip()
-        if val and val not in features:
-            features.append(val)
-    if len(features) > 600:
-        raise HTTPException(status_code=422, detail="features length cannot exceed 600")
-    if allowed_features:
-        allowed_set = set(allowed_features)
-        invalid = [feature for feature in features if feature not in allowed_set]
-        if invalid:
-            sample = ", ".join(invalid[:8])
-            raise HTTPException(
-                status_code=422,
-                detail=f"Unknown features: {sample}. Please refresh feature catalog and retry.",
-            )
-
-    lgb_params = payload.get("lgb_params", {}) or {}
-    if not isinstance(lgb_params, dict):
-        raise HTTPException(status_code=422, detail="lgb_params must be an object")
-
-    # Model-specific params (only validate the one matching model_type)
-    xgb_params = payload.get("xgb_params", {}) or {}
-    if not isinstance(xgb_params, dict):
-        raise HTTPException(status_code=422, detail="xgb_params must be an object")
-    # LightGBM max_depth=-1 convention is invalid for XGBoost; strip it
-    if isinstance(xgb_params.get("max_depth"), (int, float)) and xgb_params["max_depth"] < 0:
-        xgb_params = {k: v for k, v in xgb_params.items() if k != "max_depth"}
-
-    catboost_params = payload.get("catboost_params", {}) or {}
-    if not isinstance(catboost_params, dict):
-        raise HTTPException(status_code=422, detail="catboost_params must be an object")
-
-    dl_params = payload.get("dl_params", {}) or {}
-    if not isinstance(dl_params, dict):
-        raise HTTPException(status_code=422, detail="dl_params must be an object")
+    # display/日期/数值/特征/params 校验已收敛进 TrainingRequest。
 
     target_horizon_days = int(payload.get("target_horizon_days", 1))
     if not (1 <= target_horizon_days <= 30):
         raise HTTPException(status_code=422, detail="target_horizon_days must be between 1 and 30")
 
-    # 多周期训练：一次训练产出多个周期的模型（T+1/3/5/10…）
-    horizons: list[int] | None = None
-    raw_horizons = payload.get("horizons")
-    if raw_horizons is not None:
-        if not isinstance(raw_horizons, list) or not raw_horizons:
-            raise HTTPException(status_code=422, detail="horizons must be a non-empty array of integers")
-        horizons = []
-        for h in raw_horizons:
-            try:
-                hv = int(h)
-            except Exception:
-                raise HTTPException(status_code=422, detail=f"horizons contains non-integer value: {h}")
-            if not (1 <= hv <= 30):
-                raise HTTPException(status_code=422, detail=f"horizons value must be between 1 and 30: {hv}")
-            if hv not in horizons:
-                horizons.append(hv)
-        horizons.sort()
-        if len(horizons) < 2:
-            raise HTTPException(status_code=422, detail="horizons must contain at least 2 distinct periods")
-        # 多周期主显示周期取第一个
-        target_horizon_days = horizons[0]
-
     target_mode = str(payload.get("target_mode", "return")).strip().lower()
     if target_mode not in _ALLOWED_TARGET_MODE:
         raise HTTPException(status_code=422, detail="target_mode must be one of: return, classification")
 
-    label_formula = str(payload.get("label_formula") or "").strip()
+    # label_formula/training_window 取 req 清洗值；effective 日期形状 schema 已验，此处复核。
     effective_trade_date = str(payload.get("effective_trade_date") or "").strip()
     if effective_trade_date:
         _parse_date(effective_trade_date, "effective_trade_date")
-
-    training_window = str(payload.get("training_window") or "").strip()
 
     raw_feature_categories = payload.get("feature_categories", []) or []
     feature_categories: list[str] = []
@@ -484,36 +311,41 @@ def _normalize_payload(payload: dict[str, Any], allowed_features: list[str]) -> 
             if val and val not in feature_categories:
                 feature_categories.append(val)
 
-    context = _normalize_context(payload.get("context", {}) or {})
+    context = req.context
     explain = normalize_explain(payload.get("explain"))
 
     normalized: dict[str, Any] = {
-        "job_name": str(payload.get("job_name", "unnamed")).strip() or "unnamed",
-        "display_name": display_name,
+        "job_name": req.job_name,
+        "display_name": req.display_name,
         "model_type": model_type,
-        "train_start": train_start,
-        "train_end": train_end,
-        "val_ratio": val_ratio,
-        "num_boost_round": num_boost_round,
-        "early_stopping_rounds": early_stopping_rounds,
-        "features": features,
+        "train_start": req.train_start,
+        "train_end": req.train_end,
+        "val_ratio": req.val_ratio,
+        "num_boost_round": req.num_boost_round,
+        "early_stopping_rounds": req.early_stopping_rounds,
+        "features": req.features,
         "feature_categories": feature_categories,
         "target_horizon_days": target_horizon_days,
-        "target_mode": target_mode,
-        "label_formula": label_formula,
-        "effective_trade_date": effective_trade_date,
-        "training_window": training_window,
+        "target_mode": req.target_mode,
+        "label_formula": req.label_formula,
+        "effective_trade_date": req.effective_trade_date,
+        "training_window": req.training_window,
         "context": context,
         "explain": explain,
-        "lgb_params": lgb_params,
+        "lgb_params": req.lgb_params,
         "xgb_params": xgb_params,
-        "catboost_params": catboost_params,
-        "dl_params": dl_params,
-        "ensemble": ensemble_method,
+        "catboost_params": req.catboost_params,
+        "dl_params": req.dl_params,
+        "ensemble": req.ensemble,
         # 分位推理模式透传：此前被白名单剥掉，orchestrator 收不到
         # prediction_mode 永远回落 point，导致训练时选了「收益率分位推理」
         # 但模型 metadata 始终是 point，推理中心提示未启用分位推理。
-        "prediction_mode": _normalize_prediction_mode(payload.get("prediction_mode")),
+        "prediction_mode": req.prediction_mode,
+        # 全局股票池引用透传：orchestrator 侧 resolve_training_pool 解析成
+        # DataCfg 池字段（成分在编排器侧解析后随 config.yaml 进容器）。
+        # 为空表示全市场训练（保持旧行为）。
+        "pool_id": str(payload.get("pool_id") or "").strip() or None,
+        "node_id": str(payload.get("node_id") or "local").strip() or "local",
     }
     # Stacking 集成参数 + Optuna 超参搜索 + 截面预处理（显式透传）
     if "n_folds" in payload:
@@ -555,8 +387,6 @@ def _normalize_payload(payload: dict[str, Any], allowed_features: list[str]) -> 
         normalized["auto_feature_filter"] = str(
             raw_aff if raw_aff is not None else "true"
         ).strip().lower()
-    if horizons:
-        normalized["horizons"] = horizons
     # 训练时长预算（分钟），默认 120
     normalized["max_time_minutes"] = _clamp_int(payload.get("max_time_minutes"), 120, 10, 1440)
     if wfa_config:
@@ -570,6 +400,10 @@ def _normalize_payload(payload: dict[str, Any], allowed_features: list[str]) -> 
         normalized["factor_schema_hash"] = str(payload.get("factor_schema_hash") or "")
         normalized["factor_catalog_published_at"] = str(payload.get("factor_catalog_published_at") or "")
         normalized["factor_coverage"] = dict(payload.get("factor_coverage") or {})
+
+    # 训练起止（split gap 推导用； TrainingRequest 已校验可解析，此处不再抛错）
+    dt_train_start = _parse_date(req.train_start, "train_start")
+    dt_train_end = _parse_date(req.train_end, "train_end")
 
     explicit_fields = ["valid_start", "valid_end", "test_start", "test_end"]
     has_explicit_split = any(payload.get(k) for k in explicit_fields)
@@ -614,7 +448,7 @@ def _normalize_payload(payload: dict[str, Any], allowed_features: list[str]) -> 
         if not (dt_train_start <= dt_train_end < dt_valid_start <= dt_valid_end < dt_test_start <= dt_test_end):
             raise HTTPException(
                 status_code=422,
-                detail=f"Date order must satisfy train_start <= train_end < valid_start <= valid_end < test_start <= test_end. {' '.join(adjustment_notices)}",
+                    detail=f"Date order must satisfy train_start <= train_end < valid_start <= valid_end < test_start <= test_end. {' '.join(adjustment_notices)}",
             )
 
         normalized.update(
@@ -875,12 +709,6 @@ def _normalize_training_result_payload(
     elif isinstance(metadata.get("drift"), dict):
         normalized["drift"] = metadata["drift"]
 
-    # 多周期训练结果：透传到顶层，供前端训练结果页展示周期明细 + 融合模型
-    if isinstance(raw.get("multi_horizon"), dict):
-        normalized["multi_horizon"] = raw["multi_horizon"]
-    elif isinstance(metadata.get("multi_horizon"), dict):
-        normalized["multi_horizon"] = metadata["multi_horizon"]
-
     return normalized, validation_error
 
 
@@ -919,64 +747,28 @@ async def submit_training_job(
     tenant_id = str(current_user.get("tenant_id") or "default")
     user_id = str(current_user.get("user_id") or current_user.get("sub") or "unknown")
 
-    # ── 多周期训练：创建 parent job + 每周期一个 child job ──
-    horizons = normalized_payload.get("horizons")
-    multi_horizon = bool(horizons and isinstance(horizons, list) and len(horizons) >= 2)
+    # 身份注入：orchestrator 侧 resolve_training_pool 需要 tenant/user 来解析
+    # 用户级私有池（global 池不需要，但带着无副作用）。
+    normalized_payload["tenant_id"] = tenant_id
+    normalized_payload["user_id"] = user_id
 
     async with get_session() as session:
-        parent_record = TrainingJobRecord(
+        record = TrainingJobRecord(
             id=run_id,
             tenant_id=tenant_id,
             user_id=user_id,
             status="pending",
-            request_payload={**normalized_payload, "_parent": True},
+            request_payload=normalized_payload,
             progress=0,
         )
-        session.add(parent_record)
-
-        if multi_horizon:
-            child_run_ids: list[str] = []
-            for i, h in enumerate(horizons):
-                child_run_id = f"{run_id}_t{h}"
-                # 子任务固定单周期，display_name 追加 _T{h}
-                child_payload = {
-                    **normalized_payload,
-                    "target_horizon_days": int(h),
-                    "display_name": f"{normalized_payload.get('display_name', 'unnamed')}_T{h}",
-                    "horizons": None,
-                    "_parent_run_id": run_id,
-                    "_multi_horizon_index": i,
-                    "max_time_minutes": max(
-                        30,
-                        int(normalized_payload.get("max_time_minutes") or 120)
-                        // max(1, len(horizons)),
-                    ),
-                }
-                child_payload.pop("wfa", None)
-                child_record = TrainingJobRecord(
-                    id=child_run_id,
-                    tenant_id=tenant_id,
-                    user_id=user_id,
-                    status="pending",
-                    request_payload=child_payload,
-                    progress=0,
-                )
-                session.add(child_record)
-                child_run_ids.append(child_run_id)
-            parent_record.request_payload = {
-                **parent_record.request_payload,
-                "_child_run_ids": child_run_ids,
-                "_tenant_id": tenant_id,
-                "_user_id": user_id,
-            }
+        session.add(record)
         await session.commit()
 
     _training_log_stream.append_log(
         run_id=run_id,
         tenant_id=tenant_id,
         user_id=user_id,
-        line=f"[SYSTEM] 训练任务已创建: {run_id}"
-        + (f"（多周期 ×{len(horizons)}: " + ", ".join(f"T{h}" for h in horizons) + "）" if multi_horizon else ""),
+        line=f"[SYSTEM] 训练任务已创建: {run_id}",
         status="pending",
         progress=0,
     )
@@ -985,20 +777,10 @@ async def submit_training_job(
     node_id = str(normalized_payload.get("node_id") or payload.get("node_id") or "local")
     orchestrator = get_orchestrator(node_id=node_id)
     logger.warning(f"[SYSTEM] Dispatching training job {run_id}. node={node_id} payload_keys={list(normalized_payload.keys())}")
-    if multi_horizon:
-        # 多周期：编排器串行跑各 child，全部成功后自动创建融合模型
-        REGISTRY.register(
-            orchestrator.launch_multi_horizon_job(
-                parent_run_id=run_id,
-                child_run_ids=child_run_ids,
-                payload=normalized_payload,
-            )
-        )
-    else:
-        # 单周期：直接跑
-        REGISTRY.register(
-            orchestrator.launch_training_job(run_id=run_id, payload=normalized_payload)
-        )
+    REGISTRY.register(
+        orchestrator.launch_training_job(run_id=run_id, payload=normalized_payload),
+        run_id=run_id,
+    )
 
     # 预检特征可用性，告知前端哪些特征在 parquet 中不存在
     valid_features, missing_features = LocalDockerOrchestrator._filter_features_by_parquet(
@@ -1008,13 +790,61 @@ async def submit_training_job(
     return {
         "runId": run_id,
         "status": "pending",
-        "multiHorizon": multi_horizon,
         "payload": normalized_payload,
         "validFeatureCount": len(valid_features),
         "missingFeatureCount": len(missing_features),
         "missingFeatures": missing_features[:30],
     }
 
+
+
+_CANCELABLE_STATUSES = ("pending", "provisioning", "running", "waiting_callback")
+
+
+async def cancel_training_run(run_id: str, current_user: dict[str, Any]) -> dict[str, Any]:
+    """取消一个进行中的训练任务（用户态/管理端共用）。
+
+    流程：校验归属与状态 → 置 redis 取消标记 → 保留编排 task 执行资源回收 →
+    立即把 DB 状态置 cancelled 并写日志。真正的资源回收（docker stop / ssh kill）
+    由编排器轮询循环读到取消标记后执行，避免容器/远端进程泄漏。
+    """
+    tenant_id = str(current_user.get("tenant_id") or "default")
+    user_id = str(current_user.get("user_id") or current_user.get("sub") or "unknown")
+
+    async with get_session() as session:
+        stmt = select(TrainingJobRecord).where(
+            TrainingJobRecord.id == run_id,
+            TrainingJobRecord.tenant_id == tenant_id,
+            TrainingJobRecord.user_id == user_id,
+        )
+        record = (await session.execute(stmt)).scalar_one_or_none()
+
+        if not record:
+            raise HTTPException(status_code=404, detail="Training run not found")
+
+        status = str(record.status or "")
+        if status not in _CANCELABLE_STATUSES:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Training run is not cancelable (status={status or 'unknown'})",
+            )
+
+        record.status = "cancelled"
+        record.logs = (record.logs or "") + "[SYSTEM] 训练已被用户取消\n"
+        record.progress = max(int(record.progress or 0), 0)
+        await session.commit()
+
+    _training_log_stream.mark_cancel_requested(run_id)
+    # Keep the orchestration task alive to observe the flag and clean up resources.
+    _training_log_stream.append_log(
+        run_id=run_id,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        line="[SYSTEM] 取消请求已提交，正在停止训练容器/进程…",
+        status="cancelled",
+    )
+
+    return {"runId": run_id, "status": "cancelled", "cancelled": True}
 
 
 async def get_training_run_for_owner(run_id: str, current_user: dict[str, Any]) -> dict[str, Any]:
@@ -1057,13 +887,22 @@ async def get_training_run_for_owner(run_id: str, current_user: dict[str, Any]) 
         except Exception:
             pass
 
-    if effective_status not in {"completed", "failed"} and live_status in {
+    # 远端编排（AutoDL）常只把终态写进 Redis，DB 会一直停在 pending。
+    # 若仍以 DB 为准，前端会把已失败任务显示成「训练中」。
+    if live_status in {"completed", "failed", "cancelled"}:
+        effective_status = live_status
+    elif effective_status not in {"completed", "failed", "cancelled"} and live_status in {
         "pending",
         "provisioning",
         "running",
         "waiting_callback",
     }:
         effective_status = live_status
+
+    if effective_status == "failed" and not normalized_result.get("error"):
+        last_line = str(live_snapshot.get("last_line") or "").strip()
+        if last_line:
+            normalized_result["error"] = last_line
 
     merged_logs = _merge_log_text(record.logs or "", live_logs)
 
@@ -1073,7 +912,7 @@ async def get_training_run_for_owner(run_id: str, current_user: dict[str, Any]) 
         "progress": progress,
         "logs": merged_logs,
         "result": normalized_result,
-        "isCompleted": effective_status in ["completed", "failed"],
+        "isCompleted": effective_status in ["completed", "failed", "cancelled"],
     }
 
 
@@ -1084,7 +923,7 @@ async def get_latest_training_run_for_owner(
 
     优先从 redis 的用户活跃索引读（训练实时流会持续维护该 key，TTL 与状态一致）；
     索引失效/无缓存时回退 DB：先找进行中主任务，再回退最近创建主任务。
-    跳过多周期子任务与父占位。都没有时返回 None。
+    都没有时返回 None。
     """
     tenant_id = str(current_user.get("tenant_id") or "default")
     user_id = str(current_user.get("user_id") or current_user.get("sub") or "unknown")
@@ -1100,12 +939,8 @@ async def get_latest_training_run_for_owner(
 
     active_statuses = ("pending", "provisioning", "running", "waiting_callback")
 
-    def _is_root(rec: TrainingJobRecord) -> bool:
-        payload = rec.request_payload if isinstance(rec.request_payload, dict) else {}
-        return not (payload.get("_parent") or payload.get("_parent_run_id"))
-
     async with get_session(read_only=True) as session:
-        # 先找进行中的主任务（倒序最新一条）
+        # 先找进行中的任务（倒序最新一条）
         stmt = (
             select(TrainingJobRecord)
             .where(
@@ -1117,10 +952,10 @@ async def get_latest_training_run_for_owner(
         )
         rows = (await session.execute(stmt)).scalars().all()
 
-        root_active = next((r for r in rows if _is_root(r)), None)
+        candidate = rows[0] if rows else None
 
-        # 无进行中任务时，回退最近创建的主任务
-        if root_active is None:
+        # 无进行中任务时，回退最近创建的任务
+        if candidate is None:
             stmt_all = (
                 select(TrainingJobRecord)
                 .where(
@@ -1130,10 +965,7 @@ async def get_latest_training_run_for_owner(
                 .order_by(TrainingJobRecord.created_at.desc())
             )
             all_rows = (await session.execute(stmt_all)).scalars().all()
-            root_recent = next((r for r in all_rows if _is_root(r)), None)
-            candidate = root_recent
-        else:
-            candidate = root_active
+            candidate = all_rows[0] if all_rows else None
 
     if candidate is None:
         return None
@@ -1169,6 +1001,39 @@ def _verify_internal_call_secret(provided: str) -> None:
             status_code=401,
             detail="Invalid internal call secret",
         )
+
+
+def _registration_outcome(registration: dict[str, Any]) -> tuple[str, dict[str, Any], str]:
+    """由注册结果判定训练 run 状态（纯函数，可单测）。
+
+    - ready → completed。
+    - candidate + gate_reasons（软门禁暂留）：训练本身成功，模型待手动激活，
+      run 保持 completed，summary 如实提示，不再误报“模型注册失败”。
+    - 其余（failed / 无原因的 candidate）→ failed。
+    返回 (run_status, summary, error)。
+    """
+    status = str(registration.get("status") or "")
+    if status == "ready":
+        return "completed", {}, ""
+    gate_reasons = [
+        str(r).strip() for r in (registration.get("gate_reasons") or []) if str(r).strip()
+    ]
+    if status == "candidate" and gate_reasons:
+        message = str(registration.get("message") or "").strip() or (
+            f"样本外质量门禁：{'；'.join(gate_reasons)}，未自动激活。"
+            "请人工评估后在模型管理页手动激活。"
+        )
+        return (
+            "completed",
+            {"status": "质量门禁暂留候选", "message": message},
+            "",
+        )
+    reg_error = str(registration.get("error") or "model registration failed").strip()
+    return (
+        "failed",
+        {"status": "模型注册失败", "message": reg_error},
+        reg_error,
+    )
 
 
 async def complete_training_run(
@@ -1213,14 +1078,13 @@ async def complete_training_run(
                     result_payload=normalized_result,
                 )
                 normalized_result["model_registration"] = registration
-                if str(registration.get("status") or "") != "ready":
+                outcome, summary, reg_error = _registration_outcome(registration)
+                if outcome == "failed":
                     status = "failed"
-                    reg_error = str(registration.get("error") or "model registration failed").strip()
                     normalized_result["error"] = reg_error
-                    normalized_result["summary"] = {
-                        "status": "模型注册失败",
-                        "message": reg_error,
-                    }
+                    normalized_result["summary"] = summary
+                elif summary:
+                    normalized_result["summary"] = summary
             except Exception as exc:
                 status = "failed"
                 normalized_result["model_registration"] = {

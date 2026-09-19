@@ -21,6 +21,9 @@ from backend.services.simulation.models.fund_snapshot import (
     SimulationFundSnapshot,
 )
 from backend.shared.database_manager_v2 import get_session
+from backend.shared.simulation_account_keys import (
+    parse_account_key as parse_canonical_account_key,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,16 +49,14 @@ def _local_today() -> datetime.date:
 
 
 def _parse_account_key(key: str) -> tuple[str, str] | None:
-    # simulation:account:{tenant_id}:{user_id}
-    parts = key.split(":")
-    if len(parts) != 4:
+    # simulation:account:{tenant_id}:{user_id}（CN），带 :MARKET 后缀的市场账户
+    # 与 CN 账户按 (tenant, user) 合并成一条用户级快照：快照表以
+    # tenant/user/date 唯一，且台账 account_id（sim:{tenant}:{user}）本来
+    # 就不分市场——跨市场资产应合计为用户总资产，而非串行覆盖或跳过。
+    parsed = parse_canonical_account_key(key)
+    if not parsed:
         return None
-    if parts[0] != "simulation" or parts[1] != "account":
-        return None
-    tenant_id = parts[2].strip() or "default"
-    user_id = parts[3].strip()
-    if not user_id:
-        return None
+    tenant_id, user_id, _market = parsed
     return tenant_id, user_id
 
 
@@ -67,7 +68,9 @@ class SnapshotUpsertResult:
 
 class SimulationFundSnapshotService:
     @staticmethod
-    def _read_settings_initial_cash(redis: RedisClient, tenant_id: str, user_id: str) -> Decimal:
+    def _read_settings_initial_cash(
+        redis: RedisClient, tenant_id: str, user_id: str
+    ) -> Decimal:
         if not redis.client:
             return Decimal("0")
         settings_key = f"simulation:settings:{tenant_id}:{user_id}"
@@ -81,56 +84,33 @@ class SimulationFundSnapshotService:
         return _to_decimal(data.get("initial_cash"), Decimal("0"))
 
     @classmethod
-    def _build_row(cls, tenant_id: str, user_id: str, account: dict[str, object]) -> dict[str, object]:
-        total_asset = _to_decimal(account.get("total_asset"))
-        available_balance = _to_decimal(account.get("cash") or account.get("available_balance"))
-        frozen_balance = _to_decimal(account.get("frozen_balance"))
-        market_value = _to_decimal(account.get("market_value"))
-        initial_capital = _to_decimal(account.get("initial_capital"))
-        today_pnl = _to_decimal(account.get("today_pnl"))
-        total_pnl = _to_decimal(account.get("total_pnl"))
-        # 注意：这里不能用 total_asset 预填 initial_capital，
-        # 否则 capture_all 的 settings.initial_cash 回退永远不会命中，
-        # 导致 total_pnl 恒为 0。缺失时保留 0，由调用方做回退。
-
-        return {
-            "tenant_id": tenant_id,
-            "user_id": user_id,
-            "snapshot_date": _local_today(),
-            "total_asset": total_asset,
-            "available_balance": available_balance,
-            "frozen_balance": frozen_balance,
-            "market_value": market_value,
-            "initial_capital": initial_capital,
-            "total_pnl": total_pnl,
-            "today_pnl": today_pnl,
-            "source": "redis_simulation_account",
-        }
-
-    @classmethod
     async def get_baselines(
         cls,
         tenant_id: str,
         user_id: str,
         initial_capital: Decimal,
+        as_of=None,
     ) -> dict[str, Decimal]:
         """计算日初/月初权益基线。
 
-        取「今日之前」「本月初之前」最近一条日快照的总资产作为基线；
+        取「as_of（默认今日）之前」「本月初之前」最近一条日快照的总资产作为基线；
         无历史快照（新账户/刚重置）时回退初始资金，保证开盘口径盈亏为 0。
         """
-        today = _local_today()
+        today = as_of or _local_today()
         month_start = today.replace(day=1)
         day_open = initial_capital
         month_open = initial_capital
         try:
+            from backend.shared.simulation_account_keys import ledger_user_id_candidates
+
+            user_ids = ledger_user_id_candidates(user_id)
             async with get_session(read_only=True) as session:
                 day_row = (
                     await session.execute(
                         select(SimulationFundSnapshot.total_asset)
                         .where(
                             SimulationFundSnapshot.tenant_id == tenant_id,
-                            SimulationFundSnapshot.user_id == user_id,
+                            SimulationFundSnapshot.user_id.in_(user_ids),
                             SimulationFundSnapshot.snapshot_date < today,
                         )
                         .order_by(SimulationFundSnapshot.snapshot_date.desc())
@@ -144,7 +124,7 @@ class SimulationFundSnapshotService:
                         select(SimulationFundSnapshot.total_asset)
                         .where(
                             SimulationFundSnapshot.tenant_id == tenant_id,
-                            SimulationFundSnapshot.user_id == user_id,
+                            SimulationFundSnapshot.user_id.in_(user_ids),
                             SimulationFundSnapshot.snapshot_date < month_start,
                         )
                         .order_by(SimulationFundSnapshot.snapshot_date.desc())
@@ -162,13 +142,46 @@ class SimulationFundSnapshotService:
             )
         return {"day_open_equity": day_open, "month_open_equity": month_open}
 
+    @staticmethod
+    async def _read_ledger_initial_equity(tenant_id: str, user_id: str) -> Decimal:
+        """从 PG 台账读账户初始权益（live 成交已同步写台账后，此处有真实值）。
+
+        settings 缺失时此前直接回退 total_asset，导致 initial=total、盈亏恒为 0。
+        """
+        try:
+            from backend.services.simulation.models.account import SimulationAccount
+            from backend.services.simulation.services.ledger_service import (
+                SimulationLedgerService,
+            )
+
+            account_id = SimulationLedgerService.build_account_id(tenant_id, user_id)
+            async with get_session(read_only=True) as session:
+                row = (
+                    await session.execute(
+                        select(SimulationAccount.initial_equity).where(
+                            SimulationAccount.account_id == account_id,
+                        )
+                    )
+                ).scalar_one_or_none()
+                if row is not None and Decimal(str(row)) > 0:
+                    return Decimal(str(row))
+        except Exception as exc:
+            logger.debug("ledger initial equity lookup failed: %s", exc)
+        return Decimal("0")
+
     @classmethod
-    async def capture_all(cls, redis: RedisClient) -> SnapshotUpsertResult:
+    async def capture_all(
+        cls, redis: RedisClient, snapshot_date=None
+    ) -> SnapshotUpsertResult:
         if not redis.client:
             return SnapshotUpsertResult(upserted_rows=0, scanned_accounts=0)
+        # P0-7：EOD传入trade_date，其余调用方默认今日
+        snap_date = snapshot_date or _local_today()
 
         keys = list(redis.client.scan_iter(match="simulation:account:*", count=500))
-        rows: list[dict[str, object]] = []
+        # 同一用户跨市场账户（CN/HK/US/...）合并为一条用户级快照：
+        # 资产字段累加，盈亏在合并后的总资产上计算（与台账口径一致）。
+        grouped: dict[tuple[str, str], dict[str, Decimal]] = {}
         for key in keys:
             parsed = _parse_account_key(str(key))
             if not parsed:
@@ -182,15 +195,54 @@ class SimulationFundSnapshotService:
             except Exception:
                 continue
 
-            row = cls._build_row(tenant_id, user_id, account)
+            bucket = grouped.setdefault(
+                (tenant_id, user_id),
+                {
+                    "total_asset": Decimal("0"),
+                    "available_balance": Decimal("0"),
+                    "frozen_balance": Decimal("0"),
+                    "market_value": Decimal("0"),
+                },
+            )
+            bucket["total_asset"] += _to_decimal(account.get("total_asset"))
+            bucket["available_balance"] += _to_decimal(
+                account.get("cash") or account.get("available_balance")
+            )
+            bucket["frozen_balance"] += _to_decimal(account.get("frozen_balance"))
+            bucket["market_value"] += _to_decimal(account.get("market_value"))
+
+        rows: list[dict[str, object]] = []
+        for (tenant_id, user_id), bucket in grouped.items():
+            row = {
+                "tenant_id": tenant_id,
+                "user_id": user_id,
+                # P0-7：EOD按trade_date记，与account_daily对齐；周期采集默认今日
+                "snapshot_date": snap_date,
+                "total_asset": bucket["total_asset"],
+                "available_balance": bucket["available_balance"],
+                "frozen_balance": bucket["frozen_balance"],
+                "market_value": bucket["market_value"],
+                "initial_capital": Decimal("0"),
+                "total_pnl": Decimal("0"),
+                "today_pnl": Decimal("0"),
+                "source": "redis_simulation_account",
+            }
             if row["initial_capital"] == 0:
-                row["initial_capital"] = cls._read_settings_initial_cash(redis, tenant_id, user_id)
+                row["initial_capital"] = cls._read_settings_initial_cash(
+                    redis, tenant_id, user_id
+                )
+                if row["initial_capital"] == 0:
+                    row["initial_capital"] = await cls._read_ledger_initial_equity(
+                        tenant_id, user_id
+                    )
                 if row["initial_capital"] == 0:
                     row["initial_capital"] = row["total_asset"]
             # 总盈亏 = 总资产 - 初始资金（手续费已从现金扣减，天然计入）
             row["total_pnl"] = row["total_asset"] - row["initial_capital"]
-            # 当日盈亏 = 总资产 - 日初权益（上一交易日快照基线）
-            baselines = await cls.get_baselines(tenant_id, user_id, row["initial_capital"])
+            # 当日盈亏 = 总资产 - 日初权益（snap_date之前最近快照基线）
+            baselines = await cls.get_baselines(
+                tenant_id, user_id, row["initial_capital"], as_of=snap_date
+            )
             row["today_pnl"] = row["total_asset"] - baselines["day_open_equity"]
             rows.append(row)
 
@@ -213,7 +265,8 @@ class SimulationFundSnapshotService:
                             "total_pnl": row["total_pnl"],
                             "today_pnl": row["today_pnl"],
                             "source": row["source"],
-                            "updated_at": datetime.now(),
+                            # naive 列沿用 utcnow 口径（与模型默认值一致；审计字段不展示）
+                            "updated_at": datetime.utcnow(),
                         },
                     )
                 )
@@ -274,9 +327,13 @@ class SimulationFundSnapshotWorker:
                         result.scanned_accounts,
                     )
             except Exception as exc:
-                logger.error("Simulation fund snapshot worker failed: %s", exc, exc_info=True)
+                logger.error(
+                    "Simulation fund snapshot worker failed: %s", exc, exc_info=True
+                )
 
             try:
-                await asyncio.wait_for(self._stopped.wait(), timeout=self.interval_seconds)
+                await asyncio.wait_for(
+                    self._stopped.wait(), timeout=self.interval_seconds
+                )
             except asyncio.TimeoutError:
                 continue

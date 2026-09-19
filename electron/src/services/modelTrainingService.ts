@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import { SERVICE_ENDPOINTS } from '../config/services';
+import { SERVICE_ENDPOINTS, resolveWebSafeServiceBase } from '../config/services';
 import { authService } from '../features/auth/services/authService';
 import {
   AdminModelFeatureCatalog,
@@ -36,15 +36,6 @@ export interface UserModelRecord {
   created_at?: string | null;
   updated_at?: string | null;
   activated_at?: string | null;
-}
-
-export interface CreateEnsembleParams {
-  source_model_ids: string[];
-  display_name?: string;
-  weight_strategy?: 'equal' | 'icir' | 'manual' | 'recent_ic';
-  manual_weights?: Record<string, number>;
-  fusion_strategy?: 'linear' | 'majority_vote' | 'periodic_hierarchy' | 'confidence_gate';
-  strategy_config?: Record<string, number>;
 }
 
 export interface ModelShapSummaryItem {
@@ -493,7 +484,10 @@ export interface SystemModelRecord {
 
 class ModelTrainingService {
   private client: AxiosInstance;
-  private readonly baseURL = (import.meta as any).env?.VITE_USER_API_URL || SERVICE_ENDPOINTS.USER_SERVICE;
+  private readonly baseURL = resolveWebSafeServiceBase(
+    (import.meta as any).env?.VITE_USER_API_URL,
+    SERVICE_ENDPOINTS.USER_SERVICE,
+  );
 
   constructor() {
     this.client = axios.create({
@@ -504,7 +498,10 @@ class ModelTrainingService {
     });
 
     this.client.interceptors.request.use((config) => {
-      config.baseURL = String((import.meta as any).env?.VITE_USER_API_URL || SERVICE_ENDPOINTS.USER_SERVICE);
+      config.baseURL = resolveWebSafeServiceBase(
+        (import.meta as any).env?.VITE_USER_API_URL,
+        SERVICE_ENDPOINTS.USER_SERVICE,
+      );
       return config;
     });
 
@@ -563,6 +560,13 @@ class ModelTrainingService {
     return resp.data;
   }
 
+  async cancelTrainingRun(runId: string): Promise<{ runId: string; status: string; cancelled: boolean }> {
+    const resp = await this.client.post<{ runId: string; status: string; cancelled: boolean }>(
+      `/models/training-runs/${runId}/cancel`,
+    );
+    return resp.data;
+  }
+
   async getActiveTrainingRun(): Promise<ModelTrainingRunStatus | null> {
     // 后端对「无活跃训练任务」返回 200 + null（不再 404），此处兜底网络/未知错误
     try {
@@ -606,11 +610,6 @@ class ModelTrainingService {
 
   async getUserModel(modelId: string): Promise<UserModelRecord> {
     const resp = await this.client.get<UserModelRecord>(`/models/${modelId}`);
-    return resp.data;
-  }
-
-  async createEnsemble(params: CreateEnsembleParams): Promise<UserModelRecord> {
-    const resp = await this.client.post<UserModelRecord>('/models/ensemble/create', params);
     return resp.data;
   }
 
@@ -810,10 +809,12 @@ class ModelTrainingService {
     };
   }
 
-  async runModelInference(modelId: string, inferenceDate: string): Promise<InferenceExecutionResult> {
+  async runModelInference(modelId: string, inferenceDate: string, poolId?: string): Promise<InferenceExecutionResult> {
     const resp = await this.client.post<InferenceExecutionResult>('/models/inference/run', {
       model_id: modelId,
       inference_date: inferenceDate,
+      // 单日推理股票池（P3）：pool:<code> 引用，后端严格裁剪信号，不进 pred.parquet
+      ...(poolId?.trim() ? { pool_id: poolId.trim() } : {}),
     }, { timeout: 300000 }); // 推理可能需要较长时间，5分钟超时
     const data = resp.data as any;
     const normalized = this.normalizeInferenceRun(data);
@@ -909,10 +910,10 @@ class ModelTrainingService {
     };
   }
 
-  async getStockInferenceHistory(symbol: string, days = 180, modelId?: string): Promise<StockScoreHistoryResponse> {
+  async getStockInferenceHistory(symbol: string, days = 180, modelId?: string, endDate?: string): Promise<StockScoreHistoryResponse> {
     const resp = await this.client.get<StockScoreHistoryResponse>(
       `/models/inference/stock/${encodeURIComponent(symbol)}/history`,
-      { params: { days, ...(modelId ? { model_id: modelId } : {}) } },
+      { params: { days, ...(modelId ? { model_id: modelId } : {}), ...(endDate ? { end_date: endDate } : {}) } },
     );
     return resp.data;
   }
@@ -1021,31 +1022,7 @@ class ModelTrainingService {
     await this.client.delete(`/admin/models/backtest/history/${modelId}/${runId}`);
   }
 
-  async runMultiHorizonBacktest(params: {
-    model_id: string;
-    start_date: string;
-    end_date: string;
-    horizons?: number[];
-    sample_interval?: number;
-    cost?: TradingCostParams;
-    exclude_limit_moves?: boolean;
-  }): Promise<any> {
-    const resp = await this.client.post('/admin/models/backtest/multi-horizon', params, { timeout: 600000 });
-    return resp.data;
-  }
-
   // ── 批量多日推理 ──
-
-  async runInferenceBacktest(params: {
-    model_id: string;
-    start_date: string;
-    end_date: string;
-    signal_mode: 'realtime' | 'stored';
-    strategy: Record<string, unknown>;
-  }): Promise<Record<string, any>> {
-    const resp = await this.client.post('/admin/models/inference-backtest', params, { timeout: 600000 });
-    return resp.data;
-  }
 
   async submitBatchInference(params: BatchInferenceRequest): Promise<BatchInferenceRecord> {
     const resp = await this.client.post<BatchInferenceRecord>('/models/inference/batch', params);

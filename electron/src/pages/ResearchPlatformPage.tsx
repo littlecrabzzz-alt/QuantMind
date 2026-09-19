@@ -13,7 +13,6 @@ import {
   Flame,
   LibraryBig,
   Microscope,
-  Quote,
   RefreshCw,
   Search,
   Sparkles,
@@ -31,15 +30,24 @@ import {
   Modal,
   Pagination,
   Popover,
-  Segmented,
   Select,
+  Spin,
   Switch,
   Table,
   Tag,
 } from 'antd';
 import type { ColumnsType, ColumnType } from 'antd/es/table';
 import { PAGE_LAYOUT } from '../config/pageLayout';
+import {
+  StockPoolSelectField,
+  type StockPoolSelection,
+} from '../components/backtest/StockPoolSelectField';
 import { researchService, type ResearchRunOption } from '../services/researchService';
+import { getStockPoolMembers } from '../services/stockPoolOptionService';
+import {
+  addSymbolToUserPool,
+  USER_POOL_FAVORITES,
+} from '../services/userStockPoolService';
 import {
   BUTTON_STYLES,
   COLUMN_GROUPS,
@@ -49,15 +57,11 @@ import {
   TEMPLATE_BUTTON_STYLES,
 } from '../features/research/constants';
 import {
-  type DataSourceTab,
   type FilterSectionKey,
   type ResearchFiltersState,
   type ResearchModelOption,
-  type ResearchPoolRow,
   type ResearchStockRow,
-  type SignalType,
   type SortKey,
-  type WatchlistRow,
 } from '../features/research/types';
 import {
   fmt2,
@@ -197,18 +201,6 @@ const rVolumeTrend: CellRenderer = (value) => {
   if (trend > 0) return <Tag color="orange" className="rounded-lg border-none font-bold">递增</Tag>;
   if (trend < 0) return <Tag color="blue" className="rounded-lg border-none font-bold">递减</Tag>;
   return <Tag color="default" className="rounded-lg border-none font-bold">平缓</Tag>;
-};
-
-/** 自选/研究池：涨跌幅口径可能是小数，做一次量级归一 */
-const rScaledChange: CellRenderer = (value) => {
-  if (isNil(value)) return DASH;
-  const n = Number(value);
-  const display = Math.abs(n) > 1.0 ? n : n * 100;
-  return (
-    <span className={`whitespace-nowrap font-bold ${display >= 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-      {display >= 0 ? '+' : ''}{display.toFixed(2)}%
-    </span>
-  );
 };
 
 interface ColumnDef {
@@ -381,11 +373,6 @@ const buildColumns = (keys: string[]): ColumnsType<ResearchStockRow> =>
 const sumColumnWidth = (keys: string[]): number =>
   keys.reduce((total, key) => total + (COLUMN_DEFS[key]?.width ?? DEFAULT_COLUMN_WIDTH), 0);
 
-/** 自选 / 研究池使用的精简列 */
-const SIMPLE_TABLE_COLUMN_KEYS = [
-  'rank', 'stock', 'score', 'latestChange', 'turnoverRate', 'amount', 'pe', 'roe', 'rsi', 'sector', 'status',
-];
-
 /* ------------------------------------------------------------------ *
  * 筛选侧栏配置
  * ------------------------------------------------------------------ */
@@ -395,8 +382,8 @@ interface FilterFieldConfig {
   label: string;
   step?: number;
   suffix?: string;
-  /** 引用 QUICK_TAGS 中的分组 key，为该字段渲染快捷标签 */
-  quickTagGroup?: string;
+  /** 小数位数；0 表示只允许整数（如金额类「亿」字段） */
+  precision?: number;
 }
 
 interface FilterSectionConfig {
@@ -417,10 +404,10 @@ const FILTER_SECTIONS: FilterSectionConfig[] = [
     key: 'market',
     label: '行情与流动性',
     fields: [
-      { key: 'amountRange', label: '成交额 (亿)', suffix: '亿', quickTagGroup: 'amount' },
-      { key: 'turnoverRange', label: '换手率 (%)', suffix: '%', step: 0.1, quickTagGroup: 'turnover' },
-      { key: 'totalMvRange', label: '总市值 (亿)', suffix: '亿', quickTagGroup: 'totalMv' },
-      { key: 'floatMvRange', label: '流通市值 (亿)', suffix: '亿', quickTagGroup: 'floatMv' },
+      { key: 'amountRange', label: '成交额 (亿)', suffix: '亿', precision: 0 },
+      { key: 'turnoverRange', label: '换手率 (%)', suffix: '%', step: 0.1 },
+      { key: 'totalMvRange', label: '总市值 (亿)', suffix: '亿', precision: 0 },
+      { key: 'floatMvRange', label: '流通市值 (亿)', suffix: '亿', precision: 0 },
       { key: 'volRatio5Range', label: '5日量比 (≥)', step: 0.5 },
       { key: 'volRatio20Range', label: '20日量比 (≥)', step: 0.5 },
     ],
@@ -429,14 +416,14 @@ const FILTER_SECTIONS: FilterSectionConfig[] = [
     key: 'momentum',
     label: '动量与趋势',
     fields: [
-      { key: 'return1dRange', label: '1日收益 (%)', suffix: '%', step: 0.1, quickTagGroup: 'return1d' },
-      { key: 'return3dRange', label: '3日收益 (%)', suffix: '%', step: 0.1, quickTagGroup: 'return3d' },
-      { key: 'return5dRange', label: '5日收益 (%)', suffix: '%', step: 0.1, quickTagGroup: 'return5d' },
-      { key: 'maGap5Range', label: '5日乖离率 (%)', suffix: '%', step: 0.1, quickTagGroup: 'maGap' },
+      { key: 'return1dRange', label: '1日收益 (%)', suffix: '%', step: 0.1 },
+      { key: 'return3dRange', label: '3日收益 (%)', suffix: '%', step: 0.1 },
+      { key: 'return5dRange', label: '5日收益 (%)', suffix: '%', step: 0.1 },
+      { key: 'maGap5Range', label: '5日乖离率 (%)', suffix: '%', step: 0.1 },
       { key: 'maGap20Range', label: '20日乖离率 (%)', suffix: '%', step: 0.1 },
-      { key: 'rsiRange', label: 'RSI (6日)', step: 1, quickTagGroup: 'rsi' },
-      { key: 'kdjKRange', label: 'KDJ-K', step: 1, quickTagGroup: 'kdjK' },
-      { key: 'macdHistRange', label: 'MACD 柱', step: 0.01, quickTagGroup: 'macdHist' },
+      { key: 'rsiRange', label: 'RSI (6日)', step: 1 },
+      { key: 'kdjKRange', label: 'KDJ-K', step: 1 },
+      { key: 'macdHistRange', label: 'MACD 柱', step: 0.01 },
     ],
   },
   {
@@ -444,9 +431,9 @@ const FILTER_SECTIONS: FilterSectionConfig[] = [
     label: '波动率',
     fields: [
       { key: 'volStd5Range', label: '5日波动率', step: 0.001 },
-      { key: 'volStd20Range', label: '20日波动率', step: 0.001, quickTagGroup: 'volStd20' },
+      { key: 'volStd20Range', label: '20日波动率', step: 0.001 },
       { key: 'volStd60Range', label: '60日波动率', step: 0.001 },
-      { key: 'atr14Range', label: 'ATR(14)', step: 0.01, quickTagGroup: 'atr14' },
+      { key: 'atr14Range', label: 'ATR(14)', step: 0.01 },
     ],
   },
   {
@@ -455,17 +442,17 @@ const FILTER_SECTIONS: FilterSectionConfig[] = [
     fields: [
       { key: 'maGap10Range', label: '10日乖离率 (%)', suffix: '%', step: 0.1 },
       { key: 'rsi14Range', label: 'RSI (14日)', step: 1 },
-      { key: 'beta20Range', label: 'Beta (20日)', step: 0.1, quickTagGroup: 'beta20' },
+      { key: 'beta20Range', label: 'Beta (20日)', step: 0.1 },
     ],
   },
   {
     key: 'fundamental',
     label: '基本面',
     fields: [
-      { key: 'peRange', label: 'PE (TTM)', step: 1, quickTagGroup: 'pe' },
-      { key: 'roeRange', label: 'ROE (%)', suffix: '%', step: 0.1, quickTagGroup: 'roe' },
-      { key: 'profitGrowthRange', label: '利润增速 (%)', suffix: '%', step: 0.1, quickTagGroup: 'profitGrowth' },
-      { key: 'pbRange', label: 'PB', step: 0.1, quickTagGroup: 'pb' },
+      { key: 'peRange', label: 'PE (TTM)', step: 1 },
+      { key: 'roeRange', label: 'ROE (%)', suffix: '%', step: 0.1 },
+      { key: 'profitGrowthRange', label: '利润增速 (%)', suffix: '%', step: 0.1 },
+      { key: 'pbRange', label: 'PB', step: 0.1 },
       { key: 'psTtmRange', label: 'PS (TTM)', step: 0.1 },
       { key: 'listedDaysRange', label: '上市天数', suffix: '天' },
     ],
@@ -520,7 +507,6 @@ const SORT_OPTIONS: Array<{ key: SortKey; label: string; field: keyof ResearchSt
   { key: 'score', label: '分数', field: 'score' },
   { key: 'turnover', label: '换手', field: 'turnoverRate' },
   { key: 'amount', label: '成交额', field: 'amount' },
-  { key: 'return1d', label: '1日', field: 'return1d' },
   { key: 'volStd20', label: '波动', field: 'volStd20' },
 ];
 
@@ -538,55 +524,6 @@ const QUANTDB_PROJECTION_FIELDS: string[] = Array.from(
     ...SORT_OPTIONS.map((option) => option.field as string),
   ])
 );
-
-/** 自选 / 研究池在特征缺失时的占位行 */
-const makeFallbackRow = (key: string, code: string, name: string, score: number): ResearchStockRow => ({
-  key,
-  code,
-  name,
-  score,
-  modelId: '',
-  runId: '',
-  rank: 0,
-  signal: 'hold' as SignalType,
-  latestChange: 0,
-  totalReturn: null,
-  volumeTrend3d: 0,
-  volumeTrend5d: false,
-  turnoverRate: 0,
-  amount: 0,
-  sector: '',
-  concept: '',
-  conceptTags: [],
-  indexTags: [],
-  closePrice: 0,
-  pe: 0,
-  roe: 0,
-  profitGrowth: 0,
-  rsi: 0,
-  ma5: 0,
-  ma10: 0,
-  maGap5: 0,
-  maGap10: 0,
-  maGap20: 0,
-  volRatio5: 0,
-  return1d: 0,
-  return3d: 0,
-  return5d: 0,
-  return10d: 0,
-  return20d: 0,
-  return60d: 0,
-  pb: 0,
-  totalMv: 0,
-  floatMv: 0,
-  listedDays: 0,
-  isSt: false,
-  isTradable: true,
-  isHs300: false,
-  isCsi500: false,
-  isCsi1000: false,
-  thesis: '',
-});
 
 /* ------------------------------------------------------------------ *
  * 展示组件
@@ -640,118 +577,9 @@ const ResearchMetricCard: React.FC<{
 );
 
 /**
- * 快捷标签配置：点击后直接设置对应筛选字段的区间值。
- * 每个标签定义 label、对应的 filterKey 和区间 [min, max]。
- */
-interface QuickTagConfig {
-  label: string;
-  filterKey: keyof ResearchFiltersState;
-  range: [number, number];
-}
-
-const QUICK_TAGS: Record<string, QuickTagConfig[]> = {
-  totalMv: [
-    { label: '小市值', filterKey: 'totalMvRange', range: [0, 50] },
-    { label: '中市值', filterKey: 'totalMvRange', range: [50, 300] },
-    { label: '大市值', filterKey: 'totalMvRange', range: [300, 1000000] },
-    { label: '巨型蓝筹', filterKey: 'totalMvRange', range: [2000, 1000000] },
-  ],
-  floatMv: [
-    { label: '小盘', filterKey: 'floatMvRange', range: [0, 50] },
-    { label: '中盘', filterKey: 'floatMvRange', range: [50, 200] },
-    { label: '大盘', filterKey: 'floatMvRange', range: [200, 1000000] },
-  ],
-  amount: [
-    { label: '低成交', filterKey: 'amountRange', range: [0, 3] },
-    { label: '中成交', filterKey: 'amountRange', range: [3, 10] },
-    { label: '高成交', filterKey: 'amountRange', range: [10, 100000] },
-  ],
-  turnover: [
-    { label: '低换手', filterKey: 'turnoverRange', range: [0, 3] },
-    { label: '中换手', filterKey: 'turnoverRange', range: [3, 8] },
-    { label: '高换手', filterKey: 'turnoverRange', range: [8, 100] },
-  ],
-  pe: [
-    { label: '低估值', filterKey: 'peRange', range: [0, 15] },
-    { label: '合理估值', filterKey: 'peRange', range: [15, 30] },
-    { label: '高估值', filterKey: 'peRange', range: [30, 100000] },
-  ],
-  roe: [
-    { label: '高ROE', filterKey: 'roeRange', range: [15, 1000] },
-    { label: '中ROE', filterKey: 'roeRange', range: [5, 15] },
-  ],
-  rsi: [
-    { label: '超卖', filterKey: 'rsiRange', range: [0, 30] },
-    { label: '中性', filterKey: 'rsiRange', range: [30, 70] },
-    { label: '超买', filterKey: 'rsiRange', range: [70, 100] },
-  ],
-  return1d: [
-    { label: '大涨', filterKey: 'return1dRange', range: [3, 100] },
-    { label: '小涨', filterKey: 'return1dRange', range: [1, 100] },
-    { label: '跌', filterKey: 'return1dRange', range: [-100, 0] },
-    { label: '大跌', filterKey: 'return1dRange', range: [-100, -3] },
-  ],
-  return3d: [
-    { label: '强势', filterKey: 'return3dRange', range: [5, 100] },
-    { label: '温和', filterKey: 'return3dRange', range: [2, 100] },
-    { label: '走弱', filterKey: 'return3dRange', range: [-100, 0] },
-  ],
-  return5d: [
-    { label: '强势', filterKey: 'return5dRange', range: [8, 100] },
-    { label: '温和', filterKey: 'return5dRange', range: [3, 100] },
-    { label: '走弱', filterKey: 'return5dRange', range: [-100, -2] },
-  ],
-  maGap: [
-    { label: '超跌', filterKey: 'maGap5Range', range: [-100, -5] },
-    { label: '贴线', filterKey: 'maGap5Range', range: [-3, 3] },
-    { label: '乖离放大', filterKey: 'maGap5Range', range: [5, 100] },
-  ],
-  volStd20: [
-    { label: '低波动', filterKey: 'volStd20Range', range: [0, 0.02] },
-    { label: '中波动', filterKey: 'volStd20Range', range: [0.02, 0.05] },
-    { label: '高波动', filterKey: 'volStd20Range', range: [0.05, 100] },
-  ],
-  profitGrowth: [
-    { label: '高增长', filterKey: 'profitGrowthRange', range: [30, 100000] },
-    { label: '正增长', filterKey: 'profitGrowthRange', range: [0, 100000] },
-    { label: '负增长', filterKey: 'profitGrowthRange', range: [-100000, 0] },
-  ],
-  beta20: [
-    { label: '防守(低Beta)', filterKey: 'beta20Range', range: [-3, 0.8] },
-    { label: '中性', filterKey: 'beta20Range', range: [0.8, 1.2] },
-    { label: '进攻(高Beta)', filterKey: 'beta20Range', range: [1.2, 3] },
-  ],
-  pb: [
-    { label: '低PB', filterKey: 'pbRange', range: [0, 1.5] },
-    { label: '中PB', filterKey: 'pbRange', range: [1.5, 3] },
-    { label: '高PB', filterKey: 'pbRange', range: [3, 100000] },
-  ],
-  atr14: [
-    { label: '低ATR', filterKey: 'atr14Range', range: [0, 0.5] },
-    { label: '中ATR', filterKey: 'atr14Range', range: [0.5, 1.5] },
-    { label: '高ATR', filterKey: 'atr14Range', range: [1.5, 1000] },
-  ],
-  kdjK: [
-    { label: '超卖', filterKey: 'kdjKRange', range: [0, 20] },
-    { label: '中性', filterKey: 'kdjKRange', range: [20, 80] },
-    { label: '超买', filterKey: 'kdjKRange', range: [80, 100] },
-  ],
-  macdHist: [
-    { label: '红柱(多头)', filterKey: 'macdHistRange', range: [0.01, 100] },
-    { label: '绿柱(空头)', filterKey: 'macdHistRange', range: [-100, -0.01] },
-  ],
-};
-
-/** 判断某个快捷标签是否处于激活状态（当前值与标签 range 完全一致） */
-const isQuickTagActive = (tag: QuickTagConfig, currentValue: [number, number] | number): boolean => {
-  if (!Array.isArray(currentValue)) return false;
-  return currentValue[0] === tag.range[0] && currentValue[1] === tag.range[1];
-};
-
-/**
  * 范围输入组件 - 用于投研筛选器手动输入
  * 传入数组时渲染双端区间，传入数字时渲染单值阈值。
- * 支持通过 quickTags 属性在输入框上方显示快捷标签。
+ * 统一单行排版：左侧标签 + 右侧输入框，一个条件占一行。
  */
 const RangeInput: React.FC<{
   label?: string;
@@ -761,35 +589,20 @@ const RangeInput: React.FC<{
   prefix?: string;
   suffix?: string;
   step?: number;
-  quickTags?: QuickTagConfig[];
-  onQuickTagClick?: (tag: QuickTagConfig) => void;
-}> = ({ label, value, onChange, placeholder, prefix, suffix, step = 1, quickTags, onQuickTagClick }) => {
+  precision?: number;
+}> = ({ label, value, onChange, placeholder, prefix, suffix, step = 1, precision }) => {
   const isRange = Array.isArray(value);
   return (
-    <div className="space-y-0.5">
-      {label && <div className="truncate text-[10px] font-black uppercase tracking-tight text-slate-500">{label}</div>}
-      {quickTags && quickTags.length > 0 && onQuickTagClick && (
-        <div className="flex flex-wrap gap-1 pb-0.5">
-          {quickTags.map((tag) => {
-            const active = isQuickTagActive(tag, value);
-            return (
-              <button
-                key={tag.label}
-                type="button"
-                onClick={() => onQuickTagClick(tag)}
-                className={`rounded-md border px-1.5 py-px text-[9px] font-bold transition-all duration-200 ${
-                  active
-                    ? 'border-blue-500 bg-blue-500 text-white shadow-sm'
-                    : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600'
-                }`}
-              >
-                {tag.label}
-              </button>
-            );
-          })}
+    <div className="flex items-center gap-2">
+      {label && (
+        <div
+          className="w-[104px] flex-shrink-0 truncate text-[11px] font-semibold text-slate-500"
+          title={label}
+        >
+          {label}
         </div>
       )}
-      <div className="flex items-center gap-1">
+      <div className="flex min-w-0 flex-1 items-center gap-1">
         <InputNumber
           className="research-next-input-number flex-1"
           size="small"
@@ -802,11 +615,12 @@ const RangeInput: React.FC<{
           prefix={prefix}
           suffix={suffix}
           step={step}
+          precision={precision}
           controls={false}
         />
         {isRange && (
           <>
-            <div className="h-[1px] w-1.5 bg-slate-300" />
+            <div className="h-[1px] w-2 flex-shrink-0 bg-slate-300" />
             <InputNumber
               className="research-next-input-number flex-1"
               size="small"
@@ -816,6 +630,7 @@ const RangeInput: React.FC<{
               prefix={prefix}
               suffix={suffix}
               step={step}
+              precision={precision}
               controls={false}
             />
           </>
@@ -857,6 +672,9 @@ export const ResearchPlatformPage: React.FC = () => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+  // 用户点选过的推理日：换模型时尽量沿用，便于同一天对比不同模型；
+  // 新模型没有该日才回退到该模型最新批次，但不覆盖用户意向日期。
+  const preferredInferenceDateRef = React.useRef<string>('');
 
   // ---- QuantDB 因子缓存 ----
   // 全池投影因子：筛选与排序在分页之前执行，必须覆盖整个候选池而非当前页
@@ -865,32 +683,19 @@ export const ResearchPlatformPage: React.FC = () => {
 
   // ---- 视图状态 ----
   const [keyword, setKeyword] = React.useState<string>('');
-  const [activeDataSource, setActiveDataSource] = React.useState<DataSourceTab>('candidates');
   const [sortKey, setSortKey] = React.useState<SortKey>('score');
   const [detailModalOpen, setDetailModalOpen] = React.useState<boolean>(false);
   const [selectedStockKey, setSelectedStockKey] = React.useState<string | null>(null);
   const [klineData, setKlineData] = React.useState<any[]>([]);
   const [klineLoading, setKlineLoading] = React.useState<boolean>(false);
+  const [filterPoolSelection, setFilterPoolSelection] = React.useState<StockPoolSelection | null>(null);
+  const [filterPoolMembers, setFilterPoolMembers] = React.useState<Set<string>>(new Set());
 
   // ---- 表格密度固定为“标准”（middle），不再提供紧凑/宽松切换；列固定为 50 维宽表字段集 ----
 
   // ---- 分页状态 ----
   const [candidatePage, setCandidatePage] = React.useState<number>(1);
   const [candidatePageSize, setCandidatePageSize] = React.useState<number>(10);
-  const [watchlistPage, setWatchlistPage] = React.useState<number>(1);
-  const [watchlistPageSize, setWatchlistPageSize] = React.useState<number>(12);
-  const [poolPage, setPoolPage] = React.useState<number>(1);
-  const [poolPageSize, setPoolPageSize] = React.useState<number>(12);
-
-  // ---- 自选 / 研究池 ----
-  const [watchlistData, setWatchlistData] = React.useState<WatchlistRow[]>([]);
-  const [watchlistLoading, setWatchlistLoading] = React.useState<boolean>(false);
-  const [watchlistTotal, setWatchlistTotal] = React.useState<number>(0);
-  const [poolData, setPoolData] = React.useState<ResearchPoolRow[]>([]);
-  const [poolLoading, setPoolLoading] = React.useState<boolean>(false);
-  const [poolTotal, setPoolTotal] = React.useState<number>(0);
-  const [watchlistFeatures, setWatchlistFeatures] = React.useState<Record<string, ResearchStockRow>>({});
-  const [poolFeatures, setPoolFeatures] = React.useState<Record<string, ResearchStockRow>>({});
 
   // ---- 筛选状态：草稿(draft) 与 已应用(applied) 分离 ----
   const [draftFilters, setDraftFilters] = React.useState<ResearchFiltersState>(() => cloneFilters(DEFAULT_RESEARCH_FILTERS));
@@ -1051,11 +856,19 @@ export const ResearchPlatformPage: React.FC = () => {
         const runs = await researchService.getInferenceRuns(selectedModelId);
         if (cancelled) return;
         setAvailableRuns(runs);
-        // 列表按日期倒序；默认选中最新日期。个股列表按日期直读
-        // pred.parquet（B 套），训练测试集日期同样可查看全市场分数
+        // 列表按日期倒序。首次进入默认最新日；用户已选过历史日后换模型
+        // 优先对齐同一交易日，方便跨模型对比，缺该日才回退最新批次。
         const first = runs[0];
-        setSelectedDate(first?.inferenceDate || '');
-        setSelectedRunId(first ? first.runId || `pred_${(first.inferenceDate || '').replaceAll('-', '')}` : '');
+        const preferred = preferredInferenceDateRef.current;
+        const matched = preferred
+          ? runs.find((item) => item.inferenceDate === preferred)
+          : undefined;
+        const pick = matched || first;
+        setSelectedDate(pick?.inferenceDate || '');
+        setSelectedRunId(pick ? pick.runId || `pred_${(pick.inferenceDate || '').replaceAll('-', '')}` : '');
+        if (preferred && !matched && pick?.inferenceDate) {
+          message.warning(`该模型没有 ${preferred} 的推理截面，已切到 ${pick.inferenceDate}`);
+        }
       } catch (error) {
         console.error('[ResearchPlatformPage] load runs failed:', error);
         if (!cancelled) setRunsError('加载推理批次失败');
@@ -1142,7 +955,11 @@ export const ResearchPlatformPage: React.FC = () => {
         _setResearchDateCache(dateContext, {
           candidatePool: pool,
           overview: result,
-          universeFeatures: researchDateCache.get(dateContext)?.universeFeatures ?? {},
+          // 切日期可复用已富化特征；点「刷新数据」必须清空，否则会一直命中
+          // 旧的 return10d 空值，宽表回填后前端仍显示 “-”。
+          universeFeatures: isContextSwitch
+            ? (researchDateCache.get(dateContext)?.universeFeatures ?? {})
+            : {},
         });
       } catch (error) {
         console.error('[ResearchPlatformPage] load universe failed:', error);
@@ -1170,160 +987,37 @@ export const ResearchPlatformPage: React.FC = () => {
     }
   };
 
-  // 加载自选数据（页面初始化时即加载，用于显示总数）
+  // 加载全局股票池成分（筛选候选池）
   React.useEffect(() => {
     let cancelled = false;
-    const loadWatchlist = async () => {
-      setWatchlistLoading(true);
-      try {
-        const result = await researchService.getWatchlist(100, 0);
-        if (cancelled) return;
-        setWatchlistData(result.items.map((item) => ({
-          key: item.symbol,
-          symbol: item.symbol,
-          stockName: item.stockName,
-          addedAt: item.addedAt,
-          sourceRunId: item.sourceRunId,
-          notes: item.notes,
-          tags: item.tags,
-        })));
-        setWatchlistTotal(result.total || 0);
-      } catch (error) {
-        console.error('[ResearchPlatformPage] load watchlist failed:', error);
-        if (!cancelled) {
-          setWatchlistData([]);
-          setWatchlistTotal(0);
-        }
-      } finally {
-        if (!cancelled) setWatchlistLoading(false);
-      }
-    };
-    void loadWatchlist();
-    return () => { cancelled = true; };
-  }, [refreshNonce]);
-
-  // 加载研究池数据（页面初始化时即加载，用于显示总数）
-  React.useEffect(() => {
-    let cancelled = false;
-    const loadPool = async () => {
-      setPoolLoading(true);
-      try {
-        const result = await researchService.getResearchPool({ limit: 100, offset: 0 });
-        if (cancelled) return;
-        setPoolData(result.items.map((item) => ({
-          key: item.symbol,
-          symbol: item.symbol,
-          stockName: item.stockName,
-          addedAt: item.addedAt,
-          sourceRunId: item.sourceRunId,
-          modelId: item.modelId,
-          fusionScore: item.fusionScore,
-          thesisSummary: item.thesisSummary,
-          status: item.status,
-          notes: item.notes,
-          tags: item.tags,
-        })));
-        setPoolTotal(result.total || 0);
-      } catch (error) {
-        console.error('[ResearchPlatformPage] load pool failed:', error);
-        if (!cancelled) {
-          setPoolData([]);
-          setPoolTotal(0);
-        }
-      } finally {
-        if (!cancelled) setPoolLoading(false);
-      }
-    };
-    void loadPool();
-    return () => { cancelled = true; };
-  }, [refreshNonce]);
-
-  // 富化自选特征数据
-  React.useEffect(() => {
-    if (!watchlistData.length) {
-      setWatchlistFeatures({});
+    const poolId = filterPoolSelection?.poolId;
+    if (!poolId) {
+      setFilterPoolMembers(new Set());
       return;
     }
-    const symbols = watchlistData.map((item) => item.symbol);
-    researchService.getFeaturesBySymbols(symbols)
-      .then((features) => {
-        const map: Record<string, ResearchStockRow> = {};
-        features.forEach((f) => { map[f.code] = f; });
-        setWatchlistFeatures(map);
-      })
-      .catch(() => setWatchlistFeatures({}));
-  }, [watchlistData]);
+    const loadMembers = async () => {
+      try {
+        const members = await getStockPoolMembers(poolId);
+        if (cancelled) return;
+        setFilterPoolMembers(new Set(members));
+      } catch (error) {
+        console.error('[ResearchPlatformPage] load stock pool members failed:', error);
+        if (!cancelled) setFilterPoolMembers(new Set());
+      }
+    };
+    void loadMembers();
+    return () => { cancelled = true; };
+  }, [filterPoolSelection]);
 
-  // 富化研究池特征数据
-  React.useEffect(() => {
-    if (!poolData.length) {
-      setPoolFeatures({});
-      return;
-    }
-    const symbols = poolData.map((item) => item.symbol);
-    researchService.getFeaturesBySymbols(symbols)
-      .then((features) => {
-        const map: Record<string, ResearchStockRow> = {};
-        features.forEach((f) => { map[f.code] = f; });
-        setPoolFeatures(map);
-      })
-      .catch(() => setPoolFeatures({}));
-  }, [poolData]);
+  /* ------------------------------ 自选池操作 ------------------------------ */
 
-  /* ------------------------------ 自选/研究池操作 ------------------------------ */
-
-  const handleAddToWatchlist = async (stock: ResearchStockRow) => {
+  const handleAddToFavorites = async (stock: ResearchStockRow) => {
     try {
-      await researchService.addToWatchlist(stock.code, {
-        runId: stock.runId,
-        stockName: stock.name,
-        featuresSnapshot: stock as unknown as Record<string, unknown>,
-      });
-      message.success(`已加入自选: ${stock.name}`);
-      triggerRefresh();
+      await addSymbolToUserPool(stock.code, USER_POOL_FAVORITES);
+      message.success(`已加入自选池: ${stock.name}`);
     } catch (error) {
-      console.error('[ResearchPlatformPage] add to watchlist failed:', error);
-      message.error('加入自选失败');
-    }
-  };
-
-  const handleAddToResearchPool = async (stock: ResearchStockRow) => {
-    try {
-      await researchService.addToResearchPool(stock.code, {
-        runId: stock.runId,
-        stockName: stock.name,
-        modelId: selectedModelId,
-        fusionScore: stock.score,
-        thesisSummary: stock.thesis,
-        featuresSnapshot: stock as unknown as Record<string, unknown>,
-      });
-      message.success(`已加入研究池: ${stock.name}`);
-      triggerRefresh();
-    } catch (error) {
-      console.error('[ResearchPlatformPage] add to research pool failed:', error);
-      message.error('加入研究池失败');
-    }
-  };
-
-  const handleRemoveFromWatchlist = async (symbol: string, stockName: string | null) => {
-    try {
-      await researchService.removeFromWatchlist(symbol);
-      message.success(`已从自选移除: ${stockName || symbol}`);
-      triggerRefresh();
-    } catch (error) {
-      console.error('[ResearchPlatformPage] remove from watchlist failed:', error);
-      message.error('移出自选失败');
-    }
-  };
-
-  const handleRemoveFromPool = async (symbol: string, stockName: string | null) => {
-    try {
-      await researchService.removeFromResearchPool(symbol);
-      message.success(`已从研究池移除: ${stockName || symbol}`);
-      triggerRefresh();
-    } catch (error) {
-      console.error('[ResearchPlatformPage] remove from pool failed:', error);
-      message.error('移出研究池失败');
+      console.error('[ResearchPlatformPage] add to favorites pool failed:', error);
+      message.error('加入自选池失败');
     }
   };
 
@@ -1401,12 +1095,6 @@ export const ResearchPlatformPage: React.FC = () => {
       // --- 核心阈值 ---
       if (safeNum(item.score, 0) < appliedFilters.minScore) return;
 
-      // --- 高置信标的 ---
-      if (appliedFilters.highConfidenceOnly && item.confidence !== 'high') return;
-
-      // --- 量能持续放大 ---
-      if (appliedFilters.volumeTrendOnly && !item.volumeTrend5d) return;
-
       // --- 剔除 ST / 退市：多维校验 ---
       if (appliedFilters.excludeSt) {
         const upperName = (item.name || '').toUpperCase();
@@ -1473,6 +1161,12 @@ export const ResearchPlatformPage: React.FC = () => {
         if (!nameHit && !codeHit) return;
       }
 
+      // --- 全局股票池成分 ---
+      if (filterPoolMembers.size > 0) {
+        const code = normalizeSymbol(item.code);
+        if (!filterPoolMembers.has(code) && !filterPoolMembers.has(code.toUpperCase())) return;
+      }
+
       matches.push({ ...item, isMatched: true });
     });
 
@@ -1485,7 +1179,7 @@ export const ResearchPlatformPage: React.FC = () => {
     });
 
     return matches.slice(0, loadRange).map((item, index) => ({ ...item, rank: index + 1 }));
-  }, [appliedFilters, activeRangeFilters, enrichedPool, keyword, sortKey, loadRange]);
+  }, [appliedFilters, activeRangeFilters, enrichedPool, keyword, sortKey, loadRange, filterPoolMembers]);
 
   // 当前分页的行（表格展示范围）
   const visibleCandidateRows = React.useMemo(
@@ -1527,103 +1221,6 @@ export const ResearchPlatformPage: React.FC = () => {
   const candidateScrollX = React.useMemo(
     () => Math.max(sumColumnWidth(visibleColumnKeys), 600),
     [visibleColumnKeys]
-  );
-
-  const watchlistColumns = React.useMemo<ColumnsType<ResearchStockRow>>(
-    () => [
-      ...buildColumns(SIMPLE_TABLE_COLUMN_KEYS).map((column) =>
-        column.key === 'latestChange' ? { ...column, width: 102, render: rScaledChange } : column
-      ),
-      {
-        key: 'actions',
-        title: <span className="whitespace-nowrap">操作</span>,
-        width: 80,
-        fixed: 'right',
-        align: 'center',
-        render: (_value, record) => (
-          <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            <Button
-              size="small"
-              type="text"
-              danger
-              onClick={() => handleRemoveFromWatchlist(record.code, record.name)}
-              title="从自选移除"
-            >
-              <span className="text-[10px]">移除</span>
-            </Button>
-          </div>
-        ),
-      },
-    ],
-    []
-  );
-
-  const poolColumns = React.useMemo<ColumnsType<ResearchStockRow>>(
-    () => [
-      ...buildColumns(SIMPLE_TABLE_COLUMN_KEYS).map((column) =>
-        column.key === 'latestChange' ? { ...column, width: 102, render: rScaledChange } : column
-      ),
-      {
-        key: 'actions',
-        title: <span className="whitespace-nowrap">操作</span>,
-        width: 80,
-        fixed: 'right',
-        align: 'center',
-        render: (_value, record) => (
-          <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            <Button
-              size="small"
-              type="text"
-              danger
-              onClick={() => handleRemoveFromPool(record.code, record.name)}
-              title="从研究池移除"
-            >
-              <span className="text-[10px]">移除</span>
-            </Button>
-          </div>
-        ),
-      },
-    ],
-    []
-  );
-
-  const simpleTableScrollX = React.useMemo(() => sumColumnWidth(SIMPLE_TABLE_COLUMN_KEYS) + 80, []);
-
-  /** 自选表格数据（特征富化 + 分页 + 关键词过滤） */
-  const filteredWatchlist = React.useMemo(
-    () => watchlistData.filter(
-      (item) => !keyword || item.symbol.includes(keyword) || (item.stockName?.includes(keyword) ?? false)
-    ),
-    [watchlistData, keyword]
-  );
-
-  const watchlistRows = React.useMemo<ResearchStockRow[]>(
-    () => filteredWatchlist
-      .slice((watchlistPage - 1) * watchlistPageSize, watchlistPage * watchlistPageSize)
-      .map((item, index) => ({
-        ...(watchlistFeatures[item.symbol] || makeFallbackRow(item.key, item.symbol, item.stockName || '-', 0)),
-        rank: (watchlistPage - 1) * watchlistPageSize + index + 1,
-        key: item.key,
-      })),
-    [filteredWatchlist, watchlistFeatures, watchlistPage, watchlistPageSize]
-  );
-
-  const filteredPool = React.useMemo(
-    () => poolData.filter(
-      (item) => !keyword || item.symbol.includes(keyword) || (item.stockName?.includes(keyword) ?? false)
-    ),
-    [poolData, keyword]
-  );
-
-  const poolRows = React.useMemo<ResearchStockRow[]>(
-    () => filteredPool
-      .slice((poolPage - 1) * poolPageSize, poolPage * poolPageSize)
-      .map((item, index) => ({
-        ...(poolFeatures[item.symbol] || makeFallbackRow(item.key, item.symbol, item.stockName || '-', item.fusionScore ?? 0)),
-        rank: (poolPage - 1) * poolPageSize + index + 1,
-        key: item.key,
-      })),
-    [filteredPool, poolFeatures, poolPage, poolPageSize]
   );
 
   /* ------------------------------ 详情面板衍生数据 ------------------------------ */
@@ -1974,8 +1571,6 @@ export const ResearchPlatformPage: React.FC = () => {
       summary.push(`模型分数 ≥ ${appliedFilters.minScore.toFixed(2)}`);
     }
     if (appliedFilters.excludeSt) summary.push('剔除 ST / 退市');
-    if (appliedFilters.highConfidenceOnly) summary.push('仅保留高置信标的');
-    if (appliedFilters.volumeTrendOnly) summary.push('近 5 日量能持续放大');
     if (appliedFilters.volRatio5Range > 0) summary.push(`5日量比 ≥ ${appliedFilters.volRatio5Range}`);
     if (appliedFilters.volRatio20Range > 0) summary.push(`20日量比 ≥ ${appliedFilters.volRatio20Range}`);
     if (appliedFilters.selectedSectors.length) summary.push(`行业：${appliedFilters.selectedSectors.length} 个选中`);
@@ -2096,7 +1691,7 @@ export const ResearchPlatformPage: React.FC = () => {
       </span>
     ),
     children: (
-      <div className="space-y-3 pt-1">
+      <div className="-ml-[5px] space-y-3 pt-1">
         {section.key === 'common' && (
           <>
             <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-1.5">
@@ -2107,27 +1702,11 @@ export const ResearchPlatformPage: React.FC = () => {
                 onChange={(checked) => setFilterField('excludeSt', checked)}
               />
             </div>
-            <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-1.5">
-              <span className="text-[11px] font-bold text-slate-500">仅高置信标的</span>
-              <Switch
-                size="small"
-                checked={draftFilters.highConfidenceOnly}
-                onChange={(checked) => setFilterField('highConfidenceOnly', checked)}
-              />
-            </div>
-            <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-1.5">
-              <span className="text-[11px] font-bold text-slate-500">近 5 日量能放大</span>
-              <Switch
-                size="small"
-                checked={draftFilters.volumeTrendOnly}
-                onChange={(checked) => setFilterField('volumeTrendOnly', checked)}
-              />
-            </div>
           </>
         )}
 
-        {section.fields.length > 2 ? (
-          <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+        {section.fields.length > 0 && (
+          <div className="space-y-1.5">
             {section.fields.map((field) => (
               <RangeInput
                 key={field.key as string}
@@ -2136,24 +1715,10 @@ export const ResearchPlatformPage: React.FC = () => {
                 onChange={(value) => setFilterField(field.key, value)}
                 suffix={field.suffix}
                 step={field.step ?? 1}
-                quickTags={field.quickTagGroup ? QUICK_TAGS[field.quickTagGroup] : undefined}
-                onQuickTagClick={(tag) => setFilterField(tag.filterKey, [...tag.range])}
+                precision={field.precision}
               />
             ))}
           </div>
-        ) : (
-          section.fields.map((field) => (
-            <RangeInput
-              key={field.key as string}
-              label={field.label}
-              value={draftFilters[field.key] as [number, number] | number}
-              onChange={(value) => setFilterField(field.key, value)}
-              suffix={field.suffix}
-              step={field.step ?? 1}
-              quickTags={field.quickTagGroup ? QUICK_TAGS[field.quickTagGroup] : undefined}
-              onQuickTagClick={(tag) => setFilterField(tag.filterKey, [...tag.range])}
-            />
-          ))
         )}
 
         {section.key === 'sector' && (
@@ -2181,12 +1746,6 @@ export const ResearchPlatformPage: React.FC = () => {
     ),
   }));
 
-  const activeTableTotal = activeDataSource === 'candidates'
-    ? filteredRows.length
-    : activeDataSource === 'watchlist'
-      ? filteredWatchlist.length
-      : filteredPool.length;
-
   return (
     <>
       <div className={`${PAGE_LAYOUT.outerClass} research-platform-page`}>
@@ -2198,8 +1757,13 @@ export const ResearchPlatformPage: React.FC = () => {
                 <Microscope className="h-5 w-5" />
               </div>
               <div>
-                <h1 className="text-lg font-bold tracking-tight text-slate-900">投研平台 ({marketConfig.label})</h1>
-                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">Professional Quant Workspace</p>
+                <div className="flex items-baseline gap-2">
+                  <h1 className="text-lg font-bold tracking-tight text-slate-900">投研平台 ({marketConfig.label})</h1>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">Professional Quant Workspace</p>
+                </div>
+                <p className="mt-0.5 whitespace-nowrap text-[11px] font-semibold text-slate-800">
+                  注：本页收益均为未来收益，用于评测模型在过去某一时期的推理结果在随后区间的真实表现。
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -2316,6 +1880,7 @@ export const ResearchPlatformPage: React.FC = () => {
                                     disabled={!hasData}
                                     onClick={() => {
                                       if (!run) return;
+                                      preferredInferenceDateRef.current = d;
                                       setSelectedDate(d);
                                       setSelectedRunId(run.runId || `pred_${d.replaceAll('-', '')}`);
                                       setCalendarOpen(false);
@@ -2613,37 +2178,38 @@ export const ResearchPlatformPage: React.FC = () => {
                       </div>
                     </motion.div>
 
-                    {/* 工具栏：数据源 / 排序 / 搜索 / 列显示 */}
+                    {/* 工具栏：候选池标题 / 股票池筛选 / 排序 / 搜索 */}
                     <div className="mb-4 mt-2 flex flex-shrink-0 flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                      <Segmented
-                        value={activeDataSource}
-                        onChange={(value) => setActiveDataSource(value as DataSourceTab)}
-                        options={[
-                          { label: <div className="flex items-center gap-2 px-2"><LibraryBig className="h-3.5 w-3.5" />候选池 ({filteredRows.length})</div>, value: 'candidates' },
-                          { label: <div className="flex items-center gap-2 px-2"><Quote className="h-3.5 w-3.5" />自选 ({watchlistTotal})</div>, value: 'watchlist' },
-                          { label: <div className="flex items-center gap-2 px-2"><Microscope className="h-3.5 w-3.5" />研究池 ({poolTotal})</div>, value: 'pool' },
-                        ]}
-                        className="research-next-segmented p-1.5"
-                      />
                       <div className="flex flex-wrap items-center gap-3">
-                        {activeDataSource === 'candidates' && (
-                          <div className="flex items-center gap-1 rounded-[18px] border border-slate-200 bg-slate-50/50 p-1">
-                            {SORT_OPTIONS.map((item) => (
-                              <button
-                                key={item.key}
-                                type="button"
-                                onClick={() => setSortKey(item.key)}
-                                className={`min-w-[48px] whitespace-nowrap rounded-xl px-2 py-1.5 text-[10.5px] font-black transition-all ${
-                                  sortKey === item.key
-                                    ? 'scale-[1.02] bg-slate-800 text-white shadow-lg shadow-slate-400/20'
-                                    : 'text-slate-500 hover:bg-white hover:text-slate-700'
-                                }`}
-                              >
-                                {item.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2 px-1 text-sm font-black text-slate-800">
+                          <LibraryBig className="h-3.5 w-3.5" />
+                          候选池 ({filteredRows.length})
+                        </div>
+                        <StockPoolSelectField
+                          value={filterPoolSelection}
+                          onChange={setFilterPoolSelection}
+                          market={currentMarket}
+                          title="按股票池筛选"
+                          compact
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-1 rounded-[18px] border border-slate-200 bg-slate-50/50 p-1">
+                          {SORT_OPTIONS.map((item) => (
+                            <button
+                              key={item.key}
+                              type="button"
+                              onClick={() => setSortKey(item.key)}
+                              className={`min-w-[48px] whitespace-nowrap rounded-xl px-2 py-1.5 text-[10.5px] font-black transition-all ${
+                                sortKey === item.key
+                                  ? 'scale-[1.02] bg-slate-800 text-white shadow-lg shadow-slate-400/20'
+                                  : 'text-slate-500 hover:bg-white hover:text-slate-700'
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
                         <Input
                           className="premium-search-bar h-10 max-w-[240px] rounded-[18px] border-slate-200 font-bold"
                           placeholder="搜索代码/名称..."
@@ -2656,76 +2222,45 @@ export const ResearchPlatformPage: React.FC = () => {
                     </div>
 
                     <div className="flex flex-1 flex-col">
-                      <div className="flex-1">
-                        {activeDataSource === 'candidates' && (
-                          <Table<ResearchStockRow>
-                            className={FIELD_STYLES.table}
-                            rowKey="key"
-                            columns={columns}
-                            dataSource={visibleCandidateRows}
-                            loading={overviewLoading}
-                            pagination={false}
-                            scroll={{ x: candidateScrollX }}
-                            size="middle"
-                            locale={{ emptyText: <Empty description="暂无符合条件的候选个股。" /> }}
-                            onRow={(record) => ({
-                              onClick: () => {
-                                setSelectedStockKey(record.key);
-                                setDetailModalOpen(true);
-                              },
-                            })}
-                            rowClassName={(record) =>
-                              `cursor-pointer transition-all ${record.key === selectedStockKey ? 'research-table-row-selected' : ''} ${
-                                record.isMatched === false ? 'opacity-40 grayscale-[0.5]' : 'font-medium'
-                              }`
-                            }
-                          />
-                        )}
-                        {activeDataSource === 'watchlist' && (
-                          <Table<ResearchStockRow>
-                            className={FIELD_STYLES.table}
-                            rowKey="key"
-                            columns={watchlistColumns}
-                            dataSource={watchlistRows}
-                            loading={watchlistLoading}
-                            pagination={false}
-                            scroll={{ x: simpleTableScrollX }}
-                            locale={{ emptyText: <Empty description="自选列表为空。" /> }}
-                          />
-                        )}
-                        {activeDataSource === 'pool' && (
-                          <Table<ResearchStockRow>
-                            className={FIELD_STYLES.table}
-                            rowKey="key"
-                            columns={poolColumns}
-                            dataSource={poolRows}
-                            loading={poolLoading}
-                            pagination={false}
-                            scroll={{ x: simpleTableScrollX }}
-                            locale={{ emptyText: <Empty description="研究池为空。" /> }}
-                          />
+                      <div className="relative flex-1">
+                        <Table<ResearchStockRow>
+                          className={FIELD_STYLES.table}
+                          rowKey="key"
+                          columns={columns}
+                          dataSource={visibleCandidateRows}
+                          pagination={false}
+                          scroll={{ x: candidateScrollX }}
+                          size="middle"
+                          locale={{ emptyText: <Empty description="暂无符合条件的候选个股。" /> }}
+                          onRow={(record) => ({
+                            onClick: () => {
+                              setSelectedStockKey(record.key);
+                              setDetailModalOpen(true);
+                            },
+                          })}
+                          rowClassName={(record) =>
+                            `cursor-pointer transition-all ${record.key === selectedStockKey ? 'research-table-row-selected' : ''} ${
+                              record.isMatched === false ? 'opacity-40 grayscale-[0.5]' : 'font-medium'
+                            }`
+                          }
+                        />
+                        {(overviewLoading || universeFeaturesLoading) && (
+                          <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-white/60 backdrop-blur-[2px]">
+                            <Spin size="large" />
+                            <span className="text-xs font-semibold text-slate-600">
+                              {selectedDate ? `正在加载 ${selectedDate} 批次数据…` : '正在加载数据…'}
+                            </span>
+                          </div>
                         )}
                       </div>
                       <div className="flex items-center justify-end border-t border-slate-100 bg-white/80 px-2 py-2 backdrop-blur-sm">
                         <Pagination
-                          current={
-                            activeDataSource === 'candidates' ? candidatePage : activeDataSource === 'watchlist' ? watchlistPage : poolPage
-                          }
-                          pageSize={
-                            activeDataSource === 'candidates' ? candidatePageSize : activeDataSource === 'watchlist' ? watchlistPageSize : poolPageSize
-                          }
-                          total={activeTableTotal}
+                          current={candidatePage}
+                          pageSize={candidatePageSize}
+                          total={filteredRows.length}
                           onChange={(page, pageSize) => {
-                            if (activeDataSource === 'candidates') {
-                              setCandidatePage(page);
-                              setCandidatePageSize(pageSize);
-                            } else if (activeDataSource === 'watchlist') {
-                              setWatchlistPage(page);
-                              setWatchlistPageSize(pageSize);
-                            } else {
-                              setPoolPage(page);
-                              setPoolPageSize(pageSize);
-                            }
+                            setCandidatePage(page);
+                            setCandidatePageSize(pageSize);
                           }}
                           size="small"
                           showSizeChanger
@@ -2759,20 +2294,12 @@ export const ResearchPlatformPage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Button
                   size="small"
-                  icon={<Quote className="h-3.5 w-3.5" />}
-                  onClick={() => handleAddToWatchlist(selectedStock)}
-                  className="h-8 rounded-xl border-slate-200 text-xs font-bold transition-all hover:border-blue-400 hover:text-blue-500 active:scale-95"
-                >
-                  加入自选
-                </Button>
-                <Button
-                  size="small"
                   type="primary"
                   icon={<Sparkles className="h-3.5 w-3.5" />}
-                  onClick={() => handleAddToResearchPool(selectedStock)}
+                  onClick={() => handleAddToFavorites(selectedStock)}
                   className="h-8 rounded-xl border-none bg-blue-600 text-xs font-bold shadow-md shadow-blue-500/20 transition-all hover:bg-blue-500 active:scale-95"
                 >
-                  加入研究池
+                  加入自选池
                 </Button>
               </div>
             </div>
@@ -2877,9 +2404,6 @@ export const ResearchPlatformPage: React.FC = () => {
                   { label: '1日收益', val: fmtNullableSignedPercent2(selectedStock.return1d) },
                   { label: '3日收益', val: fmtNullableSignedPercent2(selectedStock.return3d) },
                   { label: '5日收益', val: fmtNullableSignedPercent2(selectedStock.return5d) },
-                  { label: '10日收益', val: fmtNullableSignedPercent2(selectedStock.return10d) },
-                  { label: '20日收益', val: fmtNullableSignedPercent2(selectedStock.return20d) },
-                  { label: '60日收益', val: fmtNullableSignedPercent2(selectedStock.return60d) },
                   { label: '行业', val: selectedStock.sector || '-' },
                   { label: '概念', val: (selectedStock.conceptTags || []).slice(0, 3).join(' / ') || selectedStock.concept || '-' },
                   { label: '指数', val: (selectedStock.indexTags || []).slice(0, 3).join(' / ') || '-' },

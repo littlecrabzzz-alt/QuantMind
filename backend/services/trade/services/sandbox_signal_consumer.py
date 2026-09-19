@@ -22,9 +22,12 @@ from backend.services.simulation.services.execution_engine import (
     SimulationExecutionEngine,
 )
 from backend.services.simulation.services.order_service import SimOrderService
-from backend.services.simulation.services.simulation_manager import SimulationAccountManager
+from backend.services.simulation.services.simulation_manager import (
+    SimulationAccountManager,
+    canonical_sim_uid,
+)
 from backend.services.trade_shared.trade_config import settings
-from backend.shared.database_manager_v2 import get_db_manager
+from backend.shared.database_manager_v2 import get_session
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +37,28 @@ _POLL_INTERVAL = 0.2
 
 
 def _active_strategy_key(tenant_id: str, user_id: str) -> str:
-    tenant = (tenant_id or "").strip() or "default"
-    return f"trade:active_strategy:{tenant}:{str(user_id).zfill(8)}"
+    from backend.shared.simulation_account_keys import active_strategy_key
+
+    return active_strategy_key(tenant_id, user_id)
+
+
+def _read_active_strategy_raw(tenant_id: str, user_id: str):
+    from backend.shared.simulation_account_keys import active_strategy_lookup_keys
+
+    if not redis_client.client:
+        return None
+    canonical = _active_strategy_key(tenant_id, user_id)
+    for key in active_strategy_lookup_keys(tenant_id, user_id):
+        raw = redis_client.client.get(key)
+        if not raw:
+            continue
+        if key != canonical:
+            try:
+                redis_client.client.set(canonical, raw)
+            except Exception:
+                pass
+        return raw
+    return None
 
 
 class SandboxSignalConsumer:
@@ -136,7 +159,7 @@ class SandboxSignalConsumer:
         if not redis_client.client:
             return False
         try:
-            raw = redis_client.client.get(_active_strategy_key(tenant_id, user_id))
+            raw = _read_active_strategy_raw(tenant_id, user_id)
             if not raw:
                 return False
             if isinstance(raw, bytes):
@@ -175,7 +198,7 @@ class SandboxSignalConsumer:
             logger.warning("[SandboxSignalConsumer] 信号缺少 symbol")
             return
 
-        user_id_int = int(user_id) if user_id.isdigit() else 0
+        user_id_int = canonical_sim_uid(user_id)
         if user_id_int <= 0:
             logger.warning("[SandboxSignalConsumer] 无效的 user_id: %s", user_id)
             return
@@ -196,17 +219,9 @@ class SandboxSignalConsumer:
         current_pos = positions.get(symbol.upper())
         current_volume = int(float(current_pos.get("volume", 0))) if current_pos else 0
 
-        # 获取当前价格（优先行情API，回退到持仓成本价）
+        # 获取当前价格（Redis 实时优先，HTTP 次之；取不到直接跳过，
+        # 禁止用持仓成本价回退成交，避免虚假价格污染账户）
         current_price = await self._get_current_price(symbol)
-        if current_price <= 0:
-            if current_pos:
-                fallback_price = float(current_pos.get("price") or current_pos.get("cost", 0))
-                if fallback_price > 0:
-                    current_price = fallback_price
-                    logger.info(
-                        "[SandboxSignalConsumer] 使用持仓价格回退 %s: %.2f",
-                        symbol, current_price,
-                    )
         if current_price <= 0:
             logger.warning("[SandboxSignalConsumer] 无法获取 %s 的价格，跳过下单", symbol)
             return
@@ -264,7 +279,7 @@ class SandboxSignalConsumer:
             logger.warning("[SandboxSignalConsumer] 直接下单信号缺少必要参数")
             return
 
-        user_id_int = int(user_id) if user_id.isdigit() else 0
+        user_id_int = canonical_sim_uid(user_id)
         if user_id_int <= 0:
             return
 
@@ -293,8 +308,7 @@ class SandboxSignalConsumer:
         run_id: str,
     ):
         """创建订单并执行"""
-        db_manager = get_db_manager()
-        async with db_manager.session() as db:
+        async with get_session() as db:
             order_service = SimOrderService(db)
             exec_engine = SimulationExecutionEngine(db, self._account_manager)
 
@@ -332,7 +346,17 @@ class SandboxSignalConsumer:
             await db.commit()
 
     async def _get_current_price(self, symbol: str) -> float:
-        """获取当前市场价格"""
+        """获取当前市场价格：Redis 实时序列优先，行情 HTTP 次之。"""
+        try:
+            from backend.services.simulation.services.redis_series_quote import (
+                fetch_series_tick,
+            )
+
+            tick = await fetch_series_tick(symbol)
+            if tick and float(tick["price"]) > 0:
+                return float(tick["price"])
+        except Exception as e:
+            logger.warning("获取 %s Redis 行情失败: %s", symbol, e)
         market_url = settings.MARKET_DATA_SERVICE_URL.rstrip("/")
         endpoint = f"{market_url}/api/v1/quotes/{symbol}"
         try:

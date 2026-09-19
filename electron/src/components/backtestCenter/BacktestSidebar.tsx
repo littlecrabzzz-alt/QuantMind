@@ -19,7 +19,6 @@ import {
   TrendingUp,
   BarChart3,
 } from 'lucide-react';
-import HelpCenterLink from '../common/HelpCenterLink';
 import { ModuleId } from '../../stores/backtestCenterStore';
 
 interface Module {
@@ -117,11 +116,6 @@ export const BacktestSidebar: React.FC<BacktestSidebarProps> = ({
             />
           ))}
         </div>
-      </div>
-
-      {/* 底部帮助链接 */}
-      <div className="border-t border-gray-200 p-4 shrink-0 mt-auto">
-        <HelpCenterLink className="w-full" />
       </div>
 
     </aside>

@@ -5,7 +5,7 @@ Simulation order schemas.
 from datetime import datetime
 from typing import Optional
 
-from pydantic import UUID4, BaseModel, ConfigDict, Field
+from pydantic import UUID4, BaseModel, ConfigDict, Field, field_serializer
 
 from backend.services.simulation.models.order import (
     OrderSide,
@@ -13,6 +13,7 @@ from backend.services.simulation.models.order import (
     OrderType,
     TradingMode,
 )
+from backend.shared.utc_datetime import to_utc_iso
 
 
 class SimOrderBase(BaseModel):
@@ -25,9 +26,18 @@ class SimOrderBase(BaseModel):
 
 
 class SimOrderCreate(SimOrderBase):
+    model_config = ConfigDict(extra="ignore")
+
     portfolio_id: int = Field(0, ge=0)
     strategy_id: int | None = Field(None, gt=0)
     trading_mode: TradingMode = TradingMode.SIMULATION
+    # V2提交链路透传字段（旧SimOrder表不持久化，仅保证ValidationError不阻断）
+    client_order_id: str | None = Field(None, max_length=64)
+    time_in_force: str | None = Field(None, max_length=16)
+    expires_at: datetime | None = None
+    trade_action: str | None = Field(None, max_length=32)
+    position_side: str | None = Field(None, max_length=16)
+    is_margin_trade: bool | None = False
 
 
 class SimOrderCancelRequest(BaseModel):
@@ -57,3 +67,15 @@ class SimOrderResponse(SimOrderBase):
     price_source: str | None
     created_at: datetime
     updated_at: datetime
+    symbol_name: str | None = None
+
+    @field_serializer(
+        "submitted_at",
+        "filled_at",
+        "cancelled_at",
+        "created_at",
+        "updated_at",
+        when_used="json",
+    )
+    def _serialize_datetime(self, value: datetime | None) -> str | None:
+        return to_utc_iso(value)

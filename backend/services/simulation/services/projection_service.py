@@ -6,14 +6,17 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.services.simulation.models.account import SimulationAccount
 from backend.services.simulation.models.position_lot import SimulationPositionLot
+
+_SH_TZ = ZoneInfo("Asia/Shanghai")
 
 
 @dataclass
@@ -52,6 +55,21 @@ class SimulationProjectionService:
             getattr(account, "short_market_value", 0.0) or 0.0
         )
         if positions:
+            # 防御性补齐成本/现价别名：外部拼装的 positions 可能只有 cost_price
+            # 或只有 cost，补齐后 Lua/撮合与台账侧读写各自口径都不丢。
+            for _pos in positions.values():
+                if not isinstance(_pos, dict):
+                    continue
+                _cost = _pos.get("cost", _pos.get("cost_price", 0.0))
+                try:
+                    _cost_f = float(_cost or 0.0)
+                except (TypeError, ValueError):
+                    _cost_f = 0.0
+                _pos.setdefault("cost", _cost_f)
+                _pos.setdefault("cost_price", _cost_f)
+                _pos.setdefault("price", _pos.get("last_price", 0.0))
+                _pos.setdefault("market_value", 0.0)
+                _pos.setdefault("volume", 0.0)
             long_market_value, short_market_value, market_value = (
                 SimulationProjectionService.summarize_position_market_value(positions)
             )
@@ -164,7 +182,7 @@ class SimulationProjectionService:
             return_exceptions=True,
         )
         price_map: dict[str, float] = {}
-        for symbol, value in zip(symbols, price_pairs):
+        for symbol, value in zip(symbols, price_pairs, strict=True):
             price_map[symbol] = float(value) if isinstance(value, (int, float)) else 0.0
 
         grouped: dict[tuple[str, str], dict[str, float]] = {}
@@ -207,6 +225,7 @@ class SimulationProjectionService:
                 if side == "long"
                 else f"{normalized_symbol}:short"
             )
+            cost_rounded = round(cost_price, 4) if cost_price > 0 else 0.0
             positions[key] = {
                 "symbol": normalized_symbol,
                 "volume": qty,
@@ -218,7 +237,10 @@ class SimulationProjectionService:
                 "price": round(price, 4) if price > 0 else 0.0,
                 "last_price": round(price, 4) if price > 0 else 0.0,
                 "market_value": market_value,
-                "cost_price": round(cost_price, 4) if cost_price > 0 else 0.0,
+                # 口径统一：live Redis 持仓用 `cost`（Lua/撮合读写），台账侧用
+                # `cost_price`。双写别名，任一入口重建 Redis 都不丢成本口径。
+                "cost": cost_rounded,
+                "cost_price": cost_rounded,
                 "side": side,
             }
         return positions
@@ -257,6 +279,35 @@ class SimulationProjectionService:
             6,
         )
 
+    async def load_available_quantities(
+        self,
+        *,
+        tenant_id: str,
+        user_id: str | int,
+        as_of_date: date | None = None,
+    ) -> dict[tuple[str, str], float]:
+        """Return ledger-derived sellable quantities grouped by symbol and side."""
+        account_id = self.build_account_id(tenant_id, user_id)
+        stmt = select(SimulationPositionLot).where(
+            SimulationPositionLot.account_id == account_id,
+            SimulationPositionLot.status == "open",
+            SimulationPositionLot.quantity_remaining > 0,
+        )
+        lots = list((await self.db.execute(stmt)).scalars().all())
+        target_date = as_of_date or datetime.now(_SH_TZ).date()
+        quantities: dict[tuple[str, str], float] = {}
+        for lot in lots:
+            symbol = str(lot.symbol or "").strip().upper()
+            side = str(lot.position_side or "long").strip().lower()
+            if not symbol:
+                continue
+            key = (symbol, side)
+            quantities[key] = quantities.get(key, 0.0) + self._lot_available_quantity(
+                lot,
+                as_of_date=target_date,
+            )
+        return {key: round(value, 6) for key, value in quantities.items()}
+
     @staticmethod
     def _lot_available_quantity(
         lot: SimulationPositionLot,
@@ -270,6 +321,12 @@ class SimulationProjectionService:
         if side != "long":
             return qty
         open_dt = lot.open_date
-        if isinstance(open_dt, datetime) and open_dt.date() >= as_of_date:
-            return 0.0
+        if isinstance(open_dt, datetime):
+            # Ledger timestamps are stored as naive UTC. T+1 is based on the
+            # exchange-local trade date, not UTC's calendar date.
+            if open_dt.tzinfo is None:
+                open_dt = open_dt.replace(tzinfo=timezone.utc)
+            open_trade_date = open_dt.astimezone(_SH_TZ).date()
+            if open_trade_date >= as_of_date:
+                return 0.0
         return qty

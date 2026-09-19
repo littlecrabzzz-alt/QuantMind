@@ -6,6 +6,7 @@ Simulation Scheduler - 模拟盘定时调度器
 """
 
 import asyncio
+import json
 import logging
 import os
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ from backend.services.trade_shared.redis_client import RedisClient
 from backend.services.simulation.engine import SimulationEngine, simulation_engine
 from backend.services.simulation.services.simulation_manager import (
     SimulationAccountManager,
+    canonical_sim_uid,
 )
 from backend.shared.database_manager_v2 import get_db_manager
 
@@ -126,10 +128,16 @@ class SimulationScheduler:
                 await asyncio.sleep(self.poll_interval)
 
     def _is_trading_day(self, dt: datetime) -> bool:
-        """检查是否为交易日"""
-        # 简单判断：周一到周五
-        # TODO: 接入交易日历
-        return dt.weekday() < 5
+        """检查是否为交易日（XSHG 日历；日历不可用时回退周一至周五）"""
+        try:
+            from backend.services.simulation.services.simulation_hosted_scheduler import (
+                _is_trading_day as _calendar_is_trading_day,
+            )
+
+            return _calendar_is_trading_day(dt.date())
+        except Exception as exc:
+            logger.debug("SimulationScheduler: 交易日历不可用, 回退周判断: %s", exc)
+            return dt.weekday() < 5
 
     async def run_all_users(self) -> dict[str, Any]:
         """
@@ -232,7 +240,7 @@ class SimulationScheduler:
                                         tenant_id=tenant_id,
                                         user_id=user_id,
                                         strategy_id=str(strategy_id),
-                                        account_id=int(user_id) if user_id.isdigit() else 0,
+                                        account_id=canonical_sim_uid(user_id),
                                     ))
                     except Exception as e:
                         logger.debug("SimulationScheduler: 解析账户 key 失败 %s: %s", key, e)
@@ -242,6 +250,44 @@ class SimulationScheduler:
 
         return accounts
 
+    def _resolve_pool_ref(self, account: ActiveSimulationAccount) -> str | None:
+        """从运行时 active_strategy 配置取全局股票池引用（P3 接线）。
+
+        与 hosted scheduler / 手动托管同一事实源：前端「模拟盘托管」保存的
+        live_trade_config.pool_id 存在 trade:active_strategy:{tenant}:{user}。
+        此前 SimulationScheduler 每日调仓从不读它，导致配置的池只对托管链路
+        生效、对本调度器静默失效（按全市场信号调仓）。
+        """
+        try:
+            if not self.redis.client:
+                return None
+            from backend.shared.simulation_account_keys import active_strategy_key
+
+            raw = self.redis.client.get(
+                active_strategy_key(account.tenant_id, account.user_id)
+            )
+            if not raw:
+                return None
+            data = json.loads(raw)
+            if not isinstance(data, dict):
+                return None
+            if str(data.get("strategy_id") or "").strip() != str(account.strategy_id):
+                return None
+            cfg = data.get("live_trade_config")
+            if isinstance(cfg, str):
+                cfg = json.loads(cfg)
+            if not isinstance(cfg, dict):
+                return None
+            return str(cfg.get("pool_id") or "").strip() or None
+        except Exception as e:
+            logger.debug(
+                "SimulationScheduler: 解析账户池配置失败 tenant=%s user=%s: %s",
+                account.tenant_id,
+                account.user_id,
+                e,
+            )
+            return None
+
     async def _run_single_account(self, account: ActiveSimulationAccount) -> bool:
         """执行单个账户的调仓"""
         try:
@@ -249,6 +295,7 @@ class SimulationScheduler:
                 tenant_id=account.tenant_id,
                 user_id=account.user_id,
                 strategy_id=account.strategy_id,
+                pool_id=self._resolve_pool_ref(account),
             )
             return report.error is None
         except Exception as e:
@@ -275,8 +322,9 @@ class SimulationScheduler:
                         tenant_id = parts[2]
                         user_id_str = parts[3]
                         if user_id_str.isdigit():
-                            result = await manager.unlock_t1(
-                                user_id=int(user_id_str), tenant_id=tenant_id,
+                            result = await manager.sync_t1_from_ledger(
+                                user_id=int(user_id_str),
+                                tenant_id=tenant_id,
                             )
                             if result.get("success") and result.get("unlocked", 0) > 0:
                                 unlocked_count += 1

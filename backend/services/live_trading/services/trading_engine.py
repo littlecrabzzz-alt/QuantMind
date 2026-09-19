@@ -46,7 +46,7 @@ def _infer_broker_market(symbol: str | None) -> str:
 
 
 def _selected_broker_type(redis: RedisClient, market: str) -> str:
-    """读取用户在「券商接入」页为某市场选定的券商（tiger/futu/ib/qmt/tdx）。"""
+    """读取用户在「券商接入」页为某市场选定的券商（tiger/futu/ib/qmt/tdx/qmt_exec）。"""
     try:
         if redis and redis.client:
             raw = redis.client.get(f"broker:selected:{market}")
@@ -81,7 +81,7 @@ class TradingEngine:
         """
         按订单 trading_mode 取 broker:
           - REAL/SHADOW 且启用实盘 → 按标的市场路由券商：
-            broker:selected:{market}（用户在「券商接入」页选定，tiger/futu/ib/tdx）
+            broker:selected:{market}（用户在「券商接入」页选定，tiger/futu/ib/tdx/qmt_exec）
             优先，未选定回退 settings.REAL_BROKER_TYPE
           - 其余 (SIMULATION/BACKTEST) → PaperTradingBroker (本地模拟撮合)
         通过缓存避免重复构造。
@@ -576,7 +576,11 @@ class TradingEngine:
 
             # 2. 获取备选池 (从 Redis 或 DB 获取该策略的预设权重)
             # 方案：读取该租户/用户的实时活跃配置
-            active_key = f"trade:active_strategy:{portfolio.tenant_id}:{str(user_id).zfill(8)}"
+            from backend.shared.simulation_account_keys import (
+                active_strategy_key as _canonical_active_key,
+            )
+
+            active_key = _canonical_active_key(portfolio.tenant_id, user_id)
             active_data_raw = self.redis.client.get(active_key)
             if not active_data_raw:
                 return None

@@ -174,9 +174,17 @@ class AuthService:
             return True
 
     async def _generate_user_id(self, session) -> str:
-        """生成唯一的8位数字用户ID"""
+        """生成唯一的 8 位数字用户 ID（10000000-99999999，不以 0 开头）。"""
+        from backend.shared.admin_identity import (
+            ADMIN_USER_ID,
+            LEGACY_ADMIN_USER_IDS,
+        )
+
+        reserved = {ADMIN_USER_ID, *LEGACY_ADMIN_USER_IDS, "00000000"}
         for _ in range(50):
-            candidate = f"{uuid.uuid4().int % 10**8:08d}"
+            candidate = str(uuid.uuid4().int % 90_000_000 + 10_000_000)
+            if candidate in reserved:
+                continue
             exists = await session.execute(
                 select(User.user_id).where(User.user_id == candidate)
             )
@@ -498,13 +506,10 @@ class AuthService:
 
             logger.info(f"User registered: {user_id}")
 
-        # 为新用户自动注册系统模型
+        # 为新用户自动注册系统模型（若配置了 PRIMARY_MODEL_ID）
         try:
             from backend.shared.model_registry import model_registry_service
             await model_registry_service._ensure_system_default_record(
-                tenant_id=user_data.tenant_id, user_id=user_id
-            )
-            await model_registry_service._ensure_fallback_model_record(
                 tenant_id=user_data.tenant_id, user_id=user_id
             )
             logger.info(f"System models registered for user: {user_id}")

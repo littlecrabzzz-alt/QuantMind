@@ -98,6 +98,8 @@ FACTOR_COLUMN_MAP = {
     "s_volume": "s_volume",
     # ── 指数关联 (stock_list based, handled specially in executor) ──
     "idx_all": "idx_all",
+    "is_hs300": ("quantdb_stock_list", "idx_hs300"),
+    "is_csi1000": ("quantdb_stock_list", "idx_zz1000"),
     "idx_hs300": ("quantdb_stock_list", "idx_hs300"), "hs300": ("quantdb_stock_list", "idx_hs300"),
     "idx_zz1000": ("quantdb_stock_list", "idx_zz1000"), "csi1000": ("quantdb_stock_list", "idx_zz1000"),
     "idx_zz500": ("quantdb_stock_list", "idx_zz500"),

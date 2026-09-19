@@ -39,7 +39,6 @@ import { clsx } from 'clsx';
 import { authService } from '../features/auth/services/authService';
 import { strategyManagementService } from '../services/strategyManagementService';
 import { modelTrainingService } from '../services/modelTrainingService';
-import HelpCenterLink from '../components/common/HelpCenterLink';
 import { SERVICE_ENDPOINTS } from '../config/services';
 import { PAGE_LAYOUT } from '../config/pageLayout';
 import { useAppSelector } from '../store';
@@ -712,26 +711,27 @@ const AIIDEPage: React.FC = () => {
         }
     };
 
-    const handleRenameItem = async (oldPath: string, e: React.MouseEvent) => {
+    const handleRenameItem = async (file: FileItem, e: React.MouseEvent) => {
         e.stopPropagation();
         if (activeTab !== 'local') return;
-        const oldBaseName = oldPath.split('/').pop() || oldPath;
-        const newName = await promptForText('请输入新名称', oldBaseName, '请输入新名称');
-        if (!newName || newName === oldBaseName) return;
-        const parent = oldPath.includes('/') ? oldPath.split('/').slice(0, -1).join('/') : '';
-        const newPath = parent ? `${parent}/${newName}` : newName;
+        const strategyId = String(file.id || file.path || '').replace(/\.py$/i, '');
+        const currentName = (file.name || '').replace(/\.py$/i, '');
+        const newName = await promptForText('请输入策略名称', currentName, '请输入策略名称');
+        if (!newName || newName === currentName) return;
         try {
             const res = await apiFetch('/files/rename', {
                 method: 'POST',
-                body: JSON.stringify({ old_path: oldPath, new_path: newPath })
+                body: JSON.stringify({ strategy_id: strategyId, name: newName })
             }, true);
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 const errMsg = formatError(err) || '重命名失败';
                 Modal.error({ title: '重命名失败', content: errMsg });
+                return;
             }
-            if (selectedFile?.path === oldPath) {
-                setSelectedFile(null); // Force reload
+            const displayName = newName.endsWith('.py') ? newName : `${newName}.py`;
+            if (selectedFile && (selectedFile.id === file.id || selectedFile.path === file.path)) {
+                setSelectedFile({ ...selectedFile, name: displayName });
             }
             message.success('重命名成功');
             fetchLocalFileList();
@@ -1971,7 +1971,7 @@ const AIIDEPage: React.FC = () => {
                                 </div>
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
                                     <button
-                                        onClick={(e) => handleRenameItem(file.path, e)}
+                                        onClick={(e) => handleRenameItem(file, e)}
                                         className="p-1 hover:bg-blue-100 rounded text-gray-400 hover:text-blue-600 transition-all"
                                         title="重命名"
                                     >
@@ -2022,11 +2022,6 @@ const AIIDEPage: React.FC = () => {
                             </div>
                         ))
                     )}
-                </div>
-
-                {/* Status Bar Left Part */}
-                <div className="p-4 border-t border-gray-200 shrink-0">
-                    <HelpCenterLink className="w-full" />
                 </div>
             </aside>
 

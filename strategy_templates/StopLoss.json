@@ -31,5 +31,7 @@
   "live_defaults": {
     "rebalance_days": 3
   },
-  "live_config_tips": []
+  "live_config_tips": [],
+  "dir": "通用策略",
+  "markets": []
 }

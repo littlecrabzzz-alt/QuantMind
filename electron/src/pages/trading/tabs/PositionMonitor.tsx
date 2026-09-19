@@ -1,13 +1,12 @@
 import { useAppSelector } from '../../../store';
 import { selectCurrentMarket } from '../../../store/slices/uiSlice';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { AccountInfo } from '../../../services/realTradingService';
 import { marketDataService } from '../../../services/marketDataService';
 import { websocketService, MessageType } from '../../../services/websocketService';
 import { buildNormalizedHoldings, extractPositionCodes, getPositionSummary, NormalizedHolding } from '../utils/positionMetrics';
 import PositionOverview from '../components/PositionOverview';
-import { SERVICE_URLS } from '../../../config/services';
 
 interface PositionMonitorProps {
     userId: string;
@@ -27,21 +26,6 @@ interface LiveQuote {
         timestamp?: string | number;
     };
 }
-
-interface QuoteFeedStatus {
-    running?: boolean;
-    bridge_ok?: boolean;
-    last_feed_at?: string | null;
-    last_feed_age_sec?: number | null;
-    symbols?: string[];
-    is_trading_time?: boolean;
-    last_error?: string | null;
-}
-
-const authHeader = () => ({
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${localStorage.getItem('access_token') || ''}`,
-});
 
 /** 持仓明细叠加实时价：现价/市值/盈亏全部按 live price 重算 */
 const mergeLivePrices = (holdings: NormalizedHolding[], live: Record<string, number>): NormalizedHolding[] => {
@@ -66,9 +50,7 @@ const PositionMonitor: React.FC<PositionMonitorProps> = ({ userId: _userId, isAc
     const [stockNames, setStockNames] = useState<Record<string, string>>({});
     const [livePrices, setLivePrices] = useState<Record<string, number>>({});
     const livePricesRef = useRef<Record<string, number>>({});
-    const [feedStatus, setFeedStatus] = useState<QuoteFeedStatus | null>(null);
     const subscribedRef = useRef<string[]>([]);
-    const apiGatewayBase = SERVICE_URLS.API_GATEWAY.replace(/\/+$/, '');
 
     React.useEffect(() => {
         if (!accountInfo || !accountInfo.positions) return;
@@ -130,62 +112,28 @@ const PositionMonitor: React.FC<PositionMonitorProps> = ({ userId: _userId, isAc
         subscribedRef.current = [];
     }, [isActive]);
 
-    // 行情 Feed 状态轮询（Data Feed 检查口径：last_feed_age < 300s）
-    const fetchFeedStatus = useCallback(async () => {
-        try {
-            const res = await fetch(`${apiGatewayBase}/api/v1/tdx/quote-feed/status`, {
-                headers: authHeader(),
-            });
-            if (res.status === 403) {
-                setFeedStatus(null);
-                return;
-            }
-            if (res.ok) {
-                setFeedStatus(await res.json());
-            }
-        } catch (e) {
-            console.error('Failed to fetch quote feed status', e);
-        }
-    }, [apiGatewayBase]);
-
-    useEffect(() => {
-        if (!isActive) return;
-        fetchFeedStatus();
-        const timer = setInterval(fetchFeedStatus, 20000);
-        return () => clearInterval(timer);
-    }, [isActive, fetchFeedStatus]);
-
     const holdings = React.useMemo(() => {
         return mergeLivePrices(buildNormalizedHoldings(accountInfo, stockNames), livePrices);
     }, [accountInfo, stockNames, livePrices]);
 
-    const summary = React.useMemo(() => getPositionSummary(accountInfo), [accountInfo]);
+    const summary = React.useMemo(
+        () => getPositionSummary(accountInfo, holdings),
+        [accountInfo, holdings],
+    );
 
     if (!isActive) return null;
 
-    const feedLive = !!feedStatus?.bridge_ok && (feedStatus?.last_feed_age_sec ?? 999) < 300;
-
     return (
         <div className="h-full p-2.5 pb-[50px] flex flex-col gap-2">
-            {/* 实时行情来源指示：TDX 桥实时 vs QuantDB 日线兜底（仅 CN；其余市场为日线数据） */}
+            {/* 行情来源：全市场远程 Redis（通达信内网桥已下线） */}
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-white/70 text-[11px] shrink-0 ${currentMarket !== 'CN' ? 'hidden' : ''}`}>
                 <span className="font-black text-slate-500">行情来源</span>
-                {feedLive ? (
-                    <span className="inline-flex items-center gap-1.5 font-bold text-emerald-600">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        通达信实时（{feedStatus!.last_feed_age_sec}s 前）
-                    </span>
-                ) : (
-                    <span className="inline-flex items-center gap-1.5 font-bold text-amber-600">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                        QuantDB 日线兜底{feedStatus?.last_error ? ` · ${feedStatus.last_error}` : ''}
-                    </span>
-                )}
-                {feedStatus?.is_trading_time === false && (
-                    <span className="text-slate-400 font-medium">（非交易时段）</span>
-                )}
+                <span className="inline-flex items-center gap-1.5 font-bold text-emerald-600">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    远程全市场行情 Redis（延时约 1–2 分钟）
+                </span>
                 <span className="ml-auto text-slate-300 font-mono text-[10px]">
-                    监控 {feedStatus?.symbols?.length ?? 0} 只持仓 · 实时提醒仅限持仓股
+                    监控 {extractPositionCodes(accountInfo).length} 只持仓
                 </span>
             </div>
             <div className="flex-1 min-h-0">

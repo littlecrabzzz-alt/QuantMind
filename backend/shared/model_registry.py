@@ -444,80 +444,6 @@ class ModelRegistryService:
                 },
             )
 
-    async def _ensure_fallback_model_record(
-        self, *, tenant_id: str, user_id: str
-    ) -> None:
-        """确保 fallback 模型（如 alpha158）也被注册到用户模型列表。"""
-        if not self.fallback_model_id.strip():
-            return
-        tenant, user = self._normalize_owner(tenant_id=tenant_id, user_id=user_id)
-        now = datetime.now(timezone.utc)
-        async with get_session() as session:
-            exists = (
-                await session.execute(
-                    text(
-                        """
-                        SELECT 1
-                        FROM qm_user_models
-                        WHERE tenant_id = :tenant_id AND user_id = :user_id AND model_id = :model_id
-                        LIMIT 1
-                        """
-                    ),
-                    {
-                        "tenant_id": tenant,
-                        "user_id": user,
-                        "model_id": self.fallback_model_id,
-                    },
-                )
-            ).first()
-            if exists:
-                return
-
-            # 检查 fallback 模型目录是否存在
-            fallback_dir = Path(self.fallback_model_dir)
-            if not fallback_dir.exists() or not fallback_dir.is_dir():
-                return
-
-            # 读取 metadata.json
-            meta_file = fallback_dir / "metadata.json"
-            metadata: dict[str, Any] = {}
-            if meta_file.exists():
-                try:
-                    metadata = json.loads(meta_file.read_text(encoding="utf-8"))
-                except Exception:
-                    metadata = {}
-
-            metadata.update({"system_default": True, "readonly": True})
-            metrics = metadata.get("performance_metrics", {})
-            model_file = self._find_system_model_file(fallback_dir, metadata)
-
-            await session.execute(
-                text(
-                    """
-                    INSERT INTO qm_user_models (
-                        tenant_id, user_id, model_id, source_run_id, status, storage_path, model_file,
-                        metadata_json, metrics_json, is_default, created_at, updated_at, activated_at
-                    ) VALUES (
-                        :tenant_id, :user_id, :model_id, NULL, 'active', :storage_path, :model_file,
-                        CAST(:metadata_json AS JSONB), CAST(:metrics_json AS JSONB), FALSE,
-                        :created_at, :updated_at, NULL
-                    )
-                    ON CONFLICT (tenant_id, user_id, model_id) DO NOTHING
-                    """
-                ),
-                {
-                    "tenant_id": tenant,
-                    "user_id": user,
-                    "model_id": self.fallback_model_id,
-                    "storage_path": self.fallback_model_dir,
-                    "model_file": model_file,
-                    "metadata_json": json.dumps(metadata, ensure_ascii=False),
-                    "metrics_json": json.dumps(metrics, ensure_ascii=False),
-                    "created_at": now,
-                    "updated_at": now,
-                },
-            )
-
     async def list_models(
         self,
         *,
@@ -653,7 +579,7 @@ class ModelRegistryService:
                         is_default=False,
                         activated_at=None,
                     )
-                    # 用 canonical model_id（可能与 mid 不同，如 sys-model_qlib → model_qlib）
+                    # 用 canonical model_id（可能与 mid 不同，如 sys-xxx → xxx）
                     canonical_mid = str(system_record.get("model_id") or mid)
                     mid = canonical_mid
                     target = (
@@ -1663,337 +1589,15 @@ class ModelRegistryService:
             "error": sync_error or "",
             "storage_path": str(model_dir.resolve()),
             "model_file": model_file,
-        }
-
-    async def register_ensemble_model(
-        self,
-        *,
-        tenant_id: str,
-        user_id: str,
-        source_model_ids: list[str],
-        display_name: str,
-        weight_strategy: str = "equal",
-        manual_weights: dict[str, float] | None = None,
-        fusion_strategy: str = "linear",
-        strategy_config: dict[str, float] | None = None,
-    ) -> dict[str, Any]:
-        """创建持久化融合模型（推理时融合多个源模型的预测）。
-
-        源模型可以是任意类型（单模型 / stacking 融合 / 不同周期）。
-        融合模型不包含二进制权重，其目录含：
-          - ensemble_config.json  源模型引用 + 权重 + 策略
-          - metadata.json         融合元信息
-          - inference.py          融合推理脚本（复用 inference_ensemble_src 模板）
-
-        权重策略：
-          - equal        每个源模型等权
-          - icir         按源模型 Val Rank ICIR 归一化加权
-          - manual       使用 manual_weights（自动归一化到和为 1）
-        """
-        tenant, user = self._normalize_owner(tenant_id=tenant_id, user_id=user_id)
-        await self.ensure_tables()
-
-        source_model_ids = [
-            str(m).strip() for m in (source_model_ids or []) if str(m).strip()
-        ]
-        if len(source_model_ids) < 2:
-            raise ValueError("融合至少需要 2 个源模型")
-
-        # 加载全部源模型（含 metadata_json + metrics_json）
-        sources: list[dict[str, Any]] = []
-        for mid in source_model_ids:
-            model = await self.get_model(tenant_id=tenant, user_id=user, model_id=mid)
-            if not model:
-                raise ValueError(f"源模型不存在: {mid}")
-            if str(model.get("status")) not in _READY_STATUSES:
-                raise ValueError(
-                    f"源模型 {mid} 状态为 {model.get('status')}，需为 ready/active"
-                )
-            sources.append(model)
-
-        # 权重计算
-        if weight_strategy == "icir":
-            weights: dict[str, float] = {}
-            for src in sources:
-                mid = str(src["model_id"])
-                meta = self._parse_json_field(src.get("metadata_json"))
-                metrics = self._parse_json_field(src.get("metrics_json"))
-                icir = None
-                for k in ("val_rank_icir", "val_icir", "rank_icir"):
-                    if k in metrics:
-                        icir = float(metrics[k])
-                        break
-                if icir is None:
-                    m = meta.get("metrics")
-                    if isinstance(m, dict):
-                        icir = float(m.get("val_rank_icir") or m.get("val_icir") or 0)
-                weights[mid] = max(float(icir or 0), 0.0)
-            total = sum(weights.values()) or 1.0
-            if total <= 0:
-                weights = {str(s["model_id"]): 1.0 / len(sources) for s in sources}
-            else:
-                weights = {k: v / total for k, v in weights.items()}
-        elif weight_strategy == "manual":
-            manual_weights = manual_weights or {}
-            raw = {str(k): float(v) for k, v in manual_weights.items() if float(v) > 0}
-            missing = [
-                str(s["model_id"]) for s in sources if str(s["model_id"]) not in raw
-            ]
-            if missing:
-                raise ValueError(f"manual 权重缺少源模型: {missing}")
-            total = sum(raw.values()) or 1.0
-            weights = {k: v / total for k, v in raw.items()}
-        elif weight_strategy == "recent_ic":
-            # 初始等权；每日回填任务按近30日生产 rank_ic 动态刷新 weight_snapshot.json
-            weights = {str(s["model_id"]): 1.0 / len(sources) for s in sources}
-        else:
-            weights = {str(s["model_id"]): 1.0 / len(sources) for s in sources}
-
-        # 从源模型 context 汇总市场（取出现最多的），用于 model_id 与存储分段
-        benchmark = "SH000300"
-        context: dict[str, Any] = {}
-        for src in sources:
-            meta = self._parse_json_field(src.get("metadata_json"))
-            ctx = meta.get("context")
-            if isinstance(ctx, dict):
-                context.update(ctx)
-        market = str(context.get("market") or "CN").upper()
-
-        # 生成 model_id
-        now = datetime.now(timezone.utc)
-        ts = now.strftime("%Y%m%d%H%M%S")
-        digest = hashlib.sha1(
-            "|".join(sorted(source_model_ids)).encode("utf-8")
-        ).hexdigest()[:8]
-        model_id = f"mdl_{market.lower()}_ensemble_{ts}_{digest}"
-
-        # 构建元数据
-        source_meta_list = []
-        for src in sources:
-            meta = self._parse_json_field(src.get("metadata_json"))
-            metrics = self._parse_json_field(src.get("metrics_json"))
-            source_meta_list.append(
-                {
-                    "model_id": str(src["model_id"]),
-                    "model_name": meta.get("display_name")
-                    or meta.get("model_name")
-                    or str(src["model_id"]),
-                    "model_type": meta.get("model_type"),
-                    "framework": meta.get("framework"),
-                    "target_horizon_days": meta.get("target_horizon_days"),
-                    "feature_count": meta.get("feature_count"),
-                    "weight": round(weights.get(str(src["model_id"]), 0), 6),
-                    "metrics": metrics,
-                }
-            )
-
-        # 特征并集
-        unified_features: list[str] = []
-        for src in sources:
-            meta = self._parse_json_field(src.get("metadata_json"))
-            feats = meta.get("feature_columns") or meta.get("features") or []
-            for f in feats:
-                if f not in unified_features:
-                    unified_features.append(f)
-        feature_count = len(unified_features)
-
-        raw_display_name = str(display_name or "").strip() or "Ensemble"
-        if not raw_display_name.upper().endswith(f"_{market}"):
-            raw_display_name = f"{raw_display_name}_{market}"
-
-        metadata: dict[str, Any] = {
-            "model_type": "ensemble",
-            "model_name": raw_display_name,
-            "display_name": raw_display_name,
-            "ensemble_method": "fusion",
-            "is_ensemble": True,
-            "model_file": "ensemble_config.json",
-            "framework": "ensemble",
-            "ensemble_method": "fusion",
-            "fusion_strategy": fusion_strategy,
-            "strategy_config": strategy_config or {},
-            "source_models": source_meta_list,
-            "source_model_ids": [str(s["model_id"]) for s in sources],
-            "weight_strategy": weight_strategy,
-            "weights": {
-                str(s["model_id"]): round(weights.get(str(s["model_id"]), 0), 6)
-                for s in sources
-            },
-            "feature_count": feature_count,
-            "features": unified_features,
-            "feature_columns": unified_features,
-            "context": context,
-            "benchmark": benchmark,
-            "market": market,
-            "target_horizon_days": 15,
-            "target_mode": "return",
-            "data_source": "parquet",
-            "generated_at": now.isoformat(),
-            "metrics": {
-                "val_ic": 0.0,
-                "test_ic": 0.0,
-                "score_direction": "normal",
-            },
-        }
-
-        # 创建模型目录（非 CN 市场按市场子目录分段）
-        model_dir = self.user_models_root / tenant / user / model_id
-        if market and market != "CN":
-            model_dir = (
-                self.user_models_root / tenant / user / market.lower() / model_id
-            )
-        model_dir.mkdir(parents=True, exist_ok=True)
-
-        # 写入 ensemble_config.json（源模型用绝对路径）
-        ensemble_config = {
-            "version": 1,
-            "created_at": now.isoformat(),
-            "weight_strategy": weight_strategy,
-            "fusion_strategy": fusion_strategy,
-            "strategy_config": strategy_config or {},
-            "models": [
-                {
-                    "model_id": str(s["model_id"]),
-                    "model_dir": str(
-                        Path(
-                            s.get("storage_path")
-                            or (
-                                self.user_models_root
-                                / tenant
-                                / user
-                                / str(s["model_id"])
-                            )
-                        ).resolve()
-                    ),
-                    "weight": round(weights.get(str(s["model_id"]), 0), 6),
-                    "target_horizon_days": self._parse_json_field(
-                        s.get("metadata_json")
-                    ).get("target_horizon_days"),
-                    "feature_count": self._parse_json_field(s.get("metadata_json")).get(
-                        "feature_count"
-                    ),
-                }
-                for s in sources
-            ],
-        }
-        (model_dir / "ensemble_config.json").write_text(
-            json.dumps(ensemble_config, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        (model_dir / "metadata.json").write_text(
-            json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-
-        # 部署融合推理脚本（从模板复制，避免被 parquet 模板覆盖）
-        template_path = (
-            Path(__file__).parent.parent
-            / "services"
-            / "engine"
-            / "inference"
-            / "templates"
-            / "inference_ensemble_src.py"
-        )
-        if template_path.is_file():
-            shutil.copy2(template_path, model_dir / "inference.py")
-        else:
-            logger.warning("融合推理模板不存在: %s，模型推理可能失败", template_path)
-
-        # 写库
-        now_db = datetime.now(timezone.utc)
-        async with get_session() as session:
-            await session.execute(
-                text(
-                    """
-                    INSERT INTO qm_user_models (
-                        tenant_id, user_id, model_id, source_run_id, status, storage_path, model_file,
-                        metadata_json, metrics_json, is_default, created_at, updated_at, activated_at
-                    ) VALUES (
-                        :tenant_id, :user_id, :model_id, :source_run_id, 'ready', :storage_path, :model_file,
-                        CAST(:metadata_json AS JSONB), CAST(:metrics_json AS JSONB), FALSE,
-                        :created_at, :updated_at, :activated_at
-                    )
-                    ON CONFLICT (tenant_id, user_id, model_id) DO UPDATE SET
-                        status = 'ready',
-                        storage_path = EXCLUDED.storage_path,
-                        model_file = EXCLUDED.model_file,
-                        metadata_json = EXCLUDED.metadata_json,
-                        metrics_json = EXCLUDED.metrics_json,
-                        updated_at = EXCLUDED.updated_at
-                    """
-                ),
-                {
-                    "tenant_id": tenant,
-                    "user_id": user,
-                    "model_id": model_id,
-                    "source_run_id": f"ensemble_{ts}",
-                    "storage_path": str(model_dir.resolve()),
-                    "model_file": "ensemble_config.json",
-                    "metadata_json": json.dumps(metadata, ensure_ascii=False),
-                    "metrics_json": json.dumps(
-                        {"val_ic": 0.0, "test_ic": 0.0}, ensure_ascii=False
-                    ),
-                    "created_at": now_db,
-                    "updated_at": now_db,
-                    "activated_at": now_db,
-                },
-            )
-
-            # 若无业务默认模型，设为默认
-            has_business_default = (
-                await session.execute(
-                    text(
-                        """
-                        SELECT 1
-                        FROM qm_user_models
-                        WHERE tenant_id = :tenant_id AND user_id = :user_id
-                          AND is_default = TRUE
-                          AND COALESCE((metadata_json->>'system_default')::boolean, FALSE) = FALSE
-                        LIMIT 1
-                        """
-                    ),
-                    {"tenant_id": tenant, "user_id": user},
-                )
-            ).first()
-            if not has_business_default:
-                await session.execute(
-                    text(
-                        """
-                        UPDATE qm_user_models
-                        SET is_default = FALSE, updated_at = :updated_at
-                        WHERE tenant_id = :tenant_id AND user_id = :user_id AND is_default = TRUE
-                        """
-                    ),
-                    {"tenant_id": tenant, "user_id": user, "updated_at": now_db},
-                )
-                await session.execute(
-                    text(
-                        """
-                        UPDATE qm_user_models
-                        SET is_default = TRUE, activated_at = :activated_at, updated_at = :updated_at
-                        WHERE tenant_id = :tenant_id AND user_id = :user_id AND model_id = :model_id
-                        """
-                    ),
-                    {
-                        "tenant_id": tenant,
-                        "user_id": user,
-                        "model_id": model_id,
-                        "activated_at": now_db,
-                        "updated_at": now_db,
-                    },
-                )
-
-        logger.info(
-            "[%s] 融合模型已创建: %s (%d 个源模型, 权重策略=%s)",
-            model_id,
-            raw_display_name,
-            len(sources),
-            weight_strategy,
-        )
-        return {
-            "model_id": model_id,
-            "status": "ready",
-            "storage_path": str(model_dir.resolve()),
-            "model_file": "ensemble_config.json",
-            "metadata": metadata,
+            # 软门禁暂留时非空：完成回调据此如实提示（训练成功、待手动激活），
+            # 而不是误报“模型注册失败”。
+            "gate_reasons": gate_reasons,
+            "message": (
+                f"样本外质量门禁：{'；'.join(gate_reasons)}，未自动激活。"
+                "请人工评估后在模型管理页手动激活。"
+                if gate_triggered
+                else ""
+            ),
         }
 
     def _sync_candidate_artifacts(
@@ -2021,7 +1625,9 @@ class ModelRegistryService:
             "model_cbm.cbm",
             "model_lin.pkl",
             "meta_model.pkl",
-            "ensemble_config.json",
+            "model_p10.lgb",
+            "model_p50.lgb",
+            "model_p90.lgb",
             "metadata.json",
             "pred.parquet",
             "pred.pkl",
@@ -2060,7 +1666,6 @@ class ModelRegistryService:
             "model_cbm.cbm",
             "model_lin.pkl",
             "meta_model.pkl",
-            "ensemble_config.json",
         ):
             if (target_dir / candidate).exists():
                 model_file = candidate
@@ -2149,11 +1754,7 @@ class ModelRegistryService:
         request_payload: dict[str, Any],
     ) -> str:
         if not model_file or not (target_dir / model_file).exists():
-            # 融合模型：以 ensemble_config.json 作为模型标识文件（无二进制权重）
-            if (target_dir / "ensemble_config.json").exists():
-                model_file = "ensemble_config.json"
-            else:
-                return "model file missing after sync"
+            return "model file missing after sync"
         metadata_path = target_dir / "metadata.json"
         if not metadata_path.exists():
             return "metadata.json missing after sync"

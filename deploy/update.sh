@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # QuantMind 一键更新脚本
 # 核心流程：拉代码 → 重建/重启后端容器 → 跑 data/upgrade_*.sql → 健康检查。
-# db/redis/qwenpaw 等基础设施容器不动（restart: unless-stopped 兜底）。
+# db/redis/qwenpaw 等基础设施容器不强制重启（仅 compose 配置漂移时按需重建）。
 # 用法：sudo bash deploy/update.sh [--ref master] [--remote gitee|github|origin] [--force] [--no-build] [--skip-backup]
 
 set -Eeuo pipefail
@@ -41,7 +41,29 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-require_root() { [[ $EUID -eq 0 ]] || die '请使用 sudo 执行'; }
+require_root() {
+    if [[ $EUID -eq 0 ]]; then return; fi
+    # 无 sudo 时：若用户在 docker 组且对项目目录可写，仅告警后继续；否则再阻断
+    if groups 2>/dev/null | grep -qw docker && [[ -w "$PROJECT_DIR" ]] && docker ps >/dev/null 2>&1; then
+        log "提示: 未使用 sudo，但检测到 docker 权限正常，继续执行"
+        return
+    fi
+    log "提示: 未使用 sudo 且 docker 权限不足，尝试继续（失败请改用 sudo 或将用户加入 docker 组）"
+}
+record_system_event() {
+    # 写入 system_events，供管理后台“最近事件”展示；失败不阻断主流程
+    local _level="$1" _title="$2" _msg="${3:-}"
+    local _pg_user
+    _pg_user="$(grep -E '^DB_USER=' "$PROJECT_DIR/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d \"\' || echo quantmind)"
+    _pg_user="${_pg_user:-quantmind}"
+    # 转义单引号
+    local _t_esc _m_esc
+    _t_esc="$(printf '%s' "$_title" | sed "s/'/''/g")"
+    _m_esc="$(printf '%s' "$_msg" | sed "s/'/''/g" | head -c 4000)"
+    docker exec -e PGUSER="$_pg_user" quantmind-db psql -U "$_pg_user" -v ON_ERROR_STOP=0 \
+        -c "INSERT INTO system_events (event_type, level, source, title, message) VALUES ('system_update', '$_level', 'updater', '$_t_esc', '$_m_esc')" >/dev/null 2>&1 || true
+}
+
 require_project() {
     [[ -d "$PROJECT_DIR/.git" ]] || die "不是 Git 部署目录: $PROJECT_DIR"
     [[ -f "$PROJECT_DIR/docker-compose.yml" ]] || die "缺少 docker-compose.yml: $PROJECT_DIR"
@@ -62,12 +84,12 @@ backup_database() {
     local backup_dir="$PROJECT_DIR/data/backups"
     mkdir -p "$backup_dir"
     local stamp backup_file pg_user pg_db pg_pass
-    stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+    stamp="$(TZ=Asia/Shanghai date +%Y%m%dT%H%M%S+08:00)"
     backup_file="$backup_dir/quantmind_pre_update_${stamp}.sql.gz"
     # 从 .env 读库凭据（脚本自身环境变量里 DB_PASSWORD 几乎必为空，须显式加载 .env）
     pg_user="$(grep -E '^DB_USER=' "$PROJECT_DIR/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d \"\' || echo quantmind)"
     pg_db="$(grep -E '^DB_NAME=' "$PROJECT_DIR/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d \"\' || echo quantmind)"
-    pg_pass="$(grep -E '^(DB_PASSWORD|POSTGRES_PASSWORD)=' "$PROJECT_DIR/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d \"\' | head -c 200)"
+    pg_pass="$(grep -E '^(DB_PASSWORD|POSTGRES_PASSWORD)=' "$PROJECT_DIR/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d \"\' | head -c 200 || echo '')"
     if [[ -z "$pg_pass" ]]; then
         pg_pass="${POSTGRES_PASSWORD:-${DB_PASSWORD:-quantmind2026}}"
     fi
@@ -125,7 +147,7 @@ sync_code() {
   "version": "$head_describe",
   "commit": "$head_sha",
   "branch": "$REF",
-  "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  "generated_at": "$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S+08:00)"
 }
 EOF
     else
@@ -182,11 +204,66 @@ build_core() {
 
     # docker-compose.yml 仅参与"build 段"签名，不再整文件比对：
     # compose 里端口/环境变量/卷等改动不影响镜像层，改动它们不应触发镜像重建。
-    # 用 grep 摘出 build 段相关的行（build/context/dockerfile/args/target/... 含 key），
-    # 对该子集取 sha256 作为签名；只保留那些真正改变镜像构建的参数。
-    build_blk="$(grep -nE 'build:|context:|dockerfile:|args:|target:|cache_from:|TORCH_DEVICE|TORCH_CPU_INDEX_URL' \
-        "$PROJECT_DIR/docker-compose.yml" 2>/dev/null | sha256sum \
-        | awk '{print $1}' | head -c 64)"
+    # 注意：
+    #   1) 禁用 grep -n —— 行号会随文件任意位置的编辑而漂移，导致签名每次都变、
+    #      每次部署白白全量重建。
+    #   2) 用 awk 只截取 quantmind 服务块，其他服务的 build 段变更不误伤本镜像。
+    #   3) build args 在 compose 里是 ${TORCH_DEVICE:-skip} 这类静态插值文本，
+    #      .env 里切 cpu/gpu 不会改变该文本，故把 TORCH_DEVICE 生效值单独计入签名。
+    local svc_blk torch_val
+    svc_blk="$(awk '/^  quantmind:/{f=1;next} f && /^  [A-Za-z0-9_-]+:/{exit} f' \
+        "$PROJECT_DIR/docker-compose.yml" 2>/dev/null || true)"
+    torch_val="${TORCH_DEVICE:-$(grep -E '^[[:space:]]*TORCH_DEVICE=' "$PROJECT_DIR/.env" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d "\"' " || true)}"
+    if [[ -z "$torch_val" ]]; then
+        torch_val="$(bash "$PROJECT_DIR/deploy/req-fingerprint.sh" --infer-torch \
+            "$PROJECT_DIR" quantmind-oss:latest 2>/dev/null || true)"
+        if [[ -z "$torch_val" ]]; then
+            local img_sha want d
+            img_sha="$(docker image inspect quantmind-oss:latest \
+                --format '{{ index .Config.Labels "qm.req.sha" }}' 2>/dev/null || true)"
+            case "$img_sha" in
+                ""|none|"<no value>"|notloaded) ;;
+                *)
+                    for d in cpu gpu skip; do
+                        want="$(TORCH_DEVICE="$d" bash "$PROJECT_DIR/deploy/req-fingerprint.sh" \
+                            "$PROJECT_DIR" 2>/dev/null || true)"
+                        if [[ -n "$want" && "$want" == "$img_sha" ]]; then
+                            torch_val="$d"
+                            break
+                        fi
+                    done
+                    ;;
+            esac
+        fi
+        if [[ -n "$torch_val" ]]; then
+            log "2/4 未指定 TORCH_DEVICE，已从镜像推断为 $torch_val"
+            export TORCH_DEVICE="$torch_val"
+            if [[ -f "$PROJECT_DIR/.env" ]]; then
+                if grep -qE '^[[:space:]]*TORCH_DEVICE=' "$PROJECT_DIR/.env"; then
+                    sed -i "s|^[[:space:]]*TORCH_DEVICE=.*|TORCH_DEVICE=${torch_val}|" "$PROJECT_DIR/.env"
+                else
+                    printf '\n# torch 形态（update.sh 写入，用于依赖指纹对齐）\nTORCH_DEVICE=%s\n' \
+                        "$torch_val" >> "$PROJECT_DIR/.env"
+                fi
+            fi
+        elif docker image inspect quantmind-oss:latest >/dev/null 2>&1; then
+            local img_sha
+            img_sha="$(docker image inspect quantmind-oss:latest \
+                --format '{{ index .Config.Labels "qm.req.sha" }}' 2>/dev/null || true)"
+            case "$img_sha" in
+                ""|none|"<no value>")
+                    log '2/4 镜像无依赖指纹且无法推断 TORCH_DEVICE，构建签名按 skip'
+                    ;;
+                *)
+                    die "未指定 TORCH_DEVICE，且无法从镜像推断（镜像指纹=${img_sha}）。请显式设置 TORCH_DEVICE=cpu|gpu|skip 后重试，以免把已含 torch 的镜像按 skip 重建。"
+                    ;;
+            esac
+        fi
+    fi
+    build_blk="$(printf '%s' "$svc_blk" \
+        | grep -aE 'build:|context:|dockerfile:|args:|target:|platform:|cache_from:|TORCH_DEVICE|TORCH_CPU_INDEX_URL' \
+        | sha256sum | awk '{print $1}')${torch_val:-skip}"
+    build_blk="$(printf '%s' "$build_blk" | sha256sum | awk '{print $1}' | head -c 64)"
     build_blk="${build_blk:-missing}"
     trigger="${trigger}docker-compose-build=${build_blk}\n"
 
@@ -217,7 +294,10 @@ build_core() {
 
     if $need_build; then
         log "2/4 重建核心后端镜像（检测到依赖/构建配置变更）"
-        docker compose -f "$PROJECT_DIR/docker-compose.yml" build quantmind || {
+        # 把依赖指纹同步写入镜像 Label（qm.req.sha），与 full-deploy 的指纹闸门共用一套口径。
+        local req_sha
+        req_sha="$(bash "$PROJECT_DIR/deploy/req-fingerprint.sh" "$PROJECT_DIR" 2>/dev/null || true)"
+        QM_REQ_SHA="${req_sha:-unknown}" docker compose -f "$PROJECT_DIR/docker-compose.yml" build quantmind || {
             die "镜像构建失败，请检查以上日志"
         }
     fi
@@ -226,10 +306,10 @@ build_core() {
     printf '%s' "$trigger" > "$marker"
 }
 
-# 关键步骤：只重启 application 层容器，**不**碰 db/redis/qwenpaw 等基础设施
-# （db 已 restart: unless-stopped，无需脚本干预；碰它才容易翻车）
+# 关键步骤：强制重建 application 层容器（bind mount 代码需进程重启才生效），
+# 其余服务（含 db/redis/qwenpaw）不强制重启，仅在 compose 配置发生漂移时按需重建。
 restart_services() {
-    log '3/4 重启后端服务（quantmind + celery；不动 db/redis/qwenpaw）'
+    log '3/4 重启后端服务（强制重建 quantmind + celery）'
     cd "$PROJECT_DIR"
     local services=(quantmind)
     local service
@@ -239,6 +319,20 @@ restart_services() {
         fi
     done
     docker compose up -d --no-deps --force-recreate "${services[@]}"
+
+    # 配置漂移 reconcile：对其余服务执行一次 up -d，Compose 按配置 hash 仅重建
+    # 端口/环境/镜像/挂载发生变化的容器，未变更者原地不动（db/redis 不会被无谓重启）。
+    # 修复场景：改了 qwenpaw 的绑定/环境等 compose 配置后，update 流程此前从不重建它，
+    # 导致改动长期不生效（例如 qwenpaw 端口回退 127.0.0.1）。
+    local others=()
+    while IFS= read -r service; do
+        [[ -z "$service" ]] && continue
+        [[ " ${services[*]} " == *" $service "* ]] && continue
+        others+=("$service")
+    done < <(docker compose config --services)
+    if (( ${#others[@]} > 0 )); then
+        docker compose up -d --no-deps "${others[@]}"
+    fi
 }
 
 # 跑 data/upgrade_*.sql —— 这是用户最关心的"执行 SQL"主流程。
@@ -337,6 +431,7 @@ EOSQL
 main() {
     require_root
     require_project
+    record_system_event "info" "系统更新开始" "分支 $REF 远端 $REMOTE"
     backup_database
     sync_code
     build_core
@@ -345,12 +440,20 @@ main() {
 
     # 健康检查：API + celery worker/beat 均就绪才算升级成功。
     # 仅 curl API 不充分——API 可能 200 而 celery 起崩。
+    # 时序注意：容器是 --force-recreate 重建，celery healthcheck 为
+    # StartPeriod=60s + Interval=30s + Retries=3，最坏 ~150s 才判 healthy，
+    # 因此等待窗口必须 ≥ 180s，否则升级成功后仍会误报"未就绪"。
     local attempt
-    for attempt in {1..30}; do
+    for attempt in {1..90}; do
         # 容器带 healthcheck 时校验为 healthy；无 healthcheck 的基础设施（db/redis）不校验
         local hk
         api_ok=false; celery_ok=false; beat_ok=false
-        curl --fail --silent --max-time 3 http://127.0.0.1:8000/health >/dev/null 2>&1 && api_ok=true
+        # updater 容器为 bridge 网络，127.0.0.1 指向自身；改走宿主容器 exec，避免 180s 误报失败
+        if docker exec quantmind curl --fail --silent --max-time 3 http://127.0.0.1:8000/health >/dev/null 2>&1; then
+            api_ok=true
+        elif curl --fail --silent --max-time 3 http://127.0.0.1:8000/health >/dev/null 2>&1; then
+            api_ok=true
+        fi
         for svc in quantmind-celery quantmind-celery-beat; do
             hk="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$svc" 2>/dev/null)"
             if [[ "$hk" == "healthy" ]]; then
@@ -359,10 +462,12 @@ main() {
         done
         if $api_ok && $celery_ok && $beat_ok; then
             log "升级完成 ✓ (HEAD: $(git -C "$PROJECT_DIR" rev-parse --short HEAD))"
+            record_system_event "info" "系统更新成功" "HEAD $(git -C "$PROJECT_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
             return
         fi
         sleep 2
     done
+    record_system_event "error" "系统更新失败" "API/celery 180s 内未就绪，请查看 data/update.log"
     log '健康检查失败，尾部日志：' >&2
     docker logs --tail 100 quantmind >&2 || true
     for svc in quantmind-celery quantmind-celery-beat; do
@@ -373,7 +478,7 @@ main() {
     if [[ "$(docker inspect --format '{{.State.Health.Status}}' quantmind-db 2>/dev/null)" != "healthy" ]]; then
         docker logs --tail 50 quantmind-db >&2 || true
     fi
-    die 'API/celery 未在 60s 内就绪，请根据上述日志排查'
+    die 'API/celery 未在 180s 内就绪，请根据上述日志排查'
 }
 
 main

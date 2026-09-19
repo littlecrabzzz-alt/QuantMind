@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import time
@@ -18,6 +19,9 @@ from .real_trading_utils import (
 )
 from backend.services.live_trading.services.signal_readiness_service import (
     signal_readiness_service,
+)
+from backend.services.trade.services.trading_precheck_service import (
+    run_trading_readiness_precheck,
 )
 from backend.shared.trade_redis_keys import build_trade_agent_heartbeat_key
 
@@ -78,6 +82,51 @@ async def preflight_check(
     mode = str(trading_mode or "REAL").strip().upper()
     if mode not in {"REAL", "SHADOW", "SIMULATION"}:
         raise HTTPException(status_code=400, detail=f"unsupported trading_mode: {mode}")
+
+    # 模拟盘：与 trading-precheck 共用精简 5 项，避免两阶段重复噪音。
+    if mode == "SIMULATION":
+        readiness = await run_trading_readiness_precheck(
+            db,
+            mode=mode,
+            redis_client=redis.client,
+            user_id=resolved_user_id,
+            tenant_id=resolved_tenant_id,
+            market="CN",
+        )
+        checks = [
+            {
+                "key": str(item.get("key") or ""),
+                "label": str(item.get("label") or ""),
+                "ok": bool(item.get("passed")),
+                "required": True,
+                "message": str(item.get("detail") or ""),
+                "details": {},
+            }
+            for item in (readiness.get("items") or [])
+        ]
+        ready = bool(readiness.get("passed"))
+        signal_readiness = readiness.get("signal_readiness") or {}
+        try:
+            await _upsert_preflight_snapshot(
+                db,
+                tenant_id=resolved_tenant_id,
+                user_id=resolved_user_id,
+                trading_mode=mode,
+                ready=ready,
+                checks=checks,
+            )
+        except Exception as e:
+            logger.warning("Failed to persist preflight snapshot: %s", e)
+            await db.rollback()
+        return {
+            "ready": ready,
+            "mode": mode,
+            "user_id": resolved_user_id,
+            "tenant_id": resolved_tenant_id,
+            "trading_permission": readiness.get("trading_permission"),
+            "signal_readiness": signal_readiness,
+            "checks": checks,
+        }
 
     checks = []
 
@@ -219,7 +268,7 @@ async def preflight_check(
             f"{orchestration_label} 客户端已就绪" if orchestration_ok else f"{orchestration_label} 客户端未初始化",
         )
 
-    # 7) QMT Agent 在线状态（PG 账户快照 + Redis 心跳）; 无 QMT 时回退通达信桥
+    # 7) QMT Agent 在线状态（PG 账户快照 + Redis 心跳）
     bridge_required = mode == "REAL"
     account_report: dict | None = None
     if bridge_required:
@@ -276,42 +325,25 @@ async def preflight_check(
             # 回滚事务以清除 aborted 状态，避免后续查询失败
             await db.rollback()
 
-        # QMT 未就绪时回退通达信桥（用户使用 TDX 通道，无 QMT Agent）
         if qmt_failed_detail:
-            from backend.services.live_trading.routers.real_trading_utils import (
-                check_tdx_bridge_online,
+            add_check(
+                "qmt_agent_online",
+                "QMT Agent 在线状态",
+                False,
+                bridge_required,
+                qmt_failed_detail,
             )
 
-            tdx_online, tdx_detail = check_tdx_bridge_online()
-            if tdx_online:
-                add_check(
-                    "qmt_agent_online",
-                    "交易通道（通达信桥）",
-                    True,
-                    bridge_required,
-                    f"{tdx_detail}（QMT Agent 未接入: {qmt_failed_detail}）",
-                    {"channel": "tdx_bridge", "qmt_detail": qmt_failed_detail},
-                )
-            else:
-                add_check(
-                    "qmt_agent_online",
-                    "交易通道（QMT/通达信）",
-                    False,
-                    bridge_required,
-                    f"{qmt_failed_detail}；且 {tdx_detail}",
-                )
-
-    # 7.1~7.4) 双向交易专属预检
+    # 7.1~7.4) 双向交易专属预检（仅融资开关开启时）
     margin_enabled = bool(getattr(settings, "ENABLE_MARGIN_TRADING", False))
-    add_check(
-        "margin_trading_feature",
-        "双向交易功能开关",
-        True,  # 警告：不阻断启动
-        False, # 不阻断
-        "ENABLE_MARGIN_TRADING 已开启" if margin_enabled else "[WARNING] ENABLE_MARGIN_TRADING 未开启(部分双向策略可能无法下单)",
-    )
-
     if margin_enabled:
+        add_check(
+            "margin_trading_feature",
+            "双向交易功能开关",
+            True,
+            False,
+            "ENABLE_MARGIN_TRADING 已开启",
+        )
         try:
             pool = get_margin_stock_pool_service(settings.MARGIN_STOCK_POOL_PATH)
             snapshot = pool.snapshot()
@@ -339,26 +371,16 @@ async def preflight_check(
             )
 
         real_short_required = mode == "REAL"
-        # TDX 桥通道在线时，多空灰度检查自动放行（通达信股票账户无信用数据）
-        tdx_channel_ready = False
-        if real_short_required:
-            from backend.services.live_trading.routers.real_trading_utils import (
-                check_tdx_bridge_online,
-            )
-
-            tdx_channel_ready, _tdx_detail_now = check_tdx_bridge_online()
-
-        short_skip = real_short_required and tdx_channel_ready
         long_short_enabled = bool(getattr(settings, "ENABLE_LONG_SHORT_REAL", False))
         add_check(
             "long_short_real_feature",
             "实盘多空灰度开关",
-            long_short_enabled or not real_short_required or short_skip,
+            long_short_enabled or not real_short_required,
             real_short_required,
             (
                 "ENABLE_LONG_SHORT_REAL 已开启"
                 if long_short_enabled
-                else ("通达信桥通道，跳过实盘多空灰度" if short_skip else "ENABLE_LONG_SHORT_REAL 未开启")
+                else "ENABLE_LONG_SHORT_REAL 未开启"
             ),
         )
         whitelist_users = {
@@ -370,31 +392,23 @@ async def preflight_check(
         add_check(
             "long_short_whitelist",
             "实盘多空白名单",
-            in_whitelist or not real_short_required or short_skip,
+            in_whitelist or not real_short_required,
             real_short_required,
             "当前用户在 LONG_SHORT_WHITELIST_USERS 白名单内"
             if in_whitelist
-            else (
-                "通达信桥通道，跳过实盘多空白名单"
-                if short_skip
-                else "当前用户不在 LONG_SHORT_WHITELIST_USERS 白名单"
-            ),
+            else "当前用户不在 LONG_SHORT_WHITELIST_USERS 白名单",
         )
 
         short_real_ok = bool(getattr(settings, "ENABLE_SHORT_SELLING_REAL", False))
         add_check(
             "broker_margin_trade_support",
             "信用交易动作支持",
-            short_real_ok or not real_short_required or short_skip,
+            short_real_ok or not real_short_required,
             real_short_required,
             (
                 "实盘信用交易动作已开启"
                 if short_real_ok
-                else (
-                    "通达信桥通道，跳过实盘信用交易检查"
-                    if short_skip
-                    else "未开启 ENABLE_SHORT_SELLING_REAL，实盘不会发送融券交易动作"
-                )
+                else "未开启 ENABLE_SHORT_SELLING_REAL，实盘不会发送融券交易动作"
             ),
         )
 
@@ -404,16 +418,12 @@ async def preflight_check(
         add_check(
             "margin_account_state",
             "信用账户状态",
-            account_has_credit_fields or mode != "REAL" or short_skip,
+            account_has_credit_fields or mode != "REAL",
             mode == "REAL",
             (
                 "账户快照已包含信用账户字段"
                 if account_has_credit_fields
-                else (
-                    "通达信桥通道，无需信用账户字段"
-                    if short_skip
-                    else "当前账户快照未包含 liabilities/short_market_value 等信用字段"
-                )
+                else "当前账户快照未包含 liabilities/short_market_value 等信用字段"
             ),
             account_report if account_has_credit_fields else {},
         )
@@ -423,7 +433,7 @@ async def preflight_check(
         add_check(
             "short_admission_capability",
             "做空准入能力可用",
-            short_admission_ready or mode != "REAL" or short_skip,
+            short_admission_ready or mode != "REAL",
             mode == "REAL",
             (
                 f"credit_enabled={bool(account_report.get('credit_enabled'))}, "
@@ -431,18 +441,16 @@ async def preflight_check(
                 f"last_short_check_at={account_report.get('last_short_check_at')}"
             )
             if isinstance(account_report, dict) and account_report
-            else (
-                "通达信桥通道，无需做空准入检查"
-                if short_skip
-                else "未检测到账户快照"
-            ),
+            else "未检测到账户快照",
         )
 
     # 8~10) Stream 探针：REAL/SHADOW/SIMULATION 均检测行情质量
     if mode in {"REAL", "SHADOW", "SIMULATION"}:
         # 1. Stream时序序列 (SIMULATION 可回退日线开盘价撮合，不阻断)
         try:
-            res = check_stream_series_freshness(
+            # 同步 Redis + 本地日线探测，放线程里跑，避免阻塞事件循环
+            res = await asyncio.to_thread(
+                check_stream_series_freshness,
                 redis_client=redis.client,
                 allow_quantdb_fallback=(mode in {"SIMULATION", "REAL"}),
             )
@@ -466,7 +474,8 @@ async def preflight_check(
 
         # 2. Stream行情落库 (SIMULATION 回退日线，不阻断)
         try:
-            res = check_stream_quote_persist_rate(
+            res = await asyncio.to_thread(
+                check_stream_quote_persist_rate,
                 redis_client=redis.client,
                 allow_quantdb_fallback=(mode in {"SIMULATION", "REAL"}),
             )
@@ -533,215 +542,6 @@ async def preflight_check(
                 kline_required,
                 f"K线探针失败: {e}",
                 {"endpoint": kline_url, "symbol": kline_symbol},
-            )
-
-    # 11) 模拟盘专用：沙箱进程池与关键表可用性
-    simulation_required = mode == "SIMULATION"
-    if simulation_required:
-        # 11.0 默认模型检测：单模型/多模型均必须有默认模型（阻断项），未设置时自动尝试分配
-        try:
-            from backend.shared.model_registry import model_registry_service
-
-            default_model = await model_registry_service.get_default_model(
-                tenant_id=resolved_tenant_id,
-                user_id=resolved_user_id,
-            )
-            if not default_model:
-                try:
-                    candidates = await model_registry_service.list_models(
-                        tenant_id=resolved_tenant_id, user_id=resolved_user_id, include_archived=False
-                    )
-                    avail = [m for m in candidates if str(m.get("status") or "").lower() in {"ready", "active"}]
-                    chosen = (avail or candidates[:1] or [None])[0]
-                    if chosen and chosen.get("model_id"):
-                        try:
-                            default_model = await model_registry_service.set_default_model(
-                                tenant_id=resolved_tenant_id, user_id=resolved_user_id, model_id=str(chosen.get("model_id"))
-                            )
-                        except Exception:
-                            default_model = chosen
-                except Exception:
-                    pass
-            model_configured = bool(default_model)
-            add_check(
-                "default_model_configured",
-                "默认模型已配置",
-                model_configured,
-                True,
-                (
-                    f"默认模型已配置 (model_id={default_model.get('model_id')})"
-                    if model_configured
-                    else "未配置默认模型（单模型/多模型均需设置默认模型），请先在模型管理中设置默认模型后再启动模拟盘"
-                ),
-                {
-                    "model_id": default_model.get("model_id") if model_configured else None,
-                    "model_name": default_model.get("model_name") if model_configured else None,
-                },
-            )
-        except Exception as e:
-            add_check(
-                "default_model_configured",
-                "默认模型已配置",
-                False,
-                True,
-                f"默认模型检测失败: {e}",
-            )
-
-        # 11.1 推理模型就绪度（检查生产模型目录是否有模型文件）
-        try:
-            model_ok, model_detail = _check_inference_model_exists()
-            add_check(
-                "inference_database_ready",
-                "推理模型已就绪",
-                model_ok,
-                True,
-                model_detail,
-            )
-        except Exception as e:
-            add_check(
-                "inference_database_ready",
-                "推理模型已就绪",
-                False,
-                True,
-                f"推理模型检测失败: {e}",
-            )
-
-        # 11.2 沙箱进程池
-        try:
-            from backend.services.trade.sandbox.manager import sandbox_manager
-
-            workers = list(getattr(sandbox_manager, "_workers", {}).values())
-            worker_total = len(workers)
-            alive_total = sum(1 for proc in workers if bool(proc and proc.is_alive()))
-            pool_ok = alive_total > 0
-            add_check(
-                "simulation_sandbox_pool",
-                "模拟盘沙箱池",
-                pool_ok,
-                True,
-                (
-                    f"沙箱进程池可用（alive={alive_total}/{worker_total}）"
-                    if pool_ok
-                    else "沙箱进程池不可用（无存活 worker）"
-                ),
-                {"worker_total": worker_total, "alive_total": alive_total},
-            )
-        except Exception as e:
-            add_check(
-                "simulation_sandbox_pool",
-                "模拟盘沙箱池",
-                False,
-                True,
-                f"沙箱进程池检测失败: {e}",
-            )
-
-        # 11.3 模拟盘关键表（防止库被清空后启动才报错）
-        try:
-            table_probe_sql = text("""
-                SELECT
-                    to_regclass('public.sim_orders') IS NOT NULL AS sim_orders,
-                    to_regclass('public.sim_trades') IS NOT NULL AS sim_trades,
-                    to_regclass('public.simulation_fund_snapshots') IS NOT NULL AS simulation_fund_snapshots
-                """)
-            table_probe_row = (await db.execute(table_probe_sql)).mappings().one()
-            missing_tables = [
-                name
-                for name in (
-                    "sim_orders",
-                    "sim_trades",
-                    "simulation_fund_snapshots",
-                )
-                if not bool(table_probe_row.get(name))
-            ]
-            tables_ok = len(missing_tables) == 0
-            add_check(
-                "simulation_tables",
-                "模拟盘数据表",
-                tables_ok,
-                True,
-                "模拟盘关键表已就绪" if tables_ok else f"缺少模拟盘关键表: {', '.join(missing_tables)}",
-                {
-                    "required_tables": [
-                        "sim_orders",
-                        "sim_trades",
-                        "simulation_fund_snapshots",
-                    ],
-                    "missing_tables": missing_tables,
-                },
-            )
-        except Exception as e:
-            add_check(
-                "simulation_tables",
-                "模拟盘数据表",
-                False,
-                True,
-                f"模拟盘关键表检测失败: {e}",
-            )
-            # 回滚事务以清除 aborted 状态
-            await db.rollback()
-
-        # 11.4 资金快照任务配置（非阻断，便于排障）
-        snapshot_enabled = str(os.getenv("SIM_FUND_SNAPSHOT_ENABLED", "true")).strip().lower() != "false"
-        interval_raw = str(os.getenv("SIM_FUND_SNAPSHOT_INTERVAL_SECONDS", "300")).strip()
-        try:
-            interval_seconds = int(interval_raw)
-        except Exception:
-            interval_seconds = 300
-        snapshot_config_ok = (not snapshot_enabled) or interval_seconds > 0
-        add_check(
-            "simulation_snapshot_worker_config",
-            "模拟盘资金快照任务",
-            snapshot_config_ok,
-            False,
-            (
-                f"已启用（interval={interval_seconds}s）"
-                if snapshot_enabled and snapshot_config_ok
-                else (
-                    "已关闭（SIM_FUND_SNAPSHOT_ENABLED=false）"
-                    if not snapshot_enabled
-                    else "配置异常（SIM_FUND_SNAPSHOT_INTERVAL_SECONDS 应大于 0）"
-                )
-            ),
-            {
-                "enabled": snapshot_enabled,
-                "interval_seconds": interval_seconds,
-            },
-        )
-
-        try:
-            # SIMULATION/REAL(TDX通道) 均回退 QuantDB 日线兜底：
-            # 无实时行情流时，模拟盘以开盘价撮合，不阻断
-            res = check_stream_series_freshness(
-                redis_client=redis.client,
-                allow_quantdb_fallback=(mode in {"SIMULATION", "REAL"}),
-            )
-            stream_ok = bool(res["ok"])
-            # 模拟盘该项仅警告，不阻断
-            if mode == "SIMULATION":
-                stream_ok = True
-                stream_required = False
-                res_msg = res["message"] if res.get("ok") else f"[WARNING] {res['message']}（已回退日线开盘价撮合，不阻断模拟盘）"
-            else:
-                is_trading_hours = _is_cn_trading_hours()
-                stream_required = is_trading_hours
-                res_msg = res["message"]
-            details = dict(res.get("details") or {})
-            details["is_trading_hours"] = _is_cn_trading_hours() if mode != "SIMULATION" else False
-            add_check(
-                "stream_series_freshness",
-                "实时行情服务",
-                stream_ok,
-                stream_required,
-                res_msg,
-                details,
-            )
-        except Exception as e:
-            add_check(
-                "stream_series_freshness",
-                "实时行情服务",
-                True,
-                False,
-                f"[WARNING] 行情检测失败: {e}（已回退日线开盘价撮合，不阻断模拟盘）",
             )
 
     check_order: list[str] = []

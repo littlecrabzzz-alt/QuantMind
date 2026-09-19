@@ -1,7 +1,8 @@
 """本地行情数据层 —— 模拟盘的唯一行情来源。
 
-按市场读取对应数据平台的 parquet（经各市场 DataHub 的 DuckDB 视图），
-不再依赖实时行情 HTTP 服务。
+按市场直读对应数据平台的 dt=YYYYMMDD parquet 分区（交易日取自分区目录名，
+单日数据只读对应分区文件），不再依赖实时行情 HTTP 服务。
+DuckDB 视图仅在分区布局不适用时兜底，绝不用于全分区枚举类查询。
 
 复权口径选择：
 - CN：不复权（daily_unadjusted）。模拟撮合需要"当日实际可成交价"，
@@ -18,17 +19,21 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import threading
+import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_DOWN, ROUND_HALF_UP, ROUND_UP, Decimal
+from pathlib import Path
 
 import pandas as pd
 
 from backend.services.engine.data_platform.quantdb_hub import QuantDBDataHub
 from backend.services.simulation.services.market_rules import (
     Market,
+    lot_size_for_symbol,
     normalize_market,
 )
 from backend.shared.stock_utils import StockCodeUtil
@@ -44,6 +49,30 @@ _MARKET_KLINE_VIEWS: dict[Market, str] = {
     Market.CRYPTO: "qbc_daily_forward",
 }
 
+# 与视图一一对应的 hive 分区根目录（相对 hub.data_dir）。视图本质是
+# ``dt=*/*.parquet`` 的 glob，DuckDB 每次查询都要先枚举并读取全部分区
+# （2500+ 个 parquet）的 footer 才能定列，哪怕只取一天；而目录名本身就是
+# dt 分区值，所以交易日枚举与单日取数都优先走目录/文件直读，视图只作兜底。
+_MARKET_KLINE_DIRS: dict[Market, str] = {
+    Market.CN: "1_kline_data/daily_unadjusted",
+    Market.HK: "1_kline_data/daily_forward",
+    Market.US: "1_kline_data/daily_forward",
+    Market.FUTURES: "1_kline_data/daily_forward",
+    Market.CRYPTO: "1_kline_data/daily_forward",
+}
+
+# 单日直读所需的视图列口径；分区文件缺任一则整份数据回退 DuckDB 视图
+_BAR_COLUMNS: tuple[str, ...] = ("symbol", "open", "high", "low", "close", "volume", "amount")
+# 部分市场 volume 落盘为别名列（与 hub._VOLUME_ALIASES 对齐）
+_VOLUME_ALIASES: tuple[str, ...] = ("vol_in_stock", "volinstock")
+
+# 交易日缓存刷新间隔（秒）。分区目录枚举已降到毫秒级，长驻进程需要自动看到
+# 新落盘的交易日，否则进程不重启就永远停在启动那天的"最近交易日"。
+_SESSIONS_TTL_SEC = 300.0
+
+# 尾部校验最多回溯多少个分区（防止损坏数据导致逐日 stat 蔓延）
+_SESSIONS_TAIL_CHECK = 30
+
 # 每档涨跌幅（不含 ST 折减）
 _PCT_MAIN = Decimal("0.10")
 _PCT_GROWTH = Decimal("0.20")  # 创业板 300/301/302 + 科创板 688/689
@@ -58,6 +87,9 @@ _BSE_PREFIXES = ("43", "83", "87", "88", "92")
 # 快照（HqDate=20260720）的 ZTPrice/DTPrice 对 ST 股同样按 ±10% 给出。
 # 创业板/科创板/北交所 ST 股不折减（实测最大涨幅仍为 ±20% / ±30%）。
 _ST_LIMIT_RELAXED_FROM = date(2026, 7, 6)
+
+# 创业板注册制改革：2020-08-24 起交易类证券涨跌幅由 10% 放宽至 20%（存量 300xxx 同步切换）。
+_CHINEXT_20PCT_FROM = date(2020, 8, 24)
 
 _CENT = Decimal("0.01")
 
@@ -96,17 +128,31 @@ def _round_cent(value: Decimal, rounding: str) -> float:
 
 
 def _is_bse(symbol: str) -> bool:
-    code, _, suffix = symbol.partition(".")
-    if suffix == "BJ":
+    s = str(symbol).upper().strip()
+    if s.endswith(".BJ"):
         return True
-    return code[:2] in _BSE_PREFIXES
+    # 兼容 SH/SZ/BJ 前缀式（BJ430047 / BJ830000）与后缀式（430047.BJ / 830000.BJ）
+    for pfx in ("SH", "SZ", "BJ"):
+        if s.startswith(pfx):
+            s = s[len(pfx):]
+            break
+    s = s.split(".")[0]
+    if s.startswith("BJ"):
+        s = s[2:]
+    return s[:2] in _BSE_PREFIXES or s[:2] == "92"
 
 
 def _board_pct(symbol: str) -> Decimal:
     if _is_bse(symbol):
         return _PCT_BSE
-    code = symbol.partition(".")[0]
-    if code[:3] in _GROWTH_PREFIXES:
+    s = str(symbol).upper().strip()
+    # 兼容 SH600036 / 600036.SH / 600036 均取纯数字
+    for pfx in ("SH", "SZ", "BJ"):
+        if s.startswith(pfx):
+            s = s[len(pfx):]
+            break
+    s = s.split(".")[0]
+    if s[:3] in _GROWTH_PREFIXES:
         return _PCT_GROWTH
     return _PCT_MAIN
 
@@ -114,6 +160,15 @@ def _board_pct(symbol: str) -> Decimal:
 def limit_pct(symbol: str, *, is_st: bool, trade_date: date) -> Decimal:
     """该标的当日的涨跌幅限制比例。"""
     pct = _board_pct(symbol)
+    # 历史：创业板 2020-08-24 前为 10%，之后 20%（注册制改革）
+    s = str(symbol).upper().strip()
+    for pfx in ("SH", "SZ", "BJ"):
+        if s.startswith(pfx):
+            s = s[len(pfx):]
+            break
+    s = s.split(".")[0]
+    if s[:3] in ("300", "301", "302") and trade_date < _CHINEXT_20PCT_FROM:
+        pct = _PCT_MAIN
     st_reduces = is_st and pct == _PCT_MAIN and trade_date < _ST_LIMIT_RELAXED_FROM
     return _PCT_ST_MAIN if st_reduces else pct
 
@@ -146,6 +201,40 @@ def compute_limits(
     )
 
 
+def _partition_has_data(dt_dir: Path) -> bool:
+    """分区目录是否真的落了 parquet（同步中断可能只留下空目录）。"""
+    if (dt_dir / "data.parquet").exists():
+        return True
+    try:
+        return any(p.suffix == ".parquet" for p in dt_dir.iterdir())
+    except OSError:
+        return False
+
+
+def _to_bar_frame(raw: pd.DataFrame, dt_int: int) -> pd.DataFrame | None:
+    """把分区原始列投影成视图口径（symbol/open/.../amount + dt）。
+
+    分区文件里没有 dt 列（它是 hive 分区键），必须按目录名补上，
+    否则 _build_date 无法区分目标日与前一交易日。
+    列不符合日线口径时返回 None，由调用方回退 DuckDB 视图。
+    """
+    lower = {str(c).lower(): c for c in raw.columns}
+    if "symbol" not in lower:
+        return None
+    volume_col = lower.get("volume") or next(
+        (lower[a] for a in _VOLUME_ALIASES if a in lower), None
+    )
+    if volume_col is None:
+        return None
+    out: dict[str, object] = {"dt": dt_int, "symbol": raw[lower["symbol"]]}
+    for col in ("open", "high", "low", "close", "volume", "amount"):
+        source = volume_col if col == "volume" else lower.get(col)
+        if source is None:
+            return None
+        out[col] = raw[source]
+    return pd.DataFrame(out)
+
+
 def _detect_amount_scale(df: pd.DataFrame) -> float:
     """识别当日 amount/volume 的单位口径，返回 vwap 换算系数。"""
     usable = df[(df["volume"] > 0) & (df["amount"] > 0) & (df["close"] > 0)]
@@ -176,6 +265,11 @@ class LocalMarketData:
         self._date_cache: OrderedDict[date, dict[str, DailyBar]] = OrderedDict()
         self._st_symbols: frozenset[str] | None = None
         self._session_dates: list[int] | None = None
+        self._sessions_at: float | None = None
+        # 分区根目录与直读可用性：首次访问时探测，之后只读
+        self._kline_root: Path | None = None
+        self._kline_root_probed = False
+        self._direct_read_ok = True
 
     @staticmethod
     def _resolve_hub(market: Market) -> QuantDBDataHub:
@@ -314,11 +408,27 @@ class LocalMarketData:
                 limit_down=limit_down,
                 is_st=is_st,
                 suspended=volume <= 0,
+                lot_size=lot_size_for_symbol(symbol),
             )
         return bars
 
     def _scan(self, dt_ints: tuple[int, ...]) -> pd.DataFrame:
-        """一次 DuckDB 扫描取回目标日与前一交易日的全市场日线。"""
+        """一次取回目标日与前一交易日的全市场日线。
+
+        优先直读 ``dt=<YYYYMMDD>/`` 分区文件（一天 = 一个 parquet，毫秒级）；
+        分区布局不适用时才回退 DuckDB 视图扫描。
+        """
+        root = self._probe_kline_root()
+        if root is not None and self._direct_read_ok:
+            frames = self._read_partitions(root, dt_ints)
+            if frames is not None:
+                if not frames:
+                    return pd.DataFrame(columns=[*_BAR_COLUMNS, "dt"])
+                return pd.concat(frames, ignore_index=True)
+        return self._scan_via_view(dt_ints)
+
+    def _scan_via_view(self, dt_ints: tuple[int, ...]) -> pd.DataFrame:
+        """DuckDB 视图兜底扫描（全分区元数据枚举，仅在直读不可用时使用）。"""
         dt_list = ", ".join(str(d) for d in dt_ints)
         sql = (
             "SELECT symbol, dt, open, high, low, close, volume, amount "
@@ -330,24 +440,153 @@ class LocalMarketData:
             logger.error("本地行情扫描失败 dt=%s: %s", dt_list, exc)
             return pd.DataFrame()
 
-    def _sessions(self) -> list[int]:
-        """有行情数据的交易日（以实际 parquet 分区为准，交易日历与分区并不总是一致）。"""
+    def _probe_kline_root(self) -> Path | None:
+        """hive 分区根目录；非 dt= 分区布局（或 hub 无 data_dir）时返回 None。"""
         with self._lock:
-            if self._session_dates is not None:
+            if self._kline_root_probed:
+                return self._kline_root
+        root: Path | None = None
+        try:
+            candidate = Path(self._hub.data_dir) / _MARKET_KLINE_DIRS[self.market]
+            if candidate.is_dir() and next(candidate.glob("dt=*"), None) is not None:
+                root = candidate
+        except (OSError, TypeError, ValueError, AttributeError) as exc:
+            logger.info("本地行情分区目录不可用，回退 DuckDB 视图: %s", exc)
+        with self._lock:
+            self._kline_root = root
+            self._kline_root_probed = True
+        return root
+
+    def _read_partitions(
+        self, root: Path, dt_ints: tuple[int, ...]
+    ) -> list[pd.DataFrame] | None:
+        """直读目标交易日分区；返回 None 表示该布局不适合直读。"""
+        frames: list[pd.DataFrame] = []
+        for dt_int in dt_ints:
+            part = self._read_partition(root, dt_int)
+            if part is None:
+                return None
+            if not part.empty:
+                frames.append(part)
+        return frames
+
+    def _read_partition(self, root: Path, dt_int: int) -> pd.DataFrame | None:
+        """读单个 dt= 分区，并把列投影成视图口径。
+
+        返回 None —— 分区不适合直读（缺关键列/解析失败），调用方回退视图；
+        返回空表 —— 该交易日确实无数据（分区未落盘或文件为空）。
+        """
+        dt_dir = root / f"dt={dt_int}"
+        if not dt_dir.is_dir():
+            return pd.DataFrame()
+        try:
+            files = sorted(
+                p for p in dt_dir.glob("*.parquet") if p.is_file() and p.stat().st_size > 0
+            )
+        except OSError as exc:
+            logger.warning("本地行情分区不可读 %s: %s", dt_dir, exc)
+            return None
+        if not files:
+            logger.warning("本地行情分区缺少 parquet: %s", dt_dir)
+            return pd.DataFrame()
+
+        frames: list[pd.DataFrame] = []
+        for path in files:
+            try:
+                raw = pd.read_parquet(path)
+            except Exception as exc:
+                logger.error("本地行情分区读取失败 %s: %s", path, exc)
+                return None
+            frame = _to_bar_frame(raw, dt_int)
+            if frame is None:
+                logger.error(
+                    "本地行情分区列不符合日线口径，回退 DuckDB 视图 %s: %s",
+                    path,
+                    list(raw.columns),
+                )
+                with self._lock:
+                    self._direct_read_ok = False
+                return None
+            if not frame.empty:
+                frames.append(frame)
+        if not frames:
+            return pd.DataFrame()
+        return pd.concat(frames, ignore_index=True)
+
+    def _sessions(self) -> list[int]:
+        """有行情数据的交易日（以实际 parquet 分区为准，交易日历与分区并不总是一致）。
+
+        交易日直接取自 hive 分区目录名：目录名即 dt 分区值，一次目录扫描就能
+        拿到全部交易日。旧实现是 ``SELECT DISTINCT dt FROM 视图``，DuckDB 要为
+        它枚举并读取 2500+ 个 parquet 的 footer，服务器上实测 16-20 秒同步阻塞。
+        """
+        now = time.monotonic()
+        with self._lock:
+            if self._session_dates is not None and (
+                self._sessions_at is None or now - self._sessions_at < _SESSIONS_TTL_SEC
+            ):
                 return self._session_dates
+
+        sessions = self._partition_session_dates()
+        if sessions is None:
+            sessions = self._query_session_dates()
+
+        if not sessions:
+            # 失败时不写缓存：避免把空的 session 列表永久钉住，
+            # 后续数据补齐（如 quantdb 恢复）后下次调用能自动重试。
+            return []
+        with self._lock:
+            self._session_dates = sessions
+            self._sessions_at = time.monotonic()
+        return sessions
+
+    def _partition_session_dates(self) -> list[int] | None:
+        """从分区目录名取交易日；返回 None 表示需要走视图兜底。
+
+        目录名就是 hive 分区值，纯枚举一次约 20ms（2593 个分区）。只对最新的
+        尾部分区做"确有 parquet"校验：同步中断只会发生在最新分区上，而全量
+        校验要 2593 次 stat（Windows 实测 1.0s，会白白拖慢每次冷启动）。
+        """
+        root = self._probe_kline_root()
+        if root is None:
+            return None
+        dates: list[int] = []
+        try:
+            with os.scandir(root) as entries:
+                for entry in entries:
+                    name = entry.name
+                    if not name.startswith("dt="):
+                        continue
+                    try:
+                        dt_int = int(name[3:])
+                    except ValueError:
+                        continue
+                    if entry.is_dir():
+                        dates.append(dt_int)
+        except OSError as exc:
+            logger.warning("枚举本地行情分区失败 %s: %s", root, exc)
+            return None
+        dates.sort()
+        split = len(dates) - _SESSIONS_TAIL_CHECK
+        head, tail = dates[:split], dates[split:]
+        valid_tail: list[int] = []
+        for dt_int in tail:
+            if _partition_has_data(root / f"dt={dt_int}"):
+                valid_tail.append(dt_int)
+            else:
+                logger.warning("本地行情分区无数据，暂从交易日中剔除: dt=%s", dt_int)
+        return head + valid_tail
+
+    def _query_session_dates(self) -> list[int]:
+        """视图兜底：DuckDB DISTINCT dt（慢路径，仅非 hive 布局的市场使用）。"""
         try:
             df = self._hub.query(
                 f"SELECT DISTINCT dt FROM {self._kline_view} ORDER BY dt"
             )
-            sessions = [int(v) for v in df["dt"].tolist()]
+            return [int(v) for v in df["dt"].tolist()]
         except Exception as exc:
-            # 失败时不写缓存：避免把空的 session 列表永久钉住，
-            # 后续数据补齐（如 quantdb 恢复）后下次调用能自动重试。
             logger.error("读取本地行情交易日失败: %s", exc)
             return []
-        with self._lock:
-            self._session_dates = sessions
-        return sessions
 
     def _previous_session(self, dt_int: int) -> int | None:
         sessions = self._sessions()
@@ -424,7 +663,12 @@ _default_lock = threading.Lock()
 
 
 def get_local_market_data(market: Market | str | None = None) -> LocalMarketData:
-    """进程内共享实例（DuckDB 连接与按日缓存均可复用），按市场隔离。"""
+    """进程内共享实例，按市场隔离。
+
+    必须走这个入口而不是自行 new：交易日列表、按日全市场日线、ST 名单都挂在
+    实例缓存上，逐次新建会让每次调用都重新枚举分区/重读日线（旧实现的
+    ``SELECT DISTINCT dt`` 在这里等于每次 16-20 秒）。
+    """
     market_key = normalize_market(market)
     if market_key is Market.CN and _default_instances.get(Market.CN) is None:
         # 兼容历史：无参调用复用既有 CN 单例

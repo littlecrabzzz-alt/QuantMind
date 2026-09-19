@@ -3,20 +3,27 @@ import os
 
 from redis import Redis
 
+from backend.shared.quote_redis_config import (
+    remote_quote_redis_db,
+    remote_quote_redis_host,
+    remote_quote_redis_password,
+    remote_quote_redis_port,
+)
+
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# Redis 配置 — 默认使用本地 Redis（通过环境变量覆盖）
+# 行情 Redis — 默认全市场库 quantmindai.cn db3（可用环境变量覆盖）
 # ============================================================
-REMOTE_REDIS_HOST = os.getenv("REMOTE_QUOTE_REDIS_HOST", os.getenv("REDIS_HOST", "localhost"))
-REMOTE_REDIS_PORT = int(os.getenv("REMOTE_QUOTE_REDIS_PORT", os.getenv("REDIS_PORT", "6379")))
+REMOTE_REDIS_HOST = remote_quote_redis_host()
+REMOTE_REDIS_PORT = remote_quote_redis_port()
 REMOTE_REDIS_USER = os.getenv("REMOTE_QUOTE_REDIS_USER", os.getenv("REDIS_USER", ""))
-REMOTE_REDIS_PASSWORD = os.getenv("REMOTE_QUOTE_REDIS_PASSWORD", os.getenv("REDIS_PASSWORD", ""))
-REMOTE_REDIS_DB = int(os.getenv("REMOTE_QUOTE_REDIS_DB", os.getenv("REDIS_DB", "0")))
+REMOTE_REDIS_PASSWORD = remote_quote_redis_password() or ""
+REMOTE_REDIS_DB = remote_quote_redis_db()
 
 
 def get_remote_redis_client(db: int = None) -> Redis:
-    """获取 Redis 客户端"""
+    """获取行情 Redis 客户端"""
     if db is None:
         db = REMOTE_REDIS_DB
     return Redis(

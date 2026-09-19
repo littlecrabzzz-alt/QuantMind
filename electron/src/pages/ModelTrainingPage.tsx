@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Brain, ChevronRight, Play, Settings2, BarChart, Database,
-  Copy, Sparkles, RefreshCcw, Target, Upload
+  Copy, Sparkles, RefreshCcw, Target, Upload, Layers, Square
 } from 'lucide-react';
 import {
   Button, Space, Tag, Typography, message, Card, Select, Modal, Alert, Tooltip
@@ -19,12 +19,16 @@ import { TrainingTarget, TrainingParams, TrainingContext, TrainingStatus, Traini
 import { AdminModelFeatureDataCoverage, QuantDBTrainingSource } from '../features/admin/types';
 import { adminService } from '../features/admin/services/adminService';
 import { FeatureSelector } from './training/FeatureSelector';
+import { StockPoolPickerModal } from '../components/backtest/StockPoolPickerModal';
+import type { StockPoolOption } from '../services/stockPoolOptionService';
 import { TrainingTargetConfig } from './training/TrainingTargetConfig';
 import { ParameterConfig } from './training/ParameterConfig';
 import { TrainingConsole } from './training/TrainingConsole';
 import { TrainingResultView } from './training/TrainingResultView';
 
 const { Title } = Typography;
+const NODE_STORAGE_KEY = 'qm.training.selectedNode';
+const NODE_READY = new Set(['ready', 'busy']);
 
 const TRAINING_MODULES = [
   { title: '特征选择', description: '筛选输入因子', icon: Database, hint: '第一步' },
@@ -37,7 +41,7 @@ const TRAINING_MODULES = [
 const TRAINING_PAGE_BOTTOM_SAFE_CLASS = 'pb-[30px]';
 // 直读 ML 数据集训练的市场（数据源选择 + 目录版本门禁），与后端
 // quantdb_factor_reader.MARKET_FACTOR_SOURCES 保持一致。
-const QUANTDB_DIRECT_MARKETS = ['CN', 'HK', 'US', 'FUTURES', 'CRYPTO'];
+const QUANTDB_DIRECT_MARKETS = ['CN', 'HK', 'US', 'FUTURES', 'CRYPTO', 'CUSTOM'];
 const isQuantDBMarket = (market: string) => QUANTDB_DIRECT_MARKETS.includes(market);
 let draftRestoreNoticeShown = false;
 
@@ -68,6 +72,10 @@ interface FormState {
   displayName: string;
   displayNameMode: 'auto' | 'manual';
   draftHydrated: boolean;
+  /** 股票池引用（如 pool:csi300），为空表示全市场训练 */
+  poolRef: string | null;
+  poolName: string | null;
+  poolId: string | null;
 }
 
 interface ImportPreview {
@@ -86,6 +94,7 @@ type FormAction =
   | { type: 'SET_CONTEXT'; payload: TrainingContext }
   | { type: 'SET_DISPLAY_NAME'; payload: { name: string; mode: 'auto' | 'manual' } }
   | { type: 'SET_WFA'; payload: WfaConfig }
+  | { type: 'SET_POOL'; payload: { ref: string | null; name: string | null; id: string | null } }
   | { type: 'SET_FEATURE_CATEGORIES'; payload: FeatureCategory[] }
   | { type: 'SET_MARKET_CONTEXT'; payload: { market: AppMarket; benchmark: string } };
 
@@ -95,6 +104,9 @@ function formReducer(state: FormState, action: FormAction): FormState {
       if (!action.payload) return { ...state, draftHydrated: true };
       const p = action.payload;
       const restoredParams = { ...DEFAULT_PARAMS, ...p.params };
+      // 单选模型：历史草稿若存有多选，只保留主模型
+      restoredParams.model_types = [restoredParams.model_type];
+      restoredParams.ensemble_method = 'none';
       if (!p.params?.model_types && p.params?.model_type) {
         restoredParams.model_types = [p.params.model_type];
       }
@@ -122,9 +134,14 @@ function formReducer(state: FormState, action: FormAction): FormState {
         displayNameMode: p.displayNameMode || 'auto',
         displayName: p.displayName || state.displayName,
         wfaConfig: restoredWfa,
+        poolRef: p.poolRef || null,
+        poolName: p.poolName || null,
+        poolId: p.poolId || null,
         draftHydrated: true,
       };
     }
+    case 'SET_POOL':
+      return { ...state, poolRef: action.payload.ref, poolName: action.payload.name, poolId: action.payload.id };
     case 'SET_FEATURES':
       return { ...state, selectedFeatures: action.payload };
     case 'SET_TIME':
@@ -165,8 +182,11 @@ export const ModelTrainingPage: React.FC = () => {
     target: DEFAULT_TARGET,
     params: DEFAULT_PARAMS,
     context: DEFAULT_CONTEXT,
-    displayName: buildAutoDisplayName(dayjs(), DEFAULT_TARGET, 0),
+    displayName: buildAutoDisplayName(dayjs(), DEFAULT_TARGET, 0, undefined, currentMarket, DEFAULT_PARAMS.model_type),
     displayNameMode: 'auto' as const,
+    poolRef: null,
+    poolName: null,
+    poolId: null,
     draftHydrated: false,
   });
 
@@ -186,21 +206,27 @@ export const ModelTrainingPage: React.FC = () => {
   const [logs, setLogs] = useState<string[]>([]);
   const [result, setResult] = useState<TrainingResult | null>(null);
   const [resultError, setResultError] = useState<string>('');
+  const [activeRunId, setActiveRunId] = useState<string>('');
   const [settingDefaultModel, setSettingDefaultModel] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<string>('');
   const [trainingNodes, setTrainingNodes] = useState<any[]>([]);
-  const [selectedNode, setSelectedNode] = useState<string>('local');
+  const [selectedNode, setSelectedNode] = useState<string>(
+    () => localStorage.getItem(NODE_STORAGE_KEY) || 'local'
+  );
   const [nodesLoading, setNodesLoading] = useState(false);
   // 训练时长预算（分钟）。前端已移除配置入口，固定透传 720（宽于编排器默认 120，
   // 为 GRU/LSTM 等 DL 模型在 CPU 上的长训练留出余量），如需调整改这里。
   const maxTimeMinutes = 720;
   // 因子筛选开关与阈值（默认开启，后端默认 ic_icir: top-80 / |IC|≥0.01 / |ICIR|≥0.15 / 相关性<0.9）
   const [factorFilter, setFactorFilter] = useState<TrainingFactorFilterConfig>({ ...DEFAULT_FACTOR_FILTER });
+  // 股票池（第一步数据范围）：null 表示全市场训练，否则为 pool:<code> 引用
+  const [poolPickerOpen, setPoolPickerOpen] = useState(false);
 
   const timersRef = useRef<number[]>([]);
   const pollTimerRef = useRef<number | null>(null);
   const pollFailuresRef = useRef(0);
   const logsRef = useRef<string[]>([]);
+  const serverLogSeenRef = useRef<Set<string>>(new Set());
   const catalogSuggestionAppliedRef = useRef(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const importedFeaturesRef = useRef<string[] | null>(null);
@@ -226,8 +252,8 @@ export const ModelTrainingPage: React.FC = () => {
 
   const featureCount = selectedFeatures.length;
   const autoDisplayName = useMemo(
-    () => buildAutoDisplayName(dayjs(), target, featureCount, undefined, currentMarket),
-    [target, featureCount, currentMarket]
+    () => buildAutoDisplayName(dayjs(), target, featureCount, undefined, currentMarket, params.model_type),
+    [target, featureCount, currentMarket, params.model_type]
   );
   const trainDays = useMemo(() => daysBetween(timePeriods.train), [timePeriods.train]);
   const valDays = useMemo(() => daysBetween(timePeriods.val), [timePeriods.val]);
@@ -240,8 +266,8 @@ export const ModelTrainingPage: React.FC = () => {
     ? `${dataCoverage.min_date} ～ ${dataCoverage.max_date}`
     : '等待数据源状态';
   const requestPreview = useMemo(
-    () => buildTrainingRequest(selectedFeatures, featureCategories, timePeriods, target, params, context, displayName, currentMarket, wfaConfig),
-    [selectedFeatures, featureCategories, timePeriods, target, params, context, displayName, currentMarket, wfaConfig]
+    () => buildTrainingRequest(selectedFeatures, featureCategories, timePeriods, target, params, context, displayName, currentMarket, wfaConfig, formState.poolRef),
+    [selectedFeatures, featureCategories, timePeriods, target, params, context, displayName, currentMarket, wfaConfig, formState.poolRef]
   );
   // 训练节点
   const selectedNodeObj = useMemo(
@@ -252,12 +278,18 @@ export const ModelTrainingPage: React.FC = () => {
   const isDirectCatalogReady = !isQuantDBMarket(currentMarket) || (
     !!factorCatalogVersion && dataCoverage?.ready === true
   );
-  const isSelectedNodeReady = selectedNodeObj ? selectedNodeObj.readiness === 'ready' : true;
+  const isSelectedNodeReady = selectedNodeObj
+    ? NODE_READY.has(String(selectedNodeObj.readiness || ''))
+    : trainingNodes.length === 0;
   const isReadyToTrain = selectedFeatures.length > 0 && target.horizonDays >= 1 && totalDays > 0 && isDirectCatalogReady && isSelectedNodeReady;
-  const isTrainingInProgress =
-    trainingStatus === 'running' ||
-    ['pending', 'provisioning', 'running', 'waiting_callback'].includes((backendRunStatus || '').toLowerCase());
+  // 只看本页训练态，不用后端残留的 pending 把「开始训练」锁死
+  const isTrainingInProgress = trainingStatus === 'running';
   const disableStartTraining = (isTrainingInProgress || !isSelectedNodeReady) && currentStep === 3;
+  const startDisabledReason = isTrainingInProgress
+    ? '训练任务进行中'
+    : !isSelectedNodeReady
+      ? `当前节点未就绪（${selectedNodeObj?.readiness_label || '检测中'}）。请在左侧选择已就绪的 AutoDL 节点，或点刷新。`
+      : '';
 
   // 自动 displayName
   useEffect(() => {
@@ -282,6 +314,22 @@ export const ModelTrainingPage: React.FC = () => {
   useEffect(() => {
     loadNodes();
   }, []);
+
+  useEffect(() => {
+    if (selectedNode) localStorage.setItem(NODE_STORAGE_KEY, selectedNode);
+  }, [selectedNode]);
+
+  useEffect(() => {
+    if (trainingNodes.length === 0) return;
+    const current = trainingNodes.find((n) => n.id === selectedNode);
+    if (current && NODE_READY.has(String(current.readiness || ''))) return;
+    const preferred = trainingNodes.find((n) => n.type === 'remote' && n.readiness === 'ready')
+      || trainingNodes.find((n) => n.readiness === 'ready')
+      || trainingNodes.find((n) => n.type === 'remote' && NODE_READY.has(String(n.readiness || '')));
+    if (preferred && preferred.id !== selectedNode) {
+      setSelectedNode(preferred.id);
+    }
+  }, [trainingNodes, selectedNode]);
 
   // 直读市场（CN/HK）训练目录完全由后端发布版本驱动；不回退到任何内置字段。
   useEffect(() => {
@@ -395,11 +443,14 @@ export const ModelTrainingPage: React.FC = () => {
       params,
       context,
       wfa: wfaConfig,
+      poolRef: formState.poolRef,
+      poolName: formState.poolName,
+      poolId: formState.poolId,
       lastSavedAt: new Date().toISOString(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
     setDraftSavedAt(draft.lastSavedAt);
-  }, [formState.draftHydrated, displayName, displayNameMode, selectedFeatures, timePeriods, target, params, context, wfaConfig]);
+  }, [formState.draftHydrated, formState.poolRef, formState.poolName, formState.poolId, displayName, displayNameMode, selectedFeatures, timePeriods, target, params, context, wfaConfig]);
 
   const clearTimers = () => {
     timersRef.current.forEach(t => window.clearTimeout(t));
@@ -422,6 +473,15 @@ export const ModelTrainingPage: React.FC = () => {
     setLogs(next);
   };
 
+  const ingestServerLogs = (text?: string) => {
+    if (!text) return;
+    text.split('\n').filter(Boolean).forEach((line) => {
+      if (serverLogSeenRef.current.has(line)) return;
+      serverLogSeenRef.current.add(line);
+      pushLog(line);
+    });
+  };
+
   const startTraining = async () => {
     if (isTrainingInProgress) {
       message.warning('训练任务进行中，请稍候');
@@ -437,6 +497,9 @@ export const ModelTrainingPage: React.FC = () => {
     setTrainingStatus('running');
     setExecutionStage('准备训练请求');
     setProgress(5);
+    logsRef.current = [];
+    serverLogSeenRef.current = new Set();
+    setLogs([]);
     pushLog(`正在提交训练请求：${displayName}`);
 
     try {
@@ -446,6 +509,7 @@ export const ModelTrainingPage: React.FC = () => {
         payload.factor_catalog_version = factorCatalogVersion;
       }
       const { runId } = await modelTrainingService.runTraining(payload);
+      setActiveRunId(runId);
       pushLog(`提交成功，Run ID: ${runId}`);
       startPolling(runId);
     } catch (err: any) {
@@ -459,7 +523,7 @@ export const ModelTrainingPage: React.FC = () => {
   const startPolling = async (runId: string) => {
     clearTimers();
     pollFailuresRef.current = 0;
-    pollTimerRef.current = window.setInterval(async () => {
+    const tick = async () => {
       let run;
       try {
         run = await modelTrainingService.getTrainingRun(runId);
@@ -476,19 +540,32 @@ export const ModelTrainingPage: React.FC = () => {
         return;
       }
       setBackendRunStatus(run.status || '');
-      if (run.logs) {
-         run.logs.split('\n').filter(Boolean).forEach(line => {
-           if (!logsRef.current.some(l => l.includes(line))) pushLog(line);
-         });
+      ingestServerLogs(run.logs);
+      const liveStatuses = ['running', 'provisioning', 'waiting_callback', 'pending'];
+      const failedByLog = /\[ERROR\].*(编排失败|训练异常退出|原生进程轮询异常)/.test(run.logs || '');
+      if (liveStatuses.includes(run.status || '') && !failedByLog) {
+        setProgress(Math.max(run.progress || 5, 5));
       }
-      if (run.status === 'running') setProgress(Math.max(run.progress || 20, 20));
 
-      if (run.isCompleted) {
+      if (run.status === 'cancelled') {
         clearTimers();
-        if (run.status === 'failed') {
+        pushLog('训练已被取消');
+        setTrainingStatus('draft');
+        setExecutionStage('已取消');
+        setBackendRunStatus('');
+        setActiveRunId('');
+        message.info('训练已取消');
+        return;
+      }
+
+      if (run.isCompleted || failedByLog || run.status === 'failed') {
+        clearTimers();
+        if (run.status === 'failed' || failedByLog) {
           const errorMsg = (run.result as any)?.error || '训练失败';
           setResultError(errorMsg);
           setTrainingStatus('draft');
+          setExecutionStage('待配置');
+          setBackendRunStatus('');
         } else {
           const parsed = parseTrainingResult(requestPreview, runId, run.result);
           if (parsed) {
@@ -504,26 +581,29 @@ export const ModelTrainingPage: React.FC = () => {
           }
         }
       }
-    }, 3000);
+    };
+    void tick();
+    pollTimerRef.current = window.setInterval(tick, 3000);
   };
 
-  // 页面挂载时恢复「切页前的活跃训练」：有进行中/最近任务则继续轮询，进度不丢
+  // 页面挂载时仅恢复「进行中」的训练任务：切页前的 running/provisioning 继续轮询，
+  // 进度不丢。已完成/失败不恢复，页面停在第一步（避免进页即跳到第五步结果页）。
   useEffect(() => {
     let active = true;
     (async () => {
       const run = await modelTrainingService.getActiveTrainingRun();
       if (!active || !run) return;
-      // 仅恢复尚未完成的任务；已完成/失败的任务保留默认数据卡片
-      if (run.isCompleted) return;
+      const inProgress =
+        !run.isCompleted &&
+        ['running', 'provisioning', 'waiting_callback', 'pending'].includes(run.status || '');
+      if (!inProgress) return;
+      ingestServerLogs(run.logs);
       setBackendRunStatus(run.status || '');
-      if (run.logs) {
-        run.logs.split('\n').filter(Boolean).forEach(line => {
-          if (!logsRef.current.some(l => l.includes(line))) pushLog(line);
-        });
-      }
-      if (run.status === 'running') setProgress(Math.max(run.progress || 20, 20));
+      setProgress(Math.max(run.progress || 5, 5));
       setTrainingStatus('running');
       setExecutionStage('训练进行中（已从上次会话恢复）');
+      setCurrentStep(3);
+      setActiveRunId(run.runId);
       startPolling(run.runId);
     })();
     return () => {
@@ -546,6 +626,31 @@ export const ModelTrainingPage: React.FC = () => {
     setTrainingStatus('draft');
     setResult(null);
     setResultError('');
+  };
+
+  const handleCancelTraining = () => {
+    if (!activeRunId) return;
+    Modal.confirm({
+      title: '取消训练',
+      content: `确定要取消训练任务 ${activeRunId} 吗？训练容器/进程将被停止，已产出的模型不会入库。`,
+      okText: '取消训练',
+      okButtonProps: { danger: true },
+      cancelText: '继续训练',
+      onOk: async () => {
+        try {
+          await modelTrainingService.cancelTrainingRun(activeRunId);
+          clearTimers();
+          pushLog('已提交取消请求，正在停止训练…');
+          setTrainingStatus('draft');
+          setExecutionStage('已取消');
+          setBackendRunStatus('');
+          setActiveRunId('');
+          message.success('训练已取消');
+        } catch (err: any) {
+          message.error(`取消失败: ${err.message}`);
+        }
+      },
+    });
   };
 
   const handleResetAll = () => {
@@ -839,9 +944,24 @@ export const ModelTrainingPage: React.FC = () => {
                         </>
                       )}
                       <Button size="small" icon={<RefreshCcw size={14}/>} className="rounded-xl h-8 font-bold px-3" onClick={handleResetAll} disabled={isTrainingInProgress}>清空</Button>
-                      <Button size="small" type="primary" icon={<ChevronRight size={14}/>} className="rounded-xl h-8 bg-blue-600 font-bold px-4 shadow-sm" onClick={stepAction} disabled={disableStartTraining}>
-                        {stepActionLabel}
-                      </Button>
+                      {isTrainingInProgress && (
+                        <Button
+                          size="small"
+                          danger
+                          icon={<Square size={14} />}
+                          className="rounded-xl h-8 font-bold px-4"
+                          onClick={handleCancelTraining}
+                        >
+                          取消训练
+                        </Button>
+                      )}
+                      <Tooltip title={disableStartTraining ? startDisabledReason : undefined}>
+                        <span className={disableStartTraining ? 'inline-block' : undefined}>
+                          <Button size="small" type="primary" icon={<ChevronRight size={14}/>} className="rounded-xl h-8 bg-blue-600 font-bold px-4 shadow-sm" onClick={stepAction} disabled={disableStartTraining}>
+                            {stepActionLabel}
+                          </Button>
+                        </span>
+                      </Tooltip>
                     </Space>
                   </div>
                 </Card>
@@ -856,7 +976,38 @@ export const ModelTrainingPage: React.FC = () => {
 
                 <AnimatePresence mode="wait">
                   <motion.div key={currentStep} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
-                    {currentStep === 0 && <FeatureSelector categories={featureCategories} selectedFeatures={selectedFeatures} onChange={(f) => dispatch({ type: 'SET_FEATURES', payload: f })} loading={featureCatalogLoading} onGuide={() => navigate('/admin/training-datasets')} />}
+                    {currentStep === 0 && (
+                      <>
+                        <Card className="rounded-3xl border-slate-200 shadow-sm mb-4" styles={{ body: { padding: 20 } }}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Layers size={18} className="text-indigo-500" />
+                            <Typography.Title level={4} className="!mb-0 !text-slate-900">训练股票池</Typography.Title>
+                          </div>
+                          <Typography.Paragraph className="!mb-3 !mt-2 !text-xs !text-slate-500 leading-relaxed">
+                            限定训练样本的股票范围。默认全市场；选择自定义池后训练只用池内成分（后端解析，空池拒绝提交）。
+                          </Typography.Paragraph>
+                          <Space wrap>
+                            <Button
+                              type={formState.poolRef ? 'default' : 'primary'}
+                              onClick={() => dispatch({ type: 'SET_POOL', payload: { ref: null, name: null, id: null } })}
+                            >
+                              全市场
+                            </Button>
+                            <Button
+                              type={formState.poolRef ? 'primary' : 'default'}
+                              icon={<Layers size={14} />}
+                              onClick={() => setPoolPickerOpen(true)}
+                            >
+                              {formState.poolRef ? (formState.poolName || formState.poolRef) : '自定义股票池'}
+                            </Button>
+                            {formState.poolRef && (
+                              <Tag color="blue" className="!m-0 font-mono">{formState.poolRef}</Tag>
+                            )}
+                          </Space>
+                        </Card>
+                        <FeatureSelector categories={featureCategories} selectedFeatures={selectedFeatures} onChange={(f) => dispatch({ type: 'SET_FEATURES', payload: f })} loading={featureCatalogLoading} onGuide={() => navigate('/admin/training-datasets')} />
+                      </>
+                    )}
                     {currentStep === 1 && <TrainingTargetConfig target={target} timePeriods={timePeriods} onTargetChange={(t) => dispatch({ type: 'SET_TARGET', payload: t })} onTimeChange={(k, v) => dispatch({ type: 'SET_TIME', key: k, value: v })} dataCoverage={dataCoverage} factorFilter={factorFilter} onFactorFilterChange={setFactorFilter} />}
                     {currentStep === 2 && <ParameterConfig params={params} context={context} onParamsChange={(p) => dispatch({ type: 'SET_PARAMS', payload: p })} onContextChange={(c) => dispatch({ type: 'SET_CONTEXT', payload: c })} displayName={displayName} onDisplayNameChange={(n, m) => dispatch({ type: 'SET_DISPLAY_NAME', payload: { name: n, mode: m } })} autoDisplayName={autoDisplayName} market={currentMarket} target={target} onTargetChange={(t) => dispatch({ type: 'SET_TARGET', payload: t })} wfa={wfaConfig} onWfaChange={(w) => dispatch({ type: 'SET_WFA', payload: w })} />}
                     {currentStep === 3 && <TrainingConsole trainingStatus={trainingStatus} executionStage={executionStage} progress={progress} logs={logs} backendRunStatus={backendRunStatus} result={result} requestPreview={requestPreview} totalDays={totalDays} trainDays={trainDays} valDays={valDays} testDays={testDays} target={target} factorFilter={factorFilter} onGoToResult={() => setCurrentStep(4)} />}
@@ -912,6 +1063,17 @@ export const ModelTrainingPage: React.FC = () => {
           </div>
         )}
       </Modal>
+      <StockPoolPickerModal
+        open={poolPickerOpen}
+        onClose={() => setPoolPickerOpen(false)}
+        selectedPoolId={formState.poolId}
+        market={currentMarket === 'CN' ? 'CN' : undefined}
+        title="训练股票池"
+        onSelect={(pool: StockPoolOption) => {
+          dispatch({ type: 'SET_POOL', payload: { ref: `pool:${pool.code}`, name: pool.name, id: pool.pool_id } });
+          setPoolPickerOpen(false);
+        }}
+      />
     </div>
   );
 };

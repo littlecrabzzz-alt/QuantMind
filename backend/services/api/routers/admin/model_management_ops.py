@@ -62,13 +62,13 @@ def _model_data_context(model_dir: Path) -> tuple[Path, dict[str, Any]]:
     except (OSError, ValueError, TypeError):
         meta = {}
     if str(meta.get("data_source") or "").lower() == "quantdb_factors":
-        # 与 script_runner._resolve_quantdb_data_dir 保持一致：
-        # QUANTDB_DATA_DIR → QM_QUANTDB_DATA_DIR → hub 统一解析。
-        # 仅读 QUANTDB_DATA_DIR 会在容器内落到不存在的默认 /app/data/quantdb，
-        # 导致回测日期发现/交易日期列表拿不到数据。
+        # 按模型 context.market 解析因子根目录（CN→quantdb，HK→quanthk …），
+        # 不再固定落到 A 股 QUANTDB_DATA_DIR。
         try:
-            from backend.services.engine.inference.script_runner import _resolve_quantdb_data_dir
-            return Path(_resolve_quantdb_data_dir()), meta
+            from backend.services.engine.inference.script_runner import (
+                _resolve_market_factor_data_dir,
+            )
+            return Path(_resolve_market_factor_data_dir(meta)), meta
         except Exception:  # pragma: no cover - 兜底
             return Path(os.getenv("QUANTDB_DATA_DIR", "/app/data/quantdb")), meta
     return Path(os.getcwd()) / "db" / "feature_snapshots", meta
@@ -241,7 +241,8 @@ async def update_feature_catalog(
     if not isinstance(categories, list):
         raise HTTPException(status_code=400, detail="categories must be a list")
 
-    # 计算总特征数
+    valid_markets = {"CN", "HK", "US", "CRYPTO", "FUTURES", "CUSTOM"}
+    # 计算总特征数 + 归一化 explanation/markets
     total_features = 0
     for cat in categories:
         features = cat.get("features", [])
@@ -250,6 +251,23 @@ async def update_feature_catalog(
                 status_code=400,
                 detail=f"Category '{cat.get('id')}' features must be a list",
             )
+        for feat in features:
+            if not isinstance(feat, dict):
+                continue
+            expl = str(feat.get("explanation") or feat.get("detail") or "")
+            if len(expl) > 500:
+                raise HTTPException(status_code=400, detail=f"Feature '{feat.get('key')}' explanation 超过500字")
+            feat["explanation"] = expl
+            markets = feat.get("markets")
+            if isinstance(markets, list):
+                cleaned = [str(m).upper() for m in markets if str(m).strip()]
+                unknown = [m for m in cleaned if m not in valid_markets]
+                if unknown:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Feature '{feat.get('key')}' 含非法市场: {','.join(unknown)}",
+                    )
+                feat["markets"] = cleaned
         cat["feature_count"] = len(features)
         total_features += len(features)
     catalog["feature_count"] = total_features
@@ -438,7 +456,7 @@ async def update_market_features(
 
 @router.post(
     "/sync-stock-daily-full",
-    summary="日常全量同步：从本地 parquet 补齐 stock_daily_latest 所有列（含 is_st/指数成分/技术指标等）",
+    summary="日常全量同步：从 QuantDB 补齐 stock_daily_latest 可同步列（features_daily 技术/估值 + 未复权K线 + roe/行业）",
 )
 async def sync_stock_daily_full(
     max_days: int = Query(
@@ -447,8 +465,9 @@ async def sync_stock_daily_full(
     current_user: dict = Depends(require_admin),
 ):
     """
-    从 /app/db/custom/fundamental_aligned.parquet 全量同步所有列到 stock_daily_latest。
-    包含 is_st、idx_hs300、idx_zz1000、idx_margin、各类技术指标、概念标签等。
+    从 QuantDB (features_daily + 未复权K线 + 3_financial_data/roe + instrument_detail/行业)
+    全量同步 stock_daily_latest 中 QuantDB 能提供的列。
+    注：QuantDB 目前不产 is_st/idx_*/concept_*/涨停统计 等列，这些列不参与同步。
     """
     _ = current_user
 
@@ -907,95 +926,6 @@ async def run_model_backtest(
     return result
 
 
-class MultiHorizonBacktestRequest(BaseModel):
-    model_id: str = Field(..., description="模型ID（目录名）")
-    start_date: str = Field(..., description="回测起始日期 YYYY-MM-DD")
-    end_date: str = Field(..., description="回测结束日期 YYYY-MM-DD")
-    horizons: list[int] = Field(default=[1, 5, 10, 20], description="预测周期列表")
-    sample_interval: int = Field(default=3, description="每隔 N 个交易日采样一次")
-    cost: TradingCostParams | None = Field(default=None, description="交易成本覆盖参数")
-    exclude_limit_moves: bool = Field(
-        default=True, description="剔除信号日触及涨跌停的标的"
-    )
-    model_config = {"protected_namespaces": ()}
-
-
-@router.post("/backtest/multi-horizon", summary="多周期对比回测")
-async def run_multi_horizon_backtest(
-    request: MultiHorizonBacktestRequest,
-    current_user: dict = Depends(require_admin),
-):
-    """对同一模型在多个预测周期（T+1, T+5, T+10, T+20）上进行回测比较。"""
-    import asyncio
-
-    from backend.services.engine.inference.backtest_service import BacktestService
-    from backend.services.engine.inference.data_loader import get_available_dates
-
-    model_id = request.model_id
-    model_dir = None
-
-    user_models_root = Path(MODELS_ROOT) / "users"
-    for d in user_models_root.rglob(model_id):
-        if (d / "metadata.json").exists():
-            model_dir = d
-            break
-
-    if model_dir is None:
-        prod_dir = Path(MODELS_PRODUCTION)
-        for d in prod_dir.rglob(model_id):
-            if (d / "metadata.json").exists():
-                model_dir = d
-                break
-
-    if model_dir is None:
-        raise HTTPException(status_code=404, detail=f"模型 {model_id} 未找到")
-
-    data_dir, model_meta = _model_data_context(model_dir)
-    available_dates = get_available_dates(
-        data_dir=data_dir,
-        start_date=request.start_date,
-        end_date=request.end_date,
-        meta=model_meta,
-    )
-
-    if not available_dates:
-        raise HTTPException(
-            status_code=400,
-            detail=f"日期范围 {request.start_date} ~ {request.end_date} 内无可用数据",
-        )
-
-    interval = max(1, request.sample_interval)
-    sampled_dates = available_dates[::interval]
-    if available_dates[-1] not in sampled_dates:
-        sampled_dates.append(available_dates[-1])
-
-    if len(sampled_dates) < 2:
-        raise HTTPException(
-            status_code=400,
-            detail=f"采样后日期不足（仅 {len(sampled_dates)} 天）",
-        )
-
-    try:
-        backtest_service = BacktestService()
-        result = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: backtest_service.run_multi_horizon_backtest(
-                model_id=model_id,
-                dates=sampled_dates,
-                horizons=request.horizons,
-                model_dir=model_dir,
-                data_dir=data_dir,
-                sample_interval=interval,
-                cost_override=request.cost.to_override() if request.cost else None,
-                exclude_limit_moves=request.exclude_limit_moves,
-            ),
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"多周期回测失败: {e}")
-
-    return result
-
-
 @router.get("/backtest/trading-dates", summary="获取可用回测日期列表")
 async def get_backtest_trading_dates(
     model_id: str = Query(..., description="模型ID，用于选择其绑定的数据源"),
@@ -1124,232 +1054,3 @@ async def delete_backtest_history(
     if not deleted:
         raise HTTPException(status_code=404, detail=f"回测记录 {run_id} 未找到")
     return {"status": "ok", "deleted": run_id}
-
-
-class InferenceBacktestStrategyParams(BaseModel):
-    """选股策略参数（默认值 = 平衡型）。"""
-
-    entry_threshold: float = Field(default=0.09, description="行业avgTop1入场线")
-    exit_threshold: float = Field(default=0.06, description="行业avgTop1空仓线")
-    strong_industry_min: int = Field(default=2, description="强行业数下限")
-    score_min: float = Field(default=0.10, description="个股分数下限")
-    score_max: float = Field(default=0.12, description="个股分数上限")
-    max_hold_days: int = Field(default=5, description="最长持有交易日")
-    take_profit: float = Field(default=0.08, description="止盈比例")
-    stop_loss: float = Field(default=0.05, description="止损比例")
-    max_positions: int = Field(default=5, description="最大持仓数")
-    daily_select_max: int = Field(default=5, description="每日新选股上限")
-    initial_capital: float = Field(default=100_000.0, description="初始资金")
-    main_board_only: bool = Field(default=True, description="仅主板")
-    exclude_limit_moves: bool = Field(default=True, description="剔除涨跌停")
-    exclude_st: bool = Field(default=True, description="剔除ST")
-    use_index_ma20_filter: bool = Field(default=True, description="大盘MA20过滤")
-
-
-class InferenceBacktestRequest(BaseModel):
-    model_id: str = Field(..., description="模型ID")
-    start_date: str = Field(..., description="回测起始日期 YYYY-MM-DD")
-    end_date: str = Field(..., description="回测结束日期 YYYY-MM-DD")
-    signal_mode: str = Field(
-        default="realtime", description="realtime=逐日推理 | stored=读已有信号"
-    )
-    strategy: InferenceBacktestStrategyParams = Field(
-        default_factory=InferenceBacktestStrategyParams
-    )
-    model_config = {"protected_namespaces": ()}
-
-
-@router.post("/inference-backtest", summary="推理回测（选股策略事件驱动）")
-async def run_inference_backtest(
-    request: InferenceBacktestRequest,
-    current_user: dict = Depends(require_admin),
-):
-    """
-    基于推理信号 + 选股策略的事件驱动回测。
-
-    signal_mode=stored: 直接读 engine_signal_scores 已有推理信号（快，覆盖有限）。
-    signal_mode=realtime: 逐日跑模型推理生成信号（慢，覆盖任意区间）。
-    """
-    from backend.services.engine.inference.inference_backtest_service import (
-        StrategyConfig,
-        run_inference_backtest,
-    )
-
-    # 构建策略配置
-    s = request.strategy
-    config = StrategyConfig(
-        entry_threshold=s.entry_threshold,
-        exit_threshold=s.exit_threshold,
-        strong_industry_min=s.strong_industry_min,
-        score_min=s.score_min,
-        score_max=s.score_max,
-        max_hold_days=s.max_hold_days,
-        take_profit=s.take_profit,
-        stop_loss=s.stop_loss,
-        max_positions=s.max_positions,
-        daily_select_max=s.daily_select_max,
-        initial_capital=s.initial_capital,
-        main_board_only=s.main_board_only,
-        exclude_limit_moves=s.exclude_limit_moves,
-        exclude_st=s.exclude_st,
-        use_index_ma20_filter=s.use_index_ma20_filter,
-        signal_mode=request.signal_mode,
-    )
-
-    model_dir = next(
-        (Path(d) for d in _find_model_directories(MODELS_ROOT) if Path(d).name == request.model_id),
-        None,
-    )
-    if model_dir is None:
-        raise HTTPException(status_code=404, detail=f"模型 {request.model_id} 未找到")
-    data_dir, model_meta = _model_data_context(model_dir)
-
-    # 信号提供者：stored 模式读 engine_signal_scores
-    signal_provider = None
-    if request.signal_mode == "stored":
-        signal_provider = _make_stored_signal_provider(request.model_id)
-
-    try:
-        import asyncio
-
-        result = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: run_inference_backtest(
-                model_id=request.model_id,
-                start_date=request.start_date,
-                end_date=request.end_date,
-                data_dir=data_dir,
-                model_meta=model_meta,
-                config=config,
-                signal_provider=signal_provider,
-            ),
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"推理回测执行失败: {exc}") from exc
-
-    if result.status == "error":
-        raise HTTPException(
-            status_code=400,
-            detail=str(
-                result.errors[0].get("error") if result.errors else "推理回测失败"
-            ),
-        )
-
-    return _serialize_backtest_result(result)
-
-
-def _make_stored_signal_provider(model_id: str):
-    """stored 模式信号提供者：从 engine_signal_scores 读该模型的已有推理信号。
-
-    一次性预取全部信号到内存 dict（按 trade_date 索引），provider 只查内存。
-    用 psycopg2 同步连接读取，避免在 FastAPI async 事件循环里调用 asyncio.run()
-    （会导致 RuntimeError: asyncio.run() cannot be called from a running event loop）。
-    """
-    import os
-
-    import psycopg2
-
-    conn_params = {
-        "host": os.getenv("DB_HOST", "db"),
-        "port": int(os.getenv("DB_PORT", "5432")),
-        "dbname": os.getenv("DB_NAME", "quantmind"),
-        "user": os.getenv("DB_USER", "quantmind"),
-        "password": os.getenv("DB_PASSWORD", ""),
-    }
-
-    by_date: dict[str, list[dict[str, Any]]] = {}
-    try:
-        conn = psycopg2.connect(**conn_params)
-        try:
-            cur = conn.cursor()
-            cur.execute(
-                """
-                SELECT e.trade_date::text, e.symbol, e.fusion_score AS score
-                FROM engine_signal_scores e
-                JOIN qm_model_inference_runs r ON e.run_id = r.run_id
-                WHERE r.model_id = %s
-                ORDER BY e.trade_date, e.fusion_score DESC
-                """,
-                (model_id,),
-            )
-            for trade_date, symbol, score in cur.fetchall():
-                if score is None:
-                    continue
-                by_date.setdefault(trade_date, []).append(
-                    {"symbol": str(symbol), "score": float(score)}
-                )
-            cur.close()
-        finally:
-            conn.close()
-    except Exception as exc:
-        logger = __import__("logging").getLogger(__name__)
-        logger.warning("预取推理信号失败 (model=%s): %s", model_id, exc)
-
-    def provider(trade_date: str):
-        import pandas as pd
-
-        records = by_date.get(trade_date, [])
-        return pd.DataFrame(records)
-
-    return provider
-
-
-def _serialize_backtest_result(result: Any) -> dict[str, Any]:
-    """序列化回测结果（dataclass → dict，处理 numpy 标量）。"""
-    import numpy as np
-
-    def _clean(v: Any) -> Any:
-        if isinstance(v, (np.floating, np.integer)):
-            return v.item()
-        if isinstance(v, float):
-            return round(v, 6)
-        if isinstance(v, dict):
-            return {k: _clean(val) for k, val in v.items()}
-        if isinstance(v, list):
-            return [_clean(x) for x in v]
-        return v
-
-    return {
-        "status": result.status,
-        "metrics": _clean(result.metrics),
-        "daily_selections": [
-            {
-                "trade_date": ds.trade_date,
-                "market_state": ds.market_state,
-                "industry_avg_top1": round(float(ds.industry_avg_top1), 6),
-                "strong_industry_count": ds.strong_industry_count,
-                "index_above_ma20": ds.index_above_ma20,
-                "selections": [
-                    {
-                        "symbol": p["symbol"],
-                        "score": round(float(p["score"]), 6),
-                        "industry": p["industry"],
-                    }
-                    for p in ds.selections
-                ],
-            }
-            for ds in result.daily_selections
-        ],
-        "trades": [
-            {
-                "date": t.date,
-                "symbol": t.symbol,
-                "name": t.name,
-                "side": t.side,
-                "price": round(float(t.price), 4),
-                "shares": t.shares,
-                "amount": round(float(t.amount), 2),
-                "industry": t.industry,
-                "score": round(float(t.score), 6),
-                "reason": t.reason,
-                "profit_pct": round(float(t.profit_pct), 6),
-                "hold_days": t.hold_days,
-            }
-            for t in result.trades
-        ],
-        "nav_curve": _clean(result.nav_curve),
-        "monthly_returns": _clean(result.monthly_returns),
-        "industry_rotation": result.industry_rotation,
-        "errors": result.errors,
-        "warnings": result.warnings,
-    }

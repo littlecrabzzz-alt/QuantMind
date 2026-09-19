@@ -57,7 +57,7 @@ def test_admin_training_utils_no_naive_datetime():
     fp = ROOT / "backend/services/api/routers/admin/admin_training_utils.py"
     content = fp.read_text(encoding="utf-8")
     assert "datetime.utcnow()" not in content, (
-        f"admin_training_utils.py still contains datetime.utcnow()"
+        "admin_training_utils.py still contains datetime.utcnow()"
     )
     for ln, line in enumerate(content.splitlines(), start=1):
         if "datetime.now()" in line and "timezone" not in line:
@@ -147,7 +147,7 @@ def test_submit_training_job_run_id_uses_utc_clock():
             dt_mock.now.side_effect = lambda tz=None: fixed_now
             dt_mock.timezone = timezone
             # 直接调 datetime.now(UTC) 看是否得 05:00
-            got = datetime.now(timezone.utc)
+            got = mod.datetime.now(timezone.utc)
             formatted = got.strftime("%Y%m%d%H%M%S")
             # UTC 5:00 → 20260810050000（naive 写法在 TZ=Shanghai 下会得 20260810130000）
             assert formatted == "20260810050000", (
@@ -164,7 +164,7 @@ def test_local_docker_orchestrator_no_naive_datetime():
     fp = ROOT / "backend/services/engine/training/local_docker_orchestrator.py"
     content = fp.read_text(encoding="utf-8")
     assert "datetime.utcnow()" not in content, (
-        f"local_docker_orchestrator.py still contains datetime.utcnow()"
+        "local_docker_orchestrator.py still contains datetime.utcnow()"
     )
     for ln, line in enumerate(content.splitlines(), start=1):
         if "datetime.now()" in line and "timezone" not in line:

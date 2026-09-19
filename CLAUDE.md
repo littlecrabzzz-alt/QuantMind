@@ -65,7 +65,10 @@ npm run dashboard:build  # 生产环境构建
 - **交易服务**：外部报单前强制「本地优先」落库持久化
 - **Redis 库分配**：0=通用，1=认证，2=交易，3=行情，4=回测，5=缓存
 - **共享模块**：`backend/shared/` 存放跨服务代码（DB 管理器、Redis 客户端、配置、日志）
+- **瞬时时间（成交/委托）**：`sim_trades.executed_at` 等瞬时列一律 `TIMESTAMPTZ` + aware UTC。写入走 `backend/shared/utc_datetime.py` 的 `utc_now()` / `UtcDateTime`，JSON 输出带 `Z`。禁止 naive UTC 与上海墙钟混用。存量库由 `data/upgrade_v1.0.7.sql` 对齐。
 - **策略存储**：`backend/shared/strategy_storage.py` 是所有策略增删改查的唯一入口
+- **Celery worker 必须唯一**：`SERVICE_MODE=all` 下 `main_oss.py` 默认**不启动**内嵌 worker（需 `EMBEDDED_CELERY_WORKER=true`），消费队列的只有 `celery-worker` 容器。重复 worker 会瓜分 `qlib_backtest_srv` 队列消息，表现为定时任务随机「不执行」；排查看 `redis-cli client list | grep cmd=brpop` 应只有 1 个。
+- **市场数据同步不内置默认调度**：是否开启、何时触发一律以用户在前端「同步调度」保存的 Redis 配置为准（`quantmind:sync_schedule:{market}`），未配置时 5 个市场全部 `enabled=false`；`MARKET_SUGGESTED_TIMES` 只是前端时间预填建议值（次日 00:00 以后错峰），不参与触发。详见 `backend/services/engine/README.md` →「定时调度与市场数据同步」。
 - **Alpha Agent**：`backend/services/engine/alpha_agent/` - 因子演化启动器，经 RD-Agent 支持多市场
 - **RD-Agent 集成**：`backend/services/engine/rd_agent/` - 封装微软 RD-Agent 的多市场因子挖掘框架
   - `market_adapters/` - MarketAdapter 模式：a_share（A股）、crypto（区块链）、hong_kong（港股）、us_stock（美股）
@@ -88,13 +91,13 @@ npm run dashboard:build  # 生产环境构建
   - `update_feature_parquet.py` - 151 维特征计算（动量/波动率/流动性/资金流/风格）
 - **新闻/RSS**：Huntly + RSSHub 聚合财经新闻，经 API 服务代理访问
 
-## 股票代码标准化
+## 股票代码标准化（分层口径，禁止跨层混用）
 
-- **标准格式**：前缀式（如 `SH600036`），用于内部存储、Redis 键与 API 参数
-- **禁止引入** `600036.SH` 这类后缀式标识
+- **QuantDB parquet / Qlib / 行情数据层**：后缀式（如 `600036.SH`，Qlib 桥接用全小写 `sh600036`），否则静默查空
+- **PG 数据库字段 / Redis 键 / 前端 / Strategy Lab SDK / 大多数 API**：前缀式（如 `SH600036`）
 - **标准化工具**：
-  - 后端：`backend/shared/stock_utils.py` → `StockCodeUtil.to_prefix(code)`
-  - 前端：`electron/src/utils/portfolioUtils.ts` → `normalizeStockCode(code)`
+  - 后端：`backend/shared/stock_utils.py` → `StockCodeUtil.to_suffix(code)` / `.to_prefix(code)` / `.to_qlib(code)`
+  - 前端：`electron/src/utils/portfolioUtils.ts` → `normalizeStockCode(code)`（输出前缀式）
 - **市场自动识别**：
   - `SH`：6xxxxx、9xxxxx
   - `SZ`：0xxxxx、3xxxxx、2xxxxx

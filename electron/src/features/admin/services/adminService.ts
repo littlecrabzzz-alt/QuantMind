@@ -14,13 +14,23 @@ import {
     AdminDataStatusResult,
     StrategyTemplateAdmin,
     StrategyTemplateUpsertRequest,
+    RiskRuleAdmin,
+    RiskRuleUpsertRequest,
+    RiskEventAdmin,
+    RiskDryRunItem,
+    AdminOrderHistoryItem,
+    AdminPlannedOrderItem,
+    AdminInferenceMonitor,
 } from '../types';
 import { authService } from '../../auth/services/authService';
-import { SERVICE_ENDPOINTS } from '../../../config/services';
+import { SERVICE_ENDPOINTS, resolveWebSafeServiceBase } from '../../../config/services';
 
 class AdminService {
     private axiosInstance: AxiosInstance;
-    private readonly baseURL = (import.meta as any).env?.VITE_USER_API_URL || SERVICE_ENDPOINTS.USER_SERVICE;
+    private readonly baseURL = resolveWebSafeServiceBase(
+        (import.meta as any).env?.VITE_USER_API_URL,
+        SERVICE_ENDPOINTS.USER_SERVICE,
+    );
     private metrics401Locked = false;
 
     constructor() {
@@ -198,8 +208,10 @@ class AdminService {
         return resp.data;
     }
 
-    async getModelFeatureCatalog(): Promise<AdminModelFeatureCatalog> {
-        const resp = await this.axiosInstance.get<AdminModelFeatureCatalog>('/admin/models/feature-catalog');
+    async getModelFeatureCatalog(market?: string): Promise<AdminModelFeatureCatalog> {
+        const resp = await this.axiosInstance.get<AdminModelFeatureCatalog>('/admin/models/feature-catalog', {
+            params: market ? { market } : {},
+        });
         return resp.data;
     }
 
@@ -587,6 +599,94 @@ class AdminService {
         log_tail?: string;
     }> {
         const resp = await this.axiosInstance.get('/admin/system/update/status', { timeout: 15000 });
+        return this.unwrap(resp.data);
+    }
+
+    // FinBERT 开关（独立控制按键）
+    async getFinbertStatus(): Promise<{
+        enabled: boolean;
+        device: number;
+        model: string;
+        installed?: boolean;
+        framework_ok?: boolean;
+        ready_for_use?: boolean;
+        env_enabled?: boolean;
+        model_ready: boolean;
+        model_failed: boolean;
+        override?: boolean | null;
+        toggle_path?: string;
+    }> {
+        const resp = await this.axiosInstance.get('/admin/finbert/status');
+        return resp.data?.data ?? resp.data;
+    }
+    async setFinbertEnabled(enabled: boolean): Promise<{ enabled: boolean; model_ready: boolean }> {
+        const resp = await this.axiosInstance.post('/admin/finbert/toggle', { enabled });
+        return resp.data?.data ?? resp.data;
+    }
+
+    async listRiskRules(activeOnly = false): Promise<RiskRuleAdmin[]> {
+        const resp = await this.axiosInstance.get('/admin/risk-rules', {
+            params: { active_only: activeOnly },
+        });
+        return this.unwrap(resp.data);
+    }
+
+    async createRiskRule(payload: RiskRuleUpsertRequest): Promise<RiskRuleAdmin> {
+        const resp = await this.axiosInstance.post('/admin/risk-rules', payload);
+        return this.unwrap(resp.data);
+    }
+
+    async updateRiskRule(ruleId: number, payload: Partial<RiskRuleUpsertRequest>): Promise<RiskRuleAdmin> {
+        const resp = await this.axiosInstance.patch(`/admin/risk-rules/${ruleId}`, payload);
+        return this.unwrap(resp.data);
+    }
+
+    async deleteRiskRule(ruleId: number): Promise<void> {
+        await this.axiosInstance.delete(`/admin/risk-rules/${ruleId}`);
+    }
+
+    async listRiskEvents(params?: {
+        user_id?: number;
+        rule_type?: string;
+        trade_date?: string;
+        status?: string;
+        limit?: number;
+    }): Promise<RiskEventAdmin[]> {
+        const resp = await this.axiosInstance.get('/admin/risk-events', { params });
+        return this.unwrap(resp.data);
+    }
+
+    async dryRunRiskRule(
+        ruleId: number,
+        payload: { user_id: number; tenant_id?: string; market?: string },
+    ): Promise<RiskDryRunItem[]> {
+        const resp = await this.axiosInstance.post(`/admin/risk-rules/${ruleId}/dry-run`, payload);
+        return this.unwrap(resp.data);
+    }
+
+    async listAutoOrderHistory(params?: {
+        mode?: string;
+        source?: string;
+        user_id?: string;
+        symbol?: string;
+        limit?: number;
+    }): Promise<AdminOrderHistoryItem[]> {
+        const resp = await this.axiosInstance.get('/admin/orders/history', { params });
+        return this.unwrap(resp.data);
+    }
+
+    async listPlannedOrders(): Promise<AdminPlannedOrderItem[]> {
+        const resp = await this.axiosInstance.get('/admin/orders/planned');
+        return this.unwrap(resp.data);
+    }
+
+    async getInferenceMonitor(params?: {
+        status?: string;
+        user_id?: string;
+        model_id?: string;
+        limit?: number;
+    }): Promise<AdminInferenceMonitor> {
+        const resp = await this.axiosInstance.get('/admin/inference/monitor', { params });
         return this.unwrap(resp.data);
     }
 }

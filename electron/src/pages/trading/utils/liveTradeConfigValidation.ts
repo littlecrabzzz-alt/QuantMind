@@ -1,12 +1,58 @@
-import type { LiveTradeConfig } from '../../../types/liveTrading';
+import type { LiveTradeConfig, TradingSession } from '../../../types/liveTrading';
 
 export interface ValidationIssue {
   field: string;
   message: string;
 }
 
+export const SESSION_RANGES: Record<TradingSession, [string, string]> = {
+  AM: ['09:30', '11:30'],
+  PM: ['13:00', '15:00'],
+};
+
+function toHhmm(value: string): string {
+  return value.length >= 5 ? value.slice(0, 5) : value;
+}
+
 function isTimeInRange(value: string, start: string, end: string) {
-  return value >= start && value <= end;
+  const hhmm = toHhmm(value);
+  return hhmm >= start && hhmm <= end;
+}
+
+/** 根据时点推断所属交易时段（可能为空，例如 12:00 午休）。 */
+export function sessionsForTime(time: string): TradingSession[] {
+  const hhmm = toHhmm(time);
+  const matched: TradingSession[] = [];
+  (Object.keys(SESSION_RANGES) as TradingSession[]).forEach((session) => {
+    const [start, end] = SESSION_RANGES[session];
+    if (isTimeInRange(hhmm, start, end)) matched.push(session);
+  });
+  return matched;
+}
+
+/**
+ * 改买卖时点后，保证 enabled_sessions 覆盖这些时点。
+ * 若当前时段已覆盖则保持原选；否则改为时点所属时段（午休等无法归属时保留原选）。
+ */
+export function syncSessionsToTimes(
+  current: TradingSession[],
+  sellTime: string,
+  buyTime: string,
+): TradingSession[] {
+  const sellOk = current.some((s) => {
+    const [start, end] = SESSION_RANGES[s];
+    return isTimeInRange(sellTime, start, end);
+  });
+  const buyOk = current.some((s) => {
+    const [start, end] = SESSION_RANGES[s];
+    return isTimeInRange(buyTime, start, end);
+  });
+  if (sellOk && buyOk) return current;
+
+  const needed = Array.from(
+    new Set([...sessionsForTime(sellTime), ...sessionsForTime(buyTime)]),
+  ) as TradingSession[];
+  return needed.length > 0 ? needed : current;
 }
 
 export function validateLiveTradeConfig(config: LiveTradeConfig): ValidationIssue[] {
@@ -28,7 +74,7 @@ export function validateLiveTradeConfig(config: LiveTradeConfig): ValidationIssu
     issues.push({ field: 'buy_time', message: '请选择买入时间' });
   }
 
-  if (config.sell_time && config.buy_time && config.sell_time >= config.buy_time) {
+  if (config.sell_time && config.buy_time && toHhmm(config.sell_time) >= toHhmm(config.buy_time)) {
     issues.push({ field: 'buy_time', message: '买入时间必须晚于卖出时间' });
   }
 
@@ -37,39 +83,60 @@ export function validateLiveTradeConfig(config: LiveTradeConfig): ValidationIssu
     issues.push({ field: 'enabled_sessions', message: '至少选择一个执行时段' });
   }
 
-  const sessionRanges = {
-    AM: ['00:00', '23:59'],
-    PM: ['00:00', '23:59'],
-  } as const;
-
   if (config.sell_time) {
     const sellValid = enabledSessions.some((session) => {
-      const [start, end] = sessionRanges[session];
+      const [start, end] = SESSION_RANGES[session];
       return isTimeInRange(config.sell_time, start, end);
     });
     if (!sellValid) {
-      issues.push({ field: 'sell_time', message: '卖出时间必须落在已选执行时段内' });
+      const labels = enabledSessions
+        .map((s) => `${s} ${SESSION_RANGES[s][0]}–${SESSION_RANGES[s][1]}`)
+        .join(' / ');
+      issues.push({
+        field: 'sell_time',
+        message: `卖出时间 ${toHhmm(config.sell_time)} 不在已选执行时段（${labels || '未选'}）内，请勾选「下午」或改回上午时点`,
+      });
     }
   }
 
   if (config.buy_time) {
     const buyValid = enabledSessions.some((session) => {
-      const [start, end] = sessionRanges[session];
+      const [start, end] = SESSION_RANGES[session];
       return isTimeInRange(config.buy_time, start, end);
     });
     if (!buyValid) {
-      issues.push({ field: 'buy_time', message: '买入时间必须落在已选执行时段内' });
+      const labels = enabledSessions
+        .map((s) => `${s} ${SESSION_RANGES[s][0]}–${SESSION_RANGES[s][1]}`)
+        .join(' / ');
+      issues.push({
+        field: 'buy_time',
+        message: `买入时间 ${toHhmm(config.buy_time)} 不在已选执行时段（${labels || '未选'}）内，请勾选「下午」或改回上午时点`,
+      });
     }
   }
 
-  if (config.order_type === 'LIMIT' && (config.max_price_deviation == null || config.max_price_deviation < 0 || config.max_price_deviation > 0.05)) {
-    issues.push({ field: 'max_price_deviation', message: '限价单的价格偏离容忍必须在 0% 到 5% 之间' });
+  if (
+    config.order_type === 'LIMIT' &&
+    (config.max_price_deviation == null ||
+      config.max_price_deviation < 0 ||
+      config.max_price_deviation > 0.05)
+  ) {
+    issues.push({
+      field: 'max_price_deviation',
+      message: '限价单的价格偏离容忍必须在 0% 到 5% 之间',
+    });
   }
 
-  if (!config.max_orders_per_cycle || config.max_orders_per_cycle < 1 || config.max_orders_per_cycle > 100) {
-    issues.push({ field: 'max_orders_per_cycle', message: '单轮最大委托数必须在 1 到 100 之间' });
+  if (
+    !config.max_orders_per_cycle ||
+    config.max_orders_per_cycle < 1 ||
+    config.max_orders_per_cycle > 100
+  ) {
+    issues.push({
+      field: 'max_orders_per_cycle',
+      message: '单轮最大委托数必须在 1 到 100 之间',
+    });
   }
 
   return issues;
 }
-

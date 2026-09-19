@@ -66,6 +66,16 @@ export const normalizeStockCode = (raw: string): string => {
 };
 
 /**
+ * 前缀式转后缀式（SH600519 -> 600519.SH），供行情/终端等后缀口径组件使用。
+ * 非标准代码原样返回。
+ */
+export const toSuffixCode = (raw: string): string => {
+    const s = normalizeStockCode(raw);
+    const m = s.match(/^(SH|SZ|BJ)(\d{6})$/);
+    return m ? `${m[2]}.${m[1]}` : s;
+};
+
+/**
  * 解析股票代码
  */
 export const resolveCode = (entryKey: string | null, pos: RawPosition): string => {
@@ -78,12 +88,13 @@ export const resolveCode = (entryKey: string | null, pos: RawPosition): string =
         key,
     ];
     for (const candidate of candidates) {
-        const text = String(candidate || '').trim();
+        // 持仓键可能带方向后缀（如 SH600036::long / ::short），先剥离再归一化
+        const text = String(candidate || '').trim().split('::')[0].trim();
         if (!text) continue;
         if (text === '0' && String(pos.symbol || '').trim()) continue;
         return normalizeStockCode(text);
     }
-    return normalizeStockCode(key) || '--';
+    return normalizeStockCode(key.split('::')[0]) || '--';
 };
 
 /**

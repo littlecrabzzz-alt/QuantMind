@@ -95,7 +95,11 @@ def _resolve_quantdb_data_dir() -> str:
 
 
 def _resolve_market_factor_data_dir(meta: dict) -> str:
-    """按模型 metadata.context.market 解析因子数据根目录（HK→quanthk 等）。"""
+    """按模型 metadata.context.market 解析因子数据根目录（HK→quanthk 等）。
+
+    始终返回目标市场路径，目录不存在时不回退到 A 股 QuantDB，
+    以便预检/推理对非 CN 模型给出正确失败路径。
+    """
     try:
         from backend.services.engine.data_platform.quantdb_factor_reader import (
             market_data_dir, normalize_market,
@@ -103,10 +107,79 @@ def _resolve_market_factor_data_dir(meta: dict) -> str:
         market = normalize_market(
             str((meta.get("context") or {}).get("market") or "CN")
         )
-        path = market_data_dir(market)
-        return str(path) if path.is_dir() else _resolve_quantdb_data_dir()
+        return str(market_data_dir(market))
     except Exception:  # noqa: BLE001
         return _resolve_quantdb_data_dir()
+
+
+def _load_close_price_map(trade_date: str) -> dict[str, float]:
+    """从 QuantDB 日线 parquet 一次加载当日收盘价。
+
+    返回 {纯数字代码: close}，与 engine_signal_scores.symbol 口径一致。
+    历史补全 / 批量推理均应走本地 parquet，禁止逐股打远程行情 Redis。
+    失败返回空 dict（expected_price 置空，不拖垮写库）。
+    """
+    try:
+        import pandas as pd
+
+        day = date.fromisoformat(str(trade_date)[:10])
+        dt = day.strftime("%Y%m%d")
+        base = Path(_resolve_quantdb_data_dir())
+        frame = None
+        # 交易参考价只使用不复权行情；缺失时保持未知
+        for sub in ("daily_unadjusted",):
+            part = base / "1_kline_data" / sub / f"dt={dt}"
+            if not part.is_dir():
+                continue
+            files = sorted(part.glob("*.parquet"))
+            if not files:
+                continue
+            chunks: list[Any] = []
+            for pf in files:
+                try:
+                    chunks.append(pd.read_parquet(pf, columns=["symbol", "close"]))
+                except Exception:
+                    try:
+                        chunk = pd.read_parquet(pf)
+                        if {"symbol", "close"}.issubset(chunk.columns):
+                            chunks.append(chunk[["symbol", "close"]])
+                    except Exception:
+                        continue
+            if chunks:
+                frame = pd.concat(chunks, ignore_index=True)
+                break
+        if frame is None or frame.empty:
+            return {}
+        out: dict[str, float] = {}
+        for raw_sym, close in zip(
+            frame["symbol"].astype(str), frame["close"], strict=False
+        ):
+            try:
+                px = float(close)
+            except (TypeError, ValueError):
+                continue
+            if not (px > 0) or px != px:  # NaN
+                continue
+            try:
+                prefix = StockCodeUtil.to_prefix(raw_sym)
+            except Exception:
+                prefix = str(raw_sym).strip().upper()
+            digits = re.sub(r"\D", "", prefix)
+            if digits:
+                out[digits] = px
+        logger.info(
+            "[InferenceScriptRunner] QuantDB 收盘价已加载: date=%s, n=%d",
+            str(trade_date)[:10],
+            len(out),
+        )
+        return out
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "[InferenceScriptRunner] QuantDB 收盘价加载失败"
+            "（expected_price 将为空）: %s",
+            exc,
+        )
+        return {}
 
 _PARQUET_TEMPLATE_MARKERS = (
     "QuantMind Parquet 数据源推理脚本 (inference.py 模板)",
@@ -143,13 +216,18 @@ class ExecutionResult:
     run_id: str = ""
     error: str = ""
     signals: list[dict] = field(default_factory=list)
-    fallback_used: bool = False  # True = alpha158 兜底脚本实际执行
+    fallback_used: bool = False  # True = 兜底模型脚本实际执行
     fallback_reason: str = ""  # 触发兜底的原因描述
     failure_stage: str = ""  # main_script/fallback_script/output_parse
     active_model_id: str = ""
     active_data_source: str = ""
     data_trade_date: str = ""
     prediction_trade_date: str = ""
+    # 由 InferenceRouterService 在执行后写入的执行元信息（此处声明默认值，
+    # 避免只在 router 链路赋值、直接读取时 AttributeError）
+    execution_mode: str = ""
+    model_switch_used: bool = False
+    model_switch_reason: str = ""
 
 
 class InferenceScriptRunner:
@@ -163,6 +241,9 @@ class InferenceScriptRunner:
     2. 兜底模型推理脚本（默认 inference.py）
        - exit 0 → 兜底成功，结果标记 fallback_used=True
        - 非 0   → 兜底失败，返回错误
+
+    注：系统内置 model_qlib/兜底模型已废弃，仅在显式配置
+    fallback_model_dir/fallback_model_id 时兜底才有意义。
     """
 
     # exit code 2: 数据质量不足，触发兜底
@@ -184,33 +265,28 @@ class InferenceScriptRunner:
     ):
         self.enable_fallback = enable_fallback
         # `models_production` 为历史兼容参数，等价于 primary_model_dir。
+        # 系统内置 model_qlib/alpha158 已废弃，不再有隐式默认模型。
         resolved_primary = (
             primary_model_dir
             or models_production
-            or os.getenv("MODELS_PRODUCTION", "/app/models/production/model_qlib")
+            or os.getenv("MODELS_PRODUCTION", "/app/models/production")
         )
         self.primary_model_dir = Path(resolved_primary)
         self.fallback_model_dir = Path(
             fallback_model_dir
-            or os.getenv(
-                "MODELS_FALLBACK_PRODUCTION", "/app/models/production/alpha158"
-            )
+            or os.getenv("MODELS_FALLBACK_PRODUCTION", "/app/models/production")
         )
         self.primary_data_dir = self._normalize_provider_uri(
             str(primary_data_dir or os.getenv("QLIB_PRIMARY_DATA_PATH", ""))
         )
         self.fallback_data_dir = self._normalize_provider_uri(
-            str(
-                fallback_data_dir
-                or os.getenv("QLIB_FALLBACK_DATA_PATH", "")
-            ),
-            prefer_alpha158=True,
+            str(fallback_data_dir or os.getenv("QLIB_FALLBACK_DATA_PATH", ""))
         )
         self.primary_model_id = str(
-            primary_model_id or os.getenv("PRIMARY_MODEL_ID", "model_qlib")
+            primary_model_id or os.getenv("PRIMARY_MODEL_ID", "")
         )
         self.fallback_model_id = str(
-            fallback_model_id or os.getenv("FALLBACK_MODEL_ID", "alpha158")
+            fallback_model_id or os.getenv("FALLBACK_MODEL_ID", "")
         )
         self.primary_script_name = str(
             primary_script_name or os.getenv("INFERENCE_PRIMARY_SCRIPT", "inference.py")
@@ -221,16 +297,13 @@ class InferenceScriptRunner:
         )
 
     @staticmethod
-    def _normalize_provider_uri(
-        provider_uri: str, *, prefer_alpha158: bool = False
-    ) -> str:
+    def _normalize_provider_uri(provider_uri: str) -> str:
         """
         规范化 Qlib provider uri，避免相对路径在子进程 cwd 下被错误解析。
 
         规则：
         1) 若能在候选路径中命中真实目录，返回该绝对路径；
-        2) 相对路径默认转换为 /app/<path>；
-        3) prefer_alpha158 时在候选列表头部追加 metadata 中的默认路径。
+        2) 相对路径默认转换为 /app/<path>。
         """
         raw = str(provider_uri or "").strip()
         if not raw:
@@ -719,6 +792,56 @@ class InferenceScriptRunner:
 
         return env
 
+    def _pool_filter_signals(
+        self,
+        signals: list[dict],
+        *,
+        pool_id: str | None,
+        tenant_id: str,
+        user_id: str,
+        run_id: str,
+    ) -> tuple[list[dict] | None, str | None]:
+        """按全局股票池裁剪信号。返回 (kept, error_reason)：
+
+        - 未指定池 → (signals, None)，不做任何过滤；
+        - 池为空或零命中 → (None, 原因)，调用方须显式失败，
+          **绝不静默退化为全市场**（与「单股补推」的宽松兜底刻意不同）。
+        """
+        if not pool_id:
+            return signals, None
+
+        from backend.shared.stock_pool.filters import filter_signals_by_pool
+        from backend.shared.stock_pool.resolver import (
+            ResolveContext,
+            resolver as pool_resolver,
+        )
+
+        snapshot = pool_resolver.resolve_sync(
+            pool_id,
+            ResolveContext(tenant_id=tenant_id, user_id=user_id),
+            strict=True,
+        )
+        outcome = filter_signals_by_pool(signals, snapshot)
+        if outcome.empty_pool or outcome.empty_result:
+            reason = "; ".join(outcome.warnings) or "池过滤后无信号"
+            logger.error(
+                "[InferenceScriptRunner] 池过滤失败 pool_id=%s run_id=%s: %s",
+                pool_id,
+                run_id,
+                reason,
+            )
+            return None, reason
+        logger.info(
+            "[InferenceScriptRunner] 池过滤: kept=%d dropped=%d pool_id=%s "
+            "checksum=%s run_id=%s",
+            len(outcome.kept),
+            outcome.dropped,
+            outcome.pool_id,
+            outcome.pool_checksum,
+            run_id,
+        )
+        return outcome.kept, None
+
     def _execute_fallback(
         self,
         date: str,
@@ -729,8 +852,10 @@ class InferenceScriptRunner:
         v10_stderr: str,
         fallback_reason: str,
         prediction_trade_date: str,
+        persist: bool = True,
+        pool_id: str | None = None,
     ) -> ExecutionResult:
-        """执行 inference_alpha158.py 兜底推理脚本。"""
+        """执行兜底模型推理脚本。persist=False 时只返回内存信号，不写库不发布。"""
         fallback_path = self.fallback_model_dir / self.fallback_script_name
         if not fallback_path.is_file():
             return ExecutionResult(
@@ -767,7 +892,7 @@ class InferenceScriptRunner:
             publish_notification(
                 user_id="system",
                 tenant_id="default",
-                title="触发 Alpha158 兜底模型",
+                title="触发兜底模型",
                 content=f"由于 [{fallback_reason}] 触发了兜底机制，请尽快排查主模型和数据状态。",
                 type="system",
                 level="error",
@@ -812,7 +937,7 @@ class InferenceScriptRunner:
                 exit_code=-1,
                 stdout=(exc.stdout or b"").decode("utf-8", errors="replace"),
                 stderr=(exc.stderr or b"").decode("utf-8", errors="replace"),
-                error=f"alpha158 兜底脚本超时 ({_SCRIPT_TIMEOUT_SEC}s)",
+                error=f"兜底模型脚本超时 ({_SCRIPT_TIMEOUT_SEC}s)",
                 run_id=run_id,
                 fallback_used=True,
                 fallback_reason=fallback_reason,
@@ -828,7 +953,7 @@ class InferenceScriptRunner:
                 exit_code=-1,
                 stdout="",
                 stderr="",
-                error=f"alpha158 兜底脚本启动失败: {exc}",
+                error=f"兜底模型脚本启动失败: {exc}",
                 run_id=run_id,
                 fallback_used=True,
                 fallback_reason=fallback_reason,
@@ -841,20 +966,20 @@ class InferenceScriptRunner:
 
         fb_stdout = (proc.stdout or b"").decode("utf-8", errors="replace")
         fb_stderr = (
-            v10_stderr + "\n--- alpha158 fallback ---\n" + (proc.stderr or b"").decode("utf-8", errors="replace")
+            v10_stderr + "\n--- fallback ---\n" + (proc.stderr or b"").decode("utf-8", errors="replace")
         ).strip()
         fb_exitcode = proc.returncode
 
         if fb_exitcode != 0:
             logger.error(
-                f"[InferenceScriptRunner] alpha158 兜底脚本失败 exit={fb_exitcode}, run_id={run_id}"
+                f"[InferenceScriptRunner] 兜底模型脚本失败 exit={fb_exitcode}, run_id={run_id}"
             )
             return ExecutionResult(
                 success=False,
                 exit_code=fb_exitcode,
                 stdout=fb_stdout,
                 stderr=fb_stderr,
-                error=f"alpha158 兜底脚本返回非零退出码: {fb_exitcode}",
+                error=f"兜底模型脚本返回非零退出码: {fb_exitcode}",
                 run_id=run_id,
                 fallback_used=True,
                 fallback_reason=fallback_reason,
@@ -872,7 +997,7 @@ class InferenceScriptRunner:
                 exit_code=0,
                 stdout=fb_stdout,
                 stderr=fb_stderr,
-                error="alpha158 兜底未能写入合法的 JSON 信号数组",
+                error="兜底模型未能写入合法的 JSON 信号数组",
                 run_id=run_id,
                 fallback_used=True,
                 fallback_reason=fallback_reason,
@@ -884,19 +1009,47 @@ class InferenceScriptRunner:
             )
 
         logger.info(
-            f"[InferenceScriptRunner] alpha158 兜底成功，{len(signals)} 条信号, run_id={run_id}"
+            f"[InferenceScriptRunner] 兜底模型成功，{len(signals)} 条信号, run_id={run_id}"
         )
-        self._persist_and_publish(
-            run_id,
-            prediction_trade_date,
-            tenant_id,
-            user_id,
+        # 兜底路径同样必须过池（否则池过滤会被 exit=2 兜底静默绕过）
+        kept, pool_error = self._pool_filter_signals(
             signals,
-            active_model_id=self.fallback_model_id,
-            data_trade_date=date,
+            pool_id=pool_id,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            run_id=run_id,
         )
+        if kept is None:
+            return ExecutionResult(
+                success=False,
+                exit_code=0,
+                stdout=fb_stdout,
+                stderr=fb_stderr,
+                error=pool_error or "池过滤后无信号",
+                run_id=run_id,
+                fallback_used=True,
+                fallback_reason=fallback_reason,
+                failure_stage="pool_filter",
+                active_model_id=self.fallback_model_id,
+                active_data_source=self.fallback_data_dir,
+                data_trade_date=date,
+                prediction_trade_date=prediction_trade_date,
+            )
+        signals = kept
+        if persist:
+            self._persist_and_publish(
+                run_id,
+                prediction_trade_date,
+                tenant_id,
+                user_id,
+                signals,
+                active_model_id=self.fallback_model_id,
+                data_trade_date=date,
+                # 兜底+池组合同样局部覆盖，避免池 run 清空同日全市场信号
+                partial=bool(pool_id),
+            )
 
-        if redis_client is not None:
+        if persist and redis_client is not None:
             try:
                 redis_client.set(
                     f"{_COMPLETED_REDIS_KEY_PREFIX}:{prediction_trade_date}",
@@ -929,6 +1082,8 @@ class InferenceScriptRunner:
         user_id: str = "system",
         redis_client=None,
         symbols: list[str] | None = None,
+        persist: bool = True,
+        pool_id: str | None = None,
     ) -> ExecutionResult:
         """
         执行 inference.py 脚本，解析信号输出，写库并发布 Redis Stream。
@@ -941,6 +1096,11 @@ class InferenceScriptRunner:
         redis_client: 可选 Redis 客户端，用于写完成标记
         symbols     : 可选股票代码子集（前缀式，如 ["SH600036"]）。非空时仅对匹配
                       的股票落库与返回，用于「单股补推」；为 None 时全市场（原行为）。
+        persist     : 为 False 时跳过 _persist_and_publish 与 Redis 标记，仅返回
+                      内存信号（个股独立轻路线：结果只在前端缓存，不记入后端/DB）。
+        pool_id     : 全局股票池引用（P3）。非空时把信号裁到池内，**严格语义**：
+                      池解析为空或信号零命中都会显式失败，不会静默退化为全市场。
+                      过滤发生在 symbols 之前，两者可叠加。
         """
         script_path = self.primary_model_dir / self.primary_script_name
         primary_meta = self._read_primary_metadata()
@@ -961,7 +1121,7 @@ class InferenceScriptRunner:
                 run_id = f"run_{date.replace('-', '')}_{uuid.uuid4().hex[:8]}"
                 fallback_reason = f"主模型推理脚本不存在: {script_path}"
                 logger.warning(
-                    "[InferenceScriptRunner] 主模型脚本缺失，触发 alpha158 兜底, run_id=%s, reason=%s",
+                    "[InferenceScriptRunner] 主模型脚本缺失，触发 兜底模型, run_id=%s, reason=%s",
                     run_id,
                     fallback_reason,
                 )
@@ -985,6 +1145,8 @@ class InferenceScriptRunner:
                     v10_stderr=fallback_reason,
                     fallback_reason=fallback_reason,
                     prediction_trade_date=prediction_trade_date,
+                    persist=persist,
+                    pool_id=pool_id,
                 )
 
         if data_source in ("parquet", "quantdb_factors"):
@@ -1039,7 +1201,7 @@ class InferenceScriptRunner:
         if not readiness.get("ready", False):
             fallback_reason = f"主模型维度门禁未通过: {readiness.get('detail', 'N/A')}"
             logger.warning(
-                "[InferenceScriptRunner] 主模型数据维度不足，触发 alpha158 兜底, run_id=%s, reason=%s",
+                "[InferenceScriptRunner] 主模型数据维度不足，触发 兜底模型, run_id=%s, reason=%s",
                 run_id,
                 fallback_reason,
             )
@@ -1063,6 +1225,8 @@ class InferenceScriptRunner:
                 v10_stderr=fallback_reason,
                 fallback_reason=fallback_reason,
                 prediction_trade_date=prediction_trade_date,
+                persist=persist,
+                pool_id=pool_id,
             )
 
         # 注入平台环境变量
@@ -1146,7 +1310,7 @@ class InferenceScriptRunner:
         exit_code = proc.returncode
 
         if exit_code != 0:
-            # exit code 2 = 数据质量不足 → 尝试 alpha158 兜底
+            # exit code 2 = 数据质量不足 → 尝试 兜底模型
             if exit_code == self._EXIT_DATA_QUALITY:
                 fallback_reason = (
                     stderr.strip().splitlines()[-1]
@@ -1154,7 +1318,7 @@ class InferenceScriptRunner:
                     else "v10 数据质量不足"
                 )
                 logger.warning(
-                    f"[InferenceScriptRunner] v10 数据质量不足 (exit=2)，启动 alpha158 兜底, run_id={run_id}"
+                    f"[InferenceScriptRunner] v10 数据质量不足 (exit=2)，启动 兜底模型, run_id={run_id}"
                 )
                 if not self.enable_fallback:
                     return ExecutionResult(
@@ -1176,6 +1340,8 @@ class InferenceScriptRunner:
                     v10_stderr=stderr,
                     fallback_reason=fallback_reason,
                     prediction_trade_date=prediction_trade_date,
+                    persist=persist,
+                    pool_id=pool_id,
                 )
 
             logger.error(
@@ -1209,6 +1375,33 @@ class InferenceScriptRunner:
                 active_model_id=self.primary_model_id,
                 active_data_source=self.primary_data_dir,
             )
+
+        # --- 全局股票池过滤（P3）[START] ---
+        # 严格语义：池为空或零命中都视为失败，绝不静默退化为全市场。
+        # 放在「单股补推」之前，因此两者可叠加（先按池裁，再按指定股票裁）。
+        kept, pool_error = self._pool_filter_signals(
+            signals,
+            pool_id=pool_id,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            run_id=run_id,
+        )
+        if kept is None:
+            return ExecutionResult(
+                success=False,
+                exit_code=exit_code,
+                stdout=stdout,
+                stderr=stderr,
+                error=pool_error or "池过滤后无信号",
+                run_id=run_id,
+                failure_stage="pool_filter",
+                active_model_id=self.primary_model_id,
+                active_data_source=self.primary_data_dir,
+                data_trade_date=date,
+                prediction_trade_date=prediction_trade_date,
+            )
+        signals = kept
+        # --- 全局股票池过滤（P3）[END] ---
 
         # 单股补推：非空 symbols 时仅保留目标股票，后续落库/返回只针对这些股票。
         # 推理脚本仍对全池出分（不改子进程与模板），只裁剪写库与返回，
@@ -1251,20 +1444,25 @@ class InferenceScriptRunner:
             f"[InferenceScriptRunner] 解析到 {len(signals)} 条信号, run_id={run_id}"
         )
 
-        # 写库 + 发布 Redis Stream（partial=单股补推时局部覆盖，不整桶删除）
-        self._persist_and_publish(
-            run_id,
-            prediction_trade_date,
-            tenant_id,
-            user_id,
-            signals,
-            active_model_id=self.primary_model_id,
-            data_trade_date=date,
-            partial=partial_applied,
-        )
+        # 写库 + 发布 Redis Stream（partial=单股补推/股票池时局部覆盖，不整桶删除）。
+        # persist=False（个股独立路线）时跳过，只返回内存信号。
+        # 股票池推理必须局部覆盖：整桶删除会把同日全市场 run 的信号清空，
+        # 导致推理历史的分布统计查不到明细（09-11 全市场 5189 行被池 run 清空事故）。
+        pool_scoped = bool(pool_id)
+        if persist:
+            self._persist_and_publish(
+                run_id,
+                prediction_trade_date,
+                tenant_id,
+                user_id,
+                signals,
+                active_model_id=self.primary_model_id,
+                data_trade_date=date,
+                partial=(partial_applied or pool_scoped),
+            )
 
         # 写 Redis 完成标记
-        if redis_client is not None:
+        if persist and redis_client is not None:
             try:
                 redis_client.set(
                     f"{_COMPLETED_REDIS_KEY_PREFIX}:{prediction_trade_date}",
@@ -1526,7 +1724,7 @@ class InferenceScriptRunner:
         将推理结果写入 engine_signal_scores 并发布到 Redis Stream。
 
         存储策略：按模型桶覆盖（同 tenant/user/date/model），保证同日不同模型可并存。
-        partial=True（单股补推）时只覆盖目标 symbol 的行，不整桶删除当日全市场信号。
+        partial=True（单股补推/股票池）时只覆盖目标 symbol 的行，不整桶删除当日全市场信号。
 
         Args:
             data_trade_date: 推理日期（数据截止日期），若不传则默认等于 prediction_trade_date
@@ -1783,7 +1981,7 @@ class InferenceScriptRunner:
         )
 
         # ── Step 0.2: 删除当日旧推理结果（覆盖策略）───────────────────
-        # partial（单股补推）时只删目标 symbol 的旧行，保留当日全市场信号。
+        # partial（单股补推/股票池）时只删目标 symbol 的旧行，保留当日全市场信号。
         # 注意：unique 键含 run_id，新 run 会另插一行，同 symbol 当日可能并存多行，
         # 读侧按最新 created_at 取最新（与个股分数曲线口径一致）。
         _sym_filter = " AND symbol = ANY(:partial_symbols)" if partial else ""
@@ -1807,7 +2005,7 @@ class InferenceScriptRunner:
         )
         if partial:
             logger.info(
-                f"[InferenceScriptRunner] 单股补推局部覆盖: 仅替换 {len(symbols)} 只标的的旧信号, run_id={run_id}"
+                f"[InferenceScriptRunner] 局部覆盖: 仅替换 {len(symbols)} 只标的的旧信号(单股补推/股票池), run_id={run_id}"
             )
         else:
             # 同步清除旧 feature_runs 记录（保留最新 run_id）
@@ -1863,30 +2061,11 @@ class InferenceScriptRunner:
         )
 
         # ── Step 2: 批量写入信号评分（含 signal_side 和 expected_price）──────────
-        import redis as redis_lib
-
-        redis_host = os.getenv("REMOTE_QUOTE_REDIS_HOST", "redis")
-        redis_port = int(os.getenv("REMOTE_QUOTE_REDIS_PORT", "6379"))
-        redis_password = os.getenv(
-            "REMOTE_QUOTE_REDIS_PASSWORD", ""
-        ) or None
-        try:
-            quote_redis = redis_lib.Redis(
-                host=redis_host,
-                port=redis_port,
-                password=redis_password,
-                decode_responses=True,
-                socket_timeout=2,
-            )
-            quote_redis.ping()
-            logger.info(
-                f"[InferenceScriptRunner] 已连接行情 Redis: {redis_host}:{redis_port}"
-            )
-        except Exception as redis_err:
-            logger.warning(
-                f"[InferenceScriptRunner] 无法连接行情 Redis: {redis_err}, 价格将缺失"
-            )
-            quote_redis = None
+        # expected_price 一律从 QuantDB 日线 parquet 按推理数据日取收盘价：
+        # 历史补全与当日推理同源、一次加载；禁止对 ~5000 股逐个打远程行情 Redis
+        # （此前单日写库因此卡在 5–7 分钟）。
+        _ = raw_symbols  # 保留签名兼容；价格已不再依赖 Redis 前缀键
+        price_map = _load_close_price_map(inference_date)
 
         score_sql = text("""
             INSERT INTO engine_signal_scores (
@@ -1910,43 +2089,26 @@ class InferenceScriptRunner:
         has_consensus = consensus_list is not None and len(consensus_list) == len(symbols)
         has_zfusion = zfusion_list is not None and len(zfusion_list) == len(symbols)
         has_detail = detail_list is not None and len(detail_list) == len(symbols)
+        score_rows: list[dict[str, Any]] = []
+        price_by_sym: dict[str, float | None] = {}
         for idx, (sym, score) in enumerate(zip(symbols, scores, strict=True)):
-            expected_price = None
             signal_side = signal_sides[idx]
-            # 构建 quality JSONB
             quality_parts = {"consensus": consensus_list[idx]} if has_consensus else {}
             if has_zfusion:
                 quality_parts["zfusion"] = round(zfusion_list[idx], 6)
             if has_detail:
                 quality_parts["detail"] = detail_list[idx]
-            if confidence_list is not None and idx < len(confidence_list) and confidence_list[idx] is not None:
+            if (
+                confidence_list is not None
+                and idx < len(confidence_list)
+                and confidence_list[idx] is not None
+            ):
                 quality_parts["confidence"] = round(float(confidence_list[idx]), 4)
             quality = json.dumps(quality_parts) if quality_parts else None
-            if quote_redis:
-                try:
-                    # symbols 已归一为纯数字，行情 Redis 查价需要原始
-                    # 市场前缀定位（stock:{code}.SH），raw_symbols 兜底原样
-                    raw_sym0 = raw_symbols[idx] if raw_symbols else sym
-                    raw_sym = (
-                        raw_sym0.replace("SH", "").replace("SZ", "").replace("BJ", "")
-                    )
-                    if raw_sym0.startswith("SH"):
-                        redis_key = f"stock:{raw_sym}.SH"
-                    elif raw_sym0.startswith("SZ"):
-                        redis_key = f"stock:{raw_sym}.SZ"
-                    elif raw_sym0.startswith("BJ") or raw_sym.startswith("920"):
-                        redis_key = f"stock:{raw_sym}.BJ"
-                    else:
-                        redis_key = f"stock:{raw_sym0}"
-                    now_price = quote_redis.hget(redis_key, "Now")
-                    if now_price:
-                        expected_price = float(now_price)
-                except Exception as e:
-                    logger.debug(
-                        f"[InferenceScriptRunner] 获取 {sym} 价格失败: {e}"
-                    )
-            db.execute(
-                score_sql,
+            digits = re.sub(r"\D", "", str(sym))
+            expected_price = price_map.get(digits) if digits else None
+            price_by_sym[str(sym)] = expected_price
+            score_rows.append(
                 {
                     "run_id": run_id,
                     "tenant_id": tenant_id,
@@ -1958,13 +2120,10 @@ class InferenceScriptRunner:
                     "signal_side": signal_side,
                     "expected_price": expected_price,
                     "quality": quality,
-                },
+                }
             )
-        if quote_redis:
-            try:
-                quote_redis.close()
-            except Exception:
-                pass
+        if score_rows:
+            db.execute(score_sql, score_rows)
 
         # ── Step 3: 写入投研平台候选池快照 ────────────────────────────────
         db.execute(
@@ -2016,6 +2175,7 @@ class InferenceScriptRunner:
                 confidence_level = EXCLUDED.confidence_level,
                 updated_at = NOW()
         """)
+        candidate_rows: list[dict[str, Any]] = []
         for idx, (sym, score) in enumerate(zip(symbols, scores, strict=True)):
             signal_side = signal_sides[idx]
             if signal_side == "BUY":
@@ -2024,42 +2184,25 @@ class InferenceScriptRunner:
                 confidence_level = "watch"
             else:
                 confidence_level = "medium"
-            # 获取 expected_price（从之前 Redis 查询的结果）
-            expected_price_val = None
-            if quote_redis:
-                try:
-                    raw_sym = sym.replace("SH", "").replace("SZ", "").replace("BJ", "")
-                    if sym.startswith("SH"):
-                        redis_key = f"stock:{raw_sym}.SH"
-                    elif sym.startswith("SZ"):
-                        redis_key = f"stock:{raw_sym}.SZ"
-                    elif sym.startswith("BJ") or sym.startswith("920"):
-                        redis_key = f"stock:{raw_sym}.BJ"
-                    else:
-                        redis_key = f"stock:{sym}"
-                    now_price = quote_redis.hget(redis_key, "Now")
-                    if now_price:
-                        expected_price_val = float(now_price)
-                except Exception:
-                    pass
-            db.execute(
-                candidate_sql,
+            candidate_rows.append(
                 {
                     "tenant_id": tenant_id,
                     "user_id": user_id,
                     "run_id": run_id,
                     "model_id": model_name,
-                    "data_trade_date": inference_date,  # 推理日期（数据截止日期）
+                    "data_trade_date": inference_date,
                     "prediction_trade_date": prediction_trade_date,
                     "symbol": sym,
                     "fusion_score": score,
                     "score_rank": rank_map.get(sym, 999999),
                     "signal_side": signal_side,
-                    "expected_price": expected_price_val,
+                    "expected_price": price_by_sym.get(str(sym)),
                     "universe_tag": "默认候选池",
                     "confidence_level": confidence_level,
-                },
+                }
             )
+        if candidate_rows:
+            db.execute(candidate_sql, candidate_rows)
         logger.info(
             f"[InferenceScriptRunner] 写入 {len(signals)} 条投研候选池快照, run_id={run_id}"
         )

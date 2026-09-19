@@ -8,7 +8,6 @@ import { strategyManagementService } from '../../../services/strategyManagementS
 import { userCenterService } from '../../../features/user-center/services/userCenterService';
 import { authService } from '../../../features/auth/services/authService';
 import { resolveTradingAccountMode } from '../utils/accountAdapter';
-import { SERVICE_URLS } from '../../../config/services';
 
 interface PersonalCenterProps {
     tenantId: string;
@@ -25,51 +24,6 @@ const PersonalCenter: React.FC<PersonalCenterProps> = ({ tenantId, userId, statu
     // ... (现有状态)
     const [isSyncing, setIsSyncing] = useState(false);
     const [createdAt, setCreatedAt] = useState<string | null>(null);
-    // L2 实时任务状态（交易节点 / 数据同步 / 运行时长）
-    const [l2Status, setL2Status] = useState<{ capture?: any; realtime?: any } | null>(null);
-    const apiGatewayBase = SERVICE_URLS.API_GATEWAY.replace(/\/+$/, '');
-
-    useEffect(() => {
-        let alive = true;
-        if (currentMarket !== 'CN') return;  // L2/TDX 仅 A 股
-        const fetchL2Status = async () => {
-            try {
-                const res = await fetch(`${apiGatewayBase}/api/v1/tdx/l2/status`, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('access_token') || ''}` },
-                });
-                if (!alive) return;
-                if (res.ok) setL2Status(await res.json());
-            } catch {
-                /* 桥/服务不可达时保持上一状态 */
-            }
-        };
-        fetchL2Status();
-        const timer = setInterval(fetchL2Status, 20000);
-        return () => {
-            alive = false;
-            clearInterval(timer);
-        };
-    }, [apiGatewayBase, currentMarket]);
-
-    const formatUptime = (startedAt?: string | null) => {
-        if (!startedAt) return '--';
-        const start = new Date(startedAt).getTime();
-        if (Number.isNaN(start)) return '--';
-        const diffSec = Math.max(0, Math.floor((Date.now() - start) / 1000));
-        const h = Math.floor(diffSec / 3600);
-        const m = Math.floor((diffSec % 3600) / 60);
-        const s = diffSec % 60;
-        return h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
-    };
-
-    const captureStale = (() => {
-        const last = l2Status?.capture?.last_cycle_at as string | undefined;
-        if (!last) return true;
-        const ageSec = (Date.now() - new Date(last).getTime()) / 1000;
-        return !Number.isFinite(ageSec) || ageSec > 300;
-    })();
-
-    const nodeRunning = (l2Status?.realtime?.running === true || l2Status?.capture?.running === true);
 
     const handleSyncTemplates = async () => {
         setIsSyncing(true);
@@ -335,33 +289,28 @@ const PersonalCenter: React.FC<PersonalCenterProps> = ({ tenantId, userId, statu
                                 <Server size={14} className="text-gray-500" />
                                 <span className="text-gray-700 text-sm">交易节点</span>
                             </div>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isRunning || nodeRunning ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                {isRunning || nodeRunning ? 'Running' : 'Stopped'}
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isRunning ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {isRunning ? 'Running' : 'Stopped'}
                             </span>
                         </div>
 
                         <div className="flex items-center justify-between p-1.5 bg-gray-50 rounded-lg">
                             <div className="flex items-center gap-2">
                                 <Database size={14} className="text-gray-500" />
-                                <span className="text-gray-700 text-sm">数据同步</span>
+                                <span className="text-gray-700 text-sm">行情源</span>
                             </div>
-                            {l2Status?.capture?.last_cycle_at ? (
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${captureStale ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>
-                                    {new Date(l2Status.capture.last_cycle_at).toLocaleTimeString('zh-CN', { hour12: false })}
-                                    {captureStale ? ' · 陈旧' : ' · 新鲜'}
-                                </span>
-                            ) : (
-                                <span className="text-gray-800 font-mono text-xs">--</span>
-                            )}
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-emerald-50 text-emerald-600 border-emerald-200">
+                                远程 Redis
+                            </span>
                         </div>
 
                         <div className="flex items-center justify-between p-1.5 bg-gray-50 rounded-lg">
                             <div className="flex items-center gap-2">
                                 <Clock size={14} className="text-gray-500" />
-                                <span className="text-gray-700 text-sm">运行时长</span>
+                                <span className="text-gray-700 text-sm">运行状态</span>
                             </div>
                             <span className="text-gray-800 font-mono text-xs">
-                                {isRunning || nodeRunning ? formatUptime(l2Status?.realtime?.started_at) : '--'}
+                                {isRunning ? '策略运行中' : '--'}
                             </span>
                         </div>
                     </div>

@@ -19,6 +19,20 @@ class SaveRequest(BaseModel):
 class SetRootRequest(BaseModel):
     path: str
 
+
+class RenameRequest(BaseModel):
+    strategy_id: str | None = None
+    old_path: str | None = None
+    name: str | None = None
+    new_path: str | None = None
+
+
+def _strip_py(value: str) -> str:
+    text = value.strip()
+    if text.lower().endswith(".py"):
+        return text[:-3].strip()
+    return text
+
 def _get_user_id(request: Request) -> str:
     user = getattr(request.state, "user", None)
     if not user:
@@ -46,9 +60,15 @@ async def list_files(request: Request, path: str = ""):
         # 获取用户的所有策略
         items = svc.list(user_id=user_id)
 
-        # 将策略项映射为 IDE 文件项
+        # 将策略项映射为 IDE 文件项；过滤存量 [folder] 污染数据
         ide_items = []
         for s in items:
+            _nm = s.get("name") or ""
+            _tags = s.get("tags") or []
+            if _nm.startswith("[folder]") or "folder" in [str(t).lower() for t in _tags]:
+                continue
+            if (s.get("parameters") or {}).get("type") == "folder":
+                continue
             ide_items.append({
                 "id": s["id"],
                 "name": s["name"] + ".py" if not s["name"].endswith(".py") else s["name"],
@@ -93,28 +113,36 @@ async def create_file(request: Request, item: CreateItemRequest):
 
 @router.post("/create/folder")
 async def create_folder(request: Request, item: CreateItemRequest):
-    """创建文件夹（在策略元数据中标记）"""
-    try:
-        user_id = _get_user_id(request)
-        svc = get_strategy_storage_service()
+    """创建文件夹 — 统一管理：文件夹为前端虚拟层，不再写入 strategies 表污染策略列表"""
+    name = item.name.strip("/")
+    if not name:
+        raise HTTPException(status_code=400, detail="文件夹名称不能为空")
+    # 虚拟文件夹：不落库，由前端基于策略的 dir 字段聚合展示；此处仅 ack
+    # 存量 [folder] 污染数据由 list_files 过滤，不再新增
+    return {"status": "success", "id": f"virtual-folder:{name}", "name": name, "virtual": True}
 
-        name = item.name.strip("/")
-        if not name:
-            raise HTTPException(status_code=400, detail="文件夹名称不能为空")
 
-        # 用一个空策略标记文件夹
-        res = await svc.save(
-            user_id=user_id,
-            name=f"[folder] {name}",
-            code="",
-            metadata={"type": "folder", "dir": item.dir or "", "description": f"Folder: {name}"}
-        )
-        return {"status": "success", "id": res["id"], "name": name}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create folder: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+@router.post("/rename")
+async def rename_file(request: Request, body: RenameRequest):
+    """重命名策略显示名称。云端 path 是策略编号，不能拿编号当文件名改。"""
+    user_id = _get_user_id(request)
+    sid = _strip_py(body.strategy_id or body.old_path or "")
+    raw_name = _strip_py(body.name or "")
+    if not raw_name and body.new_path:
+        raw_name = _strip_py(body.new_path.split("/")[-1])
+    if not sid or not raw_name:
+        raise HTTPException(status_code=400, detail="策略编号和名称不能为空")
+    if not sid.isdigit():
+        raise HTTPException(status_code=400, detail="无效的策略编号")
+    if len(raw_name) > 128:
+        raise HTTPException(status_code=400, detail="策略名称过长")
+
+    svc = get_strategy_storage_service()
+    updated = await svc.rename(user_id=user_id, strategy_id=sid, name=raw_name)
+    if not updated:
+        raise HTTPException(status_code=404, detail="策略不存在")
+    return {"status": "success", "id": sid, "name": raw_name}
+
 
 @router.get("/{file_id:path}")
 async def get_content(request: Request, file_id: str):
@@ -183,6 +211,9 @@ async def save_content(request: Request, file_id: str, item: SaveRequest):
 
 @router.delete("/{file_id:path}")
 async def delete_item(request: Request, file_id: str):
+    # 虚拟文件夹删除直接成功
+    if file_id.startswith("virtual-folder:"):
+        return {"status": "success", "virtual": True}
     try:
         user_id = _get_user_id(request)
         svc = get_strategy_storage_service()

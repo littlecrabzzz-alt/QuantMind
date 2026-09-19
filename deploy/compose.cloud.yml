@@ -19,7 +19,7 @@ services:
     image: redis:7
     ports: !reset []
     mem_limit: 320m
-    command: redis-server --appendonly yes --maxmemory 192mb --maxmemory-policy allkeys-lru --databases 16 --bind 0.0.0.0
+    command: redis-server --appendonly yes --maxmemory 192mb --maxmemory-policy noeviction --databases 16 --bind 0.0.0.0
   quantmind:
     volumes:
       - /root/data/disk/quantmind/secrets/glm-research-api.json:/run/secrets/research-llm.json:ro

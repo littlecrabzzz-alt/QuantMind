@@ -7,7 +7,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   Play, RefreshCw, BarChart3, Settings2, Info, AlertCircle, Copy, Check, ExternalLink, CalendarRange, Cpu,
-  ChevronDown,
+  ChevronDown, Layers,
 } from 'lucide-react';
 
 import type { BacktestConfig } from '../../services/backtestService';
@@ -27,18 +27,44 @@ import { getDefaultStrategyParams, sanitizeStrategyParams } from '../../shared/q
 import { getStoredTailTradeMode, setStoredTailTradeMode, getTailTradeDealPrice, getTailTradeSignalLagDays, ALLOW_FEATURE_SIGNAL_FALLBACK } from '../../shared/qlib/tailTradeMode';
 import { strategyManagementService } from '../../services/strategyManagementService';
 import { modelTrainingService, UserModelRecord } from '../../services/modelTrainingService';
+import type { StockPoolOption } from '../../services/stockPoolOptionService';
+import { StockPoolPickerModal } from './StockPoolPickerModal';
 import { useAppSelector } from '../../store';
 import { selectCurrentMarket } from '../../store/slices/uiSlice';
 import { getMarketConfig } from '../../config/marketConfig';
 import dayjs from 'dayjs';
 
-const MARKET_UNIVERSE_PRESETS: Record<string, { label: string; value: string }[]> = {
+/** 模型 metadata.market 与当前页签对齐。禁止 includes('US')：CUSTOM 会误判为美股。 */
+function modelMatchesMarket(rawMarket: string, currentMarket: string): boolean {
+  const mkt = rawMarket.toUpperCase().trim();
+  if (!mkt) return true;
+  const cur = currentMarket.toUpperCase();
+  if (mkt === 'CUSTOM' || mkt.endsWith('_CUSTOM')) return cur === 'CN';
+  if (cur === 'CN') return mkt === 'CN' || mkt === 'A_SHARE' || mkt === 'A股' || mkt === 'CHINA';
+  if (cur === 'HK') return mkt === 'HK' || mkt === 'HONG_KONG' || mkt === '港股';
+  if (cur === 'US') return mkt === 'US' || mkt === 'US_STOCK' || mkt === '美股';
+  if (cur === 'CRYPTO') return mkt === 'CRYPTO' || mkt === '加密';
+  if (cur === 'FUTURES') return mkt === 'FUTURES' || mkt === '期货';
+  return true;
+}
+
+function modelMarketLabel(rawMarket: string): string {
+  const mkt = rawMarket.toUpperCase().trim();
+  if (mkt === 'CUSTOM' || mkt.endsWith('_CUSTOM')) return '自定义';
+  if (mkt === 'HK' || mkt === 'HONG_KONG') return '港股';
+  if (mkt === 'US' || mkt === 'US_STOCK') return '美股';
+  if (mkt === 'CRYPTO') return '加密';
+  if (mkt === 'FUTURES') return '期货';
+  return 'A股';
+}
+
+const MARKET_UNIVERSE_PRESETS: Record<string, { label: string; value: string; custom?: boolean }[]> = {
   CN: [
     { label: '全部', value: 'all' },
     { label: '沪深300', value: 'csi300' },
     { label: '中证500', value: 'csi500' },
-    { label: '中证800', value: 'csi800' },
     { label: '中证1000', value: 'csi1000' },
+    { label: '自定义', value: '__custom__', custom: true },
   ],
   HK: [
     { label: '全部港股', value: 'all' },
@@ -63,6 +89,8 @@ export const QlibQuickBacktest: React.FC = () => {
   const runStartedAtRef = useRef<number>(0);
   const backtestConfig = useBacktestCenterStore((state) => state.backtestConfig);
   const activeModule = useBacktestCenterStore((state) => state.activeModule);
+  const quickBacktestPrefill = useBacktestCenterStore((state) => state.quickBacktestPrefill);
+  const clearQuickBacktestPrefill = useBacktestCenterStore((state) => state.clearQuickBacktestPrefill);
   const currentMarket = useAppSelector(selectCurrentMarket);
   const marketConfig = getMarketConfig(currentMarket);
   const UNIVERSE_PRESETS = useMemo(() => MARKET_UNIVERSE_PRESETS[currentMarket] || MARKET_UNIVERSE_PRESETS.CN, [currentMarket]);
@@ -74,6 +102,18 @@ export const QlibQuickBacktest: React.FC = () => {
 
   // 基础配置
   const [universePath, setUniversePath] = useState<string>('all');
+  // 自定义股票池（自定义按钮 → 共用弹窗选择，全局股票池只读接口）
+  const [customPoolOpen, setCustomPoolOpen] = useState(false);
+  const [selectedCustomPool, setSelectedCustomPool] = useState<StockPoolOption | null>(null);
+  const customPoolActive = universePath.startsWith('pool:');
+
+  const openCustomPools = () => setCustomPoolOpen(true);
+
+  const selectCustomPool = (pool: StockPoolOption) => {
+    setSelectedCustomPool(pool);
+    setUniversePath(`pool:${pool.code}`);
+    setCustomPoolOpen(false);
+  };
   const [startDate, setStartDate] = useState<string>(BACKTEST_CONFIG.QLIB.DEFAULT_START);
   const [endDate, setEndDate] = useState<string>(BACKTEST_CONFIG.QLIB.DEFAULT_END);
   const [initialCapital, setInitialCapital] = useState(1000000);
@@ -161,7 +201,8 @@ export const QlibQuickBacktest: React.FC = () => {
       setModelsLoading(true);
       try {
         const [userResp, sysModels] = await Promise.all([
-          modelTrainingService.listUserModels(true),
+          // 回测选模型：只要可用模型，已归档的不应出现（管理页才需要 includeArchived）
+          modelTrainingService.listUserModels(false),
           modelTrainingService.listSystemModels(),
         ]);
         const sysItems: UserModelRecord[] = (sysModels ?? []).map((sm) => {
@@ -210,22 +251,17 @@ export const QlibQuickBacktest: React.FC = () => {
     loadModels();
   }, []);
 
-  // 按当前市场过滤模型
+  // 按当前市场过滤模型（已归档模型一律排除，防止参与回测）
   const filteredModels = useMemo(() => {
     return models.filter((m) => {
+      if (String(m.status || '').toLowerCase() === 'archived') return false;
       const meta = (m.metadata_json || {}) as Record<string, any>;
       const raw = String(meta.market || '').toUpperCase();
       const ctx = meta.context;
       const ctxMarket = String((ctx && typeof ctx === 'object' ? ctx.market : '') || '').toUpperCase();
       const mkt = raw || ctxMarket;
       if (!mkt) return true; // 无市场标记的模型始终显示
-      // 当前市场映射
-      const cur = currentMarket.toUpperCase();
-      if (cur === 'CN') return mkt.includes('CN') || mkt.includes('A_SHARE') || mkt.includes('A股');
-      if (cur === 'HK') return mkt.includes('HK') || mkt.includes('HONG_KONG') || mkt.includes('港股');
-      if (cur === 'US') return mkt.includes('US') || mkt.includes('美股');
-      if (cur === 'CRYPTO') return mkt.includes('CRYPTO') || mkt.includes('加密');
-      return true;
+      return modelMatchesMarket(mkt, currentMarket);
     });
   }, [models, currentMarket]);
 
@@ -275,11 +311,6 @@ export const QlibQuickBacktest: React.FC = () => {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-  type BacktestConfigExt = Partial<BacktestConfig> & {
-    qlib_strategy_type?: string;
-    qlib_strategy_params?: QlibStrategyParams;
-  };
-  const sharedConfig = backtestConfig as BacktestConfigExt;
 
   // 处理策略选择
   const handleStrategySelected = (
@@ -369,6 +400,8 @@ export const QlibQuickBacktest: React.FC = () => {
         end_date: endDate,
         initial_capital: initialCapital,
         user_id: normalizeUserId(resolvedUserId),
+        // 全局股票池引用：后端 pool_id 优先于 universe 解析并物化
+        pool_id: universePath.startsWith('pool:') ? universePath : undefined,
         strategy_type: strategyType,
         strategy_params: strategyParams,
         benchmark_symbol: benchmark,
@@ -445,7 +478,7 @@ export const QlibQuickBacktest: React.FC = () => {
     };
   }, []);
 
-  // 同步回测中心共享配置（如参数优化的一键回填）
+  // 同步回测中心共享配置的基础字段（日期、股票池）
   useEffect(() => {
     if (backtestConfig.start_date) {
       setStartDate(String(backtestConfig.start_date));
@@ -453,39 +486,32 @@ export const QlibQuickBacktest: React.FC = () => {
     if (backtestConfig.end_date) {
       setEndDate(String(backtestConfig.end_date));
     }
-    const syncedType =
-      sharedConfig.qlib_strategy_type || backtestConfig.strategy_type;
-    if (syncedType) {
-      setStrategyType(String(syncedType));
-    }
-
     if (backtestConfig.symbol && typeof backtestConfig.symbol === 'string') {
       setUniversePath(String(backtestConfig.symbol));
     }
+  }, [backtestConfig.start_date, backtestConfig.end_date, backtestConfig.symbol]);
 
-    const syncedParams =
-      sharedConfig.qlib_strategy_params || backtestConfig.strategy_params;
-    if (syncedParams && typeof syncedParams === 'object') {
+  // 消费参数优化"一键回填"的一次性载荷：应用后立即从 store 清除。
+  // 若不清除，残留值会在用户后续切换策略时反复覆盖本地策略类型与参数。
+  useEffect(() => {
+    if (!quickBacktestPrefill) return;
+    const prefilledType = quickBacktestPrefill.qlib_strategy_type;
+    if (prefilledType) {
+      setStrategyType(String(prefilledType));
+    }
+    const prefilledParams = quickBacktestPrefill.qlib_strategy_params;
+    if (prefilledParams && typeof prefilledParams === 'object') {
       setStrategyParams(
         sanitizeStrategyParams(
-          String(syncedType || strategyType || DEFAULT_TEMPLATE_ID),
-          syncedParams as QlibStrategyParams,
+          String(prefilledType || strategyType || DEFAULT_TEMPLATE_ID),
+          prefilledParams as QlibStrategyParams,
           undefined,
           strategyInfo?.code
         )
       );
     }
-  }, [
-    backtestConfig.start_date,
-    backtestConfig.end_date,
-    backtestConfig.strategy_type,
-    backtestConfig.symbol,
-    sharedConfig.qlib_strategy_type,
-    backtestConfig.strategy_params,
-    sharedConfig.qlib_strategy_params,
-    strategyType,
-    strategyInfo?.code,
-  ]);
+    clearQuickBacktestPrefill();
+  }, [quickBacktestPrefill, clearQuickBacktestPrefill, strategyType, strategyInfo?.code]);
 
   return (
     <motion.div
@@ -571,8 +597,7 @@ export const QlibQuickBacktest: React.FC = () => {
               const fw = String(meta.framework || '-');
               const fc = meta.feature_count ?? '-';
               const mkt = String(meta.market || '');
-              const mktUpper = mkt.toUpperCase();
-              const mktLabel = mktUpper.includes('HK') ? '港股' : mktUpper.includes('US') ? '美股' : mktUpper.includes('CRYPTO') ? '加密' : 'A股';
+              const mktLabel = modelMarketLabel(mkt);
               const horizon = meta.target_horizon_days ?? meta.horizon_days ?? '-';
               const trainStart = meta.train_start || meta.training_window?.split?.(' to ')?.[0] || '';
               const trainEnd = meta.train_end || meta.training_window?.split?.(' to ')?.[1] || '';
@@ -809,6 +834,26 @@ export const QlibQuickBacktest: React.FC = () => {
               <label className="block text-sm font-medium text-gray-600 mb-2">股票池 (Symbols)</label>
               <div className="grid grid-cols-5 gap-2">
                 {UNIVERSE_PRESETS.map((preset) => {
+                  if (preset.custom) {
+                    return (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        onClick={openCustomPools}
+                        title="从自定义股票池中选择"
+                        className={`px-2 py-2 text-xs font-medium rounded-xl border transition-all flex items-center justify-center gap-1 truncate ${
+                          customPoolActive
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-blue-300 hover:text-blue-600'
+                        }`}
+                      >
+                        <Layers className="w-3 h-3 shrink-0" />
+                        <span className="truncate">
+                          {customPoolActive && selectedCustomPool ? selectedCustomPool.name : preset.label}
+                        </span>
+                      </button>
+                    );
+                  }
                   const active = universePath === preset.value;
                   return (
                     <button
@@ -1008,6 +1053,13 @@ export const QlibQuickBacktest: React.FC = () => {
           </motion.div>
         </div>
       </div>
+      <StockPoolPickerModal
+        open={customPoolOpen}
+        onClose={() => setCustomPoolOpen(false)}
+        selectedPoolId={selectedCustomPool?.pool_id}
+        market="CN"
+        onSelect={selectCustomPool}
+      />
       {showErrorLog && (
         <ErrorLogModal
           error={error}

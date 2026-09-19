@@ -10,6 +10,8 @@ from .quantfutures_console import router as quantfutures_console_router
 from .model_management import router as model_management_router
 from .model_management_ops import router as model_management_ops_router
 from .admin_training import router as admin_training_router
+from backend.services.api.routers.training_per_model import build_per_model_router
+from backend.services.api.user_app.middleware.auth import require_admin
 from .strategy_templates import router as strategy_templates_router
 from .users import router as users_router
 from .alpha_factor_pipeline import router as alpha_factor_pipeline_router
@@ -20,6 +22,11 @@ from .qlib_console import router as qlib_console_router
 from .system_update import router as system_update_router
 from .node_history import router as node_history_router
 from .system_events import router as system_events_router
+from .finbert import router as finbert_router
+from .stock_pool import router as stock_pool_router
+from .risk import router as risk_router
+from .orders import router as orders_router
+from .inference_monitor import router as inference_monitor_router
 
 admin_router = APIRouter()
 admin_router.include_router(
@@ -27,6 +34,9 @@ admin_router.include_router(
 )
 admin_router.include_router(
     admin_training_router, prefix="/models", tags=["Admin-ModelTraining"]
+)
+admin_router.include_router(
+    build_per_model_router(require_admin), prefix="/models", tags=["Admin-ModelTraining"]
 )
 admin_router.include_router(
     model_management_router, prefix="/models", tags=["Admin-ModelManagement"]
@@ -82,3 +92,12 @@ admin_router.include_router(
 admin_router.include_router(
     system_events_router, prefix="/system-events", tags=["Admin-SystemEvents"]
 )
+admin_router.include_router(
+    finbert_router, prefix="/finbert", tags=["Admin-FinBERT"]
+)
+admin_router.include_router(
+    stock_pool_router, prefix="/stock-pools", tags=["Admin-StockPool"]
+)
+admin_router.include_router(risk_router, tags=["Admin-Risk"])
+admin_router.include_router(orders_router, tags=["Admin-Orders"])
+admin_router.include_router(inference_monitor_router, tags=["Admin-Inference"])

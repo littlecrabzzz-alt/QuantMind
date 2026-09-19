@@ -39,12 +39,14 @@ DEFAULT_FACTOR_SOURCE: FactorSource = "l1_factors"
 
 # ── 市场 → 可用因子源映射（后台「模型训练数据集」与训练页数据源选择共用）───────
 # 各市场 6_ml_datasets/ 下实际存在的训练直读数据集。
+# CUSTOM 为用户自传市场：仅做因子扫描，不强制 OHLCV 完备性（见 describe）。
 MARKET_FACTOR_SOURCES: dict[str, tuple[FactorSource, ...]] = {
     "CN": ("l1_factors", "l2_factors", "l1_l2_factors"),
     "HK": ("l1_factors", "ccass_factors", "south_factors"),
     "US": ("l1_factors",),
     "CRYPTO": ("l1_factors",),
     "FUTURES": ("l1_factors",),
+    "CUSTOM": ("l1_factors",),
 }
 DEFAULT_FACTOR_SOURCE_BY_MARKET: dict[str, FactorSource] = {
     "CN": "l1_factors",
@@ -52,6 +54,7 @@ DEFAULT_FACTOR_SOURCE_BY_MARKET: dict[str, FactorSource] = {
     "US": "l1_factors",
     "CRYPTO": "l1_factors",
     "FUTURES": "l1_factors",
+    "CUSTOM": "l1_factors",
 }
 # 各市场数据根目录环境变量（容器内路径，本地编排器挂载后亦可见）
 MARKET_DATA_DIR_ENV: dict[str, str] = {
@@ -60,6 +63,7 @@ MARKET_DATA_DIR_ENV: dict[str, str] = {
     "US": "QM_QUANTUS_DATA_DIR",
     "CRYPTO": "QM_QUANTBC_DATA_DIR",
     "FUTURES": "QM_QUANTFUTURES_DATA_DIR",
+    "CUSTOM": "QM_QUANTCUSTOM_DATA_DIR",
 }
 MARKET_DATA_DIR_DEFAULT: dict[str, str] = {
     "CN": "/data/quantdb",
@@ -67,6 +71,7 @@ MARKET_DATA_DIR_DEFAULT: dict[str, str] = {
     "US": "/data/quantus",
     "CRYPTO": "/data/quantbc",
     "FUTURES": "/data/quantfutures",
+    "CUSTOM": "/data/quantcustom",
 }
 # 次要因子源（ccass/south 等）不含 OHLCV，标签构建所需的行情列由同目录
 # l1_factors 补给（各市场 l1_factors 均带 OHLCV）。
@@ -164,6 +169,9 @@ class QuantDBFactorReader:
             self.data_dir = Path(data_dir)
         else:
             self.data_dir = market_data_dir(market)
+        # 仅扫描模式判定用：CUSTOM 市场只扫描因子列，不强制 OHLCV。
+        # 显式传 data_dir 且未传 market 时保持 CN 口径（历史行为不变）。
+        self.market = normalize_market(market) if market is not None else "CN"
 
     @staticmethod
     def validate_source(source: str) -> FactorSource:
@@ -182,6 +190,60 @@ class QuantDBFactorReader:
         # 只统计已发布的 dt= 分区文件，排除 _stage 等非分区暂存目录，
         # 否则暂存 parquet 会被计入分区文件数，与实际可读数据不一致。
         return sorted(root.glob("dt=*/*.parquet")) if root.is_dir() else []
+
+    @staticmethod
+    def _partition_date_range(root: Path) -> tuple[str | None, str | None]:
+        """从 dt=YYYYMMDD 分区目录名直接推导 min/max 日期，避免全表扫描。
+
+        DESCRIBE + SELECT min/max 会打开 2581+ 个 parquet 做 union 推导，
+        在请求路径同步执行耗时 50s+（前端 30s 超时 → ECONNABORTED）。
+        分区名即日期，ls 目录 <0.2s。
+        """
+        if not root.is_dir():
+            return None, None
+        dates: list[str] = []
+        try:
+            for entry in root.iterdir():
+                if entry.is_dir() and entry.name.startswith("dt="):
+                    v = entry.name.split("=", 1)[1]
+                    if v.isdigit() and len(v) == 8:
+                        dates.append(f"{v[:4]}-{v[4:6]}-{v[6:]}")
+        except OSError:
+            return None, None
+        if not dates:
+            return None, None
+        return min(dates), max(dates)
+
+    @staticmethod
+    def _sample_schema_relation(files: list[Path]) -> str:
+        """用单个文件做 schema 采样，避免打开全量 2581 文件。
+
+        发布分区 schema 一致，单文件足以推导列名；全量 DESCRIBE 只读 footer
+        也要逐个开文件，耗时数秒~数十秒。刻意只取 1 个文件：多文件 UNION
+        需要子查询别名，容易写出无效 SQL，且无额外收益。
+        """
+        p = files[0].as_posix().replace("'", "''")
+        return f"read_parquet('{p}', hive_partitioning=true, union_by_name=true)"
+
+    def _donor_has_ohlcv(self) -> bool:
+        """检查 l1 donor 是否含 OHLCV：同样只采样 1 个文件，避免全扫。"""
+        root = self.data_dir / FACTOR_SOURCE_DIRS[OHLCV_DONOR_SOURCE]
+        if not root.is_dir():
+            return False
+        files = sorted(root.glob("dt=*/*.parquet"))
+        if not files:
+            return False
+        duckdb = self._duckdb()
+        con = duckdb.connect(config={"memory_limit": "2GB", "threads": "2"})
+        try:
+            rel = self._sample_schema_relation(files[:1])
+            rows = con.execute(f"DESCRIBE SELECT * FROM {rel}").fetchall()
+            cols = {str(r[0]) for r in rows}
+            return set(OHLCV_COLUMNS) <= cols
+        except Exception:  # noqa: BLE001
+            return False
+        finally:
+            con.close()
 
     @staticmethod
     def _duckdb():
@@ -260,17 +322,26 @@ class QuantDBFactorReader:
                 reason="No parquet files found",
             )
 
+        # 快路径：min/max 先走分区目录名（<0.2s），避免 SELECT 全表扫描 50s+
+        part_min, part_max = self._partition_date_range(root)
+
         duckdb = self._duckdb()
         con = duckdb.connect(config={"memory_limit": "2GB", "threads": "2"})
         try:
-            relation = self._relation(source)
-            described = con.execute(f"DESCRIBE SELECT * FROM {relation}").fetchall()
+            # schema 只采样首/中/末 3 文件，避免 DESCRIBE 打开全量 2581 文件
+            sampled = self._sample_schema_relation(files)
+            described = con.execute(f"DESCRIBE SELECT * FROM {sampled}").fetchall()
             columns = [str(row[0]) for row in described]
             column_types = {str(row[0]): str(row[1]) for row in described}
-            date_expr = self._date_expression(columns)
-            date_row = con.execute(
-                f"SELECT min({date_expr}), max({date_expr}) FROM {relation}"
-            ).fetchone()
+            if part_min is not None and part_max is not None:
+                date_row = (part_min, part_max)
+            else:
+                # 兜底：非分区存储才回退全表 min/max 扫描
+                relation = self._relation(source)
+                date_expr = self._date_expression(columns)
+                date_row = con.execute(
+                    f"SELECT min({date_expr}), max({date_expr}) FROM {relation}"
+                ).fetchone()
         except Exception as exc:
             return FactorSourceStatus(
                 dataset_id=source,
@@ -290,15 +361,17 @@ class QuantDBFactorReader:
 
         schema_hash = hashlib.sha256("\n".join(columns).encode()).hexdigest()
         missing = [column for column in REQUIRED_COLUMNS if column not in columns]
-        if "date" in missing and "dt" in columns:
+        if self.market == "CUSTOM":
+            # 自定义市场（用户自传数据）：仅扫描因子列，不强制 OHLCV 完备性。
+            # 有分区文件即 ready；标签构建仍需数据源自带 close 列，否则训练时按缺列报错。
+            missing = []
+        elif "date" in missing and "dt" in columns:
             missing.remove("date")  # dt 分区列即日期（HK l1_factors 无 date 列）
         reason = None
         if missing and set(missing) <= set(OHLCV_COLUMNS):
             # 次要源（ccass/south）：OHLCV 由同目录 l1_factors 补给，标签可构建。
-            donor = self._ohlcv_donor_relation()
-            if donor is not None and set(OHLCV_COLUMNS) <= self._relation_columns(
-                donor
-            ):
+            # 用采样检查代替全量 _relation_columns，避免又一次全扫。
+            if self._donor_has_ohlcv():
                 missing = []
             else:
                 reason = "Missing OHLCV columns (l1_factors donor unavailable)"

@@ -9,7 +9,14 @@ from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.services.trade_shared.models.enums import OrderSide, OrderStatus, OrderType, PositionSide, TradeAction, TradingMode
+from backend.services.trade_shared.models.enums import (
+    OrderSide,
+    OrderStatus,
+    OrderType,
+    PositionSide,
+    TradeAction,
+    TradingMode,
+)
 from backend.services.trade_shared.models.order import Order
 from backend.services.trade_shared.portfolio.models import Portfolio
 from backend.services.trade_shared.redis_client import RedisClient
@@ -17,7 +24,12 @@ from backend.services.trade_shared.schemas.order import OrderCreate
 from backend.services.trade_shared.services.order_service import OrderService
 from backend.services.trade_shared.simulation_manager import SimulationAccountManager
 from backend.services.live_trading.services.trading_engine import TradingEngine
-from backend.services.live_trading.routers.real_trading_utils import _fetch_active_portfolio_snapshot
+from backend.services.live_trading.routers.real_trading_utils import (
+    _fetch_active_portfolio_snapshot,
+)
+from backend.services.live_trading.services.real_mirror_service import (
+    mirror_virtual_fill,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,15 +64,19 @@ async def dispatch_internal_strategy_order(
 ) -> dict[str, Any]:
     """复用内部策略下单逻辑：实盘走真实风控/柜台，影子/模拟走虚拟成交。"""
     # user_id 口径与模拟盘接口（simulation.py _require_user_id）对齐：
-    # 非数字 JWT sub 统一映射为 0，保证命中同一模拟账户 Redis 键。
+    # 管理员族收口 10000001，避免 int("00000001")==1 读到空账。
+    from backend.services.trade_shared.simulation_manager import canonical_sim_uid
+
     _uid_raw = str(user_id or "").strip()
-    uid = int(_uid_raw) if _uid_raw.isdigit() else 0
+    uid = canonical_sim_uid(_uid_raw)
     tenant = (tenant_id or "").strip() or "default"
     trading_mode_raw = str(order_data.get("trading_mode", "REAL")).upper()
     try:
         trading_mode = TradingMode(trading_mode_raw)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"invalid trading_mode: {trading_mode_raw}")
+        raise HTTPException(
+            status_code=400, detail=f"invalid trading_mode: {trading_mode_raw}"
+        )
 
     symbol = str(order_data.get("symbol") or "").strip().upper()
     side_raw = str(order_data.get("side") or "").strip().upper()
@@ -96,20 +112,14 @@ async def dispatch_internal_strategy_order(
     )
 
     if trading_mode in {TradingMode.SHADOW, TradingMode.SIMULATION}:
-        sim_manager = SimulationAccountManager(redis)
+        # 与自动托管同一条链：SimOrderService → execute_order → apply_filled（sim_trades + ledger）。
+        # 禁止只改 Redis / 手插 sim_orders，否则交易记录与 EOD/资金台账会分裂。
         try:
-            from datetime import datetime, timezone
-
-            from backend.services.simulation.models.order import (
-                OrderSide as SimOrderSide,
-                OrderStatus as SimOrderStatus,
-                OrderType as SimOrderType,
-                SimOrder,
+            from backend.services.simulation.models.order import SimOrder
+            from backend.services.simulation.services.order_submission_service import (
+                SimulationOrderSubmissionService,
             )
-            from backend.services.simulation.models.trade import SimTrade
 
-            # 幂等：同一 client_order_id 已落账则跳过，防止任务重试导致重复扣款/加仓。
-            # sim_orders 无 client_order_id 列，以 remarks 标记作为幂等键。
             dup_marker = f"client_order_id={client_order_id}"
             dup_stmt = (
                 select(SimOrder.order_id)
@@ -117,7 +127,7 @@ async def dispatch_internal_strategy_order(
                     and_(
                         SimOrder.tenant_id == tenant,
                         SimOrder.user_id == uid,
-                        SimOrder.remarks == dup_marker,
+                        SimOrder.remarks.startswith(dup_marker),
                     )
                 )
                 .limit(1)
@@ -132,135 +142,91 @@ async def dispatch_internal_strategy_order(
                     },
                 }
 
-            side = 1 if side_raw == "BUY" else -1
-            gross = price * quantity
-            # A 股虚拟成交费用：佣金（双向、最低 5 元）+ 印花税（卖出单边），
-            # 与 PaperTradingBroker / SimulationExecutionEngine 口径一致，
-            # 否则手动/托管任务的虚拟成交不扣费，账户现金与真实券商口径背离。
-            commission = 0.0
-            stamp_duty = 0.0
-            total_fee = 0.0
-            if gross > 0:
-                try:
-                    from backend.services.trade_shared.trade_config import settings
+            strategy_id_raw = str(order_data.get("strategy_id") or "").strip()
+            strategy_id_val = int(strategy_id_raw) if strategy_id_raw.isdigit() else None
+            if strategy_id_val is not None and strategy_id_val <= 0:
+                strategy_id_val = None
+            original_remarks = str(remarks or "").strip()
+            combined_remarks = dup_marker
+            if original_remarks and original_remarks != dup_marker:
+                combined_remarks = f"{dup_marker} {original_remarks}"[:500]
+            sim_order_type = "limit" if price > 0 else "market"
+            trigger_source = "manual"
+            if str(client_order_id or "").startswith("manual-"):
+                trigger_source = "manual"
+            elif str(client_order_id or "").startswith("auto-"):
+                trigger_source = "hosted"
 
-                    commission = max(
-                        round(gross * float(settings.SIMULATION_COMMISSION_RATE), 2),
-                        float(settings.SIMULATION_COMMISSION_MIN),
-                    )
-                    try:
-                        from backend.services.simulation.services.market_rules import (
-                            infer_market,
-                        )
-
-                        cn_market = str(infer_market(symbol).value).upper() == "CN"
-                    except Exception:  # noqa: BLE001
-                        cn_market = True
-                    stamp_duty = (
-                        round(gross * float(settings.SIMULATION_STAMP_DUTY_RATE), 2)
-                        if cn_market and side < 0
-                        else 0.0
-                    )
-                except Exception:  # noqa: BLE001
-                    commission = max(round(gross * 0.0003, 2), 5.0)
-                    stamp_duty = round(gross * 0.0005, 2) if side < 0 else 0.0
-                total_fee = round(commission + stamp_duty, 2)
-            delta_cash = -(gross + total_fee) if side > 0 else gross - total_fee
-            result = await sim_manager.update_balance(
+            sim_manager = SimulationAccountManager(redis)
+            submission = SimulationOrderSubmissionService(db, sim_manager)
+            outcome = await submission.submit_and_fill(
+                tenant_id=tenant,
                 user_id=uid,
                 symbol=symbol,
-                delta_cash=delta_cash,
-                delta_volume=quantity if side > 0 else -quantity,
-                price=price,
-                tenant_id=tenant,
+                side=side_raw.lower(),
+                quantity=quantity,
+                order_type=sim_order_type,
+                price=price if price > 0 else None,
+                portfolio_id=0,
+                strategy_id=strategy_id_val,
                 trade_action=trade_action_raw,
                 position_side=position_side_raw,
                 is_margin_trade=is_margin_trade,
+                remarks=combined_remarks,
+                client_order_id=client_order_id,
+                trigger_source=trigger_source,
             )
-            if not result.get("success"):
+            if not outcome.success:
                 logger.warning(
-                    "[Shadow/Sim] 虚拟成交被账户拒绝: %s %s reason=%s",
+                    "[Shadow/Sim] 虚拟成交失败: %s %s reason=%s",
                     symbol,
                     side_raw,
-                    result.get("reason"),
+                    outcome.message,
                 )
-                return {"status": "failed", "execution": "virtual", "detail": result}
+                return {
+                    "status": "failed",
+                    "execution": "virtual",
+                    "order_id": outcome.order_id,
+                    "detail": {"success": False, "reason": outcome.message},
+                    "result": {"success": False, "message": outcome.message},
+                }
 
-            # 补写模拟订单/成交台账（sim_orders + sim_trades），让仪表盘交易记录、
-            # 成交统计等读取侧能查到手动/托管任务的虚拟成交。
-            # DB 落账失败不回滚 Redis 账户（账户资金为准），仅记录错误。
-            now = datetime.now(timezone.utc)
-            strategy_id_raw = str(order_data.get("strategy_id") or "").strip()
-            sim_side = SimOrderSide.BUY if side > 0 else SimOrderSide.SELL
-            sim_order = SimOrder(
-                tenant_id=tenant,
-                user_id=uid,
-                portfolio_id=0,
-                strategy_id=int(strategy_id_raw) if strategy_id_raw.isdigit() else None,
-                symbol=symbol,
-                side=sim_side,
-                order_type=SimOrderType.MARKET if order_type_raw == "MARKET" else SimOrderType.LIMIT,
-                status=SimOrderStatus.FILLED,
-                quantity=quantity,
-                filled_quantity=quantity,
-                price=price if price > 0 else None,
-                average_price=price,
-                order_value=gross,
-                filled_value=gross,
-                commission=commission,
-                total_fee=total_fee,
-                submitted_at=now,
-                filled_at=now,
-                execution_model="virtual_fill",
-                price_source="internal_dispatcher",
-                remarks=dup_marker,
-            )
-            db.add(sim_order)
-            await db.flush()
-            db.add(
-                SimTrade(
-                    order_id=sim_order.order_id,
-                    tenant_id=tenant,
-                    user_id=uid,
-                    portfolio_id=0,
-                    symbol=symbol,
-                    side=sim_side,
-                    quantity=quantity,
-                    price=price,
-                    trade_value=gross,
-                    commission=commission,
-                    stamp_duty=stamp_duty,
-                    total_fee=total_fee,
-                    executed_at=datetime.utcnow(),
-                    price_source="internal_dispatcher",
-                )
-            )
-            try:
-                await db.commit()
-            except Exception:  # noqa: BLE001
-                await db.rollback()
-                logger.error(
-                    "[Shadow/Sim] 成交台账落库失败（账户已生效）: %s %s",
-                    symbol,
-                    side_raw,
-                    exc_info=True,
-                )
             logger.info(
-                "[Shadow/Sim] 虚拟成交完成: %s %s qty=%s fee=%.2f",
+                "[Shadow/Sim] 虚拟成交完成: %s %s qty=%s fee=%.2f order=%s",
                 symbol,
                 side_raw,
-                quantity,
-                total_fee,
+                outcome.filled_quantity,
+                outcome.commission,
+                outcome.order_id,
+            )
+            await mirror_virtual_fill(
+                db=db,
+                redis=redis,
+                tenant_id=tenant,
+                user_id=str(uid),
+                symbol=symbol,
+                side=side_raw,
+                quantity=outcome.filled_quantity or quantity,
+                price=outcome.fill_price or price,
+                client_order_id=client_order_id or "",
+                strategy_id=strategy_id_raw,
+                source=f"internal_dispatcher:{trading_mode.value}",
             )
             return {
                 "status": "success",
                 "execution": "virtual",
-                "order_id": str(sim_order.order_id),
-                "detail": result,
+                "order_id": outcome.order_id,
+                "result": {
+                    "success": True,
+                    "message": outcome.message,
+                    "price_source": outcome.price_source,
+                },
             }
+        except HTTPException:
+            raise
         except Exception as exc:
             logger.error("[Shadow/Sim] 虚拟成交失败: %s", exc, exc_info=True)
-            raise HTTPException(status_code=500, detail=str(exc))
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
         strategy_id = order_data.get("strategy_id")
@@ -299,17 +265,23 @@ async def dispatch_internal_strategy_order(
         try:
             order_type = OrderType(order_type_raw)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"invalid order_type: {order_type_raw}")
+            raise HTTPException(
+                status_code=400, detail=f"invalid order_type: {order_type_raw}"
+            )
         try:
             position_side = PositionSide(position_side_raw)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"invalid position_side: {position_side_raw}")
+            raise HTTPException(
+                status_code=400, detail=f"invalid position_side: {position_side_raw}"
+            )
         trade_action = None
         if trade_action_raw:
             try:
                 trade_action = TradeAction(trade_action_raw)
             except ValueError:
-                raise HTTPException(status_code=400, detail=f"invalid trade_action: {trade_action_raw}")
+                raise HTTPException(
+                    status_code=400, detail=f"invalid trade_action: {trade_action_raw}"
+                )
 
         order_service = OrderService(db, redis)
         engine = TradingEngine(db, redis)

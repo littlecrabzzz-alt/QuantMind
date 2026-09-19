@@ -37,6 +37,16 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   // 任务激活 = 正在提交（POST /evolve 进行中）或后端任务运行中
   const taskActive = miningStarting || task?.status === 'running';
 
+  // 「AI 因子挖掘」入口：有任务（运行中/已完成）才进演化台；
+  // 无任务时滚动到输入框，避免打开空的进度页。
+  const handleOpenDashboard = () => {
+    if (task) {
+      onNavigate?.('mining_dashboard');
+    } else {
+      document.getElementById('mining-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
   useEffect(() => {
     getDataSummary()
       .then((res) => setDataSummary(res.data ?? null))
@@ -49,8 +59,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const dateRangeText = dataSummary?.dateRange?.start && dataSummary?.dateRange?.end
     ? `${dataSummary.dateRange.start} ~ ${dataSummary.dateRange.end}`
     : '2016-01-01 ~ 2021-12-31';
-  const l1Columns = dataSummary?.datasets?.l1_factors?.columns ?? 158;
-  const l1Categories = dataSummary?.datasets?.l1_factors?.categoryCount ?? 6;
+  const l1Columns = dataSummary?.datasets?.l1_factors?.columns ?? 101;
+  const l1Categories = dataSummary?.datasets?.l1_factors?.categoryCount ?? 15;
 
   return (
     <Layout
@@ -92,7 +102,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         </div>
 
         {/* ================= 2. Central Integrated Prompt Input ================= */}
-        <div className="w-full flex flex-col gap-3">
+        <div id="mining-input" className="w-full flex flex-col gap-3">
           {/* 运行中任务进度提示 + 提交锁（避免重复提交） */}
           {taskActive && (
             <div className="w-full max-w-4xl mx-auto flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-2.5 shadow-2xs">
@@ -173,7 +183,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
           {/* AI 因子挖掘 */}
           <div
-            onClick={() => onNavigate?.('mining_dashboard')}
+            onClick={handleOpenDashboard}
             className="group relative bg-white/80 hover:bg-white backdrop-blur-xl rounded-2xl p-5 border border-white/90 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col items-center text-center"
           >
             <div className="absolute top-4 left-4 w-10 h-10 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 flex items-center justify-center text-blue-600 group-hover:scale-105 transition-transform">
@@ -267,10 +277,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                   <Layers className="w-3 h-3 text-blue-500" /> 股票池覆盖
                 </span>
                 <span className="text-xs font-bold text-slate-800 block">
-                  {universeCount > 0 ? `${universeCount} 个多市场可选池` : '沪深 300 / 中证 500 / 1000'}
+                  {universeCount > 0 ? `5 大市场 · ${universeCount} 个 A 股可选池` : '沪深 300 / 中证 500 / 1000'}
                 </span>
               </div>
-              <span className="text-[10px] text-slate-500 mt-2">支持 A 股、港股、美股、加密</span>
+              <span className="text-[10px] text-slate-500 mt-2">A 股、港股、美股、加密、期货</span>
             </div>
 
             {/* 基础因子集 */}
@@ -283,7 +293,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                   QuantDB L1 ({l1Columns} 维 / {l1Categories} 大类)
                 </span>
               </div>
-              <span className="text-[10px] text-slate-500 mt-2">Alpha158 + 动量/量价基础库</span>
+              <span className="text-[10px] text-slate-500 mt-2">动量/波动/流动性等 15 类多因子库</span>
             </div>
 
             {/* 数据时间范围 */}

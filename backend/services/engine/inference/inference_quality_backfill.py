@@ -28,6 +28,15 @@ def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _as_date(value: Any) -> date:
+    """把 'YYYY-MM-DD' / date / datetime 统一成 date，供 DATE 列绑定。"""
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
+
+
 def _rank_ic_from_scores(df: pd.DataFrame, pred_col: str = "score", label_col: str = "label") -> float:
     """单日截面 Rank IC（Spearman）。与 train.py _rank_ic_series 同算法。"""
     df = df[[pred_col, label_col]].dropna()
@@ -77,7 +86,8 @@ def _resolve_parquet_path(data_dir: str, trade_date: str, market: str) -> str | 
     return None
 
 
-def _load_real_returns(data_dir: str, trade_date: str, market: str, horizon: int) -> pd.DataFrame:
+def _load_real_returns_snapshot(data_dir: str, trade_date: str, market: str,
+                                horizon: int) -> pd.DataFrame:
     """读特征快照，构造 T 日对未来 H 日真实收益（复用 train.py 标签构造）。
 
     返回 DataFrame: [symbol, label] where label = 未来 H 日收益（截面 rank 前原始值）。
@@ -122,6 +132,77 @@ def _load_real_returns(data_dir: str, trade_date: str, market: str, horizon: int
     return df
 
 
+def _load_real_returns_quantdb(trade_date: str, horizon: int) -> pd.DataFrame:
+    """从 QuantDB 后复权日线构造 T 日 → 未来 H 个交易日的真实收益。
+
+    A 股训练/推理已改为直读 QuantDB，feature_snapshots 目录在新部署里是空的，
+    旧路径取不到数据时用这里兜底。symbol 统一转 prefix 口径，与 PG 中的
+    推理分数（engine_signal_scores）对齐。
+    """
+    import glob as _glob
+    import os as _os
+    from backend.shared.stock_utils import StockCodeUtil
+
+    data_dir = _os.getenv("QM_QUANTDB_DATA_DIR", "/data/quantdb")
+    base = _os.path.join(data_dir, "1_kline_data", "daily_backward")
+    if not _os.path.isdir(base):
+        base = _os.path.join(data_dir, "1_kline_data", "daily_unadjusted")
+    if not _os.path.isdir(base):
+        logger.warning("QuantDB 日线目录不存在: dir=%s", data_dir)
+        return pd.DataFrame(columns=["symbol", "label"])
+
+    start = str(trade_date).replace("-", "")
+    dts = sorted(
+        p.split("=", 1)[1]
+        for p in _os.listdir(base)
+        if p.startswith("dt=") and p.split("=", 1)[1].isdigit() and p.split("=", 1)[1] >= start
+    )
+    if len(dts) <= horizon:
+        logger.warning(
+            "QuantDB 无足够的未来交易日: date=%s horizon=%d available=%d",
+            trade_date,
+            horizon,
+            len(dts),
+        )
+        return pd.DataFrame(columns=["symbol", "label"])
+
+    d0, d1 = dts[0], dts[horizon]
+    frames = []
+    for d in (d0, d1):
+        files = sorted(_glob.glob(_os.path.join(base, f"dt={d}", "*.parquet")))
+        if not files:
+            return pd.DataFrame(columns=["symbol", "label"])
+        frames.append(
+            pd.concat(
+                [pq.read_table(f, columns=["symbol", "close"]).to_pandas() for f in files]
+            ).assign(_dt=d)
+        )
+
+    piv = pd.concat(frames).pivot_table(
+        index="symbol", columns="_dt", values="close", aggfunc="last"
+    )
+    if d0 not in piv.columns or d1 not in piv.columns:
+        return pd.DataFrame(columns=["symbol", "label"])
+
+    out = ((piv[d1] / piv[d0]) - 1.0).dropna().rename("label").reset_index()
+    out["symbol"] = out["symbol"].map(StockCodeUtil.to_prefix)
+    return out[["symbol", "label"]]
+
+
+def _load_real_returns(data_dir: str, trade_date: str, market: str,
+                       horizon: int) -> pd.DataFrame:
+    """真实收益入口：优先 feature_snapshots，取不到时回退 QuantDB（A 股）。"""
+    df = _load_real_returns_snapshot(data_dir, trade_date, market, horizon)
+    if not df.empty:
+        return df
+    if str(market or "").upper() in ("CN", "A", ""):
+        logger.info(
+            "特征快照无 %s/%s 的真实收益，回退 QuantDB 日线", trade_date, market
+        )
+        return _load_real_returns_quantdb(trade_date, horizon)
+    return df
+
+
 class InferenceQualityBackfill:
     """推理质量回填：真实 IC 计算与入库。"""
 
@@ -153,6 +234,8 @@ class InferenceQualityBackfill:
     async def _get_scores_for_date(self, tenant_id: str, user_id: str, model_id: str,
                                    trade_date: str) -> pd.DataFrame | None:
         """读某模型某日推理分数（engine_signal_scores via run 定位）。"""
+        # data_trade_date 是 DATE 列，asyncpg 不接受字符串，统一转成 date
+        trade_date = _as_date(trade_date)
         async with get_session(read_only=True) as session:
             run_row = (
                 await session.execute(
@@ -194,13 +277,18 @@ class InferenceQualityBackfill:
             return None
         df = pd.DataFrame([dict(r) for r in rows])
         df = df.rename(columns={"fusion_score": "score"})
-        df["symbol"] = df["symbol"].astype(str)
+        # 统一成 prefix 口径（PG 层），与 QuantDB 侧经 StockCodeUtil 转换后的 symbol 对齐
+        from backend.shared.stock_utils import StockCodeUtil
+
+        df["symbol"] = df["symbol"].map(lambda s: StockCodeUtil.to_prefix(str(s)))
         return df
 
     async def backfill_date(self, *, tenant_id: str = "default", user_id: str = "",
                             model_id: str, trade_date: str, market: str = "CN",
                             horizon: int = 5, data_dir: str = _DEFAULT_DATA_DIR) -> dict[str, Any]:
         """回填单个 (model_id, trade_date) 的质量数据。幂等 upsert。"""
+        # 落库用 date，parquet 路径/日志继续用 YYYY-MM-DD 字符串
+        trade_date_db = _as_date(trade_date)
         scores_df = await self._get_scores_for_date(tenant_id, user_id, model_id, trade_date)
         if scores_df is None or scores_df.empty:
             return {"model_id": model_id, "trade_date": trade_date, "status": "no_scores", "rank_ic": None}
@@ -241,7 +329,7 @@ class InferenceQualityBackfill:
                 ),
                 {
                     "model_id": model_id,
-                    "trade_date": trade_date,
+                    "trade_date": trade_date_db,
                     "signals_count": int(len(scores_df)),
                     "coverage": float(coverage) if np.isfinite(coverage) else None,
                     "ic": float(ic) if np.isfinite(ic) else None,
@@ -297,99 +385,5 @@ class InferenceQualityBackfill:
             "ok": len(ok),
             "rank_ic_mean": float(np.mean([r["rank_ic"] for r in ok if r.get("rank_ic") is not None])) if ok else None,
         }
-
-    async def refresh_ensemble_weights(self, model_dir) -> dict[str, Any]:
-        """为单个融合模型刷新 recent_ic 动态权重，写 weight_snapshot.json。
-
-        权重算法：近30日每源模型生产 rank_ic 指数衰减（exp(-d/10)）加权，
-        负值截 0、归一化；全零回退 config 静态权重。覆盖率<30% 的模型 ×0.5。
-        """
-        import json as _json
-        from pathlib import Path as _Path
-
-        model_dir = _Path(model_dir)
-        config_path = model_dir / "ensemble_config.json"
-        if not config_path.exists():
-            return {"status": "not_ensemble"}
-
-        with open(config_path, encoding="utf-8") as f:
-            config = _json.load(f)
-        if str(config.get("weight_strategy") or "") != "recent_ic":
-            return {"status": "not_recent_ic", "strategy": config.get("weight_strategy")}
-
-        models = config.get("models") or []
-        # 收集各源模型近30日 rank_ic（滞后 5 日，取真实收益兑现后的）
-        weights_raw: dict[str, float] = {}
-        coverage_map: dict[str, float] = {}
-        async with get_session(read_only=True) as session:
-            for m in models:
-                mid = str(m.get("model_id") or "")
-                if not mid:
-                    continue
-                rows = (
-                    await session.execute(
-                        text(
-                            """
-                            SELECT trade_date, rank_ic, coverage
-                            FROM qm_model_inference_quality
-                            WHERE model_id = :mid
-                              AND rank_ic IS NOT NULL
-                            ORDER BY trade_date DESC
-                            LIMIT 30
-                            """
-                        ),
-                        {"mid": mid},
-                    )
-                ).mappings().all()
-                if not rows:
-                    continue
-                # 指数衰减加权：最近的权重最大
-                total = 0.0
-                w_sum = 0.0
-                coverages = []
-                for i, r in enumerate(rows):
-                    decay = float(np.exp(-i / 10.0))
-                    ic = float(r["rank_ic"]) if r["rank_ic"] is not None else 0.0
-                    total += ic * decay
-                    w_sum += decay
-                    if r["coverage"] is not None:
-                        coverages.append(float(r["coverage"]))
-                mean_ic = total / w_sum if w_sum > 0 else 0.0
-                if mean_ic > 0:
-                    weights_raw[mid] = mean_ic
-                    coverage_map[mid] = float(np.mean(coverages)) if coverages else 1.0
-
-        if not weights_raw:
-            # 无生产数据 → 回退 config 静态权重
-            static = {str(m.get("model_id")): float(m.get("weight") or 0.0) for m in models if m.get("model_id")}
-            static_w = {k: v for k, v in static.items() if v > 0}
-            tot = sum(static_w.values()) or 1.0
-            snapshot = {k: v / tot for k, v in static_w.items()}
-            snapshot["_updated_at"] = _now_utc().isoformat()
-            (model_dir / "weight_snapshot.json").write_text(
-                _json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8"
-            )
-            return {"status": "fallback_static", "model_id": str(model_dir.name)}
-
-        # 覆盖率惩罚
-        for mid in list(weights_raw.keys()):
-            if coverage_map.get(mid, 1.0) < 0.3:
-                weights_raw[mid] *= 0.5
-
-        tot_w = sum(weights_raw.values())
-        if tot_w <= 0:
-            return {"status": "zero_weight", "model_id": str(model_dir.name)}
-
-        normalized = {k: v / tot_w for k, v in weights_raw.items()}
-        normalized["_updated_at"] = _now_utc().isoformat()
-        (model_dir / "weight_snapshot.json").write_text(
-            _json.dumps(normalized, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        return {
-            "status": "ok",
-            "model_id": str(model_dir.name),
-            "weights": {k: round(v, 4) for k, v in normalized.items() if k != "_updated_at"},
-        }
-
 
 inference_quality_backfill = InferenceQualityBackfill()

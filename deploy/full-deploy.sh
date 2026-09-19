@@ -7,12 +7,15 @@
 # 可选环境变量：
 #   QUANTMIND_MANIFEST_SHA256  SHA256SUMS 清单的 SHA-256（可选）
 #   QUANTMIND_DOCKER_MIRROR  Docker 镜像加速地址
-#   QUANTMIND_REPO_URL    代码仓库地址（默认 Gitee）
+#   QUANTMIND_REPO_URL    代码仓库地址（默认自建 Gitea）
 #   QUANTMIND_REF         要部署的 Git 分支或 tag（默认 master）
-#   QUANTMIND_REPLACE_QLIB=true       覆盖已有 db/qlib_data（谨慎）
+#   QUANTMIND_REPLACE_QLIB=true       覆盖已有 Qlib 数据 data/qlib/cn_data（谨慎）
 #   QUANTMIND_REPLACE_DATABASE=true   覆盖已有 PostgreSQL 业务数据（谨慎）
 #   QUANTMIND_REPLACE_QWENPAW_DATA=true 覆盖已有 QwenPaw 持久化数据（谨慎）
-#   QUANTMIND_REBUILD_IMAGE=true 基于最新代码重建 quantmind 镜像（默认复用离线包成品镜像，谨慎）
+#   QUANTMIND_REBUILD_IMAGE=true 无条件基于最新代码重建 quantmind 镜像。
+#     默认（不设）走「依赖指纹闸门」自动决策：代码 requirements 指纹与镜像
+#     Label qm.req.sha 一致 → 复用成品镜像（秒级启动）；不一致或镜像无指纹 →
+#     自动重建对齐依赖，避免旧镜像缺新依赖导致运行时崩溃。
 #   QUANTMIND_COMPOSE_OVERLAY  已验证 docker-compose.yml 的本地路径（可选）
 #   QUANTMIND_DEPLOY_OVERLAY_DIR  受控 Dockerfile 覆盖目录（可选）
 
@@ -21,7 +24,7 @@ set -euo pipefail
 PROJECT_DIR="${QUANTMIND_PROJECT_DIR:-/opt/quantmind}"
 DOWNLOAD_DIR="${QUANTMIND_DOWNLOAD_DIR:-/opt/quantmind-downloads}"
 STAGING_DIR="${QUANTMIND_STAGING_DIR:-/opt/quantmind-staging}"
-REPO_URL="${QUANTMIND_REPO_URL:-https://gitee.com/qusong0627/QuantMind.git}"
+REPO_URL="${QUANTMIND_REPO_URL:-https://quantmindai.cn/gitea/qusong0627/QuantMind.git}"
 REF="${QUANTMIND_REF:-master}"
 COMPOSE_OVERLAY="${QUANTMIND_COMPOSE_OVERLAY:-}"
 DEPLOY_OVERLAY_DIR="${QUANTMIND_DEPLOY_OVERLAY_DIR:-}"
@@ -149,6 +152,44 @@ PY
     systemctl restart docker
 }
 
+# ── quantmind-oss 依赖指纹闸门 ────────────────────────────────────────────
+# 目的：在「部署速度」与「代码/依赖新鲜度」之间取得平衡。
+#   - 镜像构建时把 requirements.txt/production.txt/ai.txt + Dockerfile.oss
+#     的内容哈希写入 LABEL qm.req.sha（见 docker/Dockerfile.oss 的 QM_REQ_SHA，
+#     由 deploy/req-fingerprint.sh 计算）。
+#   - build_and_start（步骤 8，代码已 checkout）比对「代码算出的期望指纹」与
+#     「镜像自带指纹」：
+#       一致   → 依赖未变，复用成品镜像（秒级启动，覆盖绝大多数「纯代码更新」）。
+#       不一致 → 代码依赖已变（如新增 QMT）而镜像过期，强制重建对齐，
+#                杜绝「新代码 bind-mount + 旧镜像缺依赖」在运行时 import 崩溃。
+#   - 业务代码走 bind mount，纯代码更新永远不触发重建；只有 requirements/Dockerfile 变才重建。
+# 注意：步骤 4 的镜像导入只负责「让镜像存在」，最终是否复用/重建统一由此处（步骤 8）决定，
+#       所以步骤 4 即便复用了旧镜像也不会带病上线——步骤 8 会拦截。
+requirements_fingerprint() {
+    # 唯一实现在 deploy/req-fingerprint.sh（与打包/update/deploy 共用，避免口径漂移）。
+    # checkout 的是无此 helper 的旧 REF 时返回空 → 调用方降级为「复用现有镜像 + 警告」。
+    local helper="$PROJECT_DIR/deploy/req-fingerprint.sh"
+    if [[ -f "$helper" ]]; then
+        bash "$helper" "$PROJECT_DIR" 2>/dev/null || true
+    fi
+}
+
+# 读取已存在镜像的依赖指纹；无该镜像返回 notloaded，有镜像无 Label 返回 none。
+image_req_sha() {
+    local image="$1"
+    if ! docker image inspect "$image" >/dev/null 2>&1; then
+        printf 'notloaded'
+        return 0
+    fi
+    local sha
+    sha="$(docker image inspect "$image" \
+        --format '{{ index .Config.Labels "qm.req.sha" }}' 2>/dev/null || true)"
+    case "$sha" in
+        ""|none|"<no value>") printf 'none' ;;
+        *) printf '%s' "$sha" ;;
+    esac
+}
+
 import_images() {
     local archive="$PACKAGE_DIR/images.tar.zst"
     log '步骤 4/8：解压并导入 Docker 镜像'
@@ -168,8 +209,10 @@ import_images() {
             break
         fi
     done
+    # 镜像齐全即跳过导入（提速）。quantmind-oss 是否为最新依赖由步骤 8 指纹闸门裁决，
+    # 此处复用旧镜像不会导致带病上线。
     if $images_ready; then
-        log '复用已导入的 Docker 镜像'
+        log '复用已导入的 Docker 镜像（quantmind-oss 新鲜度将于步骤 8 依代码指纹校验）'
         return 0
     fi
 
@@ -248,17 +291,6 @@ checkout_code() {
 }
 
 install_payload_data() {
-    local qlib_target="$PROJECT_DIR/db/qlib_data"
-    # 只有真实 Qlib 数据才默认保留；仓库中的空目录或损坏数据会被离线包替换。
-    if [[ -e "$qlib_target" ]] && has_qlib_features "$qlib_target" \
-        && [[ ${QUANTMIND_REPLACE_QLIB:-false} != true ]]; then
-        log "检测到有效 Qlib 数据，复用现有目录: $qlib_target"
-    else
-        rm -rf "$qlib_target"
-        mkdir -p "$PROJECT_DIR/db"
-        mv "$STAGING_DIR/db/qlib_data" "$qlib_target"
-    fi
-
     for directory in data models; do
         [[ -d "$STAGING_DIR/$directory" ]] || die "业务数据包缺少: $directory"
         if [[ -e "$PROJECT_DIR/$directory" ]] \
@@ -269,6 +301,27 @@ install_payload_data() {
             mv "$STAGING_DIR/$directory" "$PROJECT_DIR/$directory"
         fi
     done
+
+    # Qlib A 股缓存统一放在规范目录 data/qlib/cn_data（容器内 /data/qlib/cn_data，
+    # 与 backend/shared/qlib_paths.py 及前端 marketConfig 一致）。
+    # 旧版部署包/旧脚本可能落在 db/qlib_data，检测到有效数据时自动迁移，
+    # 避免「夜间同步写 A 目录、AI-IDE 读 B 目录」导致 Qlib 数据目录不存在。
+    local qlib_target="$PROJECT_DIR/data/qlib/cn_data"
+    local qlib_legacy="$PROJECT_DIR/db/qlib_data"
+    if has_qlib_features "$qlib_target" \
+        && [[ ${QUANTMIND_REPLACE_QLIB:-false} != true ]]; then
+        log "检测到有效 Qlib 数据，复用现有目录: $qlib_target"
+    elif has_qlib_features "$qlib_legacy" \
+        && [[ ${QUANTMIND_REPLACE_QLIB:-false} != true ]]; then
+        log "检测到旧位置 Qlib 数据，迁移到规范目录: $qlib_legacy -> $qlib_target"
+        mkdir -p "$PROJECT_DIR/data/qlib"
+        rm -rf "$qlib_target"
+        mv "$qlib_legacy" "$qlib_target"
+    else
+        rm -rf "$qlib_target"
+        mkdir -p "$PROJECT_DIR/data/qlib"
+        mv "$STAGING_DIR/db/qlib_data" "$qlib_target"
+    fi
     rm -rf "$STAGING_DIR"
 }
 
@@ -369,6 +422,80 @@ configure_qwenpaw_runtime() {
     fi
 }
 
+# 统一 torch 形态，避免依赖指纹漂移：
+# 镜像的 qm.req.sha 把 TORCH_DEVICE 纳入（skip/cpu/gpu 是不同镜像）。解析顺序：
+#   TORCH_DEVICE / QUANTMIND_TORCH_DEVICE > .env > 镜像 Label（qm.torch.device 或
+#   用 cpu/gpu/skip 重算指纹与 qm.req.sha 对拍）。
+# 有现成镜像却推断不出时直接失败，禁止默认 skip——否则会把 cpu/gpu 离线包盖成无 torch。
+# 仅「镜像不存在」（全新安装）才回落 skip，并写入 .env 供后续对齐。
+persist_torch_device() {
+    local device="$1"
+    local env_file="$PROJECT_DIR/.env"
+    export TORCH_DEVICE="$device"
+    if [[ -f "$env_file" ]]; then
+        if grep -qE '^[[:space:]]*TORCH_DEVICE=' "$env_file"; then
+            sed -i "s|^[[:space:]]*TORCH_DEVICE=.*|TORCH_DEVICE=${device}|" "$env_file"
+        else
+            printf '\n# torch 形态（full-deploy 写入，用于依赖指纹对齐）\nTORCH_DEVICE=%s\n' \
+                "$device" >> "$env_file"
+        fi
+        log "TORCH_DEVICE=$device（已同步 .env）"
+    else
+        log "TORCH_DEVICE=$device（.env 不存在，仅本次生效）"
+    fi
+}
+
+ensure_torch_device() {
+    local device="${TORCH_DEVICE:-${QUANTMIND_TORCH_DEVICE:-}}"
+    local env_file="$PROJECT_DIR/.env"
+    local inferred have helper d want
+    if [[ -z "$device" && -f "$env_file" ]]; then
+        device="$(grep -E '^[[:space:]]*TORCH_DEVICE=' "$env_file" 2>/dev/null | tail -1 \
+            | cut -d= -f2- | tr -d "\"' " || true)"
+    fi
+    if [[ -z "$device" ]]; then
+        helper="$PROJECT_DIR/deploy/req-fingerprint.sh"
+        if [[ -f "$helper" ]]; then
+            inferred="$(bash "$helper" --infer-torch "$PROJECT_DIR" quantmind-oss:latest 2>/dev/null || true)"
+            # 兼容尚未包含 --infer-torch 的旧 helper：按 cpu/gpu/skip 对拍镜像指纹。
+            if [[ -z "$inferred" ]]; then
+                have="$(image_req_sha quantmind-oss:latest)"
+                if [[ "$have" != notloaded && "$have" != none ]]; then
+                    for d in cpu gpu skip; do
+                        want="$(TORCH_DEVICE="$d" bash "$helper" "$PROJECT_DIR" 2>/dev/null || true)"
+                        if [[ -n "$want" && "$want" == "$have" ]]; then
+                            inferred="$d"
+                            break
+                        fi
+                    done
+                fi
+            fi
+        fi
+        if [[ -n "$inferred" ]]; then
+            log "未指定 TORCH_DEVICE，已从镜像推断为 $inferred"
+            persist_torch_device "$inferred"
+            return 0
+        fi
+        have="$(image_req_sha quantmind-oss:latest)"
+        case "$have" in
+            notloaded)
+                log '未指定 TORCH_DEVICE 且无 quantmind-oss 镜像，按 skip 处理（全新安装）'
+                persist_torch_device skip
+                return 0
+                ;;
+            none)
+                log '未指定 TORCH_DEVICE，镜像无依赖指纹，按 skip 处理'
+                persist_torch_device skip
+                return 0
+                ;;
+            *)
+                die "未指定 TORCH_DEVICE，且无法从镜像推断（镜像指纹=${have}）。请显式设置 TORCH_DEVICE=cpu|gpu|skip 后重试，以免把已含 torch 的镜像按 skip 重建。"
+                ;;
+        esac
+    fi
+    persist_torch_device "$device"
+}
+
 build_and_start() {
     log '步骤 8/8：基于最新代码重新构建并启动服务'
     cd "$PROJECT_DIR"
@@ -380,15 +507,32 @@ build_and_start() {
             || docker pull diygod/rsshub:latest \
             || log '警告：rsshub 拉取失败（不影响核心服务，RSS 源功能将不可用）'
     fi
-    # 核心镜像按需重建：默认直接复用离线包内已导入、校验过的 quantmind-oss 成品镜像，
-    # 避免每次部署重复构建/联网拉取（离线包镜像与最新代码一致时重建纯属浪费）。
-    # 只有 QUANTMIND_REBUILD_IMAGE=true 才基于最新代码重建。web/data-gateway/dashboard
-    # 均已在离线包中提供成品镜像，直接复用可避免为可选服务拉取额外构建基础镜像。
+    # 依赖指纹闸门：代码已在步骤 5 更新，此处比对「代码 requirements 指纹 vs 镜像 Label」。
+    #   一致   → 复用成品镜像（纯代码更新永远走这条，秒级）；
+    #   不一致 → 离线包镜像已落后代码依赖（如 QMT 事件），自动重建对齐，
+    #            杜绝「新代码 + 缺依赖旧镜像」的运行时 import 崩溃。
+    # 重建需要 PyPI 访问（已配国内源与 wheel 缓存）；纯离线机若触发重建，
+    # 说明离线包过旧，应重新生成镜像包，而非静默带病上线。
+    local want have need_build=false reason=''
+    want="$(requirements_fingerprint)"
+    have="$(image_req_sha quantmind-oss:latest)"
     if [[ ${QUANTMIND_REBUILD_IMAGE:-false} == true ]]; then
-        log '按 QUANTMIND_REBUILD_IMAGE=true 基于最新代码重建 quantmind 镜像...'
-        docker compose build --pull=false quantmind
+        need_build=true; reason='QUANTMIND_REBUILD_IMAGE=true 强制重建'
+    elif [[ -z "$want" ]]; then
+        log '警告：无法计算代码依赖指纹（requirements 清单缺失？），复用现有镜像'
+    elif [[ "$have" == notloaded ]]; then
+        need_build=true; reason='quantmind-oss 镜像不存在'
+    elif [[ "$have" == none ]]; then
+        need_build=true; reason='镜像无依赖指纹（早于指纹机制的离线包/手工构建）'
+    elif [[ "$have" != "$want" ]]; then
+        need_build=true; reason="依赖指纹不一致（镜像=$have，代码=$want）"
     else
-        log '复用离线包内 quantmind-oss 成品镜像（跳过重建；QUANTMIND_REBUILD_IMAGE=true 可强制重建）'
+        log "依赖指纹一致（$want）：复用 quantmind-oss 成品镜像，跳过重建"
+    fi
+    if $need_build; then
+        log "重建 quantmind 镜像（$reason）；需 PyPI 访问，纯离线机请改用与代码匹配的新离线包"
+        QM_REQ_SHA="${want:-unknown}" docker compose build --pull=false quantmind \
+            || die "quantmind 镜像重建失败（$reason）。离线环境请重新生成与代码匹配的镜像包后重试"
     fi
     docker compose up -d --pull never
     configure_qwenpaw_runtime
@@ -404,11 +548,11 @@ main() {
     echo " -------------------------------------------------------------------------"
     echo " ⏱️  预计耗时（依服务器性能与网络波动）:"
     echo "     1. 安装依赖与 Docker        ~2-5 分钟"
-    echo "     2. 下载离线包（约 5GB）     ~5-20 分钟"
+    echo "     2. 下载离线包（约 6GB）     ~5-20 分钟"
     echo "     3. 导入 Docker 镜像         ~3-10 分钟"
     echo "     4. 下载最新代码             ~1-3 分钟"
     echo "     5. 恢复业务数据与数据库     ~2-5 分钟"
-    echo "     6. 复用成品镜像并启动服务   ~1-5 分钟（QUANTMIND_REBUILD_IMAGE=true 重建则另加构建时间）"
+    echo "     6. 依赖指纹校验并启动服务   指纹一致约 1 分钟；不一致将自动重建镜像（另加构建时间）"
     echo "     合计                       约 15-50 分钟"
     echo " -------------------------------------------------------------------------"
     echo " 💡 如遇系统组件下载缓慢，请切换至国内加速源以提升速度。"
@@ -421,8 +565,9 @@ main() {
     install_payload_data
     restore_database
     restore_qwenpaw_volumes
+    ensure_torch_device
     build_and_start
-    log "完成：代码=$PROJECT_DIR，Qlib 数据=$PROJECT_DIR/db/qlib_data"
+    log "完成：代码=$PROJECT_DIR，Qlib 数据=$PROJECT_DIR/data/qlib/cn_data"
     echo ""
     echo "========================================================================="
     echo " 🎉 QuantMind 完整部署成功！"

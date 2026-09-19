@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 import train
+from diagnostics import wfa as wfa_module
 
 
 class ResearchIntegrityTest(unittest.TestCase):
@@ -79,10 +80,10 @@ class ResearchIntegrityTest(unittest.TestCase):
     def test_wfa_purges_labels_and_uses_separate_early_stopping(self):
         wfa = {"strategy": "rolling", "train_years": 1, "val_months": 1,
                "step_months": 1, "start": "2022-01-03"}
-        earlier, later = train._wfa_split_window(self.df, wfa, 0, self.cfg)
+        earlier, later = wfa_module._wfa_split_window(self.df, wfa, 0, self.cfg)
         self.assert_labels_before(self.df, earlier, later)
-        with patch.object(train, "_prepare_arrays", wraps=train._prepare_arrays) as prepare:
-            result = train._train_wfa_single(self.cfg, ["factor"], earlier, later, wfa, 0)
+        with patch.object(wfa_module, "_prepare_arrays", wraps=wfa_module._prepare_arrays) as prepare:
+            result = wfa_module._train_wfa_single(self.cfg, ["factor"], earlier, later, wfa, 0)
         self.assertIsNotNone(result)
         fit, stop = prepare.call_args.args[:2]
         self.assert_labels_before(self.df, fit, stop)
@@ -103,7 +104,8 @@ class ResearchIntegrityTest(unittest.TestCase):
                 calls.append((fit, stop, holdout))
                 return original(model_type, fit, stop, holdout, *args, **kwargs)
 
-            with patch.object(train, "Path", side_effect=output_path), patch.object(train, "_train_single_model", side_effect=record):
+            self.cfg["output"] = {"workspace": temp}
+            with patch.object(train, "_train_single_model", side_effect=record):
                 result = train.train_stacking(self.df, ["factor"], self.cfg,
                                               ["lightgbm", "linear"], n_folds=2)
             self.assertEqual(len(calls), 6)

@@ -407,12 +407,91 @@ def _ensure_database_schema():
                            result.stderr[:200] if result.stderr else "")
         # 执行市场分析模块建表（qm_market_sectors 等，不在 db_init.sql 内）
         _ensure_market_analysis_tables(env)
+        # 执行增量升级脚本（system_events、news title 等，不在 db_init.sql 内，幂等可重放）
+        _ensure_upgrade_scripts(env)
     except FileNotFoundError:
         # psql 客户端可能未安装在镜像中，回退到 Python 方式
         logger.info("psql 未安装，使用 Python 执行数据库初始化")
         _ensure_database_schema_python()
     except Exception as e:
         logger.warning("数据库自动建表失败（不影响启动，后续按需建表）: %s", e)
+
+
+def _upgrade_script_paths() -> list[str]:
+    """升级 SQL 候选路径（去重保序）。
+
+    /app/data 是历史路径（容器里常是 uploads）；compose 把仓库 data/ 挂到 /data。
+    再扫仓库相对路径，避免本地直接跑 main_oss 时漏脚本。
+    """
+    import glob as _glob
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    repo_data = os.path.abspath(os.path.join(here, "..", "data"))
+    seen: set[str] = set()
+    out: list[str] = []
+    for pattern in (
+        "/app/data/upgrade_*.sql",
+        "/data/upgrade_*.sql",
+        os.path.join(repo_data, "upgrade_*.sql"),
+    ):
+        for sql_path in sorted(_glob.glob(pattern)):
+            if sql_path not in seen:
+                seen.add(sql_path)
+                out.append(sql_path)
+    return out
+
+
+def _ensure_upgrade_scripts(env: dict) -> None:
+    """执行 /app/data/upgrade_*.sql 增量迁移（system_events、news title 等）。
+
+    幂等（均含 IF NOT EXISTS / DO IF NOT EXISTS），可重复执行，避免
+    新表/新列因未自动迁移而导致线上 500（如 system_events 缺失、
+    news_article_enrichment.title 缺失）。
+    """
+    import glob as _glob
+    import subprocess as _sp
+
+    for sql_path in _upgrade_script_paths():
+        try:
+            result = _sp.run(
+                ["psql", "-h", os.getenv("DB_HOST", os.getenv("POSTGRES_HOST", "db")),
+                 "-p", os.getenv("DB_PORT", "5432"),
+                 "-U", os.getenv("DB_USER", os.getenv("POSTGRES_USER", "quantmind")),
+                 "-d", os.getenv("DB_NAME", os.getenv("POSTGRES_DB", "quantmind")),
+                 "-f", sql_path, "--quiet", "-v", "ON_ERROR_STOP=0"],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if result.returncode == 0:
+                logger.info("增量升级已执行: %s", os.path.basename(sql_path))
+            else:
+                logger.warning("增量升级有警告 %s: %s", os.path.basename(sql_path), (result.stderr or "")[:200])
+        except FileNotFoundError:
+            _ensure_upgrade_scripts_python(sql_path)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("增量升级失败 %s: %s", os.path.basename(sql_path), e)
+
+
+def _ensure_upgrade_scripts_python(sql_path: str) -> None:
+    """psql 不可用时的回退：用 psycopg2 直接执行 SQL 文件。"""
+    db_host = os.getenv("DB_HOST", os.getenv("POSTGRES_HOST", "db"))
+    db_port = os.getenv("DB_PORT", "5432")
+    db_name = os.getenv("DB_NAME", os.getenv("POSTGRES_DB", "quantmind"))
+    db_user = os.getenv("DB_USER", os.getenv("POSTGRES_USER", "quantmind"))
+    db_password = os.getenv("DB_PASSWORD", os.getenv("POSTGRES_PASSWORD", "quantmind2026"))
+    try:
+        import psycopg2  # type: ignore
+        sql_text = open(sql_path, encoding="utf-8").read()
+        conn = psycopg2.connect(host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password)
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute(sql_text)
+        conn.close()
+        logger.info("增量升级已执行(Python): %s", os.path.basename(sql_path))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("增量升级失败(Python) %s: %s", os.path.basename(sql_path), e)
 
 
 def _ensure_market_analysis_tables(env: dict) -> None:
@@ -475,6 +554,14 @@ def _ensure_database_schema_python():
                 with open(market_sql) as f:
                     cur.execute(f.read())
                 logger.info("市场分析表结构自检完成 (Python psycopg2)")
+            # 增量升级（system_events、news title 等，幂等）
+            for _up in _upgrade_script_paths():
+                try:
+                    with open(_up, encoding="utf-8") as f:
+                        cur.execute(f.read())
+                    logger.info("增量升级已执行(Python): %s", os.path.basename(_up))
+                except Exception as ue:  # noqa: BLE001
+                    logger.warning("增量升级失败(Python) %s: %s", os.path.basename(_up), ue)
         conn.close()
         logger.info("数据库表结构自检完成 (Python psycopg2)")
     except Exception as e:
@@ -486,7 +573,7 @@ def _ensure_seed_admin():
 
     离线部署的 postgres 转储不含 admin 用户，且历史上应用启动不会自动 seed，
     导致首次登录报 'user not found' (401)。这里在启动期幂等地创建默认 admin
-    （admin / admin123，user_id=00000001，is_admin=true，显示名 QuantMind、头像 /logo.png），
+    （admin / admin123，user_id=10000001，is_admin=true，显示名 QuantMind、头像 /logo.png），
     并补全 RBAC 角色。
     失败仅告警，不影响主流程启动。
     """
@@ -524,12 +611,34 @@ def _ensure_seed_admin():
         )
 
 
+def _ensure_stock_pool() -> None:
+    """启动期确保股票池表结构 + 内置池 seed + 成分 TXT 刷新（幂等，失败仅告警）。
+
+    全局股票池是回测 / 训练 / 推理 / 模拟盘 / 实盘共用的唯一事实源；
+    成员为前缀式 TXT（/data/stock_pool/<code>.txt），保存即生效。
+    """
+    try:
+        from backend.shared.stock_pool import (
+            pool_storage_ready,
+            refresh_builtin_txts_sync,
+            seed_builtin_pools_sync,
+        )
+
+        pool_storage_ready()
+        seed_builtin_pools_sync()
+        refresh_builtin_txts_sync()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("全局股票池初始化失败（不影响启动）: %s", e)
+
+
 def main():
     """主入口"""
     # 启动前确保数据库表结构完整
     _ensure_database_schema()
     # 启动期确保默认管理员账号存在（幂等，失败不影响启动）
     _ensure_seed_admin()
+    # 启动期确保全局股票池表结构与内置池 seed（幂等，失败不影响启动）
+    _ensure_stock_pool()
 
     service_mode = os.getenv("SERVICE_MODE", "all").lower().strip()
     ports = get_service_ports()
