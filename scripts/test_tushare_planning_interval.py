@@ -118,6 +118,7 @@ class PlanningInterval(unittest.TestCase):
         checkpoint = self.planning_checkpoint()
         acquisitions = self.acquisitions
         self.config["reconciliation_parents_per_tick"] = 1000
+        self.config["reconciliation_resolved_audit_per_tick"] = 64
         with (
             patch.object(module.Pipeline, "initialize", side_effect=AssertionError),
             patch.object(module.Pipeline, "plan_extended", side_effect=AssertionError),

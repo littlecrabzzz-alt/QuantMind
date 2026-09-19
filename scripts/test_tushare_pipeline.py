@@ -174,7 +174,23 @@ class PipelineAcceptance(unittest.TestCase):
                     pause=0,
                 )
 
-            self.assertEqual(calls[0]["max_parents"], 64)
+            self.assertEqual(
+                calls[:2],
+                [
+                    {
+                        "max_parents": 60,
+                        "deadline": calls[0]["deadline"],
+                        "parent_state": "split_pending",
+                    },
+                    {
+                        "max_parents": 4,
+                        "deadline": calls[0]["deadline"],
+                        "parent_state": "resolved",
+                    },
+                ],
+            )
+            self.assertEqual(len(calls), 3)
+            self.assertEqual(set(calls[2]), {"child_id", "deadline"})
             self.assertEqual(report["requests"], 1)
             self.assertEqual(
                 report["partition_reconciliation"],
@@ -184,6 +200,20 @@ class PipelineAcceptance(unittest.TestCase):
                     "changed": 0,
                     "newly_resolved": 0,
                     "reaffirmed_resolved": 0,
+                    "split_pending": {
+                        "checked": 0,
+                        "resolved": 0,
+                        "changed": 0,
+                        "newly_resolved": 0,
+                        "reaffirmed_resolved": 0,
+                    },
+                    "resolved_audit": {
+                        "checked": 0,
+                        "resolved": 0,
+                        "changed": 0,
+                        "newly_resolved": 0,
+                        "reaffirmed_resolved": 0,
+                    },
                 },
             )
             self.assertEqual(

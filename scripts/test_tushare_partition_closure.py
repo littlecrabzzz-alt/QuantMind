@@ -463,6 +463,37 @@ class Closure(unittest.TestCase):
         )
         self.assertEqual(self.state(parents[1]), "resolved")
 
+    def test_parent_state_filter_prioritizes_open_and_audits_resolved(self):
+        settled, settled_children = self.split(epoch="settled")
+        for child in settled_children:
+            self.finish(child)
+        self.p.reconcile_partitions(child_id=settled)
+        open_parent, open_children = self.split(epoch="open")
+        for child in open_children:
+            self.finish(child)
+
+        self.assertEqual(
+            self.p.reconcile_partitions(
+                max_parents=1, parent_state="split_pending"
+            ),
+            {
+                "checked": 1,
+                "resolved": 1,
+                "changed": 1,
+                "newly_resolved": 1,
+                "reaffirmed_resolved": 0,
+            },
+        )
+        self.assertEqual(self.state(open_parent), "resolved")
+        audit = self.p.reconcile_partitions(max_parents=1, parent_state="resolved")
+        self.assertEqual(audit["checked"], 1)
+        self.assertEqual(audit["newly_resolved"], 0)
+        self.assertEqual(audit["reaffirmed_resolved"], 1)
+        with self.assertRaisesRegex(ValueError, "cannot filter"):
+            self.p.reconcile_partitions(
+                child_id=settled, parent_state="split_pending"
+            )
+
     def test_expired_reconciliation_deadline_keeps_work_pending(self):
         parent, children = self.split(epoch="expired-deadline")
         for child in children:

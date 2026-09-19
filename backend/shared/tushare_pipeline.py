@@ -4755,7 +4755,9 @@ class Pipeline:
             self._partition_artifact_checks.pop(name, None)
             return "child_artifact_unreadable"
 
-    def reconcile_partitions(self, max_parents=1000, child_id=None, deadline=None):
+    def reconcile_partitions(
+        self, max_parents=1000, child_id=None, deadline=None, parent_state=None
+    ):
         """Bounded, restartable closure; descendants must carry positive evidence.
 
         A done pagination page or empty-unverified terminator is not a complete
@@ -4766,26 +4768,53 @@ class Pipeline:
             raise ValueError("Invalid partition reconciliation budget")
         if deadline is not None and type(deadline) not in (int, float):
             raise ValueError("Invalid partition reconciliation deadline")
+        if parent_state not in (None, "split_pending", "resolved"):
+            raise ValueError("Invalid partition reconciliation parent state")
+        if child_id is not None and parent_state is not None:
+            raise ValueError("Child reconciliation cannot filter parent state")
         selected = []
         cursor = None
         if child_id is None:
+            cursor_name = (
+                "partition_cursor"
+                if parent_state is None
+                else "partition_cursor:" + parent_state
+            )
             saved = self.db.execute(
-                "SELECT value FROM scheduler_state WHERE name='partition_cursor'"
+                "SELECT value FROM scheduler_state WHERE name=?", (cursor_name,)
             ).fetchone()
             cursor = saved[0] if saved else 0
-            selected = self.db.execute(
-                "SELECT rowid,parent_id FROM partition_splits WHERE rowid>? ORDER BY rowid LIMIT ?",
-                (cursor, max_parents),
-            ).fetchall()
+            if parent_state is None:
+                selected = self.db.execute(
+                    "SELECT rowid AS split_rowid,parent_id FROM partition_splits "
+                    "WHERE rowid>? ORDER BY rowid LIMIT ?",
+                    (cursor, max_parents),
+                ).fetchall()
+            else:
+                selected = self.db.execute(
+                    "SELECT p.rowid AS split_rowid,p.parent_id "
+                    "FROM partition_splits p JOIN jobs j ON j.id=p.parent_id "
+                    "WHERE p.rowid>? AND j.state=? ORDER BY p.rowid LIMIT ?",
+                    (cursor, parent_state, max_parents),
+                ).fetchall()
             if len(selected) < max_parents:
-                selected.extend(
-                    self.db.execute(
-                        "SELECT rowid,parent_id FROM partition_splits "
+                if parent_state is None:
+                    wrapped = self.db.execute(
+                        "SELECT rowid AS split_rowid,parent_id FROM partition_splits "
                         "WHERE rowid<=? ORDER BY rowid LIMIT ?",
                         (cursor, max_parents - len(selected)),
                     ).fetchall()
-                )
-            pending = deque((row["parent_id"], row["rowid"]) for row in selected)
+                else:
+                    wrapped = self.db.execute(
+                        "SELECT p.rowid AS split_rowid,p.parent_id "
+                        "FROM partition_splits p JOIN jobs j ON j.id=p.parent_id "
+                        "WHERE p.rowid<=? AND j.state=? ORDER BY p.rowid LIMIT ?",
+                        (cursor, parent_state, max_parents - len(selected)),
+                    ).fetchall()
+                selected.extend(wrapped)
+            pending = deque(
+                (row["parent_id"], row["split_rowid"]) for row in selected
+            )
         else:
             pending = deque(
                 (r[0], None)
@@ -4904,8 +4933,9 @@ class Pipeline:
             reaffirmed_resolved += int(not gap and was_resolved)
         if child_id is None:
             self.db.execute(
-                "INSERT INTO scheduler_state VALUES('partition_cursor',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
-                (0 if not selected else last_cursor,),
+                "INSERT INTO scheduler_state VALUES(?,?) "
+                "ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+                (cursor_name, 0 if not selected else last_cursor),
             )
         self.db.commit()
         return {
@@ -5505,10 +5535,50 @@ class Pipeline:
                 or not 1 <= reconciliation_parents <= 1000
             ):
                 raise ValueError("Invalid partition reconciliation budget")
+            resolved_audit_parents = config.get(
+                "reconciliation_resolved_audit_per_tick",
+                min(4, reconciliation_parents),
+            )
+            if (
+                type(resolved_audit_parents) is not int
+                or not 0 <= resolved_audit_parents <= reconciliation_parents
+            ):
+                raise ValueError("Invalid resolved partition audit budget")
             phase_started = time.perf_counter()
             try:
-                partition_reconciliation = self.reconcile_partitions(
-                    max_parents=reconciliation_parents, deadline=deadline
+                empty_reconciliation = {
+                    "checked": 0,
+                    "resolved": 0,
+                    "changed": 0,
+                    "newly_resolved": 0,
+                    "reaffirmed_resolved": 0,
+                }
+                open_parents = reconciliation_parents - resolved_audit_parents
+                open_report = (
+                    self.reconcile_partitions(
+                        max_parents=open_parents,
+                        deadline=deadline,
+                        parent_state="split_pending",
+                    )
+                    if open_parents
+                    else dict(empty_reconciliation)
+                )
+                audit_report = (
+                    self.reconcile_partitions(
+                        max_parents=resolved_audit_parents,
+                        deadline=deadline,
+                        parent_state="resolved",
+                    )
+                    if resolved_audit_parents
+                    and time.monotonic() < deadline
+                    else dict(empty_reconciliation)
+                )
+                partition_reconciliation = {
+                    name: open_report[name] + audit_report[name]
+                    for name in empty_reconciliation
+                }
+                partition_reconciliation.update(
+                    split_pending=open_report, resolved_audit=audit_report
                 )
             finally:
                 work_seconds["partition_reconciliation"] += (
@@ -6443,6 +6513,7 @@ def _planning_config_fingerprint(config):
             "documents_per_tick",
             "archive_worker_acquire_after_planning",
             "reconciliation_parents_per_tick",
+            "reconciliation_resolved_audit_per_tick",
         }
     }
     return digest(json_bytes({"version": 2, "config": planning_config}))
