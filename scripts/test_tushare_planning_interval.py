@@ -112,6 +112,24 @@ class PlanningInterval(unittest.TestCase):
         self.assertEqual(self.planning_checkpoint(), checkpoint)
         self.assertEqual(self.acquisitions, acquisitions + 1)
 
+    def test_reconciliation_budget_change_does_not_replan_acquisition(self):
+        self.published()
+        self.tick(1)
+        checkpoint = self.planning_checkpoint()
+        acquisitions = self.acquisitions
+        self.config["reconciliation_parents_per_tick"] = 1000
+        with (
+            patch.object(module.Pipeline, "initialize", side_effect=AssertionError),
+            patch.object(module.Pipeline, "plan_extended", side_effect=AssertionError),
+        ):
+            result = self.tick(1)
+        self.assertNotEqual(result.get("status"), "planning_only")
+        self.assertEqual(
+            result["planning_cadence"]["reason"], "interval_not_due"
+        )
+        self.assertEqual(self.planning_checkpoint(), checkpoint)
+        self.assertEqual(self.acquisitions, acquisitions + 1)
+
     def test_matching_legacy_whole_config_checkpoint_migrates_without_plan(self):
         self.published()
         effective = dict(self.config)

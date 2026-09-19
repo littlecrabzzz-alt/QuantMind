@@ -6419,6 +6419,7 @@ def _planning_config_fingerprint(config):
             "enable_documents",
             "documents_per_tick",
             "archive_worker_acquire_after_planning",
+            "reconciliation_parents_per_tick",
         }
     }
     return digest(json_bytes({"version": 2, "config": planning_config}))
