@@ -306,6 +306,17 @@ class Documents(unittest.TestCase):
             self.assertEqual(
                 docs._parse_pdf(self.root / "dummy", 1)["parse_status"], "parse_timeout"
             )
+        with (
+            patch.object(docs.sys, "platform", "linux"),
+            patch.object(
+                docs.subprocess,
+                "run",
+                return_value=Mock(returncode=-signal.SIGXCPU),
+            ),
+        ):
+            self.assertEqual(
+                docs._parse_pdf(self.root / "dummy", 1)["parse_status"], "parse_timeout"
+            )
 
     def test_darwin_parser_monitor_limits_and_monitor_failure(self):
         class Worker:
@@ -354,6 +365,12 @@ class Documents(unittest.TestCase):
         self.assertEqual(result["parse_status"], "parse_timeout")
         kill.assert_called_once_with(worker.pid, signal.SIGKILL)
 
+        cpu_limited = Mock(returncode=-signal.SIGXCPU)
+        cpu_limited.poll.return_value = -signal.SIGXCPU
+        with patch.object(docs.subprocess, "Popen", return_value=cpu_limited):
+            result = docs._parse_pdf_darwin(self.root / "unused.pdf", 1)
+        self.assertEqual(result["parse_status"], "parse_timeout")
+
     @unittest.skipUnless(sys.platform == "darwin", "Darwin libproc only")
     def test_darwin_monitor_treats_exited_process_as_complete(self):
         self.assertIsNone(docs._darwin_resident_bytes(2_000_000_000))
@@ -371,6 +388,10 @@ class Documents(unittest.TestCase):
         self.assertEqual(
             [call.args[0] for call in limit.call_args_list],
             [resource.RLIMIT_CPU, resource.RLIMIT_FSIZE],
+        )
+        self.assertEqual(
+            limit.call_args_list[0].args[1],
+            (docs.MAX_PARSE_CPU_SECONDS, docs.MAX_PARSE_CPU_SECONDS),
         )
 
         with (

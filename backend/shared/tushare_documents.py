@@ -34,6 +34,7 @@ MAX_PARSE_PAGES = 5000
 MAX_PARSE_TEXT_BYTES = 8 * 1024 * 1024
 MAX_PARSE_OUTPUT_BYTES = 32 * 1024 * 1024
 MAX_PARSE_RESIDENT_BYTES = 1024**3
+MAX_PARSE_CPU_SECONDS = 90
 DEFAULT_DOCUMENT_MAX_BYTES = 25 * 1024 * 1024
 MAX_DOCUMENT_MAX_BYTES = 320 * 1024 * 1024
 
@@ -172,7 +173,10 @@ def _parse_worker(path):
     import resource
 
     try:
-        resource.setrlimit(resource.RLIMIT_CPU, (15, 15))
+        resource.setrlimit(
+            resource.RLIMIT_CPU,
+            (MAX_PARSE_CPU_SECONDS, MAX_PARSE_CPU_SECONDS),
+        )
         resource.setrlimit(
             resource.RLIMIT_FSIZE,
             (MAX_PARSE_OUTPUT_BYTES, MAX_PARSE_OUTPUT_BYTES),
@@ -385,7 +389,7 @@ def _parse_pdf_darwin(path, timeout):
                 _kill_parser(worker)
             if result is not None:
                 return result
-            if worker.returncode == -signal.SIGALRM:
+            if worker.returncode in (-signal.SIGALRM, -signal.SIGXCPU):
                 return {"parse_status": "parse_timeout"}
             if worker.returncode:
                 return {
@@ -426,7 +430,7 @@ def _parse_pdf(path, timeout):
             check=False,
             env={"PATH": os.defpath, "LANG": "C.UTF-8"},
         )
-        if worker.returncode == -signal.SIGALRM:
+        if worker.returncode in (-signal.SIGALRM, -signal.SIGXCPU):
             return {"parse_status": "parse_timeout"}
         if worker.returncode:
             return {"parse_status": "parse_failed", "reason": "parser_process_failed"}
