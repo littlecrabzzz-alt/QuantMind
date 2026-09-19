@@ -1,0 +1,150 @@
+{
+  "verified_at": "2026-09-19T03:25:14.495768+00:00",
+  "publication": {
+    "elapsed_seconds": 648.658,
+    "previous_release_id": "data-fdebee7d2a2bedf86d4b7bc1a3f99684516d957c5fa58e13b69bb416000f2070",
+    "publish_timing": {
+      "attempt_scan": {
+        "artifacts_checked": 2374206,
+        "attempts_scanned": 929270,
+        "elapsed_seconds": 73.1057792911306,
+        "stat_batches": 290,
+        "stat_workers": 8
+      },
+      "completed_stages": [
+        "read_current",
+        "scan_gaps",
+        "scan_attempts_and_stat",
+        "contract_reassessment_overlays",
+        "normalization_recovery_overlays",
+        "schema_metadata",
+        "archive_inventory_before",
+        "document_index",
+        "metadata_inventory",
+        "coverage_and_closure",
+        "compare_previous",
+        "retain_previous",
+        "archive_inventory_after",
+        "serialize_manifest",
+        "write_manifest"
+      ],
+      "failed_stage": null,
+      "retention": {
+        "completed_stages": [
+          "reuse_stat",
+          "expected_files",
+          "lock_wait",
+          "archive_open",
+          "archive_record",
+          "known_archives"
+        ],
+        "failed_stage": null,
+        "reused_predecessor": true,
+        "stage_seconds": {
+          "archive_open": 0.0034363751765340567,
+          "archive_record": 0.7290836670435965,
+          "expected_files": 10.422618875047192,
+          "known_archives": 0.008895749924704432,
+          "lock_wait": 5.250098183751106e-06,
+          "reuse_stat": 0.0029122920241206884
+        },
+        "total_elapsed_seconds": 11.167291166028008
+      },
+      "serialization": {
+        "bytes": 968913259,
+        "chunk_generation_seconds": 5.854980875039473,
+        "chunks": 924,
+        "eager_chunks": true,
+        "largest_chunk_bytes": 1069756,
+        "total_seconds": 6.562037916155532
+      },
+      "stage_seconds": {
+        "archive_inventory_after": 0.29810004215687513,
+        "archive_inventory_before": 0.3429988329298794,
+        "compare_previous": 1.7637237920425832,
+        "contract_reassessment_overlays": 0.05456245900131762,
+        "coverage_and_closure": 45.729661209043115,
+        "document_index": 428.1836309169885,
+        "metadata_inventory": 34.99996729101986,
+        "normalization_recovery_overlays": 0.00372512498870492,
+        "read_current": 6.275574666913599,
+        "retain_previous": 11.16744437511079,
+        "scan_attempts_and_stat": 73.10607354203239,
+        "scan_gaps": 38.40663170791231,
+        "schema_metadata": 0.0071418751031160355,
+        "serialize_manifest": 6.723186291987076,
+        "write_manifest": 0.002151499968022108
+      },
+      "total_elapsed_seconds": 647.0647561249789
+    },
+    "reason": "Publish repaired SW daily freshness for cloud research cache acceptance",
+    "release_id": "data-9b2aaccda4892dd36ab0b2628418e3269b4b30d024a4fe4e029d6efb45b466a4",
+    "upstream_calls": 0,
+    "verified_at": "2026-09-19T03:13:39.035185+00:00"
+  },
+  "cloud_cache": {
+    "budget_bytes": 53687091200,
+    "cache_bytes": 4558229001,
+    "downloaded_files": 12331,
+    "manifest_sha256": "31096977942544c2b43059b1392185a16354e421ca6f388bd2e4f6fbc9e43757",
+    "release_id": "data-31096977942544c2b43059b1392185a16354e421ca6f388bd2e4f6fbc9e43757",
+    "selected_api_names": [
+      "adj_factor",
+      "ci_daily",
+      "daily",
+      "daily_basic",
+      "fund_basic",
+      "fund_daily",
+      "index_basic",
+      "index_daily",
+      "index_weight",
+      "stock_basic",
+      "sw_daily",
+      "trade_cal"
+    ],
+    "source_release_id": "data-9b2aaccda4892dd36ab0b2628418e3269b4b30d024a4fe4e029d6efb45b466a4",
+    "status": "verified",
+    "upstream_calls": 0
+  },
+  "cloud_transfer": {
+    "downloaded_bytes": 402760344,
+    "downloaded_files": 12331,
+    "manifest_sha256": "31096977942544c2b43059b1392185a16354e421ca6f388bd2e4f6fbc9e43757",
+    "needed_bytes": 402760344,
+    "release_id": "data-31096977942544c2b43059b1392185a16354e421ca6f388bd2e4f6fbc9e43757",
+    "source_release_id": "data-9b2aaccda4892dd36ab0b2628418e3269b4b30d024a4fe4e029d6efb45b466a4",
+    "started_at": "2026-09-19T03:20:55.546727+00:00",
+    "status": "downloaded",
+    "total_missing_files": 12331,
+    "updated_at": "2026-09-19T03:24:04.236721+00:00"
+  },
+  "reader_acceptance": {
+    "api": "sw_daily",
+    "trade_date": "20260918",
+    "fields": [
+      "ts_code",
+      "trade_date"
+    ],
+    "limit": 500,
+    "previous_cloud_rows": 0,
+    "local_fixed_release_rows": 439,
+    "cloud_fixed_release_rows": 439,
+    "upstream_calls": 0,
+    "rrg_status": "blocked_data"
+  },
+  "source_optimization": {
+    "commit": "2ddf2218",
+    "deployed_sha256": "24cbb11ef864df0775da4c9823494400d180e8a204089e6d07a9f14e59cbdb23",
+    "source_pid": 68246,
+    "cloud_http_pointer_matches": true,
+    "tests_passed": 3,
+    "benchmark_scope": "Only repeated provenance validation, not whole export",
+    "real_batch_rows": 5550,
+    "distinct_provenance_values": 1,
+    "iterations": 100,
+    "before_seconds": 0.1611500410363078,
+    "after_seconds": 0.004994959104806185
+  },
+  "mac_free_bytes": 2054389276672,
+  "full_history_complete": false
+}
