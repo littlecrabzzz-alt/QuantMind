@@ -178,7 +178,13 @@ class PipelineAcceptance(unittest.TestCase):
             self.assertEqual(report["requests"], 1)
             self.assertEqual(
                 report["partition_reconciliation"],
-                {"checked": 0, "resolved": 0},
+                {
+                    "checked": 0,
+                    "resolved": 0,
+                    "changed": 0,
+                    "newly_resolved": 0,
+                    "reaffirmed_resolved": 0,
+                },
             )
             self.assertEqual(
                 report["work_timing"]["counts"],

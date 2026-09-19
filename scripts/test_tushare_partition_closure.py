@@ -393,10 +393,29 @@ class Closure(unittest.TestCase):
 
         report = self.p.reconcile_partitions(max_parents=2)
 
-        self.assertEqual(report, {"checked": 2, "resolved": 2})
+        self.assertEqual(
+            report,
+            {
+                "checked": 2,
+                "resolved": 2,
+                "changed": 2,
+                "newly_resolved": 2,
+                "reaffirmed_resolved": 0,
+            },
+        )
         self.assertEqual(self.state(old), "resolved")
         self.assertEqual(self.state(appended), "resolved")
         self.assertEqual(self.state(cursor_parent), "split_pending")
+        self.assertEqual(
+            self.p.reconcile_partitions(child_id=old),
+            {
+                "checked": 1,
+                "resolved": 1,
+                "changed": 0,
+                "newly_resolved": 0,
+                "reaffirmed_resolved": 1,
+            },
+        )
 
     def test_deadline_advances_cursor_only_past_reconciled_parents(self):
         parents = []
@@ -414,7 +433,16 @@ class Closure(unittest.TestCase):
 
         with patch.object(module.time, "monotonic", side_effect=[1.0, 3.0]):
             report = self.p.reconcile_partitions(deadline=2.0)
-        self.assertEqual(report, {"checked": 1, "resolved": 1})
+        self.assertEqual(
+            report,
+            {
+                "checked": 1,
+                "resolved": 1,
+                "changed": 1,
+                "newly_resolved": 1,
+                "reaffirmed_resolved": 0,
+            },
+        )
         self.assertEqual(
             self.p.db.execute(
                 "SELECT value FROM scheduler_state WHERE name='partition_cursor'"
@@ -441,7 +469,16 @@ class Closure(unittest.TestCase):
             self.finish(child)
         with patch.object(module.time, "monotonic", return_value=2.0):
             report = self.p.reconcile_partitions(deadline=1.0)
-        self.assertEqual(report, {"checked": 0, "resolved": 0})
+        self.assertEqual(
+            report,
+            {
+                "checked": 0,
+                "resolved": 0,
+                "changed": 0,
+                "newly_resolved": 0,
+                "reaffirmed_resolved": 0,
+            },
+        )
         self.assertEqual(self.state(parent), "split_pending")
         self.assertEqual(
             self.p.db.execute(

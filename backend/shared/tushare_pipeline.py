@@ -4794,7 +4794,8 @@ class Pipeline:
                     (child_id, child_id),
                 )
             )
-        checked, resolved = 0, 0
+        checked = resolved = changed_count = newly_resolved = 0
+        reaffirmed_resolved = 0
         last_cursor = cursor
         while pending and checked < max_parents:
             if deadline is not None and time.monotonic() >= deadline:
@@ -4865,7 +4866,20 @@ class Pipeline:
                 if gap
                 else "resolved"
             )
-            changed = split["status"] != status or split["gap"] != gap
+            was_resolved = (
+                parent["state"] == "resolved"
+                and split["status"] == "resolved"
+                and split["gap"] is None
+            )
+            next_parent_state = "split_pending" if gap else "resolved"
+            changed = (
+                split["status"] != status
+                or split["gap"] != gap
+                or (
+                    parent["state"] in ("split_pending", "resolved")
+                    and parent["state"] != next_parent_state
+                )
+            )
             self.db.execute(
                 "UPDATE partition_splits SET status=?,gap=? WHERE parent_id=?",
                 (status, gap, parent_id),
@@ -4873,7 +4887,7 @@ class Pipeline:
             if parent["state"] in ("split_pending", "resolved"):
                 self.db.execute(
                     "UPDATE jobs SET state=? WHERE id=?",
-                    ("split_pending" if gap else "resolved", parent_id),
+                    (next_parent_state, parent_id),
                 )
             if changed:
                 pending.extend(
@@ -4885,13 +4899,22 @@ class Pipeline:
                 )
             checked += 1
             resolved += int(not gap)
+            changed_count += int(changed)
+            newly_resolved += int(not gap and not was_resolved)
+            reaffirmed_resolved += int(not gap and was_resolved)
         if child_id is None:
             self.db.execute(
                 "INSERT INTO scheduler_state VALUES('partition_cursor',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
                 (0 if not selected else last_cursor,),
             )
         self.db.commit()
-        return {"checked": checked, "resolved": resolved}
+        return {
+            "checked": checked,
+            "resolved": resolved,
+            "changed": changed_count,
+            "newly_resolved": newly_resolved,
+            "reaffirmed_resolved": reaffirmed_resolved,
+        }
 
     def partition_inventory(self):
         entries = []
