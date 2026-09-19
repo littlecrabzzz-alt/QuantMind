@@ -1,72 +1,139 @@
 {
-  "schema_version": 1,
-  "status": "production_accepted",
-  "observed_at": "2026-09-19T02:08:31.800022+00:00",
+  "schema_version": 2,
+  "status": "production_accepted_with_observability_correction",
+  "observed_at": "2026-09-19T02:24:19.510800+00:00",
   "authority": {
     "node": "Mac local archive owner",
     "root": "~/Library/Application Support/QuantMind/tushare",
     "cloud_full_archive_writer_enabled": false
   },
-  "change": {
+  "code": {
     "planning_fingerprint_fix_commit": "ad11d81bf3b908269d375df536cc060ca07cda16",
-    "before_reconciliation_parents_per_tick": 64,
-    "after_reconciliation_parents_per_tick": 1000,
-    "before_config_sha256": "a00eea1d34a4342e8e6478415b4b55942e6297bcad759aa80d18d8c962fa76fa",
-    "after_config_sha256": "8c245fa752b58b286b5f1a65640c131ba89a35dcbbfa914e0cdc76c0032dd9d3",
+    "reconciliation_observability_commit": "d10629d049b2f8792579a0747e40b08c73c0b3ad",
+    "open_priority_commit": "cb64c5985d96115dd34aa95b9a0837c9ac612a7b"
+  },
+  "configuration": {
+    "initial_reconciliation_parents_per_tick": 64,
+    "final_reconciliation_parents_per_tick": 1000,
+    "final_resolved_audit_per_tick": 64,
+    "effective_open_parent_budget": 936,
+    "initial_config_sha256": "a00eea1d34a4342e8e6478415b4b55942e6297bcad759aa80d18d8c962fa76fa",
+    "budget_only_config_sha256": "8c245fa752b58b286b5f1a65640c131ba89a35dcbbfa914e0cdc76c0032dd9d3",
+    "final_config_sha256": "a40e579be3f8229d45cee3869f44d255177acc540b390d6335849a4d7de6efc5",
     "planning_fingerprint_before": "a11fdc3fad7ea78eaf9af0f35f774cf3657d2b60877f31f7802a832fbd0edc43",
     "planning_fingerprint_after": "a11fdc3fad7ea78eaf9af0f35f774cf3657d2b60877f31f7802a832fbd0edc43",
     "planning_fingerprint_unchanged": true,
     "upstream_rate_policy_changed": false,
     "config_mode": "0600"
   },
+  "observed_partition_inventory": {
+    "total": 17810,
+    "blocked": 764,
+    "gap": 11215,
+    "pending": 1,
+    "resolved": 5830,
+    "parent_states": {
+      "blocked": 764,
+      "resolved": 5830,
+      "split_pending": 10691,
+      "superseded": 525
+    }
+  },
+  "production_cycles": {
+    "budget_only_legacy_report": {
+      "started_at": "2026-09-19T02:06:37.755760+00:00",
+      "completed_at": "2026-09-19T02:08:31.800022+00:00",
+      "elapsed_seconds": 114.044,
+      "requests": 749,
+      "documents_processed": 1720,
+      "partition_reconciliation": {
+        "checked": 1000,
+        "resolved_legacy_counter": 200,
+        "seconds": 2.088472
+      },
+      "correction": "The legacy resolved counter did not distinguish new transitions from already-resolved parents. It is not evidence that 200 parents were newly closed."
+    },
+    "unfiltered_with_corrected_counters": {
+      "started_at": "2026-09-19T02:16:20.978147+00:00",
+      "completed_at": "2026-09-19T02:18:04.088219+00:00",
+      "elapsed_seconds": 103.11,
+      "requests": 256,
+      "documents_processed": 1244,
+      "partition_reconciliation": {
+        "checked": 1000,
+        "changed": 0,
+        "newly_resolved": 0,
+        "reaffirmed_resolved": 543,
+        "seconds": 9.724111
+      }
+    },
+    "open_priority_accepted": {
+      "started_at": "2026-09-19T02:22:31.752617+00:00",
+      "completed_at": "2026-09-19T02:24:19.510800+00:00",
+      "elapsed_seconds": 107.758,
+      "requests": 708,
+      "documents_processed": 1220,
+      "partition_reconciliation": {
+        "checked": 1000,
+        "changed": 0,
+        "newly_resolved": 0,
+        "reaffirmed_resolved": 64,
+        "seconds": 1.679375,
+        "split_pending": {
+          "checked": 936,
+          "changed": 0,
+          "newly_resolved": 0,
+          "reaffirmed_resolved": 0
+        },
+        "resolved_audit": {
+          "checked": 64,
+          "changed": 0,
+          "newly_resolved": 0,
+          "reaffirmed_resolved": 64
+        }
+      },
+      "queue_after": {
+        "done": 490222,
+        "empty": 402997,
+        "pending": 2685491,
+        "blocked": 780,
+        "split_pending": 10700,
+        "permission_blocked": 5855,
+        "resolved": 5831
+      },
+      "planning_status": "deferred",
+      "planning_reason": "interval_not_due",
+      "pipeline_error": null
+    }
+  },
   "deployment": {
-    "drain": "existing cycle completed naturally; no task was revoked or killed",
-    "runtime_pipeline_sha256": "97564afb47fee2053066a20db497e101cd0feb594a922a77600219e7e3295a9b",
-    "repository_pipeline_sha256": "97564afb47fee2053066a20db497e101cd0feb594a922a77600219e7e3295a9b",
+    "drain": "each existing cycle completed naturally; no task was revoked or killed",
+    "runtime_pipeline_sha256": "53d9fc3ac6d022fa7843b9af033b1e80d85e3449ca464807cdb2e8cc985691fa",
+    "repository_pipeline_sha256": "53d9fc3ac6d022fa7843b9af033b1e80d85e3449ca464807cdb2e8cc985691fa",
     "launch_agent": "running",
     "launch_agent_runs": 1,
     "launch_agent_last_exit": "never exited"
   },
-  "production_cycle": {
-    "started_at": "2026-09-19T02:06:37.755760+00:00",
-    "completed_at": "2026-09-19T02:08:31.800022+00:00",
-    "elapsed_seconds": 114.044,
-    "requests": 749,
-    "partition_reconciliation": {
-      "checked": 1000,
-      "resolved": 200,
-      "seconds": 2.088472,
-      "upstream_requests": 0
-    },
-    "documents_processed": 1720,
-    "planning_status": "deferred",
-    "planning_reason": "interval_not_due",
-    "pipeline_error": null,
-    "queue_after": {
-      "done": 487659,
-      "empty": 401277,
-      "pending": 2686966,
-      "blocked": 780,
-      "split_pending": 10675,
-      "permission_blocked": 5855,
-      "resolved": 5830
-    }
-  },
   "validation": {
-    "focused_planning_interval": "12 passed",
+    "focused_partition_closure": "15 passed",
     "focused_pipeline": "26 passed",
+    "focused_planning_interval": "12 passed",
     "ruff": "passed",
     "diff_check": "passed",
-    "full_suite": {
+    "aggregate_suite_attempt": {
       "result": "1395 ran, 5 skipped, 6 multiprocessing process-pool errors in the aggregate test environment",
       "status": "non_blocking_environment_failure",
       "log_sha256": "f4ca175deb6cb1594826e57aabf3ed102500c4852b5405cc591d7326a96d9a2c",
-      "scope_note": "The independently run pipeline module, including its process-capture cases, passed 26 of 26. The six aggregate failures did not exercise the planning-fingerprint change."
+      "scope_note": "The pipeline module, including its process-capture cases, passed independently. The aggregate failures did not exercise the reconciliation changes."
     }
   },
+  "conclusion": {
+    "background_reconciliation_backlog_was_proven_ready": false,
+    "split_pending_is_only_a_local_closure_lag": false,
+    "accepted_behavior": "Prioritize open parents for crash-recovery closure and reserve bounded integrity revalidation for already-resolved parents.",
+    "upstream_requests_added_by_reconciliation": 0
+  },
   "boundaries": {
-    "queue_growth_can_continue_while_new_split_parents_are_created": true,
-    "resolved_per_scan_is_not_a_completeness_claim": true,
     "full_history_complete": false,
     "known_at_verified": false,
     "pit_verified": false,
