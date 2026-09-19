@@ -1,0 +1,22 @@
+{
+  "verified_at": "2026-09-19T04:47:29.327517+00:00",
+  "code_commit": "6fdac0de",
+  "tests_passed": 102,
+  "regression_before_fix": "Wall clock jump causes current owner to reclaim its own in-flight document ID",
+  "regression_after_fix": "Current-owner claims preserved; expired old-owner recovery and stale-result fence still pass",
+  "original_production_error": "DocumentError type only; exact original exception code unconfirmed",
+  "runtime_sha256": "d4a880fb24a735df746d3cb7de876ebf53577de6abc4b3bdfa5eee913836b60b",
+  "pid": 82258,
+  "first_cycle": {
+    "status": "completed_cycle",
+    "started_at": "2026-09-19T04:45:16.925026+00:00",
+    "updated_at": "2026-09-19T04:47:05.759244+00:00",
+    "elapsed_seconds": 108.834
+  },
+  "requests": 779,
+  "document_phases": {
+    "download": 1272,
+    "parse": 1228
+  },
+  "full_archive_complete": false
+}
