@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "status": "production_accepted",
+  "observed_at": "2026-09-19T02:08:31.800022+00:00",
+  "authority": {
+    "node": "Mac local archive owner",
+    "root": "~/Library/Application Support/QuantMind/tushare",
+    "cloud_full_archive_writer_enabled": false
+  },
+  "change": {
+    "planning_fingerprint_fix_commit": "ad11d81bf3b908269d375df536cc060ca07cda16",
+    "before_reconciliation_parents_per_tick": 64,
+    "after_reconciliation_parents_per_tick": 1000,
+    "before_config_sha256": "a00eea1d34a4342e8e6478415b4b55942e6297bcad759aa80d18d8c962fa76fa",
+    "after_config_sha256": "8c245fa752b58b286b5f1a65640c131ba89a35dcbbfa914e0cdc76c0032dd9d3",
+    "planning_fingerprint_before": "a11fdc3fad7ea78eaf9af0f35f774cf3657d2b60877f31f7802a832fbd0edc43",
+    "planning_fingerprint_after": "a11fdc3fad7ea78eaf9af0f35f774cf3657d2b60877f31f7802a832fbd0edc43",
+    "planning_fingerprint_unchanged": true,
+    "upstream_rate_policy_changed": false,
+    "config_mode": "0600"
+  },
+  "deployment": {
+    "drain": "existing cycle completed naturally; no task was revoked or killed",
+    "runtime_pipeline_sha256": "97564afb47fee2053066a20db497e101cd0feb594a922a77600219e7e3295a9b",
+    "repository_pipeline_sha256": "97564afb47fee2053066a20db497e101cd0feb594a922a77600219e7e3295a9b",
+    "launch_agent": "running",
+    "launch_agent_runs": 1,
+    "launch_agent_last_exit": "never exited"
+  },
+  "production_cycle": {
+    "started_at": "2026-09-19T02:06:37.755760+00:00",
+    "completed_at": "2026-09-19T02:08:31.800022+00:00",
+    "elapsed_seconds": 114.044,
+    "requests": 749,
+    "partition_reconciliation": {
+      "checked": 1000,
+      "resolved": 200,
+      "seconds": 2.088472,
+      "upstream_requests": 0
+    },
+    "documents_processed": 1720,
+    "planning_status": "deferred",
+    "planning_reason": "interval_not_due",
+    "pipeline_error": null,
+    "queue_after": {
+      "done": 487659,
+      "empty": 401277,
+      "pending": 2686966,
+      "blocked": 780,
+      "split_pending": 10675,
+      "permission_blocked": 5855,
+      "resolved": 5830
+    }
+  },
+  "validation": {
+    "focused_planning_interval": "12 passed",
+    "focused_pipeline": "26 passed",
+    "ruff": "passed",
+    "diff_check": "passed",
+    "full_suite": {
+      "result": "1395 ran, 5 skipped, 6 multiprocessing process-pool errors in the aggregate test environment",
+      "status": "non_blocking_environment_failure",
+      "log_sha256": "f4ca175deb6cb1594826e57aabf3ed102500c4852b5405cc591d7326a96d9a2c",
+      "scope_note": "The independently run pipeline module, including its process-capture cases, passed 26 of 26. The six aggregate failures did not exercise the planning-fingerprint change."
+    }
+  },
+  "boundaries": {
+    "queue_growth_can_continue_while_new_split_parents_are_created": true,
+    "resolved_per_scan_is_not_a_completeness_claim": true,
+    "full_history_complete": false,
+    "known_at_verified": false,
+    "pit_verified": false,
+    "secrets_in_evidence": false
+  }
+}
