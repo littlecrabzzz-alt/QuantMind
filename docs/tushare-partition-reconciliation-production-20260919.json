@@ -122,9 +122,21 @@
     "diff_check": "passed",
     "aggregate_suite_attempt": {
       "result": "1395 ran, 5 skipped, 6 multiprocessing process-pool errors in the aggregate test environment",
-      "status": "non_blocking_environment_failure",
+      "status": "superseded_by_standard_entry_pass",
       "log_sha256": "f4ca175deb6cb1594826e57aabf3ed102500c4852b5405cc591d7326a96d9a2c",
-      "scope_note": "The pipeline module, including its process-capture cases, passed independently. The aggregate failures did not exercise the reconciliation changes."
+      "scope_note": "Previous ad hoc runner called unittest.main at module scope without a __main__ guard; spawn could re-enter discovery. OS termination was not established. Standard module-entry rerun passed."
+    },
+    "full_suite_standard_entry": {
+      "tests_run": 1396,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "seconds": 120.203,
+      "result": "OK",
+      "source_commit": "a058fa128bee1988e72749fa393089cb57e0ba6b",
+      "source_equivalence": "backend/shared, scripts and config identical to master 8f090cd2",
+      "log_sha256": "15109809ca2eb90ecd7759c2aca164178ced7e9678fa0563c993a177793ce417",
+      "invocation": "UV_OFFLINE=1 uv run --python 3.10 --no-project --with httpx --with pyarrow --with duckdb --with fastapi --with pyyaml --with reportlab --with pypdf python -c 'import os,sys; from pathlib import Path; root=str(Path.cwd()); deps=[p for p in sys.path if \"site-packages\" in p]; os.environ[\"PYTHONPATH\"]=os.pathsep.join([root+\"/scripts\",root,*deps]); os.execv(sys.executable,[sys.executable,\"-B\",\"-m\",\"unittest\",\"discover\",\"-s\",\"scripts\",\"-p\",\"test_tushare*.py\"])'"
     }
   },
   "conclusion": {
