@@ -29,5 +29,24 @@
       "fut_code"
     ]
   },
-  "note": "Keep fut_code schema gap; request actual ts_code in addition. Raw response retained, no synthesized code or history completeness claim."
+  "note": "Keep fut_code schema gap; request actual ts_code in addition. Raw response retained, no synthesized code or history completeness claim.",
+  "backfill_acceptance": {
+    "verified_at": "2026-09-19T04:27:05.951255+00:00",
+    "requested_partitions": 442,
+    "states": {
+      "empty": 294,
+      "quality": 148
+    },
+    "observations_verified": 442,
+    "unique_objects_verified": 442,
+    "response_rows": 1500,
+    "rows_with_ts_code": 1500,
+    "missing_field_partition_counts": {
+      "fut_code": 442
+    },
+    "batch_requests_finished": true,
+    "full_archive_complete": false,
+    "history_complete": false,
+    "note": "Partition batch finished does not certify source history completeness. Empty responses remain unverified. fut_code is still omitted by provider; ts_code is preserved without synthesizing fut_code."
+  }
 }
