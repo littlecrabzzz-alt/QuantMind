@@ -17,7 +17,7 @@ FIELDS = {
     "stk_seasoned": """ts_code ann_date first_ann_date proj_info_source board_approval_dt sh_approval_dt sasac_approval_dt csrc_approval_dt fo_type fo_stock_type cur_stage valid_st_dt valid_end_dt plan_chg_type plan_chg_ann_dt pricing_method pricing_base_dt price_basis fo_vol_high fo_vol_low fo_price_high fo_price_low fo_price_ratio fo_raise_total fo_purpose fo_investor sub_method fo_price_act fo_vol_act fo_raise_total_act fo_raise_net_act fo_exp_total uw_fee fo_exp_audit fo_exp_legal fo_exp_inst fo_exp_pub fo_exp_reg fo_exp_other fo_exp_per_share issue_obj_type pe_issue pub_plac_qty onl_pch_vol onl_pch_num onl_pch_excess onl_winning_rate inst_plac_qty inst_sub_eff_total inst_sub_eff_cnt inst_oversub_times a_inv_plac_qty b_inv_plac_qty old_sh_pre_plac_qty old_sh_pre_plac_ratio clw_between_inst_pub prospectus_pub_dt offer_intent_pub_dt apply_date old_sh_pre_plac_dt onl_issue_date uw_start_dt uw_end_dt uw_mode new_share_list_dt list_circ_qty right_reg_dt ex_right_dt update_flag""".split(),
     "fut_inv_weekly": "ts_code trade_date fut_name exchange area warehouse grade pre_total pre_futures cur_total cur_futures chg_total chg_futures pre_capacity cur_capacity chg_capacity unit".split(),
     # Live explicit-field response omits the documented fut_code column.
-    "fut_rcpt_mat": "trade_date exchange fut_name unit cur_month next_month next_two_month".split(),
+    "fut_rcpt_mat": "trade_date exchange ts_code fut_name unit cur_month next_month next_two_month".split(),
     "fut_trade_param": "trade_date fut_code exchange trade_unit tick_size pre_settle_price price_limit position_limit trade_limit min_order_qty max_limit_order_qty max_market_order_qty".split(),
     "vix_index": "trade_date high low open close pct_change".split(),
 }
@@ -132,7 +132,7 @@ CATALOG_DELTA_CONTRACTS["rt_hk_k"].update(
 )
 CATALOG_DELTA_CONTRACTS["fut_rcpt_mat"].update(
     documented_unavailable_fields=["fut_code"],
-    field_gap_note="The 2026-09-19 explicit live request returned 23 rows but omitted documented fut_code. Runtime requests exclude that field and use fut_name in the row identity; raw observations retain the supplier discrepancy.",
+    field_gap_note="The 2026-09-19 explicit live request returned ts_code for all 23 rows but omitted documented fut_code. Request ts_code as an extra field, retain the catalog fut_code request and its schema gap, and keep fut_name in row identity because multiple warehouse classes share a product code.",
 )
 CATALOG_DELTA_CONTRACTS["etf_auction"].update(
     history_start_precision="month",

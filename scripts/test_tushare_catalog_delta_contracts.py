@@ -48,6 +48,13 @@ class CatalogDeltaContractsTest(unittest.TestCase):
         self.assertTrue(CATALOG_DELTA_CONTRACTS["etf_auction"]["independent_permission"])
         self.assertFalse(CATALOG_DELTA_CONTRACTS["vix_index"]["independent_permission"])
 
+    def test_receipt_product_code_is_requested_without_hiding_documented_gap(self):
+        spec = CATALOG_DELTA_CONTRACTS["fut_rcpt_mat"]
+        self.assertIn("ts_code", spec["extra_fields"])
+        self.assertIn("fut_name", spec["keys"])
+        self.assertIn("fut_code", spec["documented_unavailable_fields"])
+        self.assertNotIn("fut_code", spec.get("optional_requested_fields", ()))
+
     def test_planner_is_deterministic_recent_first_and_honors_floor(self):
         jobs = list(iter_catalog_delta_jobs(self.config, date(2026, 9, 19), self.identifiers))
         self.assertEqual(jobs, list(iter_catalog_delta_jobs(self.config, date(2026, 9, 19), self.identifiers)))
