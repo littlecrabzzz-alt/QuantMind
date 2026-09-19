@@ -157,6 +157,18 @@ class TerminalDocumentRecovery(unittest.TestCase):
             max_bytes=docs.MAX_DOCUMENT_MAX_BYTES,
         )["status"], "no_action")
 
+    def test_due_retry_is_not_starved_by_lower_pending_ids(self):
+        now = 2_000_000_000
+        pending, _ = self.seed(1, "download_error")
+        retry, _ = self.seed(100, "download_error")
+        self.db.execute("UPDATE documents SET download_status='pending' WHERE id=?", (pending,))
+        self.db.execute("UPDATE documents SET download_status='retry',retry_after=? WHERE id=?", (now, retry))
+        self.db.commit()
+        self.assertEqual(docs._eligible_documents(self.db, "download", now, 1)[0]["id"], retry)
+        self.db.execute("UPDATE documents SET retry_after=? WHERE id=?", (now + 60, retry))
+        self.db.commit()
+        self.assertEqual(docs._eligible_documents(self.db, "download", now, 1)[0]["id"], pending)
+
     def test_source_challenge_cools_down_after_a_repeat(self):
         now = 2_000_000_000
         ident, raw = self.seed(

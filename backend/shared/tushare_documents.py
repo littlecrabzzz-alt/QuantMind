@@ -1343,7 +1343,11 @@ def _eligible_documents(db, phase, now, limit):
                 (now, limit),
             ).fetchall()
         )
-    return sorted(rows, key=lambda row: row["id"])[:limit]
+    # Due retries are attempt-bounded. Do not strand recovered files behind
+    # millions of lexicographically earlier pending IDs.
+    return sorted(
+        rows, key=lambda row: (row["download_status"] != "retry", row["id"])
+    )[:limit]
 
 
 def _claim_documents(db, owner, phase, limit, seconds, timing=None):
