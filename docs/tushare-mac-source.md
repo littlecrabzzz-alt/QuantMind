@@ -10,6 +10,8 @@
 
 当新全量发布的子集准备耗时较长时，供数入口立即返回上一份已经校验的研究子集，同时后台准备新版。云端 `cache-status.json` 的 `source_release_id` 表示实际提供的全量源版本，`latest_source_release_id` 表示 Mac 请求时的最新全量版本；`source_lagged=true` 必须视为数据新鲜度缺口，不能把本轮缓存任务成功解释为追平。新版准备完成后，下轮拉取再校验并切换；准备失败保留旧版并记录错误，不回退到 Tushare Pro 直拉。
 
+相邻全量发布保留旧子集全部分区和相同文件校验描述时，供数端复用上轮已验证的不可变文件，只扫描并校验新增分区及其观测来源。若任何旧分区或文件描述被移除、修改，则重新生成精确子集，不沿用旧文件清单。云端仍逐文件校验本地缓存，新取文件仍在传输前后校验哈希。
+
 默认提供 daily、index_daily、fund_daily、adj_factor、daily_basic、index_weight、ci_daily、sw_daily、stock_basic、index_basic、fund_basic、trade_cal 中源 release 已有的数据。接口集合可显式指定；这不是所有研究需求的永久白名单。
 
 ## 迁移门槛与容量

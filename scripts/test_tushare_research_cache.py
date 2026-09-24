@@ -168,6 +168,73 @@ class ResearchCache(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'checksum'):
                 cache.SourcePublication(root, ['daily']).current()
 
+    def test_incremental_export_reuses_retained_partitions_and_checks_new_files(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.fixture(root)
+            old = cache.prepare(root, ['daily', 'fund_daily'])
+            old_manifest = json.loads((root / '.research-exports' / old['release_id']
+                                       / 'manifest.json').read_bytes())
+            full = json.loads((root / 'releases' / old['source_release_id']
+                               / 'manifest.json').read_bytes())
+            raw = b'{"request":{"api_name":"daily","params":{}}}'
+            obs_sha = hashlib.sha256(raw).hexdigest()
+            obs = 'observations/' + obs_sha + '.json'
+            cache.atomic_bytes(root / obs, raw)
+            table = pa.table({'ts_code': ['000002.SZ'], 'trade_date': ['20260916'],
+                              '_observation': [obs_sha + '.json'],
+                              '_fetched_at': ['2026-09-17T00:00:00Z']})
+            parquet = root / 'new.parquet'
+            pq.write_table(table, parquet)
+            payload = parquet.read_bytes()
+            parquet.unlink()
+            parquet_sha = hashlib.sha256(payload).hexdigest()
+            name = 'parquet/' + parquet_sha + '.parquet'
+            cache.atomic_bytes(root / name, payload)
+            full['files'].update({obs: {'sha256': obs_sha, 'bytes': len(raw)},
+                                  name: {'sha256': parquet_sha, 'bytes': len(payload)}})
+            full['datasets'].append({'api_name': 'daily', 'path': name})
+            release_raw = json.dumps(full).encode()
+            release_sha = hashlib.sha256(release_raw).hexdigest()
+            new_source = 'data-' + release_sha
+            cache.atomic_bytes(root / 'releases' / new_source / 'manifest.json', release_raw)
+            cache.atomic_json(root / 'CURRENT.json',
+                              {'release_id': new_source, 'manifest_sha256': release_sha})
+            with patch.object(cache, 'checked', wraps=cache.checked) as integrity:
+                pointer = cache.prepare(root, ['daily', 'fund_daily'])
+            checked_names = {call.args[1] for call in integrity.call_args_list}
+            self.assertIn(name, checked_names)
+            self.assertIn(obs, checked_names)
+            self.assertFalse(checked_names & set(old_manifest['files']))
+            result = json.loads((root / '.research-exports' / pointer['release_id']
+                                 / 'manifest.json').read_bytes())
+            self.assertEqual(set(result['files']), set(old_manifest['files']) | {name, obs})
+            self.assertEqual(pointer['source_release_id'], new_source)
+
+    def test_removed_partition_falls_back_to_exact_export(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.fixture(root)
+            old = cache.prepare(root, ['daily', 'fund_daily'])
+            full = json.loads((root / 'releases' / old['source_release_id']
+                               / 'manifest.json').read_bytes())
+            full['datasets'] = [d for d in full['datasets'] if d['api_name'] == 'daily']
+            release_raw = json.dumps(full).encode()
+            release_sha = hashlib.sha256(release_raw).hexdigest()
+            new_source = 'data-' + release_sha
+            cache.atomic_bytes(root / 'releases' / new_source / 'manifest.json', release_raw)
+            cache.atomic_json(root / 'CURRENT.json',
+                              {'release_id': new_source, 'manifest_sha256': release_sha})
+            with patch.object(cache, 'checked', wraps=cache.checked) as integrity:
+                pointer = cache.prepare(root, ['daily', 'fund_daily'])
+            daily_path = full['datasets'][0]['path']
+            self.assertIn(daily_path,
+                          {call.args[1] for call in integrity.call_args_list})
+            result = json.loads((root / '.research-exports' / pointer['release_id']
+                                 / 'manifest.json').read_bytes())
+            self.assertEqual([d['api_name'] for d in result['datasets']], ['daily'])
+            self.assertEqual(len(result['files']), 2)
+
 
 if __name__ == '__main__':
     unittest.main()

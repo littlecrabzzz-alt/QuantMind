@@ -59,13 +59,35 @@ def prepare(root, apis):
         old = json.loads(saved.read_bytes())
         if old['source_release_id'] == source:
             return old
+    previous = cached_export(root, apis) if saved.exists() else None
     manifest = manifest_at(root, source)
     datasets = [d for d in manifest['datasets'] if d['api_name'] in apis]
     if not datasets:
         raise ValueError('Requested datasets unavailable')
-    names = set()
+    schema = manifest.get('schema_path')
+    paths = {d['path'] for d in datasets}
+    previous_paths = set()
+    reused = set()
+    if previous:
+        old_manifest = previous[1]
+        previous_paths = {d['path'] for d in old_manifest['datasets']}
+        old_files = old_manifest['files']
+        # Immutable paths already passed the previous export's SHA checks. Only
+        # reuse them when the new full release retains every selected partition
+        # and its exact file descriptor; otherwise rebuild the exact subset.
+        if (previous_paths <= paths and all(
+                manifest['files'].get(name) == expected
+                for name, expected in old_files.items())):
+            reused = set(old_files)
+            if old_manifest.get('schema_path') != schema:
+                reused.discard(old_manifest.get('schema_path'))
+        else:
+            previous_paths.clear()
+    names = set(reused)
     for dataset in datasets:
         name = dataset['path']
+        if name in previous_paths:
+            continue
         path = checked(root, name, manifest['files'][name])
         names.add(name)
         for batch in pq.ParquetFile(path).iter_batches(columns=['_observation']):
@@ -74,13 +96,13 @@ def prepare(root, apis):
                 if not FILE.fullmatch(relative) or relative not in manifest['files']:
                     raise ValueError('Observation missing from source release')
                 names.add(relative)
-    schema = manifest.get('schema_path')
     if schema:
         names.add(schema)
     for name in names:
         if not FILE.fullmatch(name):
             raise ValueError('Invalid research file')
-        checked(root, name, manifest['files'][name])
+        if name not in reused:
+            checked(root, name, manifest['files'][name])
     subset = {
         'schema_version': manifest.get('schema_version', 1),
         'source_release_id': source, 'scope': 'research_subset',
