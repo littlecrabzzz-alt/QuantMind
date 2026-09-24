@@ -28,6 +28,9 @@ import {
   type AgentCapabilities,
   type AgentCase,
 } from "../services-v2/researchAgent";
+import R01ProjectView, {
+  ExternalCasePanel,
+} from "../components-v2/R01ProjectView";
 import { SERVICE_ENDPOINTS } from "../../../config/services";
 import { authService } from "../../auth/services/authService";
 
@@ -78,6 +81,7 @@ export default function AgentWorkspace() {
   const location = useLocation(),
     navigate = useNavigate();
   const queryId = new URLSearchParams(location.search).get("research");
+  const queryProject = new URLSearchParams(location.search).get("project");
   const [cap, setCap] = useState<AgentCapabilities | null>(null);
   const [cases, setCases] = useState<AgentCase[]>([]);
   const [current, setCurrent] = useState<AgentCase | null>(null);
@@ -319,6 +323,18 @@ export default function AgentWorkspace() {
           <Button block icon={<Plus size={15} />} onClick={() => open(null)}>
             新建课题
           </Button>
+          <Button
+            block
+            type={queryProject === "r01" ? "primary" : "default"}
+            onClick={() =>
+              navigate({
+                pathname: location.pathname,
+                search: "project=r01",
+              })
+            }
+          >
+            R01 项目总览
+          </Button>
           <p className="text-xs text-muted-foreground">
             我的研究 · {cases.length}
           </p>
@@ -329,10 +345,21 @@ export default function AgentWorkspace() {
               className={`w-full text-left p-3 rounded-lg border ${c.id === queryId ? "border-primary bg-primary/10" : "border-transparent hover:bg-secondary"}`}
             >
               <span className="block text-sm line-clamp-2">
+                {c.executor_kind === "external" && (
+                  <Tag color="purple" className="mr-1">
+                    外部·{c.external?.workstream || "?"}
+                  </Tag>
+                )}
                 {c.plan?.plan.title || c.input.question}
               </span>
               <span className="block text-xs text-muted-foreground mt-2">
-                {labels[c.status] || c.status}
+                {c.executor_kind === "external"
+                  ? c.external?.stale
+                    ? "断联（长时间无回报）"
+                    : labels[c.external?.execution_status || ""] ||
+                      c.external?.execution_status ||
+                      c.status
+                  : labels[c.status] || c.status}
               </span>
             </button>
           ))}
@@ -342,7 +369,13 @@ export default function AgentWorkspace() {
             </p>
           )}
         </aside>
-        {creating ? (
+        {queryProject === "r01" ? (
+          <R01ProjectView
+            node={cap?.node_id}
+            connected={connected}
+            onOpenCase={open}
+          />
+        ) : creating ? (
           <div className={`${panel} space-y-5`}>
             <div>
               <h2 className="text-lg font-medium">这次想弄清什么？</h2>
@@ -437,6 +470,86 @@ export default function AgentWorkspace() {
             </div>
           </div>
         ) : current ? (
+          current.executor_kind === "external" ? (
+            <div className="min-w-0 space-y-3">
+              <div className={`${panel} flex justify-between items-center gap-3`}>
+                <div>
+                  <h2 className="font-semibold">{current.input.question}</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    外部执行课题 · {current.external?.workstream} · 长期课题，
+                    多次有界运行累计（无 8 小时单窗口限制）
+                  </p>
+                </div>
+                <Button
+                  danger
+                  icon={<Square size={14} />}
+                  disabled={!connected || !!current.external?.stop_requested}
+                  loading={busy}
+                  onClick={() =>
+                    act(() => researchAgent.stop(cap!.node_id, current.id))
+                  }
+                >
+                  请求外部停止
+                </Button>
+              </div>
+              {current.external?.stale && (
+                <Alert
+                  type="warning"
+                  message="断联：来源长时间未回报。平台不自动认定失败或成功，也不启动第二份作业。"
+                />
+              )}
+              {current.external?.execution_status === "failed" && (
+                <Alert
+                  type="error"
+                  message="外部运行失败：原因见运行记录，失败不伪造成完成。"
+                />
+              )}
+              <div className={panel}>
+                <ExternalCasePanel
+                  node={cap!.node_id}
+                  caseId={current.id}
+                  summary={current.external!}
+                />
+              </div>
+              <div className={panel}>
+                <h3 className="font-medium mb-2">回报事件（原始证据，长期保留）</h3>
+                <div className="space-y-1 max-h-96 overflow-auto">
+                  {current.events
+                    ?.filter(
+                      (e) =>
+                        e.kind === "external_report" ||
+                        e.kind === "external_report_rejected" ||
+                        e.kind === "risk_confirm_accepted" ||
+                        e.kind === "external_stop_requested",
+                    )
+                    .slice()
+                    .reverse()
+                    .map((e) => (
+                      <div key={e.seq} className="text-xs border-b border-border pb-1">
+                        <span className="text-muted-foreground mr-2">
+                          {new Date(e.at * 1000).toLocaleTimeString()}
+                        </span>
+                        {e.apply_status === "validation_error" ? (
+                          <Tag color="red">校验失败</Tag>
+                        ) : e.apply_status === "stale_event" ? (
+                          <Tag>历史追加</Tag>
+                        ) : e.apply_status === "not_ready" ? (
+                          <Tag color="default">未准入</Tag>
+                        ) : (
+                          <Tag color="green">已应用</Tag>
+                        )}{" "}
+                        {e.report_kind || e.kind}
+                        {e.event_id ? ` · ${e.event_id}` : ""}
+                        {e.message ? ` · ${e.message}` : ""}
+                      </div>
+                    ))}
+                  {!current.events?.length && (
+                    <Empty description="尚无外部回报" />
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
           <div className="min-w-0 space-y-3">
             <div className={`${panel} flex justify-between items-center gap-3`}>
               <div>
@@ -951,6 +1064,7 @@ export default function AgentWorkspace() {
               </div>
             </div>
           </div>
+          )
         ) : (
           <div className={panel}>
             <Empty

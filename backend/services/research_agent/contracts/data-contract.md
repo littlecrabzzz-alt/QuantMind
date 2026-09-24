@@ -1,0 +1,77 @@
+# R01 数据合同（data-contract）
+
+- 版本：v2（R01P0-W1C2 修订冻结，2026-09-24T19:20:00Z；v1 见 rev1-backup/）
+- 状态：**冻结**。变更须在主工作树 `coordination/r01-p0/` 追加记录并出合同新版本。
+- 对齐：平台设计 §4；机器 schema（单一来源，三份合同互引不重复定义）：`data-contract.schema.json`（回报信封）、`etf-input-package.schema.json`（输入包 manifest+typed events）、`readiness.schema.json`（准入对象）。
+- 命名规范：字段一律 snake_case；`project_key` canonical 值为小写 `r01`（展示名 R01 仅用于 UI）；来源标识统一 `source_task`；`contract_hash` = 所引版本合同文件 UTF-8 字节的 sha256。
+
+## 1. 公共字段（外部回报信封）
+
+字段表与约束以 `data-contract.schema.json` 为准（required 集合含 `source_task`）。要点：
+
+| 字段 | 说明 |
+| --- | --- |
+| schema_version | =2 |
+| project_key / workstream | `r01`；workstream ∈ P0/A/B1/B2/B3/D/N |
+| case_id / source_task / source_run_id / event_id / seq | 幂等与乱序校验五元组（见 report-api.md §3-§4） |
+| strategy_id | 策略定义标识；P0 工程样例必须 `fixture-` 前缀 |
+| contract_version / contract_hash | 本合同版本与文件哈希 |
+| source_node / source_revision | 来源节点与代码提交 |
+| data.input_package_id / data_as_of | 固定输入包与数据截止日 |
+| timestamps.source_at / received_at | 来源时间与平台接收时间**分开**；received_at 由平台写入，存储态必填 |
+
+## 2. 两套状态与 fixture 约定
+
+1. **执行状态** execution_status：`planned / running / blocked / failed / completed / stale`（断联=stale，不算失败也不算成功）。
+2. **证据阶段** evidence_stage：`proposal / data-check / development-compare / engineering-validation / independent-verification / forward-observation`。`engineering-validation` 专用于 P0 工程验收；完成代码作业不自动提升证据阶段。
+
+**P0 工程样例命名与标注约定**（schema 强制）：`fixture=true` 且 `strategy_id` 以 `fixture-` 前缀（如 `fixture-risk-line-demo`）；展示层必须渲染显著"工程样例 (fixture)"徽标，与真实研究曲线、收益排行、月报隔离；fixture 曲线不得与真实曲线同图无标注混排。
+
+## 3. ETF 固定输入包接口（TG-007 裁决，p02 生产 / p03 消费）
+
+### 3.1 来源与版本
+- 唯一来源：Mac Tushare 归档，按 **release_id** 固定读取（首发 `data-fcbabbb7f133dddab1109d3c130653b46041e2c9f6c9cd53b685d3d28f8ac0ab`）。换 release ⇒ 新 `package_version` 并记 decisions。
+- 数据集：`fund_daily + fund_adj + fund_div + trade_cal + etf_limit`（etf_limit 2019-06-26 起；不足段 ±10% 规则近似并在 known_gaps 声明 `rule-approximation-declared`，DG-004）。
+- 禁止：研究直接读归档 CURRENT；与 QuantDB `etf_kline` 裸拼接（DG-002/DG-009/DG-010）。
+
+### 3.2 位置：节点受控引用（不写裸绝对路径）
+- 包的逻辑引用：`node://<node>/r01-etf-daily/<package_version>`（manifest.package_uri）。
+- 各节点把 `package_id` 解析为本地绝对路径的**注册表是节点私有配置**（Mac 首个包在 p02 交付时登记于 coordination 记录与 readiness），不进合同、不进 Git。
+- 消费方（p03 LocalMarketData ETF 视图）凭 `package_id + manifest_sha256` 校验后只读挂载；校验失败显式报缺口，不静默降级。
+
+### 3.3 目录布局与机器 schema
+```
+manifest.json                # 必须通过 etf-input-package.schema.json
+calendar.parquet             # SSE 开市日
+symbols/<code>.parquet       # date, open, high, low, close, pre_close,
+                             # vol(份), amount(元), adj_factor, tradable
+limits/<code>.parquet        # 涨跌停价（近似段 pre_2019_approx=true）
+events/<code>.parquet        # typed 公司行动（行级约束见 $defs.typed_event）
+```
+- `<code>` 一律 suffix 式（`510300.SH`）；全链路禁止依赖裸六位自动识别（XG-001）。
+- 单位统一换算为份/元，规则记录于 manifest.unit_conversions（DG-009）。
+
+### 3.4 typed 公司行动：定义与时序（DG-005 裁决）
+
+**因子约定（normative）**：`adjusted_close = close_unadjusted × adj_factor`（hfq）。每个 `adj_factor` 跳变日必须归类（schema 二选一）：
+- `cash_dividend`：与 fund_div 对上；`cash_per_share>0, qty_multiplier=1`。
+- `share_adjustment`：无现金事件的因子跳变（拆分/份额折算）；`cash_per_share=0, qty_multiplier = adj_factor_new / adj_factor_prev ≠ 1`。
+- **验证公式**（p02 对每个事件执行，写入 verification）：价格连续性 `close_ex ≈ pre_close_ex × (adj_factor_prev / adj_factor_new)`（无现金事件时），价值守恒 `qty_new × close_ex ≈ qty_old × close_prev`；fund_nav 可得时交叉验证。无法归类或验证不过 = **显式缺口**（`unresolved_gap`），禁止按零处理。
+- 强制回归用例：`159934.SZ 2025-09-22`（qty_multiplier=0.9481，份额折算）、`510500.SH 2015-04-15`（qty_multiplier=0.2803，因子方向以验证公式实测为准，不预设"拆分/合并"标签）。
+
+**账务处理时点**（ledger-contract §6 消费）：
+- `share_adjustment`：event_date **开盘前、当日任何订单撮合之前**调整持仓数量（价格序列当日已是调整后口径）。
+- `cash_dividend`：event_date **日终（EOD）、当日净值计算之前**计入现金。
+- 同日两类并存：先份额调整（开盘前），现金分红按调整后份额口径计（p02 已在 basis_note 声明换算）。
+- 幂等键 `(ledger_run_id, symbol, event_date, event_type)`。
+
+## 4. 数据检查项
+每项 `passed / failed / unknown` + 证据引用；`unknown` 不得当 `passed` 展示（schema checks[]）。
+
+## 5. readiness.json（准入对象）
+机器 schema：`readiness.schema.json`。要点：四类 ready 布尔 + `blocking_gaps[]`（引用 gaps.json id）+ `evidence_refs[]` + `input_manifest`/`etf_input`（节点受控引用，含 manifest_sha256）+ `contract_versions` + `self_check_at` 与 `independent_acceptance` 分开。P0 自检与独立验收分开记录；研究启动入口与外部结果准入处必须检查本对象；未准入的外部产物保留原始回报并标记未准入。数据或代码影响结论的变化 ⇒ 重新核验相关项；缺口删除/降级须说明范围变化。
+
+## 6. 结果绑定与新闻覆盖
+- 指标（metrics[]）：`value=null` 时必填 `null_reason`（not-computed / no-data / not-applicable / pending-verification），不得填 0；绑定金额、时期、价格/费用口径与策略版本（basis）。
+- D/N 组回报**必填** `news_coverage.decision_cutoff_at`（决策截止）与 `news_obtained_at`（新闻实际取得时间）（schema allOf 强制）。
+- artifact 引用统一 `artifacts[].uri`（`node://<node>/...` 或课题相对路径）+ sha256；前端消费统一本 schema 类型，A/B 不各写一套 JSON。

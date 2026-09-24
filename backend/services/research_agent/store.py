@@ -38,7 +38,8 @@ class Store:
                 await db.execute(
                     """SELECT draft_id, state FROM research_drafts
                 WHERE tenant_id=%s AND user_id=%s AND node_id=%s
-                  AND state->>'engine'='deepagents' ORDER BY updated_at DESC LIMIT 100""",
+                  AND state->>'engine' IN ('deepagents','external')
+                ORDER BY updated_at DESC LIMIT 100""",
                     (*owner, node),
                 )
             ).fetchall()
@@ -49,7 +50,7 @@ class Store:
             row = await (
                 await db.execute(
                     """SELECT * FROM research_drafts WHERE draft_id=%s
-                AND state->>'engine'='deepagents' FOR UPDATE""",
+                AND state->>'engine' IN ('deepagents','external') FOR UPDATE""",
                     (ident,),
                 )
             ).fetchone()
@@ -69,7 +70,7 @@ class Store:
         async with self.pool.connection() as db:
             row = await (
                 await db.execute(
-                    "SELECT * FROM research_drafts WHERE draft_id=%s AND state->>'engine'='deepagents'",
+                    "SELECT * FROM research_drafts WHERE draft_id=%s AND state->>'engine' IN ('deepagents','external')",
                     (ident,),
                 )
             ).fetchone()
@@ -81,12 +82,12 @@ class Store:
             raise KeyError("课题不存在")
         return row
 
-    async def create(self, owner, node, data, inventory):
+    async def create(self, owner, node, data, inventory, engine="deepagents", external=None):
         ident = uuid4().hex
-        hashed = digest(["deepagents", data["key"]])
+        hashed = digest([engine, data["key"]])
         payload_hash = digest(data)
         s = {
-            "engine": "deepagents",
+            "engine": engine,
             "input": data,
             "payload_hash": payload_hash,
             "node_id": node,
@@ -107,6 +108,11 @@ class Store:
             "created_at": time.time(),
             "error": None,
         }
+        if engine == "external":
+            # External executor cases never enqueue model discussion (TG-001);
+            # no approval window (8h cap is a builtin single-window constraint).
+            s["status"] = "registered"
+            s["external"] = external
         async with self.pool.connection() as db, db.transaction():
             await db.execute(
                 """INSERT INTO research_drafts(draft_id,tenant_id,user_id,node_id,input_hash,state)

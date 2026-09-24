@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://quantmind.local/contracts/r01/readiness-2.schema.json",
+  "title": "R01 readiness.json (v2, frozen by R01P0-W1C2)",
+  "description": "准入对象机器 schema。P0 自检与独立验收分开；etf_input 用节点受控引用（package_id/uri），不携带裸绝对路径。",
+  "type": "object",
+  "required": [
+    "schema_version", "project_key", "data_ready", "execution_ready",
+    "accounting_verified", "platform_ready", "blocking_gaps", "checked_by",
+    "evidence_refs", "input_manifest", "etf_input", "code_revision",
+    "contract_versions", "self_check_at", "independent_acceptance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 2 },
+    "project_key": { "const": "r01" },
+    "data_ready": { "type": "boolean" },
+    "execution_ready": { "type": "boolean" },
+    "accounting_verified": { "type": "boolean" },
+    "platform_ready": { "type": "boolean" },
+    "blocking_gaps": { "type": "array", "items": { "type": "string", "pattern": "^(TG|DG|XG)-[0-9]{3}$" } },
+    "checked_by": { "type": "string" },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } },
+    "input_manifest": {
+      "type": "object",
+      "required": ["package_id", "sha256", "release_id"],
+      "additionalProperties": false,
+      "properties": {
+        "package_id": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "release_id": { "type": "string" }
+      }
+    },
+    "etf_input": {
+      "type": "object",
+      "required": ["package_id", "package_version", "manifest_sha256", "node", "uri"],
+      "additionalProperties": false,
+      "properties": {
+        "package_id": { "type": "string" },
+        "package_version": { "type": "string" },
+        "manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "node": { "enum": ["mac", "cloud"] },
+        "uri": { "type": "string", "pattern": "^node://(mac|cloud)/r01-etf-daily/.+$" }
+      }
+    },
+    "code_revision": { "type": "string" },
+    "contract_versions": {
+      "type": "object",
+      "required": ["data", "ledger", "report"],
+      "additionalProperties": false,
+      "properties": {
+        "data": { "type": "integer" },
+        "ledger": { "type": "integer" },
+        "report": { "type": "integer" }
+      }
+    },
+    "self_check_at": { "type": "string", "format": "date-time" },
+    "independent_acceptance": {
+      "type": "object",
+      "required": ["status"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "enum": ["pending", "passed", "failed"] },
+        "at": { "type": ["string", "null"], "format": "date-time" },
+        "by": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

@@ -5,3 +5,4 @@ docker==7.1.0
 starlette==1.6.0
 annotated-doc==0.0.5
 click==8.5.0
+jsonschema>=4.21.0

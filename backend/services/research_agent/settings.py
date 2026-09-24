@@ -52,6 +52,11 @@ class Settings:
         self.gateway = os.environ.get("RESEARCH_ENGINE_URL") or os.environ.get(
             "INTERNAL_API_GATEWAY_URL", "http://quantmind:8001"
         )
+        # External executor staleness threshold: no fresh event for this long
+        # while a run claims planned/running/blocked => platform shows stale.
+        self.external_stale_after = float(
+            os.environ.get("RESEARCH_EXTERNAL_STALE_AFTER", "21600")
+        )
         self.dsn = make_conninfo(
             host=os.environ.get("DB_HOST", "db"),
             port=os.environ.get("DB_PORT", "5432"),
