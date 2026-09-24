@@ -15,7 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.services.simulation.models.replay import ReplayLedgerCheckpoint
 from backend.services.simulation.replay.etf_input_package import EtfInputPackage
-from backend.services.simulation.replay.r01_ledger import R01Ledger, R01LedgerConfig
+from backend.services.simulation.replay.r01_ledger import (
+    CheckpointPackageMismatch,
+    R01Ledger,
+    R01LedgerConfig,
+)
 
 
 async def save_checkpoint(db: AsyncSession, ledger: R01Ledger) -> None:
@@ -52,4 +56,11 @@ async def load_checkpoint(
     )
     if row is None:
         return None
+    # W2E4：跨包恢复防护——DB 行的 package_id 必须与传入包一致，
+    # 错误输入包不得恢复同一账本（错误信息含两个 package_id）
+    if row.package_id != package.package_id:
+        raise CheckpointPackageMismatch(
+            f"checkpoint_package_mismatch: DB 行 package_id={row.package_id!r} "
+            f"与传入包 package_id={package.package_id!r} 不一致，拒绝恢复"
+        )
     return R01Ledger.restore(package, config, row.state)

@@ -58,6 +58,14 @@ logger = logging.getLogger(__name__)
 GROUPS = ("A", "B1", "B2", "B3", "D", "N", "P0")
 
 
+class CheckpointPackageMismatch(ValueError):
+    """checkpoint 与传入输入包不匹配（W2E4：跨包恢复防护）。
+
+    checkpoint 状态与生成它的输入包绑定（行情/事件/日历一体）；用
+    另一个包恢复同一账本会静默产生混合口径账务，必须显式拒绝。
+    """
+
+
 class LedgerOrderingError(ValueError):
     """会话顺序/信号对齐违规（W2E3 修复#2）。
 
@@ -1055,8 +1063,9 @@ class R01Ledger:
         """完整账本状态快照（纯状态、确定性；与 export_evidence 的区别：
         面向恢复重放，含全部可变状态，账务字段不做展示层取整）。"""
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "ledger_run_id": self.ledger_run_id,
+            "package_id": self.package.package_id,
             "config": self.config.to_dict(),
             "cash": self.cash,
             "positions": {sym: pos.to_dict() for sym, pos in self.positions.items()},
@@ -1091,6 +1100,13 @@ class R01Ledger:
             raise ValueError(
                 f"checkpoint ledger_run_id 不匹配: {checkpoint.get('ledger_run_id')}"
                 f" != {config.ledger_run_id}"
+            )
+        # W2E4：跨包恢复防护——防绕过持久层直调 restore 混用输入包
+        cp_package = checkpoint.get("package_id")
+        if cp_package is not None and cp_package != package.package_id:
+            raise CheckpointPackageMismatch(
+                f"checkpoint_package_mismatch: checkpoint 由包 {cp_package!r} 生成，"
+                f"不能从包 {package.package_id!r} 恢复"
             )
         ledger = cls(package, config)
         ledger.cash = float(checkpoint["cash"])

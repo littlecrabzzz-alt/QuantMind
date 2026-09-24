@@ -18,6 +18,7 @@ import pytest
 
 from backend.services.simulation.replay.etf_input_package import build_fixture_package
 from backend.services.simulation.replay.r01_ledger import (
+    CheckpointPackageMismatch,
     LedgerOrderingError,
     R01Ledger,
     R01LedgerConfig,
@@ -449,6 +450,70 @@ class TestCheckpoint:
         ev_id = next(iter(restored.risk.events))
         restored.confirm_risk_event(ev_id, confirmed_by="u1")
         assert restored.risk.buys_allowed
+
+    def test_same_package_restore_succeeds(self, pkg):
+        """正例：同包恢复成功（package_id 绑定校验通过）。"""
+        ledger = R01Ledger(pkg, _config())
+        ledger.run_day(date(2025, 9, 10), {"510300.SH": 0.5})
+        cp = ledger.export_checkpoint()
+        assert cp["package_id"] == pkg.package_id
+        restored = R01Ledger.restore(pkg, _config(), cp)
+        assert restored.package.package_id == pkg.package_id
+        assert restored.equity[-1]["nav"] == pytest.approx(ledger.equity[-1]["nav"])
+
+    def test_restore_rejects_different_package(self, pkg, tmp_path):
+        """负例（W2E4）：同 run 不同包恢复被拒，错误信息含双方 package_id。"""
+        from backend.services.simulation.replay.etf_input_package import (
+            build_fixture_package,
+        )
+
+        ledger = R01Ledger(pkg, _config())
+        ledger.run_day(date(2025, 9, 10), {"510300.SH": 0.5})
+        cp = ledger.export_checkpoint()
+        other_pkg = build_fixture_package(tmp_path / "other-pkg", package_id="fixture-other-pkg-x")
+        assert other_pkg.package_id != pkg.package_id  # 前提：两包不同
+
+        with pytest.raises(CheckpointPackageMismatch) as ei:
+            R01Ledger.restore(other_pkg, _config(), cp)
+        msg = str(ei.value)
+        assert pkg.package_id in msg and other_pkg.package_id in msg
+
+    def test_restore_rejects_different_package_via_row(self, pkg, tmp_path):
+        """持久层路径负例：DB 行 package_id 与传入包不一致 → 显式拒绝。"""
+        import asyncio
+
+        from backend.services.simulation.replay.etf_input_package import (
+            build_fixture_package,
+        )
+        from backend.services.simulation.replay import ledger_persistence
+
+        other_pkg = build_fixture_package(tmp_path / "other-pkg2", package_id="fixture-other-pkg-y")
+        ledger = R01Ledger(pkg, _config())
+        ledger.run_day(date(2025, 9, 10), {"510300.SH": 0.5})
+
+        class _Row:
+            package_id = pkg.package_id
+            state = ledger.export_checkpoint()
+
+        class _Db:
+            async def execute(self, *_a, **_k):
+                class _R:
+                    def scalars(self):
+                        class _S:
+                            def first(self):
+                                return _Row()
+
+                        return _S()
+
+                return _R()
+
+        async def _load():
+            return await ledger_persistence.load_checkpoint(_Db(), other_pkg, _config())
+
+        with pytest.raises(CheckpointPackageMismatch) as ei:
+            asyncio.run(_load())
+        msg = str(ei.value)
+        assert pkg.package_id in msg and other_pkg.package_id in msg
 
     def test_restore_rejects_mismatched_run_id(self, pkg):
         ledger = R01Ledger(pkg, _config())
