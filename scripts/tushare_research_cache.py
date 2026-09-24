@@ -59,7 +59,7 @@ def prepare(root, apis):
         old = json.loads(saved.read_bytes())
         if old['source_release_id'] == source:
             return old
-    previous = cached_export(root, apis) if saved.exists() else None
+    previous = cached_export(root, apis) if saved.exists() else reusable_export(root, apis)
     manifest = manifest_at(root, source)
     datasets = [d for d in manifest['datasets'] if d['api_name'] in apis]
     if not datasets:
@@ -130,6 +130,13 @@ def cached_export(root, apis):
     saved = root / '.research-exports' / (key + '.json')
     if not saved.exists():
         return None
+    result = _checked_export(root, saved)
+    if result[1].get('selected_api_names') != sorted(apis):
+        raise ValueError('Cached research scope mismatch')
+    return result
+
+
+def _checked_export(root, saved):
     pointer = json.loads(saved.read_bytes())
     release = pointer['release_id']
     if (not RELEASE.fullmatch(release) or pointer['manifest_sha256'] != release[5:]
@@ -140,11 +147,33 @@ def cached_export(root, apis):
     if hashlib.sha256(raw).hexdigest() != pointer['manifest_sha256']:
         raise ValueError('Cached research manifest checksum mismatch')
     manifest = json.loads(raw)
+    apis = manifest.get('selected_api_names')
     if (manifest.get('scope') != 'research_subset'
             or manifest.get('source_release_id') != pointer['source_release_id']
-            or manifest.get('selected_api_names') != sorted(apis)):
+            or not isinstance(apis, list) or not all(isinstance(a, str) for a in apis)
+            or apis != sorted(set(apis))):
         raise ValueError('Cached research scope mismatch')
+    key = hashlib.sha256(json.dumps({'format': 2, 'apis': apis}).encode()).hexdigest()
+    if saved.name != key + '.json':
+        raise ValueError('Cached research key mismatch')
     return pointer, manifest, path
+
+
+def reusable_export(root, apis):
+    """Reuse a verified narrower export when the requested API set grows."""
+    best = None
+    for saved in sorted((root / '.research-exports').glob('*.json')):
+        try:
+            candidate = _checked_export(root, saved)
+            manifest = candidate[1]
+            if (set(manifest['selected_api_names']) < set(apis)
+                    and (best is None or len(manifest['files']) > len(best[1]['files']))):
+                best = candidate
+        except (OSError, ValueError, KeyError, TypeError):
+            # An unrelated invalid cache cannot provide reusable validation.
+            # The requested export still performs full checks for those files.
+            continue
+    return best
 
 
 class SourcePublication:
