@@ -237,6 +237,13 @@ async def create(data: Input, request: Request):
             raise HTTPException(400, "外部执行课题当前仅支持 project_key=r01")
         if data.workstream not in external.WORKSTREAMS:
             raise HTTPException(400, "workstream 必须是 P0/A/B1/B2/B3/D/N")
+        if not cfg.external_contract_node:
+            return _contract_response(
+                409,
+                "node_not_contract_named",
+                "本节点 node_id 不在合同 source_node 枚举（mac|cloud）内，且未配置 "
+                "RESEARCH_EXTERNAL_CONTRACT_NODE；外部回报无法绑定节点，拒绝登记外部课题",
+            )
         ident = await store.create(
             await identity(request),
             cfg.node,
@@ -442,8 +449,17 @@ async def submit_external_report(ident: str, request: Request):
         return _contract_response(
             409, "not_external_case", "课题不是外部执行模式，不能接收外部回报"
         )
+    if not cfg.external_contract_node:
+        return _contract_response(
+            409,
+            "node_not_contract_named",
+            "本节点 node_id 不在合同 source_node 枚举（mac|cloud）内，且未配置 "
+            "RESEARCH_EXTERNAL_CONTRACT_NODE；拒绝外部回报（显式拒绝，不做静默映射）",
+        )
     try:
-        external.check_case_binding(envelope, ident, state["external"], cfg.node)
+        external.check_case_binding(
+            envelope, ident, state["external"], cfg.external_contract_node
+        )
     except external.NodeMismatch:
         return _contract_response(
             409, "node_mismatch", "信封 source_node 与课题登记节点不一致"

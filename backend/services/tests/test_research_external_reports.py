@@ -70,6 +70,7 @@ class FakeSettings:
     node = NODE
     internal_secret = "test-internal"
     external_stale_after = 21600.0
+    external_contract_node = NODE
     models = ["glm-5.3-flash"]
 
     def workspace(self, ident):
@@ -486,6 +487,22 @@ class TestReadinessGating:
         assert env.get("/projects/r01/readiness").status_code == 200
         assert env.get("/projects/r02/readiness").status_code == 404
 
+    def test_readiness_rejects_invalid_datetime_format(self, env):
+        # format_checker: self_check_at / independent_acceptance.at must be RFC3339
+        response = env.post(
+            "/projects/r01/readiness",
+            json=self._readiness(self_check_at="2026-09-25 00:00:00"),  # naive, no T/Z
+        )
+        assert response.status_code == 422
+        assert "self_check_at" in response.json()["detail"]
+        response = env.post(
+            "/projects/r01/readiness",
+            json=self._readiness(
+                independent_acceptance={"status": "passed", "at": "not-a-date", "by": "x"}
+            ),
+        )
+        assert response.status_code == 422
+
     def test_non_p0_metrics_marked_not_ready_until_readiness_passes(self, env):
         case = register_case(env, workstream="B1", key="case-key-0003")
         env.case_id = case["id"]
@@ -583,6 +600,30 @@ class TestPureLogic:
         register_case(env)
         response = submit(env, envelope(env, fixture=False))
         assert response.status_code == 422  # fixture-* prefix requires fixture=true
+
+    def test_contract_node_required_for_external_routes(self, env):
+        # node_id outside contract enum (mac|cloud) without explicit config =>
+        # registration and reports refuse explicitly instead of silent mapping
+        register_case(env)
+        payload = envelope(env)
+        saved = env.app.state.settings.external_contract_node
+        env.app.state.settings.external_contract_node = None
+        try:
+            response = env.post(
+                "/cases",
+                json={
+                    "key": "case-key-0009", "question": "q",
+                    "executor_kind": "external", "project_key": "r01",
+                    "workstream": "P0",
+                },
+            )
+            assert response.status_code == 409
+            assert response.json()["code"] == "node_not_contract_named"
+            response = submit(env, payload)
+            assert response.status_code == 409
+            assert response.json()["code"] == "node_not_contract_named"
+        finally:
+            env.app.state.settings.external_contract_node = saved
 
     def test_groups_never_fabricate_numbers(self):
         groups = external.project_groups(

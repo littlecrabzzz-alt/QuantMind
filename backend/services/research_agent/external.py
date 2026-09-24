@@ -82,7 +82,9 @@ class Contracts:
         self._envelope = Draft202012Validator(
             self.envelope_schema, format_checker=Draft202012Validator.FORMAT_CHECKER
         )
-        self._readiness = Draft7Validator(self.readiness_schema)
+        self._readiness = Draft7Validator(
+            self.readiness_schema, format_checker=Draft7Validator.FORMAT_CHECKER
+        )
 
     def validate_envelope(self, envelope):
         errors = sorted(self._envelope.iter_errors(envelope), key=lambda e: list(e.path))

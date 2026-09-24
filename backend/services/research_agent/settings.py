@@ -57,6 +57,18 @@ class Settings:
         self.external_stale_after = float(
             os.environ.get("RESEARCH_EXTERNAL_STALE_AFTER", "21600")
         )
+        # Contract-facing node name for R01 envelopes (source_node enum: mac|cloud).
+        # The infra node_id may be a local sandbox random id; report binding uses
+        # this explicit name instead of silently mapping. Unset + non-contract
+        # node_id => external report routes refuse with a clear error.
+        contract_node = os.environ.get(
+            "RESEARCH_EXTERNAL_CONTRACT_NODE", ""
+        ).strip().lower()
+        if not contract_node and self.node in ("mac", "cloud"):
+            contract_node = self.node
+        if contract_node and contract_node not in ("mac", "cloud"):
+            raise ValueError("RESEARCH_EXTERNAL_CONTRACT_NODE 必须是 mac 或 cloud")
+        self.external_contract_node = contract_node or None
         self.dsn = make_conninfo(
             host=os.environ.get("DB_HOST", "db"),
             port=os.environ.get("DB_PORT", "5432"),

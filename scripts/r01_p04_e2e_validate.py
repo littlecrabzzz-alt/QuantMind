@@ -14,8 +14,12 @@ from pathlib import Path
 
 BASE = "http://127.0.0.1:8000"
 GW = BASE + "/api/v1/research-agent"
-NODE = "mac"
+# 基础设施 node_id（沙盒随机值）与合同 source_node（mac|cloud）分开：
+# 请求头 X-Research-Node 用基础设施 id；信封 source_node 用合同名
+# （sidecar 侧经 RESEARCH_EXTERNAL_CONTRACT_NODE 显式登记，见 README 偏差 5）。
 RUN_STATE = "/Users/lizeyu/Documents/ChatGPT/投资/QuantMind/.local-dev/project"
+NODE = json.load(open(RUN_STATE + "/data/research/settings.json"))["node_id"]
+CONTRACT_NODE = "mac"
 CONTRACT_MD = Path(__file__).parent.parent / "backend/services/research_agent/contracts/data-contract.md"
 CONTRACT_HASH = hashlib.sha256(CONTRACT_MD.read_bytes()).hexdigest()
 results = []
@@ -39,7 +43,13 @@ def call(method, url, body=None, token=None, expect=None, label=""):
     if expect is not None:
         ok = status == expect
     results.append((label or url, status, expect, ok))
-    print(f"[{'OK ' if ok else 'FAIL'}] {status} (expect {expect}) {label or url} :: {json.dumps(payload, ensure_ascii=False)[:220]}")
+    # 安全：日志永不落 token 明文（W2P2 审查发现 1 的防线）
+    import re as _re
+    text = json.dumps(payload, ensure_ascii=False)
+    text = _re.sub(r'"(access_token|refresh_token|token)"\s*:\s*"[^"]*"',
+                   r'"\1": "<redacted-jwt>"', text)
+    text = _re.sub(r'eyJ[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]+)*', '<redacted-jwt>', text)
+    print(f"[{'OK ' if ok else 'FAIL'}] {status} (expect {expect}) {label or url} :: {text[:220]}")
     return status, payload
 
 
@@ -48,7 +58,7 @@ def envelope(**over):
         "schema_version": 2, "project_key": "r01", "workstream": "P0",
         "case_id": CASE_ID[0], "source_task": "R01P0-W2P", "source_run_id": "run-e2e-1",
         "strategy_id": "fixture-risk-line-demo", "contract_version": "2",
-        "contract_hash": CONTRACT_HASH, "source_node": NODE, "source_revision": "w2p-e2e",
+        "contract_hash": CONTRACT_HASH, "source_node": CONTRACT_NODE, "source_revision": "w2p-e2e",
         "event_id": "ev-0", "seq": 0, "kind": "progress",
         "data": {"input_package_id": "none", "data_as_of": "2026-09-24"},
         "timestamps": {"source_at": "2026-09-25T12:00:00Z"},
@@ -79,7 +89,7 @@ def main():
     CASE_ID[0] = case["id"]
     assert case["executor_kind"] == "external"
     assert case["status"] == "registered" and not case.get("messages")
-    print("    -> no model job: status=%s messages=%s approval=%s" % (case["status"], case.get("messages"), case.get("approval")))
+    print(f"    -> no model job: status={case['status']} messages={case.get('messages')} approval={case.get('approval')}")
 
     # 1b) builtin mode regression: create must still queue model discussion
     status, builtin = call("POST", GW + "/cases", {
@@ -234,7 +244,6 @@ def main():
     # 9) durable audit stream
     status, stream = call("GET", reports + "?since_seq=0", None, token,
                           expect=200, label="audit stream (table-backed)")
-    kinds = [e["kind"] for e in stream["events"]]
     assert "validation_error" in [e["apply_status"] for e in stream["events"]]
     assert stream["count"] >= 9
     mid = stream["events"][5]["platform_seq"]
@@ -248,32 +257,28 @@ def main():
     ext = detail["external"]
     assert ext["attempts"] >= 1 and ext["gaps"] and ext["risk_pending"] == {}
     assert ext["execution_status"] in ("completed", "blocked")
-    print("    -> external summary: attempts=%s events=%s stale=%s data_as_of=%s"
-          % (ext["attempts"], ext["events_applied"], ext["stale"], ext["data"]["data_as_of"]))
+    print(f"    -> external summary: attempts={ext['attempts']} events={ext['events_applied']} stale={ext['stale']} data_as_of={ext['data']['data_as_of']}")
 
-    # 10b) cross-user access must not leak existence (归属校验).
-    # 注：沙盒 /auth/register 因既有 user_profiles.llm_extra_headers 列漂移返回 500
-    # （与本任务无关，见 artifacts 说明），故经内部身份头直接探测 sidecar 归属校验。
-    import subprocess
-    def sidecar(headers, path, body=None):
-        cmd = ["docker", "exec", "quantmind-dev-research-agent-r01", "python", "-c",
-               "import urllib.request,sys,json;"
-               "req=urllib.request.Request('http://127.0.0.1:8100'+sys.argv[1],method='POST' if sys.argv[3]!='GET' else 'GET');"
-               "req.add_header('Content-Type','application/json');[req.add_header(*h.split(':',1)) for h in sys.argv[2].split('|')];"
-               "d=sys.argv[4].encode() if sys.argv[4] else None\n"
-               "try:\n"
-               " r=urllib.request.urlopen(req,data=d);print(r.status)\n"
-               "except urllib.error.HTTPError as e:print(e.status)"]
-        out = subprocess.run(cmd + [path, headers, "POST" if body is not None else "GET",
-                                    json.dumps(body or {})], capture_output=True, text=True)
-        return int(out.stdout.strip().split()[-1])
-    other = "x-internal-call: quantmind-local-dev-internal-only|x-user-id: 99999999|x-tenant-id: default|x-research-node: mac"
-    status = sidecar(other, f"/cases/{CASE_ID[0]}")
-    results.append(("other user reading case => 404 (existence not leaked)", status, 404, status == 404))
-    print(f"[{'OK ' if status == 404 else 'FAIL'}] {status} (expect 404) other user reading case (sidecar ownership)")
-    status = sidecar(other, f"/cases/{CASE_ID[0]}/external-reports", envelope(event_id="ev-xuser"))
-    results.append(("other user submitting report => 404", status, 404, status == 404))
-    print(f"[{'OK ' if status == 404 else 'FAIL'}] {status} (expect 404) other user submitting report")
+    # 10b) cross-user access via the real gateway（W2P2 审查发现 3）：
+    # 用户 B（真实注册+登录）访问用户 A 的课题与回报路由。
+    suffix = str(int(time.time()))[-6:]
+    visitor = {"username": "r01visitor" + suffix, "password": "R01Visitor2026",
+               "email": f"r01visitor{suffix}@example.com", "tenant_id": "default"}
+    call("POST", BASE + "/api/v1/auth/register", visitor, expect=201, label="register user B (gateway)")
+    _, vb = call("POST", BASE + "/api/v1/auth/login",
+                 {"username": visitor["username"], "password": visitor["password"],
+                  "tenant_id": "default"}, expect=200, label="login user B (gateway)")
+    vtoken = vb["access_token"]
+    call("GET", GW + f"/cases/{CASE_ID[0]}", None, vtoken,
+         expect=404, label="user B reads user A case => 404 (existence not leaked)")
+    call("POST", GW + f"/cases/{CASE_ID[0]}/external-reports",
+         envelope(event_id="ev-xuser"), vtoken, expect=404,
+         label="user B submits report to A case => 404")
+    call("GET", GW + "/projects/r01", None, vtoken, expect=200,
+         label="user B own project view => 200 (empty of A data)")
+    _, voverview = call("GET", GW + "/projects/r01", None, vtoken, expect=None,
+                        label="user B project overview content check")
+    assert not any(c["case_id"] == CASE_ID[0] for c in voverview["cases"]), "leak of A cases to B"
 
     # 10c) fixture curve file is fetchable through the authenticated file endpoint
     status, resp = call("GET", GW + f"/cases/{CASE_ID[0]}/file?path=external/fixture-equity.json",
@@ -297,7 +302,7 @@ def main():
     assert stream2 == stream, "audit stream identical after restart"
 
     failed = [r for r in results if not r[3]]
-    print("\n==== SUMMARY: %d checks, %d failed ====" % (len(results), len(failed)))
+    print(f"\n==== SUMMARY: {len(results)} checks, {len(failed)} failed ====")
     for f in failed:
         print("FAIL:", f)
     sys.exit(1 if failed else 0)
