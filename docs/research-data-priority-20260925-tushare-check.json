@@ -265,5 +265,124 @@
       "pit_verified": false,
       "history_complete": false
     }
-  ]
+  ],
+  "publication": {
+    "release_id": "data-fcbabbb7f133dddab1109d3c130653b46041e2c9f6c9cd53b685d3d28f8ac0ab",
+    "published_at": "2026-09-24T17:19:01.268967+00:00",
+    "upstream_calls": 0,
+    "acquisition_gate_restored": true
+  },
+  "cache_expansion_reuse_check": {
+    "code_commit": "90ec0e6b",
+    "old_api_count": 12,
+    "requested_api_count": 15,
+    "old_partitions": 150245,
+    "retained_partitions": 150245,
+    "old_files": 300491,
+    "changed_descriptors": 0,
+    "initial_full_scan_request_timed_out": true
+  },
+  "cloud_cache_verification": {
+    "cache_status": {
+      "budget_bytes": 53687091200,
+      "cache_bytes": 8926197234,
+      "downloaded_files": 24756,
+      "latest_source_release_id": "data-fcbabbb7f133dddab1109d3c130653b46041e2c9f6c9cd53b685d3d28f8ac0ab",
+      "manifest_sha256": "0ba57ae05a931a192c45b3615dda9f88ee878743f3c9ede66418eff07d3d9c0d",
+      "release_id": "data-0ba57ae05a931a192c45b3615dda9f88ee878743f3c9ede66418eff07d3d9c0d",
+      "selected_api_names": [
+        "adj_factor",
+        "ci_daily",
+        "daily",
+        "daily_basic",
+        "fund_basic",
+        "fund_daily",
+        "index_basic",
+        "index_daily",
+        "index_weight",
+        "moneyflow",
+        "stk_limit",
+        "stock_basic",
+        "suspend_d",
+        "sw_daily",
+        "trade_cal"
+      ],
+      "source_lagged": false,
+      "source_release_id": "data-fcbabbb7f133dddab1109d3c130653b46041e2c9f6c9cd53b685d3d28f8ac0ab",
+      "status": "verified",
+      "upstream_calls": 0
+    },
+    "checked_at": "2026-09-24T18:00:13.607595+00:00",
+    "status": "passed",
+    "queries": [
+      {
+        "api": "daily",
+        "rows": 5557,
+        "expected_rows": 5557,
+        "dates": [
+          "20260924"
+        ],
+        "seconds": 12.15,
+        "release_id": "data-0ba57ae05a931a192c45b3615dda9f88ee878743f3c9ede66418eff07d3d9c0d",
+        "upstream_calls": 0
+      },
+      {
+        "api": "adj_factor",
+        "rows": 5569,
+        "expected_rows": 5569,
+        "dates": [
+          "20260924"
+        ],
+        "seconds": 15.077,
+        "release_id": "data-0ba57ae05a931a192c45b3615dda9f88ee878743f3c9ede66418eff07d3d9c0d",
+        "upstream_calls": 0
+      },
+      {
+        "api": "daily_basic",
+        "rows": 5557,
+        "expected_rows": 5557,
+        "dates": [
+          "20260924"
+        ],
+        "seconds": 19.807,
+        "release_id": "data-0ba57ae05a931a192c45b3615dda9f88ee878743f3c9ede66418eff07d3d9c0d",
+        "upstream_calls": 0
+      },
+      {
+        "api": "stk_limit",
+        "rows": 5648,
+        "expected_rows": 5648,
+        "dates": [
+          "20260924"
+        ],
+        "seconds": 15.283,
+        "release_id": "data-0ba57ae05a931a192c45b3615dda9f88ee878743f3c9ede66418eff07d3d9c0d",
+        "upstream_calls": 0
+      },
+      {
+        "api": "suspend_d",
+        "rows": 13,
+        "expected_rows": 13,
+        "dates": [
+          "20260924"
+        ],
+        "seconds": 3.905,
+        "release_id": "data-0ba57ae05a931a192c45b3615dda9f88ee878743f3c9ede66418eff07d3d9c0d",
+        "upstream_calls": 0
+      },
+      {
+        "api": "moneyflow",
+        "rows": 5557,
+        "expected_rows": 5557,
+        "dates": [
+          "20260924"
+        ],
+        "seconds": 20.293,
+        "release_id": "data-0ba57ae05a931a192c45b3615dda9f88ee878743f3c9ede66418eff07d3d9c0d",
+        "upstream_calls": 0
+      }
+    ],
+    "pit_verified": false,
+    "history_complete": false
+  }
 }
