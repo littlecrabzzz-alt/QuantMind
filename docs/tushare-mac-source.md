@@ -8,6 +8,8 @@
 
 云服务器执行 `pull --root <独立研究缓存> --source http://127.0.0.1:18765`，核对固定版本与文件哈希后才更新 CURRENT。默认缓存预算 100 GiB、磁盘空闲保留 100 GiB；超限和 Mac 不在线时保留旧版并失败退出。初版不自动删除旧缓存文件，避免清除运行中研究输入；预算用尽必须显式安排已结束版本的回收。研究子集不声称历史完整，现有 reader 可按子集 release 查询，无 Tushare 回退。
 
+当新全量发布的子集准备耗时较长时，供数入口立即返回上一份已经校验的研究子集，同时后台准备新版。云端 `cache-status.json` 的 `source_release_id` 表示实际提供的全量源版本，`latest_source_release_id` 表示 Mac 请求时的最新全量版本；`source_lagged=true` 必须视为数据新鲜度缺口，不能把本轮缓存任务成功解释为追平。新版准备完成后，下轮拉取再校验并切换；准备失败保留旧版并记录错误，不回退到 Tushare Pro 直拉。
+
 默认提供 daily、index_daily、fund_daily、adj_factor、daily_basic、index_weight、ci_daily、sw_daily、stock_basic、index_basic、fund_basic、trade_cal 中源 release 已有的数据。接口集合可显式指定；这不是所有研究需求的永久白名单。
 
 ## 迁移门槛与容量

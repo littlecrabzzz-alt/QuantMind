@@ -4,6 +4,8 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -78,6 +80,8 @@ class ResearchCache(unittest.TestCase):
             target = Path(folder) / 'cache'
             self.fixture(root)
             pointer = cache.prepare(root, ['daily'])
+            pointer = {**pointer, 'latest_source_release_id': pointer['source_release_id'],
+                       'source_lagged': False}
             manifest_path = root / '.research-exports' / pointer['release_id'] / 'manifest.json'
             manifest = json.loads(manifest_path.read_bytes())
             self.assertEqual({d['api_name'] for d in manifest['datasets']}, {'daily'})
@@ -115,6 +119,48 @@ class ResearchCache(unittest.TestCase):
             self.assertEqual(cache.PREPARE_TIMEOUT_SECONDS, 30 * 60)
             with self.assertRaisesRegex(ValueError, 'loopback'):
                 cache.pull(target, 'http://example.com:80', 1024, 0)
+
+    def test_stale_verified_release_returns_while_new_release_prepares(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.fixture(root)
+            old = cache.prepare(root, ['daily'])
+            latest = 'data-' + 'a' * 64
+            cache.atomic_json(root / 'CURRENT.json',
+                              {'release_id': latest, 'manifest_sha256': latest[5:]})
+            entered, release = threading.Event(), threading.Event()
+            def slow_prepare(*_):
+                entered.set()
+                release.wait(5)
+                raise ValueError('new release unavailable')
+            publication = cache.SourcePublication(root, ['daily'])
+            with patch.object(cache, 'prepare', side_effect=slow_prepare), \
+                    patch.object(cache.logging, 'exception'):
+                start = time.monotonic()
+                pointer, manifest, _ = publication.current()
+                self.assertLess(time.monotonic() - start, 1)
+                self.assertTrue(entered.wait(1))
+                self.assertEqual(pointer['release_id'], old['release_id'])
+                self.assertEqual(pointer['latest_source_release_id'], latest)
+                self.assertTrue(pointer['source_lagged'])
+                self.assertEqual(manifest['source_release_id'], old['source_release_id'])
+                self.assertEqual(publication.current()[0]['release_id'], old['release_id'])
+                release.set()
+                for _ in range(100):
+                    if not publication.refreshing:
+                        break
+                    time.sleep(0.01)
+                self.assertFalse(publication.refreshing)
+
+    def test_cached_manifest_corruption_does_not_get_served(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.fixture(root)
+            pointer = cache.prepare(root, ['daily'])
+            path = root / '.research-exports' / pointer['release_id'] / 'manifest.json'
+            path.write_bytes(b'corrupt')
+            with self.assertRaisesRegex(ValueError, 'checksum'):
+                cache.SourcePublication(root, ['daily']).current()
 
 
 if __name__ == '__main__':

@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import fcntl
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -101,20 +102,71 @@ def prepare(root, apis):
     return result
 
 
+def cached_export(root, apis):
+    key = hashlib.sha256(json.dumps({'format': 2, 'apis': sorted(apis)}).encode()).hexdigest()
+    saved = root / '.research-exports' / (key + '.json')
+    if not saved.exists():
+        return None
+    pointer = json.loads(saved.read_bytes())
+    release = pointer['release_id']
+    if (not RELEASE.fullmatch(release) or pointer['manifest_sha256'] != release[5:]
+            or not RELEASE.fullmatch(pointer['source_release_id'])):
+        raise ValueError('Invalid cached research release')
+    path = root / '.research-exports' / release / 'manifest.json'
+    raw = path.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != pointer['manifest_sha256']:
+        raise ValueError('Cached research manifest checksum mismatch')
+    manifest = json.loads(raw)
+    if (manifest.get('scope') != 'research_subset'
+            or manifest.get('source_release_id') != pointer['source_release_id']
+            or manifest.get('selected_api_names') != sorted(apis)):
+        raise ValueError('Cached research scope mismatch')
+    return pointer, manifest, path
+
+
+class SourcePublication:
+    def __init__(self, root, apis):
+        self.root, self.apis = root, apis
+        self.lock = threading.Lock()
+        self.refreshing = False
+
+    def _refresh(self):
+        try:
+            prepare(self.root, self.apis)
+        except Exception:
+            logging.exception('Research subset preparation failed; verified release retained')
+        finally:
+            with self.lock:
+                self.refreshing = False
+
+    def current(self):
+        source = json.loads((self.root / 'CURRENT.json').read_bytes())['release_id']
+        with self.lock:
+            cached = cached_export(self.root, self.apis)
+            if cached is None:
+                prepare(self.root, self.apis)
+                cached = cached_export(self.root, self.apis)
+            elif cached[0]['source_release_id'] != source and not self.refreshing:
+                self.refreshing = True
+                threading.Thread(target=self._refresh, daemon=True).start()
+        pointer, manifest, path = cached
+        return {**pointer, 'latest_source_release_id': source,
+                'source_lagged': pointer['source_release_id'] != source}, manifest, path
+
+
 def serve(root, apis, port):
     root = root.resolve()
+    publication = SourcePublication(root, apis)
     mutex = threading.Lock()
     available = {}
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             try:
                 if self.path == '/CURRENT.json':
+                    pointer, manifest, folder_manifest = publication.current()
                     with mutex:
-                        pointer = prepare(root, apis)
-                        folder = root / '.research-exports' / pointer['release_id']
-                        manifest = json.loads((folder / 'manifest.json').read_bytes())
                         available.update(manifest['files'])
-                        available['releases/' + pointer['release_id'] + '/manifest.json'] = folder / 'manifest.json'
+                        available['releases/' + pointer['release_id'] + '/manifest.json'] = folder_manifest
                     raw = json.dumps(pointer).encode()
                     self.send_response(200)
                     self.send_header('Content-Length', str(len(raw)))
@@ -185,6 +237,12 @@ def pull(root, url, budget, reserve):
         manifest = manifest_at(root, release)
         if manifest.get('scope') != 'research_subset':
             raise ValueError('Refusing full archive mirror')
+        if (pointer.get('source_release_id') != manifest.get('source_release_id')
+                or not isinstance(pointer.get('latest_source_release_id'), str)
+                or not RELEASE.fullmatch(pointer['latest_source_release_id'])
+                or pointer.get('source_lagged') != (
+                    pointer['source_release_id'] != pointer['latest_source_release_id'])):
+            raise ValueError('Research source lag metadata mismatch')
         missing = []
         for name, expected in manifest['files'].items():
             if not FILE.fullmatch(name):
