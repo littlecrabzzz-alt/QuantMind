@@ -209,6 +209,21 @@ def _validate_manifest(manifest: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _parse_trade_date(value) -> date:
+    """兼容 YYYY-MM-DD（fixture）与 YYYYMMDD（p02 真实包）两套日期串。"""
+    if isinstance(value, date):
+        return value
+    text = str(value).strip()
+    try:
+        if len(text) == 8 and text.isdigit():
+            return date(int(text[:4]), int(text[4:6]), int(text[6:8]))
+        if len(text) >= 10:
+            return date.fromisoformat(text[:10])
+    except ValueError:
+        pass
+    return pd.Timestamp(value).date()
+
+
 def _etf_limit_pct(symbol: str) -> float:
     code = symbol.split(".", 1)[0]
     return 0.20 if code.startswith(_ETF_STAR_PREFIXES) else 0.10
@@ -226,11 +241,20 @@ def _etf_limits(pre_close: float, symbol: str) -> tuple[float, float]:
 class EtfInputPackage:
     """一个固定输入包的只读视图（线程安全懒加载）。
 
-    布局（本模块定义的冻结消费接口，p02 生产侧对齐）::
+    布局（本模块定义的冻结消费接口；p02 v1 真实包与 fixture 两种列口径
+    均支持，优先识别真实包列名）::
 
         <package_root>/manifest.json
         <package_root>/daily/<code>.parquet    # code 为 suffix 式（510300.SH）
         <package_root>/events/<code>.parquet   # typed 事件，可为空文件/缺省
+        <package_root>/factors/<code>.parquet  # p02 真实包：adj_factor 独立文件
+        <package_root>/etf_limit/<code>.parquet# p02 真实包：交易所涨跌停价（20190626 起）
+
+    daily 列口径两套（自动识别）：
+    - p02 真实包：ts_code, trade_date(YYYYMMDD), open/high/low/close, pre_close,
+      vol_shares(已换算为份), amount_cny(已换算为元)
+    - 工程 fixture：trade_date(YYYY-MM-DD), open/high/low/close, volume(原始:手),
+      amount(原始:千元), adj_factor(内联)
     """
 
     def __init__(self, root: Path, manifest: dict[str, Any], manifest_sha256: str):
@@ -244,6 +268,7 @@ class EtfInputPackage:
         self._lock = threading.RLock()
         self._daily: dict[str, pd.DataFrame] = {}
         self._events: dict[str, list[TypedEvent]] = {}
+        self._limits: dict[str, dict[date, tuple[float, float]]] = {}
         self._trade_dates: list[date] | None = None
         self._dates_by_symbol: dict[str, list[date]] = {}
 
@@ -261,6 +286,11 @@ class EtfInputPackage:
     # -- 日线 ------------------------------------------------------------
 
     def _load_daily(self, code: str) -> pd.DataFrame:
+        """加载并规范化日线（两套列口径自动识别，见类 docstring）。
+
+        规范化后的列：trade_date(date), open, high, low, close, pre_close,
+        vol_shares(份), amount_cny(元), adj_factor。
+        """
         suffix = StockCodeUtil.to_suffix(code)
         with self._lock:
             df = self._daily.get(suffix)
@@ -273,12 +303,39 @@ class EtfInputPackage:
         if "trade_date" not in df.columns:
             raise EtfInputPackageError(f"{suffix} 日线缺 trade_date 列")
         df = df.copy()
-        df["trade_date"] = [
-            date.fromisoformat(str(v)[:10]) if isinstance(v, str)
-            else pd.Timestamp(v).date()
-            for v in df["trade_date"]
-        ]
+        df["trade_date"] = [_parse_trade_date(v) for v in df["trade_date"]]
         df = df.sort_values("trade_date").reset_index(drop=True)
+
+        # 量额单位：p02 真实包列（已换算）优先；fixture 原始列按 manifest
+        # unit_conversions 换算（vol×100→份、amount×1000→元）
+        if "vol_shares" in df.columns:
+            df["vol_shares"] = pd.to_numeric(df["vol_shares"], errors="coerce").fillna(0.0)
+        else:
+            df["vol_shares"] = (
+                pd.to_numeric(df.get("volume"), errors="coerce").fillna(0.0) * 100.0
+            )
+        if "amount_cny" in df.columns:
+            df["amount_cny"] = pd.to_numeric(df["amount_cny"], errors="coerce").fillna(0.0)
+        else:
+            df["amount_cny"] = (
+                pd.to_numeric(df.get("amount"), errors="coerce").fillna(0.0) * 1000.0
+            )
+        # 昨收：真实包自带 pre_close；fixture 从上一行推导
+        if "pre_close" not in df.columns:
+            df["pre_close"] = df["close"].shift(1)
+        # 复权因子：fixture 内联；真实包在 factors/ 按日 join（缺行 ffill）
+        if "adj_factor" not in df.columns:
+            factor_path = self.root / "factors" / f"{suffix}.parquet"
+            if factor_path.is_file():
+                fdf = pd.read_parquet(factor_path)
+                fdf = fdf.copy()
+                fdf["trade_date"] = [_parse_trade_date(v) for v in fdf["trade_date"]]
+                df = df.merge(fdf[["trade_date", "adj_factor"]], on="trade_date", how="left")
+            df["adj_factor"] = (
+                pd.to_numeric(df.get("adj_factor"), errors="coerce")
+                .ffill()
+                .fillna(1.0)
+            )
         with self._lock:
             self._daily[suffix] = df
         return df
@@ -318,14 +375,16 @@ class EtfInputPackage:
             if day_rows.empty:
                 continue
             row = day_rows.iloc[-1]
-            prev_rows = df[df["trade_date"] < trade_date]
-            pre_close = float(prev_rows.iloc[-1]["close"]) if not prev_rows.empty else 0.0
+            pre_close = float(row.get("pre_close") or 0.0)
+            if pre_close <= 0:
+                prev_rows = df[df["trade_date"] < trade_date]
+                pre_close = float(prev_rows.iloc[-1]["close"]) if not prev_rows.empty else 0.0
 
             close = float(row["close"])
-            volume = max(float(row.get("volume", 0) or 0), 0.0) * 100.0
-            amount = max(float(row.get("amount", 0) or 0), 0.0) * 1000.0
+            volume = max(float(row.get("vol_shares", 0) or 0), 0.0)
+            amount = max(float(row.get("amount_cny", 0) or 0), 0.0)
             vwap = amount / volume if volume > 0 and amount > 0 else close
-            limit_up, limit_down = _etf_limits(pre_close, suffix)
+            limit_up, limit_down = self._limits_for(suffix, trade_date, pre_close)
             bars[suffix] = DailyBar(
                 symbol=suffix,
                 trade_date=trade_date,
@@ -357,6 +416,37 @@ class EtfInputPackage:
             return None
         row = rows.iloc[-1]
         return float(row["close"]) * float(row.get("adj_factor", 1.0) or 1.0)
+
+    def _limits_for(
+        self, suffix: str, trade_date: date, pre_close: float
+    ) -> tuple[float, float]:
+        """涨跌停价：优先包内 etf_limit 数据集（p02，20190626 起），
+        未覆盖日期回退工程假设（±10%，588* 科创 ±20%）。"""
+        with self._lock:
+            cached = self._limits.get(suffix)
+        if cached is None:
+            table: dict[date, tuple[float, float]] = {}
+            path = self.root / "etf_limit" / f"{suffix}.parquet"
+            if path.is_file():
+                ldf = pd.read_parquet(path)
+                if "trade_date" in ldf.columns:
+                    ldf = ldf.copy()
+                    ldf["trade_date"] = [_parse_trade_date(v) for v in ldf["trade_date"]]
+                    for r in ldf.to_dict(orient="records"):
+                        up, down = r.get("up_limit"), r.get("down_limit")
+                        if up is None or down is None:
+                            continue
+                        try:
+                            table[r["trade_date"]] = (float(up), float(down))
+                        except (TypeError, ValueError):
+                            continue
+            with self._lock:
+                self._limits[suffix] = table
+            cached = table
+        hit = cached.get(trade_date)
+        if hit is not None:
+            return hit
+        return _etf_limits(pre_close, suffix)
 
     # -- typed events ------------------------------------------------------
 
