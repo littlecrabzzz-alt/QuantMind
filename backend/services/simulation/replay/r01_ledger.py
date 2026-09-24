@@ -56,6 +56,19 @@ from backend.shared.utc_datetime import utc_now
 logger = logging.getLogger(__name__)
 
 GROUPS = ("A", "B1", "B2", "B3", "D", "N", "P0")
+
+
+class LedgerOrderingError(ValueError):
+    """会话顺序/信号对齐违规（W2E3 修复#2）。
+
+    reason ∈ out_of_order / skipped_session / not_trade_date /
+    same_day_signal / signal_not_prev_session。账本会话必须按包交易日
+    历逐日推进；调仓日的信号必须是执行日的上一个包交易日。
+    """
+
+    def __init__(self, reason: str, message: str):
+        super().__init__(f"[{reason}] {message}")
+        self.reason = reason
 CONTRACT_VERSIONS = {
     "ledger_contract": "v2",
     "etf_input_package_schema": "v2",
@@ -76,6 +89,7 @@ _REJECT_REASONS = (
     "lot_inexpressible",
     "stale_price",
     "corporate_action_gap",
+    "no_position",  # W2E3 修复#5：无持仓/无可卖量卖出
 )
 
 
@@ -128,6 +142,23 @@ class LedgerFill:
             "price_source": self.price_source,
         }
 
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> LedgerFill:
+        return cls(
+            trade_date=d["trade_date"],
+            symbol=d["symbol"],
+            side=d["side"],
+            price=float(d["price"]),
+            quantity=int(d["quantity"]),
+            commission=float(d["commission"]),
+            stamp_duty=float(d["stamp_duty"]),
+            transfer_fee=float(d["transfer_fee"]),
+            total_fee=float(d["total_fee"]),
+            signal_date=d.get("signal_date"),
+            slippage_bps=float(d.get("slippage_bps", 0.0)),
+            price_source=d.get("price_source", "package_open"),
+        )
+
 
 @dataclass
 class LedgerOrder:
@@ -176,6 +207,30 @@ class LedgerOrder:
             "fills": [f.to_dict() for f in self.fills],
         }
 
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> LedgerOrder:
+        order = cls(
+            client_order_id=d["client_order_id"],
+            ledger_run_id=d["ledger_run_id"],
+            trade_date=d["trade_date"],
+            signal_date=d.get("signal_date"),
+            symbol=d["symbol"],
+            side=d["side"],
+            origin=d.get("origin", "signal"),
+            qty_target=int(d["qty_target"]),
+            status=d["status"],
+            qty_filled=int(d.get("qty_filled", 0)),
+            qty_remaining=int(d.get("qty_remaining", 0)),
+            avg_fill_price=float(d.get("avg_fill_price") or 0.0),
+            fees=float(d.get("fees", 0.0)),
+            realized_pnl=float(d.get("realized_pnl", 0.0)),
+            reject_reason=d.get("reject_reason"),
+            ideal_weight=d.get("ideal_weight"),
+            realized_weight=d.get("realized_weight"),
+        )
+        order.fills = [LedgerFill.from_dict(f) for f in d.get("fills", [])]
+        return order
+
 
 @dataclass
 class LedgerPosition:
@@ -183,6 +238,11 @@ class LedgerPosition:
     qty: float = 0.0
     avg_cost: float = 0.0
     available_qty: float = 0.0
+    # T+1 逐日解锁（W2E3 修复#2）：pending_t1_qty = 最近一次买入且尚未
+    # 跨过 T+1 边界的数量；available_qty 恒 = qty − pending_t1_qty（T+1
+    # 品种）/ qty（T+0 品种）。跨过下一个交易日边界时在 rollover 解锁。
+    pending_t1_qty: float = 0.0
+    pending_t1_date: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -190,7 +250,20 @@ class LedgerPosition:
             "qty": round(self.qty, 4),
             "avg_cost": round(self.avg_cost, 6),
             "available_qty": round(self.available_qty, 4),
+            "pending_t1_qty": round(self.pending_t1_qty, 4),
+            "pending_t1_date": self.pending_t1_date,
         }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> LedgerPosition:
+        return cls(
+            symbol=d["symbol"],
+            qty=float(d["qty"]),
+            avg_cost=float(d["avg_cost"]),
+            available_qty=float(d["available_qty"]),
+            pending_t1_qty=float(d.get("pending_t1_qty", 0.0)),
+            pending_t1_date=d.get("pending_t1_date"),
+        )
 
 
 @dataclass
@@ -210,6 +283,8 @@ class R01LedgerConfig:
     commission_min: float = 0.0
     slippage_bps: float = 5.0
     price_mode: str = "open"
+    # 当日市场成交量参与率（W2E3 修复#3）：成交上限 = bar.volume × 此值
+    volume_participation: float = 1.0
 
     def __post_init__(self) -> None:
         if self.group not in GROUPS:
@@ -239,6 +314,7 @@ class R01LedgerConfig:
             "commission_min": self.commission_min,
             "slippage_bps": self.slippage_bps,
             "price_mode": self.price_mode,
+            "volume_participation": self.volume_participation,
         }
 
 
@@ -314,6 +390,7 @@ class R01Ledger:
             # 佣金率/最低收费取会话假设
             asset_type="etf",
             allow_partial=True,
+            volume_participation=config.volume_participation,
         )
 
     # ------------------------------------------------------------------
@@ -349,6 +426,47 @@ class R01Ledger:
     # 单日推演
     # ------------------------------------------------------------------
 
+    def _validate_day_ordering(
+        self, trade_date: date, signal_date: date | None, has_weights: bool
+    ) -> date | None:
+        """W2E3 修复#2：会话顺序与 T+1 信号对齐强制校验。
+
+        - 执行日必须是包交易日，且严格递增、不跳日（下一包交易日）；
+        - 调仓日的 signal_date 必须是执行日的上一个包交易日（缺省自动
+          取该日；同日信号/错位信号显式拒绝）。
+        返回生效的 signal_date（可能被自动补全）。
+        """
+        if not self.package.is_trade_date(trade_date):
+            raise LedgerOrderingError(
+                "not_trade_date", f"{trade_date} 不是输入包交易日"
+            )
+        if self._last_trade_date is not None:
+            if trade_date <= self._last_trade_date:
+                raise LedgerOrderingError(
+                    "out_of_order",
+                    f"{trade_date} 不早于上一执行日 {self._last_trade_date}",
+                )
+            expected = self.package.next_trade_date(self._last_trade_date)
+            if expected != trade_date:
+                raise LedgerOrderingError(
+                    "skipped_session",
+                    f"期望下一交易日 {expected}，得到 {trade_date}（禁止跳日执行）",
+                )
+        prev = self.package.prev_trade_date(trade_date)
+        if signal_date is not None and signal_date >= trade_date:
+            raise LedgerOrderingError(
+                "same_day_signal", f"signal_date {signal_date} 必须严格早于执行日"
+            )
+        if has_weights:
+            if signal_date is None:
+                signal_date = prev  # 自动对齐上一包交易日
+            elif prev is None or signal_date != prev:
+                raise LedgerOrderingError(
+                    "signal_not_prev_session",
+                    f"signal_date {signal_date} 必须是执行日的上一包交易日 {prev}",
+                )
+        return signal_date
+
     def run_day(
         self,
         trade_date: date,
@@ -367,11 +485,13 @@ class R01Ledger:
         if key in self._executed_dates:
             raise ValueError(f"{trade_date} 已执行（重放须新 attempt，TG-004/§3）")
 
+        # W2E3 修复#2：会话顺序与信号对齐由账本强制执行。
+        signal_date = self._validate_day_ordering(trade_date, signal_date, target_weights is not None)
+
         summary = DaySummary(trade_date=key)
         bars = self.package.load_date(trade_date)
-        signal_iso = signal_date.isoformat() if signal_date else None
 
-        # 1. 回转解锁：T+1 品种昨日买入今日可卖；T+0 当日即已可卖
+        # 1. 回转解锁：T+1 品种仅解锁已跨过 T+1 边界的具体买入批次
         self._rollover_settlement(trade_date)
 
         # 2. 份额调整（开盘前；不动现金）
@@ -381,9 +501,13 @@ class R01Ledger:
                 if applied is not None:
                     summary.corporate_actions_applied.append(applied)
 
-        # 3. 目标权重 → 订单
+        # 3. 目标权重 → 订单（W2E3 修复#1：目标金额基于信号日收盘 NAV 与
+        #    信号日收盘价；执行日只用开盘价成交，无前视）
         if target_weights is not None:
-            self._rebalance(trade_date, bars, target_weights, signal_iso, summary)
+            nav_ref, closes_ref = self._signal_reference(trade_date, signal_date)
+            self._rebalance(
+                trade_date, bars, target_weights, signal_date, nav_ref, closes_ref, summary
+            )
 
         # 4. EOD
         self._eod(trade_date, bars, summary)
@@ -448,6 +572,12 @@ class R01Ledger:
             return _reject("no_quote")
         if bar.suspended:
             return _reject("suspended")
+        # W2E3 修复#5：裸卖空防护——卖出前必须有持仓且可卖量>0，
+        # 拒单 reason=no_position，现金不得增加。
+        if order.side == "sell":
+            position = self.positions.get(order.symbol)
+            if position is None or position.qty <= 1e-9 or position.available_qty <= 0:
+                return _reject("no_position")
         # 风险闸门：仅买方向；既定退出/卖出继续有效
         if order.side == "buy":
             if not self.risk.buys_allowed:
@@ -518,9 +648,16 @@ class R01Ledger:
                 else 0.0
             )
             pos.qty = new_qty
-            # T+0 品种当日可卖；T+1 品种在次日 rollover 解锁
+            # T+0 品种当日可卖；T+1 品种记 pending 批次，跨过下一交易日
+            # 边界时 rollover 解锁（W2E3 修复#2：逐日解锁具体日期）
             if etf_settlement_days_for_symbol(order.symbol) == 0:
                 pos.available_qty += mr.fill_quantity
+            else:
+                if pos.pending_t1_date == order.trade_date:
+                    pos.pending_t1_qty += mr.fill_quantity
+                else:
+                    pos.pending_t1_qty = mr.fill_quantity
+                    pos.pending_t1_date = order.trade_date
         else:
             # 卖出在减仓前抓移动加权成本（清仓后持仓会被删掉）
             avg_cost_before = pos.avg_cost
@@ -548,33 +685,84 @@ class R01Ledger:
         )
         summary.orders.append(order.to_dict())
 
+    def _signal_reference(
+        self, trade_date: date, signal_date: date | None
+    ) -> tuple[float, dict[str, float]]:
+        """信号日估值引用（W2E3 修复#1：无前视）。
+
+        nav_ref = 信号日（上一交易日）收盘 NAV；closes_ref = 持仓在信号日
+        的收盘价。信号日恰为上一执行日时直接取其 EOD 快照（同一口径），
+        否则用输入包行情重估（首日：现金=initial，持仓为空）。
+        """
+        if signal_date is None:
+            return float(self.config.initial_cash), {}
+        if self.equity and self.equity[-1]["trade_date"] == signal_date.isoformat():
+            snap = self.equity[-1]
+            closes = {sym: float(p["close"]) for sym, p in (snap.get("positions") or {}).items()}
+            return float(snap["nav"]), closes
+        sig_bars = self.package.load_date(signal_date)
+        closes: dict[str, float] = {}
+        market_value = 0.0
+        for sym, pos in self.positions.items():
+            bar = sig_bars.get(sym)
+            close = bar.close if (bar and bar.close > 0) else pos.avg_cost
+            closes[sym] = close
+            market_value += pos.qty * close
+        return self.cash + market_value, closes
+
+    def _signal_close_for(self, symbol: str, signal_date: date | None) -> float | None:
+        """标的在信号日（或其前最近可得日）的收盘价；不可得返回 None。"""
+        if signal_date is None:
+            return None
+        probe = signal_date
+        for _ in range(5):  # DG-003 缺行日回看最多 5 个交易日
+            bar = self.package.get_bar(symbol, probe)
+            if bar is not None and bar.close > 0:
+                return bar.close
+            prev = self.package.prev_trade_date(probe)
+            if prev is None:
+                return None
+            probe = prev
+        return None
+
     def _rebalance(
         self,
         trade_date: date,
         bars: dict,
         target_weights: dict[str, float],
-        signal_iso: str | None,
+        signal_date: date | None,
+        nav_ref: float,
+        closes_ref: dict[str, float],
         summary: DaySummary,
     ) -> None:
         """目标权重 → 订单，先卖后买（腾出现金）。
 
-        目标手数 = floor(目标金额 / (开盘价×100))；ideal_weight=信号
+        W2E3 修复#1：目标金额 = weight × 信号日收盘 NAV，定手数用信号日
+        收盘价；执行只用执行日开盘价成交（无前视）。ideal_weight=信号
         目标权重，realized_weight 在 EOD 按 (qty×close)/nav 回填（DG-001）。
         """
-        nav_est = self._nav_with_bars(bars)
-        if nav_est <= 0:
+        if nav_ref <= 0:
             return
-        sig_date = date.fromisoformat(signal_iso) if signal_iso else None
         sells: list[LedgerOrder] = []
         buys: list[LedgerOrder] = []
         for symbol, weight in sorted(target_weights.items()):
             symbol = symbol.upper()
             bar = bars.get(symbol)
-            price = (bar.open if bar and bar.open > 0 else (bar.close if bar else 0.0)) or 0.0
-            target_amount = weight * nav_est
-            # 原始目标份额（不预先取整）：整手约束交由撮合器统一执行；
-            # 不足一手的买入会以 BELOW_LOT_SIZE→lot_inexpressible 显式拒单
-            raw_target = target_amount / price if price > 0 else 0.0
+            price = closes_ref.get(symbol) or self._signal_close_for(symbol, signal_date) or 0.0
+            if price <= 0:
+                # 信号日无可用收盘价：显式拒单，不用执行日价格定目标
+                order = self.submit_order(
+                    trade_date, symbol, "buy", 0,
+                    origin="signal", signal_date=signal_date, ideal_weight=weight,
+                )
+                order.status = ORDER_STATUS_REJECTED
+                order.reject_reason = "stale_price"
+                summary.orders.append(order.to_dict())
+                continue
+            target_amount = weight * nav_ref
+            # 原始目标份额（按信号日收盘价，不预先取整）：整手约束交由
+            # 撮合器统一执行；不足一手的买入以 lot_inexpressible 显式拒单
+            raw_target = target_amount / price
             pos = self.positions.get(symbol)
             current_qty = pos.qty if pos else 0.0
             delta = raw_target - current_qty
@@ -584,7 +772,7 @@ class R01Ledger:
             qty = int(delta) if delta > 0 else int(math.ceil(-delta - 1e-9))
             order = self.submit_order(
                 trade_date, symbol, side, qty,
-                origin="signal", signal_date=sig_date, ideal_weight=weight,
+                origin="signal", signal_date=signal_date, ideal_weight=weight,
             )
             if bar is None or bar.suspended:
                 # 停牌/无行情日不虚构成交：显式拒单留痕
@@ -657,12 +845,19 @@ class R01Ledger:
     # ------------------------------------------------------------------
 
     def _rollover_settlement(self, trade_date: date) -> None:
-        """日初回转解锁：T+1 品种全部持仓变为可卖；T+0 已即时可卖。"""
-        if self._last_trade_date is None:
-            return
+        """日初回转解锁（W2E3 修复#2）：仅解锁已跨过 T+1 边界的具体买入
+        批次——pending 批次的买入日严格早于今日时解锁（available=qty−0），
+        当日稍后新买入的批次单独记 pending，不受影响。
+        """
         for pos in self.positions.values():
             if etf_settlement_days_for_symbol(pos.symbol) >= 1:
-                pos.available_qty = pos.qty
+                if (
+                    pos.pending_t1_date is not None
+                    and date.fromisoformat(pos.pending_t1_date) < trade_date
+                ):
+                    pos.available_qty = pos.qty
+                    pos.pending_t1_qty = 0.0
+                    pos.pending_t1_date = None
 
     def _nav_with_bars(self, bars: dict) -> float:
         market_value = 0.0
@@ -776,6 +971,26 @@ class R01Ledger:
         """用户额外减仓：允许任意时刻（含风险暂停期）；记 manual_action；
         不影响 HWM（HWM 只在 EOD 由 nav 更新）、不解除风险暂停、不计为
         策略行为；nav 影响入账。"""
+        # W2E3 修复#5：无持仓/无可卖量的手动卖出同样拒单（no_position）
+        position = self.positions.get(symbol)
+        if position is None or position.available_qty <= 0:
+            order = self.submit_order(trade_date, symbol, "sell", qty, origin="manual")
+            order.status = ORDER_STATUS_REJECTED
+            order.reject_reason = "no_position"
+            order.qty_remaining = qty
+            self.manual_actions.append(
+                {
+                    "date": trade_date.isoformat(),
+                    "symbol": symbol,
+                    "qty": qty,
+                    "reason": reason,
+                    "requested_by": requested_by,
+                    "client_order_id": order.client_order_id,
+                    "status": order.status,
+                    "reject_reason": order.reject_reason,
+                }
+            )
+            return order
         bars = bars if bars is not None else self.package.load_date(trade_date)
         order = self.submit_order(
             trade_date, symbol, "sell", qty, origin="manual",
@@ -832,6 +1047,76 @@ class R01Ledger:
         }
         return evidence
 
+    # ------------------------------------------------------------------
+    # checkpoint 导出/恢复（W2E3 修复#7：完整账本状态可持久化）
+    # ------------------------------------------------------------------
+
+    def export_checkpoint(self) -> dict[str, Any]:
+        """完整账本状态快照（纯状态、确定性；与 export_evidence 的区别：
+        面向恢复重放，含全部可变状态，账务字段不做展示层取整）。"""
+        return {
+            "schema_version": 1,
+            "ledger_run_id": self.ledger_run_id,
+            "config": self.config.to_dict(),
+            "cash": self.cash,
+            "positions": {sym: pos.to_dict() for sym, pos in self.positions.items()},
+            "executed_dates": sorted(self._executed_dates),
+            "last_trade_date": (
+                self._last_trade_date.isoformat() if self._last_trade_date else None
+            ),
+            "applied_action_keys": [list(k) for k in sorted(self.applied_action_keys)],
+            "orders": {coid: o.to_dict() for coid, o in self.orders.items()},
+            "equity": list(self.equity),
+            "corporate_action_log": list(self.corporate_action_log),
+            "dividend_log": list(self.dividend_log),
+            "manual_actions": list(self.manual_actions),
+            "deposit_rejections": list(self.deposit_rejections),
+            "risk_blocked_orders": list(self.risk_blocked_orders),
+            "risk_state": self.risk.to_dict(),
+        }
+
+    @classmethod
+    def restore(
+        cls,
+        package: EtfInputPackage,
+        config: R01LedgerConfig,
+        checkpoint: dict[str, Any],
+    ) -> R01Ledger:
+        """从 export_checkpoint 快照恢复账本，可继续推演。
+
+        恢复校验 ledger_run_id 一致（防错配）；风险状态按事件重算
+        status（不信任快照字符串）。
+        """
+        if checkpoint.get("ledger_run_id") != config.ledger_run_id:
+            raise ValueError(
+                f"checkpoint ledger_run_id 不匹配: {checkpoint.get('ledger_run_id')}"
+                f" != {config.ledger_run_id}"
+            )
+        ledger = cls(package, config)
+        ledger.cash = float(checkpoint["cash"])
+        ledger.positions = {
+            sym: LedgerPosition.from_dict(p)
+            for sym, p in checkpoint.get("positions", {}).items()
+        }
+        ledger._executed_dates = set(checkpoint.get("executed_dates", []))
+        ltd = checkpoint.get("last_trade_date")
+        ledger._last_trade_date = date.fromisoformat(ltd) if ltd else None
+        ledger.applied_action_keys = {
+            tuple(k) for k in checkpoint.get("applied_action_keys", [])
+        }
+        ledger.orders = {
+            coid: LedgerOrder.from_dict(o)
+            for coid, o in checkpoint.get("orders", {}).items()
+        }
+        ledger.equity = list(checkpoint.get("equity", []))
+        ledger.corporate_action_log = list(checkpoint.get("corporate_action_log", []))
+        ledger.dividend_log = list(checkpoint.get("dividend_log", []))
+        ledger.manual_actions = list(checkpoint.get("manual_actions", []))
+        ledger.deposit_rejections = list(checkpoint.get("deposit_rejections", []))
+        ledger.risk_blocked_orders = list(checkpoint.get("risk_blocked_orders", []))
+        ledger.risk = RiskStateMachine.from_dict(checkpoint["risk_state"])
+        return ledger
+
 
 # ---------------------------------------------------------------------------
 # 独立复算（ledger-contract §9：用输入包原始数据独立重算现金/净值逐日对齐）
@@ -852,6 +1137,8 @@ def independent_recompute(
     session = evidence["session"]
     cash = float(session["initial_cash"])
     positions: dict[str, float] = {}
+    # 移动加权成本（含费用）：与引擎口径一致，缺行情行日的估值回退用它
+    costs: dict[str, float] = {}
     fills_by_date: dict[str, list[dict]] = {}
     for order in evidence["orders"]:
         for fill in order.get("fills", []):
@@ -881,12 +1168,20 @@ def independent_recompute(
             fee = float(fill["total_fee"])
             if side == "buy":
                 cash -= qty * price + fee
-                positions[sym] = positions.get(sym, 0.0) + qty
+                prev_qty = positions.get(sym, 0.0)
+                new_qty = prev_qty + qty
+                costs[sym] = (
+                    (costs.get(sym, 0.0) * prev_qty + qty * price + fee) / new_qty
+                    if new_qty > 0
+                    else 0.0
+                )
+                positions[sym] = new_qty
             else:
                 cash += qty * price - fee
                 positions[sym] = positions.get(sym, 0.0) - qty
                 if positions[sym] <= 1e-9:
                     positions.pop(sym, None)
+                    costs.pop(sym, None)
         # EOD：现金分红（先于 nav）
         for rec in actions_by_date.get(d, []):
             sym = rec["symbol"]
@@ -903,6 +1198,10 @@ def independent_recompute(
                 close = float(
                     (snap.get("positions") or {}).get(sym, {}).get("close", 0.0)
                 )
+            if close <= 0:
+                # 缺行情行日（DG-003）：引擎按移动加权成本回退估值，
+                # 复算同口径（不是 0，避免虚假 nav 塌陷）
+                close = costs.get(sym, 0.0)
             market_value += qty * close
         out.append(
             {
@@ -921,6 +1220,7 @@ def _normalize_reject_reason(reason: str) -> str:
         "limit_up": "limit_hit",
         "limit_down": "limit_hit",
         "insufficient_available_volume": "lot_inexpressible",
+        "insufficient_market_volume": "lot_inexpressible",
         "below_lot_size": "lot_inexpressible",
         "insufficient_cash": "insufficient_cash",
         "invalid_price": "stale_price",

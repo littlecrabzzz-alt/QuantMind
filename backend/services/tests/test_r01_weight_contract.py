@@ -57,10 +57,21 @@ def _config(
 
 
 def _run_scenario(pkg, config, days_weights):
-    """按 [(date, weights|None)] 序列推演，返回 ledger。"""
+    """按 [(date, weights|None)] 序列推演，返回 ledger。
+
+    W2E3 起账本强制按包交易日历逐日推进（不跳日）：序列日期之间的
+    中间日自动以 None 权重补齐。
+    """
+    by_date = {d: w for d, w in days_weights}
+    first = min(by_date) if by_date else None
+    last = max(by_date) if by_date else None
     ledger = R01Ledger(pkg, config)
-    for d, w in days_weights:
-        ledger.run_day(d, w)
+    for d in pkg.trade_dates():
+        if first is not None and d < first:
+            continue
+        if last is not None and d > last:
+            break
+        ledger.run_day(d, by_date.get(d))
     return ledger
 
 
@@ -304,13 +315,14 @@ class TestRiskIntegration:
         assert not ev.confirmed
         ledger.confirm_risk_event(ev.risk_event_id, confirmed_by="user-1")
         assert ledger.risk.buys_allowed
+        # 确认后：09-16（fixture 停牌日）显式拒单（suspended），
+        # 但不再是 risk_paused —— 恢复买入放行
         ledger.run_day(date(2025, 9, 16), {"510300.SH": 0.5})
-        buys2 = [
+        buys3 = [
             o for o in ledger.orders.values()
             if o.side == "buy" and o.trade_date == "2025-09-16"
         ]
-        # 2025-09-16 为 fixture 停牌日：显式拒单（suspended），但不再是 risk_paused
-        assert buys2 and buys2[0].reject_reason == "suspended"
+        assert buys3 and buys3[0].reject_reason == "suspended"
 
     def test_deposit_rejected(self, pkg):
         ledger = R01Ledger(pkg, _config(initial=15000.0, strategy_id="fixture-dep-demo"))

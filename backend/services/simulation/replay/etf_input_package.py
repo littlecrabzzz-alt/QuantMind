@@ -357,6 +357,23 @@ class EtfInputPackage:
                 return x
         return None
 
+    def prev_trade_date(self, d: date) -> date | None:
+        """严格早于 d 的最近包交易日（W2E3 修复#2：T+1 信号对齐校验用）。"""
+        prev = None
+        for x in self.trade_dates():
+            if x >= d:
+                break
+            prev = x
+        return prev
+
+    def is_trade_date(self, d: date) -> bool:
+        return d in self._trade_date_set()
+
+    def _trade_date_set(self) -> set[date]:
+        if getattr(self, "_td_set", None) is None:
+            self._td_set = set(self.trade_dates())
+        return self._td_set
+
     def load_date(self, trade_date: date, symbols: list[str] | None = None) -> dict[str, DailyBar]:
         """按日加载 DailyBar（与 LocalMarketData.load_date 同口径）。
 

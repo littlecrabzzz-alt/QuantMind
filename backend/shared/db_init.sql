@@ -1533,7 +1533,8 @@ CREATE TABLE IF NOT EXISTS replay_orders (
 );
 CREATE INDEX IF NOT EXISTS idx_replay_order_session_date
     ON replay_orders (session_id, trade_date);
-CREATE INDEX IF NOT EXISTS idx_replay_order_client_oid
+-- W2E3 修复#6：client_order_id 幂等键唯一约束（NULL 不受限，兼容存量行）
+CREATE UNIQUE INDEX IF NOT EXISTS uq_replay_order_client_oid
     ON replay_orders (client_order_id);
 
 CREATE TABLE IF NOT EXISTS replay_trades (
@@ -1607,7 +1608,7 @@ CREATE TABLE IF NOT EXISTS replay_risk_events (
     action          VARCHAR(32) NOT NULL DEFAULT 'pause_buys',
     blocked_orders  JSONB NOT NULL DEFAULT '[]'::jsonb,
     confirmed_by    VARCHAR(128),
-    confirmed_at    TIMESTAMP,
+    confirmed_at    TIMESTAMPTZ,
     nav_at_confirm  FLOAT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -1634,6 +1635,15 @@ CREATE TABLE IF NOT EXISTS replay_corporate_actions (
 );
 CREATE INDEX IF NOT EXISTS idx_replay_ca_run_symbol
     ON replay_corporate_actions (ledger_run_id, symbol);
+
+-- R01 研究账本完整状态检查点（W2E3 修复#7：checkpoint 持久化）
+CREATE TABLE IF NOT EXISTS replay_ledger_checkpoints (
+    ledger_run_id   VARCHAR(160) PRIMARY KEY,
+    package_id      VARCHAR(128) NOT NULL,
+    state           JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 -- ========================
 -- 59. USER APP 扩展表（认证/RBAC/订阅/通知/KYC）

@@ -49,6 +49,9 @@ class MatchConfig:
     lot_size: int = _LOT_SIZE
     asset_type: str = ""  # "" = auto / "equity" / "etf"
     allow_partial: bool = False
+    # 当日市场成交量参与率（W2E3 修复#3）：allow_partial 模式下买卖数量
+    # 均以 bar.volume × participation 为上限；默认 1.0 = 全量可参与。
+    volume_participation: float = 1.0
 
     def asset_rules(self, symbol: str):
         """解析本单适用的资产类别规则（含显式佣金假设覆盖）。"""
@@ -151,39 +154,65 @@ def match_order(
         available_volume: T+1 可卖量（仅 sell 时需要）
         cash_available: 可用现金（仅 buy + allow_partial 时用于现金约束
             部分成交；为 None 时不做现金上限约束）
+
+    部分成交优先级（allow_partial=True，W2E3 修复#3）：
+    市场成交量上限（bar.volume×participation）→ 持仓可卖量 → 现金约束；
+    每一级截断的剩余量都计入 qty_remaining（=order_qty − fill_qty）。
     """
+    order_qty = int(quantity)
+
     # ── 停牌 ──
     if bar.suspended:
         return MatchResult(success=False, reason="SUSPENDED")
 
-    # ── 涨跌停 ──
-    if side == "buy" and bar.close >= bar.limit_up:
-        return MatchResult(success=False, reason="LIMIT_UP")
-    if side == "sell" and bar.close <= bar.limit_down:
-        return MatchResult(success=False, reason="LIMIT_DOWN")
-
     asset_rules = cfg.asset_rules(bar.symbol)
     is_etf = asset_rules.asset_type is AssetType.ETF
 
+    # ── 涨跌停（W2E3 修复#4）：按执行时点价格判定封板，不再用收盘价。
+    # R01 开盘撮合：开盘价触及涨停拒买、触及跌停拒卖；"收盘封板、开盘
+    # 可成交"或"开盘封板、收盘打开"都不再误判。
+    exec_ref_price = _pick_price(bar, cfg.price_mode)
+    if exec_ref_price <= 0:
+        return MatchResult(success=False, reason="INVALID_PRICE")
+    if side == "buy" and exec_ref_price >= bar.limit_up:
+        return MatchResult(success=False, reason="LIMIT_UP")
+    if side == "sell" and exec_ref_price <= bar.limit_down:
+        return MatchResult(success=False, reason="LIMIT_DOWN")
+
+    # ── 当日市场成交量上限（W2E3 修复#3）：仅 allow_partial 模式约束，
+    # 既有回放（allow_partial=False）行为不变。
+    volume_cap = order_qty
+    if cfg.allow_partial:
+        participation = min(max(float(cfg.volume_participation), 0.0), 1.0)
+        volume_cap = int(bar.volume * participation)
+        if volume_cap <= 0:
+            return MatchResult(
+                success=False,
+                reason="INSUFFICIENT_MARKET_VOLUME",
+                qty_remaining=order_qty,
+            )
+        quantity = min(order_qty, volume_cap)
+
     # ── T+1 可卖量 ──
-    sell_shortfall = 0
-    if side == "sell" and available_volume is not None:
-        if quantity > available_volume:
-            if cfg.allow_partial and available_volume > 0:
-                sell_shortfall = quantity - int(available_volume)
-                quantity = int(available_volume)
-            else:
-                return MatchResult(
-                    success=False,
-                    reason=f"INSUFFICIENT_AVAILABLE_VOLUME:{available_volume:.0f}",
-                )
+    if side == "sell" and available_volume is not None and quantity > available_volume:
+        if cfg.allow_partial and available_volume > 0:
+            quantity = int(available_volume)
+        else:
+            return MatchResult(
+                success=False,
+                reason=f"INSUFFICIENT_AVAILABLE_VOLUME:{available_volume:.0f}",
+            )
 
     # ── 整手 ──
     lot_size = max(1, int(lot_size_for_symbol(bar.symbol) or cfg.lot_size or _LOT_SIZE))
     if side == "buy":
         fill_qty = _floor_to_lot(quantity, lot_size)
         if fill_qty <= 0:
-            return MatchResult(success=False, reason="BELOW_LOT_SIZE")
+            return MatchResult(
+                success=False,
+                reason="BELOW_LOT_SIZE",
+                qty_remaining=order_qty,
+            )
         # 现金约束的部分成交：按可负担的最大整手数成交（allow_partial）。
         # 估价口径与最终成交价一致（滑点+价格档+钳制），保证可负担判定
         # 不会因费用口径差异多成交一手。
@@ -198,19 +227,15 @@ def match_order(
                     return MatchResult(
                         success=False,
                         reason="INSUFFICIENT_CASH",
-                        qty_remaining=quantity,
+                        qty_remaining=order_qty,
                     )
-                remaining = quantity - affordable * lot_size
                 fill_qty = affordable * lot_size
-                return _finalize_fill(
-                    side, fill_qty, remaining, bar, cfg, asset_rules, is_etf
-                )
     else:
         # 卖出允许清仓零头（不满一手也可以卖完）
         fill_qty = quantity
 
     return _finalize_fill(
-        side, fill_qty, sell_shortfall, bar, cfg, asset_rules, is_etf
+        side, fill_qty, max(0, order_qty - fill_qty), bar, cfg, asset_rules, is_etf
     )
 
 

@@ -219,3 +219,42 @@ class RiskStateMachine:
             "config": self.config.to_dict(),
             "events": [ev.to_dict() for ev in self.events.values()],
         }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RiskStateMachine:
+        """从 to_dict 快照恢复（W2E3 checkpoint 持久化用）。
+
+        事件含确认状态逐字段还原；status 由未确认触发重算（不信任快照
+        字符串，防止快照与事件状态漂移）。
+        """
+        cfg = data["config"]
+        m = cls(
+            data["ledger_run_id"],
+            RiskConfig(
+                initial_cash=float(cfg["initial_cash"]),
+                loss_line_amount=float(cfg["loss_line_amount"]),
+                drawdown_pct=float(cfg["drawdown_pct"]),
+            ),
+            high_water_mark=float(data["high_water_mark"]),
+        )
+        m.terminal = bool(data.get("terminal"))
+        for evd in data.get("events", []):
+            ev = RiskEvent(
+                risk_event_id=evd["risk_event_id"],
+                date=evd["date"],
+                nav=float(evd["nav"]),
+                risk_line=evd["risk_line"],
+                threshold=float(evd["threshold"]),
+                action=evd.get("action", "pause_buys"),
+                blocked_orders=list(evd.get("blocked_orders", [])),
+                confirmed_by=evd.get("confirmed_by"),
+                confirmed_at=evd.get("confirmed_at"),
+                nav_at_confirm=(
+                    float(evd["nav_at_confirm"])
+                    if evd.get("nav_at_confirm") is not None
+                    else None
+                ),
+            )
+            m.events[ev.risk_event_id] = ev
+        m.status = "paused" if m.has_unconfirmed_trigger else "active"
+        return m

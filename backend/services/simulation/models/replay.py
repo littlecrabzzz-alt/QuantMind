@@ -30,6 +30,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.services.simulation.models import Base, TimestampMixin
+from backend.shared.utc_datetime import UtcDateTime
 from backend.services.simulation.models.order import (
     OrderSide,
     OrderStatus,
@@ -160,7 +161,10 @@ class ReplayOrder(Base, TimestampMixin):
     qty_remaining: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     # 订单幂等键：f"{ledger_run_id}:{trade_date}:{symbol}:{side}"（同键重试
     # 返回原订单）；旧回放会话无此键时为 NULL
-    client_order_id: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
+    # W2E3 修复#6：幂等键加唯一约束（同键重试必须命中既有行，不允许第二行）
+    client_order_id: Mapped[str | None] = mapped_column(
+        String(160), nullable=True, index=True, unique=True
+    )
     # 信号日（T+1 对齐审计：执行日信号来自上一交易日数据日）
     signal_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     price: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -255,7 +259,8 @@ class ReplayRiskEvent(Base, TimestampMixin):
     action: Mapped[str] = mapped_column(String(32), nullable=False, default="pause_buys")
     blocked_orders: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     confirmed_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # W2E3 修复#6：瞬时时间列统一 TIMESTAMPTZ + aware UTC（项目唯一口径）
+    confirmed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     nav_at_confirm: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     __table_args__ = (
@@ -293,6 +298,20 @@ class ReplayCorporateAction(Base, TimestampMixin):
             name="uq_replay_ca_run_symbol_date_type",
         ),
     )
+
+
+class ReplayLedgerCheckpoint(Base, TimestampMixin):
+    """R01 研究账本完整状态检查点（W2E3 修复#7）。
+
+    state 为 export_checkpoint() 的完整快照（JSONB）；按 ledger_run_id
+    幂等 upsert——同 run 重放保存覆盖不重复，恢复后可继续推演。
+    """
+
+    __tablename__ = "replay_ledger_checkpoints"
+
+    ledger_run_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    package_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    state: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
 class ReplaySignal(Base, TimestampMixin):

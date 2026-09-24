@@ -47,6 +47,20 @@ def _buy_full(pkg, ledger, trade_date, symbol, weight=1.0):
     return ledger.run_day(trade_date, {symbol: weight})
 
 
+def _run_to(pkg, ledger, target_date, weights=None):
+    """从上一执行日之后逐日推进到 target_date（W2E3 起账本强制不跳日，
+    测试必须按包交易日历逐日 run_day；中间日 None 权重）。"""
+    start = ledger._last_trade_date
+    summary = None
+    for d in pkg.trade_dates():
+        if start is not None and d <= start:
+            continue
+        if d > target_date:
+            break
+        summary = ledger.run_day(d, weights if d == target_date else None)
+    return summary
+
+
 class TestShareAdjustment:
     def test_qty_multiplier_and_cost_basis(self, pkg):
         ledger = _ledger(pkg)
@@ -57,8 +71,8 @@ class TestShareAdjustment:
         cost_before = pos.avg_cost
 
         # 2025-09-22 份额折算（DG-005 冻结值 0.9481）；事件日不再平衡，
-        # 隔离验证公司行动本身
-        summary = ledger.run_day(date(2025, 9, 22), None)
+        # 隔离验证公司行动本身（逐日推进，不跳日）
+        summary = _run_to(pkg, ledger, date(2025, 9, 22))
         pos = ledger.positions["159934.SZ"]
         assert pos.qty == pytest.approx(qty_before * 0.9481)
         assert pos.avg_cost == pytest.approx(cost_before / 0.9481)
@@ -74,13 +88,13 @@ class TestShareAdjustment:
         _buy_full(pkg, ledger, date(2025, 9, 15), "510500.SH")
         qty_before = ledger.positions["510500.SH"].qty
         # fixture 把 2015-04-15 冻结倍率 0.2803 放在 2025-09-18
-        ledger.run_day(date(2025, 9, 18), None)
+        _run_to(pkg, ledger, date(2025, 9, 18))
         assert ledger.positions["510500.SH"].qty == pytest.approx(qty_before * 0.2803)
 
     def test_applies_before_open_no_cash_effect(self, pkg):
         ledger = _ledger(pkg)
         _buy_full(pkg, ledger, date(2025, 9, 10), "159934.SZ")
-        ledger.run_day(date(2025, 9, 22), None)
+        _run_to(pkg, ledger, date(2025, 9, 22))
         # 事件日不再平衡：现金严格不变（份额调整不动现金）
         ca = ledger.corporate_action_log[-1]
         assert ca["cash_delta"] == 0.0
@@ -94,7 +108,7 @@ class TestCashDividend:
         qty = ledger.positions["510300.SH"].qty
 
         # 2025-09-19 除息日（fixture：每份 0.05 元）
-        summary = ledger.run_day(date(2025, 9, 19), {"510300.SH": 1.0})
+        summary = _run_to(pkg, ledger, date(2025, 9, 19), {"510300.SH": 1.0})
         credited = summary.dividends_credited
         assert credited and credited[0]["symbol"] == "510300.SH"
         expected = round(qty * 0.05, 4)
@@ -107,7 +121,7 @@ class TestCashDividend:
         ledger = _ledger(pkg)
         _buy_full(pkg, ledger, date(2025, 9, 10), "510300.SH")
         # 持有跨除息日，dividend_log 记录幂等键完整
-        ledger.run_day(date(2025, 9, 19), {"510300.SH": 1.0})
+        _run_to(pkg, ledger, date(2025, 9, 19), {"510300.SH": 1.0})
         recs = [d for d in ledger.dividend_log if d["symbol"] == "510300.SH"]
         assert len(recs) == 1
         key = recs[0]["idempotency_key"]
@@ -122,7 +136,7 @@ class TestSameDayShareThenCash:
         cash_before = ledger.cash
         # 2025-09-23：先份额折算 ×0.5，后现金分红 0.04（调整后口径）；
         # 事件日不再平衡，隔离验证时序
-        summary = ledger.run_day(date(2025, 9, 23), None)
+        summary = _run_to(pkg, ledger, date(2025, 9, 23))
         assert summary.corporate_actions_applied, "份额调整应先于分红"
         assert summary.dividends_credited, "现金分红应入账"
 
@@ -138,7 +152,7 @@ class TestIdempotency:
     def test_action_key_dedup(self, pkg):
         ledger = _ledger(pkg)
         _buy_full(pkg, ledger, date(2025, 9, 10), "510300.SH")
-        ledger.run_day(date(2025, 9, 19), {"510300.SH": 1.0})
+        _run_to(pkg, ledger, date(2025, 9, 19), {"510300.SH": 1.0})
         # 重复应用同一事件（模拟重放）→ 幂等拒绝
         from backend.services.simulation.replay.etf_input_package import TypedEvent
 
@@ -199,7 +213,7 @@ class TestOrderStateMachine:
             f"{ledger.ledger_run_id}:2025-09-10:510300.SH:buy"
         ]
         assert o.qty_filled == 24900
-        assert o.qty_remaining == 25
+        assert o.qty_remaining == 50
         assert o.status == "expired_unfilled"
         assert o.avg_fill_price > 0
         assert o.fills[0].stamp_duty == 0.0  # ETF 无印花税
