@@ -36,6 +36,147 @@ class Market(str, Enum):
     CRYPTO = "CRYPTO"
 
 
+class AssetType(str, Enum):
+    """资产类别维度交易规则（R01 P0.3：与 Market 维度正交）。
+
+    同一 CN 市场内股票与 ETF 的费用/回转/价格档不同，单独用 Market
+    表达不了；ETF 规则（TG-006）：无印花税、无过户费、佣金最低收费
+    可配、债券/黄金/跨境 ETF 支持 T+0、价格档 0.001。
+    """
+
+    EQUITY = "equity"
+    ETF = "etf"
+
+
+@dataclass(frozen=True)
+class AssetTradingRules:
+    """单个资产类别的费用/回转规则（不区分市场；目前仅 CN 有 ETF 规则）。"""
+
+    asset_type: AssetType
+    # 当日买入是否当日可卖（False = T+0 品种：债券/黄金/跨境 ETF）。
+    # 注意这是“类别默认值”，具体品种以 settlement_days_for_symbol 为准。
+    t_plus_1: bool
+    lot_size: int
+    commission_rate: float
+    commission_min: float
+    # 印花税（卖出单边；ETF 恒 0，结构性豁免而非参数清零）
+    stamp_duty_rate: float
+    # 过户费（双向；ETF 恒 0）
+    transfer_fee_rate: float
+    # 最小报价单位（元）：股票 0.01，ETF 0.001
+    price_tick: float
+
+
+EQUITY_ASSET_RULES = AssetTradingRules(
+    asset_type=AssetType.EQUITY,
+    t_plus_1=True,
+    lot_size=100,
+    commission_rate=0.0003,
+    commission_min=5.0,
+    stamp_duty_rate=0.0005,
+    transfer_fee_rate=0.00001,
+    price_tick=0.01,
+)
+ETF_ASSET_RULES = AssetTradingRules(
+    asset_type=AssetType.ETF,
+    # 类别默认 T+1（场内宽基/行业 ETF）；债券/黄金/跨境为 T+0，
+    # 由 etf_settlement_days_for_symbol 按代码段判别。
+    t_plus_1=True,
+    lot_size=100,
+    commission_rate=0.0003,
+    # 佣金最低收费可配（DG-011 敏感性）：默认 0 元 = 无最低档，
+    # 由会话参数/券商假设显式覆盖；股票默认 5 元不变。
+    commission_min=0.0,
+    stamp_duty_rate=0.0,
+    transfer_fee_rate=0.0,
+    price_tick=0.001,
+)
+
+RULES_BY_ASSET_TYPE: dict[AssetType, AssetTradingRules] = {
+    AssetType.EQUITY: EQUITY_ASSET_RULES,
+    AssetType.ETF: ETF_ASSET_RULES,
+}
+
+# ETF 数字代码段 → 交易所（仅用于裸六位推断的资产类别识别；
+# 裸代码的交易所推断本身在 StockCodeUtil，XG-001）
+_ETF_NUMERIC_PREFIXES = ("51", "52", "56", "58", "15", "16")
+
+# T+0 ETF 品种代码段（上交所/深交所公开交易规则）：
+#   SH 511*  债券 ETF
+#   SH 513*  跨境 ETF
+#   SH 518*  黄金 ETF
+#   SZ 15993* 深市黄金 ETF（159934/159937）
+# 其余 ETF（宽基/行业/科创 588*）默认 T+1。验证池口径：511010/511260/
+# 511090/518880/159934 → T+0；510300/510500/159915/588000 → T+1。
+_ETF_T0_PREFIXES: dict[str, tuple[str, ...]] = {
+    "SH": ("511", "513", "518"),
+    "SZ": ("15993",),
+}
+
+
+def asset_type_for_symbol(symbol: str) -> AssetType:
+    """由标的代码推断资产类别（ETF / 股票）。
+
+    ETF 数字段：51/52/56/58（SH）、15/16（SZ）。与 StockCodeUtil 的
+    裸六位推断保持同一代码段口径（XG-001）。
+    """
+    code = _cn_numeric_code(str(symbol or "").upper().strip())
+    if code and code.startswith(_ETF_NUMERIC_PREFIXES):
+        return AssetType.ETF
+    return AssetType.EQUITY
+
+
+def etf_settlement_days_for_symbol(symbol: str) -> int:
+    """ETF 品种的回转限制天数：0=T+0（当日可卖），1=T+1。
+
+    非输入或无法识别时按类别默认 T+1（保守口径：宁可少卖不可虚增可卖）。
+    """
+    suffix = StockCodeUtil.to_suffix(str(symbol or "").strip())
+    if not suffix or "." not in suffix:
+        # 裸代码无法判交易所时按保守 T+1
+        return 1
+    code, _, exchange = suffix.partition(".")
+    exchange = exchange.upper()
+    if exchange in _ETF_T0_PREFIXES and code.startswith(_ETF_T0_PREFIXES[exchange]):
+        return 0
+    return 1
+
+
+def rules_for_asset_type(
+    asset_type: AssetType | str | None,
+    *,
+    commission_rate: float | None = None,
+    commission_min: float | None = None,
+) -> AssetTradingRules:
+    """取资产类别规则；佣金率/最低收费可被显式假设覆盖（DG-011 敏感性）。"""
+
+    if isinstance(asset_type, AssetType):
+        at = asset_type
+    else:
+        text = str(asset_type or "").lower().strip()
+        try:
+            at = AssetType(text)
+        except ValueError:
+            at = AssetType.EQUITY
+    rules = RULES_BY_ASSET_TYPE[at]
+    if commission_rate is None and commission_min is None:
+        return rules
+    return AssetTradingRules(
+        asset_type=rules.asset_type,
+        t_plus_1=rules.t_plus_1,
+        lot_size=rules.lot_size,
+        commission_rate=(
+            rules.commission_rate if commission_rate is None else commission_rate
+        ),
+        commission_min=(
+            rules.commission_min if commission_min is None else commission_min
+        ),
+        stamp_duty_rate=rules.stamp_duty_rate,
+        transfer_fee_rate=rules.transfer_fee_rate,
+        price_tick=rules.price_tick,
+    )
+
+
 _MARKET_CURRENCIES: dict[Market, str] = {
     Market.CN: "CNY",
     Market.HK: "HKD",

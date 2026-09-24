@@ -1519,6 +1519,9 @@ CREATE TABLE IF NOT EXISTS replay_orders (
     origin          VARCHAR(20) NOT NULL DEFAULT 'signal',
     quantity        FLOAT NOT NULL,
     filled_quantity FLOAT NOT NULL DEFAULT 0,
+    qty_remaining   FLOAT NOT NULL DEFAULT 0,
+    client_order_id VARCHAR(160),
+    signal_date     DATE,
     price           FLOAT,
     average_price   FLOAT,
     filled_value    FLOAT NOT NULL DEFAULT 0,
@@ -1530,6 +1533,8 @@ CREATE TABLE IF NOT EXISTS replay_orders (
 );
 CREATE INDEX IF NOT EXISTS idx_replay_order_session_date
     ON replay_orders (session_id, trade_date);
+CREATE INDEX IF NOT EXISTS idx_replay_order_client_oid
+    ON replay_orders (client_order_id);
 
 CREATE TABLE IF NOT EXISTS replay_trades (
     id              SERIAL PRIMARY KEY,
@@ -1589,6 +1594,46 @@ CREATE TABLE IF NOT EXISTS replay_signals (
 
 CREATE INDEX IF NOT EXISTS idx_replay_signal_session_date
     ON replay_signals (session_id, trade_date);
+
+-- R01 研究账本（P0.3）：风险事件与公司行动入账流水
+CREATE TABLE IF NOT EXISTS replay_risk_events (
+    id              SERIAL PRIMARY KEY,
+    ledger_run_id   VARCHAR(160) NOT NULL,
+    risk_event_id   VARCHAR(200) NOT NULL UNIQUE,
+    risk_line       VARCHAR(20) NOT NULL,
+    event_date      DATE NOT NULL,
+    nav             FLOAT NOT NULL,
+    threshold       FLOAT NOT NULL,
+    action          VARCHAR(32) NOT NULL DEFAULT 'pause_buys',
+    blocked_orders  JSONB NOT NULL DEFAULT '[]'::jsonb,
+    confirmed_by    VARCHAR(128),
+    confirmed_at    TIMESTAMP,
+    nav_at_confirm  FLOAT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_replay_risk_event_run_date
+    ON replay_risk_events (ledger_run_id, event_date);
+
+CREATE TABLE IF NOT EXISTS replay_corporate_actions (
+    id              SERIAL PRIMARY KEY,
+    ledger_run_id   VARCHAR(160) NOT NULL,
+    symbol          VARCHAR(20) NOT NULL,
+    event_date      DATE NOT NULL,
+    event_type      VARCHAR(24) NOT NULL,
+    qty_multiplier  FLOAT NOT NULL DEFAULT 1,
+    cash_per_share  FLOAT NOT NULL DEFAULT 0,
+    qty_before      FLOAT NOT NULL DEFAULT 0,
+    qty_after       FLOAT NOT NULL DEFAULT 0,
+    cash_delta      FLOAT NOT NULL DEFAULT 0,
+    applied         BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_replay_ca_run_symbol_date_type
+        UNIQUE (ledger_run_id, symbol, event_date, event_type)
+);
+CREATE INDEX IF NOT EXISTS idx_replay_ca_run_symbol
+    ON replay_corporate_actions (ledger_run_id, symbol);
 
 -- ========================
 -- 59. USER APP 扩展表（认证/RBAC/订阅/通知/KYC）

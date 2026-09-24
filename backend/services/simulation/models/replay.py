@@ -144,11 +144,10 @@ class ReplayOrder(Base, TimestampMixin):
         nullable=False,
         default=OrderType.MARKET,
     )
-    status: Mapped[OrderStatus] = mapped_column(
-        _enum(OrderStatus),
-        nullable=False,
-        default=OrderStatus.PENDING,
-    )
+    # R01（ledger-contract §4）：状态机扩展 partially_filled / expired_unfilled。
+    # 列存 VARCHAR(20)，改为 String 映射以容纳合同新增状态（不依赖
+    # models/order.py 的活盘 OrderStatus 枚举，避免跨文件影响）。
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     origin: Mapped[OrderOrigin] = mapped_column(
         _enum(OrderOrigin),
         nullable=False,
@@ -157,6 +156,13 @@ class ReplayOrder(Base, TimestampMixin):
 
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
     filled_quantity: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    # 剩余量（=target−filled，恒非负；部分成交当日收盘后转 expired_unfilled）
+    qty_remaining: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    # 订单幂等键：f"{ledger_run_id}:{trade_date}:{symbol}:{side}"（同键重试
+    # 返回原订单）；旧回放会话无此键时为 NULL
+    client_order_id: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
+    # 信号日（T+1 对齐审计：执行日信号来自上一交易日数据日）
+    signal_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     price: Mapped[float | None] = mapped_column(Float, nullable=True)
     average_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     filled_value: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
@@ -226,6 +232,66 @@ class ReplayTrade(Base, TimestampMixin):
 
     __table_args__ = (
         Index("idx_replay_trade_session_date", "session_id", "trade_date"),
+    )
+
+
+class ReplayRiskEvent(Base, TimestampMixin):
+    """R01 研究账本风险事件（ledger-contract §7 / TG-010）。
+
+    两线独立触发、逐线确认；risk_event_id 幂等，确认幂等键
+    f"{ledger_run_id}:risk-confirm:{risk_event_id}" 由应用层维护
+    （confirmed_by/confirmed_at/nav_at_confirm 首次写入后不再变更）。
+    """
+
+    __tablename__ = "replay_risk_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ledger_run_id: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    risk_event_id: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
+    risk_line: Mapped[str] = mapped_column(String(20), nullable=False)  # loss_line | drawdown_line
+    event_date: Mapped[date] = mapped_column(Date, nullable=False)
+    nav: Mapped[float] = mapped_column(Float, nullable=False)
+    threshold: Mapped[float] = mapped_column(Float, nullable=False)
+    action: Mapped[str] = mapped_column(String(32), nullable=False, default="pause_buys")
+    blocked_orders: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    confirmed_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    nav_at_confirm: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    __table_args__ = (
+        Index("idx_replay_risk_event_run_date", "ledger_run_id", "event_date"),
+    )
+
+
+class ReplayCorporateAction(Base, TimestampMixin):
+    """R01 研究账本公司行动入账流水（DG-005 裁决）。
+
+    只消费输入包 typed events；幂等键
+    (ledger_run_id, symbol, event_date, event_type)，重放不重复计入。
+    """
+
+    __tablename__ = "replay_corporate_actions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ledger_run_id: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False)
+    event_date: Mapped[date] = mapped_column(Date, nullable=False)
+    event_type: Mapped[str] = mapped_column(String(24), nullable=False)  # cash_dividend | share_adjustment
+    qty_multiplier: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    cash_per_share: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    qty_before: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    qty_after: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    cash_delta: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    applied: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "ledger_run_id",
+            "symbol",
+            "event_date",
+            "event_type",
+            name="uq_replay_ca_run_symbol_date_type",
+        ),
     )
 
 

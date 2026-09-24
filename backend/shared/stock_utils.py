@@ -37,12 +37,13 @@ class StockCodeUtil:
             return f"{symbol}.{market}"
 
         # 3. 纯 6 位数字，自动识别交易所
+        #    ETF 前缀（XG-001）：51/52/56/58 → SH，15/16 → SZ
         digit_match = re.match(r'^(\d{6})$', code)
         if digit_match:
             symbol = digit_match.group(1)
-            if symbol.startswith(('60', '68', '90')):
+            if symbol.startswith(('60', '68', '90', '51', '52', '56', '58')):
                 return f"{symbol}.SH"
-            elif symbol.startswith(('00', '30', '20')):
+            elif symbol.startswith(('00', '30', '20', '15', '16')):
                 return f"{symbol}.SZ"
             elif symbol.startswith(('83', '43', '87', '88', '92')):
                 return f"{symbol}.BJ"
@@ -81,12 +82,13 @@ class StockCodeUtil:
             return f"{market}{symbol}"
 
         # 4. 纯 6 位数字，自动识别交易所
+        #    ETF 前缀（XG-001）：51/52/56/58 → SH，15/16 → SZ
         digit_match = re.match(r'^(\d{6})$', code)
         if digit_match:
             symbol = digit_match.group(1)
-            if symbol.startswith(('60', '68', '90')):
+            if symbol.startswith(('60', '68', '90', '51', '52', '56', '58')):
                 return f"SH{symbol}"
-            elif symbol.startswith(('00', '30', '20')):
+            elif symbol.startswith(('00', '30', '20', '15', '16')):
                 return f"SZ{symbol}"
             elif symbol.startswith(('83', '43', '87', '88', '92')):
                 return f"BJ{symbol}"

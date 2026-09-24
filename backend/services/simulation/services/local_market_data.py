@@ -680,3 +680,20 @@ def get_local_market_data(market: Market | str | None = None) -> LocalMarketData
             if market_key not in _default_instances:
                 _default_instances[market_key] = LocalMarketData(market=market_key)
     return _default_instances[market_key]
+
+
+def get_etf_package_market_data(package_root, *, expect_manifest_sha256=None):
+    """R01 ETF 固定输入包视图接线（TG-007 消费侧，P0.3）。
+
+    返回 replay/etf_input_package.EtfInputPackage（与 LocalMarketData 同
+    load_date/get_bar 鸭子接口，可直接注入 ReplayDayRunner）。只读消费
+    固定包并校验 manifest_sha256；禁止直读归档 CURRENT 或裸拼接
+    QuantDB etf_kline。懒加载以避免本模块 import 环上加 replay 依赖。
+    """
+    from backend.services.simulation.replay.etf_input_package import (
+        load_etf_input_package,
+    )
+
+    return load_etf_input_package(
+        package_root, expect_manifest_sha256=expect_manifest_sha256
+    )
