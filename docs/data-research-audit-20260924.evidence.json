@@ -1,0 +1,872 @@
+{
+  "captured_at": "2026-09-24T15:18:01.388598+00:00",
+  "git_head": "af7df9278c8e1ab30d19b4acc454ec550340c51c",
+  "scope": "read-only audit; source and runtime fixes by a concurrent task are separately identified",
+  "archive_current": {
+    "manifest_sha256": "525e814eaab97faa2befe323218bde996d0b4c35160ed5a95ffb4161947b913a",
+    "release_id": "data-525e814eaab97faa2befe323218bde996d0b4c35160ed5a95ffb4161947b913a"
+  },
+  "archive_manifest_bytes": 1846172306,
+  "worker": {
+    "started_at": "2026-09-24T15:14:27.460226+00:00",
+    "updated_at": "2026-09-24T15:16:13.870846+00:00",
+    "status": "completed_cycle",
+    "elapsed_seconds": 106.411,
+    "free_bytes": 1196448464896,
+    "documents": {
+      "counts": [
+        {
+          "documents": 1677,
+          "download_status": "blocked",
+          "parse_status": "not_attempted"
+        },
+        {
+          "documents": 26149,
+          "download_status": "downloaded",
+          "parse_status": "encrypted"
+        },
+        {
+          "documents": 62201,
+          "download_status": "downloaded",
+          "parse_status": "no_text"
+        },
+        {
+          "documents": 3161,
+          "download_status": "downloaded",
+          "parse_status": "not_applicable"
+        },
+        {
+          "documents": 224,
+          "download_status": "downloaded",
+          "parse_status": "parse_failed"
+        },
+        {
+          "documents": 3,
+          "download_status": "downloaded",
+          "parse_status": "parse_limit"
+        },
+        {
+          "documents": 137553,
+          "download_status": "downloaded",
+          "parse_status": "parse_pending"
+        },
+        {
+          "documents": 126,
+          "download_status": "downloaded",
+          "parse_status": "parse_timeout"
+        },
+        {
+          "documents": 1515807,
+          "download_status": "downloaded",
+          "parse_status": "parsed"
+        },
+        {
+          "documents": 8911018,
+          "download_status": "pending",
+          "parse_status": "not_attempted"
+        },
+        {
+          "documents": 4,
+          "download_status": "retry",
+          "parse_status": "not_attempted"
+        }
+      ],
+      "download_workers": 12,
+      "elapsed_seconds": 101.042,
+      "max_bytes": 335544320,
+      "overlap_parse_download": true,
+      "parse_workers": 4,
+      "phase_counts": {
+        "download": 633,
+        "parse": 589
+      },
+      "processed": 1222,
+      "status": "ok",
+      "terminal_recovery": {
+        "eligible": 235,
+        "interval_seconds": 86400.0,
+        "max_documents": 16,
+        "preserved_attempts": 126,
+        "scheduled": [
+          {
+            "category": "content_recheck",
+            "document_id": "090fb3fb8fb09a6f11d22e71667d4a3bfd472150709ddd729dcfc7277924d120"
+          },
+          {
+            "category": "transient_failure",
+            "document_id": "01c1f2c43593c9bffe70e5a8c4999463f510feaa88bba4b73b6b5f9ab7bd8be3"
+          },
+          {
+            "category": "content_recheck",
+            "document_id": "0921bcfd288f4fd184187d298b2a923ea717188e2a3679785070f2d33393647d"
+          },
+          {
+            "category": "transient_failure",
+            "document_id": "01e2c5d5c92c6017f32d47dc6017ef049d558c0c8ac1dc3bb7f5a08912495d2a"
+          },
+          {
+            "category": "content_recheck",
+            "document_id": "0943a192ae029242e751f6f5ec9483e0303a0996cacd477b1f57086207527f9c"
+          },
+          {
+            "category": "transient_failure",
+            "document_id": "01eb9fa8701f15fb374546844aac536786f903dc0964e3f79afaeddcd2fc9cfa"
+          },
+          {
+            "category": "content_recheck",
+            "document_id": "09ad8d424854be0c585976db6cb56178fcee528780f7ada0753d42b4661943c5"
+          },
+          {
+            "category": "transient_failure",
+            "document_id": "02080c2b2c82b648d968f4e0a3e6d5a3f584e7e1976422c051d017b46ab99d3f"
+          },
+          {
+            "category": "content_recheck",
+            "document_id": "09e104a81c8c3d7efe730b4c4ea43bec76bc944edda3450353fedd87081f7b18"
+          },
+          {
+            "category": "transient_failure",
+            "document_id": "021190263fa7bb75ebd93a10b81599db00e2c4786017fb18504a392f5a7f7553"
+          },
+          {
+            "category": "content_recheck",
+            "document_id": "0a25123913fcf3a8fad056da96a189ae24cc1165651f2ee28263d1a9711e1112"
+          },
+          {
+            "category": "transient_failure",
+            "document_id": "021b2242dc24eab0724c388aa6fe023846c354e64b16436d1510444ece54c4d9"
+          },
+          {
+            "category": "content_recheck",
+            "document_id": "0a82658db8e982e604edd152a2ac9fa577d0ffde25eec10935e00c4c917ccdff"
+          },
+          {
+            "category": "transient_failure",
+            "document_id": "021bd15765240afcdeaf5e9ededca8fae8eb2e488ce97e1489e2aa1fe54abd40"
+          },
+          {
+            "category": "content_recheck",
+            "document_id": "0aedfeb88ec1699e1b48d76dac5c7c38ad2704d4ab9676f7d6c65f37c26fcedd"
+          },
+          {
+            "category": "transient_failure",
+            "document_id": "02240cf64ff5230f9896e07aa7091eb6bf38d7c79ac3923cf7ab7dd57a633374"
+          }
+        ],
+        "status": "scheduled",
+        "upstream_calls": 0
+      },
+      "timing": {
+        "claim_db_calls": 1222,
+        "claim_db_total_seconds": 0.970636,
+        "claim_db_wait_seconds": 0.056999,
+        "download_job_seconds": 164.931856,
+        "download_jobs": 633,
+        "download_refills": 621,
+        "download_slot_capacity_seconds": 573.868961,
+        "download_slot_idle_seconds": 408.937105,
+        "download_wave_seconds": 47.822413,
+        "download_waves": 1,
+        "finish_db_calls": 1222,
+        "finish_db_total_seconds": 1.134454,
+        "finish_db_wait_seconds": 0.079622,
+        "parse_active_seconds": 57.706525,
+        "parse_download_overlap_seconds": 47.822413,
+        "parse_job_seconds": 229.383173,
+        "parse_jobs": 589,
+        "parse_slot_capacity_seconds": 230.826098,
+        "parse_slot_idle_seconds": 1.442925,
+        "setup_db_calls": 0,
+        "setup_db_total_seconds": 2.2e-05,
+        "setup_db_wait_seconds": 0.0
+      }
+    }
+  },
+  "pipeline": {
+    "updated_at": "2026-09-24T15:16:13.852853+00:00",
+    "done": 855272,
+    "empty": 767516,
+    "pending": 3513701,
+    "permission_blocked": 7020,
+    "blocked": 787,
+    "quality": 377,
+    "split_pending": 20596,
+    "superseded": 5809919,
+    "timing": {
+      "completed_stages": [
+        "open",
+        "publication_check",
+        "planning_check",
+        "archive",
+        "acquire",
+        "document_registration",
+        "close"
+      ],
+      "failed_stage": null,
+      "included_stages": {
+        "reconciliation": "acquire"
+      },
+      "stage_seconds": {
+        "acquire": 100.42860179115087,
+        "archive": 0.17424249998293817,
+        "close": 0.021344958106055856,
+        "document_registration": 4.970461291028187,
+        "open": 0.0008127500768750906,
+        "planning_check": 0.0012077088467776775,
+        "publication_check": 0.7814625001046807
+      },
+      "total_elapsed_seconds": 106.39157079113647
+    },
+    "publication": {
+      "current_release_id": "data-525e814eaab97faa2befe323218bde996d0b4c35160ed5a95ffb4161947b913a",
+      "interval_seconds": 21600,
+      "last_success_at": 1790252118,
+      "mirror_status": "not_checked",
+      "mode": "acquire_only",
+      "next_due_at": 1790273718,
+      "pending": true,
+      "performed": false,
+      "status": "deferred"
+    }
+  },
+  "cycle_log_daily_utc": [
+    {
+      "utc_date": "2026-09-18",
+      "cycles": 177,
+      "requests": 107711,
+      "document_stages": 343985,
+      "median_cycle_seconds": 103.163,
+      "pending_first": 2833861,
+      "pending_last": 2687483
+    },
+    {
+      "utc_date": "2026-09-19",
+      "cycles": 743,
+      "requests": 503187,
+      "document_stages": 1608363,
+      "median_cycle_seconds": 105.576,
+      "pending_first": 2686731,
+      "pending_last": 3124622
+    },
+    {
+      "utc_date": "2026-09-20",
+      "cycles": 326,
+      "requests": 185310,
+      "document_stages": 489630,
+      "median_cycle_seconds": 110.64750000000001,
+      "pending_first": 3123977,
+      "pending_last": 3326175
+    },
+    {
+      "utc_date": "2026-09-21",
+      "cycles": 24,
+      "requests": 5762,
+      "document_stages": 9446,
+      "median_cycle_seconds": 109.033,
+      "pending_first": 3326263,
+      "pending_last": 3336077
+    },
+    {
+      "utc_date": "2026-09-23",
+      "cycles": 93,
+      "requests": 40930,
+      "document_stages": 55516,
+      "median_cycle_seconds": 111.788,
+      "pending_first": 3349553,
+      "pending_last": 3461222
+    },
+    {
+      "utc_date": "2026-09-24",
+      "cycles": 43,
+      "requests": 20340,
+      "document_stages": 76441,
+      "median_cycle_seconds": 116.282,
+      "pending_first": 3465882,
+      "pending_last": 3513701
+    }
+  ],
+  "recent_cycle_samples": [
+    {
+      "started_at": "2026-09-24T15:07:00.785596+00:00",
+      "updated_at": "2026-09-24T15:08:50.534120+00:00",
+      "status": "completed_cycle",
+      "elapsed_seconds": 109.749,
+      "free_bytes": 1198622314496,
+      "nas_migration_warning": false,
+      "cycle_interval_seconds": 105.0,
+      "document_execution": "process",
+      "acquisition": {
+        "requests": 575,
+        "done": 854158,
+        "empty": 766569,
+        "pending": 3507606,
+        "blocked": 787,
+        "split_pending": 20567,
+        "permission_blocked": 7020,
+        "resolved": 6665,
+        "snapshot_disabled": 11,
+        "deferred_legacy_period_plan": 9802,
+        "planning_status": "deferred",
+        "planning_reason": "interval_not_due",
+        "blocked_obligations": {
+          "total": 787,
+          "by_kind": {
+            "replacement_plan_retained_parent": {
+              "jobs": 764,
+              "apis": {
+                "dc_member": 621,
+                "index_weekly": 1,
+                "moneyflow_dc": 142
+              }
+            },
+            "retained_rate_limit_probe": {
+              "jobs": 2,
+              "apis": {
+                "stk_mins": 2
+              }
+            },
+            "supplier_api_unavailable": {
+              "jobs": 11,
+              "apis": {
+                "bo_cinema": 1,
+                "bo_daily": 1,
+                "bo_monthly": 1,
+                "bo_weekly": 1,
+                "film_record": 1,
+                "fund_sales_ratio": 1,
+                "fund_sales_vol": 1,
+                "stk_account_old": 1,
+                "teleplay_record": 1,
+                "tmt_twincome": 1,
+                "tmt_twincomedetail": 1
+              }
+            },
+            "unclassified": {
+              "jobs": 5,
+              "apis": {
+                "factor_value": 5
+              }
+            },
+            "unsplittable_source_cap": {
+              "jobs": 5,
+              "apis": {
+                "npr": 2,
+                "share_float": 3
+              }
+            }
+          },
+          "unclassified": 5,
+          "all_blocked_jobs_classified": false,
+          "changes_job_state": false
+        }
+      },
+      "documents": {
+        "status": "ok",
+        "processed": 1100,
+        "elapsed_seconds": 100.665,
+        "pending_download": 8905977,
+        "parsed": 1514399
+      },
+      "catalog_watch": {
+        "status": "deferred",
+        "last_status": "drift_detected",
+        "last_checked_at": "2026-09-24T14:34:39.681691+00:00"
+      }
+    },
+    {
+      "started_at": "2026-09-24T15:08:51.540666+00:00",
+      "updated_at": "2026-09-24T15:10:39.595723+00:00",
+      "status": "completed_cycle",
+      "elapsed_seconds": 108.056,
+      "free_bytes": 1197893328896,
+      "nas_migration_warning": false,
+      "cycle_interval_seconds": 105.0,
+      "document_execution": "process",
+      "acquisition": {
+        "status": "planning_only",
+        "requests": 0,
+        "planning_status": "planned",
+        "planning_reason": "interval_due",
+        "blocked_obligations": {
+          "total": 787,
+          "by_kind": {
+            "replacement_plan_retained_parent": {
+              "jobs": 764,
+              "apis": {
+                "dc_member": 621,
+                "index_weekly": 1,
+                "moneyflow_dc": 142
+              }
+            },
+            "retained_rate_limit_probe": {
+              "jobs": 2,
+              "apis": {
+                "stk_mins": 2
+              }
+            },
+            "supplier_api_unavailable": {
+              "jobs": 11,
+              "apis": {
+                "bo_cinema": 1,
+                "bo_daily": 1,
+                "bo_monthly": 1,
+                "bo_weekly": 1,
+                "film_record": 1,
+                "fund_sales_ratio": 1,
+                "fund_sales_vol": 1,
+                "stk_account_old": 1,
+                "teleplay_record": 1,
+                "tmt_twincome": 1,
+                "tmt_twincomedetail": 1
+              }
+            },
+            "unclassified": {
+              "jobs": 5,
+              "apis": {
+                "factor_value": 5
+              }
+            },
+            "unsplittable_source_cap": {
+              "jobs": 5,
+              "apis": {
+                "npr": 2,
+                "share_float": 3
+              }
+            }
+          },
+          "unclassified": 5,
+          "all_blocked_jobs_classified": false,
+          "changes_job_state": false
+        }
+      },
+      "documents": {
+        "status": "ok",
+        "processed": 1122,
+        "elapsed_seconds": 100.698,
+        "pending_download": 8906077,
+        "parsed": 1514909
+      },
+      "catalog_watch": {
+        "status": "deferred",
+        "last_status": "drift_detected",
+        "last_checked_at": "2026-09-24T14:34:39.681691+00:00"
+      }
+    },
+    {
+      "started_at": "2026-09-24T15:10:44.601970+00:00",
+      "updated_at": "2026-09-24T15:12:31.630970+00:00",
+      "status": "completed_cycle",
+      "elapsed_seconds": 107.03,
+      "free_bytes": 1197547257856,
+      "nas_migration_warning": false,
+      "cycle_interval_seconds": 105.0,
+      "document_execution": "process",
+      "acquisition": {
+        "requests": 683,
+        "done": 854542,
+        "empty": 766858,
+        "pending": 3513143,
+        "blocked": 787,
+        "split_pending": 20577,
+        "permission_blocked": 7020,
+        "resolved": 6665,
+        "snapshot_disabled": 11,
+        "deferred_legacy_period_plan": 9802,
+        "planning_status": "deferred",
+        "planning_reason": "interval_not_due",
+        "blocked_obligations": {
+          "total": 787,
+          "by_kind": {
+            "replacement_plan_retained_parent": {
+              "jobs": 764,
+              "apis": {
+                "dc_member": 621,
+                "index_weekly": 1,
+                "moneyflow_dc": 142
+              }
+            },
+            "retained_rate_limit_probe": {
+              "jobs": 2,
+              "apis": {
+                "stk_mins": 2
+              }
+            },
+            "supplier_api_unavailable": {
+              "jobs": 11,
+              "apis": {
+                "bo_cinema": 1,
+                "bo_daily": 1,
+                "bo_monthly": 1,
+                "bo_weekly": 1,
+                "film_record": 1,
+                "fund_sales_ratio": 1,
+                "fund_sales_vol": 1,
+                "stk_account_old": 1,
+                "teleplay_record": 1,
+                "tmt_twincome": 1,
+                "tmt_twincomedetail": 1
+              }
+            },
+            "unclassified": {
+              "jobs": 5,
+              "apis": {
+                "factor_value": 5
+              }
+            },
+            "unsplittable_source_cap": {
+              "jobs": 5,
+              "apis": {
+                "npr": 2,
+                "share_float": 3
+              }
+            }
+          },
+          "unclassified": 5,
+          "all_blocked_jobs_classified": false,
+          "changes_job_state": false
+        }
+      },
+      "documents": {
+        "status": "ok",
+        "processed": 756,
+        "elapsed_seconds": 105.67,
+        "pending_download": 8905694,
+        "parsed": 1515230
+      },
+      "catalog_watch": {
+        "status": "deferred",
+        "last_status": "drift_detected",
+        "last_checked_at": "2026-09-24T14:34:39.681691+00:00"
+      }
+    },
+    {
+      "started_at": "2026-09-24T15:12:32.637535+00:00",
+      "updated_at": "2026-09-24T15:14:26.454224+00:00",
+      "status": "completed_cycle",
+      "elapsed_seconds": 113.817,
+      "free_bytes": 1196687540224,
+      "nas_migration_warning": false,
+      "cycle_interval_seconds": 105.0,
+      "document_execution": "process",
+      "acquisition": {
+        "requests": 682,
+        "done": 854887,
+        "empty": 767184,
+        "pending": 3513481,
+        "blocked": 787,
+        "split_pending": 20586,
+        "permission_blocked": 7020,
+        "resolved": 6667,
+        "snapshot_disabled": 11,
+        "deferred_legacy_period_plan": 9802,
+        "planning_status": "deferred",
+        "planning_reason": "interval_not_due",
+        "blocked_obligations": {
+          "total": 787,
+          "by_kind": {
+            "replacement_plan_retained_parent": {
+              "jobs": 764,
+              "apis": {
+                "dc_member": 621,
+                "index_weekly": 1,
+                "moneyflow_dc": 142
+              }
+            },
+            "retained_rate_limit_probe": {
+              "jobs": 2,
+              "apis": {
+                "stk_mins": 2
+              }
+            },
+            "supplier_api_unavailable": {
+              "jobs": 11,
+              "apis": {
+                "bo_cinema": 1,
+                "bo_daily": 1,
+                "bo_monthly": 1,
+                "bo_weekly": 1,
+                "film_record": 1,
+                "fund_sales_ratio": 1,
+                "fund_sales_vol": 1,
+                "stk_account_old": 1,
+                "teleplay_record": 1,
+                "tmt_twincome": 1,
+                "tmt_twincomedetail": 1
+              }
+            },
+            "unclassified": {
+              "jobs": 5,
+              "apis": {
+                "factor_value": 5
+              }
+            },
+            "unsplittable_source_cap": {
+              "jobs": 5,
+              "apis": {
+                "npr": 2,
+                "share_float": 3
+              }
+            }
+          },
+          "unclassified": 5,
+          "all_blocked_jobs_classified": false,
+          "changes_job_state": false
+        }
+      },
+      "documents": {
+        "status": "ok",
+        "processed": 108,
+        "elapsed_seconds": 105.893,
+        "pending_download": 8905635,
+        "parsed": 1515256
+      },
+      "catalog_watch": {
+        "status": "deferred",
+        "last_status": "drift_detected",
+        "last_checked_at": "2026-09-24T14:34:39.681691+00:00"
+      }
+    },
+    {
+      "started_at": "2026-09-24T15:14:27.460226+00:00",
+      "updated_at": "2026-09-24T15:16:13.870846+00:00",
+      "status": "completed_cycle",
+      "elapsed_seconds": 106.411,
+      "free_bytes": 1196448464896,
+      "nas_migration_warning": false,
+      "cycle_interval_seconds": 105.0,
+      "document_execution": "process",
+      "acquisition": {
+        "requests": 729,
+        "done": 855272,
+        "empty": 767516,
+        "pending": 3513701,
+        "blocked": 787,
+        "split_pending": 20596,
+        "permission_blocked": 7020,
+        "resolved": 6669,
+        "snapshot_disabled": 11,
+        "deferred_legacy_period_plan": 9802,
+        "planning_status": "deferred",
+        "planning_reason": "interval_not_due",
+        "blocked_obligations": {
+          "total": 787,
+          "by_kind": {
+            "replacement_plan_retained_parent": {
+              "jobs": 764,
+              "apis": {
+                "dc_member": 621,
+                "index_weekly": 1,
+                "moneyflow_dc": 142
+              }
+            },
+            "retained_rate_limit_probe": {
+              "jobs": 2,
+              "apis": {
+                "stk_mins": 2
+              }
+            },
+            "supplier_api_unavailable": {
+              "jobs": 11,
+              "apis": {
+                "bo_cinema": 1,
+                "bo_daily": 1,
+                "bo_monthly": 1,
+                "bo_weekly": 1,
+                "film_record": 1,
+                "fund_sales_ratio": 1,
+                "fund_sales_vol": 1,
+                "stk_account_old": 1,
+                "teleplay_record": 1,
+                "tmt_twincome": 1,
+                "tmt_twincomedetail": 1
+              }
+            },
+            "unclassified": {
+              "jobs": 5,
+              "apis": {
+                "factor_value": 5
+              }
+            },
+            "unsplittable_source_cap": {
+              "jobs": 5,
+              "apis": {
+                "npr": 2,
+                "share_float": 3
+              }
+            }
+          },
+          "unclassified": 5,
+          "all_blocked_jobs_classified": false,
+          "changes_job_state": false
+        }
+      },
+      "documents": {
+        "status": "ok",
+        "processed": 1222,
+        "elapsed_seconds": 101.042,
+        "pending_download": 8911018,
+        "parsed": 1515807
+      },
+      "catalog_watch": {
+        "status": "deferred",
+        "last_status": "drift_detected",
+        "last_checked_at": "2026-09-24T14:34:39.681691+00:00"
+      }
+    }
+  ],
+  "local_quantdb_sync": {
+    "status": "applied",
+    "snapshot": "/Users/lizeyu/Library/Application Support/QuantMind/cloud-snapshots/quantdb/snapshot-quantdb-20260923T120043383529Z",
+    "backup": "/Users/lizeyu/Documents/ChatGPT/投资/QuantMind/.local-dev/quantdb-before-20260924T124703-e77521",
+    "qlib_backup": "/Users/lizeyu/Documents/ChatGPT/投资/QuantMind/.local-dev/qlib-before-22114500dcd3410fa1d4e3174fe7ee20",
+    "validation": {
+      "latest_date": "20260922",
+      "pg": {
+        "status": "ok",
+        "rows": 11132,
+        "trade_dates": 2,
+        "failed_batches": []
+      },
+      "qlib_calendar": "2026-09-22",
+      "qlib_live": "/app/db/qlib_data",
+      "qlib_staged": "/app/db/.quantdb-qlib-d31e6332601e4a1089753d7ecec8fe89",
+      "market_snapshot": {
+        "status": "ok",
+        "trade_date": "2026-09-22",
+        "unchanged": false
+      }
+    }
+  },
+  "local_research_settings": {
+    "version": 1,
+    "role": "sandbox",
+    "node_id": "adb51708ac1281182ebe",
+    "host_data": "/Users/lizeyu/Documents/ChatGPT/投资/QuantMind/.local-dev/project/data",
+    "label": "本地沙盒研究",
+    "snapshot_id": "frozen-controls-20260907-v3",
+    "source": "/data/research/inputs/frozen-controls-20260907-v3",
+    "image": {
+      "Id": "sha256:086d446ad5a0640f9d93bd0a423db2110a7e7f74115b26600ba0c048114f98f6",
+      "Os": "linux",
+      "Architecture": "amd64",
+      "RepoDigests": [
+        "quantmind-oss@sha256:086d446ad5a0640f9d93bd0a423db2110a7e7f74115b26600ba0c048114f98f6"
+      ]
+    },
+    "manifest_sha256": "6f2428abce2c2208b7c641863b5e5b79c34243fc35f82e570890d1cfb88e9ecc"
+  },
+  "latest_export_manifests": [
+    {
+      "release_id": "data-2841a9ef6b810fb22b98262e9594b99793a16a0bf5305746b5593e909c38a443",
+      "bytes": 85659745
+    },
+    {
+      "release_id": "data-0f73079552f6f89f0e355133d5bde3311d4d3b4cb3e8e758ece857d0762c1e7b",
+      "bytes": 83530782
+    },
+    {
+      "release_id": "data-45c053be2505d93409c16eb874222bac60ad6f83a322156ababfb8335217db88",
+      "bytes": 83530782
+    },
+    {
+      "release_id": "data-1935c8cb409db2d7cbfc612d2c9a8214d7ee291de09bc423679dc67d6ae4af37",
+      "bytes": 82421422
+    },
+    {
+      "release_id": "data-594ac256ddaed746e5c7faca910e02fbdcfec2a38775b05ba8f13e74a77a92b4",
+      "bytes": 79932334
+    }
+  ],
+  "verified_read_samples": {
+    "quantdb_cloud_parquet_latest": "2026-09-23",
+    "quantdb_cloud_rows_latest": 5568,
+    "quantdb_local_parquet_latest": "2026-09-22",
+    "quantdb_local_rows_latest": 5567,
+    "resolved_qlib_cloud_latest": "2026-09-18",
+    "resolved_qlib_local_latest": "2026-09-22",
+    "local_pg_stock_daily_latest": "2026-09-22",
+    "cloud_pg_count_and_max_probe": "4 second timeout, not established",
+    "tushare_done_daily_actual_latest": "2026-09-18",
+    "tushare_done_adj_factor_actual_latest": "2026-09-18",
+    "tushare_done_daily_basic_actual_latest": "2026-09-18",
+    "tushare_done_fund_daily_actual_latest": "2026-09-23",
+    "tushare_done_sw_daily_actual_latest": "2026-09-23",
+    "tushare_ci_daily_sample": "CI005001.CI through 2026-09-23",
+    "recent_structured_cursor": 6000,
+    "recent_structured_first_daily_ordinal": 6243,
+    "recent_structured_stock_count": 5916
+  },
+  "research_database_counts": {
+    "local": {
+      "drafts": 3,
+      "deepagents_drafts": 0,
+      "legacy_cases": 11,
+      "legacy_windows": 12,
+      "training_jobs": 2,
+      "backtests": 1
+    },
+    "cloud": {
+      "drafts": 1,
+      "deepagents_drafts": 0,
+      "legacy_cases": 1,
+      "legacy_windows": 3,
+      "training_jobs": 2,
+      "backtests": 1
+    }
+  },
+  "terminal_retry_query": {
+    "query_plan": "SCAN document_attempts",
+    "rows": 3498280,
+    "single_count": "aborted at 3.006 seconds by read-only progress deadline",
+    "attribution": "potential cost amplifier; not a full attribution of 790 second cycle"
+  },
+  "cloud_cache_final_check": {
+    "CURRENT.json": {
+      "manifest_sha256": "993dd92791675b1f43f7123d30b2003c995434a078f0ada95406805f81dc1742",
+      "release_id": "data-993dd92791675b1f43f7123d30b2003c995434a078f0ada95406805f81dc1742",
+      "source_release_id": "data-c9c99ed645ad6b4f890678cd1681f6874349b2b1cd029a6b97ee9287a5d3b6f9",
+      "file_mtime_utc": "2026-09-19T21:30:11.580494+00:00"
+    },
+    "cache-status.json": {
+      "budget_bytes": 53687091200,
+      "cache_bytes": 5449457235,
+      "downloaded_files": 0,
+      "manifest_sha256": "993dd92791675b1f43f7123d30b2003c995434a078f0ada95406805f81dc1742",
+      "release_id": "data-993dd92791675b1f43f7123d30b2003c995434a078f0ada95406805f81dc1742",
+      "selected_api_names": [
+        "adj_factor",
+        "ci_daily",
+        "daily",
+        "daily_basic",
+        "fund_basic",
+        "fund_daily",
+        "index_basic",
+        "index_daily",
+        "index_weight",
+        "stock_basic",
+        "sw_daily",
+        "trade_cal"
+      ],
+      "source_release_id": "data-c9c99ed645ad6b4f890678cd1681f6874349b2b1cd029a6b97ee9287a5d3b6f9",
+      "status": "verified",
+      "upstream_calls": 0,
+      "file_mtime_utc": "2026-09-19T21:30:11.583494+00:00"
+    },
+    "cache-transfer-status.json": {
+      "downloaded_bytes": 7719934,
+      "downloaded_files": 8400,
+      "latest_source_release_id": "data-525e814eaab97faa2befe323218bde996d0b4c35160ed5a95ffb4161947b913a",
+      "manifest_sha256": "2841a9ef6b810fb22b98262e9594b99793a16a0bf5305746b5593e909c38a443",
+      "needed_bytes": 851017133,
+      "release_id": "data-2841a9ef6b810fb22b98262e9594b99793a16a0bf5305746b5593e909c38a443",
+      "source_lagged": true,
+      "source_release_id": "data-86e6194758e817ddb37dfcb6425541a961516779fd71828b0231e847c0250dc1",
+      "started_at": "2026-09-24T15:20:18.195245+00:00",
+      "status": "downloading",
+      "total_missing_files": 83678,
+      "updated_at": "2026-09-24T15:22:23.430384+00:00",
+      "file_mtime_utc": "2026-09-24T15:22:23.430387+00:00"
+    }
+  },
+  "cloud_cache_final_checked_at": "2026-09-24T15:22:24.911640+00:00"
+}

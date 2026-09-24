@@ -1,0 +1,269 @@
+{
+  "checked_at": "2026-09-24T16:40:38.074892+00:00",
+  "checks": [
+    {
+      "api": "daily",
+      "date": "20260921",
+      "rows": 5553,
+      "state": "done",
+      "parquet_sha256": "485c9de71638db1699e5b06e71d53081e964d24137141d350095577164038e63",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "daily",
+      "date": "20260922",
+      "rows": 5554,
+      "state": "done",
+      "parquet_sha256": "19073d8a4842e9500025b67262b1dcef8189180dcb1c6e4afd4e8fff026f2c67",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "daily",
+      "date": "20260923",
+      "rows": 5556,
+      "state": "done",
+      "parquet_sha256": "a6b7de34b27ddb9e42bd122f1d0ea3909ae6496d00c52c7f8cef5ec10bd67bef",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "daily",
+      "date": "20260924",
+      "rows": 5557,
+      "state": "done",
+      "parquet_sha256": "f527dfa8ded7635489298d30c0ddeeec2ef3b34a57013ee1323788a87818e5a4",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "adj_factor",
+      "date": "20260921",
+      "rows": 5565,
+      "state": "done",
+      "parquet_sha256": "e2ed85373fd53efc74884207bcfa9f0bdb84e9d430cb6daff547242cce1c41b5",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "adj_factor",
+      "date": "20260922",
+      "rows": 5567,
+      "state": "done",
+      "parquet_sha256": "5cdbb447c55aea136207b27afff7fc7708ace34d0a10e42f730440f07045c656",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "adj_factor",
+      "date": "20260923",
+      "rows": 5568,
+      "state": "done",
+      "parquet_sha256": "a59d005de54911f457f360c15bd281e51fca67a9989bc2ddfbd0fc4bb650d452",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "adj_factor",
+      "date": "20260924",
+      "rows": 5569,
+      "state": "done",
+      "parquet_sha256": "b8d5cfb51e3d3fd07337faee74e349f411f0b6599f98df83c3a6455c28974af9",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "daily_basic",
+      "date": "20260921",
+      "rows": 5553,
+      "state": "done",
+      "parquet_sha256": "16dfc289999d491824f5a905d278e88bd7e1b706e133d16f0ed1c50d612f0d42",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "daily_basic",
+      "date": "20260922",
+      "rows": 5554,
+      "state": "done",
+      "parquet_sha256": "09e7da754718dca7ca898ee4884dfb547ab308a6f45fcf11a43cf2bbc8cd8e3b",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "daily_basic",
+      "date": "20260923",
+      "rows": 5556,
+      "state": "done",
+      "parquet_sha256": "713c8487b4333c4a6b2e5f4ca575c99427be09d65ea096d2a48ca42e8a3744ad",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "daily_basic",
+      "date": "20260924",
+      "rows": 5557,
+      "state": "done",
+      "parquet_sha256": "b686973b86d5fef0e1095c644d3cdab4327a4e50159a0ef276291e3e4b4c2c9b",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "stk_limit",
+      "date": "20260921",
+      "rows": 5644,
+      "state": "done",
+      "parquet_sha256": "9033c91790ae1df72532929c3d249d67044cac976973140def9bd5208c021a7e",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "stk_limit",
+      "date": "20260922",
+      "rows": 5646,
+      "state": "done",
+      "parquet_sha256": "b3862f76cef14ae5c5331466b3a4f9dbe05fe08020eae9df3c2f31e6cf0ab656",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "stk_limit",
+      "date": "20260923",
+      "rows": 5647,
+      "state": "done",
+      "parquet_sha256": "b41b2bf244801f4ccda50a07882059a5b3bd0382c540c0652982fe18dd7678b0",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "stk_limit",
+      "date": "20260924",
+      "rows": 5648,
+      "state": "done",
+      "parquet_sha256": "d9a66051e55998a5e39f6eeb6af18a30e9520fc882f0f1e0743c3441767131bf",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "suspend_d",
+      "date": "20260921",
+      "rows": 16,
+      "state": "done",
+      "parquet_sha256": "5de5f5ba064402af9c6235fef2be88580357788978ca88212902cfe9e895dbf1",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "suspend_d",
+      "date": "20260922",
+      "rows": 15,
+      "state": "done",
+      "parquet_sha256": "40ec0254ef55558d8414c40b5462ff3e76e32aa5eb877d584931f2002f82644f",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "suspend_d",
+      "date": "20260923",
+      "rows": 13,
+      "state": "done",
+      "parquet_sha256": "d7bf5f5626e44a48fe206cadc776c8915b0deefe8b8570f20c6c3a918987b8e7",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "suspend_d",
+      "date": "20260924",
+      "rows": 13,
+      "state": "done",
+      "parquet_sha256": "f136d59147620ed79612957d997134b18b75e18ec204a6ca07a65c42ec4755af",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "moneyflow",
+      "date": "20260921",
+      "rows": 5553,
+      "state": "done",
+      "parquet_sha256": "d5dce4321a97811b27bcfec274d5da730c024a8d631e73b95d8fb9bbc80bcac7",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "moneyflow",
+      "date": "20260922",
+      "rows": 5554,
+      "state": "done",
+      "parquet_sha256": "093fc25556c77b6631b6640346acf3ca02105eac9887d19ce0e9162d35e65bc7",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "moneyflow",
+      "date": "20260923",
+      "rows": 5556,
+      "state": "done",
+      "parquet_sha256": "2a22675361101870449fe7c761640f4a74197a4f60d63a5d8553f9ad9a8b4091",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    },
+    {
+      "api": "moneyflow",
+      "date": "20260924",
+      "rows": 5557,
+      "state": "done",
+      "parquet_sha256": "9bd20971bde8218bbb3e059a23b0932a2b2c38605d128611bc86cfb03b6029ee",
+      "hash_verified": true,
+      "date_verified": true,
+      "pit_verified": false,
+      "history_complete": false
+    }
+  ]
+}

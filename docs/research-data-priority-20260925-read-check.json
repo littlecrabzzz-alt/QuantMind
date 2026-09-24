@@ -1,0 +1,151 @@
+{
+  "status": "data_read_verified",
+  "training_executed": false,
+  "checks": [
+    {
+      "start": "2023-01-03",
+      "end": "2023-12-31",
+      "rows": 1181971,
+      "symbols": 4994,
+      "min_date": "2023-01-03 00:00:00",
+      "max_date": "2023-12-29 00:00:00",
+      "duplicates": 0,
+      "missing_features": {
+        "mom_ret_1d": 236,
+        "mom_ret_5d": 1190,
+        "mom_ret_20d": 4856,
+        "mom_ma_gap_20": 2161,
+        "vol_std_20": 2404,
+        "vol_amp_20": 4609,
+        "amt_ratio_5_20": 2161,
+        "turn_1": 1
+      },
+      "invalid_positive_volume_close": 0
+    },
+    {
+      "start": "2024-01-01",
+      "end": "2024-12-31",
+      "rows": 1217702,
+      "symbols": 5071,
+      "min_date": "2024-01-02 00:00:00",
+      "max_date": "2024-12-31 00:00:00",
+      "duplicates": 0,
+      "missing_features": {
+        "mom_ret_1d": 77,
+        "mom_ret_5d": 392,
+        "mom_ret_20d": 1620,
+        "mom_ma_gap_20": 713,
+        "vol_std_20": 793,
+        "vol_amp_20": 1536,
+        "amt_ratio_5_20": 713,
+        "turn_1": 0
+      },
+      "invalid_positive_volume_close": 0
+    },
+    {
+      "start": "2025-01-01",
+      "end": "2025-12-31",
+      "rows": 1243018,
+      "symbols": 5161,
+      "min_date": "2025-01-02 00:00:00",
+      "max_date": "2025-12-31 00:00:00",
+      "duplicates": 0,
+      "missing_features": {
+        "mom_ret_1d": 90,
+        "mom_ret_5d": 440,
+        "mom_ret_20d": 1699,
+        "mom_ma_gap_20": 784,
+        "vol_std_20": 869,
+        "vol_amp_20": 1616,
+        "amt_ratio_5_20": 784,
+        "turn_1": 22
+      },
+      "invalid_positive_volume_close": 0
+    },
+    {
+      "start": "2026-01-01",
+      "end": "2026-09-23",
+      "rows": 917780,
+      "symbols": 5208,
+      "min_date": "2026-01-05 00:00:00",
+      "max_date": "2026-09-23 00:00:00",
+      "duplicates": 0,
+      "missing_features": {
+        "mom_ret_1d": 36,
+        "mom_ret_5d": 193,
+        "mom_ret_20d": 889,
+        "mom_ma_gap_20": 362,
+        "vol_std_20": 407,
+        "vol_amp_20": 839,
+        "amt_ratio_5_20": 362,
+        "turn_1": 70
+      },
+      "invalid_positive_volume_close": 0
+    }
+  ],
+  "qlib_calendar_latest": "2026-09-23",
+  "purpose": "development_comparison",
+  "qlib_sample": {
+    "rows": 12,
+    "symbols": 3,
+    "start": "2026-09-18",
+    "end": "2026-09-23",
+    "valid_close": true
+  },
+  "source_commit": "e528a6dfdf38bac72bbc5cd8fab0c6060d268b23",
+  "input_manifest_sha256": "2a6a2168d7852f7cbb80e494e91853a3aa6ef6241480fa617a7f2975112d6de7",
+  "input_files": 47765,
+  "input_bytes": 4632587960,
+  "input_path": "/root/data/disk/quantmind/project/results/research-data-priority-20260925",
+  "cloud_default_input": {
+    "snapshot_id": "research-data-priority-20260925",
+    "manifest_sha256": "2a6a2168d7852f7cbb80e494e91853a3aa6ef6241480fa617a7f2975112d6de7",
+    "activated_at": "2026-09-24T16:47:47.505504+00:00",
+    "old_input_retained": true,
+    "active_windows_before_switch": 0,
+    "existing_agent_drafts": 0,
+    "training_executed": false
+  },
+  "local_refresh": {
+    "status": "applied",
+    "snapshot": "/Users/lizeyu/Library/Application Support/QuantMind/cloud-snapshots/quantdb/snapshot-quantdb-20260924T134920444686Z",
+    "backup": "/Users/lizeyu/Documents/ChatGPT/投资/QuantMind/.local-dev/quantdb-before-20260924T164132-def052",
+    "qlib_backup": "/Users/lizeyu/Documents/ChatGPT/投资/QuantMind/.local-dev/qlib-before-61953fa3ce0547e2ac2bca5704bb61e3",
+    "validation": {
+      "latest_date": "20260923",
+      "pg": {
+        "status": "ok",
+        "rows": 5568,
+        "trade_dates": 1,
+        "failed_batches": []
+      },
+      "qlib_calendar": "2026-09-23",
+      "qlib_live": "/app/db/qlib_data",
+      "qlib_staged": "/app/db/.quantdb-qlib-2850b18c6e754a59a7980c1a235e669e",
+      "market_snapshot": {
+        "status": "ok",
+        "trade_date": "2026-09-23",
+        "unchanged": false
+      }
+    }
+  },
+  "local_default_input": {
+    "at": "2026-09-24T16:57:59.323063+00:00",
+    "old_snapshot": "frozen-controls-20260907-v3",
+    "snapshot": "research-data-priority-20260925",
+    "manifest_sha256": "f56adb4a5db06138c3e72ef862de352e59ee0cd36449299133c18ee64083f48c",
+    "active_windows": 0,
+    "existing_agent_drafts": 0,
+    "old_input_retained": true,
+    "training_executed": false
+  },
+  "node_parity": {
+    "local_manifest_sha256": "f56adb4a5db06138c3e72ef862de352e59ee0cd36449299133c18ee64083f48c",
+    "local_source_commit": "881be655339788dc0a85e03e9b614e836b9fe6f0",
+    "files": 47765,
+    "identical_file_hashes": true,
+    "same_image_id": true,
+    "differences": [],
+    "difference_count": 0
+  }
+}
