@@ -249,8 +249,8 @@ def envelope(client, **over):
         "source_task": "R01P0-W2P",
         "source_run_id": "run-1",
         "strategy_id": "fixture-risk-line-demo",
-        "contract_version": "2",
-        "contract_hash": external.Contracts().contract_hashes["2"],
+        "contract_version": "2.2",
+        "contract_hash": external.Contracts().contract_hashes["2.2"],
         "source_node": NODE,
         "source_revision": "abc123",
         "event_id": "ev-1",
@@ -375,6 +375,18 @@ class TestReportValidation:
     def test_contract_hash_mismatch(self, env):
         register_case(env)
         response = submit(env, envelope(env, contract_hash="0" * 64))
+        assert response.status_code == 422
+        assert response.json()["code"] == "contract_hash_mismatch"
+
+    def test_superseded_v2_contract_version_rejected(self, env):
+        # W2P3: canonical is v2.2; legacy "2" (old bytes) must be refused explicitly
+        legacy_v2_hash = "780046e7d0662c58d6ca0c69cfaa8966ad66d49071461ea4b730f8d592016659"
+        register_case(env)
+        response = submit(env, envelope(env, contract_version="2", contract_hash=legacy_v2_hash))
+        assert response.status_code == 422
+        assert response.json()["code"] == "unknown_contract_version"
+        # v2.2 with the superseded hash is also refused (hash pins exact bytes)
+        response = submit(env, envelope(env, contract_hash=legacy_v2_hash))
         assert response.status_code == 422
         assert response.json()["code"] == "contract_hash_mismatch"
 

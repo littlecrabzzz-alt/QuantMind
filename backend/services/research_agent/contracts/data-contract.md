@@ -1,6 +1,6 @@
 # R01 数据合同（data-contract）
 
-- 版本：v2（R01P0-W1C2 修订冻结，2026-09-24T19:20:00Z；v1 见 rev1-backup/）
+- 版本：v2.2（R01P0-W2C4 订正冻结，2026-09-24T19:35:00Z；v2/v2.1 见 rev1-backup/ 与 REVISION.md。本次为 layout 订正：实现已双方一致、文档滞后，不改变语义）
 - 状态：**冻结**。变更须在主工作树 `coordination/r01-p0/` 追加记录并出合同新版本。
 - 对齐：平台设计 §4；机器 schema（单一来源，三份合同互引不重复定义）：`data-contract.schema.json`（回报信封）、`etf-input-package.schema.json`（输入包 manifest+typed events）、`readiness.schema.json`（准入对象）。
 - 命名规范：字段一律 snake_case；`project_key` canonical 值为小写 `r01`（展示名 R01 仅用于 UI）；来源标识统一 `source_task`；`contract_hash` = 所引版本合同文件 UTF-8 字节的 sha256。
@@ -36,20 +36,39 @@
 
 ### 3.2 位置：节点受控引用（不写裸绝对路径）
 - 包的逻辑引用：`node://<node>/r01-etf-daily/<package_version>`（manifest.package_uri）。
-- 各节点把 `package_id` 解析为本地绝对路径的**注册表是节点私有配置**（Mac 首个包在 p02 交付时登记于 coordination 记录与 readiness），不进合同、不进 Git。
+- 各节点把 `package_id` 解析为本地绝对路径的**节点私有注册表**：Mac 为 `~/Library/Application Support/QuantMind/r01/package-registry.json`（P0.2 v1 实现口径）；注册表及其快照必须进 P0.5 交接包（W1R2 第 6 项条件），否则独立验收只能验哈希不能复现文件位置。
 - 消费方（p03 LocalMarketData ETF 视图）凭 `package_id + manifest_sha256` 校验后只读挂载；校验失败显式报缺口，不静默降级。
 
-### 3.3 目录布局与机器 schema
+### 3.3 目录布局与机器 schema（v2.2：与 P0.2 生产者 / P0.3 消费者实际实现一致）
+
+实际布局（生产者 `scripts/prepare_r01_etf_inputs.py` docstring 与写出代码；消费者 `backend/services/simulation/replay/etf_input_package.py` 只读视图同口径）：
+
 ```
-manifest.json                # 必须通过 etf-input-package.schema.json
-calendar.parquet             # SSE 开市日
-symbols/<code>.parquet       # date, open, high, low, close, pre_close,
-                             # vol(份), amount(元), adj_factor, tradable
-limits/<code>.parquet        # 涨跌停价（近似段 pre_2019_approx=true）
-events/<code>.parquet        # typed 公司行动（行级约束见 $defs.typed_event）
+<output-root>/<version>/
+  manifest.json                # 必须通过 etf-input-package.schema.json
+  SHA256SUMS.txt               # 包内其余每个文件的 sha256
+  README.md                    # 布局、换算规则、预热与使用说明（包内生成）
+  derivation-report.json       # 证据：覆盖、事件、fund_nav 交叉核验
+  calendar.parquet             # SSE 交易日历：exchange, cal_date, is_open, pretrade_date
+  daily/<code>.parquet         # 未复权日线：ts_code, trade_date(YYYYMMDD),
+                               #   open, high, low, close, pre_close,
+                               #   vol_shares(份), amount_cny(元)
+  factors/<code>.parquet       # hfq 复权因子：ts_code, trade_date, adj_factor
+  dividends/<code>.parquet     # 原始 fund_div 事件（仅有分红的标的）：
+                               #   ts_code, ex_date, base_year, div_cash 等
+  events/<code>.parquet        # typed 公司行动（仅有事件的标的）：平铺列
+                               #   event_date, event_type, cash_per_share,
+                               #   qty_multiplier, adj_factor_prev, adj_factor_new
+                               #   （schema $defs.typed_event 的 derived_from 为平铺列）
+  etf_limit/<code>.parquet     # 交易所涨跌停价（2019-06-26 起）：ts_code,
+                               #   trade_date, pre_close, up_limit, down_limit, asset_type
 ```
+
 - `<code>` 一律 suffix 式（`510300.SH`）；全链路禁止依赖裸六位自动识别（XG-001）。
-- 单位统一换算为份/元，规则记录于 manifest.unit_conversions（DG-009）。
+- 单位换算在包内完成：`vol_shares = fund_daily.vol×100`、`amount_cny = fund_daily.amount×1000`，规则同时记录于 manifest.unit_conversions（DG-009）。
+- **无 `tradable` 列**：可交易性不在日线中物化，按 DG-004 口径由消费侧推导（缺行=数据洞 vs 停牌分开记录；零成交日；etf_limit 涨跌停价；2019-06-26 前无 etf_limit 行的时段由消费侧 ±10% 规则近似并在 manifest.known_gaps 以 `rule-approximation-declared` 声明）。
+- 工程 fixture 包允许另一套列口径（trade_date YYYY-MM-DD、volume 手、amount 千元、adj_factor 内联），仅用于工程验收（consumer 自动识别）；真实研究输入一律用上述真实包口径。
+- 订正说明：v2 原文误写 `symbols/`、`limits/` 目录名，且未列 `factors/`、`dividends/`、`SHA256SUMS.txt`、`README.md`、`derivation-report.json`；实际生产/消费自始使用 `daily/`、`etf_limit/` 等上表布局。本次订正不改变接口语义、单位、事件规则与哈希校验（见 REVISION.md attempt4）。
 
 ### 3.4 typed 公司行动：定义与时序（DG-005 裁决）
 
