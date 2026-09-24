@@ -771,15 +771,11 @@ def daily_data_sync_task(
             logger.info("[DailySync] 创建 Redis 同步任务 %s", job_id)
 
             result = run_daily_sync(skip_pg=skip_pg, progress_cb=celery_progress_cb(job_id))
-            upsert_job(job_id, status="completed", stage="done", finished_at=_now_iso())
+            upsert_job(job_id, status="failed" if result["status"] == "partial" else "completed",
+                       stage="done", finished_at=_now_iso())
             logger.info(
-                "[DailySync] QuantDB 完成: parquet=%s pg_rows=%s qlib=%s",
-                (result.get("parquet") or {}).get("total_downloaded"),
-                (result.get("pg_fill") or {}).get("rows"),
-                (result.get("qlib_cache") or {}).get("status"),
-            )
-            logger.info(
-                "[DailySync] QuantDB 完成: parquet=%s pg_rows=%s qlib=%s",
+                "[DailySync] QuantDB %s: parquet=%s pg_rows=%s qlib=%s",
+                result["status"],
                 (result.get("parquet") or {}).get("total_downloaded"),
                 (result.get("pg_fill") or {}).get("rows"),
                 (result.get("qlib_cache") or {}).get("status"),

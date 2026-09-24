@@ -1058,6 +1058,16 @@ def _sync_extra_sources(
     return out
 
 
+def _finish_sync(result):
+    from backend.shared.quantdb_sync_jobs import has_sync_errors
+
+    result["failed_stages"] = [key for key, value in result.items() if has_sync_errors(value)]
+    result["status"] = "partial" if result["failed_stages"] else "completed"
+    result["finished"] = datetime.now().isoformat()
+    log.info("Daily sync %s; failed stages: %s", result["status"], result["failed_stages"])
+    return result
+
+
 def run_daily_sync(
     *,
     parquet_only: bool = False,
@@ -1110,8 +1120,7 @@ def run_daily_sync(
     result["sources"] = _sync_extra_sources(dry_run=dry_run, datasets=datasets)
 
     if parquet_only:
-        result["finished"] = datetime.now().isoformat()
-        return result
+        return _finish_sync(result)
 
     # Phase 2: fill PG from parquet
     if not skip_pg:
@@ -1158,9 +1167,7 @@ def run_daily_sync(
             "reason": "direct QuantDB factor reader is active; legacy snapshot generation disabled",
         }
 
-    result["finished"] = datetime.now().isoformat()
-    log.info("Daily sync complete")
-    return result
+    return _finish_sync(result)
 
 
 def repair_partitions(datasets: list[dict] | None = None, recent_days: int = 30) -> dict:
@@ -1327,19 +1334,17 @@ def main():
 
         record_system_event(
             event_type="data_sync",
-            level="info",
+            level="error" if result["status"] == "partial" else "info",
             source="sync",
-            title="QuantDB 数据同步完成",
-            message=(
-                "parquet 同步完成，PG 填充" + ("完成" if not args.skip_pg else "跳过") +
-                "，Qlib 缓存" + ("完成" if not args.skip_qlib else "跳过")
-            ),
+            title="QuantDB 数据同步未完成" if result["status"] == "partial" else "QuantDB 数据同步完成",
+            message=("失败阶段：" + ", ".join(result["failed_stages"])) if result["failed_stages"]
+                    else "本次请求的同步阶段已完成；未请求的阶段不作完成承诺。",
             meta={"market": "quantdb", "datasets": datasets, "dry_run": args.dry_run},
         )
     except Exception as exc:  # noqa: BLE001 - 事件记录非关键路径
         log.warning("记录数据同步事件失败: %s", exc)
 
-    return 0
+    return 1 if result["status"] == "partial" else 0
 
 
 if __name__ == "__main__":

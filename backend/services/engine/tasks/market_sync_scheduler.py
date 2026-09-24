@@ -14,6 +14,8 @@ import os
 from datetime import datetime
 from typing import Any
 
+from backend.shared.quantdb_sync_jobs import has_sync_errors as _has_sync_errors
+
 logger = logging.getLogger(__name__)
 
 _SCHEDULE_KEY = "quantmind:sync_schedule:{market}"
@@ -112,17 +114,6 @@ def _mark_run(market: str, date_str: str, ttl: int = 2 * 24 * 3600) -> None:
         "1",
         ex=ttl,
     )
-
-
-def _has_sync_errors(value: Any) -> bool:
-    """Nested source failures must not be reported as a successful daily sync."""
-    if isinstance(value, dict):
-        if value.get("status") in {"error", "partial", "failed"} or value.get("error") or value.get("errors"):
-            return True
-        return any(_has_sync_errors(item) for item in value.values())
-    if isinstance(value, (list, tuple)):
-        return any(_has_sync_errors(item) for item in value)
-    return False
 
 
 def run_market_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:

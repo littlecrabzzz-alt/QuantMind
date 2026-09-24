@@ -32,6 +32,27 @@ class FrozenResearchTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "checksum"):
                 runner.verify(out)
 
+    def test_separate_runtime_supplies_data_while_code_stays_in_source(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "source"
+            runtime = Path(temp) / "runtime"
+            for dataset in ("6_ml_datasets/l1_factors", "1_kline_data/daily_backward"):
+                path = runtime / "data/quantdb" / dataset / "dt=20240102/part.parquet"
+                path.parent.mkdir(parents=True)
+                path.write_bytes(b"runtime data")
+            for name in ("calendars/day.txt", "instruments/all.txt"):
+                path = runtime / "db/qlib_data" / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("runtime qlib")
+            code = root / "backend/example.py"
+            code.parent.mkdir(parents=True)
+            code.write_text("# candidate code")
+            files = runner.snapshot_files(root, self.cfg, data_root=runtime)
+            self.assertEqual(files[code], Path("code/backend/example.py"))
+            self.assertEqual(files[runtime / "db/qlib_data/calendars/day.txt"], Path("qlib/calendars/day.txt"))
+            self.assertEqual(sum(str(target).startswith("quantdb/") for target in files.values()), 2)
+            self.assertFalse(any(str(source).startswith(str(root / "data")) for source in files))
+
     def test_container_only_mounts_readonly_snapshot_and_output(self):
         cmd = runner.command(Path("/experiments/one"), {"image": {"Id": "sha256:fixed", "Os": "linux", "Architecture": "amd64"}}, Path("/experiments/one/attempt-1"))
         mounts = [cmd[i + 1] for i, value in enumerate(cmd) if value == "--mount"]

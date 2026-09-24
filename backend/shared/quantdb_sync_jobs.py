@@ -13,6 +13,17 @@ KEY_PREFIX = "quantmind:quantdb:job:"
 TTL = 6 * 3600  # 任务记录保留 6 小时
 
 
+def has_sync_errors(value) -> bool:
+    """Nested source failures must not be reported as a successful daily sync."""
+    if isinstance(value, dict):
+        if value.get("status") in {"error", "partial", "failed"} or value.get("error") or value.get("errors"):
+            return True
+        return any(has_sync_errors(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(has_sync_errors(item) for item in value)
+    return False
+
+
 def _redis():
     import redis
     url = os.getenv("REDIS_URL") or "redis://redis:6379/0"

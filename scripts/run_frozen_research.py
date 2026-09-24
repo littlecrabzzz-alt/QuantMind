@@ -55,24 +55,25 @@ def validate_config(cfg):
         raise ValueError("The one-day baseline requires next-day close execution")
 
 
-def snapshot_files(root, cfg):
+def snapshot_files(root, cfg, data_root=None):
+    data_root = Path(data_root or root).resolve()
     start = (date.fromisoformat(cfg["split"]["train"][0]) - timedelta(days=30)).strftime("%Y%m%d")
     end = (date.fromisoformat(cfg["split"]["test"][1]) + timedelta(days=30)).strftime("%Y%m%d")
     files = {}
     for dataset in ("6_ml_datasets/l1_factors", "1_kline_data/daily_backward"):
         selected = []
-        for partition in (root / "data/quantdb" / dataset).glob("dt=*"):
+        for partition in (data_root / "data/quantdb" / dataset).glob("dt=*"):
             if start <= partition.name[3:] <= end:
                 selected.extend(partition.glob("*.parquet"))
         if not selected:
             raise RuntimeError(f"No frozen input partitions: {dataset}")
         for path in selected:
-            files[path] = Path("quantdb") / path.relative_to(root / "data/quantdb")
-    for path in (root / "db/qlib_data").rglob("*"):
+            files[path] = Path("quantdb") / path.relative_to(data_root / "data/quantdb")
+    for path in (data_root / "db/qlib_data").rglob("*"):
         if path.is_file():
-            files[path] = Path("qlib") / path.relative_to(root / "db/qlib_data")
+            files[path] = Path("qlib") / path.relative_to(data_root / "db/qlib_data")
     for required in ("calendars/day.txt", "instruments/all.txt"):
-        if not (root / "db/qlib_data" / required).is_file():
+        if not (data_root / "db/qlib_data" / required).is_file():
             raise RuntimeError(f"Qlib provider missing {required}")
     for path in (root / "backend").rglob("*.py"):
         files[path] = Path("code") / path.relative_to(root)
@@ -83,7 +84,7 @@ def snapshot_files(root, cfg):
     return files
 
 
-def freeze(root, out, cfg, image):
+def freeze(root, out, cfg, image, data_root=None):
     validate_config(cfg)
     out.mkdir(parents=True, exist_ok=True)
     if (out / "manifest.json").exists():
@@ -94,7 +95,7 @@ def freeze(root, out, cfg, image):
     snapshot = out / "snapshot"
     if snapshot.exists():
         raise RuntimeError("Incomplete snapshot retained; use a new output directory")
-    sources = snapshot_files(root, cfg)
+    sources = snapshot_files(root, cfg, data_root=data_root)
     total = sum(path.stat().st_size for path in sources)
     if shutil.disk_usage(out).free < total + 1024 ** 3:
         raise RuntimeError("Insufficient disk space for snapshot and research outputs")
@@ -163,6 +164,7 @@ def main():
     parser.add_argument("stage", choices=["freeze", "run", "verify"])
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--config", type=Path)
+    parser.add_argument("--data-root", type=Path, help="Runtime root containing data/quantdb and db/qlib_data; defaults to source root")
     parser.add_argument("--image", help="Defaults to the running QuantMind image ID")
     args = parser.parse_args()
     out = args.output.resolve()
@@ -174,12 +176,12 @@ def main():
                                else ROOT / "config/research_controls_cn_l1.json")
     cfg = read(cfg_path)
     if (out / "manifest.json").exists():
-        manifest = freeze(ROOT, out, cfg, None)
+        manifest = freeze(ROOT, out, cfg, None, data_root=args.data_root)
     else:
         image_id = args.image or subprocess.check_output(
             ["docker", "inspect", "quantmind", "--format", "{{.Image}}"], text=True).strip()
         image = json.loads(subprocess.check_output(["docker", "image", "inspect", image_id], text=True))[0]
-        manifest = freeze(ROOT, out, cfg, {key: image[key] for key in ("Id", "Os", "Architecture", "RepoDigests")})
+        manifest = freeze(ROOT, out, cfg, {key: image[key] for key in ("Id", "Os", "Architecture", "RepoDigests")}, data_root=args.data_root)
     print("Frozen", len(manifest["files"]), "files before execution", flush=True)
     if args.stage == "freeze":
         return
