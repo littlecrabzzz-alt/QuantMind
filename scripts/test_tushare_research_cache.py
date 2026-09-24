@@ -106,7 +106,13 @@ class ResearchCache(unittest.TestCase):
                         cache.pull(target, 'http://127.0.0.1:18765', 1024**2, 0)
                 self.assertFalse((target / 'CURRENT.json').exists())
                 self.assertEqual(json.loads((target / 'cache-transfer-status.json').read_bytes())['status'], 'failed')
-                report = cache.pull(target, 'http://127.0.0.1:18765', 1024**2, 0)
+                (target / 'releases' / pointer['release_id'] / 'manifest.json').unlink()
+                with patch.object(cache, 'fetch', wraps=cache.fetch) as transfer:
+                    report = cache.pull(target, 'http://127.0.0.1:18765', 1024**2, 0)
+                manifest_calls = [call for call in transfer.call_args_list
+                                  if '/releases/' in call.args[0]]
+                self.assertEqual(manifest_calls[0].kwargs['limit'], cache.MAX_MANIFEST_BYTES)
+                self.assertGreater(cache.MAX_MANIFEST_BYTES, 82 * 1024**2)
                 self.assertEqual(report['downloaded_files'], 2)
                 self.assertEqual(cache.pull(target, 'http://127.0.0.1:18765', 1024**2, 0)['downloaded_files'], 0)
                 old = (target / 'CURRENT.json').read_bytes()

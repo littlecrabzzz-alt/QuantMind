@@ -27,6 +27,7 @@ DEFAULT_APIS = ('daily', 'index_daily', 'fund_daily', 'adj_factor', 'daily_basic
                 'index_weight', 'ci_daily', 'sw_daily', 'stock_basic', 'index_basic',
                 'fund_basic', 'trade_cal')
 PREPARE_TIMEOUT_SECONDS = 30 * 60
+MAX_MANIFEST_BYTES = 512 * 1024**2
 FILE = re.compile(r'(?:parquet|observations|schemas)/[a-f0-9]+\.(?:parquet|json)')
 RELEASE = re.compile(r'data-[a-f0-9]{64}')
 
@@ -231,9 +232,9 @@ def pull(root, url, budget, reserve):
         relative = 'releases/' + release + '/manifest.json'
         manifest_path = root / relative
         if not manifest_path.exists():
-            if shutil.disk_usage(root).free < reserve + 64 * 1024**2:
+            if shutil.disk_usage(root).free < reserve + MAX_MANIFEST_BYTES:
                 raise ValueError('Insufficient disk reserve')
-            fetch(url + '/' + relative, manifest_path)
+            fetch(url + '/' + relative, manifest_path, limit=MAX_MANIFEST_BYTES)
         manifest = manifest_at(root, release)
         if manifest.get('scope') != 'research_subset':
             raise ValueError('Refusing full archive mirror')
