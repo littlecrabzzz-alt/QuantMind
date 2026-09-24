@@ -25,7 +25,7 @@ from backend.shared.tushare_pipeline import atomic_json, atomic_bytes, manifest_
 
 DEFAULT_APIS = ('daily', 'index_daily', 'fund_daily', 'adj_factor', 'daily_basic',
                 'index_weight', 'ci_daily', 'sw_daily', 'stock_basic', 'index_basic',
-                'fund_basic', 'trade_cal')
+                'fund_basic', 'trade_cal', 'stk_limit', 'suspend_d', 'moneyflow')
 PREPARE_TIMEOUT_SECONDS = 30 * 60
 MAX_MANIFEST_BYTES = 512 * 1024**2
 FILE = re.compile(r'(?:parquet|observations|schemas)/[a-f0-9]+\.(?:parquet|json)')
