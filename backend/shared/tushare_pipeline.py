@@ -171,6 +171,7 @@ from backend.shared.tushare_intake import (
     capture_sample, digest, json_bytes, utc_now, validate_request_shape,
 )
 from backend.shared.tushare_market_contracts import iter_market_date_refresh
+from backend.shared.tushare_structured_contracts import iter_structured_date_refresh
 from backend.shared.tushare_rrg_contracts import RRG_CONTRACTS
 from backend.shared.tushare_stock_lifecycle import valid_date
 from backend.shared.tushare_text_contracts import normalize_anns_d_ts_code
@@ -3891,14 +3892,18 @@ class Pipeline:
         ):
             raise ValueError("Invalid historical planner time limit")
         stats = {}
-        if (
-            "market" in PLANNERS
-            and config.get("enable_market")
-            and "market" not in blocked_families
+        # Bounded date-only admission is independent of each family's durable
+        # cursor. A large name/index universe must not starve today's core data.
+        for family, refresh in (
+            ("structured", iter_structured_date_refresh),
+            ("market", iter_market_date_refresh),
         ):
-            self.planning_timing["active_stage"] = "recent_dates:market"
+            if (family not in PLANNERS or not config.get("enable_" + family)
+                    or family in blocked_families):
+                continue
+            self.planning_timing["active_stage"] = "recent_dates:" + family
             recent = {"planned": 0, "new_jobs": 0, "promoted_jobs": 0}
-            for job in iter_market_date_refresh(config, today):
+            for job in refresh(config, today):
                 before = self.db.total_changes
                 key = self.enqueue(
                     job["api_name"], job["params"], 5, job["epoch"],
@@ -3911,7 +3916,8 @@ class Pipeline:
                 ).rowcount
                 recent["planned"] += 1
             self.db.commit()
-            stats["recent_dates:market"] = recent
+            if recent["planned"] or family == "market":
+                stats["recent_dates:" + family] = recent
         # Commit observed-period supplements before expensive ordinary families.
         # Repeated dictionary keys keep their first insertion position.
         priority_append = {

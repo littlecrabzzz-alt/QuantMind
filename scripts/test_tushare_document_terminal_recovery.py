@@ -60,6 +60,19 @@ class TerminalDocumentRecovery(unittest.TestCase):
         self.db.commit()
         return ident, raw
 
+    def test_version_six_upgrade_indexes_attempt_counts_and_preserves_history(self):
+        ident, _ = self.seed(1, "source_challenge")
+        before = self.db.execute("SELECT * FROM document_attempts").fetchall()
+        self.db.execute("DROP INDEX document_attempts_by_document")
+        self.db.execute("UPDATE document_claim_meta SET version=6")
+        self.db.commit()
+        docs._claims_setup(self.db)
+        docs._claims_setup(self.db)
+        plan = self.db.execute("EXPLAIN QUERY PLAN SELECT count(*) FROM document_attempts WHERE document_id=?", (ident,)).fetchall()
+        self.assertTrue(any("USING COVERING INDEX document_attempts_by_document" in row[3] for row in plan))
+        self.assertEqual(self.db.execute("SELECT * FROM document_attempts").fetchall(), before)
+        self.assertEqual(self.db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 7)
+
     def test_bounded_fair_retry_preserves_attempts_and_results(self):
         now = 2_000_000_000
         old = now - 86401

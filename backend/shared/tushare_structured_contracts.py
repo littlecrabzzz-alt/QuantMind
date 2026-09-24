@@ -405,6 +405,21 @@ def iter_structured_jobs(config, today, identifiers=None):
                     yield job(api, params, priority, version)
 
 
+def iter_structured_date_refresh(config, today):
+    """Admit at most 42 recent core-market requests before identifier backlogs."""
+    if isinstance(today, datetime):
+        today = today.date()
+    selected = set(config.get("structured_apis", STRUCTURED_CONTRACTS)).intersection(DAY_APIS)
+    if not selected:
+        return
+    start = max(_parse(config["history_start"]), today - timedelta(days=7))
+    yield from iter_structured_jobs(
+        {**config, "structured_apis": sorted(selected),
+         "history_start": start.strftime("%Y%m%d")},
+        today,
+    )
+
+
 def structured_prerequisites(identifiers=None):
     """Visible dependency gaps; an empty discovery list is not zero coverage."""
     ids = identifiers or {}

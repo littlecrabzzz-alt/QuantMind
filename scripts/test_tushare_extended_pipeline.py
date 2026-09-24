@@ -167,7 +167,7 @@ class ExtendedPipeline(unittest.TestCase):
             "enable_structured": True,
             "plan_jobs_per_tick": 2,
         }
-        with patch.dict(module.PLANNERS, {"structured": planner}, clear=True):
+        with patch.dict(module.PLANNERS, {"structured": planner}, clear=True), patch.object(module, "iter_structured_date_refresh", return_value=()):
             for _ in range(10):
                 p = self.pipeline()
                 before = p.db.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]

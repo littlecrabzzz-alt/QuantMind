@@ -1,0 +1,12 @@
+{
+  "group_weights": {"rrg": 10, "structured": 10, "market": 4},
+  "throughput_fast_lane_apis": [
+    "adj_factor", "daily_basic", "stk_limit", "suspend_d", "moneyflow",
+    "index_daily", "sw_daily", "ci_daily", "fund_daily", "trade_cal"
+  ],
+  "throughput_fast_lane_every": 2,
+  "document_worker_max_documents": 300,
+  "document_worker_max_seconds": 30,
+  "document_download_workers": 4,
+  "document_parse_workers": 1
+}

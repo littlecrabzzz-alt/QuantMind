@@ -669,7 +669,7 @@ class ParallelDocuments(unittest.TestCase):
         )
         self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 3)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 6
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 7
         )
         db.close()
 
@@ -798,7 +798,7 @@ class ParallelDocuments(unittest.TestCase):
         timing = {}
         docs._claims_setup(db, timing)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 6
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 7
         )
         self.assertTrue(
             db.execute(
@@ -859,7 +859,7 @@ class ParallelDocuments(unittest.TestCase):
         )
         docs._claims_setup(db)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 6
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 7
         )
         self.assertTrue(
             db.execute(
@@ -924,7 +924,7 @@ class ParallelDocuments(unittest.TestCase):
 
         docs._claims_setup(db)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 6
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 7
         )
         self.assertEqual(
             [
@@ -993,7 +993,7 @@ class ParallelDocuments(unittest.TestCase):
 
         docs._claims_setup(db)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 6
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 7
         )
         self.assertEqual(
             [row[0] for row in db.execute("SELECT parse_tries FROM documents ORDER BY id")],
@@ -1034,7 +1034,7 @@ class ParallelDocuments(unittest.TestCase):
 
         docs._claims_setup(db)
         self.assertEqual(
-            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 6
+            db.execute("SELECT version FROM document_claim_meta").fetchone()[0], 7
         )
         self.assertTrue(
             db.execute(

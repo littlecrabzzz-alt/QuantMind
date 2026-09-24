@@ -1143,9 +1143,9 @@ def _claims_setup(db, timing=None):
             "SELECT 1 FROM sqlite_master WHERE name='document_claim_meta'"
         ).fetchone():
             row = db.execute("SELECT version FROM document_claim_meta").fetchone()
-            if row is None or row[0] not in (1, 2, 3, 4, 5, 6):
+            if row is None or row[0] not in (1, 2, 3, 4, 5, 6, 7):
                 raise DocumentError("unsupported_document_claim_schema")
-            if row[0] == 6:
+            if row[0] == 7:
                 return
             with db:
                 _timed_begin(db, timing, "setup")
@@ -1177,18 +1177,23 @@ def _claims_setup(db, timing=None):
                         "AND json_extract(result,'$.parse_detail.reason')="
                         "'parser_process_failed'"
                     )
+                if row[0] < 6:
+                    db.execute(
+                        "CREATE INDEX document_parse_retry_claim_order ON documents(id) "
+                        "WHERE download_status='downloaded' AND parse_status IN "
+                        "('parse_unavailable','parse_failed','parse_timeout') "
+                        "AND parse_tries<5"
+                    )
+                    db.execute(
+                        "CREATE INDEX document_parse_pending_claim_order ON documents(id) "
+                        "WHERE download_status='downloaded' "
+                        "AND parse_status='parse_pending' AND parse_tries<5"
+                    )
                 db.execute(
-                    "CREATE INDEX document_parse_retry_claim_order ON documents(id) "
-                    "WHERE download_status='downloaded' AND parse_status IN "
-                    "('parse_unavailable','parse_failed','parse_timeout') "
-                    "AND parse_tries<5"
+                    "CREATE INDEX IF NOT EXISTS document_attempts_by_document "
+                    "ON document_attempts(document_id)"
                 )
-                db.execute(
-                    "CREATE INDEX document_parse_pending_claim_order ON documents(id) "
-                    "WHERE download_status='downloaded' "
-                    "AND parse_status='parse_pending' AND parse_tries<5"
-                )
-                db.execute("UPDATE document_claim_meta SET version=6")
+                db.execute("UPDATE document_claim_meta SET version=7")
             return
         with db:
             _timed_begin(db, timing, "setup")
@@ -1220,7 +1225,10 @@ def _claims_setup(db, timing=None):
                 "WHERE download_status='downloaded' "
                 "AND parse_status='parse_pending' AND parse_tries<5"
             )
-            db.execute("INSERT INTO document_claim_meta VALUES(6)")
+            db.execute(
+                "CREATE INDEX document_attempts_by_document ON document_attempts(document_id)"
+            )
+            db.execute("INSERT INTO document_claim_meta VALUES(7)")
     finally:
         _add_elapsed(timing, "setup_db_total_seconds", started)
 

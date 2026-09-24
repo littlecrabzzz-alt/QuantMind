@@ -123,6 +123,34 @@ class PlanningProgress(unittest.TestCase):
         self.assertNotIn("recent_dates:market", off)
         self.assertEqual({json.loads(row[0])["api_name"] for row in self.p.db.execute("SELECT job FROM jobs")}, {"sw_daily"})
 
+    def test_structured_dates_bypass_name_backlog_and_keep_cursor(self):
+        config = {**self.config, "structured_apis": ["namechange", "daily", "adj_factor", "daily_basic"]}
+        with patch.object(self.p, "identifiers", return_value={"stocks": [f"{i:06d}.SZ" for i in range(100)]}):
+            first = self.p.plan_extended(config, date(2026, 9, 24))
+            before = self.state("recent:structured")
+            self.assertFalse(before["done"])
+            self.assertEqual(first["recent_dates:structured"]["new_jobs"], 21)
+            again = self.p.plan_extended(config, date(2026, 9, 24))
+            self.assertEqual(again["recent_dates:structured"]["new_jobs"], 0)
+            self.p.plan_extended(config, date(2026, 9, 25))
+        after = self.state("recent:structured")
+        self.assertEqual(after["anchor"], before["anchor"])
+        self.assertGreater(after["offset"], before["offset"])
+        for api in ("daily", "adj_factor", "daily_basic"):
+            rows = self.p.db.execute("SELECT job,priority FROM jobs WHERE json_extract(job,'$.api_name')=?", (api,)).fetchall()
+            self.assertTrue(any(json.loads(r[0])["params"] == {"trade_date": "20260924"} and r[1] == 5 for r in rows))
+
+    def test_structured_dates_promote_reuse_and_respect_selection(self):
+        config = {**self.config, "history_start": "20260923", "structured_apis": ["daily"]}
+        key = self.p.enqueue("daily", {"trade_date": "20260923"}, 25, "20260923")
+        with patch.object(self.p, "identifiers", return_value={}):
+            report = self.p.plan_extended(config, date(2026, 9, 24))
+            off = self.p.plan_extended({**config, "enable_structured": False}, date(2026, 9, 25))
+        self.assertEqual(report["recent_dates:structured"], {"planned": 1, "new_jobs": 0, "promoted_jobs": 1})
+        self.assertEqual(self.p.db.execute("SELECT priority FROM jobs WHERE id=?", (key,)).fetchone()[0], 5)
+        self.assertNotIn("recent_dates:structured", off)
+        self.assertEqual({json.loads(r[0])["api_name"] for r in self.p.db.execute("SELECT job FROM jobs")}, {"daily"})
+
     def test_unrelated_family_contract_config_and_discovery_do_not_reset(self):
         self.tick()
         old = self.state()
@@ -402,7 +430,7 @@ class PlanningProgress(unittest.TestCase):
                     epochs = {
                         epoch for _, epoch, _ in self.jobs() if epoch != "history"
                     }
-                    self.assertEqual(epochs, {"20260901"})
+                    self.assertEqual(epochs, {"20260901", "20260920"} if family == "structured" else {"20260901"})
                     for _ in range(60):
                         self.p.plan_extended(config, date(2026, 9, 20))
                     self.assertEqual(
