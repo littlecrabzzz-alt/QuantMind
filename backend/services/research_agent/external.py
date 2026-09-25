@@ -78,9 +78,9 @@ class Contracts:
             (CONTRACTS_DIR / "readiness.schema.json").read_text()
         )
         self.contract_text = (CONTRACTS_DIR / "data-contract.md").read_bytes()
-        # Envelope contract_version -> canonical md bytes sha256 (v2.2, W2P3 sync).
-        # Superseded versions are not registered: unknown version => 422.
-        self.contract_hashes = {"2.2": hashlib.sha256(self.contract_text).hexdigest()}
+        # Envelope contract_version -> canonical md bytes sha256 (v2.3, F3P2 sync).
+        # Superseded versions (2/2.1/2.2) are not registered: unknown version => 422.
+        self.contract_hashes = {"2.3": hashlib.sha256(self.contract_text).hexdigest()}
         self._envelope = Draft202012Validator(
             self.envelope_schema, format_checker=Draft202012Validator.FORMAT_CHECKER
         )

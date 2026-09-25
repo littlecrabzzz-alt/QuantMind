@@ -1,6 +1,6 @@
 # R01 数据合同（data-contract）
 
-- 版本：v2.2（R01P0-W2C4 订正冻结，2026-09-24T19:35:00Z；v2/v2.1 见 rev1-backup/ 与 REVISION.md。本次为 layout 订正：实现已双方一致、文档滞后，不改变语义）
+- 版本：v2.3（R01P0-F1C1 修订冻结，2026-09-25T02:00:00Z；AC-01 分红三日期事件结构，配套 schema v3/包版本 v2。v2.2 见 REVISION.md）
 - 状态：**冻结**。变更须在主工作树 `coordination/r01-p0/` 追加记录并出合同新版本。
 - 对齐：平台设计 §4；机器 schema（单一来源，三份合同互引不重复定义）：`data-contract.schema.json`（回报信封）、`etf-input-package.schema.json`（输入包 manifest+typed events）、`readiness.schema.json`（准入对象）。
 - 命名规范：字段一律 snake_case；`project_key` canonical 值为小写 `r01`（展示名 R01 仅用于 UI）；来源标识统一 `source_task`；`contract_hash` = 所引版本合同文件 UTF-8 字节的 sha256。
@@ -70,19 +70,21 @@
 - 工程 fixture 包允许另一套列口径（trade_date YYYY-MM-DD、volume 手、amount 千元、adj_factor 内联），仅用于工程验收（consumer 自动识别）；真实研究输入一律用上述真实包口径。
 - 订正说明：v2 原文误写 `symbols/`、`limits/` 目录名，且未列 `factors/`、`dividends/`、`SHA256SUMS.txt`、`README.md`、`derivation-report.json`；实际生产/消费自始使用 `daily/`、`etf_limit/` 等上表布局。本次订正不改变接口语义、单位、事件规则与哈希校验（见 REVISION.md attempt4）。
 
-### 3.4 typed 公司行动：定义与时序（DG-005 裁决）
+### 3.4 typed 公司行动：定义与时序（DG-005 裁决；分红字段 AC-01/F1C1 修订）
 
 **因子约定（normative）**：`adjusted_close = close_unadjusted × adj_factor`（hfq）。每个 `adj_factor` 跳变日必须归类（schema 二选一）：
-- `cash_dividend`：与 fund_div 对上；`cash_per_share>0, qty_multiplier=1`。
-- `share_adjustment`：无现金事件的因子跳变（拆分/份额折算）；`cash_per_share=0, qty_multiplier = adj_factor_new / adj_factor_prev ≠ 1`。
-- **验证公式**（p02 对每个事件执行，写入 verification）：价格连续性 `close_ex ≈ pre_close_ex × (adj_factor_prev / adj_factor_new)`（无现金事件时），价值守恒 `qty_new × close_ex ≈ qty_old × close_prev`；fund_nav 可得时交叉验证。无法归类或验证不过 = **显式缺口**（`unresolved_gap`），禁止按零处理。
-- 强制回归用例：`159934.SZ 2025-09-22`（qty_multiplier=0.9481，份额折算）、`510500.SH 2015-04-15`（qty_multiplier=0.2803，因子方向以验证公式实测为准，不预设"拆分/合并"标签）。
+- `cash_dividend`：与 fund_div 对上；`cash_per_share>0, qty_multiplier=1`；**必填分红三日期与权益基准**：`record_date`（登记日，权益基准=收盘在册持仓）、`event_date`（=ex_date 除息日）、`pay_date`（发放日）、`entitlement_basis="record_date_close_holdings"`、`event_id`。record/pay 未知时必须显式 `record_date_status/pay_date_status="unknown_blocked"`（对应日期为 null），禁止默认 ex_date；blocked 事件须 `verification.method=unresolved_gap, passed=false`。三日期语义约束（validator 语义层校验）：`record_date ≤ ex_date ≤ pay_date`。
+- `share_adjustment`：无现金事件的因子跳变（拆分/份额折算）；`cash_per_share=0, qty_multiplier = adj_factor_new / adj_factor_prev ≠ 1`；不得携带分红日期字段。
+- **验证公式**（p02 对每个事件执行，写入 verification）：价格连续性 `close_ex ≈ pre_close_ex × (adj_factor_prev / adj_factor_new)`（无现金事件时），价值守恒 `qty_new × close_ex ≈ qty_old × close_prev`；fund_nav 可得时交叉验证；分红三日期以交易所/基金公告为准（`derived_from.fund_div_ref` 必填公告引用，如 511090 2024-04-19 上交所披露 PDF）。无法归类、验证不过或日期缺失 = **显式缺口**（`unresolved_gap`），禁止按零处理。
+- 强制回归用例：`159934.SZ 2025-09-22`（qty_multiplier=0.9481）、`510500.SH 2015-04-15`（qty_multiplier=0.2803）、`511090.SH 2024-04`（record 04-23 / ex 04-24 / pay 04-29，1.5 元/份，AC-01 三例见 ledger-contract §6）。
 
-**账务处理时点**（ledger-contract §6 消费）：
-- `share_adjustment`：event_date **开盘前、当日任何订单撮合之前**调整持仓数量（价格序列当日已是调整后口径）。
-- `cash_dividend`：event_date **日终（EOD）、当日净值计算之前**计入现金。
-- 同日两类并存：先份额调整（开盘前），现金分红按调整后份额口径计（p02 已在 basis_note 声明换算）。
-- 幂等键 `(ledger_run_id, symbol, event_date, event_type)`。
+**账务处理时点**（ledger-contract §5/§6 消费）：
+- `share_adjustment`：event_date **开盘前、当日任何订单撮合之前**调整持仓数量。
+- `cash_dividend` 三段式：record_date EOD 按收盘在册持仓定格资格 → ex_date 开盘前入 `dividend_receivable`（计入 nav，不可交易）→ pay_date 开盘前转可用现金。**禁止 ex_date 当日交易后持仓发放**（AC-01 废弃语义）。
+- 同日两类并存：先份额调整（开盘前），cash_per_share 已是调整后份额口径；资格定格不受当日份额调整影响（record 先于 ex）。
+- 幂等键：分红 `(ledger_run_id, symbol, event_id, entitlement_date=record_date)`；份额调整 `(ledger_run_id, symbol, event_date, event_type)`。
+
+**包版本约定**：schema v3（`schema_version=3`）⇔ **包版本 v2** 起；**v1 包**（schema_version=2 事件结构，无分红三日期字段）保留只读：按 `archive/etf-input-package-v2.schema.json` 校验，其分红语义已废弃，不得用于权益资格计算（见 handover/ASSUMPTIONS-DEFERRED.md）。
 
 ## 4. 数据检查项
 每项 `passed / failed / unknown` + 证据引用；`unknown` 不得当 `passed` 展示（schema checks[]）。

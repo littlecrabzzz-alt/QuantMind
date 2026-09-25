@@ -57,7 +57,7 @@ def envelope(**over):
     base = {
         "schema_version": 2, "project_key": "r01", "workstream": "P0",
         "case_id": CASE_ID[0], "source_task": "R01P0-W2P", "source_run_id": "run-e2e-1",
-        "strategy_id": "fixture-risk-line-demo", "contract_version": "2.2",
+        "strategy_id": "fixture-risk-line-demo", "contract_version": "2.3",
         "contract_hash": CONTRACT_HASH, "source_node": CONTRACT_NODE, "source_revision": "w2p-e2e",
         "event_id": "ev-0", "seq": 0, "kind": "progress",
         "data": {"input_package_id": "none", "data_as_of": "2026-09-24"},
@@ -149,9 +149,9 @@ def main():
     assert body.get("code") == "node_mismatch"
     submit(envelope(event_id="ev-ws", workstream="A"), 422, "workstream mismatch => 422")
     submit(envelope(event_id="ev-hash", contract_hash="0" * 64), 422, "contract hash mismatch => 422")
-    legacy_v2_hash = "780046e7d0662c58d6ca0c69cfaa8966ad66d49071461ea4b730f8d592016659"
-    submit(envelope(event_id="ev-legacy", contract_hash=legacy_v2_hash), 422,
-           "superseded v2 hash rejected => 422 (v2.2 canonical)")
+    legacy_v22_hash = "5337b291b8d1ba5faac6f10290bb86b1b27a2a62016aa6282a9bbdc26961c39e"
+    submit(envelope(event_id="ev-legacy", contract_hash=legacy_v22_hash), 422,
+           "superseded v2.2 hash rejected => 422 (v2.3 canonical)")
     submit(envelope(event_id="ev-art", kind="artifact",
                     artifacts=[{"name": "x", "kind": "x", "sha256": "1" * 64,
                                 "uri": "external/fixture-equity.json"}]), 422, "artifact hash mismatch => 422 (kept)")

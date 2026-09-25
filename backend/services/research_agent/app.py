@@ -523,7 +523,7 @@ async def submit_external_report(ident: str, request: Request):
         owner, cfg.node, envelope["project_key"]
     )
     formal_ready, admission_reasons = external.evaluate_formal_admission(
-        readiness, binding, contracts.contract_hashes["2.2"]
+        readiness, binding, contracts.contract_hashes["2.3"]
     )
     not_ready = envelope["workstream"] != "P0" and not formal_ready
     not_ready_reason = (", ".join(admission_reasons)) if not_ready else None
@@ -676,7 +676,7 @@ async def get_readiness(project_key: str, request: Request):
         raise HTTPException(404, "该项目的准入对象尚未登记")
     binding = await xstore.get_acceptance_binding(owner, cfg.node, project_key.lower())
     formal_ready, reasons = external.evaluate_formal_admission(
-        obj, binding, contracts.contract_hashes["2.2"]
+        obj, binding, contracts.contract_hashes["2.3"]
     )
     return {
         "readiness": obj,
@@ -708,13 +708,13 @@ async def save_readiness(project_key: str, request: Request):
         cfg.node,
         project_key.lower(),
         obj,
-        contract_hash=request.app.state.contracts.contract_hashes["2.2"],
+        contract_hash=request.app.state.contracts.contract_hashes["2.3"],
     )
     binding = await request.app.state.external.get_acceptance_binding(
         owner, cfg.node, project_key.lower()
     )
     formal_ready, reasons = external.evaluate_formal_admission(
-        obj, binding, request.app.state.contracts.contract_hashes["2.2"]
+        obj, binding, request.app.state.contracts.contract_hashes["2.3"]
     )
     return {
         "readiness": obj,
@@ -754,7 +754,7 @@ async def project_overview(project_key: str, request: Request):
         owner, cfg.node, key
     )
     formal_ready, admission_reasons = external.evaluate_formal_admission(
-        readiness, binding, request.app.state.contracts.contract_hashes["2.2"]
+        readiness, binding, request.app.state.contracts.contract_hashes["2.3"]
     )
     blocking = readiness.get("blocking_gaps", []) if readiness else []
     reported_gaps = {}

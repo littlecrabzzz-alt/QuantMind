@@ -172,7 +172,7 @@ class FakeExternalStore(external.ExternalStore):
         self.events = {}  # (draft, task, run, event_id) -> record
         self.readiness = {}
         self.bindings = {}
-        self.contract_hash = external.Contracts().contract_hashes["2.2"]
+        self.contract_hash = external.Contracts().contract_hashes["2.3"]
 
     async def find_event(self, db, draft_id, source_task, source_run_id, event_id):
         return self.events.get((draft_id, source_task, source_run_id, event_id))
@@ -269,8 +269,8 @@ def envelope(client, **over):
         "source_task": "R01P0-W2P",
         "source_run_id": "run-1",
         "strategy_id": "fixture-risk-line-demo",
-        "contract_version": "2.2",
-        "contract_hash": external.Contracts().contract_hashes["2.2"],
+        "contract_version": "2.3",
+        "contract_hash": external.Contracts().contract_hashes["2.3"],
         "source_node": NODE,
         "source_revision": "abc123",
         "event_id": "ev-1",
@@ -398,15 +398,19 @@ class TestReportValidation:
         assert response.status_code == 422
         assert response.json()["code"] == "contract_hash_mismatch"
 
-    def test_superseded_v2_contract_version_rejected(self, env):
-        # W2P3: canonical is v2.2; legacy "2" (old bytes) must be refused explicitly
+    def test_superseded_contract_versions_rejected(self, env):
+        # F3P2: canonical is v2.3; superseded "2"/"2.2" (old bytes) must be refused explicitly
         legacy_v2_hash = "780046e7d0662c58d6ca0c69cfaa8966ad66d49071461ea4b730f8d592016659"
+        legacy_v22_hash = "5337b291b8d1ba5faac6f10290bb86b1b27a2a62016aa6282a9bbdc26961c39e"
         register_case(env)
         response = submit(env, envelope(env, contract_version="2", contract_hash=legacy_v2_hash))
         assert response.status_code == 422
         assert response.json()["code"] == "unknown_contract_version"
-        # v2.2 with the superseded hash is also refused (hash pins exact bytes)
-        response = submit(env, envelope(env, contract_hash=legacy_v2_hash))
+        response = submit(env, envelope(env, contract_version="2.2", contract_hash=legacy_v22_hash))
+        assert response.status_code == 422
+        assert response.json()["code"] == "unknown_contract_version"
+        # v2.3 with a superseded hash is also refused (hash pins exact bytes)
+        response = submit(env, envelope(env, contract_hash=legacy_v22_hash))
         assert response.status_code == 422
         assert response.json()["code"] == "contract_hash_mismatch"
 
