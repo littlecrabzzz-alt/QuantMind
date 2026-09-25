@@ -134,6 +134,29 @@ def _merge_rows(dst: Path, src: Path, date_col: str) -> None:
     out.sort_values(date_col).reset_index(drop=True).to_parquet(dst, index=False)
 
 
+def _verify_bound_increments(
+    entries: dict[str, dict], increments: list[dict[str, Any]]
+) -> None:
+    """J6E2：缓存命中路径的期望绑定校验——逐增量比对注册表当前指向包
+    的 manifest sha256 与绑定（空绑定哈希项不比对，恢复侧另行拒绝）。"""
+    from backend.services.simulation.replay.etf_input_package import (
+        sha256_of_file,
+    )
+
+    for inc in increments:
+        iroot, _ = _resolve_root(
+            entries, package_id=None, version=str(inc["package_version"])
+        )
+        real_sha = sha256_of_file(iroot / "manifest.json")
+        bound_sha = inc.get("manifest_sha256")
+        if bound_sha and bound_sha != real_sha:
+            raise EtfInputPackageError(
+                f"日增量 {inc['package_version']} manifest_sha256 不一致："
+                f"绑定={bound_sha} 实际={real_sha}（篡改或换包，拒绝；"
+                "热缓存命中同样校验）"
+            )
+
+
 def rebuild_bound_package(
     binding: dict[str, Any],
     *,
@@ -230,6 +253,8 @@ def rebuild_bound_package(
         (target / "manifest.json").write_text(
             json.dumps(merged_manifest, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+    # J6E2：热缓存命中仍执行期望绑定校验（篡改/换包不因缓存绕过）
+    _verify_bound_increments(entries, increments)
     return load_etf_input_package(target)
 
 
