@@ -102,6 +102,8 @@ class LedgerOrderingError(ValueError):
     def __init__(self, reason: str, message: str):
         super().__init__(f"[{reason}] {message}")
         self.reason = reason
+
+
 # F3 修复#2：版本身份对齐冻结合同现状（ledger-contract v3 / 输入包
 # schema v3）。checkpoint 恢复按此绑定：旧 v2 checkpoint 显式拒绝
 # （CheckpointConfigMismatch，合同版本不一致），不静默混用；如需迁移
@@ -119,7 +121,12 @@ ORDER_STATUS_REJECTED = "rejected"
 # 终态（F1 修复 AC-04）：执行/入账层对终态订单幂等——同键重试返回原
 # 终态，不改现金/持仓/fills/费用/状态
 _TERMINAL_STATUSES = frozenset(
-    {ORDER_STATUS_FILLED, ORDER_STATUS_EXPIRED_UNFILLED, ORDER_STATUS_REJECTED, "cancelled"}
+    {
+        ORDER_STATUS_FILLED,
+        ORDER_STATUS_EXPIRED_UNFILLED,
+        ORDER_STATUS_REJECTED,
+        "cancelled",
+    }
 )
 
 _REJECT_REASONS = (
@@ -158,7 +165,7 @@ def make_revision_run_id(base_virtual_run_id: str, revision_date: date) -> str:
 
 
 def parse_attempt(attempt_id: str) -> int:
-    """"a0001" → 1。"""
+    """ "a0001" → 1。"""
     return int(str(attempt_id).lstrip("a"))
 
 
@@ -231,7 +238,9 @@ class LedgerOrder:
     side: str  # buy | sell
     origin: str  # signal | manual | risk_exit
     qty_target: int
-    status: str  # new/validated/submitted/partially_filled/filled/rejected/expired_unfilled
+    status: (
+        str  # new/validated/submitted/partially_filled/filled/rejected/expired_unfilled
+    )
     qty_filled: int = 0
     qty_remaining: int = 0  # = target − filled，恒非负
     avg_fill_price: float = 0.0
@@ -254,14 +263,18 @@ class LedgerOrder:
             "qty_target": self.qty_target,
             "qty_filled": self.qty_filled,
             "qty_remaining": self.qty_remaining,
-            "avg_fill_price": round(self.avg_fill_price, 4) if self.avg_fill_price else None,
+            "avg_fill_price": round(self.avg_fill_price, 4)
+            if self.avg_fill_price
+            else None,
             "status": self.status,
             "reject_reason": self.reject_reason,
             "fees": round(self.fees, 4),
             "realized_pnl": round(self.realized_pnl, 4),
             "ideal_weight": self.ideal_weight,
             "realized_weight": (
-                round(self.realized_weight, 6) if self.realized_weight is not None else None
+                round(self.realized_weight, 6)
+                if self.realized_weight is not None
+                else None
             ),
             "fills": [f.to_dict() for f in self.fills],
         }
@@ -378,17 +391,23 @@ class R01LedgerConfig:
         if self.group not in GROUPS:
             raise ValueError(f"非法运行组别 {self.group}（允许 {GROUPS}）")
         if self.group == "P0" and not self.strategy_id.startswith("fixture-"):
-            raise ValueError("P0 工程样例 strategy_id 必须以 fixture- 前缀（不进收益排行）")
+            raise ValueError(
+                "P0 工程样例 strategy_id 必须以 fixture- 前缀（不进收益排行）"
+            )
         if self.execution_attempt_id < 1:
             raise ValueError("execution_attempt_id 从 1 起（a0001）")
         if self.run_kind not in ("research", "virtual"):
             raise ValueError(f"非法 run_kind {self.run_kind}（research|virtual）")
         if self.run_kind == "virtual" and self.group == "P0":
-            raise ValueError("虚拟运行不使用 P0 工程样例组（须为正式研究组 A/B1/B2/B3/D/N）")
+            raise ValueError(
+                "虚拟运行不使用 P0 工程样例组（须为正式研究组 A/B1/B2/B3/D/N）"
+            )
         if (self.revision_of is None) != (self.revision_date is None):
             raise ValueError("revision_of 与 revision_date 必须成对提供")
         if self.revision_of is not None and self.run_kind != "virtual":
-            raise ValueError("修订轨迹仅适用于 virtual 运行（research 复算走新 attempt）")
+            raise ValueError(
+                "修订轨迹仅适用于 virtual 运行（research 复算走新 attempt）"
+            )
         if self.revision_of is not None and self.revision_of != make_virtual_run_id(
             self.group, self.strategy_id, self.strategy_version
         ):
@@ -404,7 +423,10 @@ class R01LedgerConfig:
                 return make_revision_run_id(base, self.revision_date)
             return base
         return make_ledger_run_id(
-            self.group, self.strategy_id, self.strategy_version, self.execution_attempt_id
+            self.group,
+            self.strategy_id,
+            self.strategy_version,
+            self.execution_attempt_id,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -613,7 +635,9 @@ class R01Ledger:
             raise ValueError(f"{trade_date} 已执行（重放须新 attempt，TG-004/§3）")
 
         # W2E3 修复#2：会话顺序与信号对齐由账本强制执行。
-        signal_date = self._validate_day_ordering(trade_date, signal_date, target_weights is not None)
+        signal_date = self._validate_day_ordering(
+            trade_date, signal_date, target_weights is not None
+        )
 
         summary = DaySummary(trade_date=key)
         bars = self.package.load_date(trade_date)
@@ -641,7 +665,13 @@ class R01Ledger:
         if target_weights is not None:
             nav_ref, closes_ref = self._signal_reference(trade_date, signal_date)
             self._rebalance(
-                trade_date, bars, target_weights, signal_date, nav_ref, closes_ref, summary
+                trade_date,
+                bars,
+                target_weights,
+                signal_date,
+                nav_ref,
+                closes_ref,
+                summary,
             )
 
         # 4. EOD
@@ -812,7 +842,9 @@ class R01Ledger:
             self.cash += gross - mr.total_fee
             pos.qty -= mr.fill_quantity
             pos.available_qty = max(0.0, pos.available_qty - mr.fill_quantity)
-            realized = (mr.fill_price - avg_cost_before) * mr.fill_quantity - mr.total_fee
+            realized = (
+                mr.fill_price - avg_cost_before
+            ) * mr.fill_quantity - mr.total_fee
             order.realized_pnl += realized
             if pos.qty <= 1e-9:
                 self.positions.pop(order.symbol, None)
@@ -829,7 +861,9 @@ class R01Ledger:
         order.fees += mr.total_fee
         # 部分成交：当日有效；剩余量收盘后转 expired_unfilled（_eod 统一收口）
         order.status = (
-            ORDER_STATUS_FILLED if order.qty_remaining == 0 else ORDER_STATUS_PARTIALLY_FILLED
+            ORDER_STATUS_FILLED
+            if order.qty_remaining == 0
+            else ORDER_STATUS_PARTIALLY_FILLED
         )
         summary.orders.append(order.to_dict())
 
@@ -846,7 +880,10 @@ class R01Ledger:
             return float(self.config.initial_cash), {}
         if self.equity and self.equity[-1]["trade_date"] == signal_date.isoformat():
             snap = self.equity[-1]
-            closes = {sym: float(p["close"]) for sym, p in (snap.get("positions") or {}).items()}
+            closes = {
+                sym: float(p["close"])
+                for sym, p in (snap.get("positions") or {}).items()
+            }
             return float(snap["nav"]), closes
         sig_bars = self.package.load_date(signal_date)
         closes: dict[str, float] = {}
@@ -898,12 +935,21 @@ class R01Ledger:
         for symbol, weight in sorted(target_weights.items()):
             symbol = symbol.upper()
             bar = bars.get(symbol)
-            price = closes_ref.get(symbol) or self._signal_close_for(symbol, signal_date) or 0.0
+            price = (
+                closes_ref.get(symbol)
+                or self._signal_close_for(symbol, signal_date)
+                or 0.0
+            )
             if price <= 0:
                 # 信号日无可用收盘价：显式拒单，不用执行日价格定目标
                 order = self.submit_order(
-                    trade_date, symbol, "buy", 0,
-                    origin="signal", signal_date=signal_date, ideal_weight=weight,
+                    trade_date,
+                    symbol,
+                    "buy",
+                    0,
+                    origin="signal",
+                    signal_date=signal_date,
+                    ideal_weight=weight,
                 )
                 order.status = ORDER_STATUS_REJECTED
                 order.reject_reason = "stale_price"
@@ -921,8 +967,13 @@ class R01Ledger:
             side = "buy" if delta > 0 else "sell"
             qty = int(delta) if delta > 0 else int(math.ceil(-delta - 1e-9))
             order = self.submit_order(
-                trade_date, symbol, side, qty,
-                origin="signal", signal_date=signal_date, ideal_weight=weight,
+                trade_date,
+                symbol,
+                side,
+                qty,
+                origin="signal",
+                signal_date=signal_date,
+                ideal_weight=weight,
             )
             if bar is None or bar.suspended:
                 # 停牌/无行情日不虚构成交：显式拒单留痕
@@ -1235,9 +1286,7 @@ class R01Ledger:
         # F1 修复 AC-04：同键重试幂等——已有订单（任意状态）原样返回，
         # 不重复成交、不把原成交改写为拒单（submit_order 内部另做同键
         # 异内容冲突校验）
-        coid = make_client_order_id(
-            self.ledger_run_id, trade_date, symbol, "sell"
-        )
+        coid = make_client_order_id(self.ledger_run_id, trade_date, symbol, "sell")
         existing = self.orders.get(coid)
         if existing is not None:
             if existing.qty_target != int(qty):
@@ -1268,7 +1317,11 @@ class R01Ledger:
             return order
         bars = bars if bars is not None else self.package.load_date(trade_date)
         order = self.submit_order(
-            trade_date, symbol, "sell", qty, origin="manual",
+            trade_date,
+            symbol,
+            "sell",
+            qty,
+            origin="manual",
             signal_date=None,
         )
         summary = DaySummary(trade_date=trade_date.isoformat())
@@ -1644,13 +1697,23 @@ _VIEW_SCHEMA = 2
 
 # days[].positions 逐日持仓必需字段（缺失 → ViewBuildError，不静默填零）
 _VIEW_POSITION_FIELDS = (
-    "qty", "avg_cost", "available_qty", "close", "mark_source",
-    "market_value", "stale_days",
+    "qty",
+    "avg_cost",
+    "available_qty",
+    "close",
+    "mark_source",
+    "market_value",
+    "stale_days",
 )
 # days[] 快照必需字段
 _VIEW_DAY_FIELDS = (
-    "trade_date", "cash", "dividend_receivable", "market_value", "nav",
-    "valuation_reliable", "positions",
+    "trade_date",
+    "cash",
+    "dividend_receivable",
+    "market_value",
+    "nav",
+    "valuation_reliable",
+    "positions",
 )
 
 
@@ -1678,7 +1741,9 @@ def build_view_from_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
     """
     session = evidence.get("session")
     if not isinstance(session, dict):
-        raise ViewBuildError("view 构建失败：evidence 缺 session（非原生 export_evidence 输出）")
+        raise ViewBuildError(
+            "view 构建失败：evidence 缺 session（非原生 export_evidence 输出）"
+        )
     orders = evidence.get("orders")
     equity = evidence.get("equity")
     if not isinstance(orders, list) or not isinstance(equity, list):
@@ -1710,10 +1775,14 @@ def build_view_from_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
                     # 数值源自全精度原件，仅呈现取整
                     "qty": round(float(_view_require(p, "qty", where)), 4),
                     "avg_cost": round(float(_view_require(p, "avg_cost", where)), 6),
-                    "available_qty": round(float(_view_require(p, "available_qty", where)), 4),
+                    "available_qty": round(
+                        float(_view_require(p, "available_qty", where)), 4
+                    ),
                     "last_mark": round(float(_view_require(p, "close", where)), 4),
                     "mark_source": _view_require(p, "mark_source", where),
-                    "market_value": round(float(_view_require(p, "market_value", where)), 4),
+                    "market_value": round(
+                        float(_view_require(p, "market_value", where)), 4
+                    ),
                     "stale_days": _view_require(p, "stale_days", where),
                     "last_mark_date": p.get("last_mark_date"),
                 }
@@ -1780,9 +1849,16 @@ def build_view_from_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
         "session": {
             k: session.get(k)
             for k in (
-                "strategy_id", "strategy_version", "execution_attempt_id",
-                "ledger_run_id", "group", "initial_cash", "risk_config",
-                "contract_versions", "is_fixture", "input_package_id",
+                "strategy_id",
+                "strategy_version",
+                "execution_attempt_id",
+                "ledger_run_id",
+                "group",
+                "initial_cash",
+                "risk_config",
+                "contract_versions",
+                "is_fixture",
+                "input_package_id",
             )
         },
         "package": {

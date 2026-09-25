@@ -95,8 +95,11 @@ class DailyInputsProvider(Protocol):
     ) -> EtfInputPackage:
         """按冻结身份取输入包（同身份必须返回同内容；lock=冻结清单）。"""
 
-    def input_lock(self, upto: date | None = None) -> dict:
-        """冻结哈希清单（基线+已发布非修订日增量，upto 截止含当日）。"""
+    def input_lock(
+        self, upto: date | None = None, *, now: datetime | None = None
+    ) -> dict:
+        """冻结哈希清单（基线+已发布非修订日增量，upto 截止含当日；
+        now=运行时钟，按 obtained_at 过滤迟到日包）。"""
 
     def next_open_trade_date(self, d: date) -> date | None:
         """d 之后下一个开市日（日历口径；None=超出已知日历）。"""
@@ -239,7 +242,10 @@ class StaticPackageProvider:
         # stub：单一冻结包内容不可变，lock 无额外作用（保持协议一致）
         return self._pkg
 
-    def input_lock(self, upto: date | None = None) -> dict:
+    def input_lock(
+        self, upto: date | None = None, *, now: datetime | None = None
+    ) -> dict:
+        # stub：单一冻结包内容不可变，无日增量清单（now 兼容协议签名）
         return {
             "baseline": {
                 "package_id": self._pkg.package_id,
@@ -505,11 +511,16 @@ class DailyIncrementProvider:
 
     # -- 冻结哈希清单（J4R2 #2） ------------------------------------------
 
-    def _lockable_entries(self, upto: date | None = None) -> list[dict]:
+    def _lockable_entries(
+        self, upto: date | None = None, *, now: datetime | None = None
+    ) -> list[dict]:
         """可入清单的日增量条目（非修订；upto 截止到某日含）。
 
-        修订包（revised=true）只服务于修订轨迹，不参与运行合并——
-        已冻结运行与向前运行都不悄悄改历史内容。
+        - 修订包（revised=true）只服务于修订轨迹，不参与运行合并——
+          已冻结运行与向前运行都不悄悄改历史内容；
+        - J5R3 #2：``now`` 给定时按 obtained_at 过滤——取得时间晚于
+          运行时钟的日包（迟到/尚未取得）不得进入 resolve 回退后的
+          实际加载清单。
         """
         out = []
         for _uri, e, _extra in self._daily_entries_sorted():
@@ -531,6 +542,16 @@ class DailyIncrementProvider:
             manifest = self._json.loads(mf.read_text(encoding="utf-8"))
             if manifest.get("revised"):
                 continue  # 修订包不入运行合并
+            if now is not None:
+                obtained_raw = str(manifest.get("obtained_at") or "")
+                try:
+                    obtained = datetime.fromisoformat(
+                        obtained_raw.replace("Z", "+00:00")
+                    )
+                except ValueError:
+                    continue  # 取得时间不可解析：不入清单（保守）
+                if obtained > now:
+                    continue  # 迟到/未取得：不进入实际加载
             out.append(
                 {
                     "package_version": version,
@@ -540,15 +561,21 @@ class DailyIncrementProvider:
             )
         return out
 
-    def input_lock(self, upto: date | None = None) -> dict:
-        """冻结哈希清单：基线 + 截至 upto 的已发布非修订日增量。"""
+    def input_lock(
+        self, upto: date | None = None, *, now: datetime | None = None
+    ) -> dict:
+        """冻结哈希清单：基线 + 截至 upto 的已发布非修订日增量。
+
+        ``now``（J5R3 #2）：按 obtained_at 过滤迟到日包——主链冻结/执行
+        清单一律传入运行时钟；辅助路径（状态导出）可不传。
+        """
         return {
             "baseline": {
                 "package_id": self.baseline.package_id,
                 "manifest_sha256": self._baseline_sha,
                 "root": self._baseline_root,
             },
-            "daily": self._lockable_entries(upto=upto),
+            "daily": self._lockable_entries(upto=upto, now=now),
         }
 
     def next_open_trade_date(self, d: date) -> date | None:
@@ -628,9 +655,13 @@ class DailyIncrementProvider:
             assert latest_manifest is not None
             merged_manifest["package_id"] = f"{self.baseline.package_id}+{version_tag}"
             merged_manifest["package_version"] = version_tag
-            # p03 J4E1 绑定合同：capture_binding 按此重建/前缀兼容恢复
+            # p03 J4E1/J5E1 绑定合同：capture_binding 按此重建/前缀兼容恢复
+            # （versions 与逐项 manifest_sha256s 平行清单，哈希不可缺）
             merged_manifest["daily_increment_versions"] = [
                 d["package_version"] for d in daily
+            ]
+            merged_manifest["daily_increment_manifest_sha256s"] = [
+                d["manifest_sha256"] for d in daily
             ]
             merged_manifest["baseline_manifest_sha256"] = self._baseline_sha
             merged_manifest["input_lock"] = {
@@ -763,9 +794,12 @@ class DailyIncrementProvider:
                 f"{self.baseline.package_id}+{latest_version}"
             )
             merged_manifest["package_version"] = latest_version
-            # p03 J4E1 绑定合同：capture_binding 按此重建/前缀兼容恢复
+            # p03 J4E1/J5E1 绑定合同：capture_binding 按此重建/前缀兼容恢复
             merged_manifest["daily_increment_versions"] = [
                 e["package_version"] for e in entries
+            ]
+            merged_manifest["daily_increment_manifest_sha256s"] = [
+                e["manifest_sha256"] for e in entries
             ]
             merged_manifest["baseline_manifest_sha256"] = self._baseline_sha
             merged_manifest["daily_increment_of"] = latest_manifest.get("package_uri")

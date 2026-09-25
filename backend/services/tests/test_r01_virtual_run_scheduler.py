@@ -248,3 +248,95 @@ def test_run_scheduled_day_disabled_stops_at_entry(fake_redis, cfg):
     sched.save_run_config(cfg.ledger_run_id, cfg, enabled=False)  # 禁用
     out = sched.run_scheduled_day(cfg.ledger_run_id)
     assert out["status"] == "stopped_by_config"
+
+
+def test_dispatcher_auto_redispatches_blocked_day_in_window(
+    fake_redis, sent, cfg, pkg, store
+):
+    """J5R3 #4：受阻日数据补齐后自动重新门控执行（不跳过）。
+
+    场景：09-11 决策受阻（outcome=data_blocked）；窗口（09-12 09:31）内
+    beat 重派 → 任务重跑重新门控（数据补齐则恢复）；窗口过后不再重派。
+    """
+    sched.save_run_config(cfg.ledger_run_id, cfg, enabled=True)
+    run_id = cfg.ledger_run_id
+    store.set_stage(run_id, "2025-09-11", "data_check", {"status": "data_blocked"})
+    store.set_day(run_id, "2025-09-11", {"outcome": "data_blocked"})
+
+    # 窗口内（09-11 15:20，执行窗口 09-12 09:31 未到）→ 重派
+    out = sched.dispatch_due_runs(
+        now=_at(date(2025, 9, 11), "15:20"), r=fake_redis, store=store
+    )
+    assert out["dispatched"] == [f"{run_id}:decision:2025-09-11"]
+    assert sent == [(run_id, "2025-09-11")]
+
+    # 恢复完成（outcome=completed）→ 不再派发
+    fake_redis2 = FakeRedis()
+    fake_redis2.data = dict(fake_redis.data)
+    fake_redis2.data.pop(
+        next(k for k in fake_redis2.data if k.endswith(":2025-09-11:decision")), None
+    )
+    store.set_day(run_id, "2025-09-11", {"outcome": "completed"})
+    out = sched.dispatch_due_runs(
+        now=_at(date(2025, 9, 11), "15:30"), r=fake_redis2, store=store
+    )
+    assert out["dispatched"] == []
+
+    # 窗口过后仍受阻（09-12 10:00 > 09:31）→ 受阻终态不重派
+    store.set_day(run_id, "2025-09-11", {"outcome": "data_blocked"})
+    fake_redis3 = FakeRedis()
+    fake_redis3.data = dict(fake_redis2.data)
+    out = sched.dispatch_due_runs(
+        now=_at(date(2025, 9, 12), "10:00"), r=fake_redis3, store=store
+    )
+    assert out["dispatched"] == []
+    assert any("blocked-final" in x for x in out["skipped"])
+
+
+def test_dispatcher_blocked_recovery_end_to_end(fake_redis, monkeypatch, cfg, pkg):
+    """J5R3 #4 端到端：自动调度下受阻→补数→恢复当日决策。"""
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    sched.save_run_config(cfg.ledger_run_id, cfg, enabled=True)
+    from backend.services.tests.test_r01_virtual_run_fixes import FlakyProvider
+    from backend.services.simulation.virtual_run import FrozenClock
+    from backend.services.simulation.virtual_run.locks import InMemoryLockBackend
+    from backend.services.simulation.virtual_run.pipeline import VirtualRunPipeline
+    from backend.services.simulation.virtual_run.recovery import InMemoryCheckpointStore
+    from backend.services.simulation.virtual_run.states import InMemoryRunStateStore
+
+    provider = FlakyProvider(pkg, blocked_first={date(2025, 9, 11)})
+    clock = FrozenClock(datetime(2025, 9, 11, 7, 0, tzinfo=timezone.utc))
+    pipe = VirtualRunPipeline(
+        cfg,
+        provider,
+        clock=clock,
+        lock_backend=InMemoryLockBackend(),
+        state_store=InMemoryRunStateStore(),
+        checkpoint_store=InMemoryCheckpointStore(),
+    )
+    store = pipe.store
+    sent: list[str] = []
+    monkeypatch.setattr(sched, "_send", lambda rid, d: sent.append(f"{rid}:{d}"))
+
+    # 09-10 正常（决策+执行）
+    clock.set_shanghai(date(2025, 9, 10), "15:15")
+    pipe.run_day(date(2025, 9, 10))
+    clock.set_shanghai(date(2025, 9, 11), "09:31")
+    pipe.run_day(date(2025, 9, 10))
+
+    # 09-11 决策受阻（首次门控 blocked）
+    clock.set_shanghai(date(2025, 9, 11), "15:15")
+    r1 = pipe.run_day(date(2025, 9, 11))
+    assert r1.outcome == "data_blocked"
+
+    # beat 在窗口内重派（模拟）→ 任务重跑 → 数据已补齐 → 恢复
+    clock.set_shanghai(date(2025, 9, 11), "15:20")
+    r2 = pipe.run_day(date(2025, 9, 11))
+    assert r2.outcome == "pending_execute"
+    clock.set_shanghai(date(2025, 9, 12), "09:31")
+    r3 = pipe.run_day(date(2025, 9, 11))
+    assert r3.outcome == "completed"
+    rec = store.get_day(cfg.ledger_run_id, "2025-09-11")
+    assert rec["outcome"] == "completed"

@@ -125,31 +125,77 @@ class DbCheckpointStore:
 
 
 def reconcile(ledger: R01Ledger) -> dict:
-    """独立复算对账：independent_recompute vs 账本 equity 快照。"""
+    """独立复算对账（J5R3 #1：全精度复算逐行判定，展示舍入与判定分离）。
+
+    - 复算用 ``independent_recompute(round_output=False)`` 全精度输出；
+    - 逐行判定：|复算全精度 nav − 账本 equity 展示值| ≤ 证据层舍入界
+      （evidence 成交/费用为 4dp 审计口径，复算重放这些舍入值，与账本
+      全精度内部的偏差界 = 0.5ulp×(成交笔数+1)；缺行=fail，空集不得
+      经 all([]) 判通过；界内=两侧由一致的全精度账务在证据舍入界内
+      派生，超界=真实账务分歧 fail）；
+    - ``strict_1e_6``（信息项）：全部残差 ≤1e-6 —— 需 p03 在 evidence
+      暴露全精度成交后才能达成（当前 evidence 层为 4dp 审计口径，
+      待办 p03；不以此作为通过条件，如实报告）；
+    - 每行残差如实入 mismatches 报告（含通过行的 max 残差）。
+    """
     evidence = ledger.export_evidence()
-    recomputed = independent_recompute(evidence, package=ledger.package)
-    max_diff = 0.0
+    recomputed = independent_recompute(
+        evidence, package=ledger.package, round_output=False
+    )
+    n_fills = sum(len(o.get("fills", [])) for o in evidence.get("orders", []))
+    row_bound = 5.05e-5 * (n_fills + 1)  # 证据层 4dp 舍入累积界
+    snaps = {snap["trade_date"]: snap for snap in evidence["equity"]}
     by_date = {r["trade_date"]: r for r in recomputed}
+    max_residual = 0.0
+    strict_residual = 0.0
     mismatches: list[dict] = []
-    for snap in evidence["equity"]:
-        d = snap["trade_date"]
-        rec = by_date.get(d)
-        if rec is None:
-            mismatches.append({"trade_date": d, "reason": "recompute_missing"})
-            continue
-        diff = abs(float(rec["nav"]) - float(snap["nav"]))
-        max_diff = max(max_diff, diff)
-        if diff > 1e-6:
+    rows: list[dict] = []
+    for d in sorted(set(snaps) | set(by_date)):
+        snap, rec = snaps.get(d), by_date.get(d)
+        if snap is None or rec is None:
             mismatches.append(
                 {
                     "trade_date": d,
-                    "ledger_nav": snap["nav"],
-                    "recomputed_nav": rec["nav"],
+                    "reason": "row_missing",
+                    "ledger_row": snap is not None,
+                    "recompute_row": rec is not None,
+                }
+            )
+            continue
+        nav_full = float(rec["nav"])
+        nav_display = float(snap["nav"])
+        residual = abs(nav_full - nav_display)
+        max_residual = max(max_residual, residual)
+        rows.append(
+            {
+                "trade_date": d,
+                "ledger_nav_display": nav_display,
+                "recomputed_nav_full": nav_full,
+                "residual": round(residual, 10),
+            }
+        )
+        if residual > row_bound:
+            mismatches.append(
+                {
+                    "trade_date": d,
+                    "ledger_nav": nav_display,
+                    "recomputed_nav_full": nav_full,
+                    "residual": round(residual, 10),
+                    "row_bound": round(row_bound, 10),
                 }
             )
     return {
         "ok": not mismatches,
         "days_compared": len(evidence["equity"]),
-        "max_abs_nav_diff": round(max_diff, 10),
+        "n_fills": n_fills,
+        "row_bound": round(row_bound, 10),
+        "max_abs_nav_diff": round(max_residual, 10),
+        "strict_1e_6": max_residual <= 1e-6,
         "mismatches": mismatches,
+        "rows": rows,
+        "judgment": "full_precision_per_row(evidence_layer_bound)",
+        "note": (
+            "严格 1e-6 需 evidence 暴露全精度成交（p03 待办）；当前逐行"
+            "判定界=0.5ulp×(成交笔数+1)，源于 evidence 4dp 审计口径舍入"
+        ),
     }

@@ -165,12 +165,40 @@ def dispatch_due_runs(
         # -- 决策相位：今天是包交易日、过决策截止、当日未收口 --------
         if pkg.is_trade_date(today) and wall_hm >= config.decision_cutoff:
             day_rec = store.get_day(run_id, today.isoformat())
-            if day_rec is None or not day_rec.get("outcome"):
+            outcome = (day_rec or {}).get("outcome")
+            needs_run = day_rec is None or not outcome or outcome == "data_blocked"
+            if needs_run and outcome == "data_blocked":
+                exec_day = pkg.next_trade_date(today)
+                if exec_day is not None and wall >= datetime.combine(
+                    exec_day, parse_hhmm(config.execution_time), tzinfo=tz
+                ):
+                    needs_run = False  # 窗口已过：受阻终态（近3日循环标注）
+            if needs_run:
                 if _dispatch_once(r, run_id, today, "decision", ttl=600):
                     _send(run_id, today)
                     dispatched.append(f"{run_id}:decision:{today}")
                 else:
                     skipped.append(f"{run_id}:decision:{today}(dup/retry-wait)")
+
+        # -- 受阻重派（J5R3 #4）：近 3 个交易日内的受阻日（含隔夜补数），
+        #    窗口（次一交易日执行时点）内数据补齐后自动重新门控执行 ----
+        for d in _recent_dates(today, 3):
+            if d == today or not pkg.is_trade_date(d):
+                continue
+            rec = store.get_day(run_id, d.isoformat())
+            if (rec or {}).get("outcome") != "data_blocked":
+                continue
+            if store.get_stage(run_id, d.isoformat(), "execute") is not None:
+                continue  # 已恢复执行
+            exec_day = pkg.next_trade_date(d)
+            if exec_day is not None and wall >= datetime.combine(
+                exec_day, parse_hhmm(config.execution_time), tzinfo=tz
+            ):
+                skipped.append(f"{run_id}:decision:{d}(blocked-final)")
+                continue  # 窗口已过：受阻终态，不补写
+            if _dispatch_once(r, run_id, d, "decision", ttl=600):
+                _send(run_id, d)
+                dispatched.append(f"{run_id}:decision:{d}")
 
         # -- 执行相位：近几日决策待执行、执行日=今天、窗口已开 -----------
         for d in _recent_dates(today, 7):
