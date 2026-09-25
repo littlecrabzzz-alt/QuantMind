@@ -6,9 +6,11 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import types
 import uuid
+from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
@@ -855,6 +857,51 @@ class TestPureLogic:
         assert {m["metrics"][0]["basis"] for m in ext["metrics"]} == {"版本 run-v1", "版本 run-v2"}
         version = ext["strategy_versions"][0]
         assert version["strategy_id"] == "same-strategy" and version["events"] == 2
+
+    def test_h3_adapter_strictness_and_classification(self):
+        # H3 修复2/3/4：evidence equity/orders 为 null/形状不符 => TS 适配层显式拒绝
+        # （对齐 ViewBuildError 语义）；四类运行状态分立判别；fixture 两层一致性。
+        import shutil
+        import subprocess
+
+        adapter = Path("electron/src/features/alpha-research/components-v2/ledgerAdapter.ts")
+        if not adapter.is_file() or not shutil.which("node"):
+            pytest.skip("node/tsc 不可用或前端源不在本仓")
+        out = Path("/tmp/r01-h3-adapter-test")
+        subprocess.run(
+            ["npx", "tsc", str(adapter), "--outDir", str(out), "--module", "commonjs",
+             "--target", "es2020", "--skipLibCheck"],
+            check=True, capture_output=True,
+        )
+        script = out / "check.js"
+        script.write_text(
+            "const m = require(" + repr(str(out / "ledgerAdapter.js")) + ");\n"
+            "const bad = [\n"
+            "  {equity: null, orders: [], banner: \"b\", session: {}},\n"
+            "  {equity: [], orders: null, banner: \"b\", session: {}},\n"
+            "  {equity: {not: \"array\"}, orders: [], banner: \"b\", session: {}},\n"
+            "  {equity: [{no_trade_date: 1}], orders: [], banner: \"b\", session: {}},\n"
+            "];\n"
+            "for (const b of bad) {\n"
+            "  try { m.evidenceToView(b); throw new Error(\"should have rejected\"); }\n"
+            "  catch (e) { if (!(e instanceof m.AdapterFormatError)) throw e; }\n"
+            "}\n"
+            "const kindsP0 = m.classifyRunKinds({banner: \"FIXTURE 工程样例回放\", session: {group: \"P0\"}, package: {}});\n"
+            "if (JSON.stringify(kindsP0) !== JSON.stringify([\"工程回放\"])) throw new Error(\"kindsP0 \" + kindsP0);\n"
+            "const kindsA = m.classifyRunKinds({banner: \"正式研究账本\", session: {group: \"A\"}, package: {}});\n"
+            "if (JSON.stringify(kindsA) !== JSON.stringify([\"历史研究\"])) throw new Error(\"kindsA \" + kindsA);\n"
+            "const kindsLive = m.classifyRunKinds({banner: \"x\", session: {execution_mode: \"live_trading\"}, package: {}});\n"
+            "if (JSON.stringify(kindsLive) !== JSON.stringify([\"真实交易\"])) throw new Error(\"kindsLive \" + kindsLive);\n"
+            "const kindsUnknown = m.classifyRunKinds({banner: \"\", session: {}, package: {}});\n"
+            "if (JSON.stringify(kindsUnknown) !== JSON.stringify([\"未知\"])) throw new Error(\"kindsUnknown\");\n"
+            "if (!m.fixtureConsistency({banner: \"FIXURE\".replace(\"URE\", \"TURE\"), package: {}}, true).consistent) throw new Error(\"fc1\");\n"
+            "if (!m.fixtureConsistency({banner: \"正式研究账本\", package: {}}, false).consistent) throw new Error(\"fc2\");\n"
+            "if (m.fixtureConsistency({banner: \"正式研究账本\", package: {}}, true).consistent) throw new Error(\"fc3 两层不一致应报\");\n"
+            "console.log(JSON.stringify({status: \"ok\", rejected: bad.length}));\n"
+        )
+        result = subprocess.run(["node", str(script)], capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr[-500:]
+        assert json.loads(result.stdout)["rejected"] == 4
 
     def test_groups_never_fabricate_numbers(self):
         groups = external.project_groups(

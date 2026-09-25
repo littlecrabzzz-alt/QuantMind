@@ -60,7 +60,7 @@ def main():
     pkg = load_etf_input_package(PKG_ROOT, expect_manifest_sha256=MANIFEST)
     ledger = R01Ledger(
         pkg, R01LedgerConfig(
-            group="P0", strategy_id="fixture-h1b-adapter-evidence", strategy_version=1,
+            group="A", strategy_id="h1-historical-sample", strategy_version=1,
             execution_attempt_id=1, initial_cash=20000.0,
             commission_rate=0.0003, commission_min=0.1, slippage_bps=0.0),
         created_at=datetime(2026, 9, 25, 12, 0, tzinfo=timezone.utc), source_node="mac")
@@ -102,7 +102,7 @@ def main():
                     "--outDir", "/tmp/h1b-adapt", "--module", "commonjs", "--target", "es2020",
                     "--skipLibCheck"], cwd=WORKTREE, check=True, capture_output=True)
     node_check = r'''
-const {evidenceToView, identifyExportFormat, legacyFixtureView} = require("/tmp/h1b-adapt/ledgerAdapter.js");
+const {evidenceToView, identifyExportFormat, legacyFixtureView, classifyRunKinds, fixtureConsistency} = require("/tmp/h1b-adapt/ledgerAdapter.js");
 const fs = require("fs");
 const ev = JSON.parse(fs.readFileSync(process.argv[2]));
 const vw = JSON.parse(fs.readFileSync(process.argv[3]));
@@ -137,13 +137,20 @@ for (let i = 0; i < vd.length; i++) {
     }
   }
 }
+const kinds = [];
+kinds.push(["session", classifyRunKinds(vw)]);
+kinds.push(["fixture-consistency", fixtureConsistency(vw, false)]);
+if (JSON.stringify(classifyRunKinds(vw)) !== JSON.stringify(["历史研究"])) throw "kind mismatch: " + JSON.stringify(classifyRunKinds(vw));
+if (!fixtureConsistency(vw, false).consistent) throw "fixture layers inconsistent: " + JSON.stringify(fixtureConsistency(vw, false));
+if (fixtureConsistency(vw, true).consistent) throw "inconsistent pair must be reported";
 out.formats.legacy = identifyExportFormat(JSON.parse(fs.readFileSync(process.argv[4])));
 out.formats.unknown = identifyExportFormat({});
 out.formats.legacy_days = legacyFixtureView(JSON.parse(fs.readFileSync(process.argv[4]))).daySummaries.length;
 if (out.formats.legacy !== "legacy_fixture") throw "legacy misclassified";
 if (out.formats.unknown !== "unknown") throw "unknown misclassified";
+out.kinds = kinds;
 console.log(JSON.stringify({compared_days: vd.length, field_pairs: out.pairs.length,
-  formats: out.formats, status: "identical"}));
+  formats: out.formats, status: "identical", kinds: kinds}));
 '''
     (OUT / "adapter-node-check.js").write_text(node_check)
     legacy_copy = OUT / "legacy-attempt1-sample.json"
@@ -187,15 +194,15 @@ console.log(JSON.stringify({compared_days: vd.length, field_pairs: out.pairs.len
     for name, sha in files.items():
         env = {"schema_version": 2, "project_key": "r01", "workstream": "P0",
                "case_id": cid, "source_task": "R01P0-H1P2", "source_run_id": "run-h1b",
-               "strategy_id": "fixture-h1-adapter", "contract_version": "2.3",
+               "strategy_id": "h1-historical-sample", "contract_version": "2.3",
                "contract_hash": hashlib.sha256(CONTRACT_MD.read_bytes()).hexdigest(),
                "source_node": "mac", "source_revision": HEAD,
                "event_id": f"ev-art-{name}", "seq": seq, "kind": "artifact",
                "data": {"input_package_id": "r01-etf-daily-fcbabbb7f133",
                         "data_as_of": "2024-04-29", "manifest_sha256": MANIFEST},
                "timestamps": {"source_at": "2026-09-25T12:30:00Z"},
-               "execution_status": "completed", "evidence_stage": "engineering-validation",
-               "fixture": True,
+               "execution_status": "completed", "evidence_stage": "development-compare",
+               "fixture": False,
                "artifacts": [{"name": name, "kind": "ledger-export" if "ledger" in name else "sample",
                               "sha256": sha, "uri": f"external/{name}"}]}
         seq += 1

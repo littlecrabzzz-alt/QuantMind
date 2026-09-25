@@ -45,7 +45,10 @@ def envelope(case_id, run, event_id, seq, kind, **extra):
         "contract_hash": hashlib.sha256(CONTRACT_MD.read_bytes()).hexdigest(),
         "source_node": "mac", "source_revision": HEAD,
         "event_id": event_id, "seq": seq, "kind": kind,
-        "data": {"input_package_id": "none", "data_as_of": "2026-09-24"},
+        "data": {"input_package_id": "r01-etf-daily-fcbabbb7f133",
+                 "source_release_id": "data-fcbabbb7f133dddab1109d3c130653b46041e2c9f6c9cd53b685d3d28f8ac0ab",
+                 "data_as_of": "2026-09-24",
+                 "manifest_sha256": "a0d88429301685aa3939b294c38bb942013de4befe29e8a01e7a1f03a80fc622"},
         "timestamps": {"source_at": "2026-09-25T10:30:00Z"},
         "execution_status": "running", "evidence_stage": "engineering-validation",
         "fixture": True,
@@ -71,22 +74,45 @@ def main():
     blob = json.dumps(art, ensure_ascii=False, indent=1).encode()
     (ws / "h1-run-a-nav.json").write_bytes(blob)
     sha = hashlib.sha256(blob).hexdigest()
-    log = {"head": HEAD, "case_id": cid, "steps": []}
+    files = {"h1-run-a-nav.json": sha}
+    # H3 修复5：参数→实际输入→manifest 可打开链（真实 v2 包文件注册进课题）
+    pkg_root = Path("/Users/lizeyu/Library/Application Support/QuantMind/r01/etf-daily/v2-fcbabbb7")
+    for pname in ("manifest.json", "README.md"):
+        blobx = (pkg_root / pname).read_bytes()
+        (ws / f"input-{pname}").write_bytes(blobx)
+        files[pname] = hashlib.sha256(blobx).hexdigest()
+    log = {"head": HEAD, "case_id": cid, "steps": [],
+           "input_binding": {"package_id": "r01-etf-daily-fcbabbb7f133",
+                             "package_version": "v2-fcbabbb7",
+                             "manifest_sha256": files["manifest.json"],
+                             "source_release_id": "data-fcbabbb7f133dddab1109d3c130653b46041e2c9f6c9cd53b685d3d28f8ac0ab",
+                             "openable": ["external/input-manifest.json", "external/input-README.md"]}}
 
     def post(label, body):
         st, resp = call("POST", reports, body, token)
         log["steps"].append({"label": label, "status": st, "body": resp})
         return st, resp
 
+    # 输入绑定产物回报（可打开：参数→实际输入→manifest）
+    for pname, psha in files.items():
+        if not pname.startswith("input-"):
+            continue
+        stx, respx = call("POST", reports, envelope(
+            cid, "run-a", f"a0-{pname}", 0, "artifact",
+            artifacts=[{"name": f"input-{pname}", "kind": "input-binding",
+                        "sha256": psha, "uri": f"external/input-{pname}"}]), token)
+        log["steps"].append({"label": f"artifact input-{pname}", "status": stx})
+        assert stx == 201, respx
+
     # run-a：两步完成 + 产物 + 用量实报 => completed
-    post("run-a s1 done", envelope(cid, "run-a", "a1", 0, "progress",
+    post("run-a s1 done", envelope(cid, "run-a", "a1", 1, "progress",
          progress_step={"step_id": "s1", "title": "输入核验", "status": "done"}))
-    post("run-a s2 done", envelope(cid, "run-a", "a2", 1, "progress",
+    post("run-a s2 done", envelope(cid, "run-a", "a2", 2, "progress",
          progress_step={"step_id": "s2", "title": "链路联调", "status": "done"}))
-    post("run-a artifact", envelope(cid, "run-a", "a3", 2, "artifact",
+    post("run-a artifact", envelope(cid, "run-a", "a3", 3, "artifact",
          artifacts=[{"name": "h1-run-a-nav.json", "kind": "fixture-nav",
                      "sha256": sha, "uri": "external/h1-run-a-nav.json"}]))
-    post("run-a usage(completed)", envelope(cid, "run-a", "a4", 3, "metrics",
+    post("run-a usage(completed)", envelope(cid, "run-a", "a4", 4, "metrics",
          execution_status="completed",
          metrics=[{"metric": "usage.tokens_total", "value": 4321, "unit": "tokens",
                    "basis": "runner 实报（工程运行）"},
@@ -98,7 +124,7 @@ def main():
          progress_step={"step_id": "s3", "title": "回放联调", "status": "blocked"}))
     # 重复回报：run-a 末事件原样重发 => 幂等，不新增实验/运行
     st, resp = call("POST", reports,
-                    envelope(cid, "run-a", "a4", 3, "metrics",
+                    envelope(cid, "run-a", "a4", 4, "metrics",
                              execution_status="completed",
                              metrics=[{"metric": "usage.tokens_total", "value": 4321,
                                        "unit": "tokens", "basis": "runner 实报（工程运行）"},
@@ -135,7 +161,7 @@ def main():
          "source_revision": e["payload"]["source_revision"],
          "data": e["payload"]["data"], "apply_status": e["apply_status"]}
         for e in stream["events"]]
-    assert stream["count"] == 5
+    assert stream["count"] == 7
     # 刷新一致性（页面数据源同 API）
     _, detail2 = call("GET", GW + f"/cases/{cid}", None, token)
     assert detail2["external"] == ext
@@ -149,6 +175,14 @@ def main():
     assert st3 == 200 and detail3["external"] == ext
     log["restart_identical"] = True
     (OUT / "h1-trace.json").write_text(json.dumps(log, ensure_ascii=False, indent=1))
+    (OUT / "constraints-links.md").write_text(
+        f"# H1.3 本次运行实际输入绑定（HEAD {HEAD}）\n\n"
+        f"- run-a/run-b 回报 input_package_id=r01-etf-daily-fcbabbb7f133 / v2-fcbabbb7，"
+        f"manifest_sha256={files['manifest.json']}，"
+        f"release=data-fcbabbb7…ac0ab\n"
+        f"- 参数→实际输入→manifest 可打开链：external/input-manifest.json 与 "
+        f"external/input-README.md（课题文件区可打开/下载，file API 逐字节一致）\n"
+        f"- 覆盖矩阵/质量检查等通用入口仍走 readiness.evidence_refs（runner 回报）\n")
     (OUT / "summary.md").write_text(
         f"# H1T1 证据（HEAD {HEAD}）\n\n"
         f"- 两次有界工程运行同课题：run-a completed（2 步+产物+用量实报）、run-b blocked 中断"

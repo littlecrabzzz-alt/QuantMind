@@ -8,7 +8,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Empty, Select, Table, Tag, Tooltip } from "antd";
 import { FileText } from "lucide-react";
 import {
+  AdapterFormatError,
+  classifyRunKinds,
   evidenceToView,
+  fixtureConsistency,
   identifyExportFormat,
   legacyFixtureView,
   type LedgerDay,
@@ -41,15 +44,13 @@ function numOr(v: number | null | undefined, field: string, na = false) {
   return <span>{v}</span>;
 }
 
-function modeLabel(view: LedgerView): { label: string; color: string } {
-  const banner = String(view.banner ?? "");
-  const group = String((view.session as { group?: string } | undefined)?.group ?? "");
-  if (banner.includes("FIXTURE")) return { label: "工程回放（fixture 样例）", color: "orange" };
-  if (group === "P0") return { label: "工程回放（P0 工程）", color: "blue" };
-  if (["A", "B1", "B2", "B3", "D", "N"].includes(group))
-    return { label: "历史研究（研究账本回放）", color: "geekblue" };
-  return { label: "研究账本回放（非持续虚拟运行/真实交易）", color: "default" };
-}
+const kindColor: Record<string, string> = {
+  工程回放: "orange",
+  历史研究: "geekblue",
+  持续虚拟运行: "purple",
+  真实交易: "red",
+  未知: "default",
+};
 
 function drawdownSeries(nav: number[]): number {
   let peak = nav[0];
@@ -94,16 +95,23 @@ export default function LedgerDetailView({
   }, [node, caseId, artifact.uri]);
 
   const format = useMemo(() => (raw ? identifyExportFormat(raw) : null), [raw]);
-  const view = useMemo(() => {
-    if (!raw || format !== "evidence") return null;
-    return evidenceToView(raw);
+  const conversion = useMemo(() => {
+    if (!raw || format !== "evidence") return { view: null, error: "" };
+    try {
+      return { view: evidenceToView(raw), error: "" };
+    } catch (exc) {
+      return { view: null, error: exc instanceof Error ? exc.message : String(exc) };
+    }
   }, [raw, format]);
+  const adapterError = conversion.error;
 
+  const view = conversion.view;
   const days: LedgerDay[] | null = useMemo(() => {
+    if (adapterError) return null;
     if (format === "view") return ((raw as unknown as LedgerView).days ?? null);
     if (view) return view.days;
     return null;
-  }, [raw, view, format]);
+  }, [raw, view, format, adapterError]);
 
   useEffect(() => {
     if (days?.length) setDate(days[days.length - 1].date);
@@ -144,6 +152,18 @@ R01Ledger.export_view()/export_evidence() 公共入口生成。"
     );
   }
 
+  if (adapterError) {
+    return (
+      <Alert
+        type="error"
+        showIcon
+        data-testid="ledger-adapter-rejected"
+        message="evidence 原件形状不符，公共适配层显式拒绝转换（不静默填空）"
+        description={adapterError}
+      />
+    );
+  }
+
   if (!days || !days.length) {
     return <Empty description="账本导出无逐日记录" />;
   }
@@ -152,7 +172,8 @@ R01Ledger.export_view()/export_evidence() 公共入口生成。"
     format === "view" ? (raw as unknown as LedgerView) : view!;
   const day = days.find((d) => d.date === date) ?? days[days.length - 1];
   const navs = days.map((d) => d.nav).filter((v): v is number => typeof v === "number");
-  const mode = modeLabel(activeView);
+  const kinds = classifyRunKinds(activeView);
+  const fixtureCheck = fixtureConsistency(activeView, artifact.fixture);
   const session = (activeView.session ?? {}) as Record<string, unknown>;
   const firstDay = days[0].date;
   const lastDay = days[days.length - 1].date;
@@ -165,12 +186,19 @@ R01Ledger.export_view()/export_evidence() 公共入口生成。"
 
   return (
     <div className="mt-1 space-y-2" data-testid="ledger-detail-view">
-      <div className="flex flex-wrap gap-2 items-center">
-        <Tag color={mode.color}>{mode.label}</Tag>
+      <div className="flex flex-wrap gap-2 items-center" data-testid="ledger-run-kinds">
+        {kinds.map((k) => (
+          <Tooltip key={k} title={`运行类别（按数据源字段分立判别）：${k}`}>
+            <Tag color={kindColor[k]}>{k}</Tag>
+          </Tooltip>
+        ))}
         {artifact.fixture && <FixtureBadge compact />}
         {artifact.not_ready && <NotReadyBadge />}
         {format === "evidence" && (
           <Tag color="purple">经公共适配层转换（evidence 原件 → view）</Tag>
+        )}
+        {!fixtureCheck.consistent && (
+          <Alert type="warning" message={fixtureCheck.detail} className="w-full" />
         )}
         <span className="text-xs text-muted-foreground">
           本视图为研究账本回放明细；非 fixture ≠ 真实成交，与实盘/交易记录无关

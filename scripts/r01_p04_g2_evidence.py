@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""R01 P0.4 G2P1 evidence: real-replay results viewable through the platform.
+"""[历史演示，G2P1 轮] R01 P0.4 G2P1 evidence: real-replay results viewable through the platform.
+
+⚠️ H3P1 起：本脚本的手工组装 days/day_records 演示路径已废弃，不得作为验收入口；
+当前验收入口 = R01Ledger.export_view()/export_evidence() 公共导出（见
+scripts/r01_p04_h1b_evidence.py 与 artifacts/p04/h1/final/）。保留仅作历史轮对照。
+
 
 Deterministic replay of 5 trade days (2024-04-23..) on the REAL v2 input
 package (a0d884…) via the shared R01Ledger.run_day channel, then:
@@ -232,7 +237,8 @@ def main():
         f"- 详情/总览：非 fixture 产物带真实标注；本轮 HEAD 未重验收 ⇒ not_ready 显式"
         f"（{overview['admission_reasons']}），未冒充正式结果\n"
         f"- sidecar 重启后 artifacts 逐字节一致\n"
-        f"- 复验命令：起 §E sidecar 后 `python3 scripts/r01_p04_g2_evidence.py`\n")
+        f"- [历史演示] 本轮为 G2P1 历史证据；当前验收入口=export_view/export_evidence 公共导出"
+        f"（scripts/r01_p04_h1b_evidence.py / artifacts/p04/h1/final/）\n")
     print(json.dumps({"out": str(OUT), "head": head, "days": [str(d) for d in days],
                       "nav": [r["nav"] for r in day_records],
                       "orders_total": sum(len(r["orders"]) for r in day_records),
