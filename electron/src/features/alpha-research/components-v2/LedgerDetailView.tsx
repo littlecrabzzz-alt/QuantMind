@@ -14,6 +14,7 @@ import {
   fixtureConsistency,
   identifyExportFormat,
   legacyFixtureView,
+  normalizeView,
   type LedgerDay,
   type LedgerView,
 } from "./ledgerAdapter";
@@ -106,12 +107,22 @@ export default function LedgerDetailView({
   const adapterError = conversion.error;
 
   const view = conversion.view;
+  const [viewError, setViewError] = useState("");
+  const normalized = useMemo(() => {
+    if (adapterError || format !== "view") return null;
+    try {
+      return normalizeView(raw);
+    } catch (exc) {
+      setViewError(exc instanceof Error ? exc.message : String(exc));
+      return null;
+    }
+  }, [raw, format, adapterError]);
   const days: LedgerDay[] | null = useMemo(() => {
-    if (adapterError) return null;
-    if (format === "view") return ((raw as unknown as LedgerView).days ?? null);
+    if (adapterError || viewError) return null;
+    if (format === "view") return normalized?.days ?? null;
     if (view) return view.days;
     return null;
-  }, [raw, view, format, adapterError]);
+  }, [raw, view, format, adapterError, viewError, normalized]);
 
   useEffect(() => {
     if (days?.length) setDate(days[days.length - 1].date);
@@ -164,12 +175,23 @@ R01Ledger.export_view()/export_evidence() 公共入口生成。"
     );
   }
 
+  if (viewError) {
+    return (
+      <Alert
+        type="error"
+        showIcon
+        data-testid="ledger-view-schema-rejected"
+        message="view 导出版本未知，页面显式拒绝（不猜测字段布局）"
+        description={viewError}
+      />
+    );
+  }
+
   if (!days || !days.length) {
     return <Empty description="账本导出无逐日记录" />;
   }
 
-  const activeView: LedgerView =
-    format === "view" ? (raw as unknown as LedgerView) : view!;
+  const activeView: LedgerView = format === "view" ? normalized! : view!;
   const day = days.find((d) => d.date === date) ?? days[days.length - 1];
   const navs = days.map((d) => d.nav).filter((v): v is number => typeof v === "number");
   const kinds = classifyRunKinds(activeView);
@@ -290,8 +312,22 @@ R01Ledger.export_view()/export_evidence() 公共入口生成。"
             {
               title: "标记来源",
               dataIndex: "mark_source",
-              render: (v: string | undefined) =>
-                v ?? <MissingValue field="mark_source" />,
+              render: (v: string | undefined, row: { stale_days?: number }) =>
+                v === undefined ? (
+                  <MissingValue field="mark_source" />
+                ) : v === "carry_forward" ? (
+                  <Tooltip title={`陈旧标记：连续 ${row.stale_days ?? "?"} 日缺行情，沿用最近有效市价（不伪造收盘）`}>
+                    <Tag color="orange">
+                      carry_forward（陈旧 {row.stale_days ?? "?"} 日）
+                    </Tag>
+                  </Tooltip>
+                ) : v === "unavailable" ? (
+                  <Tooltip title="该持仓从未有市价：last_mark=0 表示缺失，不是价格">
+                    <Tag color="red">unavailable（缺失）</Tag>
+                  </Tooltip>
+                ) : (
+                  <Tag color="green">{v}</Tag>
+                ),
             },
             {
               title: "市值",

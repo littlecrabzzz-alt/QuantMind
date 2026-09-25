@@ -109,6 +109,7 @@ const vw = JSON.parse(fs.readFileSync(process.argv[3]));
 const out = {pairs: [], formats: {}};
 if (identifyExportFormat(ev) !== "evidence") throw "evidence misclassified";
 if (identifyExportFormat(vw) !== "view") throw "view misclassified";
+if (vw.view_schema !== 2) throw "expect regenerated v2 sample, got " + vw.view_schema;
 const adapted = evidenceToView(ev);
 const vd = vw.days, ad = adapted.days;
 if (vd.length !== ad.length) throw "day count mismatch";
@@ -127,7 +128,20 @@ for (let i = 0; i < vd.length; i++) {
       if (JSON.stringify(a.positions[p][k]) !== JSON.stringify(b.positions[p][k]))
         throw "position mismatch " + a.date + " " + k;
     }
+    // H1-AC02：页面消费字段两条路径全等（last_mark 由适配层 close/mark 规范化同源）
+    const av = a.positions[p].last_mark !== undefined ? a.positions[p].last_mark : a.positions[p].mark;
+    const bv = b.positions[p].last_mark !== undefined ? b.positions[p].last_mark : b.positions[p].close;
+    if (JSON.stringify(av) !== JSON.stringify(bv))
+      throw "last_mark mismatch " + a.date + " " + a.positions[p].symbol + " " + av + " vs " + bv;
+    if (JSON.stringify(a.positions[p].mark_source) !== JSON.stringify(b.positions[p].mark_source))
+      throw "mark_source mismatch " + a.date;
+    out.pairs.push({date: a.date, field: "last_mark:" + a.positions[p].symbol,
+                    view: av, adapted: bv, ok: true});
   }
+  // 当日风险快照（view-fields-v2：逐日取快照；适配层同源 snap.risk_status/HWM）
+  if (JSON.stringify([a.risk && a.risk.status, a.risk && a.risk.high_water_mark]) !==
+      JSON.stringify([b.risk && b.risk.status, b.risk && b.risk.high_water_mark]))
+    throw "risk snapshot mismatch " + a.date;
   if ((a.orders || []).length !== (b.orders || []).length) throw "orders count " + a.date;
   for (let o = 0; o < (a.orders || []).length; o++) {
     for (const k of ["client_order_id", "qty_target", "qty_filled", "qty_remaining",

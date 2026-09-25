@@ -85,6 +85,28 @@ export interface LedgerView {
   adapter_notes?: Record<string, string>;
 }
 
+/** 已知 view_schema 版本（view-fields-v2 合同；未知版本显式拒绝，不猜）。 */
+export const KNOWN_VIEW_SCHEMAS = new Set([1, 2]);
+
+export function assertKnownViewSchema(obj: Record<string, unknown>): void {
+  const schema = obj.view_schema;
+  if (typeof schema !== "number" || !KNOWN_VIEW_SCHEMAS.has(schema)) {
+    throw new AdapterFormatError(
+      `未知 view_schema=${String(schema)}，页面显式拒绝（不猜测字段布局）`,
+    );
+  }
+}
+
+/** 持仓标记规范化（H1-AC02）：v2 直接输出 last_mark；旧字段 mark 作为兼容回退。 */
+export function normalizePositionMark<
+  T extends { last_mark?: number; mark?: number },
+>(p: T): T {
+  if (p.last_mark === undefined && p.mark !== undefined) {
+    return { ...p, last_mark: p.mark };
+  }
+  return p;
+}
+
 export function identifyExportFormat(obj: unknown): ExportFormat {
   if (typeof obj !== "object" || obj === null) return "unknown";
   const o = obj as Record<string, unknown>;
@@ -152,10 +174,16 @@ export function evidenceToView(evidence: Record<string, unknown>): LedgerView {
       ...(snap.valuation_reliable !== undefined
         ? { valuation_reliable: snap.valuation_reliable }
         : {}),
-      positions: Object.entries(snap.positions ?? {}).map(([symbol, p]) => ({
-        symbol,
-        ...p,
-      })),
+      positions: Object.entries(snap.positions ?? {}).map(([symbol, p]) =>
+        normalizePositionMark({
+          symbol,
+          ...p,
+          // 原生 evidence 的 close 字段规范化为 last_mark 同名（值同源，view-fields-v2）
+          ...(p.last_mark === undefined && p.close !== undefined
+            ? { last_mark: p.close }
+            : {}),
+        }),
+      ),
       orders: orders.filter((o) => String(o.trade_date ?? "") === date),
       risk: {
         status: snap.risk_status,
@@ -258,4 +286,15 @@ export function fixtureConsistency(
     consistent: false,
     detail: `两层 fixture 语义不一致：原件${innerFixture ? "自称工程样例" : "自称正式研究账本"}，外层回报${outerFixture ? "标 fixture" : "未标 fixture"}；以原件为准展示并警示`,
   };
+}
+
+
+/** view 消费前的规范化：schema 守卫 + 持仓 mark→last_mark 兼容（数值不改）。 */
+export function normalizeView(view: Record<string, unknown>): LedgerView {
+  assertKnownViewSchema(view);
+  const days = ((view.days as LedgerDay[] | undefined) ?? []).map((d) => ({
+    ...d,
+    positions: (d.positions ?? []).map((p) => normalizePositionMark(p)),
+  }));
+  return { ...(view as unknown as LedgerView), days };
 }
