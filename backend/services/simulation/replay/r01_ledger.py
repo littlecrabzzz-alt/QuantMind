@@ -58,6 +58,13 @@ logger = logging.getLogger(__name__)
 GROUPS = ("A", "B1", "B2", "B3", "D", "N", "P0")
 
 
+class ViewBuildError(ValueError):
+    """export_view 构建失败（H1.1）：原生证据缺必需字段或形状不合法。
+
+    格式不明/字段缺失一律显式报错（报出 day/字段/原因），禁止静默填零。
+    """
+
+
 class SameKeyOrderConflict(ValueError):
     """同 client_order_id 但内容不同（W2E3/F1 修复 AC-04）。
 
@@ -1258,6 +1265,15 @@ class R01Ledger:
         }
         return evidence
 
+    def export_view(self) -> dict[str, Any]:
+        """公共展示导出（H1.1，view_schema=1）。
+
+        唯一入口：Quickstart / 回报示例 / 页面共用；从审计原件
+        ``export_evidence()`` 的真实输出派生（build_view_from_evidence），
+        原件本身保持不动。字段缺失显式 ViewBuildError，不静默填零。
+        """
+        return build_view_from_evidence(self.export_evidence())
+
     # ------------------------------------------------------------------
     # checkpoint 导出/恢复（W2E3 修复#7：完整账本状态可持久化）
     # ------------------------------------------------------------------
@@ -1522,6 +1538,188 @@ def independent_recompute(
             }
         )
     return out
+
+
+# ---------------------------------------------------------------------------
+# 公共展示导出（H1.1，view_schema=1）：从审计原件派生的明确版本展示结构
+# ---------------------------------------------------------------------------
+
+_VIEW_SCHEMA = 1
+
+# days[].positions 逐日持仓必需字段（缺失 → ViewBuildError，不静默填零）
+_VIEW_POSITION_FIELDS = (
+    "qty", "avg_cost", "available_qty", "close", "mark_source",
+    "market_value", "stale_days",
+)
+# days[] 快照必需字段
+_VIEW_DAY_FIELDS = (
+    "trade_date", "cash", "dividend_receivable", "market_value", "nav",
+    "valuation_reliable", "positions",
+)
+
+
+def _view_require(container: dict, field: str, where: str) -> Any:
+    """取必需字段；缺失/None 显式报错（H1.1：不静默填零）。"""
+    if field not in container or container[field] is None:
+        raise ViewBuildError(
+            f"view_schema={_VIEW_SCHEMA} 构建失败：{where} 缺必需字段 {field!r}"
+            f"（原生输出形状不合法或版本不匹配，拒绝静默填零）"
+        )
+    return container[field]
+
+
+def build_view_from_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
+    """把 export_evidence() 审计原件转换为 view_schema=1 展示结构（纯函数）。
+
+    结构（字段表见 artifacts/p03/h1/README.md）：
+    - days[]：逐日 cash/dividend_receivable/market_value/nav/valuation_reliable
+      + positions[]（qty/avg_cost/available_qty/收盘标记/mark_source/market_value/
+      stale_days/last_mark_date）+ 当日 orders[]（qty 三态 target/filled/remaining、
+      avg_fill_price、fees、status、reject_reason、signal_date、fills）
+      + risk（当日 status/high_water_mark/当日新触发事件）
+    - 顶层：orders 全量、risk_events、corporate_actions、dividends（三段式）、
+      session/package/banner（fixture 标注随原件透传）。
+    """
+    session = evidence.get("session")
+    if not isinstance(session, dict):
+        raise ViewBuildError("view 构建失败：evidence 缺 session（非原生 export_evidence 输出）")
+    orders = evidence.get("orders")
+    equity = evidence.get("equity")
+    if not isinstance(orders, list) or not isinstance(equity, list):
+        raise ViewBuildError(
+            "view 构建失败：evidence 缺顶层 orders/equity（原生审计原件必需）"
+        )
+    orders_by_day: dict[str, list[dict]] = {}
+    for o in orders:
+        coid = _view_require(o, "client_order_id", "order")
+        day = _view_require(o, "trade_date", f"order {coid}")
+        orders_by_day.setdefault(day, []).append(o)
+    risk_state = evidence.get("risk_state") or {}
+    risk_events = risk_state.get("events") or []
+    events_by_day: dict[str, list[dict]] = {}
+    for ev in risk_events:
+        events_by_day.setdefault(str(ev.get("date")), []).append(ev)
+
+    days: list[dict[str, Any]] = []
+    for snap in equity:
+        d = _view_require(snap, "trade_date", "equity 快照")
+        positions_raw = _view_require(snap, "positions", f"equity {d}")
+        positions_out = []
+        for sym, p in sorted(positions_raw.items()):
+            where = f"equity {d} position {sym}"
+            positions_out.append(
+                {
+                    "symbol": sym,
+                    "qty": _view_require(p, "qty", where),
+                    "avg_cost": _view_require(p, "avg_cost", where),
+                    "available_qty": _view_require(p, "available_qty", where),
+                    "mark": _view_require(p, "close", where),
+                    "mark_source": _view_require(p, "mark_source", where),
+                    "market_value": _view_require(p, "market_value", where),
+                    "stale_days": _view_require(p, "stale_days", where),
+                    "last_mark_date": p.get("last_mark_date"),
+                }
+            )
+        day_orders = []
+        for o in orders_by_day.get(d, []):
+            where = f"order {o.get('client_order_id')}"
+            day_orders.append(
+                {
+                    "client_order_id": o["client_order_id"],
+                    "symbol": _view_require(o, "symbol", where),
+                    "side": _view_require(o, "side", where),
+                    "origin": o.get("origin"),
+                    "status": _view_require(o, "status", where),
+                    "qty_target": _view_require(o, "qty_target", where),
+                    "qty_filled": _view_require(o, "qty_filled", where),
+                    "qty_remaining": _view_require(o, "qty_remaining", where),
+                    "avg_fill_price": o.get("avg_fill_price"),
+                    "fees": _view_require(o, "fees", where),
+                    "reject_reason": o.get("reject_reason"),
+                    "signal_date": o.get("signal_date"),
+                    "ideal_weight": o.get("ideal_weight"),
+                    "realized_weight": o.get("realized_weight"),
+                    "fills": [
+                        {
+                            "price": f.get("price"),
+                            "quantity": f.get("quantity"),
+                            "total_fee": f.get("total_fee"),
+                        }
+                        for f in o.get("fills", [])
+                    ],
+                }
+            )
+        days.append(
+            {
+                "date": d,
+                "cash": _view_require(snap, "cash", f"equity {d}"),
+                "dividend_receivable": _view_require(
+                    snap, "dividend_receivable", f"equity {d}"
+                ),
+                "market_value": _view_require(snap, "market_value", f"equity {d}"),
+                "nav": _view_require(snap, "nav", f"equity {d}"),
+                "valuation_reliable": _view_require(
+                    snap, "valuation_reliable", f"equity {d}"
+                ),
+                "positions": positions_out,
+                "orders": day_orders,
+                "risk": {
+                    "status": risk_state.get("status"),
+                    "high_water_mark": risk_state.get("high_water_mark"),
+                    "triggered_today": events_by_day.get(d, []),
+                },
+            }
+        )
+
+    return {
+        "view_schema": _VIEW_SCHEMA,
+        "derived_from": "R01Ledger.export_evidence",
+        "banner": evidence.get("banner"),
+        "session": {
+            k: session.get(k)
+            for k in (
+                "strategy_id", "strategy_version", "execution_attempt_id",
+                "ledger_run_id", "group", "initial_cash", "risk_config",
+                "contract_versions", "is_fixture", "input_package_id",
+            )
+        },
+        "package": {
+            k: (evidence.get("package") or {}).get(k)
+            for k in ("package_id", "package_version", "manifest_sha256", "is_fixture")
+        },
+        "risk_state": {
+            "status": risk_state.get("status"),
+            "high_water_mark": risk_state.get("high_water_mark"),
+            "config": risk_state.get("config"),
+        },
+        "risk_events": risk_events,
+        "corporate_actions": evidence.get("corporate_actions", []),
+        "dividends": evidence.get("dividends", []),
+        "blocked_dividends": evidence.get("blocked_dividends", []),
+        "days": days,
+    }
+
+
+def identify_export_format(obj: dict[str, Any]) -> str:
+    """判别导出对象格式（前端适配用，H1.1 文档同步）。
+
+    返回：
+    - "view"：view_schema=N 的展示结构（本模块 export_view 产物）
+    - "evidence"：原生审计原件（export_evidence：顶层 banner/session/
+      orders/equity，无 view_schema）
+    - "legacy_fixture"：旧工程样例（顶层 day_summaries，attempt-1 形状；
+      由前端侧兼容，账本侧只读判别不转换）
+    - "unknown"：形状不明（消费方须显式拒绝，不猜）
+    """
+    if not isinstance(obj, dict):
+        return "unknown"
+    if "view_schema" in obj:
+        return "view"
+    if "day_summaries" in obj:
+        return "legacy_fixture"
+    if "banner" in obj and "session" in obj and "equity" in obj and "orders" in obj:
+        return "evidence"
+    return "unknown"
 
 
 def _current_contract_versions() -> dict[str, str]:
