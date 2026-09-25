@@ -53,6 +53,26 @@ class ResearchCache(unittest.TestCase):
         cache.atomic_bytes(root / 'releases' / ('data-' + sha) / 'manifest.json', raw)
         cache.atomic_json(root / 'CURRENT.json', {'release_id': 'data-' + sha, 'manifest_sha256': sha})
 
+    def test_research_pointer_selection_scope_and_corruption(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.fixture(root)
+            old = cache.source_pointer(root, ['daily'])
+            manifest = cache.manifest_at(root, old['release_id'])
+            manifest.update(scope='research_structured', selected_api_names=['daily'])
+            raw = json.dumps(manifest, sort_keys=True).encode()
+            sha = hashlib.sha256(raw).hexdigest()
+            pointer = dict(release_id='data-' + sha, manifest_sha256=sha,
+                           selected_api_names=['daily'], published_at=1)
+            cache.atomic_bytes(root / 'releases' / pointer['release_id'] / 'manifest.json', raw)
+            cache.atomic_json(root / 'RESEARCH_CURRENT.json', pointer)
+            self.assertEqual(cache.source_pointer(root, ['fund_daily']), old)
+            self.assertEqual(cache.prepare(root, ['daily'])['source_release_id'], pointer['release_id'])
+            pointer['manifest_sha256'] = '0' * 64
+            cache.atomic_json(root / 'RESEARCH_CURRENT.json', pointer)
+            with self.assertRaisesRegex(ValueError, 'Invalid research pointer'):
+                cache.prepare(root, ['daily'])
+
     def test_repeated_provenance_retains_all_sources_and_rejects_corruption(self):
         for corrupt in (False, True):
             with self.subTest(corrupt=corrupt), tempfile.TemporaryDirectory() as folder:

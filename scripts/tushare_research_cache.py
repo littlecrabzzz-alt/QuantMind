@@ -21,11 +21,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.request import urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from backend.shared.tushare_pipeline import atomic_json, atomic_bytes, manifest_at, utc_now
+from backend.shared.tushare_pipeline import RESEARCH_APIS, atomic_json, atomic_bytes, manifest_at, utc_now
 
-DEFAULT_APIS = ('daily', 'index_daily', 'fund_daily', 'adj_factor', 'daily_basic',
-                'index_weight', 'ci_daily', 'sw_daily', 'stock_basic', 'index_basic',
-                'fund_basic', 'trade_cal', 'stk_limit', 'suspend_d', 'moneyflow')
+DEFAULT_APIS = RESEARCH_APIS
 PREPARE_TIMEOUT_SECONDS = 30 * 60
 MAX_MANIFEST_BYTES = 512 * 1024**2
 FILE = re.compile(r'(?:parquet|observations|schemas)/[a-f0-9]+\.(?:parquet|json)')
@@ -47,10 +45,27 @@ def checked(root, name, expected):
     return path
 
 
+def source_pointer(root, apis):
+    """Use the independent lane only when it covers the entire requested scope."""
+    path = root / 'RESEARCH_CURRENT.json'
+    if path.is_symlink():
+        raise ValueError('Unsafe research pointer')
+    if path.exists():
+        pointer = json.loads(path.read_bytes())
+        if (not RELEASE.fullmatch(pointer.get('release_id', ''))
+                or pointer.get('manifest_sha256') != pointer['release_id'][5:]
+                or not isinstance(pointer.get('selected_api_names'), list)
+                or not all(isinstance(api, str) for api in pointer['selected_api_names'])):
+            raise ValueError('Invalid research pointer')
+        if set(apis) <= set(pointer['selected_api_names']):
+            return pointer
+    return json.loads((root / 'CURRENT.json').read_bytes())
+
+
 def prepare(root, apis):
     import pyarrow.parquet as pq
     root = root.resolve()
-    pointer = json.loads((root / 'CURRENT.json').read_bytes())
+    pointer = source_pointer(root, apis)
     source = pointer['release_id']
     export = root / '.research-exports'
     key = hashlib.sha256(json.dumps({'format': 2, 'apis': sorted(apis)}).encode()).hexdigest()
@@ -61,6 +76,10 @@ def prepare(root, apis):
             return old
     previous = cached_export(root, apis) if saved.exists() else reusable_export(root, apis)
     manifest = manifest_at(root, source)
+    if 'selected_api_names' in pointer and (
+            manifest.get('scope') != 'research_structured'
+            or manifest.get('selected_api_names') != pointer['selected_api_names']):
+        raise ValueError('Research source scope mismatch')
     datasets = [d for d in manifest['datasets'] if d['api_name'] in apis]
     if not datasets:
         raise ValueError('Requested datasets unavailable')
@@ -106,6 +125,7 @@ def prepare(root, apis):
     subset = {
         'schema_version': manifest.get('schema_version', 1),
         'source_release_id': source, 'scope': 'research_subset',
+        'source_scope': manifest.get('scope'),
         'selected_api_names': sorted(apis), 'datasets': datasets,
         'files': {name: manifest['files'][name] for name in sorted(names)},
         'schema_path': schema, 'history_complete': False,
@@ -114,7 +134,8 @@ def prepare(root, apis):
         'coverage_by_api': [r for r in manifest.get('coverage_by_api', [])
                             if r.get('api_name') in apis],
         'rrg_status': manifest.get('rrg_status', 'unverified'),
-        'gaps': ['Research subset only; full acquisition evidence remains in source_release_id'],
+        'gaps': ['Research subset only; acquisition completeness is not established'],
+        'source_gaps': manifest.get('gaps', []) if 'selected_api_names' in pointer else [],
     }
     raw = json.dumps(subset, sort_keys=True, ensure_ascii=False).encode()
     sha = hashlib.sha256(raw).hexdigest()
@@ -192,7 +213,8 @@ class SourcePublication:
                 self.refreshing = False
 
     def current(self):
-        source = json.loads((self.root / 'CURRENT.json').read_bytes())['release_id']
+        source_state = source_pointer(self.root, self.apis)
+        source = source_state['release_id']
         with self.lock:
             cached = cached_export(self.root, self.apis)
             if cached is None:
@@ -203,6 +225,7 @@ class SourcePublication:
                 threading.Thread(target=self._refresh, daemon=True).start()
         pointer, manifest, path = cached
         return {**pointer, 'latest_source_release_id': source,
+                'latest_source_published_at': source_state.get('published_at'),
                 'source_lagged': pointer['source_release_id'] != source}, manifest, path
 
 
