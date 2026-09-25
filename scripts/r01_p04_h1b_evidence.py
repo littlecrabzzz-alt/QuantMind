@@ -60,7 +60,7 @@ def main():
     pkg = load_etf_input_package(PKG_ROOT, expect_manifest_sha256=MANIFEST)
     ledger = R01Ledger(
         pkg, R01LedgerConfig(
-            group="P0", strategy_id="h1b-adapter-evidence", strategy_version=1,
+            group="P0", strategy_id="fixture-h1b-adapter-evidence", strategy_version=1,
             execution_attempt_id=1, initial_cash=20000.0,
             commission_rate=0.0003, commission_min=0.1, slippage_bps=0.0),
         created_at=datetime(2026, 9, 25, 12, 0, tzinfo=timezone.utc), source_node="mac")
@@ -104,8 +104,8 @@ def main():
     node_check = r'''
 const {evidenceToView, identifyExportFormat, legacyFixtureView} = require("/tmp/h1b-adapt/ledgerAdapter.js");
 const fs = require("fs");
-const ev = JSON.parse(fs.readFileSync(process.argv[1]));
-const vw = JSON.parse(fs.readFileSync(process.argv[2]));
+const ev = JSON.parse(fs.readFileSync(process.argv[2]));
+const vw = JSON.parse(fs.readFileSync(process.argv[3]));
 const out = {pairs: [], formats: {}};
 if (identifyExportFormat(ev) !== "evidence") throw "evidence misclassified";
 if (identifyExportFormat(vw) !== "view") throw "view misclassified";
@@ -137,9 +137,9 @@ for (let i = 0; i < vd.length; i++) {
     }
   }
 }
-out.formats.legacy = identifyExportFormat(JSON.parse(fs.readFileSync(process.argv[3])));
+out.formats.legacy = identifyExportFormat(JSON.parse(fs.readFileSync(process.argv[4])));
 out.formats.unknown = identifyExportFormat({});
-out.formats.legacy_days = legacyFixtureView(JSON.parse(fs.readFileSync(process.argv[3]))).daySummaries.length;
+out.formats.legacy_days = legacyFixtureView(JSON.parse(fs.readFileSync(process.argv[4]))).daySummaries.length;
 if (out.formats.legacy !== "legacy_fixture") throw "legacy misclassified";
 if (out.formats.unknown !== "unknown") throw "unknown misclassified";
 console.log(JSON.stringify({compared_days: vd.length, field_pairs: out.pairs.length,
