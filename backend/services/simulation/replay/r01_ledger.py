@@ -95,9 +95,13 @@ class LedgerOrderingError(ValueError):
     def __init__(self, reason: str, message: str):
         super().__init__(f"[{reason}] {message}")
         self.reason = reason
+# F3 修复#2：版本身份对齐冻结合同现状（ledger-contract v3 / 输入包
+# schema v3）。checkpoint 恢复按此绑定：旧 v2 checkpoint 显式拒绝
+# （CheckpointConfigMismatch，合同版本不一致），不静默混用；如需迁移
+# 须另发 checkpoint schema 版本与迁移路径记录。
 CONTRACT_VERSIONS = {
-    "ledger_contract": "v2",
-    "etf_input_package_schema": "v2",
+    "ledger_contract": "v3",
+    "etf_input_package_schema": "v3",
 }
 
 # 订单/成交状态机（ledger-contract §4）
@@ -1064,7 +1068,15 @@ class R01Ledger:
                 mark_source = "carry_forward"
             if pos.stale_days > self.config.stale_mark_limit:
                 valuation_reliable = False
-            close = pos.last_mark if pos.last_mark > 0 else pos.avg_cost
+            if pos.last_mark > 0:
+                close = pos.last_mark
+            else:
+                # F3 修复#1：从未观测到任何有效市价（首个持仓日即缺行情）——
+                # 无"最近有效市价"可 carry，禁止静默回退成本价；持仓以 0 计
+                # 入 nav 并强制当日快照不可信（显式暴露，非 silently cost）
+                close = 0.0
+                mark_source = "unavailable"
+                valuation_reliable = False
             market_value += pos.qty * close
             positions_out[symbol] = {
                 **pos.to_dict(),
