@@ -94,13 +94,11 @@ def main():
         return st, resp
 
     # 输入绑定产物回报（可打开：参数→实际输入→manifest）
-    for pname, psha in files.items():
-        if not pname.startswith("input-"):
-            continue
+    for pname in ("manifest.json", "README.md"):
         stx, respx = call("POST", reports, envelope(
             cid, "run-a", f"a0-{pname}", 0, "artifact",
             artifacts=[{"name": f"input-{pname}", "kind": "input-binding",
-                        "sha256": psha, "uri": f"external/input-{pname}"}]), token)
+                        "sha256": files[pname], "uri": f"external/input-{pname}"}]), token)
         log["steps"].append({"label": f"artifact input-{pname}", "status": stx})
         assert stx == 201, respx
 
