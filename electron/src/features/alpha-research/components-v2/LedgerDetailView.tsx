@@ -1,0 +1,374 @@
+/**
+ * R01 账本明细视图（H1.2）：按日期查看持仓/现金/应收/权益/估值可信度、
+ * 订单三态数量+费用+拒因（缺失 vs 不适用区分）、净值与回撤（单位/起点/
+ * 区间/费用口径）、标记（fixture/未准入/工程回放 vs 历史研究；非 fixture
+ * ≠真实成交）。四种导出格式经公共适配层（ledgerAdapter）同一入口消费。
+ */
+import React, { useEffect, useMemo, useState } from "react";
+import { Alert, Empty, Select, Table, Tag, Tooltip } from "antd";
+import { FileText } from "lucide-react";
+import {
+  evidenceToView,
+  identifyExportFormat,
+  legacyFixtureView,
+  type LedgerDay,
+  type LedgerView,
+} from "./ledgerAdapter";
+import { researchAgent } from "../services-v2/researchAgent";
+import { FixtureBadge, NotReadyBadge } from "./R01ProjectView";
+
+function relativeUri(uri: string): string {
+  return uri.startsWith("node://")
+    ? uri.split(`/workspace/`)[1] || uri.split("/").slice(3).join("/")
+    : uri;
+}
+
+function MissingValue({ field }: { field: string }) {
+  return (
+    <Tooltip title={`该账本导出缺失字段 ${field}（不填零）`}>
+      <Tag color="volcano">缺失</Tag>
+    </Tooltip>
+  );
+}
+
+function naValue() {
+  return <span className="text-muted-foreground">—（不适用）</span>;
+}
+
+function numOr(v: number | null | undefined, field: string, na = false) {
+  if (v === null) return na ? naValue() : <MissingValue field={field} />;
+  if (v === undefined) return <MissingValue field={field} />;
+  return <span>{v}</span>;
+}
+
+function modeLabel(view: LedgerView): { label: string; color: string } {
+  const banner = String(view.banner ?? "");
+  const group = String((view.session as { group?: string } | undefined)?.group ?? "");
+  if (banner.includes("FIXTURE")) return { label: "工程回放（fixture 样例）", color: "orange" };
+  if (group === "P0") return { label: "工程回放（P0 工程）", color: "blue" };
+  if (["A", "B1", "B2", "B3", "D", "N"].includes(group))
+    return { label: "历史研究（研究账本回放）", color: "geekblue" };
+  return { label: "研究账本回放（非持续虚拟运行/真实交易）", color: "default" };
+}
+
+function drawdownSeries(nav: number[]): number {
+  let peak = nav[0];
+  let maxDd = 0;
+  for (const v of nav) {
+    peak = Math.max(peak, v);
+    maxDd = Math.max(maxDd, peak > 0 ? (peak - v) / peak : 0);
+  }
+  return maxDd;
+}
+
+export default function LedgerDetailView({
+  node,
+  caseId,
+  artifact,
+}: {
+  node: string;
+  caseId: string;
+  artifact: { name: string; uri: string; fixture?: boolean; not_ready?: boolean };
+}) {
+  const [raw, setRaw] = useState<Record<string, unknown> | null>(null);
+  const [error, setError] = useState("");
+  const [date, setDate] = useState<string>("");
+  const [openOriginal, setOpenOriginal] = useState(false);
+  const [original, setOriginal] = useState("");
+
+  useEffect(() => {
+    let stopped = false;
+    (async () => {
+      try {
+        const blob = await researchAgent.file(node, caseId, relativeUri(artifact.uri));
+        const parsed = JSON.parse(await blob.text());
+        if (stopped) return;
+        setRaw(parsed);
+      } catch {
+        if (!stopped) setError("账本文件不可读（节点受控目录）");
+      }
+    })();
+    return () => {
+      stopped = true;
+    };
+  }, [node, caseId, artifact.uri]);
+
+  const format = useMemo(() => (raw ? identifyExportFormat(raw) : null), [raw]);
+  const view = useMemo(() => {
+    if (!raw || format !== "evidence") return null;
+    return evidenceToView(raw);
+  }, [raw, format]);
+
+  const days: LedgerDay[] | null = useMemo(() => {
+    if (format === "view") return ((raw as unknown as LedgerView).days ?? null);
+    if (view) return view.days;
+    return null;
+  }, [raw, view, format]);
+
+  useEffect(() => {
+    if (days?.length) setDate(days[days.length - 1].date);
+  }, [days]);
+
+  if (error) return <Alert type="error" message={error} />;
+  if (!raw) return <p className="text-xs text-muted-foreground mt-1">读取账本明细…</p>;
+
+  if (format === "unknown") {
+    return (
+      <Alert
+        type="error"
+        showIcon
+        data-testid="ledger-unknown-format"
+        message="无法识别的账本导出格式（unknown）"
+        description="该文件既不是 export_view（view_schema）、也不是原生 evidence（banner+session+equity+orders）、
+也不是旧工程样例（day_summaries）。页面显式拒绝展示，不做猜测或以零值填充；请通过
+R01Ledger.export_view()/export_evidence() 公共入口生成。"
+      />
+    );
+  }
+
+  if (format === "legacy_fixture") {
+    const legacy = legacyFixtureView(raw);
+    return (
+      <div className="mt-1" data-testid="ledger-legacy-compat">
+        <div className="flex flex-wrap gap-2 items-center mb-1">
+          <Tag color="orange">旧工程样例兼容展示（legacy_fixture）</Tag>
+          <span className="text-xs text-muted-foreground">
+            attempt-1 形状（day_summaries），只读兼容；数值不与新 view 混算
+          </span>
+        </div>
+        <pre className="bg-secondary/30 rounded p-2 text-xs whitespace-pre-wrap max-h-72 overflow-auto">
+          {JSON.stringify(legacy.daySummaries.slice(0, 3), null, 1).slice(0, 4000)}
+          {legacy.daySummaries.length > 3 ? `\n…（共 ${legacy.daySummaries.length} 日）` : ""}
+        </pre>
+      </div>
+    );
+  }
+
+  if (!days || !days.length) {
+    return <Empty description="账本导出无逐日记录" />;
+  }
+
+  const activeView: LedgerView =
+    format === "view" ? (raw as unknown as LedgerView) : view!;
+  const day = days.find((d) => d.date === date) ?? days[days.length - 1];
+  const navs = days.map((d) => d.nav).filter((v): v is number => typeof v === "number");
+  const mode = modeLabel(activeView);
+  const session = (activeView.session ?? {}) as Record<string, unknown>;
+  const firstDay = days[0].date;
+  const lastDay = days[days.length - 1].date;
+  const totalReturn =
+    navs.length >= 2 && navs[0] !== 0 ? navs[navs.length - 1] / navs[0] - 1 : null;
+  const totalFees = days
+    .flatMap((d) => d.orders ?? [])
+    .reduce((acc, o) => acc + (typeof o.fees === "number" ? o.fees : 0), 0);
+  const maxDd = navs.length >= 2 ? drawdownSeries(navs) : null;
+
+  return (
+    <div className="mt-1 space-y-2" data-testid="ledger-detail-view">
+      <div className="flex flex-wrap gap-2 items-center">
+        <Tag color={mode.color}>{mode.label}</Tag>
+        {artifact.fixture && <FixtureBadge compact />}
+        {artifact.not_ready && <NotReadyBadge />}
+        {format === "evidence" && (
+          <Tag color="purple">经公共适配层转换（evidence 原件 → view）</Tag>
+        )}
+        <span className="text-xs text-muted-foreground">
+          本视图为研究账本回放明细；非 fixture ≠ 真实成交，与实盘/交易记录无关
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-3 items-center text-xs">
+        <span>查看日期：</span>
+        <Select
+          size="small"
+          value={day.date}
+          style={{ minWidth: 140 }}
+          onChange={setDate}
+          options={days.map((d) => ({ value: d.date, label: d.date }))}
+        />
+        <button
+          className="text-primary inline-flex items-center gap-1"
+          data-testid="ledger-open-original"
+          onClick={() => {
+            if (openOriginal) {
+              setOpenOriginal(false);
+              return;
+            }
+            researchAgent
+              .file(node, caseId, relativeUri(artifact.uri))
+              .then(async (blob) => {
+                setOriginal((await blob.text()).slice(0, 100000));
+                setOpenOriginal(true);
+              });
+          }}
+        >
+          <FileText size={12} /> {openOriginal ? "收起原件" : "打开/核对原件"}
+        </button>
+      </div>
+      {openOriginal && (
+        <pre className="bg-secondary/30 rounded p-2 text-xs whitespace-pre-wrap max-h-72 overflow-auto">
+          {original}
+        </pre>
+      )}
+      <div className="text-xs space-y-1">
+        <p>
+          现金：{numOr(day.cash, "cash")} · 应收红利：
+          {numOr(day.dividend_receivable, "dividend_receivable")} · 持仓市值：
+          {numOr(day.market_value, "market_value")} · 权益 nav：
+          {numOr(day.nav, "nav")}
+        </p>
+        <p>
+          估值可信度：
+          {day.valuation_reliable === undefined ? (
+            <MissingValue field="valuation_reliable" />
+          ) : day.valuation_reliable ? (
+            <Tag color="green">可信</Tag>
+          ) : (
+            <Tag color="red">不可信（缺行情估值冻结/无市价，数值沿用最近有效标记）</Tag>
+          )}
+          {day.risk?.status ? ` · 当日风险态：${day.risk.status}` : ""}
+        </p>
+      </div>
+      <details open>
+        <summary className="cursor-pointer text-xs">
+          持仓（{day.positions.length}，{day.date} 收盘）
+        </summary>
+        <Table
+          size="small"
+          pagination={false}
+          dataSource={day.positions}
+          rowKey="symbol"
+          columns={[
+            { title: "标的", dataIndex: "symbol" },
+            {
+              title: "数量",
+              dataIndex: "qty",
+              render: (v: number | null) => numOr(v, "qty"),
+            },
+            {
+              title: "可用数量",
+              dataIndex: "available_qty",
+              render: (v: number | null) => numOr(v, "available_qty"),
+            },
+            {
+              title: "均价",
+              dataIndex: "avg_cost",
+              render: (v: number | null) => numOr(v, "avg_cost"),
+            },
+            {
+              title: "收盘标记",
+              dataIndex: "last_mark",
+              render: (v: number | null) => numOr(v, "last_mark"),
+            },
+            {
+              title: "标记来源",
+              dataIndex: "mark_source",
+              render: (v: string | undefined) =>
+                v ?? <MissingValue field="mark_source" />,
+            },
+            {
+              title: "市值",
+              dataIndex: "market_value",
+              render: (v: number | null) => numOr(v, "market_value"),
+            },
+          ].map((c) => ({ ...c, width: undefined }))}
+        />
+      </details>
+      <details>
+        <summary className="cursor-pointer text-xs">
+          订单（当日 {day.orders.length} 笔；三态数量+费用+拒因）
+        </summary>
+        <Table
+          size="small"
+          pagination={false}
+          dataSource={day.orders}
+          rowKey="client_order_id"
+          columns={[
+            { title: "标的", dataIndex: "symbol" },
+            { title: "方向", dataIndex: "side" },
+            {
+              title: "目标数量",
+              dataIndex: "qty_target",
+              render: (v: number | null) => numOr(v, "qty_target"),
+            },
+            {
+              title: "成交数量",
+              dataIndex: "qty_filled",
+              render: (v: number | null) => numOr(v, "qty_filled", true),
+            },
+            {
+              title: "剩余数量",
+              dataIndex: "qty_remaining",
+              render: (v: number | null) => numOr(v, "qty_remaining", true),
+            },
+            {
+              title: "成交均价",
+              dataIndex: "avg_fill_price",
+              render: (v: number | null) => numOr(v, "avg_fill_price", true),
+            },
+            {
+              title: "费用",
+              dataIndex: "fees",
+              render: (v: number | null) => numOr(v, "fees", true),
+            },
+            {
+              title: "状态",
+              dataIndex: "status",
+              render: (v: string) => <Tag>{v}</Tag>,
+            },
+            {
+              title: "拒单/未成交原因",
+              dataIndex: "reject_reason",
+              render: (v: string | null) =>
+                v === null ? naValue() : <span className="text-red-500">{v}</span>,
+            },
+            {
+              title: "理想/实际权重",
+              render: (_, o) => (
+                <span>
+                  {numOr(o.ideal_weight ?? null, "ideal_weight", true)} /{" "}
+                  {numOr(o.realized_weight ?? null, "realized_weight", true)}
+                </span>
+              ),
+            },
+          ]}
+        />
+      </details>
+      <details>
+        <summary className="cursor-pointer text-xs">净值与回撤（口径说明）</summary>
+        <div className="text-xs space-y-1">
+          <p>
+            单位：元 · 起点：{firstDay} nav={navs[0] ?? "缺失"} · 区间：
+            {firstDay}~{lastDay}（{days.length} 个账本日）
+          </p>
+          <p>
+            费用口径：订单费用已计入 nav（{String(session.commission_rate ?? "会话未记录费率")}{" "}
+            费率，最低 {String(session.commission_min ?? "—")}）；净值含现金+应收红利+持仓市值
+          </p>
+          <p>
+            区间收益：
+            {totalReturn === null ? (
+              <MissingValue field="区间收益（不足两日）" />
+            ) : (
+              `${(totalReturn * 100).toFixed(4)}%`
+            )}{" "}
+            · 最大回撤：
+            {maxDd === null ? (
+              <MissingValue field="最大回撤（不足两日）" />
+            ) : (
+              `${(maxDd * 100).toFixed(4)}%`
+            )}{" "}
+            · 累计费用：{totalFees.toFixed(4)} 元 · 换手：
+            <Tooltip title="输入不足以按冻结口径计算换手（无冻结换手定义的成交额基数）">
+              <Tag>未知（null）</Tag>
+            </Tooltip>
+          </p>
+        </div>
+      </details>
+      {format === "evidence" && (
+        <p className="text-xs text-muted-foreground">
+          适配说明：{view?.adapter_notes?.origin}；{view?.adapter_notes?.triggered_today}
+        </p>
+      )}
+    </div>
+  );
+}

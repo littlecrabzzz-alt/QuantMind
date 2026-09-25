@@ -26,6 +26,7 @@ import {
   type ExternalCaseSummary,
   type ProjectOverview,
 } from "../services-v2/researchAgent";
+import LedgerDetailView from "./LedgerDetailView";
 
 const panel = "rounded-xl border border-border bg-card p-4";
 const workstreamName: Record<string, string> = {
@@ -387,135 +388,9 @@ function ArtifactEntry({
         </pre>
       )}
       {error && <span className="text-red-500">{error}</span>}
-      {/replay-evidence|positions|orders/i.test(artifact.name + artifact.kind) && (
-        <ReplayEvidenceInline node={node} caseId={caseId} artifact={artifact} />
+      {/replay|ledger|evidence|nav/i.test(artifact.name + artifact.kind) && (
+        <LedgerDetailView node={node} caseId={caseId} artifact={artifact} />
       )}
-    </div>
-  );
-}
-
-interface ReplayDayRecord {
-  date?: string;
-  trade_date?: string;
-  cash?: number | Record<string, unknown>;
-  nav?: number;
-  equity?: number | number[] | Record<string, unknown>;
-  positions?: Array<Record<string, unknown>>;
-  orders?: Array<Record<string, unknown>>;
-  [key: string]: unknown;
-}
-
-function ReplayEvidenceInline({
-  node,
-  caseId,
-  artifact,
-}: {
-  node: string;
-  caseId: string;
-  artifact: { name: string; uri: string };
-}) {
-  const [data, setData] = useState<{ days: ReplayDayRecord[] } | null>(null);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    let stopped = false;
-    (async () => {
-      try {
-        const blob = await researchAgent.file(node, caseId, relativeUri(artifact.uri));
-        const parsed = JSON.parse(await blob.text());
-        const days: ReplayDayRecord[] =
-          parsed.days || parsed.day_summaries || parsed.summaries || [];
-        if (stopped) return;
-        if (days.length) setData({ days });
-        else setError("证据文件缺少逐日记录（days）");
-      } catch {
-        if (!stopped) setError("证据文件不可读或不是合法 JSON");
-      }
-    })();
-    return () => {
-      stopped = true;
-    };
-  }, [node, caseId, artifact.uri]);
-  if (error) return <div className="text-muted-foreground mt-1">{error}</div>;
-  if (!data) return <div className="text-muted-foreground mt-1">读取回放明细…</div>;
-  const last = data.days[data.days.length - 1];
-  const positions = (last.positions || []) as Array<Record<string, unknown>>;
-  const orders = data.days.flatMap((d) =>
-    ((d.orders || []) as Array<Record<string, unknown>>).map(
-      (o) => ({ ...o, _date: d.date || d.trade_date }) as Record<string, unknown>,
-    ),
-  );
-  const navRows = data.days.filter((d) => d.nav !== undefined);
-  return (
-    <div className="mt-1 space-y-2" data-testid="replay-evidence-detail">
-      <details open>
-        <summary className="cursor-pointer">
-          持仓 / 现金（{last.date || last.trade_date} 收盘）
-        </summary>
-        <table className="w-full text-xs my-1">
-          <thead>
-            <tr className="text-muted-foreground">
-              <th className="text-left">标的</th>
-              <th className="text-right">数量</th>
-              <th className="text-right">收盘价</th>
-              <th className="text-right">市值</th>
-            </tr>
-          </thead>
-          <tbody>
-            {positions.map((p, i) => (
-              <tr key={i} className="border-t border-border">
-                <td>{String(p.symbol || p.code || "")}</td>
-                <td className="text-right">{String(p.qty ?? p.quantity ?? "")}</td>
-                <td className="text-right">{String(p.close ?? p.price ?? "")}</td>
-                <td className="text-right">{String(p.market_value ?? p.value ?? "")}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="text-xs">
-          现金：{typeof last.cash === "number" ? last.cash : JSON.stringify(last.cash)} ·
-          权益/净值：{String(last.nav ?? last.equity ?? "")}
-        </p>
-      </details>
-      <details>
-        <summary className="cursor-pointer">订单（全部 {orders.length} 笔）</summary>
-        <table className="w-full text-xs my-1">
-          <thead>
-            <tr className="text-muted-foreground">
-              <th className="text-left">日期</th>
-              <th className="text-left">标的</th>
-              <th className="text-left">方向</th>
-              <th className="text-right">数量</th>
-              <th className="text-right">价格</th>
-              <th className="text-left">状态</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map((o, i) => (
-              <tr key={i} className="border-t border-border">
-                <td>{String(o._date || "")}</td>
-                <td>{String(o.symbol || o.code || "")}</td>
-                <td>{String(o.side || o.action || "")}</td>
-                <td className="text-right">{String(o.qty ?? o.quantity ?? "")}</td>
-                <td className="text-right">{String(o.price ?? o.fill_price ?? "")}</td>
-                <td>{String(o.status || "")}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </details>
-      <details>
-        <summary className="cursor-pointer">逐日净值（{navRows.length} 日）</summary>
-        <table className="w-full text-xs my-1">
-          <tbody>
-            {navRows.map((d, i) => (
-              <tr key={i} className="border-t border-border">
-                <td>{String(d.date || d.trade_date)}</td>
-                <td className="text-right">nav={String(d.nav)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </details>
     </div>
   );
 }
