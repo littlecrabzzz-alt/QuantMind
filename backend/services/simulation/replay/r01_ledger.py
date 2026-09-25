@@ -461,6 +461,7 @@ class R01Ledger:
         *,
         created_at: datetime | None = None,
         source_node: str = "mac",
+        input_binding: dict[str, Any] | None = None,
     ):
         self.package = package
         self.config = config
@@ -468,6 +469,12 @@ class R01Ledger:
         self.created_at = created_at or utc_now()
         self.source_node = source_node
         self.contract_versions = dict(CONTRACT_VERSIONS)
+        # J4E1：输入绑定（基线 + 已消费日增量有序清单）。缺省从包自身
+        # 捕获；恢复/续跑走 rebuild_bound_package 重建的包应显式传入
+        # 同源绑定（消费新增量后须用 extend_binding 更新再入检查点）。
+        from backend.services.simulation.replay.daily_binding import capture_binding
+
+        self.input_binding = input_binding or capture_binding(package)
 
         self.cash = float(config.initial_cash)
         self.initial_cash_locked = True
@@ -1337,9 +1344,11 @@ class R01Ledger:
         """完整账本状态快照（纯状态、确定性；与 export_evidence 的区别：
         面向恢复重放，含全部可变状态，账务字段不做展示层取整）。"""
         return {
-            "schema_version": 4,
+            "schema_version": 5,
             "ledger_run_id": self.ledger_run_id,
             "package_id": self.package.package_id,
+            # J4E1：跨包恢复身份=基线+已消费日增量清单（非瞬时 package_id）
+            "input_binding": self.input_binding,
             "config": self.config.to_dict(),
             "contract_versions": dict(self.contract_versions),
             "cash": self.cash,
@@ -1380,12 +1389,26 @@ class R01Ledger:
                 f"checkpoint ledger_run_id 不匹配: {checkpoint.get('ledger_run_id')}"
                 f" != {config.ledger_run_id}"
             )
-        # W2E4：跨包恢复防护——防绕过持久层直调 restore 混用输入包
-        cp_package = checkpoint.get("package_id")
-        if cp_package is not None and cp_package != package.package_id:
+        # W2E4/J4E1：跨包恢复防护——身份=基线+已消费日增量清单（前缀
+        # 兼容）。旧式瞬时 package_id 全等仅在 checkpoint 无 input_binding
+        # 时兜底；绑定缺失按冻结规则显式拒绝（schema v5 起必带）。
+        cp_binding = checkpoint.get("input_binding")
+        if cp_binding is None:
             raise CheckpointPackageMismatch(
-                f"checkpoint_package_mismatch: checkpoint 由包 {cp_package!r} 生成，"
-                f"不能从包 {package.package_id!r} 恢复"
+                "checkpoint_package_mismatch: 快照缺少 input_binding 绑定字段"
+                f"（schema_version={checkpoint.get('schema_version')}，拒绝恢复；"
+                "重建包请用 daily_binding.rebuild_bound_package 并传入绑定）"
+            )
+        from backend.services.simulation.replay.daily_binding import (
+            binding_compatible,
+            capture_binding,
+        )
+
+        ok, why = binding_compatible(capture_binding(package), cp_binding)
+        if not ok:
+            raise CheckpointPackageMismatch(
+                f"checkpoint_package_mismatch: {why}；已消费清单不因新发布的"
+                "未消费日增量改变（消费新增量须 extend_binding 显式扩展）"
             )
         # F1 修复 AC-03：完整冻结 config 绑定——本金/费率/滑点/风险参数/
         # 参与率/组别/策略标识/attempt 全量比对；缺绑定字段（旧版快照）
