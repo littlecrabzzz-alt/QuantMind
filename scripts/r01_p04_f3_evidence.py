@@ -52,7 +52,9 @@ def call(method, url, body=None, token=None):
 def db_binding():
     out = subprocess.run(
         ["docker", "exec", "quantmind-dev-db", "psql", "-U", "quantmind", "-d", "quantmind", "-At", "-c",
-         "SELECT coalesce(acceptance_binding::text,'NULL') FROM research_project_readiness WHERE project_key='r01'"],
+         "SELECT coalesce(acceptance_binding::text,'NULL') FROM research_project_readiness "
+         "WHERE tenant_id='default' AND user_id='10000001' AND project_key='r01' "
+         f"AND node_id='{NODE}'"],
         capture_output=True, text=True).stdout.strip()
     return json.loads(out) if out != "NULL" else None
 
@@ -183,6 +185,34 @@ def main():
     call("POST", GW + "/projects/r01/readiness", final, token)
     binding_final = db_binding()
     results.append(report("G 真实绑定+验收 passed => applied"))
+    # H. 未登记：新注册用户（真实网关）无 readiness 行 => readiness_missing
+    suffix = str(int(time.time()))[-6:]
+    _, reg = call("POST", BASE + "/api/v1/auth/register",
+                  {"username": "f3visitor" + suffix, "password": "F3Visitor2026",
+                   "email": f"f3visitor{suffix}@example.com", "tenant_id": "default"})
+    _, vb_auth = call("POST", BASE + "/api/v1/auth/login",
+                      {"username": "f3visitor" + suffix, "password": "F3Visitor2026",
+                       "tenant_id": "default"})
+    vtoken = vb_auth["access_token"]
+    _, vcase = call("POST", GW + "/cases", {
+        "key": "r01-f3-visitor-" + suffix, "question": "F3P2 未登记用户（B1）",
+        "executor_kind": "external", "project_key": "r01", "workstream": "B1"}, vtoken)
+    _, vbody = call("POST", GW + f"/cases/{vcase['id']}/external-reports",
+                    envelope(vcase["id"], event_id="ev-v1"), vtoken)
+    results.append({"label": "H 未登记 readiness => not_ready(readiness_missing)",
+                    "http": 201, "status": vbody.get("status"),
+                    "not_ready_reason": vbody.get("not_ready_reason")})
+    # I. 绑定缺失：verdict=passed 但绑定行为空（模拟历史行/绑定丢失）
+    subprocess.run(["docker", "exec", "quantmind-dev-db", "psql", "-U", "quantmind", "-d", "quantmind", "-c",
+                    f"UPDATE research_project_readiness SET acceptance_binding=NULL "
+                    f"WHERE tenant_id='default' AND user_id='10000001' AND project_key='r01' AND node_id='{NODE}'"],
+                   capture_output=True, text=True)
+    results.append(report("I 绑定缺失 => not_ready(acceptance_binding_missing)"))
+    # 恢复真实绑定（重过验收翻 passed：绑定重建）
+    call("POST", GW + "/projects/r01/readiness",
+         readiness(independent_acceptance={"status": "pending", "at": None, "by": None}), token)
+    call("POST", GW + "/projects/r01/readiness",
+         readiness(independent_acceptance={**accepted_verdict, "at": "2026-09-25T06:30:00Z"}), token)
     (OUT / "ac06-negative-cases.json").write_text(json.dumps({
         "note": "AC-06 六类：pending/failed/绑定缺失(由 binding None 形态或历史行)/未登记/漂移 stale/passed 放行；"
                 "绑定缺失场景见 acceptance-binding-snapshots.json 说明（本序列中 D 首次翻 passed 前不存在绑定）",
@@ -227,7 +257,8 @@ def main():
                       "results": [(r["label"], r["status"]) for r in results]}, ensure_ascii=False, indent=1))
     assert all(ok for _, ok in checklist), checklist
     assert binding_first == binding_after_repeat
-    expected = ["not_ready", "not_ready", "not_ready", "applied", "not_ready", "not_ready", "applied"]
+    expected = ["not_ready", "not_ready", "not_ready", "applied", "not_ready", "not_ready",
+                "applied", "not_ready", "not_ready"]
     assert [r["status"] for r in results] == expected, [r["status"] for r in results]
 
 if __name__ == "__main__":
