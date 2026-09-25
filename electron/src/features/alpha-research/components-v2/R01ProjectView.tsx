@@ -376,6 +376,7 @@ function ArtifactEntry({
         </span>
         {artifact.fixture ? <FixtureBadge compact /> : <Tag color="blue">真实</Tag>}
         {artifact.not_ready && <NotReadyBadge />}
+        <span className="text-muted-foreground">来源 run：{artifact.source_run_id}</span>
         <Button size="small" onClick={() => void download()}>
           下载
         </Button>
@@ -536,6 +537,9 @@ function ExternalCasePanel({
         </Tag>
         <Tag>证据阶段：{stageLabel[summary.evidence_stage] || summary.evidence_stage}</Tag>
         <Tag>{workstreamName[summary.workstream] || summary.workstream}</Tag>
+        <Tooltip title="研究执行状态与实盘/交易运行状态互不挂接；running 仅指研究运行">
+          <Tag color="default">研究执行状态（非交易）</Tag>
+        </Tooltip>
         {summary.stop_requested && (
           <Tag color="orange" icon={<PauseCircle size={12} />}>
             已请求外部停止（待外部确认，平台不伪造已停止）
@@ -559,6 +563,28 @@ function ExternalCasePanel({
         最近回报 {summary.last_event_at?.slice(0, 19) || "无"}
         {summary.data?.data_as_of ? ` · 数据截止 ${summary.data.data_as_of}` : ""}
       </p>
+      <div className="text-xs space-y-1">
+        <p>
+          当前步骤：
+          {summary.current_step
+            ? `${summary.current_step.title}（${stepLabel[summary.current_step.status] || summary.current_step.status}，${summary.current_step.at.slice(0, 19)}）`
+            : "尚无步骤回报"}
+        </p>
+        <p>
+          下一步：
+          {summary.next_step
+            ? `${summary.next_step.title}（${stepLabel[summary.next_step.status] || summary.next_step.status}）`
+            : "全部已回报步骤完成或无待办"}
+        </p>
+        <p>
+          用量/费用：
+          {summary.usage?.values?.length
+            ? summary.usage.values
+                .map((v) => `${v.metric}=${v.value}${v.unit}（${v.source_run_id}）`)
+                .join("；")
+            : summary.usage?.note || "未统计"}
+        </p>
+      </div>
       {summary.runs.map((run) => (
         <details key={run.source_run_id} className="border border-border rounded-lg p-2">
           <summary className="cursor-pointer">
@@ -569,7 +595,8 @@ function ExternalCasePanel({
           <p className="text-xs mt-1">
             任务 {run.source_task} · 运行区间 {run.first_seen_at.slice(0, 19)} →{" "}
             {run.last_seen_at.slice(0, 19)}
-            {run.data?.input_package_id ? ` · 输入 ${run.data.input_package_id}` : ""}
+            {run.data?.input_package_id ? ` · 输入 ${run.data.input_package_id}` : ""} ·
+            恢复点：续报从 seq {run.resume_after_seq ?? run.last_seq} + 1 起（重复回报幂等不新增实验）
           </p>
           {run.errors.length > 0 && (
             <pre className="text-xs whitespace-pre-wrap text-red-500 mt-1">

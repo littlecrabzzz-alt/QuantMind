@@ -516,6 +516,35 @@ def apply_event(external, envelope, received_at, not_ready, not_ready_reason=Non
     return decision, "; ".join(notes) if notes else None
 
 
+def _current_step(external):
+    steps = external.get("progress") or {}
+    order = [sid for sid in external.get("steps_order", []) if sid in steps]
+    return {"step_id": order[-1], **steps[order[-1]]} if order else None
+
+
+def _next_step(external):
+    steps = external.get("progress") or {}
+    for sid in external.get("steps_order", []):
+        row = steps.get(sid)
+        if row and row.get("status") != "done":
+            return {"step_id": sid, **row}
+    return None
+
+
+def _reported_usage(external):
+    """Aggregate only runner-reported usage/cost metrics; None => 未统计."""
+    values = []
+    for entry in external.get("metrics") or []:
+        for m in entry.get("metrics") or []:
+            if m.get("metric", "").startswith(("usage.", "usage_", "cost.", "cost_")):
+                values.append({**m, "source_run_id": entry.get("source_run_id"),
+                               "at": entry.get("at")})
+    if not values:
+        return {"values": None,
+                "note": "未统计：外部 runner 未按合同回报用量/费用（不以累计尝试冒充）"}
+    return {"values": values, "note": "来源：外部回报 metrics（真实值）"}
+
+
 def derive_summary(external, now=None, stale_after=21600.0):
     """Read-side derived fields (never persisted): staleness and rollups."""
 
@@ -557,6 +586,8 @@ def derive_summary(external, now=None, stale_after=21600.0):
                         "errors",
                     )
                 },
+                # 恢复点：续报从 last_seq+1 起；同 run 重复事件幂等不新增实验
+                "resume_after_seq": r["last_seq"],
             }
             for rid, r in external["runs"].items()
         ],
@@ -565,6 +596,10 @@ def derive_summary(external, now=None, stale_after=21600.0):
         "events_stale": external.get("events_stale", 0),
         "events_error": external.get("events_error", 0),
         "last_event_at": external.get("last_event_at"),
+        "current_step": _current_step(external),
+        "next_step": _next_step(external),
+        # 用量/费用只认外部回报的真实值；未回报=未统计，不以 attempts 冒充
+        "usage": _reported_usage(external),
         "progress": [
             {"step_id": sid, **external["progress"][sid]} for sid in external["steps_order"]
         ],

@@ -112,6 +112,7 @@ export interface ExternalRun {
   source_task: string;
   first_seq: number;
   last_seq: number;
+  resume_after_seq?: number;
   execution_status: string;
   evidence_stage: string;
   first_seen_at: string;
@@ -137,6 +138,20 @@ export interface ExternalCaseSummary {
   events_stale: number;
   events_error: number;
   last_event_at: string | null;
+  current_step?: { step_id: string; title: string; status: string; at: string } | null;
+  next_step?: { step_id: string; title: string; status: string } | null;
+  usage?: {
+    values: Array<{
+      metric: string;
+      value: number | null;
+      null_reason?: string;
+      unit: string;
+      basis: string;
+      source_run_id?: string;
+      at?: string;
+    }> | null;
+    note: string;
+  };
   progress: Array<{
     step_id: string;
     title: string;
@@ -155,6 +170,8 @@ export interface ExternalCaseSummary {
     at: string;
     fixture: boolean;
     not_ready: boolean;
+    not_ready_reason?: string;
+    source_run_id?: string;
   }>;
   metrics: Array<{
     strategy_id: string;

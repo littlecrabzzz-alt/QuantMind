@@ -790,6 +790,72 @@ class TestPureLogic:
         finally:
             env.app.state.settings.external_contract_node = saved
 
+    def test_h1_step_and_usage_derivations(self, env):
+        # 两次有界运行：一次完成、一次失败中断；当前/下一步、用量、恢复点派生
+        register_case(env, key="case-key-h1")
+        # run-1：两步完成 + 真实用量回报
+        submit(env, envelope(env, source_run_id="run-h1-a", event_id="ev-a1", seq=0,
+                             execution_status="running",
+                             progress_step={"step_id": "s1", "title": "数据核验", "status": "done"}))
+        submit(env, envelope(env, source_run_id="run-h1-a", event_id="ev-a2", seq=1,
+                             execution_status="running",
+                             progress_step={"step_id": "s2", "title": "链路联调", "status": "done"}))
+        usage_env = envelope(env, source_run_id="run-h1-a", event_id="ev-a3", seq=2,
+                             kind="metrics", execution_status="completed",
+                             fixture=False, strategy_id="h1-demo")
+        usage_env.pop("progress_step")
+        usage_env["metrics"] = [
+            {"metric": "usage.tokens_input", "value": 1234, "unit": "tokens", "basis": "runner 实报"},
+            {"metric": "cost.cny", "value": 1.25, "unit": "cny", "basis": "runner 实报"},
+        ]
+        assert submit(env, usage_env).status_code == 201
+        # run-2：中断（blocked + errors）
+        failed = envelope(env, source_run_id="run-h1-b", event_id="ev-b1", seq=0,
+                          execution_status="blocked",
+                          progress_step={"step_id": "s3", "title": "回放联调", "status": "blocked"},
+                          errors=["sandbox 网络中断"])
+        assert submit(env, failed).status_code == 201
+        detail = env.get(f"/cases/{env.case_id}").json()
+        ext = detail["external"]
+        assert ext["attempts"] == 2  # 成功与失败运行都保留
+        runs = {r["source_run_id"]: r for r in ext["runs"]}
+        assert runs["run-h1-a"]["execution_status"] == "completed"
+        assert runs["run-h1-b"]["execution_status"] == "blocked"
+        assert runs["run-h1-b"]["errors"] == ["sandbox 网络中断"]
+        assert runs["run-h1-a"]["resume_after_seq"] == 2  # 恢复点
+        assert ext["current_step"]["step_id"] == "s3"  # 最近实际回报步骤
+        assert ext["next_step"]["step_id"] == "s3"  # 首个未完成步骤
+        assert {v["metric"] for v in ext["usage"]["values"]} == {"usage.tokens_input", "cost.cny"}
+
+    def test_h1_usage_untracked_when_not_reported(self, env):
+        register_case(env, key="case-key-h1b")
+        submit(env, envelope(env, event_id="ev-u1", seq=0))
+        ext = env.get(f"/cases/{env.case_id}").json()["external"]
+        assert ext["usage"]["values"] is None
+        assert "未统计" in ext["usage"]["note"] and "冒充" in ext["usage"]["note"]
+        assert ext["attempts"] == 1  # attempts 不冒充用量
+
+    def test_h1_same_name_different_versions_not_mixed(self, env):
+        # 同名策略不同版本：strategy_id 相同、seq/run 不同的事件按运行归属，不混
+        register_case(env, key="case-key-h1c")
+        for i, rid in enumerate(("run-v1", "run-v2")):
+            payload = envelope(env, source_run_id=rid, event_id=f"ev-{rid}", seq=0,
+                               kind="metrics", strategy_id="same-strategy",
+                               execution_status="completed" if i else "failed",
+                               fixture=False)
+            payload.pop("progress_step")
+            payload["metrics"] = [
+                {"metric": "total_return", "value": None, "null_reason": "not-computed",
+                 "unit": "ratio", "basis": f"版本 {rid}"},
+            ]
+            assert submit(env, payload).status_code == 201
+        ext = env.get(f"/cases/{env.case_id}").json()["external"]
+        assert ext["attempts"] == 2
+        assert {m["source_run_id"] for m in ext["metrics"]} == {"run-v1", "run-v2"}
+        assert {m["metrics"][0]["basis"] for m in ext["metrics"]} == {"版本 run-v1", "版本 run-v2"}
+        version = ext["strategy_versions"][0]
+        assert version["strategy_id"] == "same-strategy" and version["events"] == 2
+
     def test_groups_never_fabricate_numbers(self):
         groups = external.project_groups(
             [{"case_id": "c1", "workstream": "A", "metrics": [],
