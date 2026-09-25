@@ -351,6 +351,420 @@ def _write_sums(package_dir: Path):
     (package_dir / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n")
 
 
+SSE_511090_20240424_ANNOUNCEMENT = "https://www.sse.com.cn/disclosure/fund/announcement/c/new/2024-04-19/511090_20240419_UBA9.pdf"
+# Authoritative case from the independent acceptance report AC-01:
+# 511090 registration 2024-04-23 / ex-div 2024-04-24 / pay 2024-04-29, 1.5 CNY/share.
+AUTHORITATIVE_511090 = {
+    "code": "511090.SH",
+    "event_date": "2024-04-24",
+    "record_date": "2024-04-23",
+    "pay_date": "2024-04-29",
+    "cash_per_share": 1.5,
+}
+
+
+def _verify_package_sums(package_dir: Path):
+    """Return {rel_path: sha256} after recomputing SHA256SUMS.txt entries."""
+    sums = {}
+    for line in (package_dir / "SHA256SUMS.txt").read_text().splitlines():
+        digest, rel = line.split("  ", 1)
+        path = package_dir / rel
+        if not path.is_file() or sha256_file(path) != digest:
+            raise SystemExit(f"Frozen package file missing/hash mismatch: {rel}")
+        sums[rel] = digest
+    on_disk = {
+        str(p.relative_to(package_dir))
+        for p in package_dir.rglob("*")
+        if p.is_file() and p.name != "SHA256SUMS.txt"
+    }
+    if on_disk != set(sums):
+        raise SystemExit("Frozen package SHA256SUMS does not cover all files")
+    return sums
+
+
+def _write_events_parquet_v3(path, code, events):
+    """Schema v3 events parquet: cash rows carry the dividend date fields.
+
+    Rows are exported to JSON row-type-aware: keys whose value is null AND that
+    are forbidden for the row's event_type (the cash-only date fields on a
+    share_adjustment row) are dropped; keys required for the row's event_type
+    are kept even when null (unknown dates).
+    """
+    derived = pa.struct(
+        [
+            pa.field("adj_factor_prev", pa.float64()),
+            pa.field("adj_factor_new", pa.float64()),
+            pa.field("fund_div_ref", pa.string()),
+        ]
+    )
+    verification = pa.struct(
+        [
+            pa.field("passed", pa.bool_()),
+            pa.field("method", pa.string()),
+            pa.field("detail", pa.string()),
+        ]
+    )
+    schema = pa.schema(
+        [
+            pa.field("symbol", pa.string()),
+            pa.field("event_date", pa.string()),
+            pa.field("event_type", pa.string()),
+            pa.field("cash_per_share", pa.float64()),
+            pa.field("qty_multiplier", pa.float64()),
+            pa.field("event_id", pa.string()),
+            pa.field("record_date", pa.string()),
+            pa.field("record_date_status", pa.string()),
+            pa.field("pay_date", pa.string()),
+            pa.field("pay_date_status", pa.string()),
+            pa.field("entitlement_basis", pa.string()),
+            pa.field("basis_note", pa.string()),
+            pa.field("derived_from", derived),
+            pa.field("verification", verification),
+        ]
+    )
+    rows = []
+    for e in events:
+        row = {
+            "symbol": code,
+            **{
+                k: e[k]
+                for k in (
+                    "event_date",
+                    "event_type",
+                    "cash_per_share",
+                    "qty_multiplier",
+                    "basis_note",
+                )
+            },
+            **{
+                k: e.get(k)
+                for k in (
+                    "event_id",
+                    "record_date",
+                    "record_date_status",
+                    "pay_date",
+                    "pay_date_status",
+                    "entitlement_basis",
+                )
+            },
+            "derived_from": e["derived_from"],
+            "verification": e["verification"],
+        }
+        rows.append(row)
+    pq.write_table(pa.Table.from_pylist(rows, schema=schema), path)
+
+
+def upgrade_dividends_v3(args):
+    """Derive package v2 (schema v3): v1 content frozen, dividend events upgraded."""
+    root = args.root.expanduser().resolve()
+    release_hash = args.release_id.removeprefix("data-")
+    manifest_path = root / "releases" / args.release_id / "manifest.json"
+    raw = manifest_path.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != release_hash:
+        raise SystemExit("Release manifest checksum mismatch")
+    rel_manifest = json.loads(raw)
+
+    v1_dir = args.from_package.expanduser().resolve()
+    v1_manifest = json.loads((v1_dir / "manifest.json").read_text())
+    if v1_manifest.get("schema_version") != 2:
+        raise SystemExit("--from-package must be a schema_version=2 (v1) package")
+    if v1_manifest["source_release_id"] != args.release_id:
+        raise SystemExit("v1 package source release differs from --release-id")
+    v1_sums = _verify_package_sums(v1_dir)
+    v1_manifest_sha = sha256_file(v1_dir / "manifest.json")
+    print(
+        f"[v1] frozen package verified ({len(v1_sums)} files, manifest {v1_manifest_sha[:12]}…)",
+        flush=True,
+    )
+
+    # ---- fund_div record/pay dates from the same frozen release
+    rows, _, entries = collect_api(root, rel_manifest, "fund_div", args.workers)
+    div = pd.DataFrame(rows)
+    div, _ = latest_version(div, ["ts_code", "ex_date", "base_year", "div_cash"])
+    div_dates = {}
+    prefix_to_suffix = {v: k for k, v in SUFFIX_TO_PREFIX.items()}
+    for row in div.itertuples(index=False):
+        code = prefix_to_suffix.get(row.ts_code)
+        if code is None:
+            continue
+        div_dates.setdefault(code, {})[str(row.ex_date)] = {
+            "record_date": None if pd.isna(row.record_date) else str(row.record_date),
+            "pay_date": None if pd.isna(row.pay_date) else str(row.pay_date),
+            "base_year": None if pd.isna(row.base_year) else str(row.base_year),
+            "div_cash": None if pd.isna(row.div_cash) else float(row.div_cash),
+        }
+    print(
+        f"[fund_div] {len(entries)} files verified, codes with events: {sorted(div_dates)}",
+        flush=True,
+    )
+
+    version = args.package_version or ("v2-" + release_hash[:8])
+    package_dir = args.output_root.expanduser() / version
+    if package_dir.exists():
+        if not args.force:
+            raise SystemExit(
+                f"Package directory already exists: {package_dir} (use --force)"
+            )
+        shutil.rmtree(package_dir)
+    (package_dir / "events").mkdir(parents=True)
+
+    # ---- copy every non-events file byte-identical from v1
+    copied = {}
+    for rel in sorted(v1_sums):
+        if rel.startswith("events/") or rel in (
+            "manifest.json",
+            "README.md",
+            "derivation-report.json",
+            "SHA256SUMS.txt",
+        ):
+            continue
+        target = package_dir / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(v1_dir / rel, target)
+        copied[rel] = sha256_file(target)
+    diff_mismatch = [rel for rel, digest in copied.items() if digest != v1_sums[rel]]
+    if diff_mismatch:
+        raise SystemExit(f"Copied files differ from v1: {diff_mismatch}")
+
+    # ---- upgrade dividend events
+    blocked_stats = {"codes": {}, "total_blocked": 0, "total_cash": 0}
+    coverage = {}
+    authoritative_ok = False
+    for code, _, _ in POOL:
+        v1_ev = v1_dir / "events" / f"{code}.parquet"
+        if not v1_ev.exists():
+            continue
+        events = pq.read_table(v1_ev).to_pylist()
+        upgraded = []
+        cov_rows = []
+        for e in events:
+            e = {k: v for k, v in e.items() if k != "symbol"}
+            if e["event_type"] != "cash_dividend":
+                upgraded.append(e)
+                continue
+            day8 = e["event_date"].replace("-", "")
+            info = div_dates.get(code, {}).get(day8)
+            if info is None:
+                raise SystemExit(
+                    f"fund_div raw event missing for {code} {day8}; cannot upgrade"
+                )
+            prefix = SUFFIX_TO_PREFIX[code]
+            year = info["base_year"] or f"{info['div_cash']:g}"
+            rec = _iso(info["record_date"]) if info["record_date"] else None
+            pay = _iso(info["pay_date"]) if info["pay_date"] else None
+            rec_status = "known" if rec else "unknown_blocked"
+            pay_status = "known" if pay else "unknown_blocked"
+            e2 = dict(e)
+            e2["event_id"] = f"fund_div:{prefix}:{day8}:{year}"
+            e2["record_date"] = rec
+            e2["record_date_status"] = rec_status
+            e2["pay_date"] = pay
+            e2["pay_date_status"] = pay_status
+            e2["entitlement_basis"] = "record_date_close_holdings"
+            blocked = rec_status == "unknown_blocked" or pay_status == "unknown_blocked"
+            if blocked:
+                e2["verification"] = {
+                    "passed": False,
+                    "method": "unresolved_gap",
+                    "detail": (
+                        f"dividend dates blocked (record_date={'known' if rec else 'unknown'}, "
+                        f"pay_date={'known' if pay else 'unknown'}); ex_date anchoring kept; "
+                        f"factor evidence retained: {e['verification'].get('detail', '')}"
+                    ),
+                }
+                blocked_stats["total_blocked"] += 1
+            elif (
+                code == AUTHORITATIVE_511090["code"]
+                and e["event_date"] == AUTHORITATIVE_511090["event_date"]
+            ):
+                ref = e2["derived_from"]
+                e2["derived_from"] = {
+                    **ref,
+                    "fund_div_ref": f"{ref.get('fund_div_ref', '')}; announcement: {SSE_511090_20240424_ANNOUNCEMENT}",
+                }
+                e2["verification"] = {
+                    "passed": True,
+                    "method": "record_date_evidence",
+                    "detail": (
+                        f"authoritative announcement match: record_date={rec} ex_date={day8} "
+                        f"pay_date={pay} div={info['div_cash']:g} CNY/share "
+                        f"(SSE disclosure {SSE_511090_20240424_ANNOUNCEMENT}); "
+                        f"factor evidence: {e['verification'].get('detail', '')}"
+                    ),
+                }
+                if (
+                    rec == AUTHORITATIVE_511090["record_date"]
+                    and pay == AUTHORITATIVE_511090["pay_date"]
+                    and abs(
+                        e2["cash_per_share"] - AUTHORITATIVE_511090["cash_per_share"]
+                    )
+                    < 1e-9
+                ):
+                    authoritative_ok = True
+            else:
+                e2["verification"] = {
+                    **e["verification"],
+                    "detail": (
+                        f"{e['verification'].get('detail', '')}; "
+                        f"record_date={rec} pay_date={pay} (fund_div raw fields)"
+                    ),
+                }
+            upgraded.append(e2)
+            cov_rows.append(
+                {
+                    "event_date": e2["event_date"],
+                    "record_date": rec,
+                    "record_date_status": rec_status,
+                    "pay_date": pay,
+                    "pay_date_status": pay_status,
+                    "cash_per_share": e2["cash_per_share"],
+                    "blocked": blocked,
+                    "event_id": e2["event_id"],
+                }
+            )
+        blocked_stats["codes"][code] = {
+            "cash_events": sum(
+                1 for x in upgraded if x["event_type"] == "cash_dividend"
+            ),
+            "blocked": sum(1 for x in cov_rows if x["blocked"]),
+        }
+        blocked_stats["total_cash"] += blocked_stats["codes"][code]["cash_events"]
+        coverage[code] = cov_rows
+        _write_events_parquet_v3(
+            package_dir / "events" / f"{code}.parquet", code, upgraded
+        )
+        print(
+            f"[v2-events] {code}: {len(upgraded)} events "
+            f"(cash={blocked_stats['codes'][code]['cash_events']}, blocked={blocked_stats['codes'][code]['blocked']})",
+            flush=True,
+        )
+    if not authoritative_ok:
+        raise SystemExit(
+            "Authoritative 511090 2024-04-24 case did not match the archive (record/pay/cash)"
+        )
+
+    manifest_out = dict(v1_manifest)
+    manifest_out.update(
+        {
+            "schema_version": 3,
+            "package_version": version,
+            "package_uri": f"node://mac/r01-etf-daily/{version}",
+            "generated_at": datetime.now(timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z"),
+        }
+    )
+    manifest_out["factor_convention"] = dict(v1_manifest["factor_convention"])
+    manifest_out["factor_convention"]["verified_cases"] = list(
+        v1_manifest["factor_convention"]["verified_cases"]
+    ) + [
+        (
+            f"{AUTHORITATIVE_511090['code']} {AUTHORITATIVE_511090['event_date']} cash_dividend record_date_evidence: "
+            f"record {AUTHORITATIVE_511090['record_date']} / ex {AUTHORITATIVE_511090['event_date']} / "
+            f"pay {AUTHORITATIVE_511090['pay_date']} / {AUTHORITATIVE_511090['cash_per_share']} CNY per share "
+            f"matches the SSE fund announcement ({SSE_511090_20240424_ANNOUNCEMENT}); blocked dividend-date events: 0"
+        )
+    ]
+    (package_dir / "manifest.json").write_text(
+        json.dumps(manifest_out, ensure_ascii=False, indent=2) + "\n"
+    )
+
+    report = {
+        "kind": "v2-upgrade-from-v1",
+        "v1_package": str(v1_dir),
+        "v1_package_uri": v1_manifest["package_uri"],
+        "v1_manifest_sha256": v1_manifest_sha,
+        "source_release_id": args.release_id,
+        "package_version": version,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "diff_v1_to_v2": (
+            "Only dividend (cash_dividend) event fields changed: added event_id, record_date, "
+            "record_date_status, pay_date, pay_date_status, entitlement_basis (schema v3). "
+            "daily/, factors/, dividends/, etf_limit/, calendar.parquet copied byte-identical "
+            "(hash-equal to v1 SHA256SUMS); share_adjustment events unchanged; v1 package untouched."
+        ),
+        "files_copied_byte_identical": sorted(copied),
+        "share_adjustment_events_unchanged": True,
+        "dividend_date_coverage": coverage,
+        "blocked_events": blocked_stats,
+        "authoritative_511090_case": {
+            **AUTHORITATIVE_511090,
+            "matched": authoritative_ok,
+            "announcement": SSE_511090_20240424_ANNOUNCEMENT,
+        },
+    }
+    (package_dir / "derivation-report.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=2, default=str) + "\n"
+    )
+
+    readme = [
+        f"# R01 ETF fixed daily input package `{version}` (schema v3)",
+        "",
+        "- v2 upgrade of the frozen v1 package (AC-01 fix): identical daily/factors/dividends/etf_limit/calendar",
+        "  content; only cash_dividend events gained `event_id`, `record_date`, `record_date_status`, `pay_date`,",
+        "  `pay_date_status`, `entitlement_basis` (contract `etf-input-package.schema.json` v3).",
+        "- Unknown dates are `null` with `*_status=unknown_blocked` and `verification.method=unresolved_gap`,",
+        "  `passed=false`; ex_date is NEVER defaulted into record_date/pay_date.",
+        "- Entitlement basis (normative): `record_date_close_holdings` — holdings registered at the record-date",
+        "  close receive the dividend; cash becomes available on pay_date.",
+        "- Row-to-JSON export rule for `events/*.parquet`: drop null-valued keys that are forbidden for the",
+        "  row's event_type (the dividend date fields on share_adjustment rows); keep required keys even when null.",
+        f"- v1 lineage: {v1_manifest['package_uri']} (manifest sha256 {v1_manifest_sha}); source release {args.release_id}.",
+        "- Units/factors/warmup conventions unchanged from v1 (see v1 README and docs/r01-p0/).",
+        "",
+        "Generated by `scripts/prepare_r01_etf_inputs.py --from-package <v1 dir>`.",
+    ]
+    (package_dir / "README.md").write_text("\n".join(readme) + "\n")
+    _write_sums(package_dir)
+
+    # ---- registry
+    args.registry.parent.mkdir(parents=True, exist_ok=True)
+    registry = {"packages": {}}
+    if args.registry.exists():
+        try:
+            registry = json.loads(args.registry.read_text())
+        except json.JSONDecodeError as exc:
+            raise SystemExit("Node registry is corrupt") from exc
+    uri = manifest_out["package_uri"]
+    existing = registry["packages"].get(uri)
+    if (
+        existing
+        and existing.get("absolute_path") != str(package_dir)
+        and not args.force
+    ):
+        raise SystemExit(f"Registry already maps {uri} to {existing['absolute_path']}")
+    registry["packages"][uri] = {
+        "absolute_path": str(package_dir),
+        "package_id": manifest_out["package_id"],
+        "package_version": version,
+        "source_release_id": args.release_id,
+        "created_at": manifest_out["generated_at"],
+        "upgrade_of": v1_manifest["package_uri"],
+    }
+    fd, tmp = tempfile.mkstemp(dir=args.registry.parent)
+    with os.fdopen(fd, "w") as handle:
+        json.dump(registry, handle, ensure_ascii=False, indent=2)
+    os.replace(tmp, args.registry)
+
+    print(
+        json.dumps(
+            {
+                "package_uri": uri,
+                "package_path": str(package_dir),
+                "manifest_sha256": sha256_file(package_dir / "manifest.json"),
+                "schema_version": 3,
+                "cash_events": blocked_stats["total_cash"],
+                "blocked_events": blocked_stats["total_blocked"],
+                "authoritative_511090_matched": authoritative_ok,
+                "v1_manifest_sha256_unchanged": sha256_file(v1_dir / "manifest.json")
+                == v1_manifest_sha,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
@@ -361,11 +775,21 @@ def main():
     parser.add_argument("--package-version", default=None)
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument(
+        "--from-package",
+        type=Path,
+        default=None,
+        help="upgrade mode: derive schema-v3 package v2 from this frozen v1 package",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="overwrite an existing package directory/registry entry",
     )
     args = parser.parse_args()
+
+    if args.from_package:
+        upgrade_dividends_v3(args)
+        return
 
     root = args.root.expanduser().resolve()
     release_hash = args.release_id.removeprefix("data-")

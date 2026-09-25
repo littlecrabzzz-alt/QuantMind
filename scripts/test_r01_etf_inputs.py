@@ -110,8 +110,8 @@ def validate_manifest(m):
         },
         "manifest",
     )
-    if m.get("schema_version") != 2:
-        problems.append("schema_version must be 2")
+    if m.get("schema_version") not in (2, 3):
+        problems.append("schema_version must be 2 or 3")
     for key in ("package_id", "package_version", "source_release_id"):
         if not isinstance(m.get(key), str) or not m[key]:
             problems.append(f"{key} must be a nonempty string")
@@ -240,7 +240,37 @@ def validate_manifest(m):
     return problems
 
 
-def validate_typed_event(e, where):
+CASH_ONLY_FIELDS = (
+    "event_id",
+    "record_date",
+    "record_date_status",
+    "pay_date",
+    "pay_date_status",
+    "entitlement_basis",
+)
+
+
+def row_to_event(row):
+    """Documented events/*.parquet row-to-JSON export rule.
+
+    Drop null-valued keys that are forbidden for the row's event_type (the
+    cash-only dividend fields on a share_adjustment row); keep keys required
+    for the row's event_type even when null (unknown dividend dates).
+    """
+    e = {k: v for k, v in row.items() if k != "symbol"}
+    if e.get("event_type") == "share_adjustment":
+        for key in CASH_ONLY_FIELDS:
+            if e.get(key) is None:
+                e.pop(key, None)
+    if e.get("basis_note") in (None, ""):
+        e.pop("basis_note", None)
+    derived = e.get("derived_from")
+    if isinstance(derived, dict) and derived.get("fund_div_ref") is None:
+        derived.pop("fund_div_ref", None)
+    return e
+
+
+def validate_typed_event(e, where, schema_version=2):
     """Mirror $defs.typed_event including the event_type conditionals."""
     problems = []
     req = [
@@ -251,7 +281,10 @@ def validate_typed_event(e, where):
         "derived_from",
         "verification",
     ]
+    v3_cash_req = list(CASH_ONLY_FIELDS)
     allowed = set(req) | {"basis_note"}
+    if schema_version >= 3:
+        allowed |= set(CASH_ONLY_FIELDS)
     for key in req:
         if key not in e:
             problems.append(f"{where}: missing '{key}'")
@@ -275,11 +308,67 @@ def validate_typed_event(e, where):
             problems.append(f"{where}: cash_dividend requires qty_multiplier==1")
         if not cash or cash <= 0:
             problems.append(f"{where}: cash_dividend requires cash_per_share>0")
+        if schema_version >= 3:
+            for key in v3_cash_req:
+                if key not in e:
+                    problems.append(f"{where}: v3 cash_dividend missing '{key}'")
+            if not isinstance(e.get("event_id"), str) or not e.get("event_id"):
+                problems.append(f"{where}: event_id must be a nonempty string")
+            if e.get("entitlement_basis") != "record_date_close_holdings":
+                problems.append(f"{where}: entitlement_basis enum")
+            for date_key, status_key in (
+                ("record_date", "record_date_status"),
+                ("pay_date", "pay_date_status"),
+            ):
+                status = e.get(status_key)
+                value = e.get(date_key)
+                if status not in ("known", "unknown_blocked"):
+                    problems.append(f"{where}: {status_key} enum")
+                    continue
+                if status == "known":
+                    if not isinstance(value, str) or not re.fullmatch(
+                        r"\d{4}-\d{2}-\d{2}", value or ""
+                    ):
+                        problems.append(
+                            f"{where}: {date_key} must be YYYY-MM-DD when {status_key}=known"
+                        )
+                else:
+                    if value is not None:
+                        problems.append(
+                            f"{where}: {date_key} must be null when {status_key}=unknown_blocked"
+                        )
+            if "record_date_status" in e or "pay_date_status" in e:
+                blocked = (
+                    e.get("record_date_status") == "unknown_blocked"
+                    or e.get("pay_date_status") == "unknown_blocked"
+                )
+                if blocked and (
+                    e.get("verification", {}).get("method") != "unresolved_gap"
+                    or e.get("verification", {}).get("passed") is not False
+                ):
+                    problems.append(
+                        f"{where}: blocked dividend dates require unresolved_gap/passed=false"
+                    )
+                if not blocked and e.get("verification", {}).get("passed") is not True:
+                    problems.append(
+                        f"{where}: unblocked cash event must have passed=true"
+                    )
+                # three-date ordering when known
+                rec, pay = e.get("record_date"), e.get("pay_date")
+                ex = e.get("event_date")
+                if rec and rec > ex:
+                    problems.append(f"{where}: record_date after ex_date")
+                if pay and pay < ex:
+                    problems.append(f"{where}: pay_date before ex_date")
     elif etype == "share_adjustment":
         if cash != 0:
             problems.append(f"{where}: share_adjustment requires cash_per_share==0")
         if mult == 1:
             problems.append(f"{where}: share_adjustment requires qty_multiplier!=1")
+        if schema_version >= 3:
+            for key in CASH_ONLY_FIELDS:
+                if key in e:
+                    problems.append(f"{where}: share_adjustment must not carry '{key}'")
     derived = e.get("derived_from", {})
     for key in ("adj_factor_prev", "adj_factor_new"):
         v = derived.get(key)
@@ -298,6 +387,7 @@ def validate_typed_event(e, where):
         "pre_close_continuity",
         "nav_continuity",
         "fund_div_match",
+        "record_date_evidence",
         "unresolved_gap",
     ):
         problems.append(f"{where}: verification.method enum")
@@ -474,6 +564,12 @@ def main():
     parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY)
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
     parser.add_argument("--skip-archive", action="store_true")
+    parser.add_argument(
+        "--frozen-v1",
+        type=Path,
+        default=None,
+        help="frozen v1 package dir to verify unchanged (default: resolve from registry)",
+    )
     parser.add_argument("--report", type=Path, default=None)
     args = parser.parse_args()
 
@@ -614,12 +710,16 @@ def main():
         )
 
         ev_path = package_dir / "events" / f"{code}.parquet"
-        events = pq.read_table(ev_path).to_pylist() if ev_path.exists() else []
+        events = (
+            [row_to_event(r) for r in pq.read_table(ev_path).to_pylist()]
+            if ev_path.exists()
+            else []
+        )
         ev_problems = []
         for i, e in enumerate(events):
             ev_problems.extend(
                 validate_typed_event(
-                    {k: v for k, v in e.items() if k != "symbol"}, f"{code}.events[{i}]"
+                    e, f"{code}.events[{i}]", schema_version=manifest["schema_version"]
                 )
             )
         check(f"{code}.events.schema", not ev_problems, "; ".join(ev_problems[:4]))
@@ -628,10 +728,39 @@ def main():
             f"{code}.events.unique_sorted",
             len(keys) == len(set(keys)) and keys == sorted(keys),
         )
+        blocked_cash = [
+            e
+            for e in events
+            if e["event_type"] == "cash_dividend"
+            and (
+                e.get("record_date_status") == "unknown_blocked"
+                or e.get("pay_date_status") == "unknown_blocked"
+            )
+        ]
         check(
-            f"{code}.events.all_passed",
-            all(e["verification"]["passed"] for e in events),
+            f"{code}.events.passing_semantics",
+            all(
+                e["verification"]["passed"]
+                for e in events
+                if e["event_type"] == "share_adjustment"
+            )
+            and all(
+                (
+                    e["verification"]["passed"]
+                    and e["verification"]["method"] != "unresolved_gap"
+                )
+                if e not in blocked_cash
+                else (
+                    not e["verification"]["passed"]
+                    and e["verification"]["method"] == "unresolved_gap"
+                )
+                for e in events
+                if e["event_type"] == "cash_dividend"
+            ),
+            f"blocked cash events must be unresolved_gap/passed=false, "
+            f"others passed=true (blocked={len(blocked_cash)})",
         )
+        check(f"{code}.events.all_passed", not blocked_cash)
 
         factor_map = dict(zip(fdates, f["adj_factor"], strict=True))
         close_map = dict(zip(dates, d["close"], strict=True))
@@ -746,8 +875,10 @@ def main():
             if cp and pc and abs(pc / cp - 1.0) > PRECLOSE_TOL:
                 disc.append((b, round(pc / cp, 6)))
         derivation = json.loads((package_dir / "derivation-report.json").read_text())
+        # v2 upgrade reports document only the v1->v2 diff; per-symbol derivation
+        # evidence lives in the v1 report and its files are hash-identical here.
         reported = (
-            derivation["symbols"]
+            derivation.get("symbols", {})
             .get(code, {})
             .get("unexplained_pre_close_discontinuities", [])
         )
@@ -793,6 +924,156 @@ def main():
             ok = bool(hits)
             detail = f"hits={len(hits)}"
         check(f"mandatory.{code}.{day}", ok, detail)
+
+    # AC-01 authoritative case: 511090 registration 2024-04-23 / ex 2024-04-24 /
+    # pay 2024-04-29, 1.5 CNY/share (SSE fund announcement)
+    if manifest["schema_version"] >= 3:
+        ev_path = package_dir / "events" / "511090.SH.parquet"
+        ok, detail = False, "events file missing"
+        if ev_path.exists():
+            hits = [
+                row_to_event(r)
+                for r in pq.read_table(ev_path).to_pylist()
+                if r["event_date"] == "2024-04-24"
+                and r["event_type"] == "cash_dividend"
+            ]
+            ok = bool(hits) and all(
+                h["record_date"] == "2024-04-23"
+                and h["record_date_status"] == "known"
+                and h["pay_date"] == "2024-04-29"
+                and h["pay_date_status"] == "known"
+                and abs(h["cash_per_share"] - 1.5) < 1e-9
+                and h["verification"]["passed"]
+                and h["entitlement_basis"] == "record_date_close_holdings"
+                for h in hits
+            )
+            detail = f"hits={len(hits)}" + (f" first={hits[0]}" if hits else "")
+        check("mandatory.511090.SH.2024-04-24.three_dates", ok, detail)
+
+        # event_id uniqueness across the package
+        ids = []
+        for s in manifest["symbols"]:
+            ev_path = package_dir / "events" / f"{s['code']}.parquet"
+            if ev_path.exists():
+                ids.extend(
+                    e["event_id"]
+                    for e in (
+                        row_to_event(r) for r in pq.read_table(ev_path).to_pylist()
+                    )
+                    if e.get("event_id")
+                )
+        check("events.event_id_unique", len(ids) == len(set(ids)), f"n={len(ids)}")
+
+    # v1 freeze check: the frozen v1 package must be untouched (AC-01 fix keeps it)
+    frozen_v1 = getattr(args, "frozen_v1", None)
+    if frozen_v1 is None and args.registry.is_file():
+        registry = json.loads(args.registry.read_text())
+        entry = registry.get("packages", {}).get("node://mac/r01-etf-daily/v1-fcbabbb7")
+        if entry:
+            frozen_v1 = Path(entry["absolute_path"])
+    if frozen_v1 is not None and Path(frozen_v1).is_dir():
+        frozen_v1 = Path(frozen_v1).expanduser().resolve()
+        v1_manifest = json.loads((frozen_v1 / "manifest.json").read_text())
+        v1_sums_ok, v1_files = True, 0
+        for line in (frozen_v1 / "SHA256SUMS.txt").read_text().splitlines():
+            digest, rel = line.split("  ", 1)
+            path = frozen_v1 / rel
+            v1_files += 1
+            if not path.is_file() or sha256_file(path) != digest:
+                v1_sums_ok = False
+                break
+        v1_sha = sha256_file(frozen_v1 / "manifest.json") if v1_sums_ok else None
+        lineage_ok = True
+        lineage_note = ""
+        dr = package_dir / "derivation-report.json"
+        if dr.is_file():
+            lineage = json.loads(dr.read_text())
+            expected = lineage.get("v1_manifest_sha256")
+            if expected and v1_sha != expected:
+                lineage_ok = False
+                lineage_note = f"lineage expects {expected[:12]}…, got {v1_sha[:12] if v1_sha else None}"
+        check(
+            "frozen_v1.unchanged",
+            v1_sums_ok and lineage_ok and v1_manifest.get("schema_version") == 2,
+            f"files={v1_files} sums_ok={v1_sums_ok} manifest_sha={v1_sha[:16] if v1_sha else None}… {lineage_note}",
+        )
+        report["frozen_v1"] = {
+            "path": str(frozen_v1),
+            "manifest_sha256": v1_sha,
+            "sums_verified": v1_sums_ok,
+            "files": v1_files,
+        }
+        # v1 -> v2 diff: non-event files byte-identical
+        if manifest["schema_version"] >= 3 and v1_sums_ok:
+            v1_sums = {}
+            for line in (frozen_v1 / "SHA256SUMS.txt").read_text().splitlines():
+                digest, rel = line.split("  ", 1)
+                v1_sums[rel] = digest
+            v2_sums = {}
+            for line in (package_dir / "SHA256SUMS.txt").read_text().splitlines():
+                digest, rel = line.split("  ", 1)
+                v2_sums[rel] = digest
+            changed = []
+            for rel, digest in v2_sums.items():
+                if rel.startswith("events/") or rel in (
+                    "manifest.json",
+                    "README.md",
+                    "derivation-report.json",
+                    "SHA256SUMS.txt",
+                ):
+                    continue
+                if v1_sums.get(rel) != digest:
+                    changed.append(rel)
+            v1_only = [
+                rel
+                for rel in v1_sums
+                if rel not in v2_sums
+                and not rel.startswith("events/")
+                and rel
+                not in (
+                    "manifest.json",
+                    "README.md",
+                    "derivation-report.json",
+                    "SHA256SUMS.txt",
+                )
+            ]
+            check(
+                "diff_v1_v2.only_events_changed",
+                not changed and not v1_only,
+                f"changed={changed[:5]} v1_only={v1_only[:5]}",
+            )
+            # share_adjustment events unchanged between v1 and v2
+            sa_changed = []
+            for s in manifest["symbols"]:
+                code = s["code"]
+                p1, p2 = (
+                    frozen_v1 / "events" / f"{code}.parquet",
+                    package_dir / "events" / f"{code}.parquet",
+                )
+                if p1.exists() != p2.exists():
+                    sa_changed.append(code)
+                    continue
+                if not p1.exists():
+                    continue
+                sa1 = [
+                    e
+                    for e in (row_to_event(r) for r in pq.read_table(p1).to_pylist())
+                    if e["event_type"] == "share_adjustment"
+                ]
+                sa2 = [
+                    e
+                    for e in (row_to_event(r) for r in pq.read_table(p2).to_pylist())
+                    if e["event_type"] == "share_adjustment"
+                ]
+                if sa1 != sa2:
+                    sa_changed.append(code)
+            check(
+                "diff_v1_v2.share_adjustment_unchanged", not sa_changed, str(sa_changed)
+            )
+    else:
+        print(
+            "[SKIP] frozen_v1.unchanged (v1 package not resolvable; pass --frozen-v1)"
+        )
 
     if not args.skip_archive:
         reconcile_against_archive(
