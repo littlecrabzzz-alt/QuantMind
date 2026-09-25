@@ -63,7 +63,7 @@ class TestViewBasics:
     def test_view_schema_and_invariants(self, pkg):
         led = _run_window(pkg, _cfg("h1-view"))
         view = led.export_view()
-        assert view["view_schema"] == 1
+        assert view["view_schema"] == 2
         assert view["derived_from"] == "R01Ledger.export_evidence"
         assert view["session"]["ledger_run_id"] == led.ledger_run_id
         assert view["package"]["package_id"] == pkg.package_id
@@ -169,8 +169,8 @@ class TestViewScenarios:
         p = pos_ex[0]
         assert p["qty"] == 100.0
         assert p["avg_cost"] > 0
-        assert p["mark"] > 0 and p["mark_source"] == "eod_close"
-        assert p["market_value"] == pytest.approx(p["qty"] * p["mark"], rel=1e-6)
+        assert p["last_mark"] > 0 and p["mark_source"] == "eod_close"
+        assert p["market_value"] == pytest.approx(p["qty"] * p["last_mark"], rel=1e-6)
         assert p["stale_days"] == 0
         assert p["available_qty"] == 100.0  # 04-22 买入，T+0 国债 ETF
 
@@ -203,7 +203,7 @@ class TestViewStrictnessAndFormat:
 
     @real_pkg_needed
     def test_risk_fields_present(self, pkg):
-        """风险字段：逐日 status/HWM/当日触发 + 顶层 risk_events。"""
+        """风险字段：逐日 status/HWM/当日触发 + 顶层 risk_events（最终态）。"""
         # 逐日走到 04-26 后注入亏损，04-29 触发损失线（20000×30% → 阈 14000）
         led = R01Ledger(pkg, _cfg("h1-risk"))
         o = led.submit_order(date(2024, 4, 22), SYM, "buy", 100)
@@ -220,3 +220,101 @@ class TestViewStrictnessAndFormat:
         assert by_date["2024-04-29"]["risk"]["triggered_today"]
         assert view["risk_events"]
         assert view["risk_state"]["status"] == "paused"
+
+    @real_pkg_needed
+    def test_h1ac01_daily_risk_from_snapshot(self, pkg):
+        """H1-AC01：逐日风险态/HWM 取当日快照，禁止最终态补历史。
+
+        验收场景复现：损失线设 100 元（独立工程探针口径，不改 30% 规则），
+        五日窗口内触发——触发前/触发日/触发后逐日断言 view 与原生 equity
+        逐日一致；HWM 只在新高日上移。
+        """
+        cfg = _cfg("h1-ac01", loss_line_amount=100.0, drawdown_pct=0.99)
+        led = R01Ledger(pkg, cfg)
+        o = led.submit_order(date(2024, 4, 22), SYM, "buy", 100)
+        bars = pkg.load_date(date(2024, 4, 22))
+        led._validate_and_execute(o, date(2024, 4, 22), bars, DaySummary(trade_date="2024-04-22"))
+        led._eod(date(2024, 4, 22), bars, DaySummary(trade_date="2024-04-22"))
+        for d in [date(2024, 4, 23), date(2024, 4, 24), date(2024, 4, 25), date(2024, 4, 26), date(2024, 4, 29)]:
+            led.run_day(d, None)
+        view = led.export_view()
+        # 逐日：view risk == 原生 equity 快照（status + HWM），非最终态
+        for day, snap in zip(view["days"], led.equity, strict=True):
+            assert day["risk"]["status"] == snap["risk_status"], day["date"]
+            assert day["risk"]["high_water_mark"] == pytest.approx(
+                snap["high_water_mark"], abs=1e-6
+            ), day["date"]
+        # 存在状态切换（验收：触发前 active → 触发后 paused）
+        statuses = [d["risk"]["status"] for d in view["days"]]
+        assert "active" in statuses and "paused" in statuses
+        first_paused = statuses.index("paused")
+        assert statuses[:first_paused] == ["active"] * first_paused
+        # 触发日有 triggered_today；触发前无
+        assert not view["days"][first_paused - 1]["risk"]["triggered_today"]
+        assert view["days"][first_paused]["risk"]["triggered_today"]
+        # HWM 只增不减（逐日单调非降）
+        hwms = [d["risk"]["high_water_mark"] for d in view["days"]]
+        assert hwms == sorted(hwms)
+        # 顶层仍是最终态
+        assert view["risk_state"]["status"] == statuses[-1]
+
+    @real_pkg_needed
+    def test_h1ac01_missing_snapshot_fields_rejected(self, pkg):
+        """快照缺 risk_status/high_water_mark → 显式拒绝，不用最终态补历史。"""
+        view_src = _run_window(pkg, _cfg("h1-ac01-strict"))
+        evidence = view_src.export_evidence()
+        tampered = copy.deepcopy(evidence)
+        tampered["equity"][1].pop("risk_status")
+        with pytest.raises(Exception, match="risk_status"):
+            from backend.services.simulation.replay.r01_ledger import (
+                build_view_from_evidence,
+            )
+            build_view_from_evidence(tampered)
+        tampered2 = copy.deepcopy(evidence)
+        tampered2["equity"][1].pop("high_water_mark")
+        with pytest.raises(Exception, match="high_water_mark"):
+            build_view_from_evidence(tampered2)
+
+    @real_pkg_needed
+    def test_h1ac02_last_mark_matches_native(self, pkg):
+        """H1-AC02：持仓收盘标记字段=last_mark，两日期与原生一致
+        （验收用例 04-24=113.031、04-29=110.685），页面消费字段直接断言。"""
+        view = _run_window(pkg, _cfg("h1-ac02")).export_view()
+        by_date = {d["date"]: d for d in view["days"]}
+        # 验收引用的两个日期（与原生 evidence 收盘一致，不"缺失"）
+        p24 = by_date["2024-04-24"]["positions"][0]
+        p29 = by_date["2024-04-29"]["positions"][0]
+        assert "last_mark" in p24 and "mark" not in p24  # 字段合同统一
+        assert p24["last_mark"] == pytest.approx(113.031, abs=1e-3)
+        assert p29["last_mark"] == pytest.approx(110.685, abs=1e-3)
+        assert p24["mark_source"] == "eod_close" and p29["mark_source"] == "eod_close"
+        # 全窗口逐日：view last_mark == 原生快照 close
+        native = _run_window(pkg, _cfg("h1-ac02-native")).equity
+        for day, snap in zip(view["days"], native, strict=True):
+            for p in day["positions"]:
+                assert p["last_mark"] == pytest.approx(
+                    snap["positions"][p["symbol"]]["close"], abs=1e-9
+                ), day["date"]
+
+    def test_h1ac02_stale_missing_semantics_preserved(self, tmp_path):
+        """陈旧/缺失收盘标记语义保留：carry_forward/unavailable 不伪造。"""
+        from backend.services.simulation.replay.etf_input_package import (
+            build_fixture_package,
+        )
+        from backend.services.simulation.replay.r01_ledger import R01Ledger, R01LedgerConfig
+
+        fx = build_fixture_package(tmp_path / "fx")
+        led = R01Ledger(fx, R01LedgerConfig(
+            group="P0", strategy_id="fixture-h1-ac02-stale", strategy_version=1,
+            execution_attempt_id=1, initial_cash=30000.0, slippage_bps=0.0))
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        # 缺行情日：bars 空 → carry_forward
+        led._eod(date(2025, 9, 11), {}, DaySummary(trade_date="2025-09-11"))
+        view = led.export_view()
+        by_date = {d["date"]: d for d in view["days"]}
+        p_carry = by_date["2025-09-11"]["positions"][0]
+        assert p_carry["mark_source"] == "carry_forward"
+        assert p_carry["stale_days"] == 1
+        assert p_carry["last_mark"] == pytest.approx(
+            by_date["2025-09-10"]["positions"][0]["last_mark"]
+        )  # 沿用最近有效市价

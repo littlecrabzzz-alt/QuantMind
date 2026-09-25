@@ -1544,7 +1544,10 @@ def independent_recompute(
 # 公共展示导出（H1.1，view_schema=1）：从审计原件派生的明确版本展示结构
 # ---------------------------------------------------------------------------
 
-_VIEW_SCHEMA = 1
+# v2（I1E1）：①days[].risk.status/high_water_mark 改取当日快照（禁止用
+# 顶层最终态补历史，H1-AC01）；②持仓收盘标记字段统一 last_mark
+# （H1-AC02，与页面消费字段一致；mark→last_mark）。
+_VIEW_SCHEMA = 2
 
 # days[].positions 逐日持仓必需字段（缺失 → ViewBuildError，不静默填零）
 _VIEW_POSITION_FIELDS = (
@@ -1573,8 +1576,8 @@ def build_view_from_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
 
     结构（字段表见 artifacts/p03/h1/README.md）：
     - days[]：逐日 cash/dividend_receivable/market_value/nav/valuation_reliable
-      + positions[]（qty/avg_cost/available_qty/收盘标记/mark_source/market_value/
-      stale_days/last_mark_date）+ 当日 orders[]（qty 三态 target/filled/remaining、
+      + positions[]（qty/avg_cost/available_qty/last_mark 收盘标记/mark_source/
+      market_value/stale_days/last_mark_date）+ 当日 orders[]（qty 三态 target/filled/remaining、
       avg_fill_price、fees、status、reject_reason、signal_date、fills）
       + risk（当日 status/high_water_mark/当日新触发事件）
     - 顶层：orders 全量、risk_events、corporate_actions、dividends（三段式）、
@@ -1613,7 +1616,7 @@ def build_view_from_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
                     "qty": _view_require(p, "qty", where),
                     "avg_cost": _view_require(p, "avg_cost", where),
                     "available_qty": _view_require(p, "available_qty", where),
-                    "mark": _view_require(p, "close", where),
+                    "last_mark": _view_require(p, "close", where),
                     "mark_source": _view_require(p, "mark_source", where),
                     "market_value": _view_require(p, "market_value", where),
                     "stale_days": _view_require(p, "stale_days", where),
@@ -1663,9 +1666,13 @@ def build_view_from_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
                 ),
                 "positions": positions_out,
                 "orders": day_orders,
+                # H1-AC01：逐日风险态/HWM 取当日快照（缺字段显式拒绝，
+                # 禁止用顶层最终态补历史）；顶层 risk_state 仍为最终态
                 "risk": {
-                    "status": risk_state.get("status"),
-                    "high_water_mark": risk_state.get("high_water_mark"),
+                    "status": _view_require(snap, "risk_status", f"equity {d}"),
+                    "high_water_mark": _view_require(
+                        snap, "high_water_mark", f"equity {d}"
+                    ),
                     "triggered_today": events_by_day.get(d, []),
                 },
             }
