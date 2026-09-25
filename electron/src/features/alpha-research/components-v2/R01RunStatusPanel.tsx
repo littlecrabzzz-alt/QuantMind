@@ -11,6 +11,7 @@ import {
   researchAgent,
   type R01RunStatus,
 } from "../services-v2/researchAgent";
+import { displayDrawdown, displayNumber, scheduleText } from "./runStatusFormat";
 
 const panel = "rounded-xl border border-border bg-card p-4";
 const stateColor: Record<string, string> = {
@@ -113,10 +114,7 @@ export default function R01RunStatusPanel({ node }: { node?: string }) {
                     ? new Date(run.last_success_at * 1000).toLocaleString()
                     : String(run.last_success_at).slice(0, 19)
                   : "无"}
-                {" · "}下次运行：
-                {d?.next_run_at
-                  ? `${d.next_run_at}（来源：${d.next_run_at_source}）`
-                  : "待启用（无已配置调度）"}
+                {" · "}下次运行：{scheduleText(run.schedule)}
               </p>
               <p>
                 今日决策：{run.today_decision.action}
@@ -130,10 +128,8 @@ export default function R01RunStatusPanel({ node }: { node?: string }) {
                 <StageTag stage={run.stop_restore?.job_restore} label="恢复" />
                 <Tooltip title="风险暂停（两线触发，待确认）与作业暂停（用户/运维停止）分别展示">
                   <Tag color={run.run_state === "paused_risk" ? "magenta" : "default"}>
-                    风险态：{run.risk_state.status}
-                    {run.risk_state.high_water_mark !== undefined
-                      ? ` · HWM ${run.risk_state.high_water_mark}`
-                      : ""}
+                    风险态：{run.risk_state.status} · HWM：
+                    {displayNumber(run.risk_state.high_water_mark)}
                   </Tag>
                 </Tooltip>
                 {!!run.risk_state.pending_confirmations?.length && (
@@ -144,9 +140,9 @@ export default function R01RunStatusPanel({ node }: { node?: string }) {
                 )}
               </div>
               <p>
-                nav：{run.nav ?? "缺失"} · 回撤：
-                {run.drawdown !== undefined ? `${(run.drawdown * 100).toFixed(2)}%` : "缺失"} ·
-                现金：{run.cash ?? "缺失"} · 应收红利：{run.dividend_receivable ?? "缺失"}
+                nav：{displayNumber(run.nav)} · 回撤：{displayDrawdown(run.drawdown)} ·
+                现金：{displayNumber(run.cash)} · 应收红利：
+                {displayNumber(run.dividend_receivable)}
               </p>
               <details>
                 <summary className="cursor-pointer">持仓（{(run.positions ?? []).length}）</summary>

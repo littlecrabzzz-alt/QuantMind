@@ -1013,6 +1013,54 @@ def _run_status_payload(**over):
     return base
 
 
+class TestRunStatusDisplaySemantics:
+    """H2-AC03（L2P1）：缺失/未知与真实零值三分——复验实际载荷直测页面格式化函数。"""
+
+    def test_display_semantics_with_acceptance_payloads(self):
+        import subprocess
+        import shutil
+
+        helper = Path(
+            "electron/src/features/alpha-research/components-v2/runStatusFormat.ts"
+        )
+        if not helper.is_file() or not shutil.which("node"):
+            pytest.skip("node/tsc 不可用或前端源不在本仓")
+        out = Path("/tmp/r01-l2-format-test")
+        subprocess.run(
+            ["npx", "tsc", str(helper), "--outDir", str(out), "--module", "commonjs",
+             "--target", "es2020", "--skipLibCheck"],
+            check=True, capture_output=True,
+        )
+        script = out / "check.js"
+        # 复验实际载荷：drawdown=null、HWM=null、configured=true 无 next_run_at
+        script.write_text(
+            "const m = require(" + repr(str(out / "runStatusFormat.js")) + ");\n"
+            "const rows = [];\n"
+            "const cases = [\n"
+            "  [\"drawdown=null\", () => m.displayDrawdown(null), \"缺失/未计算\"],\n"
+            "  [\"drawdown=0(真实零)\", () => m.displayDrawdown(0), \"0.00%\"],\n"
+            "  [\"drawdown=0.003\", () => m.displayDrawdown(0.003), \"0.30%\"],\n"
+            "  [\"hwm=null\", () => m.displayNumber(null), \"缺失/未计算\"],\n"
+            "  [\"hwm=30100\", () => m.displayNumber(30100), \"30100\"],\n"
+            "  [\"configured=true+next_run_at\", () => m.scheduleText({configured: true, next_run_at: \"2026-09-26T15:40:00+08:00\"}), \"2026-09-26T15:40:00+08:00（来源：runner 报告的已配置调度 quantmind:r01:vr:schedule）\"],\n"
+            "  [\"configured=true 无 next_run_at\", () => m.scheduleText({configured: true, next_run_at: null}), \"已配置；下一时刻未知/等待日历\"],\n"
+            "  [\"configured=false\", () => m.scheduleText({configured: false}), \"待启用（无已配置调度）\"],\n"
+            "  [\"schedule 缺失\", () => m.scheduleText(undefined), \"待启用（无已配置调度）\"],\n"
+            "  [\"configured=false 但残留 next_run_at\", () => m.scheduleText({configured: false, next_run_at: \"x\"}), \"待启用（无已配置调度）\"],\n"
+            "];\n"
+            "for (const [name, fn, expect] of cases) {\n"
+            "  const got = fn();\n"
+            "  rows.push({case: name, got, expect, ok: got === expect});\n"
+            "  if (got !== expect) throw new Error(name + \": \" + got + \" != \" + expect);\n"
+            "}\n"
+            "console.log(JSON.stringify({rows, ok: rows.length}));\n"
+        )
+        result = subprocess.run(["node", str(script)], capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr[-500:]
+        payload = json.loads(result.stdout)
+        assert len(payload["rows"]) == 10  # 四种调度组合 + 回撤三分 + HWM/nav/现金数值
+
+
 class TestR01RunStatus:
     def test_write_and_read_roundtrip_with_derivations(self, env):
         import time as _t
