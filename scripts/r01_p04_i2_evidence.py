@@ -104,8 +104,8 @@ def main():
     node_script = r'''
 const m = require("/tmp/i2-adapt/ledgerAdapter.js");
 const fs = require("fs");
-const ev = JSON.parse(fs.readFileSync(process.argv[2]));
-const vw = JSON.parse(fs.readFileSync(process.argv[3]));
+const ev = JSON.parse(fs.readFileSync(process.argv[3]));
+const vw = JSON.parse(fs.readFileSync(process.argv[4]));
 const adapted = m.evidenceToView(ev);
 if (m.identifyExportFormat(vw) !== "view") throw "view misclassified";
 if (vw.view_schema !== 2) throw "expect v2";
