@@ -151,7 +151,6 @@ console.log(JSON.stringify({days: rows.length, status: "identical"}));
         assert abs(got - expected) < 1e-9, (d, got, expected)
     assert all(v["match"] for day in close_by_date.values() for v in day.values())
     # TS 两路径（适配层 vs view）last_mark/mark_source/数量/市值 ≥2 日期全等
-    node2 = node_script.replace("/tmp/i2-adapt", "/tmp/i2-adapt")
     r2 = subprocess.run(["node", str(OUT / "adapter-node-check.js"), "x",
                          str(OUT / "ac02-evidence.json"), str(OUT / "ac02-view.json")],
                         capture_output=True, text=True)
