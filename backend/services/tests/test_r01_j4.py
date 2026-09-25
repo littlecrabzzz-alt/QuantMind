@@ -131,13 +131,23 @@ def env(tmp_path):
             "package_version": dversion(D2), "kind": "daily_increment",
         },
     }}, ensure_ascii=False), encoding="utf-8")
+    # J5E1：绑定用真实 manifest sha256（空/None 哈希恢复会被拒绝）
+    from backend.services.simulation.replay.etf_input_package import sha256_of_file
+
+    sha1 = sha256_of_file(inc1_root / "manifest.json")
+    sha2 = sha256_of_file(inc2_root / "manifest.json")
     binding_base = {
         "baseline": {"package_id": baseline.package_id, "manifest_sha256": baseline.manifest_sha256},
         "increments": [],
     }
-    b1 = extend_binding(binding_base, {"package_version": dversion(D1), "manifest_sha256": None})
-    b2 = extend_binding(b1, {"package_version": dversion(D2), "manifest_sha256": None})
-    return {"baseline": baseline, "registry": registry, "b0": binding_base, "b1": b1, "b2": b2}
+    b1 = extend_binding(binding_base, {"package_version": dversion(D1), "manifest_sha256": sha1})
+    b2 = extend_binding(b1, {"package_version": dversion(D2), "manifest_sha256": sha2})
+    return {
+        "baseline": baseline, "registry": registry,
+        "b0": binding_base, "b1": b1, "b2": b2,
+        "sha": {"d1": sha1, "d2": sha2},
+        "roots": {"inc1": inc1_root, "inc2": inc2_root},
+    }
 
 
 def _seed_and_run(led, until: date):
@@ -260,6 +270,14 @@ class TestCrossPackageRecovery:
         pkg1 = rebuild_bound_package(env["b1"], registry_path=env["registry"])
         ok, why = binding_compatible(capture_binding(pkg1), env["b2"])
         assert not ok and "短于" in why
-        # extend_binding 不改原绑定
-        b1 = extend_binding(env["b0"], {"package_version": dversion(D1)})
-        assert env["b0"]["increments"] == [] and b1["increments"][-1]["package_version"] == dversion(D1)
+        # extend_binding 不改原绑定（真实哈希）
+        b1 = extend_binding(
+            env["b0"],
+            {"package_version": dversion(D1), "manifest_sha256": env["sha"]["d1"]},
+        )
+        assert env["b0"]["increments"] == []
+        assert b1["increments"][-1]["package_version"] == dversion(D1)
+        # J5E1：空/None 哈希 → 拒绝（不跳过校验）
+        bad_none = extend_binding(env["b0"], {"package_version": dversion(D1), "manifest_sha256": None})
+        ok, why = binding_compatible(cap, bad_none)
+        assert not ok and "缺失/为空" in why

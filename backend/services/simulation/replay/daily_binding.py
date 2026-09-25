@@ -66,14 +66,18 @@ def capture_binding(package: EtfInputPackage) -> dict[str, Any]:
     else:
         baseline_sha = manifest.get("baseline_manifest_sha256")
     versions = manifest.get("daily_increment_versions")
+    hashes = manifest.get("daily_increment_manifest_sha256s")
     if not versions:
         suffix = str(manifest["package_id"]).split(_BASELINE_MARKER, 1)[1:]
         versions = suffix if suffix else []
+        hashes = None
+    increments = []
+    for i, v in enumerate(versions):
+        sha = hashes[i] if hashes and i < len(hashes) else None
+        increments.append({"package_version": v, "manifest_sha256": sha})
     return {
         "baseline": {"package_id": baseline_id, "manifest_sha256": baseline_sha},
-        "increments": [
-            {"package_version": v, "manifest_sha256": None} for v in versions
-        ],
+        "increments": increments,
     }
 
 
@@ -162,6 +166,7 @@ def rebuild_bound_package(
         )
 
     versions = [str(inc["package_version"]) for inc in increments]
+    inc_hashes: list[str | None] = [inc.get("manifest_sha256") for inc in increments]
     cache_root = Path(cache_dir) if cache_dir else Path(tempfile.mkdtemp(prefix="r01-bound-"))
     target = cache_root / hashlib.sha256(
         "|".join([baseline["package_id"]] + versions).encode("utf-8")
@@ -178,16 +183,25 @@ def rebuild_bound_package(
         merged_manifest["baseline_manifest_sha256"] = baseline_pkg.manifest_sha256
         merged_manifest["daily_increment_versions"] = versions
         data_end = merged_manifest.get("data_end")
-        for inc in increments:
+        real_hashes: list[str] = []
+        for inc, bound_sha in zip(increments, inc_hashes, strict=True):
             iroot, _ = _resolve_root(
                 entries, package_id=None, version=str(inc["package_version"])
             )
-            inc_pkg = load_etf_input_package(
-                iroot,
-                expect_manifest_sha256=(
-                    inc.get("manifest_sha256") if inc.get("manifest_sha256") else None
-                ),
+            # J5E1：绑定哈希非空时强校验（篡改/换包在重建期拒绝）；
+            # 同时计算真实哈希记入清单（捕获/恢复均不再出现 None）
+            from backend.services.simulation.replay.etf_input_package import (
+                sha256_of_file,
             )
+
+            real_sha = sha256_of_file(iroot / "manifest.json")
+            if bound_sha and bound_sha != real_sha:
+                raise EtfInputPackageError(
+                    f"日增量 {inc['package_version']} manifest_sha256 不一致："
+                    f"绑定={bound_sha} 实际={real_sha}（篡改或换包，拒绝重建）"
+                )
+            real_hashes.append(real_sha)
+            inc_pkg = load_etf_input_package(iroot, expect_manifest_sha256=real_sha)
             codes = [s["code"] for s in inc_pkg.manifest.get("symbols", [])]
             for sub, date_col in (
                 ("daily", "trade_date"),
@@ -210,6 +224,7 @@ def rebuild_bound_package(
             data_end = inc_pkg.manifest.get("data_as_of") or data_end
         merged_manifest["package_id"] = f"{baseline['package_id']}+{versions[-1]}"
         merged_manifest["package_version"] = versions[-1]
+        merged_manifest["daily_increment_manifest_sha256s"] = real_hashes
         if data_end:
             merged_manifest["data_end"] = data_end
         (target / "manifest.json").write_text(
@@ -226,9 +241,11 @@ def binding_compatible(
     cb = (checkpoint_binding or {}).get("baseline") or {}
     if pb.get("package_id") != cb.get("package_id"):
         return False, f"基线不一致：checkpoint={cb.get('package_id')} 包={pb.get('package_id')}"
-    if cb.get("manifest_sha256") and pb.get("manifest_sha256"):
-        if pb["manifest_sha256"] != cb["manifest_sha256"]:
-            return False, "基线 manifest_sha256 不一致（篡改或换包）"
+    # J5E1：哈希缺失/为空 → 显式拒绝（不得跳过校验）
+    if not cb.get("manifest_sha256") or not pb.get("manifest_sha256"):
+        return False, "基线 manifest_sha256 缺失/为空（拒绝：无法核验身份）"
+    if pb["manifest_sha256"] != cb["manifest_sha256"]:
+        return False, "基线 manifest_sha256 不一致（篡改或换包）"
     cp_incs = list((checkpoint_binding or {}).get("increments") or [])
     pkg_incs = list((package_binding or {}).get("increments") or [])
     if len(cp_incs) > len(pkg_incs):
@@ -240,9 +257,13 @@ def binding_compatible(
                 f"增量清单第 {i} 项版本不一致：checkpoint={cp.get('package_version')}"
                 f" 包={pv.get('package_version')}"
             )
-        if cp.get("manifest_sha256") and pv.get("manifest_sha256"):
-            if cp["manifest_sha256"] != pv["manifest_sha256"]:
-                return False, f"增量 {cp.get('package_version')} manifest_sha256 不一致（篡改）"
+        if not cp.get("manifest_sha256") or not pv.get("manifest_sha256"):
+            return False, (
+                f"增量 {cp.get('package_version')} manifest_sha256 缺失/为空"
+                "（拒绝：不得跳过校验）"
+            )
+        if cp["manifest_sha256"] != pv["manifest_sha256"]:
+            return False, f"增量 {cp.get('package_version')} manifest_sha256 不一致（篡改或换包）"
     return True, "ok"
 
 

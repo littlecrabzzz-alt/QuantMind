@@ -1483,8 +1483,13 @@ class R01Ledger:
 def independent_recompute(
     evidence: dict[str, Any],
     package: EtfInputPackage | None = None,
+    *,
+    round_output: bool = True,
 ) -> list[dict[str, Any]]:
     """从导出证据的原始明细（成交/公司行动）独立重建 nav 序列。
+
+    ``round_output=True``（默认）输出 4dp 展示口径；``False`` 输出全精度
+    （J2E2 精度政策：对账侧可用全精度逐行判定；默认行为不变）。
 
     F2（ledger-contract v3 / AC-01）：分红权益资格**独立重算**——按
     record_date 收盘在册持仓定格、ex 入应收、pay 转现金，全部从输入包
@@ -1607,14 +1612,24 @@ def independent_recompute(
                     (snap.get("positions") or {}).get(sym, {}).get("close", 0.0)
                 )
             market_value += qty * close
-        out.append(
-            {
-                "trade_date": d,
-                "cash": round(cash, 4),
-                "dividend_receivable": round(dividend_receivable, 4),
-                "nav": round(cash + dividend_receivable + market_value, 4),
-            }
-        )
+        if round_output:
+            out.append(
+                {
+                    "trade_date": d,
+                    "cash": round(cash, 4),
+                    "dividend_receivable": round(dividend_receivable, 4),
+                    "nav": round(cash + dividend_receivable + market_value, 4),
+                }
+            )
+        else:
+            out.append(
+                {
+                    "trade_date": d,
+                    "cash": cash,
+                    "dividend_receivable": dividend_receivable,
+                    "nav": cash + dividend_receivable + market_value,
+                }
+            )
     return out
 
 
