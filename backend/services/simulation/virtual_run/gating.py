@@ -322,22 +322,39 @@ class DailyIncrementProvider:
         now: datetime,
     ) -> GateResult:
         baseline = self.baseline
-        # 基线内日期：直接用基线日历判定（回放/补历史场景）
-        if baseline.is_trade_date(decision_date):
-            provider = StaticPackageProvider(baseline)
-            return provider.resolve(decision_date, symbols=symbols, now=now)
-
+        # 优先日增量包：当日 d 包已发布 ⇒ 身份/门控/数据以此为准；
+        # 基线内日期且无 d 包 ⇒ 回退基线（回放/历史场景）；基线之后且
+        # 无 d 包 ⇒ 显式受阻（未发布或休市无法区分，不臆造不冒充）
         found = self._daily_entry(decision_date)
         if found is None:
-            # 未来日期无日包：休市或未发布无法区分 → 显式受阻（不臆造）
+            if baseline.is_trade_date(decision_date):
+                provider = StaticPackageProvider(baseline)
+                return provider.resolve(decision_date, symbols=symbols, now=now)
+            # 基线之后：用日包日历分类休市/无交易日；开市日无包=受阻
+            is_open = self._calendar_open(decision_date)
+            if is_open is False:
+                return GateResult(
+                    status="not_trade_day",
+                    reason=f"{decision_date} 非交易日（日包日历 is_open=0：周末/节假日）",
+                    checks=[GateCheck("trade_calendar", "skip", "closed")],
+                )
             return GateResult(
                 status="data_blocked",
                 reason=(
                     f"no_daily_package: 注册表无 d{decision_date.strftime('%Y%m%d')} "
-                    "日增量包（未发布或休市；runner 无独立日历端点，按受阻处理，"
+                    "日增量包（开市日未发布=迟到；"
                     "不用陈旧数据冒充当日已执行）"
+                    if is_open
+                    else f"no_daily_package: {decision_date} 超出已发布日历覆盖，"
+                    "无法判定开市日（按受阻处理）"
                 ),
-                checks=[GateCheck("daily_package", "unknown", "registry miss")],
+                checks=[
+                    GateCheck(
+                        "daily_package",
+                        "unknown",
+                        "registry miss" + ("" if is_open else "; calendar range"),
+                    )
+                ],
             )
         _uri, entry = found
         p02 = _load_p02_publisher()
@@ -402,6 +419,13 @@ class DailyIncrementProvider:
     def load(self, identity: DailyDataIdentity) -> EtfInputPackage:
         found = self._daily_entry(date.fromisoformat(identity.decision_date))
         if found is None:
+            # 基线回退身份（resolve 走基线路径时由 StaticPackageProvider 派生）：
+            # package_id/sha 与基线一致 → 返回合并视图（基线+已发布日增量）
+            if (
+                identity.package_id == self.baseline.package_id
+                and identity.manifest_sha256 == self._baseline_sha
+            ):
+                return self._merged_package_all()
             raise ValueError(
                 f"注册表无 {identity.package_version}（身份与注册表不一致）"
             )
@@ -415,6 +439,32 @@ class DailyIncrementProvider:
         for uri, e in self._registry_entries().items():
             out.append((uri, e, {}))
         return sorted(out, key=lambda t: str(t[1].get("package_version", "")))
+
+    def _calendar_open(self, d: date) -> bool | None:
+        """日包 calendar.parquet 判定并市开市日；None=日历未覆盖。
+
+        日包携带全量 SSE 交易日历（1990-12 起），供基线之后日期的
+        休市/无交易日分类（不再把周末/节假日误报为 data_blocked）。
+        """
+        if getattr(self, "_cal", None) is None:
+            import pandas as pd
+
+            self._cal = {}
+            for _uri, entry, _ in self._daily_entries_sorted():
+                f = (
+                    __import__("pathlib").Path(entry["absolute_path"])
+                    / "calendar.parquet"
+                )
+                if f.is_file():
+                    df = pd.read_parquet(f)
+                    self._cal = {
+                        str(r["cal_date"]): int(r["is_open"]) for _, r in df.iterrows()
+                    }
+                    break
+        key = d.strftime("%Y%m%d")
+        if key in self._cal:
+            return self._cal[key] == 1
+        return None
 
     def _merged_package_all(self) -> EtfInputPackage:
         """基线 + 注册表全部已发布日增量 → 单一账本输入视图。
@@ -472,16 +522,17 @@ class DailyIncrementProvider:
                         if dst.is_file():
                             base_df = pd.read_parquet(dst)
                             day_df = pd.read_parquet(f)
-                            keep = ~base_df["trade_date"].astype(str).isin(
-                                day_df["trade_date"].astype(str)
+                            date_col = "event_date" if sub == "events" else "trade_date"
+                            keep = ~base_df[date_col].astype(str).isin(
+                                day_df[date_col].astype(str)
                             )
                             out = pd.concat(
                                 [base_df[keep].reset_index(drop=True), day_df],
                                 ignore_index=True,
                             )
-                            out.sort_values("trade_date").reset_index(
-                                drop=True
-                            ).to_parquet(dst, index=False)
+                            out.sort_values(date_col).reset_index(drop=True).to_parquet(
+                                dst, index=False
+                            )
                         else:
                             shutil.copy(f, dst)
             assert latest_manifest is not None

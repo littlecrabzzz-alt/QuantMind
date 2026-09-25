@@ -668,9 +668,14 @@ def post_platform_status(
     internal_secret: str,
     node: str | None = None,
     tenant_id: str = "default",
+    user_id: str = "runner",
     timeout: float = 5.0,
 ) -> dict[str, Any]:
-    """POST /r01/run-status（研究 agent 网关；best-effort 由调用方决定）。"""
+    """POST /r01/run-status（研究 agent 网关；best-effort 由调用方决定）。
+
+    网关应用层身份依赖要求 x-user-id/x-tenant-id（runner 服务身份），
+    直写通道另需 x-internal-call（平台内部密钥）。
+    """
     import json as _json
     import urllib.request
 
@@ -682,6 +687,7 @@ def post_platform_status(
             "Content-Type": "application/json",
             "x-internal-call": internal_secret,
             "x-tenant-id": tenant_id,
+            "x-user-id": user_id,
             **({"x-research-node": node} if node else {}),
         },
         method="POST",

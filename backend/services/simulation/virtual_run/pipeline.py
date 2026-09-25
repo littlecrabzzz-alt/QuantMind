@@ -94,9 +94,13 @@ class DayRunResult:
 
 
 def is_month_last_trade_date(pkg: EtfInputPackage, d: date) -> bool:
-    """月末信号日：下一包交易日不存在或跨月。"""
+    """月末信号日：存在下一包交易日且跨月。
+
+    日历前沿（无下一交易日）不视为月末——前沿日不知下月首日，
+    不发调仓信号（等日历扩展后由后续决策日重新评估）。
+    """
     nxt = pkg.next_trade_date(d)
-    return nxt is None or (nxt.year, nxt.month) != (d.year, d.month)
+    return nxt is not None and (nxt.year, nxt.month) != (d.year, d.month)
 
 
 class VirtualRunPipeline:
@@ -661,13 +665,22 @@ class VirtualRunPipeline:
             raise CrashInjection(f"crash_point={point}")
 
     def _decision_window_verdict(self, decision_date: date, now: datetime) -> str:
-        """early（未到截止）/ open / missed（已过截止+超时）。"""
+        """early（未到截止）/ open / missed（已过执行窗口开端仍未决策）。
+
+        决策窗口从截止时点起保持开放，直到**次一交易日执行窗口开端**：
+        日增量数据在收盘后至次日清晨到达（DG-006 时间线：D 日分区
+        D+1 ~00:18 取得），决策跟数据到达走；到执行窗口开端仍未决策则
+        按错过处理（不补写）。无已知下一交易日（日历前沿）时窗口保持
+        开放，等下一个 d 包扩展日历。
+        """
         cutoff = self._wall_time(decision_date, self.config.decision_cutoff)
-        deadline = cutoff + timedelta(minutes=self.config.window_timeout_minutes)
         if now < cutoff:
             return "early"
-        if now > deadline:
-            return "missed"
+        pkg = self.provider.package
+        exec_date = pkg.next_trade_date(decision_date) if pkg is not None else None
+        if exec_date is not None:
+            if now >= self._wall_time(exec_date, self.config.execution_time):
+                return "missed"
         return "open"
 
     def _record_missed_decision(self, decision_date: date, now: datetime) -> dict:
