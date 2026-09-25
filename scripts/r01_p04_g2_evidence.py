@@ -84,8 +84,9 @@ def main():
         summary = ledger.run_day(d, weights)
         snap = summary.snapshot
         # 原值派生净值：现金+应收+持仓收盘市值 独立重算并与账本 nav 对齐
+        positions = [{"symbol": sym, **p} for sym, p in snap["positions"].items()]
         derived = snap["cash"] + snap["dividend_receivable"] + sum(
-            p["qty"] * p["close"] for p in snap["positions"]
+            p["qty"] * p["close"] for p in positions
         )
         assert abs(derived - snap["nav"]) < 0.01, (d, derived, snap["nav"])
         day_records.append({
@@ -94,11 +95,14 @@ def main():
             "dividend_receivable": snap["dividend_receivable"],
             "market_value": snap["market_value"],
             "nav": snap["nav"],
-            "positions": snap["positions"],
+            "positions": positions,
             "orders": [
-                {"symbol": o["symbol"], "side": o["side"], "qty": o["quantity"],
-                 "price": o["price"], "total_fee": o["total_fee"],
-                 "status": "filled", "trade_date": o["trade_date"]}
+                {"symbol": o["symbol"], "side": o["side"], "qty": o["qty_filled"],
+                 "qty_target": o["qty_target"], "qty_remaining": o["qty_remaining"],
+                 "price": o["avg_fill_price"], "fees": o["fees"],
+                 "status": o["status"], "reject_reason": o["reject_reason"],
+                 "ideal_weight": o["ideal_weight"], "realized_weight": o["realized_weight"],
+                 "trade_date": o["trade_date"], "signal_date": o["signal_date"]}
                 for o in summary.orders
             ],
             "corporate_actions_applied": summary.corporate_actions_applied,
