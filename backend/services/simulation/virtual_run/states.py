@@ -464,6 +464,7 @@ def build_run_status(
     now: datetime,
     anomalies: list[dict] | None = None,
     pending_actions: list[dict] | None = None,
+    next_run_at_value: str | None = None,
 ) -> dict[str, Any]:
     """组装 run_status 对象（§4 表格字段逐一对应）。
 
@@ -476,15 +477,15 @@ def build_run_status(
     identity = (last_rec or {}).get("identity") or {}
     ls = ledger_summary or {}
 
-    if schedule_cfg is None:
+    schedule_enabled = bool(schedule_cfg and schedule_cfg.get("enabled"))
+    # J4R2 #5：next_run_at 仅来自实际已配置调度；配置启用时用调用方算出的
+    # 实际下一调度时刻（ISO），算不出（超出已知日历）也不推测时间
+    if not schedule_enabled:
         next_run_at = "pending_activation"
-    elif not schedule_cfg.get("enabled"):
-        next_run_at = "pending_activation"
+    elif next_run_at_value:
+        next_run_at = next_run_at_value
     else:
-        next_run_at = (
-            f"schedule: cutoff {schedule_cfg.get('decision_cutoff', config.decision_cutoff)}"
-            f" @ {schedule_cfg.get('timezone_name', config.timezone_name)}"
-        )
+        next_run_at = "beyond_known_calendar（已配置，超出已知日历，不推测）"
 
     days = ls.get("days") or []
     latest_day = days[-1] if days else {}
@@ -501,13 +502,15 @@ def build_run_status(
             "decision_date": last_rec.get("decision_date") if last_rec else None,
             "daily_data_identity": identity or None,
         },
-        # 心跳/成功
+        # 心跳/成功（J4R2 #5：仅真实成功执行计入——受阻/错过不算；
+        # completed 与 not_trade_day（休市无订单的有效运行）计入）
         "last_heartbeat": store.last_heartbeat(config.ledger_run_id),
         "last_success_at": max(
             (
                 r.get("completed_at")
                 for r in day_records.values()
                 if r.get("completed_at")
+                and r.get("outcome") in ("completed", "not_trade_day")
             ),
             default=None,
         ),
@@ -533,6 +536,7 @@ def build_run_status(
         or (last_rec or {}).get("pending_actions", []),
         # 调度
         "next_run_at": next_run_at,
+        "schedule_enabled": schedule_enabled,
         "stop_restore_status": None,
         "generated_at": now.isoformat(),
     }
@@ -599,10 +603,12 @@ def to_platform_payload(
         run_state = "running"
 
     identity = status.get("input_date", {}).get("daily_data_identity") or {}
-    schedule = status.get("next_run_at")
-    configured = isinstance(schedule, str) and schedule.startswith("schedule:")
+    # J4R2 #5：configured 仅来自实际已启用的调度；next_run_at 仅在能给出
+    # 真实下一调度时刻（ISO）时携带——算不出不推测（平台侧强校验）
+    configured = bool(status.get("schedule_enabled"))
+    schedule = status.get("next_run_at") if configured else None
     sched_obj: dict[str, Any] = {"configured": configured}
-    if configured:
+    if configured and isinstance(schedule, str) and schedule[:1].isdigit():
         sched_obj["next_run_at"] = schedule
 
     stop_restore: dict[str, Any] = {}

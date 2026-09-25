@@ -152,6 +152,7 @@ class VirtualRunPipeline:
             if self.store.get_stage(run_id, day_key, "data_check") is None:
                 self.control.mark_effective(run_id, now)
                 if self.control.stop_effective(run_id):
+                    self._write_status_from_records(now)  # 先生效后回报
                     return DayRunResult(day_key, OUTCOME_STOPPED, "stop 于安全点生效")
 
         lock = DayRunLock(
@@ -217,7 +218,22 @@ class VirtualRunPipeline:
                 )
 
         # -- data_check -------------------------------------------------
-        dc = self._stage_data_check(decision_date, now)
+        # 受阻恢复（J4R2 #4）：窗口内重试时对已受阻的当日决策重新门控
+        # （数据补齐可恢复；窗口结束后受阻终态保持）
+        in_window = self._decision_window_verdict(decision_date, now) == "open"
+        dc = self._stage_data_check(decision_date, now, retry_blocked=in_window)
+        if dc["status"] == "missed_decision_window":
+            # 同日重试（错过后）：不读 identity，返回已记录的错过结果
+            return DayRunResult(
+                day_key,
+                OUTCOME_MISSED_DECISION,
+                dc.get("reason", "决策窗口已错过"),
+                today_decision={
+                    "action": "missed_decision",
+                    "reason": "decision window missed",
+                    "no_trade_reason": "decision_window_missed",
+                },
+            )
         if dc["status"] == "not_trade_day":
             return self._finish_simple_day(
                 decision_date,
@@ -291,11 +307,16 @@ class VirtualRunPipeline:
 
     # -- 各阶段实现 ------------------------------------------------------
 
-    def _stage_data_check(self, decision_date: date, now: datetime) -> dict:
+    def _stage_data_check(
+        self, decision_date: date, now: datetime, *, retry_blocked: bool = False
+    ) -> dict:
         run_id, day_key = self.config.ledger_run_id, decision_date.isoformat()
         cached = self.store.get_stage(run_id, day_key, "data_check")
         if cached is not None:
-            return cached
+            # J4R2 #4：data_blocked 不永久缓存——窗口内重试重新门控，
+            # 数据补齐则恢复当日决策（仍受阻则更新原因/重试计数）
+            if not (retry_blocked and cached.get("status") == "data_blocked"):
+                return cached
         gate: GateResult = self.provider.resolve(
             decision_date,
             symbols=sorted(self.config.target_weights),
@@ -322,6 +343,9 @@ class VirtualRunPipeline:
         frozen = {
             "task_id": make_task_id(run_id, day_key, "freeze_input"),
             "identity": identity.to_dict(),
+            # 冻结哈希清单（J4R2 #2）：基线+截至决策日的已发布非修订日增量；
+            # 后续 load 一律按此清单取内容（不重取最新），修订包不入
+            "input_lock": self.provider.input_lock(upto=decision_date),
             "strategy_frozen": self.config.to_dict(),
             "frozen_at": now.isoformat(),
         }
@@ -337,6 +361,16 @@ class VirtualRunPipeline:
         self._crash("after_freeze_state")
         return frozen
 
+    def _ledger_package(self, identity: DailyDataIdentity):
+        """账本输入视图：最新锁定清单（基线+已发布非修订日增量）。"""
+        return self.provider.load(identity, lock=self.provider.input_lock(upto=None))
+
+    def _decision_lock(self, decision_date: date) -> dict:
+        frozen = self.store.get_stage(
+            self.config.ledger_run_id, decision_date.isoformat(), "freeze_input"
+        )
+        return (frozen or {}).get("input_lock")
+
     def _stage_signal(
         self, decision_date: date, identity: DailyDataIdentity, now: datetime
     ) -> dict:
@@ -344,7 +378,9 @@ class VirtualRunPipeline:
         cached = self.store.get_stage(run_id, day_key, "signal")
         if cached is not None:
             return cached
-        pkg = self.provider.load(identity)
+        # 账本检查点加载用最新锁定视图（J4E1 绑定前缀保证已消费增量不变；
+        # 决策冻结清单仅作审计身份，不限制账本连续性恢复）
+        pkg = self._ledger_package(identity)
 
         action, targets, no_trade_reason, rule = "no_trade", None, None, ""
         is_entry = (
@@ -358,7 +394,7 @@ class VirtualRunPipeline:
                 dict(self.config.target_weights),
                 "entry:first_decision_day（冻结配置的一次性建仓）",
             )
-        elif is_month_last_trade_date(pkg, decision_date):
+        elif self._is_month_end(decision_date):
             action, targets, rule = (
                 "rebalance",
                 dict(self.config.target_weights),
@@ -392,6 +428,14 @@ class VirtualRunPipeline:
         self._crash("after_signal_state")
         return payload
 
+    def _is_month_end(self, decision_date: date) -> bool:
+        """月末信号日（日历口径）：下一开市日已知且跨月；前沿不发信号。"""
+        nxt = self.provider.next_open_trade_date(decision_date)
+        return nxt is not None and (nxt.year, nxt.month) != (
+            decision_date.year,
+            decision_date.month,
+        )
+
     def _stage_risk_check(
         self, decision_date: date, identity: DailyDataIdentity, sig: dict, now: datetime
     ) -> dict:
@@ -399,7 +443,7 @@ class VirtualRunPipeline:
         cached = self.store.get_stage(run_id, day_key, "risk_check")
         if cached is not None:
             return cached
-        pkg = self.provider.load(identity)
+        pkg = self._ledger_package(identity)
         ledger = self.checkpoints.load(pkg, self.config.to_ledger_config())
         pending_actions: list[dict] = []
         if ledger is None:
@@ -448,7 +492,16 @@ class VirtualRunPipeline:
     ) -> dict:
         run_id, day_key = self.config.ledger_run_id, decision_date.isoformat()
         cached = self.store.get_stage(run_id, day_key, "execute")
-        pkg = self.provider.load(identity)
+        # 执行输入清单（J4R2 #2）：决策冻结清单 + 截至执行日已发布非修订
+        # 日增量（执行日行情包在决策后才发布，属合法后到输入）；首次执行
+        # 即记录清单，重试/恢复按记录清单取内容，不重取最新
+        exec_lock = (
+            cached.get("input_lock_exec")
+            if cached is not None
+            else self.provider.input_lock(upto=None)
+        )
+        # 决策清单必须完全包含于执行清单（决策输入不可被替换）
+        pkg = self.provider.load(identity, lock=exec_lock)
         exec_date = pkg.next_trade_date(decision_date)
         if cached is not None:
             # 幂等重入：核对账本权威状态（结果不明不盲目续）
@@ -486,6 +539,7 @@ class VirtualRunPipeline:
             payload = {
                 "task_id": make_task_id(run_id, day_key, "execute"),
                 "status": "missed_window",
+                "input_lock_exec": exec_lock,
                 "policy": self.config.missed_window_policy,
                 "detail": (
                     f"执行窗口 [{win[0].isoformat()}~{win[1].isoformat()}] 已错过："
@@ -518,6 +572,7 @@ class VirtualRunPipeline:
         payload = {
             "task_id": make_task_id(run_id, day_key, "execute"),
             "status": "executed",
+            "input_lock_exec": exec_lock,
             "execution": self._four_tuple(decision_date, exec_date, executed=True),
             "executed_sessions": [d.isoformat() for d in catchup]
             + [exec_date.isoformat()],
@@ -547,7 +602,7 @@ class VirtualRunPipeline:
         reconciliation = None
         if ex.get("status") in ("executed", "missed_window"):
             ledger = self.checkpoints.load(
-                self.provider.load(identity), self.config.to_ledger_config()
+                self._ledger_package(identity), self.config.to_ledger_config()
             )
             if ledger is not None:
                 reconciliation = reconcile(ledger)
@@ -587,6 +642,10 @@ class VirtualRunPipeline:
         ):
             day_rec["re_evaluate_next"] = True
         self.store.set_day(run_id, day_key, day_rec)
+        # J4R2 #5：安全点控制命令先生效、再回报——页面不停留 received
+        ctl = self.control.get(run_id)
+        if ctl is not None and ctl.state == "received":
+            self.control.mark_effective(run_id, now)
         self._write_status_from_records(now)
         self.store.set_stage(
             run_id,
@@ -599,10 +658,6 @@ class VirtualRunPipeline:
             },
         )
         self._beat(now)
-        # settle 完成=安全点：received 的控制命令生效
-        ctl = self.control.get(run_id)
-        if ctl is not None and ctl.state == "received":
-            self.control.mark_effective(run_id, now)
         return DayRunResult(
             day_key, outcome, detail, today_decision=today, anomalies=anomalies
         )
@@ -629,6 +684,10 @@ class VirtualRunPipeline:
             "completed_at": now.isoformat(),
         }
         self.store.set_day(run_id, day_key, day_rec)
+        # J4R2 #5：先生效后回报（简单收尾日同样是安全点）
+        ctl = self.control.get(run_id)
+        if ctl is not None and ctl.state == "received":
+            self.control.mark_effective(run_id, now)
         self._write_status_from_records(now)
         self.store.set_stage(
             run_id,
@@ -641,10 +700,6 @@ class VirtualRunPipeline:
             },
         )
         self._beat(now)
-        # 简单收尾日（休市/受阻）也是安全点：received 的控制命令生效
-        ctl = self.control.get(run_id)
-        if ctl is not None and ctl.state == "received":
-            self.control.mark_effective(run_id, now)
         return DayRunResult(
             day_key,
             outcome,
@@ -814,6 +869,32 @@ class VirtualRunPipeline:
             action = f"{action}_pending_execution"
         return {"action": action, "reason": reason, "no_trade_reason": no_trade}
 
+    def _next_run_at(self, now: datetime) -> str | None:
+        """实际下一调度时刻（J4R2 #5）：已启用调度 → 下一个开市日的
+        决策截止时点（ISO，含时区）；未启用/超出已知日历 → None（不推测）。"""
+        if not (self.schedule_cfg and self.schedule_cfg.get("enabled")):
+            return None
+        cutoff = parse_hhmm(
+            str(self.schedule_cfg.get("decision_cutoff", self.config.decision_cutoff))
+        )
+        wall = local_wall(now, self._tz)
+        cur = wall.date()
+        for _ in range(90):
+            if self._is_open(cur):
+                t = datetime.combine(cur, cutoff, tzinfo=self._tz)
+                if t > now:
+                    return t.isoformat()
+            cur = self.provider.next_open_trade_date(cur)
+            if cur is None:
+                return None
+        return None
+
+    def _is_open(self, d: date) -> bool:
+        """d 是否开市日（经 provider 日历：d-1 的下一开市日==d）。"""
+        return (
+            self.provider.next_open_trade_date(date.fromordinal(d.toordinal() - 1)) == d
+        )
+
     def _write_status_from_records(self, now: datetime) -> None:
         ledger = self.checkpoints.load(
             self.provider.package, self.config.to_ledger_config()
@@ -863,6 +944,7 @@ class VirtualRunPipeline:
             ledger_summary=ledger_summary,
             schedule_cfg=self.schedule_cfg,
             now=now,
+            next_run_at_value=self._next_run_at(now),
         )
         status["stop_restore_status"] = ctl.to_dict() if ctl else None
         if extra_note:

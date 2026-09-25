@@ -240,3 +240,11 @@ def test_pg_config_carrier_mapping():
 
     with _pytest.raises(ValueError, match="漂移"):
         virtual_run_config_from_pg_row(bad)
+
+
+def test_run_scheduled_day_disabled_stops_at_entry(fake_redis, cfg):
+    """J4R2 #3：运行中被禁用 → 任务入口即停（stopped_by_config）。"""
+    sched.save_run_config(cfg.ledger_run_id, cfg, enabled=True)
+    sched.save_run_config(cfg.ledger_run_id, cfg, enabled=False)  # 禁用
+    out = sched.run_scheduled_day(cfg.ledger_run_id)
+    assert out["status"] == "stopped_by_config"

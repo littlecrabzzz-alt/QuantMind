@@ -119,15 +119,17 @@ def dispatch_due_runs(
 ) -> dict[str, Any]:
     """检查全部已配置运行：决策截止到点 / 执行窗口到点 → 派发幂等任务。
 
-    ``r``/``store`` 可注入（测试）；默认真实 Redis db0。
+    ``r``/``store`` 可注入（测试）；默认真实 Redis db0。J4R2 #3：包源统一
+    走 DailyIncrementProvider（真实日增量注册表，含日历/哈希复验），
+    不再用 fixture stub。
     """
-    from backend.services.simulation.replay.etf_input_package import (
-        load_etf_input_package,
-    )
     from backend.services.simulation.virtual_run.clock import (
         SystemClock,
         local_wall,
         parse_hhmm,
+    )
+    from backend.services.simulation.virtual_run.gating import (
+        DailyIncrementProvider,
     )
     from backend.services.simulation.virtual_run.states import RedisRunStateStore
 
@@ -152,12 +154,13 @@ def dispatch_due_runs(
         today = wall.date()
         wall_hm = wall.strftime("%H:%M")
 
-        pkg = load_etf_input_package(
-            config.package_root, expect_manifest_sha256=config.manifest_sha256 or None
+        provider = DailyIncrementProvider(
+            config.package_root,
+            baseline_manifest_sha256=config.manifest_sha256,
+            registry_path=os.getenv("R01_VR_REGISTRY") or None,
+            cache_dir=os.getenv("R01_VR_MERGE_CACHE") or None,
         )
-        from backend.services.simulation.virtual_run.gating import StaticPackageProvider
-
-        provider = StaticPackageProvider(pkg)
+        pkg = provider.package
 
         # -- 决策相位：今天是包交易日、过决策截止、当日未收口 --------
         if pkg.is_trade_date(today) and wall_hm >= config.decision_cutoff:
@@ -220,7 +223,10 @@ def _send(run_id: str, decision_date: date) -> None:
 def run_scheduled_day(
     ledger_run_id: str, decision_date: str | None = None
 ) -> dict[str, Any]:
-    """执行（或续跑）某运行的一个决策日；异常向上抛由任务包装记录。"""
+    """执行（或续跑）某运行的一个决策日；异常向上抛由任务包装记录。
+
+    J4R2 #3：任务入口复查 enabled——运行中被禁用即停（不推进新决策日）。
+    """
     from backend.services.simulation.virtual_run.clock import local_wall
 
     got = get_run_config(ledger_run_id)
@@ -229,6 +235,13 @@ def run_scheduled_day(
             "ledger_run_id": ledger_run_id,
             "status": "pending_activation",
             "detail": "未配置调度（待启用），不运行",
+        }
+    _config, sched = got
+    if not sched.get("enabled"):
+        return {
+            "ledger_run_id": ledger_run_id,
+            "status": "stopped_by_config",
+            "detail": "调度已被禁用：入口即停，不推进决策日",
         }
     config, sched = got
     pipeline = build_pipeline(config, schedule_cfg=sched)

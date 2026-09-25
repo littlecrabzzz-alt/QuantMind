@@ -93,12 +93,35 @@ class DbCheckpointStore:
     def load(
         self, package: EtfInputPackage, config: R01LedgerConfig
     ) -> R01Ledger | None:
-        from backend.services.simulation.replay import ledger_persistence
+        """按 config.ledger_run_id 取快照并恢复账本；无快照返回 None。
+
+        J4R2/J4E1：带 input_binding 的检查点（r01vr 日增量运行）直接经
+        R01Ledger.restore 按绑定前缀兼容恢复——恢复包可以是已消费清单的
+        扩展（新日增量显式消费后进入），不要求瞬时 package_id 全等；
+        无绑定字段由 restore 自身显式拒绝（J4E1 语义）。
+        """
+        from sqlalchemy import select
+
+        from backend.services.simulation.models.replay import ReplayLedgerCheckpoint
+        from backend.services.simulation.replay.r01_ledger import R01Ledger
 
         async def _fn(db):
-            return await ledger_persistence.load_checkpoint(db, package, config)
+            return (
+                (
+                    await db.execute(
+                        select(ReplayLedgerCheckpoint).where(
+                            ReplayLedgerCheckpoint.ledger_run_id == config.ledger_run_id
+                        )
+                    )
+                )
+                .scalars()
+                .first()
+            )
 
-        return self._run(_fn)
+        row = self._run(_fn)
+        if row is None:
+            return None
+        return R01Ledger.restore(package, config, row.state)
 
 
 def reconcile(ledger: R01Ledger) -> dict:

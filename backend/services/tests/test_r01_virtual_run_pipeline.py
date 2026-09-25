@@ -676,4 +676,7 @@ def test_schedule_none_means_pending_activation(h: Harness):
     h2.decide(date(2025, 9, 10))
     h2.execute(date(2025, 9, 10))
     status = h2.store.get_status(h2.config.ledger_run_id)
-    assert status["next_run_at"].startswith("schedule:")
+    # J4R2 #5：已启用调度 → 实际下一调度时刻（ISO，含时区），非描述串
+    assert status["schedule_enabled"] is True
+    assert status["next_run_at"].startswith("2025-09-"), status["next_run_at"]
+    assert "+08:00" in status["next_run_at"]

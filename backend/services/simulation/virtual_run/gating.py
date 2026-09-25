@@ -20,6 +20,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Protocol
@@ -89,8 +90,16 @@ class DailyInputsProvider(Protocol):
         now: datetime,
     ) -> GateResult: ...
 
-    def load(self, identity: DailyDataIdentity) -> EtfInputPackage:
-        """按冻结身份取输入包（同身份必须返回同内容）。"""
+    def load(
+        self, identity: DailyDataIdentity, *, lock: dict | None = None
+    ) -> EtfInputPackage:
+        """按冻结身份取输入包（同身份必须返回同内容；lock=冻结清单）。"""
+
+    def input_lock(self, upto: date | None = None) -> dict:
+        """冻结哈希清单（基线+已发布非修订日增量，upto 截止含当日）。"""
+
+    def next_open_trade_date(self, d: date) -> date | None:
+        """d 之后下一个开市日（日历口径；None=超出已知日历）。"""
 
 
 def _fixture_daily_identity(
@@ -224,14 +233,25 @@ class StaticPackageProvider:
         )
         return GateResult(status="ready", checks=checks, identity=identity, package=pkg)
 
-    def load(self, identity: DailyDataIdentity) -> EtfInputPackage:
-        # stub：同包同内容；真实实现按 registry 按 identity 解析并复验 sha
-        if identity.package_id != self._pkg.package_id:
-            raise ValueError(
-                f"identity.package_id={identity.package_id} 与冻结包 "
-                f"{self._pkg.package_id} 不一致（stub 不支持跨包）"
-            )
+    def load(
+        self, identity: DailyDataIdentity, *, lock: dict | None = None
+    ) -> EtfInputPackage:
+        # stub：单一冻结包内容不可变，lock 无额外作用（保持协议一致）
         return self._pkg
+
+    def input_lock(self, upto: date | None = None) -> dict:
+        return {
+            "baseline": {
+                "package_id": self._pkg.package_id,
+                "manifest_sha256": self._pkg.manifest_sha256,
+                "root": str(self._pkg.root),
+            },
+            "daily": [],
+        }
+
+    def next_open_trade_date(self, d: date) -> date | None:
+        # fixture/冻结包：包内日历（包末尾之后未知 → None，前沿语义）
+        return self._pkg.next_trade_date(d)
 
 
 # ---------------------------------------------------------------------------
@@ -392,6 +412,47 @@ class DailyIncrementProvider:
             revised=bool(manifest.get("revised")),
             supersedes=(manifest.get("supersedes") or {}).get("package_version"),
         )
+        # 迟到校验（J4R2 #2）：obtained_at 晚于运行时钟 ⇒ 数据尚未实际取得，
+        # 不得进入已开始/当次的决策（显式受阻，不用未来数据）；
+        # 基线内日期可回退基线覆盖（数据当日可得，只是日包未发布）
+        if identity.obtained_at:
+            try:
+                obtained = datetime.fromisoformat(
+                    identity.obtained_at.replace("Z", "+00:00")
+                )
+                if obtained > now:
+                    if baseline.is_trade_date(decision_date):
+                        provider = StaticPackageProvider(baseline)
+                        result = provider.resolve(
+                            decision_date, symbols=symbols, now=now
+                        )
+                        result.checks.append(
+                            GateCheck(
+                                "daily_pkg_not_yet_obtained",
+                                "skip",
+                                f"日包 {identity.package_version} 取得晚于时钟"
+                                f"（{identity.obtained_at}），回退基线覆盖",
+                            )
+                        )
+                        return result
+                    return GateResult(
+                        status="data_blocked",
+                        reason=(
+                            f"data_not_yet_obtained: obtained_at={identity.obtained_at} "
+                            f"晚于运行时钟 {now.isoformat()}（数据未到，不冒充已取得）"
+                        ),
+                        checks=[
+                            GateCheck("obtained_at_clock", "fail", identity.obtained_at)
+                        ],
+                    )
+            except ValueError:
+                return GateResult(
+                    status="data_blocked",
+                    reason=f"obtained_at 不可解析: {identity.obtained_at!r}",
+                    checks=[
+                        GateCheck("obtained_at_clock", "unknown", identity.obtained_at)
+                    ],
+                )
         pkg = self._merged_package_all()
         # 消费侧复核：决策标的当日行覆盖
         bars = pkg.load_date(decision_date, symbols=symbols)
@@ -416,7 +477,18 @@ class DailyIncrementProvider:
             package=pkg,
         )
 
-    def load(self, identity: DailyDataIdentity) -> EtfInputPackage:
+    def load(
+        self, identity: DailyDataIdentity, *, lock: dict | None = None
+    ) -> EtfInputPackage:
+        """按冻结身份取输入包。
+
+        - ``lock``（冻结哈希清单，J4R2 #2）：严格按清单合并（基线+清单内
+          日增量，逐项复验 manifest sha；清单外/修订包一律不参与），
+          不重取注册表最新——已冻结运行的内容不可变；
+        - 无 lock（未冻结场景/测试）：基线+全部已发布非修订日增量。
+        """
+        if lock is not None:
+            return self._merged_locked(lock)
         found = self._daily_entry(date.fromisoformat(identity.decision_date))
         if found is None:
             # 基线回退身份（resolve 走基线路径时由 StaticPackageProvider 派生）：
@@ -430,6 +502,184 @@ class DailyIncrementProvider:
                 f"注册表无 {identity.package_version}（身份与注册表不一致）"
             )
         return self._merged_package_all()
+
+    # -- 冻结哈希清单（J4R2 #2） ------------------------------------------
+
+    def _lockable_entries(self, upto: date | None = None) -> list[dict]:
+        """可入清单的日增量条目（非修订；upto 截止到某日含）。
+
+        修订包（revised=true）只服务于修订轨迹，不参与运行合并——
+        已冻结运行与向前运行都不悄悄改历史内容。
+        """
+        out = []
+        for _uri, e, _extra in self._daily_entries_sorted():
+            version = str(e.get("package_version", ""))
+            if len(version) < 9 or not version.startswith("d"):
+                continue
+            try:
+                day = date(int(version[1:5]), int(version[5:7]), int(version[7:9]))
+            except ValueError:
+                continue
+            if upto is not None and day > upto:
+                continue
+            root = __import__("pathlib").Path(e["absolute_path"])
+            mf = root / "manifest.json"
+            if not mf.is_file():
+                continue
+            import hashlib
+
+            manifest = self._json.loads(mf.read_text(encoding="utf-8"))
+            if manifest.get("revised"):
+                continue  # 修订包不入运行合并
+            out.append(
+                {
+                    "package_version": version,
+                    "manifest_sha256": hashlib.sha256(mf.read_bytes()).hexdigest(),
+                    "absolute_path": str(root),
+                }
+            )
+        return out
+
+    def input_lock(self, upto: date | None = None) -> dict:
+        """冻结哈希清单：基线 + 截至 upto 的已发布非修订日增量。"""
+        return {
+            "baseline": {
+                "package_id": self.baseline.package_id,
+                "manifest_sha256": self._baseline_sha,
+                "root": self._baseline_root,
+            },
+            "daily": self._lockable_entries(upto=upto),
+        }
+
+    def next_open_trade_date(self, d: date) -> date | None:
+        # 日包 calendar.parquet 全量日历（含未来月），供月末信号判定；
+        # 超出已知日历（None）→ 前沿：不发月末信号，等日历扩展
+        for i in range(1, 61):
+            nxt = date.fromordinal(d.toordinal() + i)
+            state = self._calendar_open(nxt)
+            if state is True:
+                return nxt
+            if state is None:
+                return None
+        return None
+
+    @staticmethod
+    def lock_key(lock: dict) -> str:
+        import hashlib
+
+        return hashlib.sha256(
+            json.dumps(lock, ensure_ascii=False, sort_keys=True).encode()
+        ).hexdigest()
+
+    def _merged_locked(self, lock: dict) -> EtfInputPackage:
+        """严格按冻结清单合并：逐项复验 sha（不符显式报错，不静默续）。"""
+        import hashlib
+        import shutil
+
+        import pandas as pd
+
+        from backend.services.simulation.replay.etf_input_package import (
+            load_etf_input_package,
+        )
+
+        baseline = lock.get("baseline") or {}
+        if baseline.get("manifest_sha256") != self._baseline_sha:
+            raise ValueError(
+                "input_lock 基线哈希与 provider 不一致："
+                f"lock={baseline.get('manifest_sha256')} provider={self._baseline_sha}"
+            )
+        daily = sorted(lock.get("daily") or [], key=lambda e: e["package_version"])
+        for e in daily:
+            mf = __import__("pathlib").Path(e["absolute_path"]) / "manifest.json"
+            if not mf.is_file():
+                raise ValueError(f"input_lock 条目缺失: {e['package_version']} ({mf})")
+            sha = hashlib.sha256(mf.read_bytes()).hexdigest()
+            if sha != e["manifest_sha256"]:
+                raise ValueError(
+                    f"input_lock 哈希失配: {e['package_version']} "
+                    f"lock={e['manifest_sha256'][:16]}… actual={sha[:16]}…（内容被动过，拒绝）"
+                )
+        version_tag = daily[-1]["package_version"] if daily else "baseline-only"
+        cache_key = "locked-" + self.lock_key(lock)
+        cached = self._merged.get(cache_key)
+        if cached is not None:
+            return cached
+        if not daily:
+            return self.baseline
+
+        cache = self._cache_dir or __import__("tempfile").mkdtemp(
+            prefix="r01vr-merged-"
+        )
+        target = __import__("pathlib").Path(cache) / f"lock-{version_tag}"
+        if not (target / "manifest.json").is_file():
+            for sub in ("daily", "events", "factors", "etf_limit"):
+                src = __import__("pathlib").Path(self._baseline_root) / sub
+                if src.is_dir():
+                    shutil.copytree(src, target / sub, dirs_exist_ok=True)
+            merged_manifest = dict(self.baseline.manifest)
+            latest_manifest = None
+            for e in daily:
+                droot = __import__("pathlib").Path(e["absolute_path"])
+                dmanifest = self._json.loads(
+                    (droot / "manifest.json").read_text(encoding="utf-8")
+                )
+                latest_manifest = dmanifest
+                self._merge_one_increment(target, droot, dmanifest)
+            assert latest_manifest is not None
+            merged_manifest["package_id"] = f"{self.baseline.package_id}+{version_tag}"
+            merged_manifest["package_version"] = version_tag
+            # p03 J4E1 绑定合同：capture_binding 按此重建/前缀兼容恢复
+            merged_manifest["daily_increment_versions"] = [
+                d["package_version"] for d in daily
+            ]
+            merged_manifest["baseline_manifest_sha256"] = self._baseline_sha
+            merged_manifest["input_lock"] = {
+                "daily": [d["package_version"] for d in daily],
+                "locked": True,
+            }
+            merged_manifest["data_end"] = latest_manifest.get("data_as_of")
+            (target / "manifest.json").write_text(
+                self._json.dumps(merged_manifest, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        pkg = load_etf_input_package(target)
+        self._merged[cache_key] = pkg
+        return pkg
+
+    @staticmethod
+    def _merge_one_increment(target, droot, dmanifest: dict) -> None:
+        """把一个日增量目录合并进 target（按各自日期列去重追加）。"""
+        import shutil
+
+        import pandas as pd
+
+        codes = [sym["code"] for sym in dmanifest.get("symbols", [])]
+        for sub in ("daily", "events", "factors", "etf_limit"):
+            dsrc = __import__("pathlib").Path(droot) / sub
+            if not dsrc.is_dir():
+                continue
+            (target / sub).mkdir(parents=True, exist_ok=True)
+            date_col = "event_date" if sub == "events" else "trade_date"
+            for code in codes:
+                f = dsrc / f"{code}.parquet"
+                if not f.is_file():
+                    continue
+                dst = target / sub / f"{code}.parquet"
+                if dst.is_file():
+                    base_df = pd.read_parquet(dst)
+                    day_df = pd.read_parquet(f)
+                    keep = ~base_df[date_col].astype(str).isin(
+                        day_df[date_col].astype(str)
+                    )
+                    out = pd.concat(
+                        [base_df[keep].reset_index(drop=True), day_df],
+                        ignore_index=True,
+                    )
+                    out.sort_values(date_col).reset_index(drop=True).to_parquet(
+                        dst, index=False
+                    )
+                else:
+                    shutil.copy(f, dst)
 
     # -- 合并 -------------------------------------------------------------
 
@@ -467,26 +717,25 @@ class DailyIncrementProvider:
         return None
 
     def _merged_package_all(self) -> EtfInputPackage:
-        """基线 + 注册表全部已发布日增量 → 单一账本输入视图。
+        """基线 + 全部已发布非修订日增量 → 单一账本输入视图（未冻结场景）。
 
-        - 缓存键=最新日版本；后续新 d 包发布后重建（决策幂等不受影响：
-          逐 session 只读当日行情/事件，追加后续日期不改变已执行日期结果）；
+        - 修订包（revised）不参与（只服务修订轨迹）；
+        - 已冻结运行走 ``_merged_locked``（清单锁定，不重取最新）；
+        - 缓存键=最新可入清单日版本；后续新 d 包发布后重建（决策幂等
+          不受影响：逐 session 只读当日行情/事件）；
         - 信号/月末判断需要"下一交易日"在场：合并全部已发布增量保证
           日历完整（decision 日为最新发布日时 next=None 属包边界语义）。
         """
-        import hashlib
         import shutil
-
-        import pandas as pd
 
         from backend.services.simulation.replay.etf_input_package import (
             load_etf_input_package,
         )
 
-        entries = self._daily_entries_sorted()
+        entries = self._lockable_entries()  # 非修订、路径/manifest 完整
         if not entries:
             return self.baseline
-        latest_version = str(entries[-1][1].get("package_version"))
+        latest_version = entries[-1]["package_version"]
         cached = self._merged.get(latest_version)
         if cached is not None:
             return cached
@@ -502,44 +751,23 @@ class DailyIncrementProvider:
                     shutil.copytree(src, target / sub, dirs_exist_ok=True)
             merged_manifest = dict(self.baseline.manifest)
             latest_manifest = None
-            for _uri, entry, _ in entries:
-                droot = __import__("pathlib").Path(entry["absolute_path"])
+            for e in entries:
+                droot = __import__("pathlib").Path(e["absolute_path"])
                 dmanifest = self._json.loads(
                     (droot / "manifest.json").read_text(encoding="utf-8")
                 )
                 latest_manifest = dmanifest
-                codes = [sym["code"] for sym in dmanifest.get("symbols", [])]
-                for sub in ("daily", "events", "factors", "etf_limit"):
-                    dsrc = droot / sub
-                    if not dsrc.is_dir():
-                        continue
-                    (target / sub).mkdir(parents=True, exist_ok=True)
-                    for code in codes:
-                        f = dsrc / f"{code}.parquet"
-                        if not f.is_file():
-                            continue
-                        dst = target / sub / f"{code}.parquet"
-                        if dst.is_file():
-                            base_df = pd.read_parquet(dst)
-                            day_df = pd.read_parquet(f)
-                            date_col = "event_date" if sub == "events" else "trade_date"
-                            keep = ~base_df[date_col].astype(str).isin(
-                                day_df[date_col].astype(str)
-                            )
-                            out = pd.concat(
-                                [base_df[keep].reset_index(drop=True), day_df],
-                                ignore_index=True,
-                            )
-                            out.sort_values(date_col).reset_index(drop=True).to_parquet(
-                                dst, index=False
-                            )
-                        else:
-                            shutil.copy(f, dst)
+                self._merge_one_increment(target, droot, dmanifest)
             assert latest_manifest is not None
             merged_manifest["package_id"] = (
                 f"{self.baseline.package_id}+{latest_version}"
             )
             merged_manifest["package_version"] = latest_version
+            # p03 J4E1 绑定合同：capture_binding 按此重建/前缀兼容恢复
+            merged_manifest["daily_increment_versions"] = [
+                e["package_version"] for e in entries
+            ]
+            merged_manifest["baseline_manifest_sha256"] = self._baseline_sha
             merged_manifest["daily_increment_of"] = latest_manifest.get("package_uri")
             merged_manifest["data_end"] = latest_manifest.get("data_as_of")
             (target / "manifest.json").write_text(
