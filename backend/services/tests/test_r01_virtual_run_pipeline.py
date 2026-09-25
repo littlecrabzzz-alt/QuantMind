@@ -218,18 +218,21 @@ def test_not_trade_day_and_package_end(h: Harness):
     assert r.outcome == "not_trade_day"
     assert h.day_record(date(2025, 9, 27))["today_decision"]["no_trade_reason"]
 
-    # 包最后一日 10-01：有决策但无下一交易日 → 终态收口（不执行）
+    # 包最后一日 10-01：日历未知（数据前沿）→ 可恢复等待（H2-AC01）：
+    # 不写终态、不推进 last_success、execute 阶段不落盘
     h.decide(date(2025, 9, 30))
     r = h.execute(date(2025, 9, 30))
     assert r.outcome == "completed"
+    last_success_before = h.store.get_status(h.config.ledger_run_id)["last_success_at"]
     r = h.decide(date(2025, 10, 1))
-    assert (
-        r.outcome == "completed"
-    )  # 无下一交易日：execute 阶段 no_next_trade_date 收口
+    assert r.outcome == "waiting_calendar"  # 日历未知：可恢复等待，非终态
     rec = h.day_record(date(2025, 10, 1))
-    assert rec["orders_summary"] == []
-    ex = h.store.get_stage(h.config.ledger_run_id, "2025-10-01", "execute")
-    assert ex["status"] == "no_next_trade_date"
+    assert rec["outcome"] == "waiting_calendar"
+    assert "completed_at" not in rec  # 不计成功
+    assert h.store.get_stage(h.config.ledger_run_id, "2025-10-01", "execute") is None
+    status = h.store.get_status(h.config.ledger_run_id)
+    assert status["last_success_at"] == last_success_before  # 未推进
+    assert "日历未知" in (status["today_decision"] or {}).get("reason", "")
 
 
 def test_data_blocked_explicit(pkg):

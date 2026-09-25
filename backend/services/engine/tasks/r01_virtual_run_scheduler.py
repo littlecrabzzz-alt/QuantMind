@@ -225,11 +225,14 @@ def dispatch_due_runs(
                 _send(run_id, d)
                 dispatched.append(f"{run_id}:decision:{d}")
 
-        # -- 执行相位：近几日决策待执行、执行日=今天、窗口已开 -----------
-        for d in _recent_dates(today, 7):
+        # -- 执行相位（H2-AC02：按交易日回看，非自然日）：近 8 个交易日内
+        #    的待执行决策（signal 有、execute 无）、执行日=今天（行情视图
+        #    或日历口径——前沿无行情时也派发，任务内如实记录可恢复受阻）、
+        #    窗口已开；长休市（相距 8/9+ 自然日）不漏派 -------------
+        for d in _recent_trade_dates(provider, pkg, today, 8):
             if not pkg.is_trade_date(d):
                 continue
-            exec_date = pkg.next_trade_date(d)
+            exec_date = pkg.next_trade_date(d) or provider.next_open_trade_date(d)
             if exec_date != today:
                 continue
             gate = provider.resolve(d, symbols=sorted(config.target_weights), now=now)
@@ -263,7 +266,7 @@ def _recent_trade_dates(provider, pkg, today: date, n: int) -> list[date]:
     """
     out: list[date] = []
     probe = today
-    for _ in range(30):
+    for _ in range(60):  # 覆盖长假（春节等 8+ 自然日间隔）
         if len(out) >= n:
             break
         probe = date.fromordinal(probe.toordinal() - 1)

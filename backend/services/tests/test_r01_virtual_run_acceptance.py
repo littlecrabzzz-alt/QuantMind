@@ -242,14 +242,23 @@ def test_engineering_acceptance_matrix(pkg, tmp_path):
         ["not_trade_day", "日记录+心跳"],
         r_sat.outcome == "not_trade_day",
     )
-    r_end = hol.decide(date(2025, 10, 1))  # 包末尾（无下一交易日）
+    # H2-AC01：包末尾（日历未知=数据前沿）→ 可恢复等待，非终态、不计成功
+    last_success_before = hol.store.get_status(hol.config.ledger_run_id)[
+        "last_success_at"
+    ]
+    r_end = hol.decide(date(2025, 10, 1))  # 包末尾（日历未知）
     ex_end = hol.store.get_stage(hol.config.ledger_run_id, "2025-10-01", "execute")
-    ok_end = r_end.outcome == "completed" and ex_end["status"] == "no_next_trade_date"
+    st_end = hol.store.get_status(hol.config.ledger_run_id)
+    ok_end = (
+        r_end.outcome == "waiting_calendar"
+        and ex_end is None
+        and st_end["last_success_at"] == last_success_before
+    )
     _record(
-        "无下一交易日（包边界）",
-        "10-01 决策无执行日",
+        "数据前沿（日历未知）可恢复等待",
+        "10-01 决策、日历无下一开市日",
         r_end.outcome,
-        ["execute=no_next_trade_date 收口", "不伪造执行"],
+        ["不写终态 completed", "execute 不落盘", "last_success 不推进", "原因传平台"],
         ok_end,
     )
 

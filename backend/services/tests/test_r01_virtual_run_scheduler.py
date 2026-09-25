@@ -387,3 +387,113 @@ def test_recent_trade_dates_monday_covers_friday(pkg):
     # 2025-09-15（周一）回看：09-12(五)/09-11(四)/09-10(三)，无周末日
     got = _recent_trade_dates(provider, pkg, date(2025, 9, 15), 3)
     assert got == [date(2025, 9, 12), date(2025, 9, 11), date(2025, 9, 10)]
+
+
+def _make_synthetic_provider(d, today, ready=True):
+    """合成两开市日 provider（闭包绑定日期，避免循环变量滞后绑定）。"""
+    from types import SimpleNamespace
+
+    class Package:
+        def is_trade_date(self, x):
+            return x in (d, today)
+
+        def next_trade_date(self, x):
+            return today if x == d else None
+
+    class Provider:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        package = Package()
+
+        def resolve(self, *args, **kw):
+            return SimpleNamespace(status="ready" if ready else "data_blocked")
+
+        def next_open_trade_date(self, x):
+            return next((y for y in (d, today) if y > x), None)
+
+    return Provider
+
+
+def test_execution_phase_long_holiday_dispatch(fake_redis, sent, cfg, pkg):
+    """H2-AC02：长休市间隔后待执行决策不漏派（合成两开市日日历）。
+
+    覆盖：相距 1/3/8/9 自然日全部正确派发；重复 beat 去重；窗口前不派；
+    数据受阻不派；已执行跳过。日历为合成（不声称真实假期安排）。
+    """
+    from types import SimpleNamespace
+
+    run_id = cfg.ledger_run_id
+    d = date(2025, 9, 30)
+
+    for gap in (1, 3, 8, 9):
+        today = date.fromordinal(d.toordinal() + gap)
+
+        r = FakeRedis()
+        sched.save_redis_schedule(r, run_id, {**cfg.to_dict(), "enabled": True})
+        s2 = InMemoryRunStateStore()
+        s2.set_stage(run_id, d.isoformat(), "signal", {"action": "entry"})
+        s2.set_day(run_id, d.isoformat(), {"outcome": None})
+        # 注入合成 provider/pkg：monkeypatch gating.DailyIncrementProvider
+        import pytest as _pytest
+        import backend.services.simulation.virtual_run.gating as gating
+
+        Provider = _make_synthetic_provider(d, today)
+        with _pytest.MonkeyPatch.context() as mp:
+            mp.setattr(gating, "DailyIncrementProvider", Provider)
+            from datetime import datetime as _dt, timezone as _tz
+
+            now = _dt.combine(
+                today, _dt.strptime("09:35", "%H:%M").time(), tzinfo=_tz.utc
+            )
+            out = sched.dispatch_due_runs(now=now, r=r, store=s2)
+        # 待执行决策被派发（今日新决策的 decision 派发亦属正常）
+        assert f"{run_id}:execute:{d}" in out["dispatched"], (gap, out)
+        sent.clear()
+
+    # 重复 beat：同相位去重（TTL 内不重派）
+    today = date.fromordinal(d.toordinal() + 9)
+
+    Provider = _make_synthetic_provider(d, today)
+    import backend.services.simulation.virtual_run.gating as gating
+    import pytest as _pytest
+
+    r = FakeRedis()
+    sched.save_redis_schedule(r, run_id, {**cfg.to_dict(), "enabled": True})
+    s2 = InMemoryRunStateStore()
+    s2.set_stage(run_id, d.isoformat(), "signal", {"action": "entry"})
+    s2.set_day(run_id, d.isoformat(), {"outcome": None})
+    from datetime import datetime as _dt, timezone as _tz
+
+    with _pytest.MonkeyPatch.context() as mp:
+        mp.setattr(gating, "DailyIncrementProvider", Provider)
+        now = _dt.combine(today, _dt.strptime("09:35", "%H:%M").time(), tzinfo=_tz.utc)
+        o1 = sched.dispatch_due_runs(now=now, r=r, store=s2)
+        o2 = sched.dispatch_due_runs(now=now, r=r, store=s2)
+    assert f"{run_id}:execute:{d}" in o1["dispatched"]
+    assert o2["dispatched"] == []  # 重复 beat：去重
+
+    # 窗口前（09:00）不派；数据受阻不派；已执行跳过
+    for when, expect in (("09:00", []),):
+        r3 = FakeRedis()
+        with _pytest.MonkeyPatch.context() as mp:
+            mp.setattr(gating, "DailyIncrementProvider", Provider)
+            now = _dt.combine(today, _dt.strptime(when, "%H:%M").time(), tzinfo=_tz.utc)
+            o3 = sched.dispatch_due_runs(now=now, r=r3, store=s2)
+        assert o3["dispatched"] == expect
+
+    BlockedProvider = _make_synthetic_provider(d, today, ready=False)
+    r4 = FakeRedis()
+    with _pytest.MonkeyPatch.context() as mp:
+        mp.setattr(gating, "DailyIncrementProvider", BlockedProvider)
+        now = _dt.combine(today, _dt.strptime("09:35", "%H:%M").time(), tzinfo=_tz.utc)
+        o4 = sched.dispatch_due_runs(now=now, r=r4, store=s2)
+    assert o4["dispatched"] == []  # 数据受阻：无待执行
+
+    s2.set_stage(run_id, d.isoformat(), "execute", {"status": "executed"})
+    r5 = FakeRedis()
+    with _pytest.MonkeyPatch.context() as mp:
+        mp.setattr(gating, "DailyIncrementProvider", Provider)
+        now = _dt.combine(today, _dt.strptime("09:35", "%H:%M").time(), tzinfo=_tz.utc)
+        o5 = sched.dispatch_due_runs(now=now, r=r5, store=s2)
+    assert o5["dispatched"] == []  # 已执行跳过

@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -191,6 +192,20 @@ def _write_daily_pkg(
             for c in codes
         ],
     }
+    # 日历（合成：工作日开市、周末休市，覆盖 day-10..day+40）——供
+    # next_open_trade_date/前沿判定（H2-AC01 验收场景需要日历已知）
+    cal_rows = []
+    for i in range(-10, 41):
+        dd = date.fromordinal(version_day.toordinal() + i)
+        cal_rows.append(
+            {
+                "exchange": "SSE",
+                "cal_date": dd.strftime("%Y%m%d"),
+                "is_open": 0 if dd.weekday() >= 5 else 1,
+                "pretrade_date": None,
+            }
+        )
+    pd.DataFrame(cal_rows).to_parquet(dst / "calendar.parquet", index=False)
     (dst / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -420,3 +435,140 @@ def test_reconcile_strict_full_precision_diff(pkg):
     # 全精度对值逐行存在且为数值差（非舍入比较）
     assert all(r["full_precision_diff"] is not None for r in out["rows"])
     assert all(abs(r["full_precision_diff"]) <= 1e-6 for r in out["rows"])
+
+
+def test_frontier_publish_wait_then_continue(inc_env):
+    """H2-AC01 验收场景：仅发布 D 包 → 决策等待 → 再发布下一日所需数据 →
+    按冻结的可用时间和窗口继续——不漏决策、不用未来日线、不重复成交；
+    晚到超窗按既定政策收口（missed 路径）。
+
+    合成日包（真实 p02 口径 manifest+calendar）：基线为 fixture 冻结包，
+    d1/d2 为基线之后的两个开市日（数据行取自基线末日，日期推进）。
+    """
+    baseline, registry, provider, tmp = inc_env
+    d1 = _next_weekday(date.fromordinal(max(baseline.trade_dates()).toordinal() + 1))
+    d2 = _next_weekday(date.fromordinal(d1.toordinal() + 1))
+
+    from backend.services.simulation.virtual_run import FrozenClock
+    from backend.services.simulation.virtual_run.locks import InMemoryLockBackend
+    from backend.services.simulation.virtual_run.pipeline import VirtualRunPipeline
+    from backend.services.simulation.virtual_run.recovery import (
+        InMemoryCheckpointStore,
+    )
+    from backend.services.simulation.virtual_run.states import InMemoryRunStateStore
+
+    cfg = make_config()
+    clock = FrozenClock()
+    h_store, h_cp = InMemoryRunStateStore(), InMemoryCheckpointStore()
+
+    class P:
+        """真实 DailyIncrementProvider（注册表可增量发布）。"""
+
+        def __init__(self):
+            self._p = provider
+
+        def __getattr__(self, name):
+            return getattr(self._p, name)
+
+    pipe = VirtualRunPipeline(
+        cfg,
+        P(),
+        clock=clock,
+        lock_backend=InMemoryLockBackend(),
+        state_store=h_store,
+        checkpoint_store=h_cp,
+    )
+
+    # -- 阶段 1：仅发布 d1（取得于 d1 收盘后）→ 次日清晨决策 d1（建仓
+    #    信号，真实 DG-006 节奏）→ 执行日 d2 行情未取得 → 等待 ------
+    _add_entry(
+        registry,
+        f"node://test/r01-etf-daily/d{d1.strftime('%Y%m%d')}",
+        _write_daily_pkg(tmp, d1, baseline_pkg=baseline),
+    )
+    assert provider.next_open_trade_date(d1) == d2  # 日历已知 d2（开市日）
+    clock.set_shanghai(d2, "08:00")
+    r = pipe.run_day(d1)
+    assert r.outcome == "waiting_execution_data", r.detail
+    rec = h_store.get_day(cfg.ledger_run_id, d1.isoformat())
+    assert rec["outcome"] == "waiting_execution_data"
+    assert "completed_at" not in rec  # 不计成功
+    # 窗口开（09:31）但行情仍未取得：可恢复受阻
+    clock.set_shanghai(d2, "09:35")
+    r = pipe.run_day(d1)
+    assert r.outcome == "execution_data_blocked"
+    assert h_store.get_stage(cfg.ledger_run_id, d1.isoformat(), "execute") is None
+
+    # -- 阶段 2：发布 d2（取得于 d2 09:30，窗口内补齐）→ 按冻结窗口继续 --
+    _add_entry(
+        registry,
+        f"node://test/r01-etf-daily/d{d2.strftime('%Y%m%d')}",
+        _write_daily_pkg(
+            tmp,
+            d2,
+            baseline_pkg=baseline,
+            obtained_at=f"{d2.isoformat()}T01:30:00+00:00",
+        ),
+    )
+    clock.set_shanghai(d2, "09:40")
+    r = pipe.run_day(d1)
+    assert r.outcome == "completed", r.detail
+    ex = h_store.get_stage(cfg.ledger_run_id, d1.isoformat(), "execute")
+    assert (
+        ex["status"] == "executed"
+        and ex["execution"]["execution_date"] == d2.isoformat()
+    )
+    led = h_cp.load(provider.package, cfg.to_ledger_config())
+    st = led.export_checkpoint()
+    assert st["executed_dates"] == [d2.isoformat()]
+    fills = (
+        [f for o in st["orders"].values() for f in o.get("fills", [])]
+        if isinstance(next(iter(st["orders"].values()), None), dict)
+        else []
+    )
+    # 不重复成交：重复调度后订单/成交不变
+    r2 = pipe.run_day(d1)
+    assert r2.outcome == "completed"
+    st2 = h_cp.load(provider.package, cfg.to_ledger_config()).export_checkpoint()
+    assert st2["orders"] == st["orders"] and st2["cash"] == st["cash"]
+
+    # -- 阶段 3（另一 run）：晚到超窗 → 按冻结策略收口（missed，不补写） --
+    cfg_late = make_config()
+    clock_l = FrozenClock()
+    store_l, cp_l = InMemoryRunStateStore(), InMemoryCheckpointStore()
+    provider_l = DailyIncrementProvider(
+        str(baseline.root),
+        baseline_manifest_sha256=baseline.manifest_sha256,
+        registry_path=str(tmp / "registry-late.json"),
+        cache_dir=str(tmp / "m2"),
+    )
+    reg_late = tmp / "registry-late.json"
+    reg_late.write_text(json.dumps({"packages": {}}), encoding="utf-8")
+    provider_l = DailyIncrementProvider(
+        str(baseline.root),
+        baseline_manifest_sha256=baseline.manifest_sha256,
+        registry_path=str(reg_late),
+        cache_dir=str(tmp / "m2"),
+    )
+    _add_entry(
+        reg_late,
+        f"node://test/r01-etf-daily/d{d1.strftime('%Y%m%d')}",
+        _write_daily_pkg(tmp / "late", d1, baseline_pkg=baseline),
+    )
+    pipe_l = VirtualRunPipeline(
+        cfg_late,
+        provider_l,
+        clock=clock_l,
+        lock_backend=InMemoryLockBackend(),
+        state_store=store_l,
+        checkpoint_store=cp_l,
+    )
+    clock_l.set_shanghai(d2, "08:00")
+    assert pipe_l.run_day(d1).outcome == "waiting_execution_data"
+    clock_l.set_shanghai(d2, "10:05")  # 超窗（09:31+30min）
+    r = pipe_l.run_day(d1)
+    assert r.outcome == "missed_execution_window"
+    ex_l = store_l.get_stage(cfg_late.ledger_run_id, d1.isoformat(), "execute")
+    assert ex_l["status"] == "missed_window"
+    led_l = cp_l.load(provider_l.package, cfg_late.to_ledger_config())
+    assert led_l is None or not led_l.export_checkpoint()["orders"]  # 无成交不补写
