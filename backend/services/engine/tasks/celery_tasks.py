@@ -1033,3 +1033,45 @@ def run_market_snapshot() -> dict[str, Any]:
     except Exception as exc:
         logger.exception("[MarketSnapshot] 失败: %s", exc)
         return {"status": "failed", "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# R01 持续虚拟盘（H2.2，h2-scope p02r 段：仅新增 r01 虚拟运行任务包装）
+# ---------------------------------------------------------------------------
+@celery_app.task(name="engine.tasks.dispatch_r01_virtual_runs")
+def dispatch_r01_virtual_runs() -> dict[str, Any]:
+    """beat 周期检查 r01vr 调度配置（Redis quantmind:r01:vr:schedule:*）。
+
+    无配置/未启用 = no-op（无内置默认调度）；到点派发幂等日任务。
+    """
+    try:
+        from backend.services.engine.tasks.r01_virtual_run_scheduler import (
+            dispatch_due_runs,
+        )
+
+        return dispatch_due_runs()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("[R01VR] 派发检查失败: %s", exc)
+        return {"status": "failed", "error": str(exc)}
+
+
+@celery_app.task(
+    name="engine.tasks.r01_virtual_run_daily",
+    # 任务自身幂等（阶段键+日锁）；派发即 ack，失败不无限重投
+    # （下轮 beat 在去重 TTL 过后重派，窗口截止由流水线按冻结策略收口）
+    acks_late=False,
+    reject_on_worker_lost=False,
+    soft_time_limit=600,
+    time_limit=660,
+)
+def r01_virtual_run_daily(ledger_run_id: str, decision_date: str | None = None) -> dict[str, Any]:
+    """执行/续跑某 r01vr 运行的一个决策日（由 dispatch_r01_virtual_runs 派发）。"""
+    try:
+        from backend.services.engine.tasks.r01_virtual_run_scheduler import (
+            run_scheduled_day,
+        )
+
+        return run_scheduled_day(ledger_run_id, decision_date)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("[R01VR] %s %s 运行失败: %s", ledger_run_id, decision_date, exc)
+        return {"status": "failed", "ledger_run_id": ledger_run_id, "error": str(exc)}

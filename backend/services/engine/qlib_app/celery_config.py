@@ -141,6 +141,15 @@ if os.getenv("MARKET_SYNC_SCHEDULE_ENABLED", "true").lower() == "true":
         "options": {"queue": "market_sync", "expires": 120},
     }
 
+# R01 持续虚拟盘调度检查（H2.2：每几分钟轮询 Redis quantmind:r01:vr:schedule:*；
+# 无配置/未启用 = no-op，无内置默认调度；具体决策截止/执行时点由各 run 配置）
+if os.getenv("R01_VIRTUAL_RUN_SCHEDULE_ENABLED", "true").lower() == "true":
+    beat_schedule["r01-virtual-run-dispatch"] = {
+        "task": "engine.tasks.dispatch_r01_virtual_runs",
+        "schedule": crontab(minute="*/5", hour="*"),
+        "options": {"expires": 240},
+    }
+
 # Strategy Lab daily scan — runs after the data sync settles (Day 16)
 if os.getenv("STRATEGY_LAB_SCAN_ENABLED", "true").lower() == "true":
     beat_schedule["strategy-lab-daily-scan"] = {
