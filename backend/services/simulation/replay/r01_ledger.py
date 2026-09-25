@@ -310,14 +310,16 @@ class LedgerPosition:
     stale_days: int = 0
 
     def to_dict(self) -> dict[str, Any]:
+        """J2E2 精度政策：内部/检查点/审计原件一律全精度（份额折算等
+        乘法不留 4dp 舍入），仅展示层（export_view）格式化。"""
         return {
             "symbol": self.symbol,
-            "qty": round(self.qty, 4),
-            "avg_cost": round(self.avg_cost, 6),
-            "available_qty": round(self.available_qty, 4),
-            "pending_t1_qty": round(self.pending_t1_qty, 4),
+            "qty": self.qty,
+            "avg_cost": self.avg_cost,
+            "available_qty": self.available_qty,
+            "pending_t1_qty": self.pending_t1_qty,
             "pending_t1_date": self.pending_t1_date,
-            "last_mark": round(self.last_mark, 6),
+            "last_mark": self.last_mark,
             "last_mark_date": self.last_mark_date,
             "stale_days": self.stale_days,
         }
@@ -1666,12 +1668,14 @@ def build_view_from_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
             positions_out.append(
                 {
                     "symbol": sym,
-                    "qty": _view_require(p, "qty", where),
-                    "avg_cost": _view_require(p, "avg_cost", where),
-                    "available_qty": _view_require(p, "available_qty", where),
-                    "last_mark": _view_require(p, "close", where),
+                    # J2E2 精度政策：展示层格式化（qty/标记/市值 4dp、成本 6dp）；
+                    # 数值源自全精度原件，仅呈现取整
+                    "qty": round(float(_view_require(p, "qty", where)), 4),
+                    "avg_cost": round(float(_view_require(p, "avg_cost", where)), 6),
+                    "available_qty": round(float(_view_require(p, "available_qty", where)), 4),
+                    "last_mark": round(float(_view_require(p, "close", where)), 4),
                     "mark_source": _view_require(p, "mark_source", where),
-                    "market_value": _view_require(p, "market_value", where),
+                    "market_value": round(float(_view_require(p, "market_value", where)), 4),
                     "stale_days": _view_require(p, "stale_days", where),
                     "last_mark_date": p.get("last_mark_date"),
                 }
