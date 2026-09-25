@@ -60,7 +60,7 @@ sys.modules["psycopg_pool"].AsyncConnectionPool = MagicMock()
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from backend.services.research_agent import external  # noqa: E402
+from backend.services.research_agent import external, runstatus  # noqa: E402
 from backend.services.research_agent.app import app  # noqa: E402
 from backend.services.research_agent.store import digest, enqueue, event  # noqa: E402
 
@@ -239,6 +239,26 @@ class FakeExternalStore(external.ExternalStore):
         self.bindings[key] = binding
 
 
+class FakeRunStatusStore(runstatus.RunStatusStore):
+    def __init__(self):
+        super().__init__(None)
+        self.rows = {}  # (tenant, node, ledger_run_id) -> {decision_date, payload, received_at}
+
+    async def upsert(self, owner, node, payload, received_at):
+        key = (owner[0], node, payload["ledger_run_id"])
+        row = self.rows.get(key)
+        if row and payload["input_date"]["decision_date"] < row["decision_date"]:
+            return {"stored": False, "ignored": "stale_write",
+                    "kept_decision_date": row["decision_date"]}
+        self.rows[key] = {"decision_date": payload["input_date"]["decision_date"],
+                          "payload": payload, "received_at": received_at}
+        return {"stored": True, "ignored": None}
+
+    async def list(self, owner, node):
+        return [{"ledger_run_id": k[2], **v} for k, v in self.rows.items()
+                if k[0] == owner[0] and k[1] == node]
+
+
 @pytest.fixture()
 def env(tmp_path):
     (tmp_path / "external").mkdir()
@@ -247,6 +267,7 @@ def env(tmp_path):
     app.state.settings = FakeSettings()
     app.state.store = store
     app.state.external = xstore
+    app.state.run_status = FakeRunStatusStore()
     app.state.contracts = external.Contracts()
     client = TestClient(app)
     client.headers.update(
@@ -970,3 +991,108 @@ class TestPureLogic:
         )
         assert groups["A"]["status"] == "pending-research"
         assert groups["D"]["status"] == "pending-research"  # reserved group
+
+
+def _run_status_payload(**over):
+    base = {
+        "ledger_run_id": "r01vr-A-demo-v1-a1", "strategy_id": "a-demo",
+        "strategy_version": 1, "group": "A", "run_state": "running",
+        "input_date": {"decision_date": "2026-09-25", "data_as_of": "2026-09-24",
+                       "obtained_at": "2026-09-25T15:40:00Z",
+                       "manifest_sha256": "a" * 64, "package_id": "r01-etf-daily-fcbabbb7f133"},
+        "today_decision": {"action": "no_trade", "reason": "月末调仓未到期",
+                           "no_trade_reason": "无调仓信号"},
+        "risk_state": {"status": "active", "high_water_mark": 30100.0},
+        "schedule": {"configured": False},
+        "last_heartbeat": None, "last_success_at": None,
+        "positions": [], "cash": 30000.0, "dividend_receivable": 0.0,
+        "orders": [], "nav": 30000.0, "drawdown": 0.0, "hwm": 30000.0,
+        "anomalies": [], "pending_actions": [],
+    }
+    base.update(over)
+    return base
+
+
+class TestR01RunStatus:
+    def test_write_and_read_roundtrip_with_derivations(self, env):
+        import time as _t
+        payload = _run_status_payload(last_heartbeat=_t.time())
+        resp = env.post("/r01/run-status", json=payload,
+                        headers={"x-tenant-id": "default"})
+        assert resp.status_code == 200 and resp.json()["stored"] is True, resp.text
+        body = env.get("/r01/run-status").json()
+        assert body["count"] == 1
+        run = body["runs"][0]
+        assert run["platform_derived"]["display_state"] == "正常"
+        assert run["platform_derived"]["activation"] == "pending_activation"
+        assert run["platform_derived"]["next_run_at"] is None  # 未配置=待启用
+
+    def test_write_requires_runner_channel_and_valid_payload(self, env):
+        # 内部密钥错误拒绝（runner 通道）
+        resp = env.post("/r01/run-status", json=_run_status_payload(),
+                        headers={"x-internal-call": "wrong"})
+        assert resp.status_code == 401
+        # 未知字段/缺必填/未配置却带 next_run_at 均拒绝
+        for over, why in (
+            ({"unknown_field": 1}, "unknown"),
+            ({"run_state": "paused"}, "bad run_state"),
+        ):
+            bad = dict(_run_status_payload(), **over)
+            resp = env.post("/r01/run-status", json=bad,
+                            headers={"x-tenant-id": "default"})
+            assert resp.status_code == 422, (why, resp.text)
+        bad = _run_status_payload(schedule={"configured": False, "next_run_at": "2026-09-26T15:40:00Z"})
+        resp = env.post("/r01/run-status", json=bad, headers={"x-tenant-id": "default"})
+        assert resp.status_code == 422 and "推测" in resp.json()["detail"]
+
+    def test_heartbeat_stale_shows_stale_not_failure(self, env):
+        payload = _run_status_payload(last_heartbeat=1000.0)  # 远古心跳
+        env.post("/r01/run-status", json=payload, headers={"x-tenant-id": "default"})
+        run = env.get("/r01/run-status").json()["runs"][0]
+        assert run["platform_derived"]["heartbeat_stale"] is True
+        assert run["platform_derived"]["display_state"] == "stale_heartbeat"
+        assert run["run_state"] == "running"  # 不自动判成败
+
+    def test_three_stage_stop_and_risk_vs_job_pause(self, env):
+        # 三段：仅执行端写入 effective 才显示生效；平台不自动推进
+        payload = _run_status_payload(
+            run_state="paused_job",
+            stop_restore={"job_stop": {"stage": "requested"}})
+        env.post("/r01/run-status", json=payload, headers={"x-tenant-id": "default"})
+        run = env.get("/r01/run-status").json()["runs"][0]
+        assert run["stop_restore"]["job_stop"]["stage"] == "requested"
+        assert run["platform_derived"]["display_state"] == "作业暂停"
+        # 升级到 received（runner 回执）仍非生效
+        payload["stop_restore"] = {"job_stop": {"stage": "received"}}
+        env.post("/r01/run-status", json=payload, headers={"x-tenant-id": "default"})
+        run = env.get("/r01/run-status").json()["runs"][0]
+        assert run["stop_restore"]["job_stop"]["stage"] == "received"
+        # 执行端确认 effective
+        payload["stop_restore"] = {"job_stop": {"stage": "effective"}}
+        env.post("/r01/run-status", json=payload, headers={"x-tenant-id": "default"})
+        run = env.get("/r01/run-status").json()["runs"][0]
+        assert run["stop_restore"]["job_stop"]["stage"] == "effective"
+        # 风险暂停与作业暂停分别展示
+        risk = _run_status_payload(ledger_run_id="r01vr-A-demo-v1-a2",
+                                   run_state="paused_risk",
+                                   risk_state={"status": "paused",
+                                               "pending_confirmations": [{"line": "loss_line"}]})
+        env.post("/r01/run-status", json=risk, headers={"x-tenant-id": "default"})
+        runs = {r["ledger_run_id"]: r for r in env.get("/r01/run-status").json()["runs"]}
+        assert runs["r01vr-A-demo-v1-a2"]["platform_derived"]["display_state"] == "风险暂停"
+        assert runs["r01vr-A-demo-v1-a1"]["platform_derived"]["display_state"] == "作业暂停"
+
+    def test_stale_write_guard_and_data_blocked(self, env):
+        env.post("/r01/run-status", json=_run_status_payload(),
+                 headers={"x-tenant-id": "default"})
+        older = _run_status_payload(
+            input_date={"decision_date": "2026-09-24", "data_as_of": "2026-09-23"})
+        resp = env.post("/r01/run-status", json=older, headers={"x-tenant-id": "default"})
+        assert resp.json() == {"stored": False, "ignored": "stale_write",
+                               "kept_decision_date": "2026-09-25"}
+        blocked = _run_status_payload(run_state="data_blocked",
+                                      anomalies=[{"kind": "daily_input_gate", "detail": "manifest 校验 fail"}])
+        env.post("/r01/run-status", json=blocked, headers={"x-tenant-id": "default"})
+        run = env.get("/r01/run-status").json()["runs"][0]
+        assert run["platform_derived"]["display_state"] == "数据受阻"
+        assert run["anomalies"]

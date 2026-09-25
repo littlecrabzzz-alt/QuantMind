@@ -362,4 +362,65 @@ export const researchAgent = {
   }> => call(`/projects/${projectKey}/readiness`, node),
   projectOverview: (node: string, projectKey: string): Promise<ProjectOverview> =>
     call(`/projects/${projectKey}`, node),
+  r01RunStatus: async (node: string): Promise<{ runs: R01RunStatus[]; count: number }> =>
+    (
+      await request("/r01/run-status", node, {}, "/research-agent")
+    ).data,
 };
+
+// ---- H2.2-P1 持续虚拟运行状态（h2-interfaces §4；不改信封）----
+export interface R01RunStatus {
+  ledger_run_id: string;
+  strategy_id: string;
+  strategy_version: number | string;
+  group: string;
+  run_state:
+    | "running"
+    | "no_trade_needed"
+    | "data_blocked"
+    | "failed"
+    | "paused_risk"
+    | "paused_job";
+  input_date: {
+    decision_date: string;
+    data_as_of?: string;
+    obtained_at?: number | string;
+    package_id?: string;
+    manifest_sha256?: string;
+    release_id?: string;
+  };
+  today_decision: { action: string; reason: string; no_trade_reason?: string };
+  risk_state: {
+    status: string;
+    loss_line?: unknown;
+    drawdown_line?: unknown;
+    pending_confirmations?: Array<Record<string, unknown>>;
+    blocked_orders?: Array<Record<string, unknown>>;
+    high_water_mark?: number;
+  };
+  schedule: { configured: boolean; next_run_at?: string | null };
+  last_heartbeat?: number;
+  last_success_at?: number | string | null;
+  positions?: Array<Record<string, unknown>>;
+  cash?: number;
+  dividend_receivable?: number;
+  orders?: Array<Record<string, unknown>>;
+  nav?: number;
+  drawdown?: number;
+  hwm?: number;
+  anomalies?: Array<Record<string, unknown>>;
+  pending_actions?: Array<Record<string, unknown>>;
+  stop_restore?: {
+    job_stop?: { stage: "requested" | "received" | "effective"; at?: number } | null;
+    job_restore?: { stage: "requested" | "received" | "effective"; at?: number } | null;
+  };
+  platform_derived?: {
+    display_state: string;
+    heartbeat_stale: boolean;
+    next_run_at: string | null;
+    next_run_at_source: string | null;
+    activation: "configured" | "pending_activation";
+    stop_restore: NonNullable<R01RunStatus["stop_restore"]>;
+  };
+  platform_received_at?: number;
+}

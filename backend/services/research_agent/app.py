@@ -19,8 +19,9 @@ from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, ConfigDict, Field
 
-from . import external
+from . import external, runstatus
 from .external import Contracts, ExternalStore
+from .runstatus import RunStatusStore
 from .runtime import Runner
 from .sandbox import Sandbox, files, read_file
 from .settings import Settings
@@ -57,6 +58,7 @@ async def lifespan(app):
         await saver.setup()
     app.state.settings, app.state.store = cfg, store
     app.state.external, app.state.contracts = ExternalStore(store.pool), Contracts()
+    app.state.run_status = RunStatusStore(store.pool)
     app.state.runner = Runner(cfg, store)
     # Ambiguous in-flight model/tool calls are not blindly replayed after a crash.
     for row in await store.active(cfg.node):
@@ -787,3 +789,64 @@ async def project_overview(project_key: str, request: Request):
             default=None,
         ),
     }
+
+
+def _runner_identity(request):
+    """Runner 直写通道：内部密钥+节点（H2 runner 与平台同节点部署）；读取走用户身份。"""
+    cfg = request.app.state.settings
+    if not hmac.compare_digest(
+        request.headers.get("x-internal-call", ""), cfg.internal_secret
+    ):
+        raise HTTPException(401, "仅接受平台认证网关请求")
+    if request.headers.get("x-research-node", cfg.node) != cfg.node:
+        raise HTTPException(409, "研究节点已改变，请刷新页面")
+    tenant = request.headers.get("x-tenant-id", "default")
+    if not tenant:
+        raise HTTPException(401, "缺少租户身份")
+    return tenant, None
+
+
+@app.post("/r01/run-status")
+async def write_run_status(request: Request):
+    """Runner 直写运行状态（H2.2-P1；h2-interfaces §4 字段，当前状态 upsert）。
+
+    幂等：同 ledger_run_id 后写覆盖（状态快照语义）；decision_date 回退的迟到
+    写入被忽略并显式返回。三段停止/恢复只存 runner 写入的阶段——平台不自动推进。
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(400, "请求体不是合法 JSON") from None
+    try:
+        runstatus.validate_run_status(payload)
+    except runstatus.RunStatusError as exc:
+        return _contract_response(422, exc.code, exc.detail)
+    tenant, _ = _runner_identity(request)
+    owner = (tenant, "runner")
+    result = await request.app.state.run_status.upsert(
+        owner, request.app.state.settings.node, payload, time.time()
+    )
+    return result
+
+
+@app.get("/r01/run-status")
+async def read_run_status(request: Request):
+    """平台日常页数据源（只读）：§4 字段 + 读取侧派生（陈旧/待启用/三段）。"""
+    cfg = request.app.state.settings
+    tenant, _ = await identity(request)
+    owner = (tenant, "runner")
+    rows = await request.app.state.run_status.list(owner, cfg.node)
+    runs = []
+    for row in rows:
+        payload = row["payload"]
+        runs.append({
+            **payload,
+            "platform_derived": runstatus.derive_view(
+                payload,
+                heartbeat_stale_after=getattr(
+                    cfg, "vr_heartbeat_stale_after", 900.0
+                ),
+            ),
+            "platform_received_at": row["received_at"],
+        })
+    return {"runs": runs, "count": len(runs)}

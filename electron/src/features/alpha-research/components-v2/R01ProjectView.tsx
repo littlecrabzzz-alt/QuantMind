@@ -27,6 +27,7 @@ import {
   type ProjectOverview,
 } from "../services-v2/researchAgent";
 import LedgerDetailView from "./LedgerDetailView";
+import R01RunStatusPanel from "./R01RunStatusPanel";
 
 const panel = "rounded-xl border border-border bg-card p-4";
 const workstreamName: Record<string, string> = {
@@ -655,6 +656,7 @@ export default function R01ProjectView({
               ))}
             </div>
           </div>
+          <R01RunStatusPanel node={node} />
           <div className={panel} data-testid="r01-real-curves">
             <h3 className="font-medium mb-2">真实回放曲线（非 fixture）</h3>
             {overview.cases.flatMap((c) =>
