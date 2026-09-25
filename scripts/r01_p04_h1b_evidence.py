@@ -143,6 +143,10 @@ kinds.push(["fixture-consistency", fixtureConsistency(vw, false)]);
 if (JSON.stringify(classifyRunKinds(vw)) !== JSON.stringify(["历史研究"])) throw "kind mismatch: " + JSON.stringify(classifyRunKinds(vw));
 if (!fixtureConsistency(vw, false).consistent) throw "fixture layers inconsistent: " + JSON.stringify(fixtureConsistency(vw, false));
 if (fixtureConsistency(vw, true).consistent) throw "inconsistent pair must be reported";
+const legacyObj = JSON.parse(fs.readFileSync(process.argv[4]));
+const legacyInnerFixture = String(legacyObj.banner || "").includes("FIXTURE") || (legacyObj.package || {}).is_fixture === true;
+if (!legacyInnerFixture) throw "legacy sample should be inner-fixture (banner FIXTURE)";
+out.formats.legacy_fixture_layers = {inner: legacyInnerFixture, outer: true};
 out.formats.legacy = identifyExportFormat(JSON.parse(fs.readFileSync(process.argv[4])));
 out.formats.unknown = identifyExportFormat({});
 out.formats.legacy_days = legacyFixtureView(JSON.parse(fs.readFileSync(process.argv[4]))).daySummaries.length;
@@ -192,17 +196,24 @@ console.log(JSON.stringify({compared_days: vd.length, field_pairs: out.pairs.len
            "adapter_check": adapter_result, "steps": []}
     seq = 0
     for name, sha in files.items():
+        # 两层 fixture 语义一致（H4 修复1）：研究账本导出（group A）=非 fixture；
+        # legacy 旧工程样例与 unknown 演示文件=fixture=true + fixture- 策略前缀
+        is_fixture_sample = name in ("legacy-attempt1-sample.json", "unknown-shape.json")
         env = {"schema_version": 2, "project_key": "r01", "workstream": "P0",
                "case_id": cid, "source_task": "R01P0-H1P2", "source_run_id": "run-h1b",
-               "strategy_id": "h1-historical-sample", "contract_version": "2.3",
+               "strategy_id": ("fixture-h1-legacy-sample" if is_fixture_sample
+                               else "h1-historical-sample"),
+               "contract_version": "2.3",
                "contract_hash": hashlib.sha256(CONTRACT_MD.read_bytes()).hexdigest(),
                "source_node": "mac", "source_revision": HEAD,
                "event_id": f"ev-art-{name}", "seq": seq, "kind": "artifact",
                "data": {"input_package_id": "r01-etf-daily-fcbabbb7f133",
                         "data_as_of": "2024-04-29", "manifest_sha256": MANIFEST},
                "timestamps": {"source_at": "2026-09-25T12:30:00Z"},
-               "execution_status": "completed", "evidence_stage": "development-compare",
-               "fixture": False,
+               "execution_status": "completed",
+               "evidence_stage": ("engineering-validation" if is_fixture_sample
+                                  else "development-compare"),
+               "fixture": is_fixture_sample,
                "artifacts": [{"name": name, "kind": "ledger-export" if "ledger" in name else "sample",
                               "sha256": sha, "uri": f"external/{name}"}]}
         seq += 1

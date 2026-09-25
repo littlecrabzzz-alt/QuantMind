@@ -94,23 +94,23 @@ def main():
         return st, resp
 
     # 输入绑定产物回报（可打开：参数→实际输入→manifest）
-    for pname in ("manifest.json", "README.md"):
+    for seq_i, pname in enumerate(("manifest.json", "README.md")):
         stx, respx = call("POST", reports, envelope(
-            cid, "run-a", f"a0-{pname}", 0, "artifact",
+            cid, "run-a", f"a0-{pname}", seq_i, "artifact",
             artifacts=[{"name": f"input-{pname}", "kind": "input-binding",
                         "sha256": files[pname], "uri": f"external/input-{pname}"}]), token)
         log["steps"].append({"label": f"artifact input-{pname}", "status": stx})
         assert stx == 201, respx
 
     # run-a：两步完成 + 产物 + 用量实报 => completed
-    post("run-a s1 done", envelope(cid, "run-a", "a1", 1, "progress",
+    post("run-a s1 done", envelope(cid, "run-a", "a1", 2, "progress",
          progress_step={"step_id": "s1", "title": "输入核验", "status": "done"}))
-    post("run-a s2 done", envelope(cid, "run-a", "a2", 2, "progress",
+    post("run-a s2 done", envelope(cid, "run-a", "a2", 3, "progress",
          progress_step={"step_id": "s2", "title": "链路联调", "status": "done"}))
-    post("run-a artifact", envelope(cid, "run-a", "a3", 3, "artifact",
+    post("run-a artifact", envelope(cid, "run-a", "a3", 4, "artifact",
          artifacts=[{"name": "h1-run-a-nav.json", "kind": "fixture-nav",
                      "sha256": sha, "uri": "external/h1-run-a-nav.json"}]))
-    post("run-a usage(completed)", envelope(cid, "run-a", "a4", 4, "metrics",
+    post("run-a usage(completed)", envelope(cid, "run-a", "a4", 5, "metrics",
          execution_status="completed",
          metrics=[{"metric": "usage.tokens_total", "value": 4321, "unit": "tokens",
                    "basis": "runner 实报（工程运行）"},
@@ -122,7 +122,7 @@ def main():
          progress_step={"step_id": "s3", "title": "回放联调", "status": "blocked"}))
     # 重复回报：run-a 末事件原样重发 => 幂等，不新增实验/运行
     st, resp = call("POST", reports,
-                    envelope(cid, "run-a", "a4", 4, "metrics",
+                    envelope(cid, "run-a", "a4", 5, "metrics",
                              execution_status="completed",
                              metrics=[{"metric": "usage.tokens_total", "value": 4321,
                                        "unit": "tokens", "basis": "runner 实报（工程运行）"},
@@ -150,6 +150,19 @@ def main():
     assert runs["run-b"]["execution_status"] == "blocked" and runs["run-b"]["errors"]
     assert ext["usage"]["values"] and ext["usage"]["values"][0]["source_run_id"] == "run-a"
     assert ext["current_step"]["step_id"] == "s3" and ext["next_step"]["step_id"] == "s3"
+    # 文件 GET 逐字节对值（关键文件入产物列表：可打开链的 201 之外证明）
+    log["openable_files"] = []
+    for fname in ("input-manifest.json", "input-README.md", "h1-run-a-nav.json"):
+        req = urllib.request.Request(GW + f"/cases/{cid}/file?path=external/{fname}")
+        req.add_header("Authorization", "Bearer " + token)
+        req.add_header("X-Research-Node", NODE)
+        with urllib.request.urlopen(req) as r4:
+            raw4 = r4.read()
+        identical = raw4 == (ws / fname).read_bytes()
+        log["openable_files"].append({"file": fname, "sha256": hashlib.sha256(raw4).hexdigest(),
+                                      "byte_identical": identical})
+        assert identical, fname
+
     # 冻结参数/输入/合同身份：审计流保留完整 envelope（按 run 可定位）
     _, stream = call("GET", reports + "?since_seq=0", None, token)
     log["audit_frozen_identity"] = [
@@ -161,6 +174,8 @@ def main():
         for e in stream["events"]]
     this_case_events = [e for e in stream["events"] if e["payload"]["case_id"] == cid]
     assert len(this_case_events) == 7, len(this_case_events)  # 2 输入绑定+4 run-a+1 run-b
+    assert all(e["apply_status"] != "stale_event" for e in this_case_events), \
+        "顺序缺陷回归：本链不应出现 stale_event"
     # 刷新一致性（页面数据源同 API）
     _, detail2 = call("GET", GW + f"/cases/{cid}", None, token)
     assert detail2["external"] == ext
