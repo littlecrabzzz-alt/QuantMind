@@ -74,22 +74,45 @@ def list_run_ids() -> list[str]:
 
 
 def build_pipeline(config: VirtualRunConfig, schedule_cfg: dict | None = None):
-    """生产/沙盒构建（重导入以避免 celery 进程早绑定）。"""
-    from backend.services.simulation.replay.etf_input_package import (
-        load_etf_input_package,
+    """生产/沙盒构建（重导入以避免 celery 进程早绑定）。
+
+    J6R4 #1：构建入口接真实包源与平台回报（与 dispatcher 同一接法）——
+    DailyIncrementProvider（v2 基线+日增量注册表，逐项哈希复验/迟到过滤）
+    + reporter（R01_VR_AGENT_BASE 未配置则仅状态键+心跳，不外报）。
+    """
+    from backend.services.simulation.virtual_run.gating import (
+        DailyIncrementProvider,
     )
-    from backend.services.simulation.virtual_run.gating import StaticPackageProvider
     from backend.services.simulation.virtual_run.locks import RedisLockBackend
     from backend.services.simulation.virtual_run.pipeline import VirtualRunPipeline
     from backend.services.simulation.virtual_run.recovery import DbCheckpointStore
-    from backend.services.simulation.virtual_run.states import RedisRunStateStore
+    from backend.services.simulation.virtual_run.states import (
+        RedisRunStateStore,
+        post_platform_status,
+    )
 
     redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
-    pkg = load_etf_input_package(
-        config.package_root, expect_manifest_sha256=config.manifest_sha256 or None
+    provider = DailyIncrementProvider(
+        config.package_root,
+        baseline_manifest_sha256=config.manifest_sha256,
+        registry_path=os.getenv("R01_VR_REGISTRY") or None,
+        cache_dir=os.getenv("R01_VR_MERGE_CACHE") or None,
     )
-    provider = StaticPackageProvider(pkg)
     dsn = os.getenv("DATABASE_URL") or _pg_dsn_from_env()
+
+    agent_base = os.getenv("R01_VR_AGENT_BASE")
+    reporter = None
+    if agent_base:
+        secret = os.getenv("INTERNAL_CALL_SECRET", "")
+
+        def reporter(payload: dict) -> dict:  # noqa: F811
+            return post_platform_status(
+                payload,
+                base_url=agent_base,
+                internal_secret=secret,
+                node=os.getenv("R01_VR_NODE") or None,
+            )
+
     return VirtualRunPipeline(
         config,
         provider,
@@ -97,6 +120,7 @@ def build_pipeline(config: VirtualRunConfig, schedule_cfg: dict | None = None):
         state_store=RedisRunStateStore(redis_url),
         checkpoint_store=DbCheckpointStore(dsn),
         schedule_cfg=schedule_cfg,
+        platform_reporter=reporter,
     )
 
 
@@ -180,9 +204,10 @@ def dispatch_due_runs(
                 else:
                     skipped.append(f"{run_id}:decision:{today}(dup/retry-wait)")
 
-        # -- 受阻重派（J5R3 #4）：近 3 个交易日内的受阻日（含隔夜补数），
+        # -- 受阻重派（J5R3 #4 / J6R4 #3）：近 3 个**交易日**（交易日历
+        #    口径，周一可覆盖周五；非自然日）内的受阻日（含隔夜补数），
         #    窗口（次一交易日执行时点）内数据补齐后自动重新门控执行 ----
-        for d in _recent_dates(today, 3):
+        for d in _recent_trade_dates(provider, pkg, today, 3):
             if d == today or not pkg.is_trade_date(d):
                 continue
             rec = store.get_day(run_id, d.isoformat())
@@ -228,6 +253,32 @@ def dispatch_due_runs(
 
 def _recent_dates(today: date, days: int) -> list[date]:
     return [today - timedelta(days=i) for i in range(days)]
+
+
+def _recent_trade_dates(provider, pkg, today: date, n: int) -> list[date]:
+    """近 n 个交易日（J6R4 #3：交易日历口径，非自然日——周一能覆盖周五）。
+
+    优先 provider 日历（日包 calendar.parquet，覆盖基线之后），回退
+    合并包日历（基线内日期）。
+    """
+    out: list[date] = []
+    probe = today
+    for _ in range(30):
+        if len(out) >= n:
+            break
+        probe = date.fromordinal(probe.toordinal() - 1)
+        if pkg.is_trade_date(probe):
+            out.append(probe)
+            continue
+        try:
+            if (
+                provider.next_open_trade_date(date.fromordinal(probe.toordinal() - 1))
+                == probe
+            ):
+                out.append(probe)
+        except Exception:  # noqa: BLE001
+            continue
+    return out
 
 
 def _dispatch_once(r, run_id: str, d: date, phase: str, *, ttl: int) -> bool:

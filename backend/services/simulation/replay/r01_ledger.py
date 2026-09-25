@@ -193,6 +193,9 @@ class LedgerFill:
     price_source: str = "package_open"
 
     def to_dict(self) -> dict[str, Any]:
+        # total_fee_exact（J6R4）：全精度费用审计字段——复算侧
+        # （independent_recompute）优先消费它，消除 4dp 展示舍入在证据层
+        # 重放中的累积残差；既有消费者不读该字段，行为不变。
         return {
             "trade_date": self.trade_date,
             "symbol": self.symbol,
@@ -203,6 +206,7 @@ class LedgerFill:
             "stamp_duty": round(self.stamp_duty, 4),
             "transfer_fee": round(self.transfer_fee, 4),
             "total_fee": round(self.total_fee, 4),
+            "total_fee_exact": self.total_fee,
             "signal_date": self.signal_date,
             "slippage_bps": self.slippage_bps,
             "price_source": self.price_source,
@@ -219,7 +223,10 @@ class LedgerFill:
             commission=float(d["commission"]),
             stamp_duty=float(d["stamp_duty"]),
             transfer_fee=float(d["transfer_fee"]),
-            total_fee=float(d["total_fee"]),
+            # J6R4：checkpoint 恢复优先全精度费用（to_dict 的 4dp 展示值
+            # 仅旧快照回退）——避免往返丢失费用精度导致复算/账本现金
+            # 出现 ~1ulp×笔数 级伪残差
+            total_fee=float(d.get("total_fee_exact", d["total_fee"])),
             signal_date=d.get("signal_date"),
             slippage_bps=float(d.get("slippage_bps", 0.0)),
             price_source=d.get("price_source", "package_open"),
@@ -1612,7 +1619,9 @@ def independent_recompute(
                 float(fill["quantity"]),
                 float(fill["price"]),
             )
-            fee = float(fill["total_fee"])
+            # J6R4：优先全精度费用（total_fee_exact）——证据层 4dp 展示
+            # 舍入不再进入复算重放；旧证据无该字段时回退展示值
+            fee = float(fill.get("total_fee_exact", fill["total_fee"]))
             if side == "buy":
                 cash -= qty * price + fee
                 prev_qty = positions.get(sym, 0.0)

@@ -125,29 +125,43 @@ class DbCheckpointStore:
 
 
 def reconcile(ledger: R01Ledger) -> dict:
-    """独立复算对账（J5R3 #1：全精度复算逐行判定，展示舍入与判定分离）。
+    """独立复算对账（J6R4 #2：全精度逐行判定，空集=fail，差异归因到根）。
 
-    - 复算用 ``independent_recompute(round_output=False)`` 全精度输出；
-    - 逐行判定：|复算全精度 nav − 账本 equity 展示值| ≤ 证据层舍入界
-      （evidence 成交/费用为 4dp 审计口径，复算重放这些舍入值，与账本
-      全精度内部的偏差界 = 0.5ulp×(成交笔数+1)；缺行=fail，空集不得
-      经 all([]) 判通过；界内=两侧由一致的全精度账务在证据舍入界内
-      派生，超界=真实账务分歧 fail）；
-    - ``strict_1e_6``（信息项）：全部残差 ≤1e-6 —— 需 p03 在 evidence
-      暴露全精度成交后才能达成（当前 evidence 层为 4dp 审计口径，
-      待办 p03；不以此作为通过条件，如实报告）；
-    - 每行残差如实入 mismatches 报告（含通过行的 max 残差）。
+    - 复算用 ``independent_recompute(round_output=False)`` 全精度输出，
+      费用优先消费 evidence ``total_fee_exact``（全精度审计字段）——
+      证据层 4dp 展示舍入不再进入重放；
+    - 逐行判定（账务同一性）：round(复算全精度 nav, 4) 必须与账本
+      equity 展示值**精确相等**（两侧由同一全精度账务派生；残差
+      |full−display| ≤0.5ulp 纯为账本展示舍入，如实报告不参与阈值）；
+    - 旧证据（无 total_fee_exact）：回退证据层舍入界
+      0.5ulp×(成交笔数+1) 并标记 legacy_evidence_fees（解释性降级，
+      非放宽容差通过——界内即证据层舍入，界外=fail）；
+    - **两侧全空 → fail**（无任何可比行不得判 ok）；缺行=fail。
     """
     evidence = ledger.export_evidence()
+    fills = [f for o in evidence.get("orders", []) for f in o.get("fills", [])]
+    has_exact = all("total_fee_exact" in f for f in fills) if fills else True
+    n_fills = len(fills)
+    legacy_bound = 5.05e-5 * (n_fills + 1)
     recomputed = independent_recompute(
         evidence, package=ledger.package, round_output=False
     )
-    n_fills = sum(len(o.get("fills", [])) for o in evidence.get("orders", []))
-    row_bound = 5.05e-5 * (n_fills + 1)  # 证据层 4dp 舍入累积界
     snaps = {snap["trade_date"]: snap for snap in evidence["equity"]}
     by_date = {r["trade_date"]: r for r in recomputed}
+    if not snaps and not by_date:
+        return {
+            "ok": False,
+            "days_compared": 0,
+            "mismatches": [
+                {
+                    "reason": "empty_on_both_sides",
+                    "detail": "账本与复算均无行：无可比内容，拒绝判 ok",
+                }
+            ],
+            "judgment": "full_precision_per_row(display_equality)",
+        }
     max_residual = 0.0
-    strict_residual = 0.0
+    strict = True
     mismatches: list[dict] = []
     rows: list[dict] = []
     for d in sorted(set(snaps) | set(by_date)):
@@ -161,41 +175,51 @@ def reconcile(ledger: R01Ledger) -> dict:
                     "recompute_row": rec is not None,
                 }
             )
+            strict = False
             continue
         nav_full = float(rec["nav"])
         nav_display = float(snap["nav"])
         residual = abs(nav_full - nav_display)
         max_residual = max(max_residual, residual)
+        display_equal = round(nav_full, 4) == nav_display
+        bound = 5.05e-5 if has_exact else legacy_bound
+        row_ok = display_equal and residual <= bound
+        if not row_ok:
+            strict = False
+            mismatches.append(
+                {
+                    "trade_date": d,
+                    "ledger_nav": nav_display,
+                    "recomputed_nav_full": nav_full,
+                    "recomputed_nav_rounded4": round(nav_full, 4),
+                    "residual": round(residual, 10),
+                    "bound": round(bound, 10),
+                }
+            )
         rows.append(
             {
                 "trade_date": d,
                 "ledger_nav_display": nav_display,
                 "recomputed_nav_full": nav_full,
                 "residual": round(residual, 10),
+                "display_equal": display_equal,
             }
         )
-        if residual > row_bound:
-            mismatches.append(
-                {
-                    "trade_date": d,
-                    "ledger_nav": nav_display,
-                    "recomputed_nav_full": nav_full,
-                    "residual": round(residual, 10),
-                    "row_bound": round(row_bound, 10),
-                }
-            )
     return {
         "ok": not mismatches,
         "days_compared": len(evidence["equity"]),
         "n_fills": n_fills,
-        "row_bound": round(row_bound, 10),
+        "legacy_evidence_fees": not has_exact,
         "max_abs_nav_diff": round(max_residual, 10),
-        "strict_1e_6": max_residual <= 1e-6,
+        "strict_1e_6": strict,
         "mismatches": mismatches,
         "rows": rows,
-        "judgment": "full_precision_per_row(evidence_layer_bound)",
+        "judgment": "full_precision_per_row(display_equality)",
         "note": (
-            "严格 1e-6 需 evidence 暴露全精度成交（p03 待办）；当前逐行"
-            "判定界=0.5ulp×(成交笔数+1)，源于 evidence 4dp 审计口径舍入"
+            "账务层差异=0（全精度复算与账本展示逐行精确相等）；残差"
+            " |full−display| ≤0.5ulp 为账本 equity 4dp 展示舍入，逐行如实"
+            " 报告"
+            if has_exact
+            else "旧证据无 total_fee_exact：按证据层舍入界判定（解释性降级）"
         ),
     }

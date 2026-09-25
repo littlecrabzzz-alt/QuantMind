@@ -294,18 +294,23 @@ def test_dispatcher_auto_redispatches_blocked_day_in_window(
 
 
 def test_dispatcher_blocked_recovery_end_to_end(fake_redis, monkeypatch, cfg, pkg):
-    """J5R3 #4 端到端：自动调度下受阻→补数→恢复当日决策。"""
-    from datetime import datetime, timezone
-    from types import SimpleNamespace
+    """J6R4 #3 端到端：经 dispatcher/调度入口——受阻→（窗口内）自动重派
+    →任务重跑重新门控→数据补齐恢复当日决策→执行收口。
 
-    sched.save_run_config(cfg.ledger_run_id, cfg, enabled=True)
-    from backend.services.tests.test_r01_virtual_run_fixes import FlakyProvider
+    _send 打桩为内联执行任务体（pipeline 为注入的 fixture 后端）；派发
+    判定（何时/是否重派）完全走真实 dispatch_due_runs。
+    """
+    from datetime import datetime, timezone
+
     from backend.services.simulation.virtual_run import FrozenClock
     from backend.services.simulation.virtual_run.locks import InMemoryLockBackend
     from backend.services.simulation.virtual_run.pipeline import VirtualRunPipeline
     from backend.services.simulation.virtual_run.recovery import InMemoryCheckpointStore
     from backend.services.simulation.virtual_run.states import InMemoryRunStateStore
 
+    from backend.services.tests.test_r01_virtual_run_fixes import FlakyProvider
+
+    sched.save_run_config(cfg.ledger_run_id, cfg, enabled=True)
     provider = FlakyProvider(pkg, blocked_first={date(2025, 9, 11)})
     clock = FrozenClock(datetime(2025, 9, 11, 7, 0, tzinfo=timezone.utc))
     pipe = VirtualRunPipeline(
@@ -317,26 +322,68 @@ def test_dispatcher_blocked_recovery_end_to_end(fake_redis, monkeypatch, cfg, pk
         checkpoint_store=InMemoryCheckpointStore(),
     )
     store = pipe.store
-    sent: list[str] = []
-    monkeypatch.setattr(sched, "_send", lambda rid, d: sent.append(f"{rid}:{d}"))
 
-    # 09-10 正常（决策+执行）
+    def _run_task(ledger_run_id: str, decision_date) -> None:
+        # 任务体：beat→dispatcher→send→（此处内联）执行决策日
+        d = (
+            decision_date
+            if isinstance(decision_date, date)
+            else date.fromisoformat(decision_date)
+        )
+        pipe.run_day(d)
+
+    monkeypatch.setattr(sched, "_send", _run_task)
+    # 任务入口 build_pipeline 走注入（真实入口联调见集成证据）
+    monkeypatch.setattr(sched, "build_pipeline", lambda config, schedule_cfg=None: pipe)
+
+    # 09-10 15:15：正常决策（dispatcher 派发 → 任务执行）
     clock.set_shanghai(date(2025, 9, 10), "15:15")
-    pipe.run_day(date(2025, 9, 10))
+    out = sched.dispatch_due_runs(now=clock.now(), r=fake_redis, store=store)
+    assert "decision:2025-09-10" in ",".join(out["dispatched"])
+    # 09-11 09:31：执行相位派发 → 执行
     clock.set_shanghai(date(2025, 9, 11), "09:31")
-    pipe.run_day(date(2025, 9, 10))
+    out = sched.dispatch_due_runs(now=clock.now(), r=fake_redis, store=store)
+    assert "execute:2025-09-10" in ",".join(out["dispatched"])
 
-    # 09-11 决策受阻（首次门控 blocked）
+    # 09-11 15:15：决策受阻（首次门控 blocked，任务如实记录受阻）
     clock.set_shanghai(date(2025, 9, 11), "15:15")
-    r1 = pipe.run_day(date(2025, 9, 11))
-    assert r1.outcome == "data_blocked"
+    out = sched.dispatch_due_runs(now=clock.now(), r=fake_redis, store=store)
+    assert "decision:2025-09-11" in ",".join(out["dispatched"])
+    rec = store.get_day(cfg.ledger_run_id, "2025-09-11")
+    assert rec["outcome"] == "data_blocked"
 
-    # beat 在窗口内重派（模拟）→ 任务重跑 → 数据已补齐 → 恢复
-    clock.set_shanghai(date(2025, 9, 11), "15:20")
-    r2 = pipe.run_day(date(2025, 9, 11))
-    assert r2.outcome == "pending_execute"
+    # 09-11 15:25（窗口内，数据已补齐）：dispatcher 自动重派 → 恢复当日决策
+    fake_redis2 = FakeRedis()  # 绕过去重 TTL（模拟下一轮 beat 的键状态）
+    fake_redis2.data = dict(fake_redis.data)
+    fake_redis2.data.pop(
+        next(k for k in fake_redis2.data if k.endswith(":2025-09-11:decision")), None
+    )
+    clock.set_shanghai(date(2025, 9, 11), "15:25")
+    out = sched.dispatch_due_runs(now=clock.now(), r=fake_redis2, store=store)
+    assert "decision:2025-09-11" in ",".join(out["dispatched"])
+    # 决策已推进：signal 阶段已落、execute 未落（待执行窗口）
+    assert store.get_stage(cfg.ledger_run_id, "2025-09-11", "signal") is not None
+    assert store.get_stage(cfg.ledger_run_id, "2025-09-11", "execute") is None
+
+    # 09-12 09:31：执行相位派发 → 当日收口
     clock.set_shanghai(date(2025, 9, 12), "09:31")
-    r3 = pipe.run_day(date(2025, 9, 11))
-    assert r3.outcome == "completed"
+    out = sched.dispatch_due_runs(now=clock.now(), r=fake_redis, store=store)
+    assert "execute:2025-09-11" in ",".join(out["dispatched"])
     rec = store.get_day(cfg.ledger_run_id, "2025-09-11")
     assert rec["outcome"] == "completed"
+    led = pipe.checkpoints.load(pkg, cfg.to_ledger_config())
+    assert led.export_checkpoint()["executed_dates"] == ["2025-09-11", "2025-09-12"]
+
+
+def test_recent_trade_dates_monday_covers_friday(pkg):
+    """J6R4 #3：回看窗口按交易日历（周一覆盖周五，跳过周末）。"""
+    from backend.services.simulation.virtual_run.gating import StaticPackageProvider
+
+    from backend.services.engine.tasks.r01_virtual_run_scheduler import (
+        _recent_trade_dates,
+    )
+
+    provider = StaticPackageProvider(pkg)
+    # 2025-09-15（周一）回看：09-12(五)/09-11(四)/09-10(三)，无周末日
+    got = _recent_trade_dates(provider, pkg, date(2025, 9, 15), 3)
+    assert got == [date(2025, 9, 12), date(2025, 9, 11), date(2025, 9, 10)]

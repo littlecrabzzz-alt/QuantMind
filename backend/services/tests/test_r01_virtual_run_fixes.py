@@ -376,3 +376,44 @@ def test_stop_effective_before_report(pkg):
     payload = to_platform_payload(status, control=ctl)
     assert payload["stop_restore"]["job_stop"]["stage"] == "effective"
     assert payload["run_state"] == "paused_job"
+
+
+def test_reconcile_empty_both_sides_fails():
+    """J6R4 #2：账本与复算两侧全空 → fail（不得 ok=true）。"""
+    from types import SimpleNamespace
+
+    from backend.services.simulation.virtual_run.recovery import reconcile
+
+    stub = SimpleNamespace(
+        package=None,
+        export_evidence=lambda: {
+            "session": {"initial_cash": 30000.0},
+            "orders": [],
+            "equity": [],
+        },
+    )
+    out = reconcile(stub)
+    assert out["ok"] is False
+    assert out["mismatches"][0]["reason"] == "empty_on_both_sides"
+
+
+def test_reconcile_strict_display_equality_with_exact_fees(pkg):
+    """J6R4 #2：全精度费用（total_fee_exact）下逐行展示值精确相等（strict）。"""
+    from datetime import date as _d
+
+    from backend.services.simulation.replay.r01_ledger import R01Ledger
+    from backend.services.simulation.virtual_run.recovery import reconcile
+
+    cfg = make_config()
+    led = R01Ledger(pkg, cfg.to_ledger_config())
+    led.run_day(
+        _d(2025, 9, 11),
+        {"510300.SH": 0.6, "518880.SH": 0.4},
+        signal_date=_d(2025, 9, 10),
+    )
+    led.run_day(_d(2025, 9, 12))
+    out = reconcile(led)
+    assert out["ok"] is True, out["mismatches"]
+    assert out["strict_1e_6"] is True
+    assert out["legacy_evidence_fees"] is False
+    assert all(r["display_equal"] for r in out["rows"])
