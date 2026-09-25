@@ -84,11 +84,28 @@ class MatchResult:
 
 
 def _pick_price(bar: DailyBar, mode: str) -> float:
+    """兼容视图：请求时点价格缺失时回退收盘（仅供历史调用方）。
+
+    撮合主路径已改用 _execution_price（W2E3/F1 修复 AC-05：约定执行
+    时点价格缺失 → 明确拒单，不隐式替代）。
+    """
     if mode == "vwap" and bar.vwap > 0:
         return bar.vwap
     if mode == "open" and bar.open > 0:
         return bar.open
     return bar.close
+
+
+def _execution_price(bar: DailyBar, mode: str) -> float | None:
+    """按请求时点取执行价；该时点价格缺失/无效（≤0/NaN/inf）→ None。
+
+    AC-05：price_mode 指定的执行时点价格缺失时不隐式替代（不回退
+    收盘/其他时点）；调用方据此拒单（MISSING_EXECUTION_PRICE）。
+    """
+    value = {"open": bar.open, "vwap": bar.vwap}.get(mode, bar.close)
+    if value is None or not math.isfinite(value) or value <= 0:
+        return None
+    return float(value)
 
 
 def _round_to_tick(price: float, tick: float) -> float:
@@ -171,9 +188,10 @@ def match_order(
     # ── 涨跌停（W2E3 修复#4）：按执行时点价格判定封板，不再用收盘价。
     # R01 开盘撮合：开盘价触及涨停拒买、触及跌停拒卖；"收盘封板、开盘
     # 可成交"或"开盘封板、收盘打开"都不再误判。
-    exec_ref_price = _pick_price(bar, cfg.price_mode)
-    if exec_ref_price <= 0:
-        return MatchResult(success=False, reason="INVALID_PRICE")
+    exec_ref_price = _execution_price(bar, cfg.price_mode)
+    if exec_ref_price is None:
+        # AC-05：约定执行时点价格缺失 → 明确不成交，不隐式替代
+        return MatchResult(success=False, reason="MISSING_EXECUTION_PRICE")
     if side == "buy" and exec_ref_price >= bar.limit_up:
         return MatchResult(success=False, reason="LIMIT_UP")
     if side == "sell" and exec_ref_price <= bar.limit_down:
@@ -262,8 +280,8 @@ def _affordable_lots(
 
 def _estimate_fill_price(bar: DailyBar, side: str, cfg: MatchConfig, asset_rules) -> float:
     """与 _finalize_fill 同口径的估价（滑点+价格档+钳制），买入现金约束用。"""
-    base_price = _pick_price(bar, cfg.price_mode)
-    if base_price <= 0:
+    base_price = _execution_price(bar, cfg.price_mode)
+    if base_price is None:
         return 0.0
     slippage = cfg.slippage_bps / 10000
     direction = 1 if side == "buy" else -1

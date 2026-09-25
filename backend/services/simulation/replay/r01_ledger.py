@@ -58,6 +58,24 @@ logger = logging.getLogger(__name__)
 GROUPS = ("A", "B1", "B2", "B3", "D", "N", "P0")
 
 
+class SameKeyOrderConflict(ValueError):
+    """同 client_order_id 但内容不同（W2E3/F1 修复 AC-04）。
+
+    幂等键命中已有订单时，qty_target 必须一致；同键异内容显式拒绝，
+    防止静默改写目标量。
+    """
+
+
+class CheckpointConfigMismatch(ValueError):
+    """checkpoint 冻结参数与传入 config 不匹配（F1 修复 AC-03）。
+
+    run_id 只绑定 (group, strategy_id, version, attempt)，不含本金/费率/
+    风险参数等冻结定义；同 run 改参数恢复会形成混合口径账本。恢复入口
+    必须比对完整 config（含合同版本），不匹配显式拒绝，变更参数须新建
+    strategy_version/attempt。
+    """
+
+
 class CheckpointPackageMismatch(ValueError):
     """checkpoint 与传入输入包不匹配（W2E4：跨包恢复防护）。
 
@@ -87,6 +105,11 @@ ORDER_STATUS_PARTIALLY_FILLED = "partially_filled"
 ORDER_STATUS_EXPIRED_UNFILLED = "expired_unfilled"
 ORDER_STATUS_FILLED = "filled"
 ORDER_STATUS_REJECTED = "rejected"
+# 终态（F1 修复 AC-04）：执行/入账层对终态订单幂等——同键重试返回原
+# 终态，不改现金/持仓/fills/费用/状态
+_TERMINAL_STATUSES = frozenset(
+    {ORDER_STATUS_FILLED, ORDER_STATUS_EXPIRED_UNFILLED, ORDER_STATUS_REJECTED, "cancelled"}
+)
 
 _REJECT_REASONS = (
     "no_quote",
@@ -251,6 +274,12 @@ class LedgerPosition:
     # 品种）/ qty（T+0 品种）。跨过下一个交易日边界时在 rollover 解锁。
     pending_t1_qty: float = 0.0
     pending_t1_date: str | None = None
+    # F1 修复 AC-02：缺行情估值冻结政策——沿用最近有效市价（carry-forward）
+    # 并记录陈旧程度，禁止静默改用成本价。有行情日 last_mark=收盘并清零
+    # stale_days；缺行情日沿用并递增。
+    last_mark: float = 0.0
+    last_mark_date: str | None = None
+    stale_days: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -260,6 +289,9 @@ class LedgerPosition:
             "available_qty": round(self.available_qty, 4),
             "pending_t1_qty": round(self.pending_t1_qty, 4),
             "pending_t1_date": self.pending_t1_date,
+            "last_mark": round(self.last_mark, 6),
+            "last_mark_date": self.last_mark_date,
+            "stale_days": self.stale_days,
         }
 
     @classmethod
@@ -271,6 +303,9 @@ class LedgerPosition:
             available_qty=float(d["available_qty"]),
             pending_t1_qty=float(d.get("pending_t1_qty", 0.0)),
             pending_t1_date=d.get("pending_t1_date"),
+            last_mark=float(d.get("last_mark", 0.0)),
+            last_mark_date=d.get("last_mark_date"),
+            stale_days=int(d.get("stale_days", 0)),
         )
 
 
@@ -293,6 +328,9 @@ class R01LedgerConfig:
     price_mode: str = "open"
     # 当日市场成交量参与率（W2E3 修复#3）：成交上限 = bar.volume × 此值
     volume_participation: float = 1.0
+    # F1 修复 AC-02：缺行情 carry-forward 可靠性阈值——连续缺行情超过该
+    # 天数时当日快照标 valuation_reliable=False（不可信，不静默当有效净值）
+    stale_mark_limit: int = 5
 
     def __post_init__(self) -> None:
         if self.group not in GROUPS:
@@ -323,6 +361,7 @@ class R01LedgerConfig:
             "slippage_bps": self.slippage_bps,
             "price_mode": self.price_mode,
             "volume_participation": self.volume_participation,
+            "stale_mark_limit": self.stale_mark_limit,
         }
 
 
@@ -546,7 +585,13 @@ class R01Ledger:
         coid = make_client_order_id(self.ledger_run_id, trade_date, symbol, side)
         existing = self.orders.get(coid)
         if existing is not None:
-            return existing  # 同键重试：返回原订单与原成交
+            # 同键重试：返回原订单与原成交；同键异内容（目标量不同）拒绝
+            if existing.qty_target != int(qty):
+                raise SameKeyOrderConflict(
+                    f"client_order_id={coid} 已存在 qty_target={existing.qty_target}，"
+                    f"与重试 qty={qty} 不一致（同键异内容禁止）"
+                )
+            return existing
 
         order = LedgerOrder(
             client_order_id=coid,
@@ -567,7 +612,14 @@ class R01Ledger:
     def _validate_and_execute(
         self, order: LedgerOrder, trade_date: date, bars: dict, summary: DaySummary
     ) -> None:
-        """validated → submitted → fill/reject 状态机（单日内完成）。"""
+        """validated → submitted → fill/reject 状态机（单日内完成）。
+
+        F1 修复 AC-04：终态订单幂等——重试不再执行任何校验/撮合/入账，
+        原样返回（现金/持仓/fills/费用/状态均不变），卖光后的重试也不
+        会把原成交改写为拒单。
+        """
+        if order.status in _TERMINAL_STATUSES:
+            return
         order.status = "validated"
         bar = bars.get(order.symbol)
 
@@ -713,7 +765,9 @@ class R01Ledger:
         market_value = 0.0
         for sym, pos in self.positions.items():
             bar = sig_bars.get(sym)
-            close = bar.close if (bar and bar.close > 0) else pos.avg_cost
+            # F1 AC-02：信号日缺行情沿用最近有效市价（carry-forward），
+            # 禁止静默改用成本价
+            close = bar.close if (bar and bar.close > 0) else pos.last_mark
             closes[sym] = close
             market_value += pos.qty * close
         return self.cash + market_value, closes
@@ -819,6 +873,9 @@ class R01Ledger:
             pos.qty *= ev.qty_multiplier
             pos.available_qty *= ev.qty_multiplier
             pos.avg_cost /= ev.qty_multiplier  # 成本基准同比例调整
+            # F1 AC-02：carry-forward 市价同步换算到新份额口径（qty×m ↔ mark/m）
+            if pos.last_mark > 0:
+                pos.last_mark /= ev.qty_multiplier
             record["qty_after"] = round(pos.qty, 4)
             record["avg_cost_after"] = round(pos.avg_cost, 6)
         self.corporate_action_log.append(record)
@@ -871,7 +928,8 @@ class R01Ledger:
         market_value = 0.0
         for symbol, pos in self.positions.items():
             bar = bars.get(symbol)
-            close = bar.close if (bar and bar.close > 0) else pos.avg_cost
+            # F1 AC-02：缺行情沿用最近有效市价，不再回退成本价
+            close = bar.close if (bar and bar.close > 0) else pos.last_mark
             market_value += pos.qty * close
         return self.cash + market_value
 
@@ -890,18 +948,32 @@ class R01Ledger:
                 if credited is not None:
                     summary.dividends_credited.append(credited)
 
-        # 收盘估值
+        # 收盘估值（F1 修复 AC-02 冻结政策）：有行情 → mark=收盘、陈旧清零；
+        # 缺行情 → 沿用最近有效市价（carry-forward）、陈旧 +1；连续缺日超
+        # 阈值 → 当日快照 valuation_reliable=False（结果不可信，显式暴露）
         market_value = 0.0
         fees_today = 0.0
         realized_pnl_today = 0.0
+        valuation_reliable = True
         positions_out: dict[str, Any] = {}
         for symbol, pos in sorted(self.positions.items()):
             bar = bars.get(symbol)
-            close = bar.close if (bar and bar.close > 0) else pos.avg_cost
+            if bar is not None and bar.close > 0:
+                pos.last_mark = float(bar.close)
+                pos.last_mark_date = trade_date.isoformat()
+                pos.stale_days = 0
+                mark_source = "eod_close"
+            else:
+                pos.stale_days += 1
+                mark_source = "carry_forward"
+            if pos.stale_days > self.config.stale_mark_limit:
+                valuation_reliable = False
+            close = pos.last_mark if pos.last_mark > 0 else pos.avg_cost
             market_value += pos.qty * close
             positions_out[symbol] = {
                 **pos.to_dict(),
                 "close": round(close, 4),
+                "mark_source": mark_source,
                 "market_value": round(pos.qty * close, 4),
             }
         nav = self.cash + market_value
@@ -928,6 +1000,7 @@ class R01Ledger:
             "cash": round(self.cash, 4),
             "market_value": round(market_value, 4),
             "nav": round(nav, 4),
+            "valuation_reliable": valuation_reliable,
             "fees_today": round(fees_today, 4),
             "realized_pnl_today": round(realized_pnl_today, 4),
             "high_water_mark": round(self.risk.high_water_mark, 4),
@@ -979,6 +1052,20 @@ class R01Ledger:
         """用户额外减仓：允许任意时刻（含风险暂停期）；记 manual_action；
         不影响 HWM（HWM 只在 EOD 由 nav 更新）、不解除风险暂停、不计为
         策略行为；nav 影响入账。"""
+        # F1 修复 AC-04：同键重试幂等——已有订单（任意状态）原样返回，
+        # 不重复成交、不把原成交改写为拒单（submit_order 内部另做同键
+        # 异内容冲突校验）
+        coid = make_client_order_id(
+            self.ledger_run_id, trade_date, symbol, "sell"
+        )
+        existing = self.orders.get(coid)
+        if existing is not None:
+            if existing.qty_target != int(qty):
+                raise SameKeyOrderConflict(
+                    f"client_order_id={coid} 已存在 qty_target={existing.qty_target}，"
+                    f"与重试 qty={qty} 不一致（同键异内容禁止）"
+                )
+            return existing
         # W2E3 修复#5：无持仓/无可卖量的手动卖出同样拒单（no_position）
         position = self.positions.get(symbol)
         if position is None or position.available_qty <= 0:
@@ -1063,10 +1150,11 @@ class R01Ledger:
         """完整账本状态快照（纯状态、确定性；与 export_evidence 的区别：
         面向恢复重放，含全部可变状态，账务字段不做展示层取整）。"""
         return {
-            "schema_version": 2,
+            "schema_version": 3,
             "ledger_run_id": self.ledger_run_id,
             "package_id": self.package.package_id,
             "config": self.config.to_dict(),
+            "contract_versions": dict(self.contract_versions),
             "cash": self.cash,
             "positions": {sym: pos.to_dict() for sym, pos in self.positions.items()},
             "executed_dates": sorted(self._executed_dates),
@@ -1107,6 +1195,39 @@ class R01Ledger:
             raise CheckpointPackageMismatch(
                 f"checkpoint_package_mismatch: checkpoint 由包 {cp_package!r} 生成，"
                 f"不能从包 {package.package_id!r} 恢复"
+            )
+        # F1 修复 AC-03：完整冻结 config 绑定——本金/费率/滑点/风险参数/
+        # 参与率/组别/策略标识/attempt 全量比对；缺绑定字段（旧版快照）
+        # 一律拒绝（无版本化迁移路径时不静默放行）
+        cp_config = checkpoint.get("config")
+        if not isinstance(cp_config, dict) or "initial_cash" not in cp_config:
+            raise CheckpointConfigMismatch(
+                "checkpoint_config_mismatch: 快照缺少冻结 config 绑定字段"
+                f"（schema_version={checkpoint.get('schema_version')}，拒绝恢复）"
+            )
+        new_config = config.to_dict()
+        if cp_config != new_config:
+            diff = {
+                k: (cp_config.get(k), new_config.get(k))
+                for k in sorted(set(cp_config) | set(new_config))
+                if cp_config.get(k) != new_config.get(k)
+            }
+            raise CheckpointConfigMismatch(
+                f"checkpoint_config_mismatch: 冻结参数不一致 {diff}；"
+                f"变更参数须新建 strategy_version/execution_attempt"
+            )
+        cp_contracts = checkpoint.get("contract_versions")
+        current_contracts = _current_contract_versions()
+        if cp_contracts is None:
+            # 缺绑定字段（旧版快照）显式拒绝：无版本化迁移路径不静默放行
+            raise CheckpointConfigMismatch(
+                "checkpoint_config_mismatch: 快照缺少 contract_versions 绑定字段"
+                f"（schema_version={checkpoint.get('schema_version')}，拒绝恢复）"
+            )
+        if cp_contracts != current_contracts:
+            raise CheckpointConfigMismatch(
+                f"checkpoint_config_mismatch: 合同版本不一致 "
+                f"checkpoint={cp_contracts} vs 当前={current_contracts}"
             )
         ledger = cls(package, config)
         ledger.cash = float(checkpoint["cash"])
@@ -1153,8 +1274,11 @@ def independent_recompute(
     session = evidence["session"]
     cash = float(session["initial_cash"])
     positions: dict[str, float] = {}
-    # 移动加权成本（含费用）：与引擎口径一致，缺行情行日的估值回退用它
+    # 移动加权成本（含费用）：与引擎口径一致（已实现盈亏对账用）
     costs: dict[str, float] = {}
+    # 独立 carry-forward 市价观察（AC-02：独立实现缺行情估值政策，
+    # 不读引擎 last_mark）：逐日从包观察累积最近有效收盘
+    last_close_seen: dict[str, float] = {}
     fills_by_date: dict[str, list[dict]] = {}
     for order in evidence["orders"]:
         for fill in order.get("fills", []):
@@ -1203,21 +1327,24 @@ def independent_recompute(
             sym = rec["symbol"]
             if rec["event_type"] == "cash_dividend" and sym in positions:
                 cash += positions[sym] * rec["cash_per_share"]
-        # nav：cash + Σ qty×close（优先直接从输入包取收盘价，独立于引擎）
+        # nav：cash + Σ qty×close。F1 修复 AC-02：缺行情日估值政策由本函数
+        # 独立实现（不复制引擎回退路径）——自维护每个标的的最近有效收盘
+        # （仅从输入包逐日观察累积），缺行情日沿用该市价；无包模式沿用
+        # 快照记录的 close。禁止用成本价替代市价。
         market_value = 0.0
         for sym, qty in positions.items():
             close = 0.0
             if package is not None:
                 bar = package.get_bar(sym, day)
-                close = bar.close if bar and bar.close > 0 else 0.0
+                if bar is not None and bar.close > 0:
+                    close = float(bar.close)
+                    last_close_seen[sym] = close
+                else:
+                    close = last_close_seen.get(sym, 0.0)
             else:
                 close = float(
                     (snap.get("positions") or {}).get(sym, {}).get("close", 0.0)
                 )
-            if close <= 0:
-                # 缺行情行日（DG-003）：引擎按移动加权成本回退估值，
-                # 复算同口径（不是 0，避免虚假 nav 塌陷）
-                close = costs.get(sym, 0.0)
             market_value += qty * close
         out.append(
             {
@@ -1227,6 +1354,11 @@ def independent_recompute(
             }
         )
     return out
+
+
+def _current_contract_versions() -> dict[str, str]:
+    """restore 侧取当前合同版本（模块常量与实例初始化同源）。"""
+    return dict(CONTRACT_VERSIONS)
 
 
 def _normalize_reject_reason(reason: str) -> str:
@@ -1240,6 +1372,7 @@ def _normalize_reject_reason(reason: str) -> str:
         "below_lot_size": "lot_inexpressible",
         "insufficient_cash": "insufficient_cash",
         "invalid_price": "stale_price",
+        "missing_execution_price": "stale_price",
         "risk_paused": "risk_paused",
         "corporate_action_gap": "corporate_action_gap",
     }

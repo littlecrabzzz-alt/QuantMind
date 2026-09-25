@@ -236,11 +236,16 @@ class TestOrderIdempotency:
         assert len(buys) == 1
 
     def test_same_day_same_symbol_side_single_order(self, pkg):
-        # 月频再平衡同一 symbol 同日同方向只允许一笔目标订单
+        # 月频再平衡同一 symbol 同日同方向只允许一笔目标订单：
+        # 同键同量 → 返回原订单；同键异量 → 显式冲突（F1 AC-04）
+        from backend.services.simulation.replay.r01_ledger import SameKeyOrderConflict
+
         ledger = R01Ledger(pkg, _config(initial=30000.0))
         o1 = ledger.submit_order(date(2025, 9, 10), "510300.SH", "buy", 1000)
-        o2 = ledger.submit_order(date(2025, 9, 10), "510300.SH", "buy", 999)
+        o2 = ledger.submit_order(date(2025, 9, 10), "510300.SH", "buy", 1000)
         assert o1 is o2
+        with pytest.raises(SameKeyOrderConflict):
+            ledger.submit_order(date(2025, 9, 10), "510300.SH", "buy", 999)
 
 
 class TestSixGroupIsolation:
