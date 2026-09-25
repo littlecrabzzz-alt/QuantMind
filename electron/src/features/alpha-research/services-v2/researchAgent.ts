@@ -138,7 +138,8 @@ export interface ExternalCaseSummary {
   events_stale: number;
   events_error: number;
   last_event_at: string | null;
-  current_step?: { step_id: string; title: string; status: string; at: string } | null;
+  current_run_id?: string | null;
+  current_step?: { step_id: string; title: string; status: string; at: string; source_run_id?: string } | null;
   next_step?: { step_id: string; title: string; status: string } | null;
   usage?: {
     values: Array<{

@@ -829,6 +829,60 @@ class TestPureLogic:
         assert ext["next_step"]["step_id"] == "s3"  # 首个未完成步骤
         assert {v["metric"] for v in ext["usage"]["values"]} == {"usage.tokens_input", "cost.cny"}
 
+    def test_i1_ac03_current_step_scoped_to_current_run_four_states(self, env):
+        # H1-AC03：两轮复用相同步骤 ID——第二轮 in_progress/blocked/恢复/done 四态，
+        # 当前步骤始终属当前运行；不拿跨 run seq 当全局先后；重放不加 attempts/events
+        register_case(env, key="case-key-i1")
+        # run-1：input(done) + replay(done) => completed
+        submit(env, envelope(env, source_run_id="run-1", event_id="r1a", seq=0,
+                             execution_status="running",
+                             progress_step={"step_id": "input", "title": "输入核验", "status": "done"}))
+        submit(env, envelope(env, source_run_id="run-1", event_id="r1b", seq=1,
+                             execution_status="completed",
+                             progress_step={"step_id": "replay", "title": "回放联调", "status": "done"}))
+        ext = env.get(f"/cases/{env.case_id}").json()["external"]
+        assert ext["current_step"]["step_id"] == "replay"  # run-1 内 seq 更大
+        assert ext["current_run_id"] == "run-1"
+        assert ext["next_step"] is None  # run-1 全部完成
+
+        def run2_state(status, event_id, seq, **over):
+            return submit(env, envelope(env, source_run_id="run-2", event_id=event_id,
+                                        seq=seq, execution_status="running",
+                                        progress_step={"step_id": "input", "title": "输入核验",
+                                                       "status": status}, **over))
+        # 态① 启动：run-2 复用 input=in_progress => 当前步骤属 run-2（不再是 run-1 replay）
+        assert run2_state("in_progress", "r2a", 0).status_code == 201
+        ext = env.get(f"/cases/{env.case_id}").json()["external"]
+        assert ext["current_run_id"] == "run-2"
+        assert ext["current_step"] == {"step_id": "input", **ext["current_step"]}
+        assert ext["current_step"]["status"] == "in_progress"
+        assert ext["current_step"]["source_run_id"] == "run-2"
+        assert ext["next_step"]["step_id"] == "input" and ext["next_step"]["source_run_id"] == "run-2"
+        # 态② 失败受阻
+        assert run2_state("blocked", "r2b", 1, errors=["依赖中断"]).status_code == 201
+        ext = env.get(f"/cases/{env.case_id}").json()["external"]
+        assert ext["current_step"]["status"] == "blocked" and ext["current_step"]["source_run_id"] == "run-2"
+        # 态③ 恢复
+        assert run2_state("in_progress", "r2c", 2).status_code == 201
+        # 态④ 完成（run-2 只完成 input；replay 未在 run-2 回报 => next=replay 属 run-1 镜像不混入）
+        assert run2_state("done", "r2d", 3).status_code == 201
+        ext = env.get(f"/cases/{env.case_id}").json()["external"]
+        assert ext["current_step"]["status"] == "done" and ext["current_step"]["source_run_id"] == "run-2"
+        assert ext["next_step"] is None  # run-2 内无未完成步骤
+        # 归属显式：每 run 独立 steps；run-1 旧状态与原始事件保留
+        runs = {r["source_run_id"]: r for r in ext["runs"]}
+        assert set(runs["run-2"]["steps"]) == {"input"}
+        assert set(runs["run-1"]["steps"]) == {"input", "replay"}
+        assert ext["attempts"] == 2 and ext["events_applied"] == 6
+        # 重放 run-1 旧事件：幂等，不加 attempts/events、不改当前步骤
+        replay = submit(env, envelope(env, source_run_id="run-1", event_id="r1b", seq=1,
+                                      execution_status="completed",
+                                      progress_step={"step_id": "replay", "title": "回放联调", "status": "done"}))
+        assert replay.status_code == 200 and replay.json()["reused"] is True
+        ext2 = env.get(f"/cases/{env.case_id}").json()["external"]
+        assert ext2["attempts"] == 2 and ext2["events_applied"] == 6
+        assert ext2["current_step"] == ext["current_step"]
+
     def test_h1_usage_untracked_when_not_reported(self, env):
         register_case(env, key="case-key-h1b")
         submit(env, envelope(env, event_id="ev-u1", seq=0))

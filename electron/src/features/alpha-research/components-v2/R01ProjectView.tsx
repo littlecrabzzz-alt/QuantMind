@@ -440,7 +440,7 @@ function ExternalCasePanel({
       </p>
       <div className="text-xs space-y-1">
         <p>
-          当前步骤：
+          当前步骤（属 {summary.current_run_id || "当前运行"}）：
           {summary.current_step
             ? `${summary.current_step.title}（${stepLabel[summary.current_step.status] || summary.current_step.status}，${summary.current_step.at.slice(0, 19)}）`
             : "尚无步骤回报"}

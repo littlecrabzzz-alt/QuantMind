@@ -389,6 +389,9 @@ def apply_event(external, envelope, received_at, not_ready, not_ready_reason=Non
             "events": 0,
             "data": None,
             "errors": [],
+            # H1-AC03：每 run 独立步骤状态（step_id 可跨 run 复用，归属显式）
+            "steps": {},
+            "steps_order": [],
         }
         external["runs"][run_id] = run
         external["attempts"] += 1
@@ -437,9 +440,7 @@ def apply_event(external, envelope, received_at, not_ready, not_ready_reason=Non
     if kind == "progress":
         step = envelope["progress_step"]
         step_id = step["step_id"]
-        if step_id not in external["progress"]:
-            external["steps_order"].append(step_id)
-        external["progress"][step_id] = {
+        entry = {
             "title": step["title"],
             "status": step["status"],
             "note": step.get("note", ""),
@@ -447,6 +448,14 @@ def apply_event(external, envelope, received_at, not_ready, not_ready_reason=Non
             "at": at,
             "source_run_id": run_id,
         }
+        # 每 run 独立步骤状态（顺序=该 run 内首次回报顺序；seq 仅 run 内有效）
+        if step_id not in run["steps"]:
+            run["steps_order"].append(step_id)
+        run["steps"][step_id] = entry
+        # 兼容镜像（课题级最新应用事件覆盖；跨 run 不比 seq，记录归属 run）
+        if step_id not in external["progress"]:
+            external["steps_order"].append(step_id)
+        external["progress"][step_id] = entry
     elif kind == "data-check-report":
         for check in envelope["checks"]:
             external["checks"][check["item"]] = {
@@ -516,15 +525,47 @@ def apply_event(external, envelope, received_at, not_ready, not_ready_reason=Non
     return decision, "; ".join(notes) if notes else None
 
 
-def _current_step(external):
-    steps = external.get("progress") or {}
+def _current_run(external):
+    """当前运行=最近有回报的 run（last_seen_at 最大；不拿跨 run seq 当先后）。"""
+    runs = external.get("runs") or {}
+    if not runs:
+        return None
+    return max(runs.items(), key=lambda kv: kv[1].get("last_seen_at") or "")
+
+
+def _run_steps(external, rid, run):
+    """该 run 的步骤状态；旧数据无 run.steps 时按 source_run_id 从兼容镜像回填。"""
+    steps = run.get("steps") or {}
+    if steps or not run:
+        return steps, run.get("steps_order", [s for s in steps])
+    mirror = external.get("progress") or {}
+    steps = {sid: row for sid, row in mirror.items()
+             if row.get("source_run_id") == rid}
     order = [sid for sid in external.get("steps_order", []) if sid in steps]
-    return {"step_id": order[-1], **steps[order[-1]]} if order else None
+    return steps, order
+
+
+def _current_step(external):
+    """当前步骤=当前运行内最近一次有效回报的步骤（run 内 seq 定先后）。"""
+    current = _current_run(external)
+    if not current:
+        return None
+    rid, run = current
+    steps, _ = _run_steps(external, rid, run)
+    if not steps:
+        return None
+    sid = max(steps, key=lambda s: steps[s].get("seq", -1))
+    return {"step_id": sid, **steps[sid]}
 
 
 def _next_step(external):
-    steps = external.get("progress") or {}
-    for sid in external.get("steps_order", []):
+    """下一步=当前运行内首个未完成步骤（该 run 首次回报顺序）；全完成=>None。"""
+    current = _current_run(external)
+    if not current:
+        return None
+    rid, run = current
+    steps, order = _run_steps(external, rid, run)
+    for sid in order:
         row = steps.get(sid)
         if row and row.get("status") != "done":
             return {"step_id": sid, **row}
@@ -586,6 +627,14 @@ def derive_summary(external, now=None, stale_after=21600.0):
                         "errors",
                     )
                 },
+                # 每 run 独立步骤状态（H1-AC03；旧数据缺省时由读取侧回填）
+                "steps": r.get("steps") or {
+                    sid: row for sid, row in (external.get("progress") or {}).items()
+                    if row.get("source_run_id") == rid
+                },
+                "steps_order": r.get("steps_order")
+                or [sid for sid in external.get("steps_order", [])
+                    if sid in (r.get("steps") or {})],
                 # 恢复点：续报从 last_seq+1 起；同 run 重复事件幂等不新增实验
                 "resume_after_seq": r["last_seq"],
             }
@@ -596,6 +645,7 @@ def derive_summary(external, now=None, stale_after=21600.0):
         "events_stale": external.get("events_stale", 0),
         "events_error": external.get("events_error", 0),
         "last_event_at": external.get("last_event_at"),
+        "current_run_id": (_current_run(external) or (None,))[0],
         "current_step": _current_step(external),
         "next_step": _next_step(external),
         # 用量/费用只认外部回报的真实值；未回报=未统计，不以 attempts 冒充
