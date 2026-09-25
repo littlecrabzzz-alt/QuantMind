@@ -92,26 +92,61 @@ def validate_manifest(m):
         ],
         "manifest",
     )
-    no_extra(
-        m,
-        {
-            "schema_version",
-            "package_id",
-            "package_version",
-            "package_uri",
-            "source_release_id",
-            "generated_at",
-            "generated_by_node",
-            "source_datasets",
-            "unit_conversions",
-            "factor_convention",
-            "symbols",
-            "known_gaps",
-        },
-        "manifest",
-    )
-    if m.get("schema_version") not in (2, 3):
-        problems.append("schema_version must be 2 or 3")
+    daily = m.get("schema_version") == 3.1
+    daily_fields = {
+        "package_kind",
+        "decision_date",
+        "data_as_of",
+        "obtained_at",
+        "baseline_package",
+        "quality_gate",
+        "revised",
+        "supersedes",
+    }
+    base_allowed = {
+        "schema_version",
+        "package_id",
+        "package_version",
+        "package_uri",
+        "source_release_id",
+        "generated_at",
+        "generated_by_node",
+        "source_datasets",
+        "unit_conversions",
+        "factor_convention",
+        "symbols",
+        "known_gaps",
+    }
+    no_extra(m, base_allowed | (daily_fields if daily else set()), "manifest")
+    if m.get("schema_version") not in (2, 3, 3.1):
+        problems.append("schema_version must be 2, 3 or 3.1")
+    if daily:
+        for key in (
+            "package_kind",
+            "decision_date",
+            "data_as_of",
+            "obtained_at",
+            "quality_gate",
+        ):
+            if key not in m:
+                problems.append(f"v3.1 daily manifest missing '{key}'")
+        if m.get("package_kind") != "daily_increment":
+            problems.append("v3.1 package_kind must be daily_increment")
+        version = str(m.get("package_version", ""))
+        if not re.fullmatch(r"d[0-9]{8}(r[0-9]+)?", version):
+            problems.append("v3.1 package_version must be d<YYYYMMDD>(rN)")
+        gate = m.get("quality_gate", {})
+        if gate.get("overall") not in ("pass", "blocked"):
+            problems.append("quality_gate.overall enum")
+        if not isinstance(gate.get("blocked_reasons"), list):
+            problems.append("quality_gate.blocked_reasons must be a list")
+        if not isinstance(gate.get("decision_date_is_trade_day"), bool):
+            problems.append("quality_gate.decision_date_is_trade_day bool")
+        for name, c in (gate.get("checks") or {}).items():
+            if c.get("status") not in ("pass", "fail", "unknown") or "detail" not in c:
+                problems.append(f"quality_gate.checks.{name} invalid")
+        if m.get("revised") and not m.get("supersedes"):
+            problems.append("revised daily package must carry supersedes")
     for key in ("package_id", "package_version", "source_release_id"):
         if not isinstance(m.get(key), str) or not m[key]:
             problems.append(f"{key} must be a nonempty string")
@@ -171,9 +206,10 @@ def validate_manifest(m):
         or not all(isinstance(c, str) for c in cases)
     ):
         problems.append("factor_convention.verified_cases must be nonempty strings")
-    for mandatory in ("159934.SZ 2025-09-22", "510500.SH 2015-04-15"):
-        if not any(mandatory in c for c in cases):
-            problems.append(f"verified_cases missing mandatory case {mandatory}")
+    if not daily:  # the two mandatory regression cases belong to fixed packages only
+        for mandatory in ("159934.SZ 2025-09-22", "510500.SH 2015-04-15"):
+            if not any(mandatory in c for c in cases):
+                problems.append(f"verified_cases missing mandatory case {mandatory}")
 
     classes = {"equity_broad", "gold", "treasury"}
     roles = {"primary", "backup", "regression-only"}
@@ -578,9 +614,15 @@ def main():
         registry = json.loads(args.registry.read_text())
         if not registry.get("packages"):
             raise SystemExit("Registry empty; pass --package")
-        uri, info = max(
-            registry["packages"].items(), key=lambda kv: kv[1].get("created_at", "")
-        )
+        fixed = {
+            u: e
+            for u, e in registry["packages"].items()
+            if e.get("kind") != "daily_increment"
+            and not str(e.get("package_version", "")).startswith("d")
+        }
+        if not fixed:
+            raise SystemExit("No fixed (non-daily) package in registry; pass --package")
+        uri, info = max(fixed.items(), key=lambda kv: kv[1].get("created_at", ""))
         package_dir = Path(info["absolute_path"])
         print(f"[registry] resolved {uri} -> {package_dir}")
     package_dir = package_dir.expanduser().resolve()
