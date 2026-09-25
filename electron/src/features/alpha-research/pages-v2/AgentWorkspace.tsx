@@ -529,8 +529,15 @@ export default function AgentWorkspace() {
                         <span className="text-muted-foreground mr-2">
                           {new Date(e.at * 1000).toLocaleTimeString()}
                         </span>
-                        {e.apply_status === "validation_error" ? (
-                          <Tag color="red">校验失败</Tag>
+                        {e.kind === "external_report_rejected" ||
+                        e.apply_status === "validation_error" ? (
+                          <Tag color="red">
+                            已拒绝
+                            {e.apply_status === "validation_error" ||
+                            /hash_mismatch/.test(e.message || "")
+                              ? "（校验失败）"
+                              : ""}
+                          </Tag>
                         ) : e.apply_status === "stale_event" ? (
                           <Tag>历史追加</Tag>
                         ) : e.apply_status === "not_ready" ? (

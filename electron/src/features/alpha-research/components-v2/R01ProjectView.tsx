@@ -30,12 +30,12 @@ import {
 const panel = "rounded-xl border border-border bg-card p-4";
 const workstreamName: Record<string, string> = {
   P0: "P0 开发与数据",
-  A: "A · 趋势组",
-  B1: "B1",
-  B2: "B2",
-  B3: "B3",
-  D: "D · 新闻组（预留）",
-  N: "N · 新闻对照（预留）",
+  A: "A · 固定配置基线",
+  B1: "B1 · 趋势过滤",
+  B2: "B2 · 相对动量",
+  B3: "B3 · 波动率仓位",
+  D: "D · 数据 agent（后续预留）",
+  N: "N · 数据+新闻 agent（后续预留）",
 };
 const statusLabel: Record<string, string> = {
   planned: "计划中",
@@ -112,16 +112,26 @@ function MetricValue({
   );
 }
 
+function relativeUri(uri: string): string {
+  return uri.startsWith("node://")
+    ? uri.split(`/workspace/`)[1] || uri.split("/").slice(3).join("/")
+    : uri;
+}
+
 function CurveCard({
   node,
   caseId,
   uri,
   name,
+  fixture,
+  notReady,
 }: {
   node: string;
   caseId: string;
   uri: string;
   name: string;
+  fixture: boolean;
+  notReady?: boolean;
 }) {
   const [points, setPoints] = useState<Array<{ date: string; nav: number }> | null>(
     null,
@@ -131,10 +141,7 @@ function CurveCard({
     let stopped = false;
     (async () => {
       try {
-        const relative = uri.startsWith("node://")
-          ? uri.split(`/workspace/`)[1] || uri.split("/").slice(3).join("/")
-          : uri;
-        const blob = await researchAgent.file(node, caseId, relative);
+        const blob = await researchAgent.file(node, caseId, relativeUri(uri));
         const parsed = JSON.parse(await blob.text());
         const rows = parsed.points || parsed.curve || parsed;
         if (stopped) return;
@@ -145,9 +152,9 @@ function CurveCard({
               nav: Number(r.nav ?? r.value),
             })),
           );
-        else setError("样例曲线文件为空或格式不符");
+        else setError("曲线文件为空或格式不符");
       } catch {
-        if (!stopped) setError("样例曲线文件不可读（节点受控目录）");
+        if (!stopped) setError("曲线文件不可读（节点受控目录）");
       }
     })();
     return () => {
@@ -156,14 +163,21 @@ function CurveCard({
   }, [node, caseId, uri]);
   return (
     <div
-      className="rounded-lg border-2 border-orange-400 border-dashed p-3"
-      data-testid="fixture-curve-card"
+      className={`rounded-lg border-2 p-3 ${
+        fixture
+          ? "border-orange-400 border-dashed"
+          : "border-blue-500 border-solid"
+      }`}
+      data-testid={fixture ? "fixture-curve-card" : "real-curve-card"}
     >
       <div className="flex flex-wrap items-center gap-2 mb-1">
-        <FixtureBadge />
+        {fixture ? <FixtureBadge /> : <Tag color="blue">真实回放数据</Tag>}
+        {notReady && <NotReadyBadge />}
         <span className="text-sm font-medium">{name}</span>
         <span className="text-xs text-muted-foreground">
-          非真实研究结果，仅用于界面与通路验收
+          {fixture
+            ? "非真实研究结果，仅用于界面与通路验收"
+            : "真实输入包确定性回放派生；未通过正式准入前仅作原始证据展示"}
         </span>
       </div>
       {points ? (
@@ -178,8 +192,10 @@ function CurveCard({
               {
                 type: "line",
                 showSymbol: false,
-                lineStyle: { type: "dashed", color: "#d97706" },
-                itemStyle: { color: "#d97706" },
+                lineStyle: fixture
+                  ? { type: "dashed", color: "#d97706" }
+                  : { type: "solid", color: "#2563eb" },
+                itemStyle: { color: fixture ? "#d97706" : "#2563eb" },
                 data: points.map((p) => p.nav),
               },
             ],
@@ -310,6 +326,199 @@ function GroupCard({
   );
 }
 
+function ArtifactEntry({
+  node,
+  caseId,
+  artifact,
+}: {
+  node: string;
+  caseId: string;
+  artifact: NonNullable<
+    ExternalCaseSummary["artifacts"]
+  >[number] & { not_ready_reason?: string };
+}) {
+  const [content, setContent] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const open = async () => {
+    if (content !== null) {
+      setContent(null);
+      return;
+    }
+    try {
+      const blob = await researchAgent.file(node, caseId, relativeUri(artifact.uri));
+      setContent((await blob.text()).slice(0, 200000));
+    } catch {
+      setError("文件不可读（节点受控目录）");
+    }
+  };
+  const download = async () => {
+    const blob = await researchAgent.file(node, caseId, relativeUri(artifact.uri));
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = artifact.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  return (
+    <div className="text-xs border-b border-border pb-1 mb-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <FileText size={13} />
+        <button
+          className="text-primary break-all text-left"
+          data-testid="artifact-open"
+          onClick={() => void open()}
+        >
+          {artifact.name}
+        </button>
+        <span className="text-muted-foreground font-mono">
+          {artifact.sha256.slice(0, 12)}…
+        </span>
+        {artifact.fixture ? <FixtureBadge compact /> : <Tag color="blue">真实</Tag>}
+        {artifact.not_ready && <NotReadyBadge />}
+        <Button size="small" onClick={() => void download()}>
+          下载
+        </Button>
+      </div>
+      {content !== null && (
+        <pre className="bg-secondary/30 rounded p-2 mt-1 whitespace-pre-wrap max-h-80 overflow-auto">
+          {content}
+        </pre>
+      )}
+      {error && <span className="text-red-500">{error}</span>}
+      {/replay-evidence|positions|orders/i.test(artifact.name + artifact.kind) && (
+        <ReplayEvidenceInline node={node} caseId={caseId} artifact={artifact} />
+      )}
+    </div>
+  );
+}
+
+interface ReplayDayRecord {
+  date?: string;
+  trade_date?: string;
+  cash?: number | Record<string, unknown>;
+  nav?: number;
+  equity?: number | number[] | Record<string, unknown>;
+  positions?: Array<Record<string, unknown>>;
+  orders?: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+}
+
+function ReplayEvidenceInline({
+  node,
+  caseId,
+  artifact,
+}: {
+  node: string;
+  caseId: string;
+  artifact: { name: string; uri: string };
+}) {
+  const [data, setData] = useState<{ days: ReplayDayRecord[] } | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let stopped = false;
+    (async () => {
+      try {
+        const blob = await researchAgent.file(node, caseId, relativeUri(artifact.uri));
+        const parsed = JSON.parse(await blob.text());
+        const days: ReplayDayRecord[] =
+          parsed.days || parsed.day_summaries || parsed.summaries || [];
+        if (stopped) return;
+        if (days.length) setData({ days });
+        else setError("证据文件缺少逐日记录（days）");
+      } catch {
+        if (!stopped) setError("证据文件不可读或不是合法 JSON");
+      }
+    })();
+    return () => {
+      stopped = true;
+    };
+  }, [node, caseId, artifact.uri]);
+  if (error) return <div className="text-muted-foreground mt-1">{error}</div>;
+  if (!data) return <div className="text-muted-foreground mt-1">读取回放明细…</div>;
+  const last = data.days[data.days.length - 1];
+  const positions = (last.positions || []) as Array<Record<string, unknown>>;
+  const orders = data.days.flatMap((d) =>
+    ((d.orders || []) as Array<Record<string, unknown>>).map(
+      (o) => ({ ...o, _date: d.date || d.trade_date }) as Record<string, unknown>,
+    ),
+  );
+  const navRows = data.days.filter((d) => d.nav !== undefined);
+  return (
+    <div className="mt-1 space-y-2" data-testid="replay-evidence-detail">
+      <details open>
+        <summary className="cursor-pointer">
+          持仓 / 现金（{last.date || last.trade_date} 收盘）
+        </summary>
+        <table className="w-full text-xs my-1">
+          <thead>
+            <tr className="text-muted-foreground">
+              <th className="text-left">标的</th>
+              <th className="text-right">数量</th>
+              <th className="text-right">收盘价</th>
+              <th className="text-right">市值</th>
+            </tr>
+          </thead>
+          <tbody>
+            {positions.map((p, i) => (
+              <tr key={i} className="border-t border-border">
+                <td>{String(p.symbol || p.code || "")}</td>
+                <td className="text-right">{String(p.qty ?? p.quantity ?? "")}</td>
+                <td className="text-right">{String(p.close ?? p.price ?? "")}</td>
+                <td className="text-right">{String(p.market_value ?? p.value ?? "")}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-xs">
+          现金：{typeof last.cash === "number" ? last.cash : JSON.stringify(last.cash)} ·
+          权益/净值：{String(last.nav ?? last.equity ?? "")}
+        </p>
+      </details>
+      <details>
+        <summary className="cursor-pointer">订单（全部 {orders.length} 笔）</summary>
+        <table className="w-full text-xs my-1">
+          <thead>
+            <tr className="text-muted-foreground">
+              <th className="text-left">日期</th>
+              <th className="text-left">标的</th>
+              <th className="text-left">方向</th>
+              <th className="text-right">数量</th>
+              <th className="text-right">价格</th>
+              <th className="text-left">状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.map((o, i) => (
+              <tr key={i} className="border-t border-border">
+                <td>{String(o._date || "")}</td>
+                <td>{String(o.symbol || o.code || "")}</td>
+                <td>{String(o.side || o.action || "")}</td>
+                <td className="text-right">{String(o.qty ?? o.quantity ?? "")}</td>
+                <td className="text-right">{String(o.price ?? o.fill_price ?? "")}</td>
+                <td>{String(o.status || "")}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+      <details>
+        <summary className="cursor-pointer">逐日净值（{navRows.length} 日）</summary>
+        <table className="w-full text-xs my-1">
+          <tbody>
+            {navRows.map((d, i) => (
+              <tr key={i} className="border-t border-border">
+                <td>{String(d.date || d.trade_date)}</td>
+                <td className="text-right">nav={String(d.nav)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+    </div>
+  );
+}
+
 function ExternalCasePanel({
   node,
   caseId,
@@ -381,17 +590,9 @@ function ExternalCasePanel({
       )}
       {summary.artifacts.length > 0 && (
         <div>
-          <h4 className="font-medium mb-1">文件 / 证据</h4>
+          <h4 className="font-medium mb-1">文件 / 证据（可打开原件）</h4>
           {summary.artifacts.map((a, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs">
-              <FileText size={13} />
-              <span>{a.name}</span>
-              <span className="text-muted-foreground font-mono">
-                {a.sha256.slice(0, 12)}…
-              </span>
-              {a.fixture && <FixtureBadge compact />}
-              {a.not_ready && <NotReadyBadge />}
-            </div>
+            <ArtifactEntry key={i} node={node} caseId={caseId} artifact={a} />
           ))}
         </div>
       )}
@@ -552,8 +753,31 @@ export default function R01ProjectView({
               ))}
             </div>
           </div>
+          <div className={panel} data-testid="r01-real-curves">
+            <h3 className="font-medium mb-2">真实回放曲线（非 fixture）</h3>
+            {overview.cases.flatMap((c) =>
+              c.artifacts
+                .filter((a) => !a.fixture && /curve|equity|nav/i.test(a.name + a.kind))
+                .map((a) => (
+                  <CurveCard
+                    key={`${c.case_id}-${a.sha256}`}
+                    node={node!}
+                    caseId={c.case_id}
+                    uri={a.uri}
+                    name={a.name}
+                    fixture={false}
+                    notReady={a.not_ready}
+                  />
+                )),
+            )}
+            {!overview.cases.some((c) =>
+              c.artifacts.some(
+                (a) => !a.fixture && /curve|equity|nav/i.test(a.name + a.kind),
+              ),
+            ) && <Empty description="尚无真实回放曲线；真实与样例曲线分区标注，不混排" />}
+          </div>
           <div className={panel} data-testid="r01-fixture">
-            <h3 className="font-medium mb-2">工程样例曲线（P0 验收用）</h3>
+            <h3 className="font-medium mb-2">工程样例曲线（fixture，P0 验收用）</h3>
             {overview.cases.flatMap((c) =>
               c.artifacts
                 .filter((a) => a.fixture && /curve|equity|nav/i.test(a.name + a.kind))
@@ -564,6 +788,8 @@ export default function R01ProjectView({
                     caseId={c.case_id}
                     uri={a.uri}
                     name={a.name}
+                    fixture
+                    notReady={a.not_ready}
                   />
                 )),
             )}
