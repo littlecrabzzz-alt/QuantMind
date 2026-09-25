@@ -397,8 +397,8 @@ def test_reconcile_empty_both_sides_fails():
     assert out["mismatches"][0]["reason"] == "empty_on_both_sides"
 
 
-def test_reconcile_strict_display_equality_with_exact_fees(pkg):
-    """J6R4 #2：全精度费用（total_fee_exact）下逐行展示值精确相等（strict）。"""
+def test_reconcile_strict_full_precision_diff(pkg):
+    """J7R5：严格判定=全精度值直接相减 ≤1e-6（无 round/format）。"""
     from datetime import date as _d
 
     from backend.services.simulation.replay.r01_ledger import R01Ledger
@@ -415,5 +415,8 @@ def test_reconcile_strict_display_equality_with_exact_fees(pkg):
     out = reconcile(led)
     assert out["ok"] is True, out["mismatches"]
     assert out["strict_1e_6"] is True
-    assert out["legacy_evidence_fees"] is False
-    assert all(r["display_equal"] for r in out["rows"])
+    assert out["legacy_equity"] is False
+    assert out["max_full_precision_diff"] <= 1e-6
+    # 全精度对值逐行存在且为数值差（非舍入比较）
+    assert all(r["full_precision_diff"] is not None for r in out["rows"])
+    assert all(abs(r["full_precision_diff"]) <= 1e-6 for r in out["rows"])

@@ -156,7 +156,7 @@ def test_engineering_acceptance_matrix(pkg, tmp_path):
         "独立复算对账",
         "independent_recompute vs 账本 equity",
         f"days={settle['reconciliation']['days_compared']}",
-        ["max_abs_nav_diff<=1e-6"],
+        ["max_full_precision_diff<=1e-6"],
         ok_recon,
         detail=json.dumps(settle["reconciliation"], ensure_ascii=False),
     )

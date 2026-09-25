@@ -1238,6 +1238,9 @@ class R01Ledger:
             "dividend_receivable": round(self.dividend_receivable, 4),
             "market_value": round(market_value, 4),
             "nav": round(nav, 4),
+            # J7R5：全精度 NAV 审计字段（严格对账用——与复算全精度值直接
+            # 相减，比较前禁止 round/format；展示字段 nav 不变）
+            "nav_exact": nav,
             "valuation_reliable": valuation_reliable,
             "fees_today": round(fees_today, 4),
             "realized_pnl_today": round(realized_pnl_today, 4),
