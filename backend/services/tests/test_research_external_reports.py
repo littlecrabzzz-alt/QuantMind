@@ -171,6 +171,8 @@ class FakeExternalStore(external.ExternalStore):
         super().__init__(None)
         self.events = {}  # (draft, task, run, event_id) -> record
         self.readiness = {}
+        self.bindings = {}
+        self.contract_hash = external.Contracts().contract_hashes["2.2"]
 
     async def find_event(self, db, draft_id, source_task, source_run_id, event_id):
         return self.events.get((draft_id, source_task, source_run_id, event_id))
@@ -213,8 +215,26 @@ class FakeExternalStore(external.ExternalStore):
     async def get_readiness(self, owner, node, project_key):
         return self.readiness.get((owner, node, project_key))
 
-    async def save_readiness(self, owner, node, project_key, obj):
-        self.readiness[(owner, node, project_key)] = obj
+    async def get_acceptance_binding(self, owner, node, project_key):
+        return self.bindings.get((owner, node, project_key))
+
+    async def save_readiness(self, owner, node, project_key, obj, contract_hash=None):
+        key = (owner, node, project_key)
+        prior = self.readiness.get(key)
+        prior_status = (
+            (prior or {}).get("independent_acceptance", {}).get("status")
+        )
+        verdict = obj.get("independent_acceptance", {}).get("status")
+        binding = self.bindings.get(key)
+        if verdict == "passed":
+            if prior_status != "passed" or not isinstance(binding, dict):
+                binding = external.acceptance_binding_from(
+                    obj, contract_hash or self.contract_hash
+                )
+        else:
+            binding = None
+        self.readiness[key] = obj
+        self.bindings[key] = binding
 
 
 @pytest.fixture()
@@ -515,25 +535,95 @@ class TestReadinessGating:
         )
         assert response.status_code == 422
 
-    def test_non_p0_metrics_marked_not_ready_until_readiness_passes(self, env):
-        case = register_case(env, workstream="B1", key="case-key-0003")
-        env.case_id = case["id"]
+    def _b1_metrics(self, env, event_id, seq):
         payload = envelope(env, workstream="B1", kind="metrics", fixture=False,
-                           strategy_id="b1-momentum-v1")
+                           strategy_id="b1-momentum-v1", event_id=event_id, seq=seq)
         payload.pop("progress_step")
         payload["metrics"] = [
             {"metric": "total_return", "value": 0.12, "unit": "ratio", "basis": "30万·2025"},
         ]
-        response = submit(env, payload)
+        return payload
+
+    def _submit_b1(self, env, key, event_id, seq=0):
+        case = register_case(env, workstream="B1", key=key)
+        env.case_id = case["id"]
+        return submit(env, self._b1_metrics(env, event_id, seq))
+
+    def test_non_p0_metrics_not_ready_until_formal_admission(self, env):
+        # 自检门未过 => not_ready（原始证据保留）
+        env.post("/projects/r01/readiness", json=self._readiness(data_ready=False))
+        response = self._submit_b1(env, "case-key-0003", "ev-m1")
         assert response.status_code == 201 and response.json()["status"] == "not_ready"
+        assert "gate_data_ready" in response.json()["not_ready_reason"]
         state = env.store.rows[env.case_id]["state"]
         assert state["external"]["metrics"][0]["not_ready"] is True
+        assert state["external"]["metrics"][0]["not_ready_reason"]
+
+        # 自检全过但独立验收 pending => 仍 not_ready（AC-06）
         env.post("/projects/r01/readiness", json=self._readiness())
-        payload["event_id"] = "ev-m2"
-        payload["seq"] = 1
-        response = submit(env, payload)
+        response = self._submit_b1(env, "case-key-0003", "ev-m2", seq=1)
+        assert response.json()["status"] == "not_ready"
+        assert "independent_acceptance_pending" in response.json()["not_ready_reason"]
+
+        # 独立验收 passed 且版本一致 => applied（正式比较放行）
+        env.post("/projects/r01/readiness", json=self._readiness(
+            independent_acceptance={"status": "passed", "at": "2026-09-25T00:00:00Z", "by": "w1r"}))
+        response = self._submit_b1(env, "case-key-0003", "ev-m3", seq=2)
         assert response.json()["status"] == "applied"
-        assert env.store.rows[env.case_id]["state"]["external"]["metrics"][1]["not_ready"] is False
+        assert env.store.rows[env.case_id]["state"]["external"]["metrics"][2]["not_ready"] is False
+
+    def test_formal_admission_rejects_failed_verdict(self, env):
+        env.post("/projects/r01/readiness", json=self._readiness(
+            independent_acceptance={"status": "failed", "at": "2026-09-25T00:00:00Z", "by": "w1r"}))
+        response = self._submit_b1(env, "case-key-0004", "ev-f1")
+        assert response.json()["status"] == "not_ready"
+        assert "independent_acceptance_failed" in response.json()["not_ready_reason"]
+
+    def test_formal_admission_rejects_code_drift_after_acceptance(self, env):
+        accepted = self._readiness(
+            independent_acceptance={"status": "passed", "at": "2026-09-25T00:00:00Z", "by": "w1r"})
+        env.post("/projects/r01/readiness", json=accepted)
+        # 验收后代码版本变更，verdict 未重做（仍 passed）=> 绑定漂移，拒绝正式比较
+        drifted = self._readiness(code_revision="newcommit9999")
+        drifted["independent_acceptance"] = accepted["independent_acceptance"]
+        env.post("/projects/r01/readiness", json=drifted)
+        response = self._submit_b1(env, "case-key-0005", "ev-d1")
+        assert response.json()["status"] == "not_ready"
+        assert "acceptance_stale_code" in response.json()["not_ready_reason"]
+
+    def test_formal_admission_rejects_manifest_drift_after_acceptance(self, env):
+        accepted = self._readiness(
+            independent_acceptance={"status": "passed", "at": "2026-09-25T00:00:00Z", "by": "w1r"})
+        env.post("/projects/r01/readiness", json=accepted)
+        drifted = self._readiness()
+        drifted["independent_acceptance"] = accepted["independent_acceptance"]
+        drifted["input_manifest"] = {**accepted["input_manifest"], "sha256": "9" * 64}
+        env.post("/projects/r01/readiness", json=drifted)
+        response = self._submit_b1(env, "case-key-0006", "ev-d2")
+        assert response.json()["status"] == "not_ready"
+        assert "acceptance_stale_manifest" in response.json()["not_ready_reason"]
+
+    def test_formal_admission_rejects_contract_drift_or_missing_binding(self, env):
+        owner = (("default", "10000001"), "mac", "r01")
+        accepted = self._readiness(
+            independent_acceptance={"status": "passed", "at": "2026-09-25T00:00:00Z", "by": "w1r"})
+        env.post("/projects/r01/readiness", json=accepted)
+        # 合同 hash 漂移（绑定快照被改）=> 拒绝
+        saved = env.xstore.bindings[owner]
+        env.xstore.bindings[owner] = {**saved, "contract_hash": "0" * 64}
+        response = self._submit_b1(env, "case-key-0007", "ev-c1")
+        assert response.json()["status"] == "not_ready"
+        assert "acceptance_stale_contract" in response.json()["not_ready_reason"]
+        # 绑定缺失（如历史行无快照）=> 拒绝且原因显式
+        env.xstore.bindings[owner] = None
+        response = self._submit_b1(env, "case-key-0007", "ev-c2", seq=1)
+        assert response.json()["status"] == "not_ready"
+        assert "acceptance_binding_missing" in response.json()["not_ready_reason"]
+        # readiness 未登记 => readiness_missing
+        env.xstore.readiness.pop(owner, None)
+        response = self._submit_b1(env, "case-key-0007", "ev-c3", seq=2)
+        assert response.json()["status"] == "not_ready"
+        assert "readiness_missing" in response.json()["not_ready_reason"]
 
 
 class TestLongTermRuns:

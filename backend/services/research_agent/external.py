@@ -148,8 +148,13 @@ def initial_external_state(project_key, workstream):
     }
 
 
-def readiness_passes(obj):
-    """P0 self-check level: all four gates true and no blocking gaps."""
+def self_check_passes(obj):
+    """P0 self-check level: all four gates true and no blocking gaps.
+
+    Formal research admission additionally requires the independent
+    acceptance verdict (see evaluate_formal_admission) — a passing self-check
+    alone never unlocks formal comparisons (AC-06).
+    """
 
     if not isinstance(obj, dict):
         return False
@@ -162,11 +167,65 @@ def readiness_passes(obj):
     )
 
 
+# Backwards-compatible alias for the self-check predicate only.
+readiness_passes = self_check_passes
+
+
 def independently_accepted(obj):
     return (
         isinstance(obj, dict)
         and obj.get("independent_acceptance", {}).get("status") == "passed"
     )
+
+
+def acceptance_binding_from(readiness, contract_hash):
+    """Server-side snapshot of what the acceptance verdict covers.
+
+    The frozen readiness schema has no room for a binding block inside
+    independent_acceptance (additionalProperties:false), so the platform
+    snapshots the binding itself when it first observes status=="passed":
+    the accepted code revision, input manifest and contract hash. Any later
+    drift invalidates the verdict for formal admission (stale).
+    """
+
+    return {
+        "commit": readiness.get("code_revision"),
+        "manifest_sha256": (readiness.get("input_manifest") or {}).get("sha256"),
+        "contract_hash": contract_hash,
+        "accepted_at": readiness.get("independent_acceptance", {}).get("at"),
+    }
+
+
+def evaluate_formal_admission(readiness, binding, current_contract_hash):
+    """Formal admission gate for non-P0 research results (AC-06).
+
+    Returns (ready_for_research, reasons). ready=True requires: self-check
+    gates pass AND blocking gaps empty AND independent acceptance passed AND
+    the acceptance binding still matches the current context. pending/failed
+    verdicts or version drift keep results as raw evidence only (not_ready).
+    """
+
+    if not isinstance(readiness, dict):
+        return False, ["readiness_missing"]
+    reasons = []
+    for gate in ("data_ready", "execution_ready", "accounting_verified", "platform_ready"):
+        if readiness.get(gate) is not True:
+            reasons.append(f"gate_{gate}")
+    if readiness.get("blocking_gaps"):
+        reasons.append("blocking_gaps:" + ",".join(readiness["blocking_gaps"]))
+    verdict = (readiness.get("independent_acceptance") or {}).get("status")
+    if verdict != "passed":
+        reasons.append(f"independent_acceptance_{verdict or 'missing'}")
+        return False, reasons
+    if not isinstance(binding, dict) or not binding.get("contract_hash"):
+        return False, reasons + ["acceptance_binding_missing"]
+    if binding.get("commit") != readiness.get("code_revision"):
+        reasons.append("acceptance_stale_code")
+    if binding.get("manifest_sha256") != (readiness.get("input_manifest") or {}).get("sha256"):
+        reasons.append("acceptance_stale_manifest")
+    if binding.get("contract_hash") != current_contract_hash:
+        reasons.append("acceptance_stale_contract")
+    return (not reasons), reasons
 
 
 def normalize_submission(raw):
@@ -263,7 +322,7 @@ def evidence_transition_allowed(current, proposed):
     return EVIDENCE_ORDER.index(proposed) >= EVIDENCE_ORDER.index(current)
 
 
-def apply_event(external, envelope, received_at, not_ready):
+def apply_event(external, envelope, received_at, not_ready, not_ready_reason=None):
     """Apply one envelope to the mirrored case state; returns apply decision.
 
     Decision is 'applied' or 'stale_event' (kept verbatim, no regression).
@@ -372,6 +431,7 @@ def apply_event(external, envelope, received_at, not_ready):
                     "seq": envelope["seq"],
                     "fixture": fixture,
                     "not_ready": not_ready,
+                    "not_ready_reason": not_ready_reason,
                     "source_run_id": run_id,
                 }
             )
@@ -386,6 +446,7 @@ def apply_event(external, envelope, received_at, not_ready):
                 "seq": envelope["seq"],
                 "fixture": fixture,
                 "not_ready": not_ready,
+                "not_ready_reason": not_ready_reason,
                 "source_run_id": run_id,
             }
         )
@@ -638,13 +699,54 @@ class ExternalStore:
             return None
         return {**row["object"], "platform_updated_at": row["updated_at"].isoformat().replace("+00:00", "Z")}
 
-    async def save_readiness(self, owner, node, project_key, obj):
+    async def get_acceptance_binding(self, owner, node, project_key):
+        async with self.pool.connection() as db:
+            row = await (
+                await db.execute(
+                    """SELECT acceptance_binding FROM research_project_readiness
+                    WHERE tenant_id=%s AND user_id=%s AND node_id=%s AND project_key=%s""",
+                    (*owner, node, project_key),
+                )
+            ).fetchone()
+        return (row or {}).get("acceptance_binding")
+
+    async def save_readiness(self, owner, node, project_key, obj, contract_hash=None):
+        """Upsert readiness + maintain the server-side acceptance binding.
+
+        The binding is snapshotted when the verdict first flips to "passed"
+        (what was accepted: commit/manifest/contract hash). While the verdict
+        stays "passed" across re-POSTs the original binding is kept, so later
+        code/input drift is detected as a stale acceptance (AC-06). Verdicts
+        other than "passed" clear the binding.
+        """
+
         async with self.pool.connection() as db, db.transaction():
+            prior = await (
+                await db.execute(
+                    """SELECT object, acceptance_binding FROM research_project_readiness
+                    WHERE tenant_id=%s AND user_id=%s AND node_id=%s AND project_key=%s
+                    FOR UPDATE""",
+                    (*owner, node, project_key),
+                )
+            ).fetchone()
+            prior_status = (
+                (prior["object"] or {}).get("independent_acceptance", {}).get("status")
+                if prior
+                else None
+            )
+            verdict = obj.get("independent_acceptance", {}).get("status")
+            binding = prior.get("acceptance_binding") if prior else None
+            if verdict == "passed":
+                if prior_status != "passed" or not isinstance(binding, dict):
+                    binding = acceptance_binding_from(obj, contract_hash)
+            else:
+                binding = None
             await db.execute(
                 """INSERT INTO research_project_readiness
-                (tenant_id,user_id,node_id,project_key,object,updated_at)
-                VALUES(%s,%s,%s,%s,%s,now())
+                (tenant_id,user_id,node_id,project_key,object,acceptance_binding,updated_at)
+                VALUES(%s,%s,%s,%s,%s,%s,now())
                 ON CONFLICT(tenant_id,user_id,node_id,project_key)
-                DO UPDATE SET object=EXCLUDED.object, updated_at=now()""",
-                (*owner, node, project_key, Jsonb(obj)),
+                DO UPDATE SET object=EXCLUDED.object,
+                acceptance_binding=EXCLUDED.acceptance_binding, updated_at=now()""",
+                (*owner, node, project_key, Jsonb(obj), Jsonb(binding)),
             )

@@ -203,14 +203,37 @@ def main():
     status, body = call("POST", GW + f"/cases/{b1_id}/external-reports", m, token,
                         expect=201, label="B1 metrics before readiness => not_ready")
     assert body.get("status") == "not_ready", body
-    readiness_pass = dict(readiness_fail, data_ready=True, accounting_verified=True,
-                          blocking_gaps=[])
-    call("POST", GW + "/projects/r01/readiness", readiness_pass, token,
-         expect=200, label="readiness saved (all gates)")
+    readiness_selfcheck = dict(readiness_fail, data_ready=True, accounting_verified=True,
+                               blocking_gaps=[])
+    status, body = call("POST", GW + "/projects/r01/readiness", readiness_selfcheck, token,
+                        expect=200, label="readiness self-check all gates, acceptance pending")
+    assert body["ready_for_research"] is False and body["self_check_passes"] is True
+    assert body["admission_reasons"] == ["independent_acceptance_pending"]
     m2 = dict(m, event_id="ev-b1-2", seq=1)
     status, body = call("POST", GW + f"/cases/{b1_id}/external-reports", m2, token,
-                        expect=201, label="B1 metrics after readiness => applied")
+                        expect=201, label="B1 metrics: acceptance pending => still not_ready (AC-06)")
+    assert body.get("status") == "not_ready", body
+    assert "independent_acceptance_pending" in body.get("not_ready_reason", "")
+    readiness_accepted = dict(readiness_selfcheck,
+                              independent_acceptance={"status": "passed",
+                                                      "at": "2026-09-25T13:00:00Z", "by": "w1r-e2e"})
+    status, body = call("POST", GW + "/projects/r01/readiness", readiness_accepted, token,
+                        expect=200, label="readiness independent acceptance passed")
+    assert body["ready_for_research"] is True and body["admission_reasons"] == []
+    m3 = dict(m, event_id="ev-b1-3", seq=2)
+    status, body = call("POST", GW + f"/cases/{b1_id}/external-reports", m3, token,
+                        expect=201, label="B1 metrics after formal admission => applied")
     assert body.get("status") == "applied", body
+    # 验收后代码漂移（verdict 未重做）=> 再次 not_ready（stale 绑定）
+    drifted = dict(readiness_accepted, code_revision="drifted-commit-0001")
+    drifted["independent_acceptance"] = readiness_accepted["independent_acceptance"]
+    call("POST", GW + "/projects/r01/readiness", drifted, token,
+         expect=200, label="readiness code drift after acceptance")
+    m4 = dict(m, event_id="ev-b1-4", seq=3)
+    status, body = call("POST", GW + f"/cases/{b1_id}/external-reports", m4, token,
+                        expect=201, label="B1 metrics after code drift => not_ready (stale)")
+    assert body.get("status") == "not_ready"
+    assert "acceptance_stale_code" in body.get("not_ready_reason", "")
 
     # 6) risk confirm flow
     r = dict(envelope(), case_id=CASE_ID[0], event_id="ev-risk", seq=6,
@@ -242,7 +265,10 @@ def main():
     assert b1_metrics[0]["value"] is None and b1_metrics[0]["null_reason"] == "not-computed"
     fixture_artifacts = [a for c in ov1["cases"] for a in c["artifacts"] if a["fixture"]]
     assert any("fixture-equity" in a["name"] for a in fixture_artifacts)
-    assert ov1["ready_for_research"] is True and ov1["independently_accepted"] is False
+    # 验收后代码漂移：overview 显示正式准入关闭与显式原因（AC-06）
+    assert ov1["ready_for_research"] is False
+    assert ov1["independently_accepted"] is True
+    assert "acceptance_stale_code" in ov1["admission_reasons"]
 
     # 9) durable audit stream
     status, stream = call("GET", reports + "?since_seq=0", None, token,

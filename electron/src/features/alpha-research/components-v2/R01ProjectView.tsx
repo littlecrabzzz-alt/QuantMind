@@ -254,8 +254,10 @@ function ReadinessPanel({
         <Alert
           type="warning"
           showIcon
-          message="准入未通过：正式研究与结果比较入口保持关闭"
-          description="未通过原因如上；外部回报仍作为原始证据保留，可查看但不得标记为已验证成果。"
+          message="正式准入未通过：研究结果比较入口保持关闭"
+          description={`未通过原因：${(overview.admission_reasons || ["unknown"]).join("；")}。
+自检通过≠正式准入：独立验收通过且版本绑定一致后才放行；外部回报仍作为原始证据保留，
+可查看但不得标记为已验证成果。`}
         />
       )}
     </div>

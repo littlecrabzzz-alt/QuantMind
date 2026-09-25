@@ -231,8 +231,10 @@ export interface ReadinessObject {
 export interface ProjectOverview {
   project_key: string;
   readiness: ReadinessObject | null;
+  self_check_passes: boolean;
   ready_for_research: boolean;
   independently_accepted: boolean;
+  admission_reasons: string[];
   cases: Array<ExternalCaseSummary & { case_id: string; input: AgentCase["input"] }>;
   gaps: Array<{ gap_id: string; desc: string; count: number; blocking: boolean }>;
   blocking_gaps: string[];
@@ -335,8 +337,10 @@ export const researchAgent = {
     projectKey: string,
   ): Promise<{
     readiness: ReadinessObject;
+    self_check_passes: boolean;
     ready_for_research: boolean;
     independently_accepted: boolean;
+    admission_reasons: string[];
   }> => call(`/projects/${projectKey}/readiness`, node),
   projectOverview: (node: string, projectKey: string): Promise<ProjectOverview> =>
     call(`/projects/${projectKey}`, node),

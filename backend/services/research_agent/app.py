@@ -519,9 +519,14 @@ async def submit_external_report(ident: str, request: Request):
             return _contract_response(422, exc.code, exc.detail)
 
     readiness = await xstore.get_readiness(owner, cfg.node, envelope["project_key"])
-    not_ready = envelope["workstream"] != "P0" and not external.readiness_passes(
-        readiness
+    binding = await xstore.get_acceptance_binding(
+        owner, cfg.node, envelope["project_key"]
     )
+    formal_ready, admission_reasons = external.evaluate_formal_admission(
+        readiness, binding, contracts.contract_hashes["2.2"]
+    )
+    not_ready = envelope["workstream"] != "P0" and not formal_ready
+    not_ready_reason = (", ".join(admission_reasons)) if not_ready else None
 
     async with store.pool.connection() as db, db.transaction():
         existing = await xstore.find_event(
@@ -554,7 +559,7 @@ async def submit_external_report(ident: str, request: Request):
         ).fetchone()
         s = fresh["state"]
         decision, note = external.apply_event(
-            s["external"], envelope, received_at, not_ready
+            s["external"], envelope, received_at, not_ready, not_ready_reason
         )
         apply_status = "not_ready" if not_ready else decision
         platform_seq = await xstore.insert_event(
@@ -590,6 +595,7 @@ async def submit_external_report(ident: str, request: Request):
             "received_at": received_at,
             "apply_note": note,
             "not_ready": not_ready,
+            "not_ready_reason": not_ready_reason,
         },
     )
 
@@ -659,16 +665,25 @@ async def confirm_resume(ident: str, event_id: str, request: Request):
 
 @app.get("/projects/{project_key}/readiness")
 async def get_readiness(project_key: str, request: Request):
-    cfg = request.app.state.settings
-    obj = await request.app.state.external.get_readiness(
-        await identity(request), cfg.node, project_key.lower()
+    cfg, xstore, contracts = (
+        request.app.state.settings,
+        request.app.state.external,
+        request.app.state.contracts,
     )
+    owner = await identity(request)
+    obj = await xstore.get_readiness(owner, cfg.node, project_key.lower())
     if obj is None:
         raise HTTPException(404, "该项目的准入对象尚未登记")
+    binding = await xstore.get_acceptance_binding(owner, cfg.node, project_key.lower())
+    formal_ready, reasons = external.evaluate_formal_admission(
+        obj, binding, contracts.contract_hashes["2.2"]
+    )
     return {
         "readiness": obj,
-        "ready_for_research": external.readiness_passes(obj),
+        "self_check_passes": external.self_check_passes(obj),
+        "ready_for_research": formal_ready,
         "independently_accepted": external.independently_accepted(obj),
+        "admission_reasons": reasons,
     }
 
 
@@ -687,13 +702,26 @@ async def save_readiness(project_key: str, request: Request):
         return _contract_response(
             422, "project_mismatch", "对象内 project_key 与路径不一致"
         )
+    owner = await identity(request)
     await request.app.state.external.save_readiness(
-        await identity(request), cfg.node, project_key.lower(), obj
+        owner,
+        cfg.node,
+        project_key.lower(),
+        obj,
+        contract_hash=request.app.state.contracts.contract_hashes["2.2"],
+    )
+    binding = await request.app.state.external.get_acceptance_binding(
+        owner, cfg.node, project_key.lower()
+    )
+    formal_ready, reasons = external.evaluate_formal_admission(
+        obj, binding, request.app.state.contracts.contract_hashes["2.2"]
     )
     return {
         "readiness": obj,
-        "ready_for_research": external.readiness_passes(obj),
+        "self_check_passes": external.self_check_passes(obj),
+        "ready_for_research": formal_ready,
         "independently_accepted": external.independently_accepted(obj),
+        "admission_reasons": reasons,
     }
 
 
@@ -722,6 +750,12 @@ async def project_overview(project_key: str, request: Request):
         )
         summaries.append({**case["external"], "case_id": r["draft_id"], "input": case["input"]})
     readiness = await request.app.state.external.get_readiness(owner, cfg.node, key)
+    binding = await request.app.state.external.get_acceptance_binding(
+        owner, cfg.node, key
+    )
+    formal_ready, admission_reasons = external.evaluate_formal_admission(
+        readiness, binding, request.app.state.contracts.contract_hashes["2.2"]
+    )
     blocking = readiness.get("blocking_gaps", []) if readiness else []
     reported_gaps = {}
     for s in summaries:
@@ -730,8 +764,10 @@ async def project_overview(project_key: str, request: Request):
     return {
         "project_key": key,
         "readiness": readiness,
-        "ready_for_research": external.readiness_passes(readiness),
+        "ready_for_research": formal_ready,
+        "self_check_passes": external.self_check_passes(readiness),
         "independently_accepted": external.independently_accepted(readiness),
+        "admission_reasons": admission_reasons,
         "cases": summaries,
         "gaps": [
             {**g, "blocking": g["gap_id"] in blocking} for g in reported_gaps.values()
