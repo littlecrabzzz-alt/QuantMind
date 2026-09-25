@@ -502,7 +502,7 @@ class TestReadinessGating:
             "accounting_verified": True, "platform_ready": True,
             "blocking_gaps": [], "checked_by": "p02",
             "evidence_refs": ["node://mac/docs/r01-p0/coverage-matrix.md"],
-            "input_manifest": {"package_id": "pkg", "sha256": "3" * 64, "release_id": "r"},
+            "input_manifest": {"package_id": "r01-etf-daily", "sha256": "3" * 64, "release_id": "r"},
             "etf_input": {"package_id": "pkg", "package_version": "v1",
                           "manifest_sha256": "4" * 64, "node": "mac",
                           "uri": "node://mac/r01-etf-daily/v1"},
@@ -539,13 +539,18 @@ class TestReadinessGating:
         )
         assert response.status_code == 422
 
-    def _b1_metrics(self, env, event_id, seq):
+    def _b1_metrics(self, env, event_id, seq, **over):
         payload = envelope(env, workstream="B1", kind="metrics", fixture=False,
-                           strategy_id="b1-momentum-v1", event_id=event_id, seq=seq)
+                           strategy_id="b1-momentum-v1", event_id=event_id, seq=seq,
+                           source_revision="deadbee",
+                           data={"input_package_id": "r01-etf-daily",
+                                 "source_release_id": "r", "data_as_of": "2026-09-24",
+                                 "manifest_sha256": "3" * 64})
         payload.pop("progress_step")
         payload["metrics"] = [
             {"metric": "total_return", "value": 0.12, "unit": "ratio", "basis": "30万·2025"},
         ]
+        payload.update(over)
         return payload
 
     def _submit_b1(self, env, key, event_id, seq=0):
@@ -606,6 +611,60 @@ class TestReadinessGating:
         response = self._submit_b1(env, "case-key-0006", "ev-d2")
         assert response.json()["status"] == "not_ready"
         assert "acceptance_stale_manifest" in response.json()["not_ready_reason"]
+
+    def _accept_readiness(self, env):
+        env.post("/projects/r01/readiness", json=self._readiness(
+            independent_acceptance={"status": "passed", "at": "2026-09-25T00:00:00Z", "by": "w1r"}))
+
+    def test_g1_identity_mismatch_single_field_repros(self, env):
+        # 复验报告 F-AC06 三反例：仅改 envelope 单字段，readiness/绑定不动
+        self._accept_readiness(env)
+        self._submit_b1(env, "case-key-g1", "ev-g1-warm")  # register B1 case
+        base = self._b1_metrics(env, "ev-g1-ok", 1)
+        response = submit(env, base)
+        assert response.json()["status"] == "applied"  # 匹配正例先 applied
+        # ① source_revision 改动
+        response = submit(env, self._b1_metrics(env, "ev-g1-code", 2, source_revision="b" * 40))
+        assert response.json()["status"] == "not_ready"
+        assert "identity_mismatch_code" in response.json()["not_ready_reason"]
+        assert "b" * 40 in response.json()["not_ready_reason"]  # 双方值显式
+        # ② manifest_sha256 改动
+        response = submit(env, self._b1_metrics(env, "ev-g1-man", 3,
+                                                data={"input_package_id": "r01-etf-daily",
+                                                      "data_as_of": "2026-09-24",
+                                                      "manifest_sha256": "c" * 64}))
+        assert response.json()["status"] == "not_ready"
+        assert "identity_mismatch_manifest" in response.json()["not_ready_reason"]
+        # ③ input_package_id 改动
+        response = submit(env, self._b1_metrics(env, "ev-g1-pkg", 4,
+                                                data={"input_package_id": "wrong-input-package",
+                                                      "data_as_of": "2026-09-24",
+                                                      "manifest_sha256": "3" * 64}))
+        assert response.json()["status"] == "not_ready"
+        assert "identity_mismatch_package" in response.json()["not_ready_reason"]
+        assert "wrong-input-package" in response.json()["not_ready_reason"]
+        # 未进正式聚合：三条反例镜像带 not_ready 标记（含原因），正例保持 applied
+        state = env.store.rows[env.case_id]["state"]["external"]
+        for m in state["metrics"][2:]:
+            assert m["not_ready"] is True and "identity_mismatch" in m["not_ready_reason"]
+        assert all(m["not_ready"] is False for m in state["metrics"][:2])
+
+    def test_g1_missing_manifest_treated_as_mismatch(self, env):
+        self._accept_readiness(env)
+        self._submit_b1(env, "case-key-g1b", "ev-g1b-warm")
+        response = submit(env, self._b1_metrics(env, "ev-g1-noman", 1,
+                                                data={"input_package_id": "r01-etf-daily",
+                                                      "data_as_of": "2026-09-24"}))
+        assert response.json()["status"] == "not_ready"
+        assert "identity_mismatch_manifest" in response.json()["not_ready_reason"]
+
+    def test_g1_p0_reports_exempt_from_identity_gate(self, env):
+        # P0 工程回报不进正式比较，identity 门控不适用（input_package_id=none 等）
+        self._accept_readiness(env)
+        register_case(env)  # P0 case
+        response = submit(env, envelope(env, event_id="ev-p0-g1", seq=0))
+        assert response.status_code == 201
+        assert response.json().get("not_ready") is False
 
     def test_formal_admission_rejects_contract_drift_or_missing_binding(self, env):
         owner = (("default", "10000001"), "mac", "r01")

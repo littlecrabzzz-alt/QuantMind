@@ -196,6 +196,52 @@ def acceptance_binding_from(readiness, contract_hash):
     }
 
 
+def envelope_identity_vs_binding(envelope, readiness, binding):
+    """G1P1: compare the envelope's actual code/data identity against the
+    accepted binding snapshot at the real report ingress.
+
+    Checked per-field (envelope vs accepted): source_revision vs commit,
+    data.manifest_sha256 vs binding manifest, data.input_package_id vs
+    readiness.input_manifest.package_id. Mismatched reports are kept as raw
+    evidence with explicit identity_mismatch_* reasons (both sides' values)
+    and never enter formal metrics/comparison aggregates. Returns (ok, reasons);
+    ok=True when there is no binding to compare against (the formal gate
+    blocks that case independently).
+    """
+
+    if not isinstance(binding, dict) or not binding.get("contract_hash"):
+        return True, []
+    reasons = []
+    revision = envelope.get("source_revision")
+    accepted_commit = binding.get("commit")
+    if revision != accepted_commit:
+        reasons.append(
+            f"identity_mismatch_code: envelope source_revision={revision!r} "
+            f"vs accepted commit={accepted_commit!r}"
+        )
+    data = envelope.get("data") or {}
+    manifest = data.get("manifest_sha256")
+    accepted_manifest = binding.get("manifest_sha256")
+    if not manifest:
+        reasons.append(
+            "identity_mismatch_manifest: envelope data.manifest_sha256 缺失"
+            "（正式准入回报必须携带）"
+        )
+    elif manifest != accepted_manifest:
+        reasons.append(
+            f"identity_mismatch_manifest: envelope={str(manifest)[:16]}… "
+            f"vs accepted={str(accepted_manifest)[:16]}…"
+        )
+    package = data.get("input_package_id")
+    accepted_package = (readiness or {}).get("input_manifest", {}).get("package_id")
+    if package != accepted_package:
+        reasons.append(
+            f"identity_mismatch_package: envelope={package!r} "
+            f"vs accepted={accepted_package!r}"
+        )
+    return (not reasons), reasons
+
+
 def evaluate_formal_admission(readiness, binding, current_contract_hash):
     """Formal admission gate for non-P0 research results (AC-06).
 

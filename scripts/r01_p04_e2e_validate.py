@@ -194,9 +194,12 @@ def main():
         "project_key": "r01", "workstream": "B1",
     }, token, expect=200, label="create B1 case")
     b1_id = b1["id"]
+    # B1 回报身份与 readiness/验收绑定一致（G1P1：identity 逐项核对）
     m = dict(envelope(), case_id=b1_id, workstream="B1", event_id="ev-b1-1",
              fixture=False, strategy_id="b1-momentum-v1", execution_status="running",
-             kind="metrics")
+             kind="metrics",
+             data={"input_package_id": "r01-etf-daily", "data_as_of": "2026-09-24",
+                   "manifest_sha256": "3" * 64})
     m.pop("progress_step")
     m["metrics"] = [{"metric": "total_return", "value": None, "null_reason": "not-computed",
                      "unit": "ratio", "basis": "30万·未开始"}]
@@ -224,12 +227,28 @@ def main():
     status, body = call("POST", GW + f"/cases/{b1_id}/external-reports", m3, token,
                         expect=201, label="B1 metrics after formal admission => applied")
     assert body.get("status") == "applied", body
+    # G1P1 复验三反例：仅改 envelope 单字段（readiness/绑定不动）=> not_ready，不进正式聚合
+    repros = [
+        ("ev-g1-code", {"source_revision": "b" * 40}, "identity_mismatch_code"),
+        ("ev-g1-man", {"data": {"input_package_id": "r01-etf-daily",
+                                "data_as_of": "2026-09-24", "manifest_sha256": "c" * 64}},
+         "identity_mismatch_manifest"),
+        ("ev-g1-pkg", {"data": {"input_package_id": "wrong-input-package",
+                                "data_as_of": "2026-09-24", "manifest_sha256": "3" * 64}},
+         "identity_mismatch_package"),
+    ]
+    for i, (eid, over, code) in enumerate(repros):
+        status, body = call("POST", GW + f"/cases/{b1_id}/external-reports",
+                            dict(m, event_id=eid, seq=3 + i, **over), token,
+                            expect=201, label=f"G1 repro {code} => not_ready")
+        assert body.get("status") == "not_ready", body
+        assert code in body.get("not_ready_reason", "")
     # 验收后代码漂移（verdict 未重做）=> 再次 not_ready（stale 绑定）
     drifted = dict(readiness_accepted, code_revision="drifted-commit-0001")
     drifted["independent_acceptance"] = readiness_accepted["independent_acceptance"]
     call("POST", GW + "/projects/r01/readiness", drifted, token,
          expect=200, label="readiness code drift after acceptance")
-    m4 = dict(m, event_id="ev-b1-4", seq=3)
+    m4 = dict(m, event_id="ev-b1-4", seq=6)
     status, body = call("POST", GW + f"/cases/{b1_id}/external-reports", m4, token,
                         expect=201, label="B1 metrics after code drift => not_ready (stale)")
     assert body.get("status") == "not_ready"
@@ -265,6 +284,11 @@ def main():
     assert b1_metrics[0]["value"] is None and b1_metrics[0]["null_reason"] == "not-computed"
     fixture_artifacts = [a for c in ov1["cases"] for a in c["artifacts"] if a["fixture"]]
     assert any("fixture-equity" in a["name"] for a in fixture_artifacts)
+    b1_metrics_all = ov1["groups"]["B1"]["metrics"]
+    assert any(m["not_ready"] and "identity_mismatch" in (m.get("not_ready_reason") or "")
+               for m in b1_metrics_all), "identity 反例应带未准入标记保留"
+    formal = [m for m in b1_metrics_all if not m["not_ready"]]
+    assert formal and all(m["source_run_id"] for m in formal)
     # 验收后代码漂移：overview 显示正式准入关闭与显式原因（AC-06）
     assert ov1["ready_for_research"] is False
     assert ov1["independently_accepted"] is True

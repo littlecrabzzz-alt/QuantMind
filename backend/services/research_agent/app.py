@@ -525,8 +525,14 @@ async def submit_external_report(ident: str, request: Request):
     formal_ready, admission_reasons = external.evaluate_formal_admission(
         readiness, binding, contracts.contract_hashes["2.3"]
     )
-    not_ready = envelope["workstream"] != "P0" and not formal_ready
-    not_ready_reason = (", ".join(admission_reasons)) if not_ready else None
+    # G1P1: the envelope's own identity (code/manifest/package) must match the
+    # accepted binding; mismatched reports stay as raw not_ready evidence.
+    identity_ok, identity_reasons = external.envelope_identity_vs_binding(
+        envelope, readiness, binding
+    )
+    reasons = admission_reasons + identity_reasons
+    not_ready = envelope["workstream"] != "P0" and bool(reasons)
+    not_ready_reason = (", ".join(reasons)) if not_ready else None
 
     async with store.pool.connection() as db, db.transaction():
         existing = await xstore.find_event(
