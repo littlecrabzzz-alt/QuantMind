@@ -59,13 +59,20 @@ def _provider(tmp_path: Path, **kw) -> DailyIncrementProvider:
 
 @real_pkg_needed
 def test_real_daily_package_ready_and_baseline_path(tmp_path):
-    """真实 d20260924：在基线内 → 基线包直供；门控 ready。"""
+    """真实 d20260924：优先日包路径；基线内无包日回退基线。"""
     p = _provider(tmp_path)
-    # 2026-09-24 在 v2 基线内（data_end=2026-09-24）→ 走基线判定
+    # 2026-09-24 有真实日包 → 日增量路径（身份绑定 d20260924）
     r = p.resolve(date(2026, 9, 24), symbols=["510300.SH", "518880.SH"], now=NOW)
     assert r.status == "ready"
-    assert r.identity is not None and r.identity.package_version.startswith("d20260924")
+    assert r.identity is not None and r.identity.package_version == "d20260924"
+    assert r.identity.manifest_sha256 == (
+        "4bcf7dac2c6005ff00ae60f3bda3d371185b0b2e37eb96350ef6d425437b9f05"
+    )
     assert r.package.trade_dates()[-1] >= date(2026, 9, 24)
+    # 2026-09-23 在基线内且无日包 → 回退基线（回放/历史场景）
+    r2 = p.resolve(date(2026, 9, 23), symbols=["510300.SH", "518880.SH"], now=NOW)
+    assert r2.status == "ready"
+    assert r2.package is not None and r2.package.is_trade_date(date(2026, 9, 23))
 
 
 @real_pkg_needed
