@@ -64,19 +64,33 @@ _VERIFICATION_METHODS = (
     "pre_close_continuity",
     "nav_continuity",
     "fund_div_match",
+    "record_date_evidence",  # schema v3
     "unresolved_gap",
 )
 
 
 @dataclass(frozen=True)
 class TypedEvent:
-    """一条公司行动 typed 事件（账本只消费这个结构，不解读原始因子）。"""
+    """一条公司行动 typed 事件（账本只消费这个结构，不解读原始因子）。
+
+    v3（ledger-contract v3 / AC-01）：cash_dividend 为三段式——
+    event_date=ex_date（除息日）、record_date（权益登记日）、pay_date
+    （发放日）三日期齐备（unknown_blocked 时对应段显式阻塞，禁止默认
+    ex_date 充当）；event_id 用于分红幂等键。share_adjustment 不携带
+    分红日期字段（schema v3 禁混）。
+    """
 
     symbol: str
-    event_date: date
+    event_date: date  # cash_dividend=ex_date；share_adjustment=生效日
     event_type: str  # cash_dividend | share_adjustment
     cash_per_share: float
     qty_multiplier: float
+    event_id: str = ""
+    record_date: date | None = None
+    record_date_status: str = "known"
+    pay_date: date | None = None
+    pay_date_status: str = "known"
+    entitlement_basis: str = ""
     derived_from: dict[str, Any] = field(default_factory=dict)
     verification: dict[str, Any] = field(default_factory=dict)
     basis_note: str = ""
@@ -85,6 +99,22 @@ class TypedEvent:
     def idempotency_key(self) -> tuple[str, str, str, str]:
         """(ledger_run_id 占位, symbol, event_date, event_type) 中后三段。"""
         return (self.symbol, self.event_date.isoformat(), self.event_type)
+
+    @property
+    def dividend_idempotency_key(self) -> tuple[str, str, str, str]:
+        """(run 占位, symbol, event_id, entitlement_date=record_date)。"""
+        return (
+            self.symbol,
+            self.event_id,
+            self.record_date.isoformat() if self.record_date else "",
+        )
+
+    @property
+    def blocked(self) -> bool:
+        return (
+            self.record_date_status == "unknown_blocked"
+            or self.pay_date_status == "unknown_blocked"
+        )
 
 
 def _parse_typed_event_row(symbol: str, row: dict[str, Any]) -> TypedEvent:
@@ -127,6 +157,14 @@ def _parse_typed_event_row(symbol: str, row: dict[str, Any]) -> TypedEvent:
     if "detail" in ver_raw:
         verification["detail"] = str(ver_raw["detail"])
 
+    # ── v3 分红三日期字段（schema v3 allOf）──
+    event_id = str(row.get("event_id") or "")
+    record_date: date | None = None
+    pay_date: date | None = None
+    record_status = str(row.get("record_date_status") or "known")
+    pay_status = str(row.get("pay_date_status") or "known")
+    entitlement_basis = str(row.get("entitlement_basis") or "")
+
     # allOf 分支语义
     if event_type == "cash_dividend":
         if qty_multiplier != 1:
@@ -135,11 +173,49 @@ def _parse_typed_event_row(symbol: str, row: dict[str, Any]) -> TypedEvent:
             raise EtfInputPackageError(f"{symbol} 现金分红事件 cash_per_share≤0: {row}")
         if not derived.get("fund_div_ref"):
             raise EtfInputPackageError(f"{symbol} 现金分红事件缺 fund_div_ref: {row}")
-    else:  # share_adjustment
+        # 无日期字段的旧格式（v1 包）：按 unknown_blocked 显式阻塞，
+        # 禁止默认 ex_date 充当 record/pay（ledger-contract v3 §5）；
+        # event_id 由 fund_div_ref 合成（阻塞记录审计仍可寻址）
+        has_v3_fields = (
+            "record_date" in row or "pay_date" in row
+            or "record_date_status" in row or "pay_date_status" in row
+        )
+        if not has_v3_fields:
+            record_status = pay_status = "unknown_blocked"
+            event_id = event_id or f"legacy:{derived.get('fund_div_ref', event_date.isoformat())}"
+        if not event_id:
+            raise EtfInputPackageError(f"{symbol} 现金分红事件缺 event_id（v3 幂等键）: {row}")
+        else:
+            if record_status not in ("known", "unknown_blocked") or pay_status not in (
+                "known", "unknown_blocked"
+            ):
+                raise EtfInputPackageError(f"{symbol} 分红日期状态非法: {row}")
+        if record_status == "known":
+            if not row.get("record_date"):
+                raise EtfInputPackageError(f"{symbol} record_date_status=known 但缺日期: {row}")
+            record_date = date.fromisoformat(str(row["record_date"])[:10])
+        if pay_status == "known":
+            if not row.get("pay_date"):
+                raise EtfInputPackageError(f"{symbol} pay_date_status=known 但缺日期: {row}")
+            pay_date = date.fromisoformat(str(row["pay_date"])[:10])
+        if record_date and record_date > event_date:
+            raise EtfInputPackageError(
+                f"{symbol} record_date {record_date} 晚于 ex_date {event_date}: {row}"
+            )
+        if entitlement_basis and entitlement_basis != "record_date_close_holdings":
+            raise EtfInputPackageError(f"{symbol} 未知 entitlement_basis: {row}")
+    else:  # share_adjustment：禁混分红字段（schema v3）
         if cash_per_share != 0:
             raise EtfInputPackageError(f"{symbol} 份额调整事件 cash_per_share≠0: {row}")
         if qty_multiplier == 1:
             raise EtfInputPackageError(f"{symbol} 份额调整事件 qty_multiplier=1: {row}")
+        for forbidden in ("event_id", "record_date", "pay_date",
+                          "record_date_status", "pay_date_status", "entitlement_basis"):
+            if row.get(forbidden) not in (None, "", 1.0) and forbidden != "event_id":
+                if row.get(forbidden) is not None:
+                    raise EtfInputPackageError(
+                        f"{symbol} 份额调整事件携带分红字段 {forbidden}（schema v3 禁混）: {row}"
+                    )
 
     return TypedEvent(
         symbol=symbol,
@@ -147,6 +223,14 @@ def _parse_typed_event_row(symbol: str, row: dict[str, Any]) -> TypedEvent:
         event_type=event_type,
         cash_per_share=cash_per_share,
         qty_multiplier=qty_multiplier,
+        event_id=event_id,
+        record_date=record_date,
+        record_date_status=record_status,
+        pay_date=pay_date,
+        pay_date_status=pay_status,
+        entitlement_basis=entitlement_basis or (
+            "record_date_close_holdings" if event_type == "cash_dividend" else ""
+        ),
         derived_from=derived,
         verification=verification,
         basis_note=str(row.get("basis_note") or ""),
@@ -178,9 +262,9 @@ def _validate_manifest(manifest: dict[str, Any]) -> None:
     for key in _MANIFEST_REQUIRED:
         if key not in manifest:
             raise EtfInputPackageError(f"manifest 缺必需字段: {key}")
-    if manifest["schema_version"] != 2:
+    if manifest["schema_version"] not in (2, 3):
         raise EtfInputPackageError(
-            f"manifest schema_version≠2: {manifest['schema_version']}"
+            f"manifest schema_version 非法（允许 2/3）: {manifest['schema_version']}"
         )
     if not str(manifest["package_uri"]).startswith("node://"):
         raise EtfInputPackageError(
@@ -497,6 +581,17 @@ class EtfInputPackage:
                     out.append(ev)
         return out
 
+    def dividend_events(self) -> list[TypedEvent]:
+        """全部现金分红事件（三日期字段齐备；v3 消费侧主入口）。"""
+        out: list[TypedEvent] = []
+        for sym in self.manifest["symbols"]:
+            out.extend(e for e in self.events_for(sym["code"]) if e.event_type == "cash_dividend")
+        return out
+
+    def blocked_dividend_events(self) -> list[TypedEvent]:
+        """日期缺失（unknown_blocked）的分红事件：账本显式阻塞处理。"""
+        return [e for e in self.dividend_events() if e.blocked]
+
     def unresolved_gap_symbols(self) -> set[str]:
         """verification=unresolved_gap 的事件对应 symbol：账本暂停其后续买入。"""
         out: set[str] = set()
@@ -564,7 +659,8 @@ def build_fixture_package(
 
     显著标注：package_id 以 fixture- 开头；manifest.fixture=true。
     日常行情为确定性合成序列（真实包由 p02 产出，集成验证另派）。
-    回归事件采用 DG-005 冻结口径：
+    事件采用 schema v3（分红三日期 event_id；份额调整禁混字段；含一个
+    unknown_blocked 用例）。回归倍率沿用 DG-005 冻结口径：
       - 159934.SZ 2025-09-22 share_adjustment qty_multiplier=0.9481
       - 510500.SH 2015-04-15 share_adjustment qty_multiplier=0.2803
       - 510300.SH 分红链样例（cash_dividend）
@@ -654,13 +750,19 @@ def build_fixture_package(
             "verification": {"passed": True, "method": "pre_close_continuity", "detail": "fixture"},
         }
     ]
-    # 510300.SH 现金分红链（ex_date 2025-09-19，每份 0.05 元）
+    # 510300.SH 现金分红链（v3 三段式：record 09-18 / ex 09-19 / pay 09-24）
     ev_510300 = [
         {
             "event_date": "2025-09-19",
             "event_type": "cash_dividend",
             "cash_per_share": 0.05,
             "qty_multiplier": 1.0,
+            "event_id": "fund_div:SH510300:20250919:20250918",
+            "record_date": "2025-09-18",
+            "record_date_status": "known",
+            "pay_date": "2025-09-24",
+            "pay_date_status": "known",
+            "entitlement_basis": "record_date_close_holdings",
             "basis_note": "",
             "derived_from": {
                 "adj_factor_prev": 1.5000,
@@ -671,7 +773,7 @@ def build_fixture_package(
         }
     ]
     # 同日并存用例：518880.SH 2025-09-23 先份额调整后现金分红
-    # （cash_per_share 已是调整后份额口径）
+    # （cash_per_share 已是调整后份额口径；v3 三日期：record 09-22 / pay 09-26）
     ev_518880 = [
         {
             "event_date": "2025-09-23",
@@ -687,6 +789,12 @@ def build_fixture_package(
             "event_type": "cash_dividend",
             "cash_per_share": 0.0400,
             "qty_multiplier": 1.0,
+            "event_id": "fund_div:SH518880:20250923:20250922",
+            "record_date": "2025-09-22",
+            "record_date_status": "known",
+            "pay_date": "2025-09-26",
+            "pay_date_status": "known",
+            "entitlement_basis": "record_date_close_holdings",
             "basis_note": "同日既有份额调整：0.0400 已换算为调整后份额口径",
             "derived_from": {
                 "adj_factor_prev": 0.7000,
@@ -696,16 +804,39 @@ def build_fixture_package(
             "verification": {"passed": True, "method": "nav_continuity", "detail": "fixture"},
         },
     ]
+    # blocked 用例：159915.SZ 分红日期缺失（v3 显式阻塞路径，账本停买该标的）
+    ev_159915 = [
+        {
+            "event_date": "2025-09-17",
+            "event_type": "cash_dividend",
+            "cash_per_share": 0.0100,
+            "qty_multiplier": 1.0,
+            "event_id": "fund_div:SZ159915:20250917:blocked",
+            "record_date": None,
+            "record_date_status": "unknown_blocked",
+            "pay_date": None,
+            "pay_date_status": "unknown_blocked",
+            "entitlement_basis": "record_date_close_holdings",
+            "basis_note": "fixture：日期缺失用例（verification 必须 unresolved_gap）",
+            "derived_from": {
+                "adj_factor_prev": 1.0,
+                "adj_factor_new": 1.0,
+                "fund_div_ref": "fund_div:SZ159915:20250917:blocked",
+            },
+            "verification": {"passed": False, "method": "unresolved_gap", "detail": "fixture"},
+        }
+    ]
     for code, recs in (
         ("159934.SZ", ev_159934),
         ("510500.SH", ev_510500),
         ("510300.SH", ev_510300),
         ("518880.SH", ev_518880),
+        ("159915.SZ", ev_159915),
     ):
         _events_df(recs).to_parquet(root / "events" / f"{code}.parquet", index=False)
 
     manifest = {
-        "schema_version": 2,
+        "schema_version": 3,
         "package_id": package_id,
         "package_version": "w2e-fixture-1",
         "package_uri": f"node://{generated_by_node}/r01-etf-daily/{package_id}",

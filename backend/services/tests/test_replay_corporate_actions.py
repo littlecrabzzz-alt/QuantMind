@@ -102,63 +102,110 @@ class TestShareAdjustment:
 
 
 class TestCashDividend:
-    def test_dividend_credited_eod_before_nav(self, pkg):
+    """v3 三段式（F2）：record EOD 定格 → ex 入应收（nav、不可交易）
+    → pay 转可用现金。fixture 510300：record 09-18 / ex 09-19 / pay 09-24。"""
+
+    def test_three_stage_flow(self, pkg):
         ledger = _ledger(pkg)
         _buy_full(pkg, ledger, date(2025, 9, 10), "510300.SH")
         qty = ledger.positions["510300.SH"].qty
+        cash_after_buy = ledger.cash
 
-        # 2025-09-19 除息日（fixture：每份 0.05 元）
-        summary = _run_to(pkg, ledger, date(2025, 9, 19), {"510300.SH": 1.0})
-        credited = summary.dividends_credited
-        assert credited and credited[0]["symbol"] == "510300.SH"
-        expected = round(qty * 0.05, 4)
-        assert credited[0]["cash_delta"] == pytest.approx(expected, abs=0.01)
-        # 现金确实入账（当日无交易时差额=分红）
-        # 注：当日或有调仓费用；分红记录本身对账
-        assert credited[0]["qty"] == pytest.approx(qty)
+        # record 09-18 EOD：定格权益（无现金流）
+        _run_to(pkg, ledger, date(2025, 9, 18))
+        recs = [
+            r for r in ledger.dividend_entitlements.values()
+            if r["symbol"] == "510300.SH"
+        ]
+        assert recs and recs[0]["stage"] == "entitled"
+        assert recs[0]["entitlement_qty"] == pytest.approx(qty)
+        assert recs[0]["entitlement_amount"] == pytest.approx(qty * 0.05, abs=0.01)
+        assert ledger.cash == pytest.approx(cash_after_buy)  # record 日无现金流
+
+        # ex 09-19 开盘前：入应收（现金不增、nav 含应收）
+        _run_to(pkg, ledger, date(2025, 9, 19), {"510300.SH": 1.0})
+        assert recs[0]["stage"] == "receivable"
+        assert ledger.dividend_receivable == pytest.approx(qty * 0.05, abs=0.01)
+        snap_ex = ledger.equity[-1]
+        assert snap_ex["nav"] == pytest.approx(
+            snap_ex["cash"] + snap_ex["dividend_receivable"] + snap_ex["market_value"],
+            rel=1e-6,
+        )
+
+        # pay 09-24 开盘前：应收转可用现金（当日可交易）
+        cash_pre_pay = ledger.cash
+        _run_to(pkg, ledger, date(2025, 9, 24))
+        assert recs[0]["stage"] == "paid"
+        assert ledger.dividend_receivable == pytest.approx(0.0)
+        assert ledger.cash == pytest.approx(cash_pre_pay + qty * 0.05, abs=0.02)
 
     def test_dividend_chain_510300(self, pkg):
         ledger = _ledger(pkg)
         _buy_full(pkg, ledger, date(2025, 9, 10), "510300.SH")
-        # 持有跨除息日，dividend_log 记录幂等键完整
         _run_to(pkg, ledger, date(2025, 9, 19), {"510300.SH": 1.0})
-        recs = [d for d in ledger.dividend_log if d["symbol"] == "510300.SH"]
+        recs = [r for r in ledger.dividend_entitlements.values() if r["symbol"] == "510300.SH"]
         assert len(recs) == 1
-        key = recs[0]["idempotency_key"]
-        assert key[1:] == ["510300.SH", "2025-09-19", "cash_dividend"]
+        key = next(k for k in ledger.dividend_entitlements if ledger.dividend_entitlements[k] is recs[0])
+        # 幂等键 (run, symbol, event_id, entitlement_date=record_date)
+        assert key[0] == ledger.ledger_run_id
+        assert key[1] == "510300.SH"
+        assert key[2] == "fund_div:SH510300:20250919:20250918"
+        assert key[3] == "2025-09-18"
 
 
 class TestSameDayShareThenCash:
     def test_same_day_ordering(self, pkg):
+        """同日份额折算+分红（v3 §6）：份额调整开盘前先应用；cash_per_share
+        为调整后口径，权益按 record 日（09-22）旧口径持仓换算：
+        amount = record_qty × cps × m（fixture：1000×0.04×0.5=20 元）。
+        ex 日入应收、现金不动；pay 日（09-26）转现金。"""
         ledger = _ledger(pkg)
         _buy_full(pkg, ledger, date(2025, 9, 10), "518880.SH")
-        qty_before = ledger.positions["518880.SH"].qty
+        _run_to(pkg, ledger, date(2025, 9, 22))  # record 日
+        qty_at_record = ledger.positions["518880.SH"].qty
         cash_before = ledger.cash
-        # 2025-09-23：先份额折算 ×0.5，后现金分红 0.04（调整后口径）；
-        # 事件日不再平衡，隔离验证时序
-        summary = _run_to(pkg, ledger, date(2025, 9, 23))
-        assert summary.corporate_actions_applied, "份额调整应先于分红"
-        assert summary.dividends_credited, "现金分红应入账"
 
-        div = summary.dividends_credited[0]
-        # 分红按调整后份额计：qty_after_adjust × 0.04
-        assert div["qty"] == pytest.approx(qty_before * 0.5)
-        assert div["cash_delta"] == pytest.approx(qty_before * 0.5 * 0.04, abs=0.01)
-        # 事件日不再平衡 → 现金变动恰为分红
-        assert ledger.cash == pytest.approx(cash_before + qty_before * 0.5 * 0.04, abs=1e-6)
+        summary = _run_to(pkg, ledger, date(2025, 9, 23))  # ex 日（不再平衡）
+        assert summary.corporate_actions_applied, "份额调整应先于分红段"
+        assert summary.dividends_credited, "分红应收段应入账"
+        div = [
+            d for d in summary.dividends_credited if d.get("action") == "receivable"
+        ][0]
+        assert div["basis_multiplier"] == pytest.approx(0.5)
+        assert div["entitlement_qty"] == pytest.approx(qty_at_record)
+        assert div["entitlement_amount"] == pytest.approx(qty_at_record * 0.04 * 0.5, abs=1e-6)
+        # ex 日：入应收（nav 含、不可交易），现金不动
+        assert ledger.cash == pytest.approx(cash_before)
+        assert ledger.dividend_receivable == pytest.approx(qty_at_record * 0.02)
+        # pay 日（09-26）：转可用现金
+        cash_pre_pay = ledger.cash
+        _run_to(pkg, ledger, date(2025, 9, 26))
+        assert ledger.cash == pytest.approx(cash_pre_pay + qty_at_record * 0.02, abs=1e-6)
+        assert ledger.dividend_receivable == pytest.approx(0.0)
 
 
 class TestIdempotency:
     def test_action_key_dedup(self, pkg):
+        """三段共用幂等键：定格后重复定格/重复入应收不重复入账（F2）。"""
         ledger = _ledger(pkg)
         _buy_full(pkg, ledger, date(2025, 9, 10), "510300.SH")
         _run_to(pkg, ledger, date(2025, 9, 19), {"510300.SH": 1.0})
-        # 重复应用同一事件（模拟重放）→ 幂等拒绝
+        recs = [r for r in ledger.dividend_entitlements.values() if r["symbol"] == "510300.SH"]
+        assert len(recs) == 1
+        recv_before = ledger.dividend_receivable
+        # 重放定格段（record 已过）：无新记录
+        ledger._stage_dividend_entitlement(date(2025, 9, 18))
+        assert len([
+            r for r in ledger.dividend_entitlements.values() if r["symbol"] == "510300.SH"
+        ]) == 1
+        # 重放入应收段：阶段已过 → 无变化
+        assert ledger._stage_dividend_receivable(date(2025, 9, 19)) == []
+        assert ledger.dividend_receivable == pytest.approx(recv_before)
+        # 份额调整幂等（原用例保留）
         from backend.services.simulation.replay.etf_input_package import TypedEvent
 
         ev = [e for e in pkg.events_for("510300.SH") if e.event_type == "cash_dividend"][0]
-        assert ledger._apply_cash_dividend(ev, ev.event_date) is None
-        assert ledger._apply_share_adjustment(ev) is None  # 非份额事件同键族也已占用
+        assert ledger._apply_share_adjustment(ev) is None  # 非份额事件不入账
 
     def test_run_day_same_date_rejected(self, pkg):
         ledger = _ledger(pkg)

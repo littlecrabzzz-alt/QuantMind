@@ -36,8 +36,8 @@ from backend.services.simulation.services.ashare_matcher import (
 )
 from backend.services.simulation.services.local_market_data import DailyBar
 
-REAL_PKG = "/Users/lizeyu/Library/Application Support/QuantMind/r01/etf-daily/v1-fcbabbb7"
-REAL_SHA = "cd8b807e8caf152c8d7e5c024ba518722bb3acad68de73b483b922adf7135245"
+REAL_PKG = "/Users/lizeyu/Library/Application Support/QuantMind/r01/etf-daily/v2-fcbabbb7"
+REAL_SHA = "a0d88429301685aa3939b294c38bb942013de4befe29e8a01e7a1f03a80fc622"
 real_pkg_needed = pytest.mark.skipif(
     not __import__("pathlib").Path(REAL_PKG, "manifest.json").is_file(),
     reason="真实输入包不在本机",

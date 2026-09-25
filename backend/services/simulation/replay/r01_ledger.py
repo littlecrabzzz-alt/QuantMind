@@ -419,7 +419,13 @@ class R01Ledger:
         # 公司行动幂等键 (run, symbol, event_date, event_type)
         self.applied_action_keys: set[tuple[str, str, str, str]] = set()
         self.corporate_action_log: list[dict[str, Any]] = []
-        self.dividend_log: list[dict[str, Any]] = []
+        # F2（ledger-contract v3 §5/§6/§8）：分红三段式
+        # entitlements: 幂等键 (run, symbol, event_id, record_date) → 阶段记录
+        #   stage: entitled（record EOD 定格）→ receivable（ex 开盘前入应收）
+        #          → paid（pay 开盘前转可用现金）
+        self.dividend_entitlements: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+        self.dividend_receivable: float = 0.0  # 应收红利（计入 nav、不可交易）
+        self.blocked_dividend_log: list[dict[str, Any]] = []
         self.manual_actions: list[dict[str, Any]] = []
         self.deposit_rejections: list[dict[str, Any]] = []
         self.risk_blocked_orders: list[dict[str, Any]] = []
@@ -524,9 +530,10 @@ class R01Ledger:
         """执行一个交易日（顺序是语义的一部分）：
 
         1. T+1 解锁（settlement 回转按品种）
-        2. 份额调整 typed 事件（开盘前、撮合前）
-        3. 目标权重 → 订单（先卖后买）
-        4. EOD：现金分红入账 → 收盘估值 → nav → 风险评估 → 快照
+        2. 份额调整 typed 事件（开盘前、撮合前，先于分红段）
+        3. 分红段（v3 三段式）：ex 开盘前入应收 → pay 开盘前转现金
+        4. 目标权重 → 订单（先卖后买）
+        5. EOD：record 收盘定格权益 → 收盘估值（nav=现金+应收+持仓）→ 风险 → 快照
         """
         key = trade_date.isoformat()
         if key in self._executed_dates:
@@ -541,12 +548,20 @@ class R01Ledger:
         # 1. 回转解锁：T+1 品种仅解锁已跨过 T+1 边界的具体买入批次
         self._rollover_settlement(trade_date)
 
-        # 2. 份额调整（开盘前；不动现金）
+        # 2. 份额调整（开盘前；不动现金；先于分红段）
         for ev in self.package.events_on(trade_date):
             if ev.event_type == "share_adjustment":
                 applied = self._apply_share_adjustment(ev)
                 if applied is not None:
                     summary.corporate_actions_applied.append(applied)
+        # 3. 分红三段式（F2 / v3）：ex 开盘前入应收（不可交易），pay 开盘前
+        #    应收转可用现金；同日先应收后到账；blocked 事件显式阻塞
+        for staged in self._stage_dividend_receivable(trade_date):
+            summary.dividends_credited.append(staged)
+        for staged in self._stage_dividend_pay(trade_date):
+            summary.dividends_credited.append(staged)
+        for blocked in self._register_blocked_dividends():
+            summary.dividends_credited.append(blocked)
 
         # 3. 目标权重 → 订单（W2E3 修复#1：目标金额基于信号日收盘 NAV 与
         #    信号日收盘价；执行日只用开盘价成交，无前视）
@@ -770,7 +785,7 @@ class R01Ledger:
             close = bar.close if (bar and bar.close > 0) else pos.last_mark
             closes[sym] = close
             market_value += pos.qty * close
-        return self.cash + market_value, closes
+        return self.cash + self.dividend_receivable + market_value, closes
 
     def _signal_close_for(self, symbol: str, signal_date: date | None) -> float | None:
         """标的在信号日（或其前最近可得日）的收盘价；不可得返回 None。"""
@@ -854,6 +869,8 @@ class R01Ledger:
         """份额调整：开盘前、撮合前；qty×=multiplier、成本基准同比例调整、
         不动现金。幂等键 (ledger_run_id, symbol, event_date, event_type)。
         """
+        if ev.event_type != "share_adjustment":
+            return None  # 非份额调整事件不入此路径（防误用）
         key = (self.ledger_run_id, ev.symbol, ev.event_date.isoformat(), ev.event_type)
         if key in self.applied_action_keys:
             return None
@@ -881,29 +898,111 @@ class R01Ledger:
         self.corporate_action_log.append(record)
         return record
 
-    def _apply_cash_dividend(self, ev: TypedEvent, trade_date: date) -> dict[str, Any] | None:
-        """现金分红：EOD、nav 计算前；cash += qty × cash_per_share。"""
-        key = (self.ledger_run_id, ev.symbol, ev.event_date.isoformat(), ev.event_type)
-        if key in self.applied_action_keys:
-            return None
-        self.applied_action_keys.add(key)
-        pos = self.positions.get(ev.symbol)
-        qty = pos.qty if pos else 0.0
-        amount = round(qty * ev.cash_per_share, 4)
-        if amount:
-            self.cash += amount
-        record = {
-            "idempotency_key": list(key),
-            "event_type": ev.event_type,
-            "symbol": ev.symbol,
-            "event_date": ev.event_date.isoformat(),
-            "cash_per_share": ev.cash_per_share,
-            "qty": round(qty, 4),
-            "cash_delta": amount,
-            "applied": qty > 0,
-        }
-        self.dividend_log.append(record)
-        return record
+    # ------------------------------------------------------------------
+    # 分红三段式（F2 / ledger-contract v3 §5-§6）
+    # 幂等键 (ledger_run_id, symbol, event_id, entitlement_date=record_date)，
+    # 三段共用同键；旧"ex_date EOD 按交易后持仓发放"路径已删除（AC-01 判定
+    # 为错误语义：误发无权盘、漏发已卖盘、提前释放现金）。
+    # ------------------------------------------------------------------
+
+    def _entitlement_key(self, ev: TypedEvent) -> tuple[str, str, str, str]:
+        return (
+            self.ledger_run_id,
+            ev.symbol,
+            ev.event_id,
+            ev.record_date.isoformat() if ev.record_date else "",
+        )
+
+    def _stage_dividend_entitlement(self, trade_date: date) -> None:
+        """record_date EOD：按收盘在册持仓定格权益（登记日当日买入享有、
+        登记日后卖出不消灭）。不产生现金流；qty 为当日交易后持仓。
+
+        口径统一（v3 §6）：record→ex 之间发生份额调整时，包内
+        cash_per_share 为调整后份额口径，定额按 record 日旧口径持仓换算：
+        amount = record_qty × cps × Π(multiplier)（等价 record_qty×cps_old）。
+        """
+        for ev in self.package.dividend_events():
+            if ev.blocked or ev.record_date != trade_date:
+                continue
+            key = self._entitlement_key(ev)
+            if key in self.dividend_entitlements:
+                continue  # 幂等：重放不重复定格
+            pos = self.positions.get(ev.symbol)
+            qty = pos.qty if pos else 0.0
+            basis_multiplier = 1.0
+            for adj in self.package.events_for(ev.symbol):
+                if (
+                    adj.event_type == "share_adjustment"
+                    and ev.record_date < adj.event_date <= ev.event_date
+                ):
+                    basis_multiplier *= adj.qty_multiplier
+            amount = qty * ev.cash_per_share * basis_multiplier
+            self.dividend_entitlements[key] = {
+                "symbol": ev.symbol,
+                "event_id": ev.event_id,
+                "record_date": ev.record_date.isoformat(),
+                "ex_date": ev.event_date.isoformat(),
+                "pay_date": ev.pay_date.isoformat() if ev.pay_date else None,
+                "cash_per_share": ev.cash_per_share,
+                "basis_multiplier": round(basis_multiplier, 9),
+                "entitlement_qty": round(qty, 4),
+                "entitlement_amount": round(amount, 4),
+                "stage": "entitled",
+                "entitled_on": trade_date.isoformat(),
+            }
+
+    def _stage_dividend_receivable(self, trade_date: date) -> list[dict[str, Any]]:
+        """ex_date 开盘前：entitlement → dividend_receivable（计入 nav、
+        不可用于交易）。价格序列自当日起已除息。"""
+        staged: list[dict[str, Any]] = []
+        for rec in self.dividend_entitlements.values():
+            if rec["stage"] != "entitled" or rec["ex_date"] != trade_date.isoformat():
+                continue
+            self.dividend_receivable += rec["entitlement_amount"]
+            rec["stage"] = "receivable"
+            rec["receivable_on"] = trade_date.isoformat()
+            staged.append({**rec, "action": "receivable"})
+        return staged
+
+    def _stage_dividend_pay(self, trade_date: date) -> list[dict[str, Any]]:
+        """pay_date 开盘前：应收转可用现金（当日可交易）。"""
+        staged: list[dict[str, Any]] = []
+        for rec in self.dividend_entitlements.values():
+            if (
+                rec["stage"] != "receivable"
+                or rec["pay_date"] is None
+                or rec["pay_date"] != trade_date.isoformat()
+            ):
+                continue
+            self.dividend_receivable -= rec["entitlement_amount"]
+            self.cash += rec["entitlement_amount"]
+            rec["stage"] = "paid"
+            rec["paid_on"] = trade_date.isoformat()
+            staged.append({**rec, "action": "paid"})
+        return staged
+
+    def _register_blocked_dividends(self) -> list[dict[str, Any]]:
+        """日期缺失（unknown_blocked）分红：三段全阻塞、显式入缺口、
+        暂停该标的后续买入（corporate_action_gap 拒单）。幂等登记。"""
+        out: list[dict[str, Any]] = []
+        for ev in self.package.blocked_dividend_events():
+            key = f"blocked:{ev.symbol}:{ev.event_id}"
+            if any(b["key"] == key for b in self.blocked_dividend_log):
+                continue
+            record = {
+                "key": key,
+                "symbol": ev.symbol,
+                "event_id": ev.event_id,
+                "ex_date": ev.event_date.isoformat(),
+                "record_date_status": ev.record_date_status,
+                "pay_date_status": ev.pay_date_status,
+                "action": "blocked",
+                "note": "分红日期缺失：权益/到账各段显式阻塞（不默认 ex_date），停买该标的",
+            }
+            self.blocked_dividend_log.append(record)
+            self.buy_suspended_symbols.add(ev.symbol)
+            out.append(record)
+        return out
 
     # ------------------------------------------------------------------
     # EOD
@@ -931,7 +1030,7 @@ class R01Ledger:
             # F1 AC-02：缺行情沿用最近有效市价，不再回退成本价
             close = bar.close if (bar and bar.close > 0) else pos.last_mark
             market_value += pos.qty * close
-        return self.cash + market_value
+        return self.cash + self.dividend_receivable + market_value
 
     def _eod(self, trade_date: date, bars: dict, summary: DaySummary) -> None:
         # 部分成交剩余量收口：当日收盘后转 expired_unfilled，不隔日挂单
@@ -941,12 +1040,9 @@ class R01Ledger:
             ):
                 order.status = ORDER_STATUS_EXPIRED_UNFILLED
 
-        # 现金分红（先于 nav）
-        for ev in self.package.events_on(trade_date):
-            if ev.event_type == "cash_dividend":
-                credited = self._apply_cash_dividend(ev, trade_date)
-                if credited is not None:
-                    summary.dividends_credited.append(credited)
+        # record_date EOD：收盘在册持仓定格分红权益（F2 三段式第一段；
+        # 旧 ex_date EOD 发放路径已删除）
+        self._stage_dividend_entitlement(trade_date)
 
         # 收盘估值（F1 修复 AC-02 冻结政策）：有行情 → mark=收盘、陈旧清零；
         # 缺行情 → 沿用最近有效市价（carry-forward）、陈旧 +1；连续缺日超
@@ -976,7 +1072,9 @@ class R01Ledger:
                 "mark_source": mark_source,
                 "market_value": round(pos.qty * close, 4),
             }
-        nav = self.cash + market_value
+        # v3 §8：nav = cash + dividend_receivable + Σ qty×close（应收计入
+        # nav 并参与两条风险线；pay 日转现金后不重复计入）
+        nav = self.cash + self.dividend_receivable + market_value
         for order in self.orders.values():
             if order.trade_date == trade_date.isoformat():
                 fees_today += order.fees
@@ -998,6 +1096,7 @@ class R01Ledger:
         snapshot = {
             "trade_date": trade_date.isoformat(),
             "cash": round(self.cash, 4),
+            "dividend_receivable": round(self.dividend_receivable, 4),
             "market_value": round(market_value, 4),
             "nav": round(nav, 4),
             "valuation_reliable": valuation_reliable,
@@ -1134,7 +1233,12 @@ class R01Ledger:
             "orders": [o.to_dict() for o in self.orders.values()],
             "equity": list(self.equity),
             "corporate_actions": list(self.corporate_action_log),
-            "dividends": list(self.dividend_log),
+            "dividends": [
+                {**{"idempotency_key": list(k)}, **rec}
+                for k, rec in self.dividend_entitlements.items()
+            ],
+            "blocked_dividends": list(self.blocked_dividend_log),
+            "dividend_receivable": round(self.dividend_receivable, 4),
             "manual_actions": list(self.manual_actions),
             "deposit_rejections": list(self.deposit_rejections),
             "risk_blocked_orders": list(self.risk_blocked_orders),
@@ -1150,7 +1254,7 @@ class R01Ledger:
         """完整账本状态快照（纯状态、确定性；与 export_evidence 的区别：
         面向恢复重放，含全部可变状态，账务字段不做展示层取整）。"""
         return {
-            "schema_version": 3,
+            "schema_version": 4,
             "ledger_run_id": self.ledger_run_id,
             "package_id": self.package.package_id,
             "config": self.config.to_dict(),
@@ -1165,7 +1269,11 @@ class R01Ledger:
             "orders": {coid: o.to_dict() for coid, o in self.orders.items()},
             "equity": list(self.equity),
             "corporate_action_log": list(self.corporate_action_log),
-            "dividend_log": list(self.dividend_log),
+            "dividend_log": [  # 兼容字段：三段式 entitlement 记录快照
+                {**{"idempotency_key": list(k)}, **rec}
+                for k, rec in self.dividend_entitlements.items()
+            ],
+            "dividend_receivable": self.dividend_receivable,
             "manual_actions": list(self.manual_actions),
             "deposit_rejections": list(self.deposit_rejections),
             "risk_blocked_orders": list(self.risk_blocked_orders),
@@ -1247,7 +1355,13 @@ class R01Ledger:
         }
         ledger.equity = list(checkpoint.get("equity", []))
         ledger.corporate_action_log = list(checkpoint.get("corporate_action_log", []))
-        ledger.dividend_log = list(checkpoint.get("dividend_log", []))
+        ledger.dividend_entitlements = {
+            tuple(rec["idempotency_key"]): {
+                k: v for k, v in rec.items() if k != "idempotency_key"
+            }
+            for rec in checkpoint.get("dividend_log", [])
+        }
+        ledger.dividend_receivable = float(checkpoint.get("dividend_receivable", 0.0))
         ledger.manual_actions = list(checkpoint.get("manual_actions", []))
         ledger.deposit_rejections = list(checkpoint.get("deposit_rejections", []))
         ledger.risk_blocked_orders = list(checkpoint.get("risk_blocked_orders", []))
@@ -1264,39 +1378,68 @@ def independent_recompute(
     evidence: dict[str, Any],
     package: EtfInputPackage | None = None,
 ) -> list[dict[str, Any]]:
-    """从导出证据的原始明细（成交/公司行动/分红）独立重建 nav 序列。
+    """从导出证据的原始明细（成交/公司行动）独立重建 nav 序列。
 
-    刻意不复用 R01Ledger 的任何记账路径：只读 fills + corporate actions
-    + dividends + 收盘价（package 提供时直接从输入包取，不经引擎中间
-    结果），逐日重放现金与持仓。返回逐日 (date, cash, nav)，供与
-    evidence.equity 对账（ledger-contract §9）。
+    F2（ledger-contract v3 / AC-01）：分红权益资格**独立重算**——按
+    record_date 收盘在册持仓定格、ex 入应收、pay 转现金，全部从输入包
+    typed 事件与自身持仓重放推导，**不读引擎 dividend_entitlements/
+    dividend_receivable/分红日志**（package 缺省时不做分红核算，仅限
+    无分红的遗留证据）。份额调整仍从证据 corporate_actions 重放。
+    返回逐日 (date, cash, receivable, nav)，供与 evidence.equity 对账。
     """
     session = evidence["session"]
     cash = float(session["initial_cash"])
     positions: dict[str, float] = {}
-    # 移动加权成本（含费用）：与引擎口径一致（已实现盈亏对账用）
     costs: dict[str, float] = {}
-    # 独立 carry-forward 市价观察（AC-02：独立实现缺行情估值政策，
-    # 不读引擎 last_mark）：逐日从包观察累积最近有效收盘
+    dividend_receivable = 0.0
+    # 独立权益表：键 (symbol, event_id, record_date) —— 与引擎幂等键同构
+    # 但完全由本函数从包事件+自身持仓推导
+    entitlements: dict[tuple[str, str, str], dict[str, Any]] = {}
     last_close_seen: dict[str, float] = {}
     fills_by_date: dict[str, list[dict]] = {}
     for order in evidence["orders"]:
         for fill in order.get("fills", []):
             fills_by_date.setdefault(fill["trade_date"], []).append(fill)
     actions_by_date: dict[str, list[dict]] = {}
-    for rec in evidence.get("corporate_actions", []) + evidence.get("dividends", []):
+    for rec in evidence.get("corporate_actions", []):
         actions_by_date.setdefault(rec["event_date"], []).append(rec)
+
+    # 分红事件按三日期独立索引（只用包，不用引擎日志）
+    div_by_record: dict[str, list] = {}
+    div_by_ex: dict[str, list] = {}
+    div_by_pay: dict[str, list] = {}
+    if package is not None:
+        for ev in package.dividend_events():
+            if ev.blocked:
+                continue
+            div_by_record.setdefault(ev.record_date.isoformat(), []).append(ev)
+            div_by_ex.setdefault(ev.event_date.isoformat(), []).append(ev)
+            div_by_pay.setdefault(ev.pay_date.isoformat(), []).append(ev)
 
     out: list[dict[str, Any]] = []
     for snap in evidence["equity"]:
         d = snap["trade_date"]
         day = date.fromisoformat(d)
-        # 开盘前：份额调整（同日先份额后现金）
+        # 开盘前：份额调整（先于分红段）
         for rec in actions_by_date.get(d, []):
             sym = rec["symbol"]
             if rec["event_type"] == "share_adjustment" and sym in positions:
                 mult = rec["qty_multiplier"]
                 positions[sym] *= mult
+        # 开盘前：分红段（独立重算）——ex 入应收、pay 转现金
+        for ev in div_by_ex.get(d, []):
+            key = (ev.symbol, ev.event_id, ev.record_date.isoformat())
+            rec = entitlements.get(key)
+            if rec is not None and rec["stage"] == "entitled":
+                dividend_receivable += rec["amount"]
+                rec["stage"] = "receivable"
+        for ev in div_by_pay.get(d, []):
+            key = (ev.symbol, ev.event_id, ev.record_date.isoformat())
+            rec = entitlements.get(key)
+            if rec is not None and rec["stage"] == "receivable":
+                dividend_receivable -= rec["amount"]
+                cash += rec["amount"]
+                rec["stage"] = "paid"
         # 成交重放
         for fill in fills_by_date.get(d, []):
             sym, side, qty, price = (
@@ -1322,15 +1465,27 @@ def independent_recompute(
                 if positions[sym] <= 1e-9:
                     positions.pop(sym, None)
                     costs.pop(sym, None)
-        # EOD：现金分红（先于 nav）
-        for rec in actions_by_date.get(d, []):
-            sym = rec["symbol"]
-            if rec["event_type"] == "cash_dividend" and sym in positions:
-                cash += positions[sym] * rec["cash_per_share"]
-        # nav：cash + Σ qty×close。F1 修复 AC-02：缺行情日估值政策由本函数
-        # 独立实现（不复制引擎回退路径）——自维护每个标的的最近有效收盘
-        # （仅从输入包逐日观察累积），缺行情日沿用该市价；无包模式沿用
-        # 快照记录的 close。禁止用成本价替代市价。
+        # EOD：record 收盘在册持仓定格权益（独立资格重算：当日交易后持仓；
+        # record→ex 份额调整同口径换算 amount = qty × cps × Πm）
+        for ev in div_by_record.get(d, []):
+            key = (ev.symbol, ev.event_id, ev.record_date.isoformat())
+            if key in entitlements:
+                continue
+            qty = positions.get(ev.symbol, 0.0)
+            basis_m = 1.0
+            if package is not None:
+                for adj in package.events_for(ev.symbol):
+                    if (
+                        adj.event_type == "share_adjustment"
+                        and ev.record_date < adj.event_date <= ev.event_date
+                    ):
+                        basis_m *= adj.qty_multiplier
+            entitlements[key] = {
+                "amount": round(qty * ev.cash_per_share * basis_m, 4),
+                "qty": qty,
+                "stage": "entitled",
+            }
+        # nav：cash + receivable + Σ qty×close（独立 carry-forward 市价观察）
         market_value = 0.0
         for sym, qty in positions.items():
             close = 0.0
@@ -1350,7 +1505,8 @@ def independent_recompute(
             {
                 "trade_date": d,
                 "cash": round(cash, 4),
-                "nav": round(cash + market_value, 4),
+                "dividend_receivable": round(dividend_receivable, 4),
+                "nav": round(cash + dividend_receivable + market_value, 4),
             }
         )
     return out
