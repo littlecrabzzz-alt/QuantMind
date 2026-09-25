@@ -284,9 +284,16 @@ def main():
     assert b1_metrics[0]["value"] is None and b1_metrics[0]["null_reason"] == "not-computed"
     fixture_artifacts = [a for c in ov1["cases"] for a in c["artifacts"] if a["fixture"]]
     assert any("fixture-equity" in a["name"] for a in fixture_artifacts)
+    # 本轮 B1 课题镜像：三条 identity 反例带标记+原因保留，正例保持正式
+    _, b1_detail = call("GET", GW + f"/cases/{b1_id}", None, token, expect=200,
+                        label="B1 case detail (identity repros flagged)")
+    b1_metrics_now = b1_detail["external"]["metrics"]
+    flagged = [m for m in b1_metrics_now if m.get("not_ready_reason")]
+    assert any("identity_mismatch" in m["not_ready_reason"] for m in flagged), flagged
+    assert len(flagged) >= 3
+    assert any(not m["not_ready"] for m in b1_metrics_now)
     b1_metrics_all = ov1["groups"]["B1"]["metrics"]
-    assert any(m["not_ready"] and "identity_mismatch" in (m.get("not_ready_reason") or "")
-               for m in b1_metrics_all), "identity 反例应带未准入标记保留"
+    assert any(m["not_ready"] for m in b1_metrics_all)
     formal = [m for m in b1_metrics_all if not m["not_ready"]]
     assert formal and all(m["source_run_id"] for m in formal)
     # 验收后代码漂移：overview 显示正式准入关闭与显式原因（AC-06）
