@@ -140,6 +140,23 @@ def make_ledger_run_id(group: str, strategy_id: str, version: int, attempt: int)
     return f"r01-{group}-{strategy_id}-v{version}-a{attempt:04d}"
 
 
+def make_virtual_run_id(group: str, strategy_id: str, version: int) -> str:
+    """虚拟运行 ledger_run_id = r01vr-<group>-<strategy_id>-v<version>（H2.1-L1）。
+
+    无 attempt 段：持续运行是单轨迹（不重复尝试）；策略定义/参数变更 ⇒
+    新 version（新 r01vr run），旧轨迹只读保留、净值不拼接。
+    """
+    return f"r01vr-{group}-{strategy_id}-v{version}"
+
+
+def make_revision_run_id(base_virtual_run_id: str, revision_date: date) -> str:
+    """修订轨迹 run id：`r01vr-…:rev<YYYYMMDD>`（H2.1-L5）。
+
+    补算/修订与原始向前决策分离——独立 run/检查点/证据，不回填原始轨迹。
+    """
+    return f"{base_virtual_run_id}:rev{revision_date.strftime('%Y%m%d')}"
+
+
 def parse_attempt(attempt_id: str) -> int:
     """"a0001" → 1。"""
     return int(str(attempt_id).lstrip("a"))
@@ -322,13 +339,25 @@ class LedgerPosition:
 
 @dataclass
 class R01LedgerConfig:
-    """一次账本运行的冻结定义（创建后锁定）。"""
+    """一次账本运行的冻结定义（创建后锁定）。
+
+    run_kind（H2.1-L1）：
+    - "research"：研究账本，r01-…-a<attempt>（复算/重试分层）；
+    - "virtual"：虚拟运行账本，r01vr-<group>-<strategy_id>-v<version>
+      （无 attempt 段，单轨迹；同一 R01Ledger 引擎与已验收执行/账务规则）。
+    修订（L5）：revision_of/revision_date 非空时，run id 在虚拟 id 后追加
+    ":rev<date>"——修订轨迹独立落检查点/证据，原始轨迹不回填。
+    """
 
     group: str
     strategy_id: str
     strategy_version: int
     execution_attempt_id: int  # 单调递增 a0001 起；不靠新窗口重置
     initial_cash: float
+    run_kind: str = "research"  # research | virtual
+    # L5 修订轨迹（仅 virtual 基轨迹可修订；research 复算本就走新 attempt）
+    revision_of: str | None = None
+    revision_date: date | None = None
     # 风险线（默认 initial_cash×30% 与回撤 30%）
     loss_line_amount: float | None = None
     drawdown_pct: float = 0.30
@@ -350,9 +379,28 @@ class R01LedgerConfig:
             raise ValueError("P0 工程样例 strategy_id 必须以 fixture- 前缀（不进收益排行）")
         if self.execution_attempt_id < 1:
             raise ValueError("execution_attempt_id 从 1 起（a0001）")
+        if self.run_kind not in ("research", "virtual"):
+            raise ValueError(f"非法 run_kind {self.run_kind}（research|virtual）")
+        if self.run_kind == "virtual" and self.group == "P0":
+            raise ValueError("虚拟运行不使用 P0 工程样例组（须为正式研究组 A/B1/B2/B3/D/N）")
+        if (self.revision_of is None) != (self.revision_date is None):
+            raise ValueError("revision_of 与 revision_date 必须成对提供")
+        if self.revision_of is not None and self.run_kind != "virtual":
+            raise ValueError("修订轨迹仅适用于 virtual 运行（research 复算走新 attempt）")
+        if self.revision_of is not None and self.revision_of != make_virtual_run_id(
+            self.group, self.strategy_id, self.strategy_version
+        ):
+            raise ValueError("revision_of 必须指向同 group/strategy/version 的基轨迹")
 
     @property
     def ledger_run_id(self) -> str:
+        if self.run_kind == "virtual":
+            base = make_virtual_run_id(
+                self.group, self.strategy_id, self.strategy_version
+            )
+            if self.revision_date is not None:
+                return make_revision_run_id(base, self.revision_date)
+            return base
         return make_ledger_run_id(
             self.group, self.strategy_id, self.strategy_version, self.execution_attempt_id
         )
@@ -362,6 +410,11 @@ class R01LedgerConfig:
             "group": self.group,
             "strategy_id": self.strategy_id,
             "strategy_version": self.strategy_version,
+            "run_kind": self.run_kind,
+            "revision_of": self.revision_of,
+            "revision_date": (
+                self.revision_date.isoformat() if self.revision_date else None
+            ),
             "execution_attempt_id": f"a{self.execution_attempt_id:04d}",
             "ledger_run_id": self.ledger_run_id,
             "initial_cash": self.initial_cash,

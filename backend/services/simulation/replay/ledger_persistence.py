@@ -64,3 +64,53 @@ async def load_checkpoint(
             f"与传入包 package_id={package.package_id!r} 不一致，拒绝恢复"
         )
     return R01Ledger.restore(package, config, row.state)
+
+
+# ---------------------------------------------------------------------------
+# H2.1-L1/L3/L4：虚拟运行（r01vr-）runner 消费接口（实现归 runner owner）
+# ---------------------------------------------------------------------------
+
+
+def virtual_ledger_config_from_row(row) -> R01LedgerConfig:
+    """r01_virtual_run_config ORM 行 → 冻结 R01LedgerConfig（runner 入口）。
+
+    run_kind="virtual"（无 attempt 段，单轨迹）；风险参数/撮合假设来自
+    配置行 risk_config（缺省走引擎默认：损失线 initial×30%、回撤 30%、
+    佣金/滑点默认）；同租户用户权限沿用（配置行不含用户隔离字段，
+    页面/查询按既有 tenant/user 认证过滤——见账户关系审计说明）。
+    """
+    risk = dict(row.risk_config or {})
+    return R01LedgerConfig(
+        group=row.group,
+        strategy_id=row.strategy_id,
+        strategy_version=row.strategy_version,
+        execution_attempt_id=1,  # virtual 无 attempt 语义，恒 1
+        initial_cash=float(row.initial_cash),
+        run_kind="virtual",
+        loss_line_amount=risk.get("loss_line_amount"),
+        drawdown_pct=float(risk.get("drawdown_pct", 0.30)),
+        commission_rate=float(risk.get("commission_rate", 0.0003)),
+        commission_min=float(risk.get("commission_min", 0.0)),
+        slippage_bps=float(risk.get("slippage_bps", 0.0)),
+        price_mode=str(risk.get("price_mode", "open")),
+        volume_participation=float(risk.get("volume_participation", 1.0)),
+        stale_mark_limit=int(risk.get("stale_mark_limit", 5)),
+    )
+
+
+async def load_or_create(
+    db: AsyncSession,
+    package: EtfInputPackage,
+    config: R01LedgerConfig,
+) -> tuple[R01Ledger, bool]:
+    """按 ledger_run_id 取检查点恢复账本；无检查点则新建（H2.1-L4）。
+
+    返回 (ledger, created)。r01vr- 前缀与研究 r01- 前缀在同一
+    replay_ledger_checkpoints 表中天然不冲突；跨日跨月延续=每次运行日
+    从最后检查点 restore 续跑（现金/持仓/应收/累计费用/HWM/风险态/
+    检查点全部随 checkpoint 延续，不每日清零）。
+    """
+    ledger = await load_checkpoint(db, package, config)
+    if ledger is not None:
+        return ledger, False
+    return R01Ledger(package, config), True

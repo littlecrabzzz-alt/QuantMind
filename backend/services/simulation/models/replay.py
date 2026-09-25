@@ -314,6 +314,65 @@ class ReplayLedgerCheckpoint(Base, TimestampMixin):
     state: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
+class R01VirtualRunConfig(Base, TimestampMixin):
+    """H2.1-L3：虚拟运行启用配置载体。
+
+    enabled 候选来自研究冻结方案；未配置/未启用 ⇒ 平台显示"待启用"，
+    不自动运行全部六组（runner 消费接口见 ledger_persistence /
+    artifacts/p03/h2/README.md；实现归 runner owner）。
+    """
+
+    __tablename__ = "r01_virtual_run_config"
+
+    ledger_run_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    strategy_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    strategy_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    group: Mapped[str] = mapped_column(String(8), nullable=False)
+    # 默认 3 万情景；20000 粒度检查保留为校验项（DG-001）
+    initial_cash: Mapped[float] = mapped_column(Float, nullable=False, default=30000.0)
+    granularity_check_cash: Mapped[float] = mapped_column(
+        Float, nullable=False, default=20000.0
+    )
+    # 风险线参数（None=loss 默认 30%；drawdown 30%）等冻结定义
+    risk_config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    # 数据源身份（v2 冻结包 + 日增量包 d…）
+    data_source: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    # 约定执行窗口（如 open；含 missed_window_policy）
+    execution_window: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    # 调度键（quantmind:r01:vr:schedule:{ledger_run_id}；无配置=待启用）
+    schedule_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # 研究冻结方案出处（哪份方案启用了该候选）
+    source_plan_ref: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+
+class R01VirtualRunState(Base, TimestampMixin):
+    """H2.2-R3 恢复点载体（p03 出表结构；runner 写入/消费）。
+
+    每阶段完成即落一行（stage ∈ data_check/freeze_input/signal/
+    risk_check/execute/settle/report）；幂等键 (ledger_run_id,
+    decision_date, stage)。账本状态本身复用 ReplayLedgerCheckpoint。
+    """
+
+    __tablename__ = "r01_virtual_run_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ledger_run_id: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    decision_date: Mapped[date] = mapped_column(Date, nullable=False)
+    stage: Mapped[str] = mapped_column(String(24), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="done")
+    # done / blocked / failed / unknown（unknown 须核对后续跑，不盲目重放）
+    detail: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "ledger_run_id", "decision_date", "stage",
+            name="uq_r01vr_state_run_date_stage",
+        ),
+        Index("idx_r01vr_state_run_date", "ledger_run_id", "decision_date"),
+    )
+
+
 class ReplaySignal(Base, TimestampMixin):
     """回放专用信号表 —— 与 engine_signal_scores 完全隔离。
 

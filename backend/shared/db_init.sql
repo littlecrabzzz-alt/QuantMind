@@ -1645,6 +1645,42 @@ CREATE TABLE IF NOT EXISTS replay_ledger_checkpoints (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- H2.1-L3：虚拟运行启用配置（r01vr-；未配置/未启用=待启用，不自动跑六组）
+CREATE TABLE IF NOT EXISTS r01_virtual_run_config (
+    ledger_run_id           VARCHAR(160) PRIMARY KEY,
+    enabled                 BOOLEAN NOT NULL DEFAULT FALSE,
+    strategy_id             VARCHAR(128) NOT NULL,
+    strategy_version        INTEGER NOT NULL,
+    "group"                 VARCHAR(8) NOT NULL,
+    initial_cash            FLOAT NOT NULL DEFAULT 30000,
+    granularity_check_cash  FLOAT NOT NULL DEFAULT 20000,
+    risk_config             JSONB NOT NULL DEFAULT '{}'::jsonb,
+    data_source             JSONB NOT NULL DEFAULT '{}'::jsonb,
+    execution_window        JSONB NOT NULL DEFAULT '{}'::jsonb,
+    schedule_key            VARCHAR(200),
+    source_plan_ref         VARCHAR(300),
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_r01vr_config_enabled
+    ON r01_virtual_run_config (enabled, "group");
+
+-- H2.2-R3 恢复点载体（runner 每阶段完成落行；幂等键 run+date+stage）
+CREATE TABLE IF NOT EXISTS r01_virtual_run_state (
+    id              SERIAL PRIMARY KEY,
+    ledger_run_id   VARCHAR(160) NOT NULL,
+    decision_date   DATE NOT NULL,
+    stage           VARCHAR(24) NOT NULL,
+    status          VARCHAR(16) NOT NULL DEFAULT 'done',
+    detail          JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_r01vr_state_run_date_stage
+        UNIQUE (ledger_run_id, decision_date, stage)
+);
+CREATE INDEX IF NOT EXISTS idx_r01vr_state_run_date
+    ON r01_virtual_run_state (ledger_run_id, decision_date);
+
 -- ========================
 -- 59. USER APP 扩展表（认证/RBAC/订阅/通知/KYC）
 -- NOTE: 列定义与 backend/services/api/user_app/models/ 下的模型一致
