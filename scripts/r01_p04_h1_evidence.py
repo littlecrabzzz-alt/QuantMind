@@ -161,7 +161,8 @@ def main():
          "source_revision": e["payload"]["source_revision"],
          "data": e["payload"]["data"], "apply_status": e["apply_status"]}
         for e in stream["events"]]
-    assert stream["count"] == 7
+    this_case_events = [e for e in stream["events"] if e["payload"]["case_id"] == cid]
+    assert len(this_case_events) == 7, len(this_case_events)  # 2 输入绑定+4 run-a+1 run-b
     # 刷新一致性（页面数据源同 API）
     _, detail2 = call("GET", GW + f"/cases/{cid}", None, token)
     assert detail2["external"] == ext
