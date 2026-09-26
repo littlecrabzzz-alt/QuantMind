@@ -166,4 +166,3 @@ def test_overnight_accounting_wait_is_retryable_before_next_open(tmp_path):
     assert h.pipeline().run_day(second).outcome=='pending_execute'
     assert h.execute(second,'15:45').outcome=='completed'
     assert len(h.ledger_state()['equity'])==2
-

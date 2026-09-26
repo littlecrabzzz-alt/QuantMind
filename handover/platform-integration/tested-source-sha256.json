@@ -17,7 +17,7 @@
   "backend/services/simulation/virtual_run/pipeline.py": "81d92b15ca4d62515a397078a754362ebf55e088af9eed7463bf347f9bb329b9",
   "backend/services/simulation/virtual_run/states.py": "1caafaeefe08cbe949b4cb3c81e465f63975477ce97dac58561344a5d550922c",
   "backend/services/tests/test_r01_platform_comparison.py": "bb32fac2b7d1a5b90600b7147eead5de978cbb2d8b2d71e864a362104d70d6e9",
-  "backend/services/tests/test_r01_platform_execution.py": "8275c769c0b2ad7c22c1129c4273fc39887e163370307824a6900012b4b6569c",
+  "backend/services/tests/test_r01_platform_execution.py": "467321ad1ade162dbcfbdeef76c96f217c0eaa2b433b2cd34e8baf00243d62e3",
   "backend/shared/database_manager_v2.py": "117c84110ff93ad0a4d7a78192a8e3954321a0b888cfc70e297358659810e6da",
   "backend/shared/strategy_storage.py": "b40347b6bdd67b6181dace01ad172e3db9a715067b46d934d09724aef83bfcaf",
   "electron/src/components/backtest/BacktestComparison.tsx": "4fba87d31f9040b39037da47a016aba29e1e55413615dca44ea46cc87040f5d9",
