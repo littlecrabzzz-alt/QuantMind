@@ -35,6 +35,13 @@ class CollectionScopeTest(unittest.TestCase):
             for api in cfg[family + "_apis"]:
                 self.assertEqual(contract_for(api)["group"], family)
         self.assertFalse(cfg["enable_documents"])
+        with tempfile.TemporaryDirectory() as d:
+            pipe = Pipeline(Path(d), {"entries": []})
+            try:
+                self.assertIsNone(pipe.next_job(cfg, time.monotonic() + 0.01))
+            finally:
+                pipe.close()
+
 
 
 if __name__ == "__main__":

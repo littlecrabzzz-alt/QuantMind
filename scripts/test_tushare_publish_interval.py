@@ -531,6 +531,19 @@ class PublicationInterval(unittest.TestCase):
             self.assertEqual(self.acquisitions, 3)
         self.assertEqual((self.root / "RESEARCH_CURRENT.json").read_bytes(), old)
 
+    def test_research_scope_change_republishes_without_waiting_for_old_interval(self):
+        self.config["publish_interval_seconds"] = 3600
+        self.tick()
+        self.config["research_publish_interval_seconds"] = 900
+        with patch.object(module, "RESEARCH_APIS", module.RESEARCH_APIS[:2]):
+            previous = self.tick()
+        current = self.tick(1)
+        self.assertTrue(current["research_publication"]["performed"])
+        self.assertEqual(current["research_publication"]["status"], "published")
+        pointer = json.loads((self.root / "RESEARCH_CURRENT.json").read_bytes())
+        self.assertEqual(pointer["selected_api_names"], sorted(module.RESEARCH_APIS))
+        self.assertNotEqual(pointer["release_id"], previous["research_publication"]["current_release_id"])
+
     def test_research_failure_is_partial_preserves_pointer_and_acquires(self):
         self.config["publish_interval_seconds"] = 3600
         self.tick()
