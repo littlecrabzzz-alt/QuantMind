@@ -393,6 +393,9 @@ class R01LedgerConfig:
     # F1 修复 AC-02：缺行情 carry-forward 可靠性阈值——连续缺行情超过该
     # 天数时当日快照标 valuation_reliable=False（不可信，不静默当有效净值）
     stale_mark_limit: int = 5
+    # M6E1（项1）：输入日期上界冻结进 config（防未授权放大：续段更大
+    # 上界=显式新 config/checkpoint；None=整包现状）
+    read_through_bound: date | None = None
     # M2E1（R01SELF 狭义零股申报缺口）：上交所交易规则 2026 修订 §3.3.8
     # "卖出证券时，余额不足100股（份）的部分，应当一次性申报卖出"——
     # 生效日 2026-07-06（上证发〔2026〕41 号）；仅 trade_date ≥ 该日启用
@@ -463,6 +466,9 @@ class R01LedgerConfig:
             "volume_participation": self.volume_participation,
             "stale_mark_limit": self.stale_mark_limit,
             "sublot_rule_effective": self.sublot_rule_effective.isoformat(),
+            "read_through_bound": (
+                self.read_through_bound.isoformat() if self.read_through_bound else None
+            ),
         }
 
 

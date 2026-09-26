@@ -227,11 +227,21 @@ def match_order(
         # 初始申报的整手性由调用方（M5E1 买初报 floor）保证；撮合层不再
         # 对申报量重复 floor——市场量约束的部分成交保持精确量
         # （M5E2 项2：申报 200、volume 137 → fill 137、余 63，不整手化）。
-        fill_qty = int(quantity)
-        if fill_qty < lot_size:
+        # M6E1（项2）：BELOW_LOT_SIZE 只对**申报量**判定（order_qty <
+        # lot_size 的非法初始申报）；量约束后的 fill 可以 < 100（合法申报
+        # 报 200 cap 37 → 成交 37 余 163；报 100 cap 1 → 成交 1 余 99），
+        # 仅保 fill > 0 下限（0 由量约束分支显式拒绝）。
+        if order_qty < lot_size:
             return MatchResult(
                 success=False,
                 reason="BELOW_LOT_SIZE",
+                qty_remaining=order_qty,
+            )
+        fill_qty = int(quantity)
+        if fill_qty <= 0:
+            return MatchResult(
+                success=False,
+                reason="INSUFFICIENT_MARKET_VOLUME",
                 qty_remaining=order_qty,
             )
         # 现金约束的部分成交：按可负担的最大整手数成交（allow_partial）。

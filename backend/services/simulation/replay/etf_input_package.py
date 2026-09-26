@@ -341,10 +341,23 @@ class EtfInputPackage:
       amount(原始:千元), adj_factor(内联)
     """
 
-    def __init__(self, root: Path, manifest: dict[str, Any], manifest_sha256: str):
+    def __init__(
+        self,
+        root: Path,
+        manifest: dict[str, Any],
+        manifest_sha256: str,
+        *,
+        read_through: date | None = None,
+    ):
         self.root = Path(root)
         self.manifest = manifest
         self.manifest_sha256 = manifest_sha256
+        # M6E1（项1）：只读日期上界——daily/factors 行在类型转换/缓存/
+        # 统计之前按 trade_date ≤ read_through 裁定（未来数据异常不影响
+        # 已授权前缀）；默认 None=现状整包。manifest/SUMS 完整性仍按
+        # 全包哈希校验；固定包身份（package_id/sha）与 daily_binding 不变。
+        # 公司行动语义见 _events_visible_through 注释（现金分红保权）。
+        self.read_through = read_through
         self.package_id = str(manifest["package_id"])
         self.package_version = str(manifest["package_version"])
         self.package_uri = str(manifest["package_uri"])
@@ -389,6 +402,9 @@ class EtfInputPackage:
         df = df.copy()
         df["trade_date"] = [_parse_trade_date(v) for v in df["trade_date"]]
         df = df.sort_values("trade_date").reset_index(drop=True)
+        # M6E1：类型转换/缓存/统计之前按上界裁定（授权前缀隔离）
+        if self.read_through is not None:
+            df = df[df["trade_date"] <= self.read_through].reset_index(drop=True)
 
         # 量额单位：p02 真实包列（已换算）优先；fixture 原始列按 manifest
         # unit_conversions 换算（vol×100→份、amount×1000→元）
@@ -414,6 +430,8 @@ class EtfInputPackage:
                 fdf = pd.read_parquet(factor_path)
                 fdf = fdf.copy()
                 fdf["trade_date"] = [_parse_trade_date(v) for v in fdf["trade_date"]]
+                if self.read_through is not None:
+                    fdf = fdf[fdf["trade_date"] <= self.read_through]
                 df = df.merge(fdf[["trade_date", "adj_factor"]], on="trade_date", how="left")
             df["adj_factor"] = (
                 pd.to_numeric(df.get("adj_factor"), errors="coerce")
@@ -551,6 +569,35 @@ class EtfInputPackage:
 
     # -- typed events ------------------------------------------------------
 
+    def _event_visible_through(self, ev: TypedEvent) -> bool:
+        """M6E1（项1）：公司行动日期语义（read_through 上界）。
+
+        - share_adjustment：仅应用到已授权生效日（event_date ≤ 上界）；
+        - **现金分红保权**：record_date ≤ 上界的事件必须保留（ex/pay 跨界
+          时维持登记/应收连续，不得按 pay_date/ex_date 过滤丢权）；record
+          在上界后的事件不加载；
+        - 完全在上界后（share 的 event_date、dividend 的 record_date 均
+          > 上界）→ 不可见。
+
+        **非 PIT 假设（显式声明）**：事件按包内日期字段直接裁定，不按
+        公告可得时点（announcement availability）过滤——不声称未来信息
+        在当时可得；PIT 语义若需引入须另发合同版本。
+        """
+        rt = self.read_through
+        if rt is None:
+            return True
+        if ev.event_type == "share_adjustment":
+            return ev.event_date <= rt
+        # cash_dividend：以 record_date（权益登记日）为授权锚点
+        anchor = ev.record_date or ev.event_date
+        return anchor <= rt
+
+    @property
+    def actual_max_input_date(self) -> date | None:
+        """M6E1：实际加载的最大输入日（供 runner 记录；None=无 daily 行）。"""
+        dates = self.trade_dates()
+        return dates[-1] if dates else None
+
     def events_for(self, symbol: str) -> list[TypedEvent]:
         """该 symbol 的全部 typed 事件，按（日期, 份额调整优先）排序。
 
@@ -567,7 +614,9 @@ class EtfInputPackage:
         if path.is_file():
             df = pd.read_parquet(path)
             for row in df.to_dict(orient="records"):
-                events.append(_parse_typed_event_row(suffix, row))
+                ev = _parse_typed_event_row(suffix, row)
+                if self._event_visible_through(ev):
+                    events.append(ev)
         events.sort(key=lambda e: (e.event_date, 0 if e.event_type == "share_adjustment" else 1))
         with self._lock:
             self._events[suffix] = events
@@ -621,11 +670,17 @@ def load_etf_input_package(
     package_root: str | Path,
     *,
     expect_manifest_sha256: str | None = None,
+    read_through: date | None = None,
 ) -> EtfInputPackage:
     """加载并校验固定输入包。
 
     expect_manifest_sha256 非空时强制比对 manifest.json 的 SHA256
-    （TG-007：执行侧只读消费固定包并校验 manifest_sha256）。
+    （TG-007：执行侧只读消费固定包并校验 manifest_sha256；完整性按
+    全包校验——read_through 只裁定可见行，不改哈希口径）。
+    read_through（M6E1）：只读日期上界——daily/factors 行在类型转换/
+    缓存/统计之前按 trade_date ≤ 上界裁定；公司行动语义见
+    _event_visible_through（现金分红 record≤上界保权）。默认 None=整包
+    （现状行为不变）。同包不同上界各自实例化（缓存按实例隔离不串）。
     """
     root = Path(package_root)
     manifest_path = root / "manifest.json"
@@ -641,7 +696,7 @@ def load_etf_input_package(
     except json.JSONDecodeError as exc:
         raise EtfInputPackageError(f"manifest.json 解析失败: {exc}") from exc
     _validate_manifest(manifest)
-    return EtfInputPackage(root, manifest, digest)
+    return EtfInputPackage(root, manifest, digest, read_through=read_through)
 
 
 # ---------------------------------------------------------------------------
