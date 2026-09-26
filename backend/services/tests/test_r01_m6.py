@@ -76,7 +76,7 @@ class TestReadThroughDaily:
     def test_run_day_beyond_bound_no_quote(self):
         """越界执行日：无行情行 → 显式 no_quote 拒单（不虚构）。"""
         v = _bounded(date(2024, 4, 26))
-        led = R01Ledger(v, _cfg())
+        led = R01Ledger(v, _cfg(read_through_bound=date(2024, 4, 26)))
         s = led.run_day(date(2024, 4, 23), {SYM: 0.7}, signal_date=date(2024, 4, 22))
         assert led.positions[SYM].qty > 0
         # 04-29 在上界后：is_trade_date False → LedgerOrderingError(not_trade_date)
@@ -110,7 +110,7 @@ class TestReadThroughEvents:
             if e.event_type == "cash_dividend" and e.event_date == date(2024, 4, 24)
         ]
         assert evs, "record≤bound 的分红事件必须可见（保权）"
-        led = R01Ledger(v, _cfg())
+        led = R01Ledger(v, _cfg(read_through_bound=date(2024, 4, 26)))
         led.run_day(date(2024, 4, 23), {SYM: 0.7}, signal_date=date(2024, 4, 22))
         qty = led.positions[SYM].qty
         led.run_day(date(2024, 4, 24), None)  # ex 日：应收入账
@@ -133,7 +133,7 @@ class TestReadThroughEvents:
             if e.event_type == "cash_dividend" and e.record_date == date(2024, 4, 23)
         ]
         assert evs, "record≤bound：事件可见"
-        led = R01Ledger(v, _cfg())
+        led = R01Ledger(v, _cfg(read_through_bound=date(2024, 4, 23)))
         led.run_day(date(2024, 4, 23), {SYM: 0.7}, signal_date=date(2024, 4, 22))
         # record EOD：权益定格（entitlement 记录存在）
         assert any(
@@ -246,3 +246,100 @@ class TestMatcherSmallFill:
         """fill=0（量约束 0）仍显式拒（保 fill>0 下限）。"""
         mr = match_order("buy", 200, _bar(0.001), self._cfg(), cash_available=1e9)
         assert not mr.success
+
+
+class TestM6E2BoundBinding:
+    @real_pkg_needed
+    def test_narrow_config_wide_view_rejected(self):
+        """项2：窄 config（None/早日期）+ 宽视图 → 拒（错误含双方值）。"""
+        v = _bounded(date(2024, 8, 30))
+        with pytest.raises(ValueError, match="read_through_bound mismatch"):
+            R01Ledger(v, _cfg())  # config 无上界 vs 视图 08-30
+        with pytest.raises(ValueError, match="2024-04-26"):
+            R01Ledger(v, _cfg(read_through_bound=date(2024, 4, 26)))
+
+    @real_pkg_needed
+    def test_consistent_bound_passes(self):
+        """一致通过：config 上界 == 视图上界。"""
+        v = _bounded(date(2024, 4, 26))
+        led = R01Ledger(v, _cfg(read_through_bound=date(2024, 4, 26)))
+        led.run_day(date(2024, 4, 23), {SYM: 0.7}, signal_date=date(2024, 4, 22))
+        assert led.positions[SYM].qty > 0
+
+    @real_pkg_needed
+    def test_wide_config_narrow_view_rejected(self):
+        """宽 config + 窄视图 → 同样拒（双向一致）。"""
+        v = _bounded(date(2024, 4, 26))
+        with pytest.raises(ValueError, match="mismatch"):
+            R01Ledger(v, _cfg(read_through_bound=date(2024, 8, 30)))
+
+    @real_pkg_needed
+    def test_checkpoint_restore_checks_binding(self):
+        """恢复路径核对：同 bound 恢复 OK；换视图 bound → 拒。"""
+        v = _bounded(date(2024, 4, 26))
+        cfg = _cfg(read_through_bound=date(2024, 4, 26))
+        led = R01Ledger(v, cfg)
+        led.run_day(date(2024, 4, 23), {SYM: 0.7}, signal_date=date(2024, 4, 22))
+        cp = led.export_checkpoint()
+        r = R01Ledger.restore(v, cfg, cp)  # 一致恢复 OK
+        assert r.ledger_run_id == led.ledger_run_id
+        v_wide = _bounded(date(2024, 8, 30))
+        with pytest.raises(ValueError, match="read_through_bound mismatch"):
+            R01Ledger.restore(v_wide, cfg, cp)  # 宽视图恢复窄 config → 拒
+
+    def test_full_package_with_none_config_still_works(self, tmp_path):
+        """整包视图（read_through=None）+ config None：现状不变。"""
+        pkg = build_fixture_package(tmp_path / "p")
+        led = R01Ledger(pkg, _cfg())
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        assert led.orders
+
+
+class TestM6E2Prefilter:
+    def test_future_garbage_rows_do_not_break_prefix(self, tmp_path):
+        """项1：上界后行含非法值（NaN 日期/坏数字）不影响授权前缀加载。"""
+        import json
+
+        import pandas as pd
+
+        root = tmp_path / "pkg"
+        (root / "daily").mkdir(parents=True)
+        (root / "events").mkdir(parents=True)
+        rows = [
+            {"trade_date": "2026-07-06", "open": 4.0, "high": 4.0, "low": 4.0,
+             "close": 4.0, "volume": 1000.0, "amount": 4000.0, "adj_factor": 1.0},
+            {"trade_date": "2026-07-07", "open": 4.1, "high": 4.1, "low": 4.1,
+             "close": 4.1, "volume": 1000.0, "amount": 4100.0, "adj_factor": 1.0},
+            # 上界后的非法行：NaN/None 日期 + NaN 数值（未来行不进解析路径）
+            {"trade_date": None, "open": float("nan"), "high": None, "low": float("nan"),
+             "close": None, "volume": None, "amount": None, "adj_factor": None},
+        ]
+        pd.DataFrame(rows).to_parquet(root / "daily" / "510300.SH.parquet", index=False)
+        pd.DataFrame([], columns=["event_date", "event_type"]).to_parquet(
+            root / "events" / "510300.SH.parquet", index=False
+        )
+        manifest = {
+            "schema_version": 3, "package_id": "fixture-m6e2-garbage",
+            "package_version": "m6e2", "package_uri": "node://mac/r01-etf-daily/fixture-m6e2-garbage",
+            "source_release_id": "fixture", "generated_at": "2026-09-26T00:00:00Z",
+            "generated_by_node": "mac",
+            "source_datasets": [{"api_name": n, "sha256": "0" * 64} for n in
+                                ("fund_daily", "fund_adj", "fund_div", "trade_cal", "etf_limit")],
+            "unit_conversions": {"vol": "lot(100 shares) -> shares, multiply by 100",
+                                 "amount": "thousand CNY -> CNY, multiply by 1000", "rules": "s"},
+            "factor_convention": {"formula": "adjusted_close = close_unadjusted × adj_factor (hfq)",
+                                  "verified_cases": []},
+            "symbols": [{"code": "510300.SH", "class": "equity_broad", "role": "primary",
+                         "data_start": "2026-07-06", "data_end": "2026-07-07",
+                         "missing_days": [], "warmup_start": "2026-07-06"}],
+            "known_gaps": [],
+        }
+        (root / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        v = load_etf_input_package(root, read_through=date(2026, 7, 7))
+        # 授权前缀加载成功（非法未来行不进解析路径/不影响）
+        assert v.actual_max_input_date == date(2026, 7, 7)
+        assert v.get_bar("510300.SH", date(2026, 7, 6)).close == 4.0
+        led = R01Ledger(v, _cfg(read_through_bound=date(2026, 7, 7)))
+        led.run_day(date(2026, 7, 6), None)
+        led.run_day(date(2026, 7, 7), {"510300.SH": 0.5})
+        assert any(o.side == "buy" for o in led.orders.values())

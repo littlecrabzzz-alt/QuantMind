@@ -38,6 +38,27 @@ from backend.shared.stock_utils import StockCodeUtil
 
 logger = logging.getLogger(__name__)
 
+def _bound_filters(path: Path, bound: date):
+    """M6E2：按 trade_date 首行嗅探格式构造 pyarrow filters（YYYYMMDD 或
+    YYYY-MM-DD；单格式单一比较，避免混合比较杀死合法行）。返回 filters
+    或 None（无法下推时调用方读后过滤）。"""
+    try:
+        head = pd.read_parquet(path, columns=["trade_date"])
+    except Exception:
+        return None
+    if head.empty:
+        return None
+    first = str(head["trade_date"].iloc[0])
+    bound_str = bound.strftime("%Y%m%d") if len(first.replace("-", "")) == 8 and "-" not in first else bound.isoformat()
+    return [("trade_date", "<=", bound_str)]
+
+
+# M6E2：filters 下推不可用时捕获的引擎异常别名（pyarrow 未装/老版本）
+try:  # pragma: no cover - 环境相关
+    from pyarrow.lib import ArrowNotImplementedError as ArrowNotImplementedErrorAlias
+except ImportError:  # pragma: no cover
+    ArrowNotImplementedErrorAlias = ()
+
 # 涨跌幅：ETF 默认 ±10%，科创 ETF（588xxx）±20%。债券/黄金/跨境同为 ±10%
 # （基金交易规则）。该口径为工程假设，p02 交付 etf_limit 数据集后以其为准。
 _ETF_STAR_PREFIXES = ("588",)
@@ -396,14 +417,29 @@ class EtfInputPackage:
         path = self.root / "daily" / f"{suffix}.parquet"
         if not path.is_file():
             raise EtfInputPackageError(f"包内缺日线文件: {path.name}")
-        df = pd.read_parquet(path)
+        # M6E2（项1）：**加载前置裁定**——pyarrow filters 下推（格式嗅探后
+        # 单一比较），未来行不进解析路径（含非法值/NaN 日期的未来行不
+        # 影响授权前缀加载）；无法下推时回退读后过滤（post_bound）。
+        filters = (
+            _bound_filters(path, self.read_through)
+            if self.read_through is not None
+            else None
+        )
+        try:
+            df = pd.read_parquet(path, filters=filters)
+        except (TypeError, ValueError, ImportError, ArrowNotImplementedErrorAlias):
+            # 引擎不支持 filters 下推（如非 pyarrow 后端）→ 回退读后过滤
+            df = pd.read_parquet(path)
+            post_bound = True
+        else:
+            post_bound = filters is None
         if "trade_date" not in df.columns:
             raise EtfInputPackageError(f"{suffix} 日线缺 trade_date 列")
         df = df.copy()
         df["trade_date"] = [_parse_trade_date(v) for v in df["trade_date"]]
         df = df.sort_values("trade_date").reset_index(drop=True)
-        # M6E1：类型转换/缓存/统计之前按上界裁定（授权前缀隔离）
-        if self.read_through is not None:
+        if post_bound and self.read_through is not None:
+            # M6E1：类型转换/缓存/统计之前按上界裁定（授权前缀隔离）
             df = df[df["trade_date"] <= self.read_through].reset_index(drop=True)
 
         # 量额单位：p02 真实包列（已换算）优先；fixture 原始列按 manifest
@@ -427,10 +463,20 @@ class EtfInputPackage:
         if "adj_factor" not in df.columns:
             factor_path = self.root / "factors" / f"{suffix}.parquet"
             if factor_path.is_file():
-                fdf = pd.read_parquet(factor_path)
+                ffilters = (
+                    _bound_filters(factor_path, self.read_through)
+                    if self.read_through is not None
+                    else None
+                )
+                try:
+                    fdf = pd.read_parquet(factor_path, filters=ffilters)
+                    fpost = ffilters is None
+                except (TypeError, ValueError, ImportError, ArrowNotImplementedErrorAlias):
+                    fdf = pd.read_parquet(factor_path)
+                    fpost = True
                 fdf = fdf.copy()
                 fdf["trade_date"] = [_parse_trade_date(v) for v in fdf["trade_date"]]
-                if self.read_through is not None:
+                if fpost and self.read_through is not None:
                     fdf = fdf[fdf["trade_date"] <= self.read_through]
                 df = df.merge(fdf[["trade_date", "adj_factor"]], on="trade_date", how="left")
             df["adj_factor"] = (
@@ -613,6 +659,19 @@ class EtfInputPackage:
         events: list[TypedEvent] = []
         if path.is_file():
             df = pd.read_parquet(path)
+            # M6E2（项1）：解析前裁定——先丢弃完全在上界后的行（share 按
+            # event_date、dividend 按 record_date 锚点；两列均字符串可比），
+            # 再逐行解析 + _event_visible_through 语义终审（保权等复杂
+            # 语义仍由终审保证；前置过滤仅为解析路径隔离）
+            if self.read_through is not None:
+                bound_iso = self.read_through.isoformat()
+                def _row_maybe_visible(r):
+                    if str(r.get("event_type")) == "share_adjustment":
+                        return str(r.get("event_date")) <= bound_iso
+                    rec = r.get("record_date")
+                    anchor = str(rec) if rec and str(rec) != "None" else str(r.get("event_date"))
+                    return anchor <= bound_iso
+                df = df[[ _row_maybe_visible(r) for r in df.to_dict(orient="records")]]
             for row in df.to_dict(orient="records"):
                 ev = _parse_typed_event_row(suffix, row)
                 if self._event_visible_through(ev):

@@ -519,6 +519,15 @@ class R01Ledger:
         from backend.services.simulation.replay.daily_binding import capture_binding
 
         self.input_binding = input_binding or capture_binding(package)
+        # M6E2（项2）：视图—冻结上界绑定——config.read_through_bound 必须
+        # 与 package.read_through 一致（防旧窄 config 配宽视图越界读）。
+        pkg_rt = getattr(package, "read_through", None)
+        if (self.config.read_through_bound or None) != (pkg_rt or None):
+            raise ValueError(
+                f"read_through_bound mismatch: config="
+                f"{self.config.read_through_bound} vs package.read_through="
+                f"{pkg_rt}（视图与冻结上界必须一致；改上界须显式新 config）"
+            )
 
         self.cash = float(config.initial_cash)
         self.initial_cash_locked = True
@@ -1743,6 +1752,14 @@ class R01Ledger:
                 f" dd={exp_dd})"
             )
         ledger.risk = RiskStateMachine.from_dict(checkpoint["risk_state"])
+        # M6E2（项2）：恢复路径同样校验视图—冻结上界绑定
+        pkg_rt = getattr(package, "read_through", None)
+        if (config.read_through_bound or None) != (pkg_rt or None):
+            raise ValueError(
+                f"read_through_bound mismatch: config="
+                f"{config.read_through_bound} vs package.read_through="
+                f"{pkg_rt}（恢复视图与冻结上界必须一致）"
+            )
         # M4E2：origin 精度标记（legacy 恢复的账本不冒充 full）
         # M5E1：legacy 判定只认 schema_version（v5=无条件 legacy）；
         # 仅原生 v6（schema6 + full 标记）可为 full
