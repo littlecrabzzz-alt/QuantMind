@@ -78,6 +78,8 @@ def _run_extra_tasks(datasets: list[str], days: int) -> dict:
 
 def run(*, days: int = 5, datasets: list[str] | None = None, **kwargs: Any) -> dict:
     """同步期货数据。datasets 为勾选的 catalog 数据集名；None 时全量同步。"""
+    from backend.shared.data_source_config import require_upstream_collection
+    require_upstream_collection()
     from backend.scripts.akshare_futures_sync import sync as ak_futures_sync
 
     if not datasets:

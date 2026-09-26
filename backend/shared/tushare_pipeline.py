@@ -221,6 +221,7 @@ RESEARCH_APIS = (
     "daily", "index_daily", "fund_daily", "adj_factor", "daily_basic",
     "index_weight", "ci_daily", "sw_daily", "stock_basic", "index_basic",
     "fund_basic", "trade_cal", "stk_limit", "suspend_d", "moneyflow",
+    "fund_adj", "index_classify", "index_member_all",
 )
 
 
@@ -895,6 +896,15 @@ class Pipeline:
         return None, []
 
     def next_job(self, config, deadline, *, task_scope=False, mark_inflight=False):
+        # Policy pauses existing non-research jobs too; disabling planners alone
+        # would still dispatch their retained backlog through the fallback queue.
+        collection_apis = config.get("collection_api_names") if not task_scope else None
+        if collection_apis is not None:
+            if (not isinstance(collection_apis, list) or not collection_apis
+                    or any(not isinstance(api, str) or api not in EXTENDED_CONTRACTS
+                           for api in collection_apis)
+                    or len(collection_apis) != len(set(collection_apis))):
+                raise ValueError("Invalid collection API scope")
         # Preserve legacy structured fallback behavior; extend only enabled families.
         fair_families = {"structured"} | {
             name for name in PLANNERS if name != "rrg" and config.get("enable_" + name)
@@ -911,7 +921,9 @@ class Pipeline:
             rpm = min(positive_int(rpm, "account request rate"), rollout)
         if rpm is None:
             now = time.time()
-            if task_scope:
+            if collection_apis:
+                row, scoped_checkpoints = self._next_throughput_job(collection_apis, now)
+            elif task_scope:
                 row = self.db.execute(
                     "SELECT j.* FROM exact_task_scope s CROSS JOIN jobs j "
                     "ON j.id=s.task_id WHERE j.state='pending' AND j.retry_after<=? "
@@ -925,8 +937,10 @@ class Pipeline:
                     "ORDER BY priority,rowid LIMIT 1",
                     (now,),
                 ).fetchone()
-            checkpoints = []
-            if row and task_scope:
+            checkpoints = scoped_checkpoints if collection_apis else []
+            if row and collection_apis:
+                pass
+            elif row and task_scope:
                 row, checkpoints = self._next_exact_task_job(
                     now, check_gates=False
                 )
@@ -1032,7 +1046,9 @@ class Pipeline:
                 WHERE j.state='pending' AND j.retry_after<=? AND COALESCE(g.next_at,0)<=?
                 {group_filter} ORDER BY j.priority,j.rowid LIMIT 1"""
             checkpoints = []
-            if task_scope:
+            if collection_apis:
+                row, checkpoints = self._next_throughput_job(collection_apis, now)
+            elif task_scope:
                 # An exact batch is fair across its APIs regardless of the normal
                 # family policy. The same account/API gates and reservations below
                 # still apply, and priority remains ordered within each API.
@@ -1062,7 +1078,7 @@ class Pipeline:
                     ),
                     (now, now, group),
                 ).fetchone()
-            if row is None and not task_scope:
+            if row is None and not task_scope and not collection_apis:
                 row = self.db.execute(
                     sql.format(group_filter="", ready_index="jobs_ready_order"),
                     (now, now),
@@ -1133,6 +1149,18 @@ class Pipeline:
                         profile["counts"]["gate_reservations"] += 1
                 self._fair_turn += 1
                 return row
+            if collection_apis:
+                # Only wait on selected API gates, never scan the entire paused queue.
+                placeholders = ",".join("?" for _ in collection_apis)
+                earliest = self.db.execute(
+                    "SELECT MIN(next_at) FROM request_gates WHERE next_at>? "
+                    f"AND scope IN ({placeholders})",
+                    (now, *("api:" + api for api in collection_apis)),
+                ).fetchone()[0]
+                if earliest is None or earliest - now >= deadline - time.monotonic():
+                    return None
+                time.sleep(max(0.01, earliest - now))
+                continue
             earliest_sql = """
                 SELECT MIN(MAX(j.retry_after,COALESCE(g.next_at,0)))
                 FROM {source} LEFT JOIN request_gates g

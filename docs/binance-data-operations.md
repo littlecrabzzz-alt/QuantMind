@@ -77,14 +77,14 @@ python3 -m backend.scripts.equity_perpetual_archive \
 
 ## 定时更新口径
 
-BC 建议时间为北京时间 08:15，即 UTC 日线闭合后 15 分钟。既有调度每天补派一次；当天错过时刻可补派，但任务失败后当天不自动重试，需检查失败原因再手动执行。长停机后的增量按已存最后一日回补，不再被 `days` 的短窗口截断。要求构建研究数据时，BC 的 Qlib/H5 跳过或失败会将总体结果标记为 partial。
+BC 由 Mac 本地每天北京时间08:15采集，即UTC日线闭合后15分钟；每15分钟和唤醒后补查，失败阶段下轮重试。采集成功后传固定版本到云端与本地沙盒，分别生成Qlib/H5。长停机按已存最后一日回补，云端不向币安直接取数。运行说明见 [本地数据源](local-market-source.md)。
 
 管理员 QuantBC 数据页独立于全局 crypto 研究开关；可保持 `ENABLE_CRYPTO=false`、`VITE_ENABLE_CRYPTO=false`。日更使用显式已验证 release 准备 Qlib/H5，不因数据构建把全局研究市场打开。
 
 ## 当前部署边界
 
-2026-09-26 已将通过逐文件 SHA-256 校验的固定版本发布到云端 `data/quantbc` 和 `data/binance-tokenized-equity`。BTC/ETH 的 BC 调度已通过管理 API 保存为每天北京时间 08:15、`days=5`、`daily_forward` / `instrument_detail`、`with_qlib=true`，并已自然补派成功一次。当前管理页只展示这两项已实现的数据集。
+2026-09-27 将 BTC/ETH 每日采集从云端迁至 Mac 独立源目录。云端 BC 调度关闭且禁止重新派发；Mac 采集、固定版本校验、两端 Qlib/H5 派生共用现有入口。源文件与业务库分别管理，不通过 Syncthing 传数据。
 
-云端是 BTC/ETH 日更的唯一写入者。AAPLB 仍为独立固定版本，未启用其自动采集或研究。Mac 沙盒 `.local-dev/project/data/` 下保留首次验收的固定版本；目前没有 BTC/ETH 云端新版本自动回传 Mac 的链路，也不通过 Syncthing 传数据。实际版本、任务和消费证据见 `coordination/binance-data/` 最新验收记录。
+AAPLB 和另16项扩充批次仍是独立固定版本，不在本次日更池中。已有研究继续使用原版本。实际版本与验收见 `coordination/tushare-data/` 本地源切换记录。
 
-后端与前端全局 crypto 研究开关、实盘开关仍关闭。管理员可查看数据、保存调度和准备派生数据；这些操作不启动策略研究或交易。股票代币与股票永续不纳入 BTC/ETH 调度。历史回填仍不具备历史时点到达时间证明。
+后端与前端全局 crypto 研究开关、实盘开关仍关闭。管理员可查看数据和准备派生数据；这些操作不启动策略研究或交易。股票代币与股票永续不纳入 BTC/ETH 调度。历史回填仍不具备历史时点到达时间证明。

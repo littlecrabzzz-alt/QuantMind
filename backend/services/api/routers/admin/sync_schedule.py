@@ -52,6 +52,21 @@ def _scheduler():
     return MARKETS, get_all_schedules, get_schedule, save_schedule, run_market_sync
 
 
+def _source_policy(market):
+    from backend.shared.data_source_config import upstream_collection_allowed
+    if upstream_collection_allowed():
+        return {}
+    from pathlib import Path
+    import json
+    path = Path("/data/local-market-source") / (market + "-receipt.json")
+    receipt = json.loads(path.read_text()) if path.exists() else {}
+    return {"collection_owner": "mac", "upstream_collection_allowed": False,
+            "source_time": {"A": "03:00", "BC": "08:15"}.get(market),
+            "received_status": receipt.get("status", "awaiting_local_release"),
+            "received_at": receipt.get("completed_at"),
+            "data_end": receipt.get("validation", {}).get("latest_date")}
+
+
 @router.get("/sync-schedule")
 async def list_schedules(current_user: dict = Depends(require_admin)):
     MARKETS, get_all_schedules, *_ = _scheduler()
@@ -60,7 +75,7 @@ async def list_schedules(current_user: dict = Depends(require_admin)):
         "success": True,
         "data": {
             "schedules": [
-                {"market": m, "label": MARKETS[m], **schedules[m]} for m in MARKETS
+                {"market": m, "label": MARKETS[m], **schedules[m], **_source_policy(m)} for m in MARKETS
             ]
         },
     }
@@ -72,7 +87,7 @@ async def get_market_schedule(market: str, current_user: dict = Depends(require_
     market = market.upper()
     if market not in MARKETS:
         raise HTTPException(status_code=404, detail=f"未知市场: {market}")
-    return {"success": True, "data": {"market": market, "label": MARKETS[market], **get_schedule(market)}}
+    return {"success": True, "data": {"market": market, "label": MARKETS[market], **get_schedule(market), **_source_policy(market)}}
 
 
 @router.post("/sync-schedule/{market}")
@@ -85,6 +100,9 @@ async def save_market_schedule(
     market = market.upper()
     if market not in MARKETS:
         raise HTTPException(status_code=404, detail=f"未知市场: {market}")
+    from backend.shared.data_source_config import upstream_collection_allowed
+    if payload.enabled and not upstream_collection_allowed():
+        raise HTTPException(status_code=409, detail="行情由本地自动采集，云端不能启用上游采集定时。")
     saved = save_schedule(
         market,
         {
@@ -107,6 +125,9 @@ async def run_market_schedule_now(
 ):
     """立即触发一次该市场的定时同步（按已保存配置）。"""
     MARKETS, _, get_schedule, _, run_market_sync = _scheduler()
+    from backend.shared.data_source_config import upstream_collection_allowed
+    if not upstream_collection_allowed():
+        raise HTTPException(status_code=409, detail="行情由本地自动采集，云端仅接收已校验版本。")
     market = market.upper()
     if market not in MARKETS:
         raise HTTPException(status_code=404, detail=f"未知市场: {market}")

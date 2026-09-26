@@ -94,6 +94,9 @@ def get_all_schedules() -> dict[str, dict[str, Any]]:
 
 def save_schedule(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
     normalized = _normalize(cfg, market)
+    if normalized.get("enabled"):
+        from backend.shared.data_source_config import require_upstream_collection
+        require_upstream_collection()
     r = _redis()
     r.set(
         _SCHEDULE_KEY.format(market=market),
@@ -118,6 +121,8 @@ def _mark_run(market: str, date_str: str, ttl: int = 2 * 24 * 3600) -> None:
 
 def run_market_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
     """执行指定市场的同步（按配置的数据集/天数）。"""
+    from backend.shared.data_source_config import require_upstream_collection
+    require_upstream_collection()
     days = int(cfg.get("days") or 5)
     datasets = cfg.get("datasets") or []
     with_qlib = bool(cfg.get("with_qlib"))
@@ -224,6 +229,9 @@ def run_market_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
 
 def dispatch_due_syncs() -> dict[str, Any]:
     """检查所有市场定时配置，到点或错过时间且今天未派发的同步任务。"""
+    from backend.shared.data_source_config import upstream_collection_allowed
+    if not upstream_collection_allowed():
+        return {"dispatched": [], "source": "local", "status": "consumer_only"}
     from backend.services.engine.qlib_app.celery_config import celery_app
 
     now = datetime.now()

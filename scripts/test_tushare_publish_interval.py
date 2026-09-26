@@ -578,7 +578,7 @@ class PublicationInterval(unittest.TestCase):
         p.db.execute("INSERT INTO contract_reassessments VALUES(?,?,?,?)", ("daily-job", "now", "test", json.dumps(result)))
         # A nonpriority broken artifact must not gate this lane.
         p.db.execute("INSERT INTO attempts VALUES(?,?,?)", ("other-job", 1, json.dumps({
-            "api_name": "fund_adj", "status": "sample_ok", "parquet": {"path": "parquet/missing.parquet"}
+            "api_name": "income_vip", "status": "sample_ok", "parquet": {"path": "parquet/missing.parquet"}
         })))
         p.db.commit()
         release = p.publish(research=True)
