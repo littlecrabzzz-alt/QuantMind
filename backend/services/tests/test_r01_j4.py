@@ -176,7 +176,7 @@ class TestCrossPackageRecovery:
         pkg1 = rebuild_bound_package(env["b1"], registry_path=env["registry"])
         part = _seed_and_run(R01Ledger(pkg1, cfg, input_binding=env["b1"]), D1)
         cp = part.export_checkpoint()
-        assert cp["schema_version"] == 5
+        assert cp["schema_version"] == 6  # M4E1：v6=全精度
         assert cp["input_binding"]["increments"][-1]["package_version"] == dversion(D1)
 
         # 恢复：按绑定清单重建（d2 不可见）→ 恢复成功

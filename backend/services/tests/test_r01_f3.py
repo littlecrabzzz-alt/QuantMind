@@ -112,9 +112,10 @@ class TestNoCostFallbackResidue:
 
 
 class TestVersionIdentity:
-    def test_contract_versions_are_v3(self):
+    def test_contract_versions_are_v31(self):
+        """M4E1（项4）：ledger 合同版本绑定 v3.1（附录 rev2）。"""
         assert CONTRACT_VERSIONS == {
-            "ledger_contract": "v3",
+            "ledger_contract": "v3.1",
             "etf_input_package_schema": "v3",
         }
 

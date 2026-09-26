@@ -108,8 +108,9 @@ class LedgerOrderingError(ValueError):
 # schema v3）。checkpoint 恢复按此绑定：旧 v2 checkpoint 显式拒绝
 # （CheckpointConfigMismatch，合同版本不一致），不静默混用；如需迁移
 # 须另发 checkpoint schema 版本与迁移路径记录。
+# M4E1（项4）：ledger 合同版本绑定 v3.1（附录 rev2 零股收窄+精度语义）。
 CONTRACT_VERSIONS = {
-    "ledger_contract": "v3",
+    "ledger_contract": "v3.1",
     "etf_input_package_schema": "v3",
 }
 
@@ -194,19 +195,19 @@ class LedgerFill:
     price_source: str = "package_open"
 
     def to_dict(self) -> dict[str, Any]:
-        # total_fee_exact（J6R4）：全精度费用审计字段——复算侧
-        # （independent_recompute）优先消费它，消除 4dp 展示舍入在证据层
-        # 重放中的累积残差；既有消费者不读该字段，行为不变。
+        """M4E1（项3）：恢复层（checkpoint/审计原件）全精度——commission/
+        fees 等不再 4dp 舍入（原 total_fee_exact 审计字段保留兼容）；
+        展示格式化仅在 export_view。"""
         return {
             "trade_date": self.trade_date,
             "symbol": self.symbol,
             "side": self.side,
-            "price": round(self.price, 4),
+            "price": self.price,
             "quantity": self.quantity,
-            "commission": round(self.commission, 4),
-            "stamp_duty": round(self.stamp_duty, 4),
-            "transfer_fee": round(self.transfer_fee, 4),
-            "total_fee": round(self.total_fee, 4),
+            "commission": self.commission,
+            "stamp_duty": self.stamp_duty,
+            "transfer_fee": self.transfer_fee,
+            "total_fee": self.total_fee,
             "total_fee_exact": self.total_fee,
             "signal_date": self.signal_date,
             "slippage_bps": self.slippage_bps,
@@ -271,13 +272,11 @@ class LedgerOrder:
             "qty_target": self.qty_target,
             "qty_filled": self.qty_filled,
             "qty_remaining": self.qty_remaining,
-            "avg_fill_price": round(self.avg_fill_price, 4)
-            if self.avg_fill_price
-            else None,
+            "avg_fill_price": self.avg_fill_price if self.avg_fill_price else None,
             "status": self.status,
             "reject_reason": self.reject_reason,
-            "fees": round(self.fees, 4),
-            "realized_pnl": round(self.realized_pnl, 4),
+            "fees": self.fees,
+            "realized_pnl": self.realized_pnl,
             "ideal_weight": self.ideal_weight,
             "realized_weight": (
                 round(self.realized_weight, 6)
@@ -881,6 +880,36 @@ class R01Ledger:
         )
         summary.orders.append(order.to_dict())
 
+    def _sublot_declaration_check(
+        self,
+        trade_date: date,
+        symbol: str,
+        declared_qty: int,
+        pos: LedgerPosition | None,
+        *,
+        extra: str = "",
+    ) -> str | None:
+        """§3.3.8 零股申报校验（M4E1 收窄到已证关系；run_day/manual_sell 共享）。
+
+        **唯一强制**：总仓≈可卖（|差|<1e-9，双方强证场景：总仓=可卖<100）
+        且 0<申报<可卖（部分零股申报）→ 拒 sublot_partial_sell_not_allowed。
+        total≠available（如 T+1 锁定）**不强制**——分歧场景无官方依据不判，
+        现状放行（审计记录 total/available/declared 供复核）。
+        仅 trade_date ≥ sublot_rule_effective（默认 2026-07-06）；此前放行。
+        不扩大卖量、不整手化合法部分成交。返回拒单原因或 None（放行）。
+        """
+        if trade_date < self.config.sublot_rule_effective:
+            return None
+        total = round(pos.qty, 9) if pos else 0.0
+        available = round(pos.available_qty, 9) if pos else 0.0
+        total_eq_available = abs(total - available) < 1e-9
+        if not (total_eq_available and 0 < available < 100 and 0 < declared_qty < available):
+            return None  # 未证关系/全额/余额≥100：放行（无判据不判）
+        detail = f"total={total},available={available},declared={declared_qty}"
+        if extra:
+            detail += f",{extra}"
+        return f"sublot_partial_sell_not_allowed:{detail}"
+
     def _signal_reference(
         self, trade_date: date, signal_date: date | None
     ) -> tuple[float, dict[str, float]]:
@@ -898,7 +927,10 @@ class R01Ledger:
                 sym: float(p["close"])
                 for sym, p in (snap.get("positions") or {}).items()
             }
-            return float(snap["nav"]), closes
+            # M4E1（项3）：目标额度取精确 NAV（nav_exact 优先）——合同口径
+            # "信号日收盘 NAV"本义即精确值（语义澄清，非默改；舍入边缘的
+            # 目标量可能与旧构建差 1 股，回归说明见附录）
+            return float(snap.get("nav_exact", snap["nav"])), closes
         sig_bars = self.package.load_date(signal_date)
         closes: dict[str, float] = {}
         market_value = 0.0
@@ -989,23 +1021,15 @@ class R01Ledger:
                 signal_date=signal_date,
                 ideal_weight=weight,
             )
-            # M2E1/M3E1（§3.3.8，仅 trade_date ≥ sublot_rule_effective）：
-            # **证据支持范围的收窄实现**——唯一强制：可卖余额 <100 份
-            # （零股余额）时，申报量 0<申报<可卖余额 即"部分零股申报"→ 拒
-            # （卖 3 留 2 缺口用例）。全额申报（==可卖余额）或余额 ≥100
-            # 不做整手性判断（lot-multiple 扩展未实施：无提交方官方依据；
-            # 如有官方取证按 change-control 增补，见合同 v3.1 附录）。
-            # 拒单不规范化、不改目标：持仓/现金不动，明细入 reject_reason。
-            if side == "sell" and trade_date >= self.config.sublot_rule_effective:
-                available_rounded = round(pos.available_qty, 4) if pos else 0.0
-                total_rounded = round(current_qty, 4)
-                if 0 < available_rounded < 100 and 0 < qty < available_rounded:
+            # M2E1/M3E1/M4E1（§3.3.8，仅 trade_date ≥ sublot_rule_effective）：
+            # 共享申报校验（run_day 与 manual_sell 统一入口），量截断/撮合前。
+            if side == "sell":
+                reject_reason = self._sublot_declaration_check(
+                    trade_date, symbol, qty, pos, extra=f"target_weight={weight}"
+                )
+                if reject_reason:
                     order.status = ORDER_STATUS_REJECTED
-                    order.reject_reason = (
-                        f"sublot_partial_sell_not_allowed:total={total_rounded},"
-                        f"available={available_rounded},"
-                        f"declared={qty},target_weight={weight}"
-                    )
+                    order.reject_reason = reject_reason
                     order.qty_remaining = qty
                     summary.orders.append(order.to_dict())
                     continue
@@ -1356,6 +1380,29 @@ class R01Ledger:
                 }
             )
             return order
+        # M4E1（项2）：manual_sell 与 run_day 统一申报入口——量截断/撮合前
+        # 走同一 §3.3.8 校验（同一 helper），不可绕过
+        sublot_reason = self._sublot_declaration_check(
+            trade_date, symbol, int(qty), position, extra=f"manual,reason={reason}"
+        )
+        if sublot_reason:
+            order = self.submit_order(trade_date, symbol, "sell", qty, origin="manual")
+            order.status = ORDER_STATUS_REJECTED
+            order.reject_reason = sublot_reason
+            order.qty_remaining = qty
+            self.manual_actions.append(
+                {
+                    "date": trade_date.isoformat(),
+                    "symbol": symbol,
+                    "qty": qty,
+                    "reason": reason,
+                    "requested_by": requested_by,
+                    "client_order_id": order.client_order_id,
+                    "status": order.status,
+                    "reject_reason": order.reject_reason,
+                }
+            )
+            return order
         bars = bars if bars is not None else self.package.load_date(trade_date)
         order = self.submit_order(
             trade_date,
@@ -1438,13 +1485,14 @@ class R01Ledger:
         """完整账本状态快照（纯状态、确定性；与 export_evidence 的区别：
         面向恢复重放，含全部可变状态，账务字段不做展示层取整）。"""
         return {
-            "schema_version": 5,
+            "schema_version": 6,  # M4E1：v6=全精度（订单/成交/NAV sizing）
             "ledger_run_id": self.ledger_run_id,
             "package_id": self.package.package_id,
             # J4E1：跨包恢复身份=基线+已消费日增量清单（非瞬时 package_id）
             "input_binding": self.input_binding,
             "config": self.config.to_dict(),
             "contract_versions": dict(self.contract_versions),
+            "precision_semantics": "full_precision",  # v6 标记（M4E1 项4）
             "cash": self.cash,
             "positions": {sym: pos.to_dict() for sym, pos in self.positions.items()},
             "executed_dates": sorted(self._executed_dates),
@@ -1507,6 +1555,15 @@ class R01Ledger:
         # F1 修复 AC-03：完整冻结 config 绑定——本金/费率/滑点/风险参数/
         # 参与率/组别/策略标识/attempt 全量比对；缺绑定字段（旧版快照）
         # 一律拒绝（无版本化迁移路径时不静默放行）
+        # M4E1（项4）：checkpoint 精度语义版本——v6=全精度；v5=legacy_precision
+        # （接受为历史快照，按原样恢复，不补偿已丢精度、不补造）；v4 缺
+        # input_binding 由后续既有校验拒绝。
+        cp_schema = checkpoint.get("schema_version")
+        if cp_schema not in (5, 6):
+            raise CheckpointConfigMismatch(
+                f"checkpoint_config_mismatch: 不支持的 schema_version={cp_schema}"
+                f"（允许 5=legacy_precision / 6=full_precision）"
+            )
         cp_config = checkpoint.get("config")
         if not isinstance(cp_config, dict) or "initial_cash" not in cp_config:
             raise CheckpointConfigMismatch(
@@ -1533,10 +1590,17 @@ class R01Ledger:
                 f"（schema_version={checkpoint.get('schema_version')}，拒绝恢复）"
             )
         if cp_contracts != current_contracts:
-            raise CheckpointConfigMismatch(
-                f"checkpoint_config_mismatch: 合同版本不一致 "
-                f"checkpoint={cp_contracts} vs 当前={current_contracts}"
-            )
+            # M4E1（项4）：v5 legacy 快照携带 v3 合同版本——接受为
+            # legacy_precision（ledger_contract v3 是其生成时身份，非漂移）；
+            # 其余不一致（含 v6 携带旧版本）仍拒绝
+            legacy_ok = cp_schema == 5 and cp_contracts.get(
+                "ledger_contract"
+            ) == "v3" and cp_contracts.get("etf_input_package_schema") == "v3"
+            if not legacy_ok:
+                raise CheckpointConfigMismatch(
+                    f"checkpoint_config_mismatch: 合同版本不一致 "
+                    f"checkpoint={cp_contracts} vs 当前={current_contracts}"
+                )
         ledger = cls(package, config)
         ledger.cash = float(checkpoint["cash"])
         ledger.positions = {
