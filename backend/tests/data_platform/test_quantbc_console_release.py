@@ -56,6 +56,9 @@ def test_catalog_and_preview_read_release_without_enabling_crypto(console_client
     _, client, root = console_client
     release = _publish(root, "first")
     catalog = client.get("/quantbc/catalog").json()["data"]
+    assert {item["dataset"] for item in catalog["datasets"]} == {
+        "daily_forward", "instrument_detail"
+    }
     assert catalog["data_dir"] == str(release)
     assert catalog["release_id"] == "first"
     assert catalog["timezone"] == "UTC" and catalog["data_end"] == "2024-01-07"

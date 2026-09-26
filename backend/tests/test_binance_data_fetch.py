@@ -323,3 +323,52 @@ def test_invalid_cross_period_close_is_not_repaired(monkeypatch):
             "BTCUSDT", start_date="2018-02-08", end_date="2018-02-09"
         )
     assert calls == [data.BINANCE_KLINE_URLS[0]]
+
+
+# Identical public response SHA256 on Mac and Linux:
+# b666e54043c7ebabd5024f390c1b5be19c3ea26687318f48ae097c150c7a3cec.
+_REST_20260923_PRECISION = [
+    1790121600000,
+    "86208.57000000",
+    "87278.54000000",
+    "83500.01000000",
+    "84397.60000000",
+    "22150.93277000",
+    1790207999999,
+    "1887736866.15679790",
+    3301896,
+    "10334.67252000",
+    "881464898.31627080",
+    "0",
+]
+
+
+def emulate_cloud_numeric_parser(monkeypatch):
+    """Reproduce the observed Linux pandas fast-parser rounding discrepancy."""
+    original = pd.to_numeric
+
+    def convert(values, *args, **kwargs):
+        result = original(values, *args, **kwargs)
+        if isinstance(values, pd.Series) and values.name == "quote_volume":
+            affected = values.eq("1887736866.15679790")
+            if affected.any():
+                result.loc[affected] = float.fromhex("0x1.c2125088a08f9p+30")
+        return result
+
+    monkeypatch.setattr(pd, "to_numeric", convert)
+
+
+def test_economic_decimal_strings_have_stable_binary64_rounding(monkeypatch):
+    emulate_cloud_numeric_parser(monkeypatch)
+    metadata = {
+        "request": {"url": data.BINANCE_KLINE_URLS[0]},
+        "sha256": "b666e54043c7ebabd5024f390c1b5be19c3ea26687318f48ae097c150c7a3cec",
+        "collected_at": "2026-09-26T03:12:18.855016Z",
+    }
+    parsed = data._parse_klines([_REST_20260923_PRECISION], "BTCUSDT", "1d", metadata)
+    assert float(parsed.iloc[0].quote_volume).hex() == "0x1.c2125088a08fap+30"
+    for column in data._VALUE_COLUMNS:
+        if column != "trades":
+            expected = float(_REST_20260923_PRECISION[data._RAW_COLUMNS.index(column)])
+            assert float(parsed.iloc[0][column]).hex() == expected.hex()
+    assert parsed.iloc[0].trades == 3301896

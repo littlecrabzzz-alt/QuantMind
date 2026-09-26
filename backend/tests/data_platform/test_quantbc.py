@@ -21,6 +21,7 @@ from backend.scripts.blockchain_sync import (
     _write_partition,
     _write_symbol_file,
 )
+from backend.tests.data_platform.test_quantbc_console_release import console_client
 
 
 def test_default_symbols_include_major_pairs():
@@ -119,23 +120,11 @@ def test_write_partition_incremental_dedup(tmp_path):
     assert btc["close"] == 105.0
 
 
-def test_market_console_bc_datasets():
-    from backend.services.api.routers.admin.global_market_console import (
-        _default_datasets,
-    )
-
-    specs = _default_datasets("BC")
+def test_market_console_bc_datasets(console_client):  # noqa: F811 - shared router fixture
+    module, _, _ = console_client
+    specs = module._default_datasets("BC")
     names = {s.dataset for s in specs}
-    # 区块链数据段精简：日线/估值/标的详情等，无财务/分析师段
-    assert "daily_forward" in names
-    assert "valuation" in names
-    assert "instrument_detail" in names
-    assert "min5_kline" in names
-    assert "min1_kline" in names
-    assert "income" not in names
-    assert "recommendations" not in names
-    # 日线必须按日分区，估值也是分区；分钟线按标的
+    assert names == {"daily_forward", "instrument_detail"}
     by_name = {s.dataset: s for s in specs}
     assert by_name["daily_forward"].layout == "partition"
-    assert by_name["valuation"].layout == "partition"
-    assert by_name["min5_kline"].layout == "symbol"
+    assert by_name["instrument_detail"].layout == "single"

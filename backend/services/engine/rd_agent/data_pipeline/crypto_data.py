@@ -275,7 +275,12 @@ def _parse_klines(rows, symbol, interval, metadata, *, timestamp_unit=None):
         np.where(units == "us", 1000, 1_000_000), unit="ns"
     )
     for col in _VALUE_COLUMNS:
-        df[col] = pd.to_numeric(df[col], errors="raise")
+        # pandas' string-to-float fast path can round differently across our
+        # Mac/Linux builds. Python float gives one stable binary64 conversion.
+        df[col] = (
+            pd.to_numeric(df[col], errors="raise")
+            if col == "trades" else df[col].map(float)
+        )
     validate_binance_klines(df, interval)
     df["trades"] = df["trades"].astype("int64")
     df["datetime"] = df["open_time"]

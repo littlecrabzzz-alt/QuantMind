@@ -38,7 +38,7 @@ python3 -m backend.scripts.quantbc_daily_sync \
 `--build-research` 在发布后构建 Qlib/H5；需要现有后端镜像中的 Qlib 与 PyTables。派生文件位于 `derived/<release_id>/`，不会写回不可变原始版本。每个 RD 任务复制固定 Qlib/H5，并携带 `source_manifest.json`；已有任务拒绝换用另一个 release。
 
 ```sh
-ENABLE_CRYPTO=true python3 -m backend.scripts.quantbc_daily_sync \
+python3 -m backend.scripts.quantbc_daily_sync \
   --data-dir /absolute/path/to/quantbc --build-research
 
 python3 scripts/binance_data_acceptance.py \
@@ -68,6 +68,8 @@ BC 建议时间为北京时间 08:15，即 UTC 日线闭合后 15 分钟。既�
 
 ## 当前部署边界
 
-本次真实数据保存于 Mac 沙盒的 `.local-dev/project/data/quantbc` 和 `.local-dev/project/data/binance-tokenized-equity`；不属于主工作树 `data/`，也不会经 Syncthing 传到云端。实际版本、测试结果和消费报告见 `coordination/binance-data/` 最新验收记录。
+2026-09-26 已将通过逐文件 SHA-256 校验的固定版本发布到云端 `data/quantbc` 和 `data/binance-tokenized-equity`。BTC/ETH 的 BC 调度已通过管理 API 保存为每天北京时间 08:15、`days=5`、`daily_forward` / `instrument_detail`、`with_qlib=true`，并已自然补派成功一次。当前管理页只展示这两项已实现的数据集。
 
-现有后台手动同步与市场调度入口已适配固定版本和研究数据构建。自动日更仍按前端保存的市场调度配置触发；安装代码不代表开启调度。若后续开启，日线应在 UTC 零点后留出上游发布余量，显示最新已闭合日期及失败状态。云端发布、界面市场开关及自动调度分别验收，不能由本地数据验收推断已经开启。
+云端是 BTC/ETH 日更的唯一写入者。AAPLB 仍为独立固定版本，未启用其自动采集或研究。Mac 沙盒 `.local-dev/project/data/` 下保留首次验收的固定版本；目前没有 BTC/ETH 云端新版本自动回传 Mac 的链路，也不通过 Syncthing 传数据。实际版本、任务和消费证据见 `coordination/binance-data/` 最新验收记录。
+
+后端与前端全局 crypto 研究开关、实盘开关仍关闭。管理员可查看数据、保存调度和准备派生数据；这些操作不启动策略研究或交易。股票代币与股票永续不纳入 BTC/ETH 调度。历史回填仍不具备历史时点到达时间证明。

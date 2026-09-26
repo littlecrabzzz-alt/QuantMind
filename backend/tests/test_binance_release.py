@@ -250,3 +250,39 @@ def test_short_scheduler_window_recovers_more_than_two_weeks_offline(
     assert calls[-2:] == [("2026-09-18", "2026-09-26")] * 2
     assert replay["unchanged"] is True
     assert replay["release_id"] == recovered["release_id"]
+
+
+def test_same_raw_decimal_response_is_idempotent_across_numeric_parsers(
+    intake, tmp_path, monkeypatch
+):
+    from backend.tests.test_binance_data_fetch import (
+        _REST_20260923_PRECISION,
+        emulate_cloud_numeric_parser,
+    )
+
+    def download(symbol, **kwargs):
+        return fetch._parse_klines(
+            [_REST_20260923_PRECISION],
+            symbol,
+            "1d",
+            {
+                "request": {"url": fetch.BINANCE_KLINE_URLS[0]},
+                "sha256": "b666e54043c7ebabd5024f390c1b5be19c3ea26687318f48ae097c150c7a3cec",
+                "collected_at": "2026-09-26T03:12:18.855016Z",
+            },
+        )
+
+    monkeypatch.setattr(fetch, "download_binance_klines", download)
+    args = {"symbols": "BTCUSDT", "start_date": "2026-09-23", "end_date": "2026-09-24"}
+    initial = sync.run(**args)
+    pointer = (tmp_path / "CURRENT.json").read_bytes()
+    emulate_cloud_numeric_parser(monkeypatch)
+    replay = sync.run(**args)
+    assert replay["release_id"] == initial["release_id"]
+    assert replay["unchanged"] is True
+    assert replay["revised_rows"] == 0
+    assert (tmp_path / "CURRENT.json").read_bytes() == pointer
+    assert len(list((tmp_path / "releases").iterdir())) == 1
+    stored = sync._previous(tmp_path)[2].iloc[0]
+    assert float(stored.quote_volume).hex() == "0x1.c2125088a08fap+30"
+    assert stored.amount == stored.quote_volume

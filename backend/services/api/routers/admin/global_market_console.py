@@ -67,33 +67,7 @@ def _default_datasets(market: str) -> tuple[DatasetSpec, ...]:
                 "kline",
                 "1_kline_data/daily_forward",
                 "partition",
-                "Binance 日线",
-            ),
-            DatasetSpec(
-                "min5_kline",
-                "5分钟线",
-                "1",
-                "kline",
-                "1_kline_data/min5_kline",
-                "symbol",
-                "Binance 5m，体积大，按需同步",
-            ),
-            DatasetSpec(
-                "min1_kline",
-                "1分钟线",
-                "1",
-                "kline",
-                "1_kline_data/min1_kline",
-                "symbol",
-                "Binance 1m，体积大，按需同步",
-            ),
-            DatasetSpec(
-                "index_daily",
-                "指数日线",
-                "1",
-                "kline",
-                "1_kline_data/index_daily",
-                "partition",
+                "Binance UTC 已收盘日线",
             ),
             # 2 基础板块
             DatasetSpec(
@@ -103,27 +77,6 @@ def _default_datasets(market: str) -> tuple[DatasetSpec, ...]:
                 "base_sector",
                 "2_base_sector/instrument_detail",
                 "single",
-            ),
-            DatasetSpec(
-                "sector",
-                "行业板块",
-                "2",
-                "base_sector",
-                "2_base_sector/sector",
-                "symbol",
-            ),
-            DatasetSpec(
-                "f10", "基本面快照", "2", "base_sector", "2_base_sector/f10", "symbol"
-            ),
-            # 5 技术衍生
-            DatasetSpec(
-                "valuation",
-                "估值",
-                "5",
-                "technical",
-                "5_technical_derived/valuation",
-                "partition",
-                "Binance 收盘快照",
             ),
         )
     if market == "FUTURES":
