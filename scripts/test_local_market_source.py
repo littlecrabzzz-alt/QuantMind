@@ -166,6 +166,16 @@ class LocalMarketSourceTest(unittest.TestCase):
                 transfer.assert_not_called()
                 ssh.assert_called_once()
 
+    def test_receiver_cli_does_not_require_host_deploy_topology(self):
+        import subprocess, shutil, sys
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            scripts = root / "scripts"; scripts.mkdir()
+            for name in ("local_market_source.py", "dual_node_inventory.py"):
+                shutil.copy2(Path(source.__file__).parent / name, scripts / name)
+            subprocess.run([sys.executable, "-I", str(scripts / "local_market_source.py"), "--help"],
+                           stdout=subprocess.DEVNULL, check=True)
+
 
 if __name__ == "__main__":
     unittest.main()
