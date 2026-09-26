@@ -139,6 +139,7 @@ _REJECT_REASONS = (
     "stale_price",
     "corporate_action_gap",
     "no_position",  # W2E3 修复#5：无持仓/无可卖量卖出
+    "sublot_partial_sell_not_allowed",  # M2E1：§3.3.8 零股余额须一次性申报
 )
 
 
@@ -393,6 +394,11 @@ class R01LedgerConfig:
     # F1 修复 AC-02：缺行情 carry-forward 可靠性阈值——连续缺行情超过该
     # 天数时当日快照标 valuation_reliable=False（不可信，不静默当有效净值）
     stale_mark_limit: int = 5
+    # M2E1（R01SELF 狭义零股申报缺口）：上交所交易规则 2026 修订 §3.3.8
+    # "卖出证券时，余额不足100股（份）的部分，应当一次性申报卖出"——
+    # 生效日 2026-07-06（上证发〔2026〕41 号）；仅 trade_date ≥ 该日启用
+    # 申报校验，此前维持现行为（早期规则全文未取得，不声称全历史违规）
+    sublot_rule_effective: date = date(2026, 7, 6)
 
     def __post_init__(self) -> None:
         if self.group not in GROUPS:
@@ -457,6 +463,7 @@ class R01LedgerConfig:
             "price_mode": self.price_mode,
             "volume_participation": self.volume_participation,
             "stale_mark_limit": self.stale_mark_limit,
+            "sublot_rule_effective": self.sublot_rule_effective.isoformat(),
         }
 
 
@@ -982,6 +989,31 @@ class R01Ledger:
                 signal_date=signal_date,
                 ideal_weight=weight,
             )
+            # M2E1（§3.3.8，仅 trade_date ≥ sublot_rule_effective）：
+            # 不足 100 份的零股余额只能"全额一次性申报"或不申报——
+            # 合法 ⇔ 申报量为整手倍数，或零股尾额被完整消费（申报后
+            # 余额为整手倍数且申报尾额==总仓尾额），或申报覆盖全部余额。
+            # 卖 3 留 2 / 105 报 103 非法；5 报 5、105 报 105/100 合法。
+            # 拒单不规范化、不改目标：持仓/现金不动，明细入 reject_reason。
+            if side == "sell" and trade_date >= self.config.sublot_rule_effective:
+                total_rounded = round(current_qty, 4)
+                remainder = round(total_rounded - qty, 4)
+                lot_multiple = qty % 100 == 0
+                full_closeout = qty >= total_rounded
+                tail_consumed = (
+                    round(qty % 100, 4) == round(total_rounded % 100, 4)
+                    and round(remainder % 100, 4) == 0
+                )
+                if not (lot_multiple or full_closeout or tail_consumed):
+                    order.status = ORDER_STATUS_REJECTED
+                    order.reject_reason = (
+                        f"sublot_partial_sell_not_allowed:total={total_rounded},"
+                        f"available={round(pos.available_qty, 4) if pos else 0},"
+                        f"declared={qty},target_weight={weight}"
+                    )
+                    order.qty_remaining = qty
+                    summary.orders.append(order.to_dict())
+                    continue
             if bar is None or bar.suspended:
                 # 停牌/无行情日不虚构成交：显式拒单留痕
                 order.status = ORDER_STATUS_REJECTED
