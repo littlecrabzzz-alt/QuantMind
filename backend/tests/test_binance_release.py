@@ -357,3 +357,21 @@ def test_numeric_contract_migration_replays_history_then_is_idempotent(
     assert replay["revised_rows"] == 0
     assert (tmp_path / "CURRENT.json").read_bytes() == pointer
     assert len(list((tmp_path / "releases").iterdir())) == 2
+
+
+def test_fixed_release_preparation_reuses_valid_cache_and_rejects_corruption(intake, monkeypatch):
+    from pathlib import Path
+    from backend.services.engine.rd_agent.market_adapters.crypto import CryptoAdapter
+    from backend.services.engine import qlib_data_builder as builder
+    result = sync.run(**intake)
+    adapter = CryptoAdapter(result["data_dir"])
+    assert adapter.prepare_data()
+    root = Path(adapter.get_qlib_provider_uri())
+    original = (root / "source_manifest.json").read_bytes()
+    def no_replacement(*args):
+        raise AssertionError("Fixed verified input must not be exchanged again")
+    monkeypatch.setattr(builder, "_publish_directory", no_replacement)
+    assert adapter.prepare_data()
+    assert (root / "source_manifest.json").read_bytes() == original
+    next((root / "features").glob("*/close.day.bin")).write_bytes(b"bad")
+    assert not adapter.prepare_data()
