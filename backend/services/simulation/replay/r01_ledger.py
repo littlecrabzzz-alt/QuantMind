@@ -1102,8 +1102,8 @@ class R01Ledger:
                 "ex_date": ev.event_date.isoformat(),
                 "pay_date": ev.pay_date.isoformat() if ev.pay_date else None,
                 "cash_per_share": ev.cash_per_share,
-                "basis_multiplier": round(basis_multiplier, 9),
-                "entitlement_qty": round(qty, 4),
+                "basis_multiplier": basis_multiplier,  # M3E2：全精度
+                "entitlement_qty": qty,  # M3E2：全精度（展示层才格式化）
                 "entitlement_amount": amount,  # M3E1：全精度（pay 段入账金额）
                 "stage": "entitled",
                 "entitled_on": trade_date.isoformat(),
@@ -1291,7 +1291,11 @@ class R01Ledger:
     ) -> dict[str, Any]:
         """用户逐线确认（幂等键 f"{ledger_run_id}:risk-confirm:{risk_event_id}"）。"""
         ts = (confirmed_at or utc_now()).astimezone(timezone.utc)
-        latest_nav = self.equity[-1]["nav"] if self.equity else self.config.initial_cash
+        # M3E2：确认净值取未舍入源（nav_exact 全精度；无快照回退 initial_cash）
+        last = self.equity[-1] if self.equity else {}
+        latest_nav = last.get(
+            "nav_exact", last.get("nav", self.config.initial_cash)
+        )
         self.risk.confirm(
             risk_event_id,
             confirmed_by=confirmed_by,

@@ -188,7 +188,7 @@ class RiskStateMachine:
             return event  # 幂等
         event.confirmed_by = confirmed_by
         event.confirmed_at = confirmed_at
-        event.nav_at_confirm = round(float(nav_at_confirm), 4)
+        event.nav_at_confirm = float(nav_at_confirm)  # M3E2：全精度
         if not self.has_unconfirmed_trigger:
             self.status = "active"
         return event
