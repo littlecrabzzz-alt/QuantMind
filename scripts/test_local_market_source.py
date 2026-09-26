@@ -176,6 +176,25 @@ class LocalMarketSourceTest(unittest.TestCase):
             subprocess.run([sys.executable, "-I", str(scripts / "local_market_source.py"), "--help"],
                            stdout=subprocess.DEVNULL, check=True)
 
+    def test_first_source_preparation_preserves_historical_factor_training_prices(self):
+        import pandas as pd
+        from backend.scripts import quantdb_daily_sync as qdb
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d); data = root / "working/project/data/quantdb"
+            factor = data / "6_ml_datasets/l1_factors/dt=20160104/data.parquet"
+            daily = data / "1_kline_data/daily_backward/dt=20160104/data.parquet"
+            factor.parent.mkdir(parents=True);daily.parent.mkdir(parents=True)
+            pd.DataFrame({"symbol": ["600000.SH"], "factor_example": [2.5]}).to_parquet(factor, index=False)
+            pd.DataFrame({"symbol": ["600000.SH"], **{c: [10.] for c in ("open","high","low","close","volume","amount")}}).to_parquet(daily, index=False)
+            with patch.dict("os.environ", {"QM_NODE_ROLE": "archive"}), \
+                 patch.object(qdb,"QUANTDB_DATA_DIR",data), patch.object(qdb,"reseed_state",return_value={}), \
+                 patch.object(qdb,"sync_parquet",return_value={"errors": []}):
+                source.collect(root,"A")
+            actual = pd.read_parquet(factor)
+            self.assertEqual(actual["close"].iloc[0], 10.)
+            self.assertEqual(actual["factor_example"].iloc[0], 2.5)
+            self.assertTrue((root / "A-history-prepared.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
