@@ -66,7 +66,7 @@ class RiskEvent:
             "blocked_orders": list(self.blocked_orders),
             "confirmed_by": self.confirmed_by,
             "confirmed_at": self.confirmed_at,
-            "nav_at_confirm": self.nav_at_confirm,
+            "nav_at_confirm": self.nav_at_confirm,  # 已全精度（M3E1）
         }
 
 
@@ -149,9 +149,10 @@ class RiskStateMachine:
                 event = RiskEvent(
                     risk_event_id=event_id,
                     date=day.isoformat(),
-                    nav=round(float(nav), 4),
+                    # M3E1/J2E2 精度政策：内部/检查点全精度（展示格式化在 view 层）
+                    nav=float(nav),
                     risk_line=risk_line,
-                    threshold=round(float(threshold), 4),
+                    threshold=float(threshold),
                 )
                 self.events[event_id] = event
                 triggered.append(event)
@@ -211,11 +212,12 @@ class RiskStateMachine:
         self.terminal = True
 
     def to_dict(self) -> dict[str, Any]:
+        # M3E1/J2E2：全精度导出（checkpoint 恢复不得丢 HWM 精度；展示层格式化）
         return {
             "ledger_run_id": self.ledger_run_id,
             "status": self.status,
             "terminal": self.terminal,
-            "high_water_mark": round(self.high_water_mark, 4),
+            "high_water_mark": self.high_water_mark,
             "config": self.config.to_dict(),
             "events": [ev.to_dict() for ev in self.events.values()],
         }

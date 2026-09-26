@@ -197,8 +197,10 @@ class TestSublotRule:
             assert order["status"] == "filled"
             assert SYM not in led.positions
 
-    def test_105_three_states(self):
-        """105 三态：报 105 合法（100+全额零5）/ 报 100 留 5 合法 / 报 103 非法。"""
+    def test_105_current_behavior_narrowed(self):
+        """M3E1 收窄后现状记录（非合法性主张）：余额 ≥100 不做整手性判断
+        ——105 报 105/100/103/2 均按现行为放行（lot-multiple 扩展未实施，
+        无提交方官方依据；1000 卖 5 同理）。"""
         days = _weekdays(date(2026, 7, 7), 10)
         with tempfile.TemporaryDirectory() as td:
             pkg = _fixture(Path(td), days, {days[3]: 1.05})  # 100 → 105
@@ -214,19 +216,28 @@ class TestSublotRule:
                 s = led.run_day(days[4], {SYM: w})
                 return led, [o for o in s.orders if o["side"] == "sell"][0]
 
-            # 报 105（目标 0）：全额含零尾 → 合法清仓
-            led, o = build(0.0)
-            assert o["qty_target"] == 105 and o["status"] == "filled"
-            assert SYM not in led.positions
-            # 报 100（目标 5）：整手倍数 → 合法，留零股 5
-            led, o = build(5.0)
-            assert o["qty_target"] == 100 and o["status"] == "filled"
-            assert led.positions[SYM].qty == pytest.approx(5.0)
-            # 报 103（目标 2）：非整手且未全额/尾额不完整 → 拒单
-            led, o = build(2.0)
-            assert o["qty_target"] == 103 and o["status"] == "rejected"
-            assert o["reject_reason"].startswith("sublot_partial_sell_not_allowed")
-            assert led.positions[SYM].qty == pytest.approx(105.0)
+            for target_qty, decl in ((0.0, 105), (5.0, 100), (2.0, 103)):
+                led, o = build(target_qty)
+                assert o["qty_target"] == decl
+                assert o["reject_reason"] is None  # 现行为放行（余额≥100）
+                assert o["status"] in ("filled", "expired_unfilled")
+            # 105 报 2（对方未证例）：余额≥100 → 放行（现状）
+            led, o = build(103.0)
+            assert o["qty_target"] == 2 and o["reject_reason"] is None
+            # 1000 卖 5（对方未证例）：余额≥100 → 放行（现状）
+        with tempfile.TemporaryDirectory() as td:
+            days10 = _weekdays(date(2026, 7, 7), 12)
+            pkg = _fixture(Path(td), days10, {days10[3]: 10.0})  # 100 → 1000
+            led = R01Ledger(pkg, _cfg())
+            led.run_day(days10[0], None)
+            led.run_day(days10[1], {SYM: 0.8})
+            led.run_day(days10[2], None)
+            led.run_day(days10[3], None)
+            assert led.positions[SYM].qty == 1000.0
+            w = _weight_for_target(led, pkg, days10[3], 995.0)  # 申报 5
+            s = led.run_day(days10[4], {SYM: w})
+            o = [x for x in s.orders if x["side"] == "sell"][0]
+            assert o["qty_target"] == 5 and o["reject_reason"] is None  # 现状放行
 
     def test_effective_date_boundary(self):
         """边界：07-03（生效前）卖 3 留 2 维持现行为成交；07-06（生效日）
@@ -307,3 +318,52 @@ class TestSublotRule:
             o = [x for x in s.orders if x["side"] == "sell"][0]
             assert o["qty_target"] == 3 and o["status"] == "filled"
             assert led.positions[SYM].qty == pytest.approx(2.0)
+
+
+class TestCheckpointPrecisionM3:
+    """M3E1 项 1：checkpoint 恢复精度（对齐 R01SELF checkpoint-gap 场景）。"""
+
+    @pytest.mark.skipif(
+        not Path("/Users/lizeyu/Library/Application Support/QuantMind/r01/etf-daily/v2-fcbabbb7/manifest.json").is_file(),
+        reason="真实 v2 包不在本机",
+    )
+    def test_restore_preserves_full_precision_positions_and_hwm(self):
+        """买 100 → ×1.00443373 折算 → checkpoint → 恢复：qty/avg_cost/
+        available/pending/HWM 全精度逐位相等（恢复原始浮点）。"""
+        from backend.services.simulation.replay.etf_input_package import (
+            load_etf_input_package,
+        )
+
+        pkg = load_etf_input_package(
+            "/Users/lizeyu/Library/Application Support/QuantMind/r01/etf-daily/v2-fcbabbb7",
+            expect_manifest_sha256="a0d88429301685aa3939b294c38bb942013de4befe29e8a01e7a1f03a80fc622",
+        )
+        cfg = R01LedgerConfig(
+            group="A", strategy_id="m3e1-ckpt-precision", strategy_version=1,
+            execution_attempt_id=1, initial_cash=20000.0, slippage_bps=0.0,
+        )
+        D0, FOLD, D2 = date(2026, 9, 17), date(2026, 9, 18), date(2026, 9, 21)
+        led = R01Ledger(pkg, cfg)
+        o = led.submit_order(D0, "511010.SH", "buy", 100)
+        bars = pkg.load_date(D0)
+        from backend.services.simulation.replay.r01_ledger import DaySummary
+
+        led._validate_and_execute(o, D0, bars, DaySummary(trade_date=D0.isoformat()))
+        led._eod(D0, bars, DaySummary(trade_date=D0.isoformat()))
+        led.run_day(FOLD, None)
+        pos = led.positions["511010.SH"]
+        assert pos.qty == pytest.approx(100 * 1.00443373)
+        # 人为抬出小数 HWM（对齐对方 30000.123456 用例形态）
+        led.risk.high_water_mark = 30000.123456789
+        cp = led.export_checkpoint()
+        restored = R01Ledger.restore(pkg, cfg, cp)
+        rp = restored.positions["511010.SH"]
+        assert rp.qty == pos.qty  # 全精度逐位（非 approx）
+        assert rp.avg_cost == pos.avg_cost
+        assert rp.available_qty == pos.available_qty
+        assert rp.pending_t1_qty == pos.pending_t1_qty
+        assert restored.risk.high_water_mark == 30000.123456789  # 非 30000.1235
+        # 续跑与连续一致
+        led.run_day(D2, None)
+        restored.run_day(D2, None)
+        assert restored.equity[-1]["nav_exact"] == led.equity[-1]["nav_exact"]

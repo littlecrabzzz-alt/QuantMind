@@ -989,26 +989,21 @@ class R01Ledger:
                 signal_date=signal_date,
                 ideal_weight=weight,
             )
-            # M2E1（§3.3.8，仅 trade_date ≥ sublot_rule_effective）：
-            # 不足 100 份的零股余额只能"全额一次性申报"或不申报——
-            # 合法 ⇔ 申报量为整手倍数，或零股尾额被完整消费（申报后
-            # 余额为整手倍数且申报尾额==总仓尾额），或申报覆盖全部余额。
-            # 卖 3 留 2 / 105 报 103 非法；5 报 5、105 报 105/100 合法。
+            # M2E1/M3E1（§3.3.8，仅 trade_date ≥ sublot_rule_effective）：
+            # **证据支持范围的收窄实现**——唯一强制：可卖余额 <100 份
+            # （零股余额）时，申报量 0<申报<可卖余额 即"部分零股申报"→ 拒
+            # （卖 3 留 2 缺口用例）。全额申报（==可卖余额）或余额 ≥100
+            # 不做整手性判断（lot-multiple 扩展未实施：无提交方官方依据；
+            # 如有官方取证按 change-control 增补，见合同 v3.1 附录）。
             # 拒单不规范化、不改目标：持仓/现金不动，明细入 reject_reason。
             if side == "sell" and trade_date >= self.config.sublot_rule_effective:
+                available_rounded = round(pos.available_qty, 4) if pos else 0.0
                 total_rounded = round(current_qty, 4)
-                remainder = round(total_rounded - qty, 4)
-                lot_multiple = qty % 100 == 0
-                full_closeout = qty >= total_rounded
-                tail_consumed = (
-                    round(qty % 100, 4) == round(total_rounded % 100, 4)
-                    and round(remainder % 100, 4) == 0
-                )
-                if not (lot_multiple or full_closeout or tail_consumed):
+                if 0 < available_rounded < 100 and 0 < qty < available_rounded:
                     order.status = ORDER_STATUS_REJECTED
                     order.reject_reason = (
                         f"sublot_partial_sell_not_allowed:total={total_rounded},"
-                        f"available={round(pos.available_qty, 4) if pos else 0},"
+                        f"available={available_rounded},"
                         f"declared={qty},target_weight={weight}"
                     )
                     order.qty_remaining = qty
@@ -1109,7 +1104,7 @@ class R01Ledger:
                 "cash_per_share": ev.cash_per_share,
                 "basis_multiplier": round(basis_multiplier, 9),
                 "entitlement_qty": round(qty, 4),
-                "entitlement_amount": round(amount, 4),
+                "entitlement_amount": amount,  # M3E1：全精度（pay 段入账金额）
                 "stage": "entitled",
                 "entitled_on": trade_date.isoformat(),
             }
@@ -1689,7 +1684,7 @@ def independent_recompute(
                     ):
                         basis_m *= adj.qty_multiplier
             entitlements[key] = {
-                "amount": round(qty * ev.cash_per_share * basis_m, 4),
+                "amount": qty * ev.cash_per_share * basis_m,  # M3E1：全精度
                 "qty": qty,
                 "stage": "entitled",
             }
