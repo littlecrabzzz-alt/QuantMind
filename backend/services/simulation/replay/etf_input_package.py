@@ -38,10 +38,11 @@ from backend.shared.stock_utils import StockCodeUtil
 
 logger = logging.getLogger(__name__)
 
-def _bound_filters(path: Path, bound: date):
-    """M6E2：按 trade_date 首行嗅探格式构造 pyarrow filters（YYYYMMDD 或
-    YYYY-MM-DD；单格式单一比较，避免混合比较杀死合法行）。返回 filters
-    或 None（无法下推时调用方读后过滤）。"""
+def _sniff_bound_str(path: Path, bound: date) -> str | None:
+    """按 trade_date 首行嗅探格式，返回对应格式的上界字符串。
+
+    YYYYMMDD（v2 真实包）或 YYYY-MM-DD（fixture）；空/不可读 → None。
+    """
     try:
         head = pd.read_parquet(path, columns=["trade_date"])
     except Exception:
@@ -49,8 +50,25 @@ def _bound_filters(path: Path, bound: date):
     if head.empty:
         return None
     first = str(head["trade_date"].iloc[0])
-    bound_str = bound.strftime("%Y%m%d") if len(first.replace("-", "")) == 8 and "-" not in first else bound.isoformat()
+    if len(first.replace("-", "")) == 8 and "-" not in first:
+        return bound.strftime("%Y%m%d")
+    return bound.isoformat()
+
+
+def _bound_filters(path: Path, bound: date):
+    """M6E2：构造 pyarrow filters（格式嗅探后单一比较）。返回 filters
+    或 None（无法下推时调用方走原始行字符串级预过滤）。"""
+    bound_str = _sniff_bound_str(path, bound)
+    if bound_str is None:
+        return None
     return [("trade_date", "<=", bound_str)]
+
+
+def _prefilter_raw_rows(df, bound_str: str):
+    """M6E3（项1）：回退路径的**解析前**过滤——原始 trade_date 字符串级
+    比较上界（与下推同语义）；非法/NaN 未来行（"None"/垃圾串 > 数字串）
+    在解析前丢弃，不进 _parse_trade_date 路径。"""
+    return df[df["trade_date"].map(lambda v: str(v) <= bound_str)]
 
 
 # M6E2：filters 下推不可用时捕获的引擎异常别名（pyarrow 未装/老版本）
@@ -428,8 +446,12 @@ class EtfInputPackage:
         try:
             df = pd.read_parquet(path, filters=filters)
         except (TypeError, ValueError, ImportError, ArrowNotImplementedErrorAlias):
-            # 引擎不支持 filters 下推（如非 pyarrow 后端）→ 回退读后过滤
+            # M6E3：引擎不支持 filters 下推 → 回退：读全表后**解析前**按
+            # 原始 trade_date 字符串级比较过滤（非法/NaN 未来行不进解析）
             df = pd.read_parquet(path)
+            bound_str = _sniff_bound_str(path, self.read_through)
+            if bound_str is not None:
+                df = _prefilter_raw_rows(df, bound_str)
             post_bound = True
         else:
             post_bound = filters is None
@@ -473,6 +495,9 @@ class EtfInputPackage:
                     fpost = ffilters is None
                 except (TypeError, ValueError, ImportError, ArrowNotImplementedErrorAlias):
                     fdf = pd.read_parquet(factor_path)
+                    fbound = _sniff_bound_str(factor_path, self.read_through)
+                    if fbound is not None:
+                        fdf = _prefilter_raw_rows(fdf, fbound)
                     fpost = True
                 fdf = fdf.copy()
                 fdf["trade_date"] = [_parse_trade_date(v) for v in fdf["trade_date"]]

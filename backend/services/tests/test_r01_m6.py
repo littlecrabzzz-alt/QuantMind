@@ -77,7 +77,7 @@ class TestReadThroughDaily:
         """越界执行日：无行情行 → 显式 no_quote 拒单（不虚构）。"""
         v = _bounded(date(2024, 4, 26))
         led = R01Ledger(v, _cfg(read_through_bound=date(2024, 4, 26)))
-        s = led.run_day(date(2024, 4, 23), {SYM: 0.7}, signal_date=date(2024, 4, 22))
+        led.run_day(date(2024, 4, 23), {SYM: 0.7}, signal_date=date(2024, 4, 22))
         assert led.positions[SYM].qty > 0
         # 04-29 在上界后：is_trade_date False → LedgerOrderingError(not_trade_date)
         from backend.services.simulation.replay.r01_ledger import LedgerOrderingError
@@ -343,3 +343,89 @@ class TestM6E2Prefilter:
         led.run_day(date(2026, 7, 6), None)
         led.run_day(date(2026, 7, 7), {"510300.SH": 0.5})
         assert any(o.side == "buy" for o in led.orders.values())
+
+
+class TestM6E3FallbackPrefilter:
+    def _garbage_pkg(self, tmp_path):
+        import json
+
+        import pandas as pd
+
+        root = tmp_path / "pkg"
+        (root / "daily").mkdir(parents=True)
+        (root / "events").mkdir(parents=True)
+        rows = [
+            {"trade_date": "2026-07-06", "open": 4.0, "high": 4.0, "low": 4.0,
+             "close": 4.0, "volume": 1000.0, "amount": 4000.0, "adj_factor": 1.0},
+            {"trade_date": "2026-07-07", "open": 4.1, "high": 4.1, "low": 4.1,
+             "close": 4.1, "volume": 1000.0, "amount": 4100.0, "adj_factor": 1.0},
+            {"trade_date": None, "open": float("nan"), "high": None,
+             "low": float("nan"), "close": None, "volume": None, "amount": None,
+             "adj_factor": None},
+        ]
+        pd.DataFrame(rows).to_parquet(root / "daily" / "510300.SH.parquet", index=False)
+        pd.DataFrame([], columns=["event_date", "event_type"]).to_parquet(
+            root / "events" / "510300.SH.parquet", index=False
+        )
+        manifest = {
+            "schema_version": 3, "package_id": "fixture-m6e3-fallback",
+            "package_version": "m6e3",
+            "package_uri": "node://mac/r01-etf-daily/fixture-m6e3-fallback",
+            "source_release_id": "fixture", "generated_at": "2026-09-26T00:00:00Z",
+            "generated_by_node": "mac",
+            "source_datasets": [{"api_name": n, "sha256": "0" * 64} for n in
+                                ("fund_daily", "fund_adj", "fund_div", "trade_cal", "etf_limit")],
+            "unit_conversions": {"vol": "lot(100 shares) -> shares, multiply by 100",
+                                 "amount": "thousand CNY -> CNY, multiply by 1000", "rules": "s"},
+            "factor_convention": {"formula": "adjusted_close = close_unadjusted × adj_factor (hfq)",
+                                  "verified_cases": []},
+            "symbols": [{"code": "510300.SH", "class": "equity_broad", "role": "primary",
+                         "data_start": "2026-07-06", "data_end": "2026-07-07",
+                         "missing_days": [], "warmup_start": "2026-07-06"}],
+            "known_gaps": [],
+        }
+        (root / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+        return root
+
+    def test_fallback_path_filters_garbage_before_parse(self, tmp_path, monkeypatch):
+        """项1：模拟 filters 不可用（read_parquet 带 filters 即抛）→ 回退
+        路径原始行字符串级预过滤：垃圾未来行不进解析，前缀加载成功。"""
+        import pandas as pd
+
+        import backend.services.simulation.replay.etf_input_package as eip
+
+        root = self._garbage_pkg(tmp_path)
+        real_read = pd.read_parquet
+
+        def no_filters_read(path, *a, **kw):
+            if kw.get("filters") is not None:
+                raise TypeError("filters unsupported (simulated)")
+            # 嗅探列读取也不带 filters → 正常
+            return real_read(path, *a, **{k: v for k, v in kw.items() if k != "filters"})
+
+        monkeypatch.setattr(eip.pd, "read_parquet", no_filters_read)
+        v = load_etf_input_package(root, read_through=date(2026, 7, 7))
+        assert v.actual_max_input_date == date(2026, 7, 7)
+        assert v.get_bar("510300.SH", date(2026, 7, 6)).close == 4.0
+        led = R01Ledger(v, _cfg(read_through_bound=date(2026, 7, 7)))
+        led.run_day(date(2026, 7, 6), None)
+        led.run_day(date(2026, 7, 7), {"510300.SH": 0.5})
+        assert any(o.side == "buy" for o in led.orders.values())
+
+    def test_prefilter_raw_rows_string_semantics(self):
+        """原始行字符串级比较语义：None/垃圾串 > 数字串（被丢）、
+        合法前缀行保留。"""
+        import pandas as pd
+
+        from backend.services.simulation.replay.etf_input_package import (
+            _prefilter_raw_rows,
+        )
+
+        df = pd.DataFrame({
+            "trade_date": ["2026-07-06", "2026-07-07", None, "garbage"],
+            "x": [1, 2, 3, 4],
+        })
+        out = _prefilter_raw_rows(df, "2026-07-07")
+        assert list(out["trade_date"]) == ["2026-07-06", "2026-07-07"]
+        out2 = _prefilter_raw_rows(df, "20260707")  # YYYYMMDD 格式嗅探同语义
+        assert len(out2) == 2 and list(out2["x"]) == [1, 2]
