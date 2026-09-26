@@ -299,3 +299,108 @@ class TestItem4VersionBinding:
         v5["contract_versions"] = {"ledger_contract": "v3", "etf_input_package_schema": "v3"}
         assert v5["schema_version"] != v6["schema_version"]
         assert "precision_semantics" in v6 and "precision_semantics" not in v5
+
+
+class TestM4E2PassAudit:
+    def test_locked_period_pass_leaves_audit_trace(self, pkg_2026):
+        """项1：total≠available 放行留痕（skipped_unproven_scope）。"""
+        days = pkg_2026.trade_dates()[:6]
+        led = _seed_total5(R01Ledger(pkg_2026, _cfg()), days)
+        pos = led.positions[SYM]
+        pos.qty, pos.available_qty = 105.0, 5.0
+        w = 102.0 * PRICE / led.equity[-1]["nav"]  # 申报 3
+        s = led.run_day(days[3], {SYM: w})
+        o = [x for x in s.orders if x["side"] == "sell"][0]
+        assert o["reject_reason"] is None  # 放行
+        # 审计痕迹：summary.sublot_checks + to_dict 留痕
+        checks = [c for c in s.sublot_checks if c["symbol"] == SYM]
+        assert checks, "放行须留 sublot_check 审计"
+        assert checks[0]["sublot_check"] == "skipped_unproven_scope"
+        assert checks[0]["total"] == 105.0 and checks[0]["available"] == 5.0
+        assert checks[0]["declared"] == 3
+        assert "client_order_id" in checks[0]
+
+    def test_balance_ge_100_pass_audit(self, pkg_2026):
+        """余额≥100 放行留痕（skipped_balance_ge_100）。"""
+        days = pkg_2026.trade_dates()[:6]
+        led = _seed_total5(R01Ledger(pkg_2026, _cfg()), days)
+        pos = led.positions[SYM]
+        pos.qty = pos.available_qty = 105.0
+        w = 103.0 * PRICE / led.equity[-1]["nav"]  # 申报 2
+        s = led.run_day(days[3], {SYM: w})
+        o = [x for x in s.orders if x["side"] == "sell"][0]
+        assert o["reject_reason"] is None
+        checks = [c for c in s.sublot_checks if c["symbol"] == SYM]
+        assert checks and checks[0]["sublot_check"] == "skipped_balance_ge_100"
+
+    def test_reject_audit_enforced(self, pkg_2026):
+        """拒单场景留痕 enforced_reject。"""
+        days = pkg_2026.trade_dates()[:6]
+        led = _seed_total5(R01Ledger(pkg_2026, _cfg()), days)
+        w = 2.0 * PRICE / led.equity[-1]["nav"]  # 申报 3（总仓=可卖=5）
+        s = led.run_day(days[3], {SYM: w})
+        checks = [c for c in s.sublot_checks if c["symbol"] == SYM]
+        assert checks and checks[0]["sublot_check"] == "enforced_reject"
+
+    def test_manual_pass_leaves_log(self, pkg_2026):
+        """manual 放行留痕（sublot_check_log）。"""
+        days = pkg_2026.trade_dates()[:6]
+        led = _seed_total5(R01Ledger(pkg_2026, _cfg()), days)
+        pos = led.positions[SYM]
+        pos.qty, pos.available_qty = 105.0, 5.0
+        led.run_day(days[3], None)
+        order = led.manual_sell(days[3], SYM, 3, reason="r", requested_by="u")
+        assert order.reject_reason is None
+        entry = [c for c in led.sublot_check_log if c["symbol"] == SYM]
+        assert entry and entry[-1]["sublot_check"] == "skipped_unproven_scope"
+        assert "manual" in entry[-1].get("context", "")
+
+
+class TestM4E2PrecisionChain:
+    def test_v5_restore_then_reexport_marks_legacy(self, tmp_path):
+        """项2：v5→恢复→再导出 schema6 标记 legacy（不冒充 full）。"""
+        pkg = build_fixture_package(tmp_path / "p")
+        led = R01Ledger(pkg, _cfg())
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        cp = led.export_checkpoint()
+        # 伪装 v5（legacy：schema 5、v3 合同、4dp 订单费用、无 precision 标记）
+        cp["schema_version"] = 5
+        cp.pop("precision_semantics", None)
+        cp["contract_versions"] = {"ledger_contract": "v3", "etf_input_package_schema": "v3"}
+        for o in cp["orders"].values():
+            o["fees"] = round(o["fees"], 4)
+            for f in o.get("fills", []):
+                f["commission"] = round(f["commission"], 4)
+                f["total_fee"] = round(f["total_fee"], 4)
+        restored = R01Ledger.restore(pkg, _cfg(), cp)
+        assert restored.checkpoint_precision_origin == "legacy_precision"
+        # 再导出：schema 6 结构 + legacy 标记（语义链正确传递）
+        cp2 = restored.export_checkpoint()
+        assert cp2["schema_version"] == 6
+        assert cp2["precision_semantics"] == "legacy_precision"
+        # legacy 链再次恢复仍正确
+        r2 = R01Ledger.restore(pkg, _cfg(), cp2)
+        assert r2.checkpoint_precision_origin == "legacy_precision"
+        # 不冒充 full：legacy 恢复的费用保持原样（4dp）
+        o = next(iter(r2.orders.values()))
+        assert o.fees == round(o.fees, 4)
+
+    def test_v6_missing_precision_rejected(self, tmp_path):
+        """schema 6 缺 precision_semantics → 损坏拒绝。"""
+        pkg = build_fixture_package(tmp_path / "p")
+        led = R01Ledger(pkg, _cfg())
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        cp = led.export_checkpoint()
+        cp.pop("precision_semantics")
+        with pytest.raises(CheckpointConfigMismatch, match="precision_semantics"):
+            R01Ledger.restore(pkg, _cfg(), cp)
+
+    def test_fresh_ledger_marks_full(self, tmp_path):
+        """新建账本导出标记 full_precision。"""
+        pkg = build_fixture_package(tmp_path / "p")
+        led = R01Ledger(pkg, _cfg())
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        cp = led.export_checkpoint()
+        assert cp["precision_semantics"] == "full_precision"
+        r = R01Ledger.restore(pkg, _cfg(), cp)
+        assert r.checkpoint_precision_origin == "full_precision"

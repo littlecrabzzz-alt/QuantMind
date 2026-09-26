@@ -469,6 +469,8 @@ class R01LedgerConfig:
 @dataclass
 class DaySummary:
     trade_date: str
+    # M4E2：§3.3.8 申报校验审计痕迹（含放行：skipped_unproven_scope 等）
+    sublot_checks: list[dict[str, Any]] = field(default_factory=list)
     corporate_actions_applied: list[dict[str, Any]] = field(default_factory=list)
     dividends_credited: list[dict[str, Any]] = field(default_factory=list)
     orders: list[dict[str, Any]] = field(default_factory=list)
@@ -478,6 +480,7 @@ class DaySummary:
     def to_dict(self) -> dict[str, Any]:
         return {
             "trade_date": self.trade_date,
+            "sublot_checks": list(self.sublot_checks),
             "corporate_actions_applied": self.corporate_actions_applied,
             "dividends_credited": self.dividends_credited,
             "orders": self.orders,
@@ -534,6 +537,10 @@ class R01Ledger:
         self.dividend_entitlements: dict[tuple[str, str, str, str], dict[str, Any]] = {}
         self.dividend_receivable: float = 0.0  # 应收红利（计入 nav、不可交易）
         self.blocked_dividend_log: list[dict[str, Any]] = []
+        # M4E2：零股申报校验审计（跨日累计；manual_sell 等摘要外入口）
+        self.sublot_check_log: list[dict[str, Any]] = []
+        # M4E2：checkpoint 精度来源标记（新建=full；legacy 恢复=legacy）
+        self.checkpoint_precision_origin: str = "full_precision"
         self.manual_actions: list[dict[str, Any]] = []
         self.deposit_rejections: list[dict[str, Any]] = []
         self.risk_blocked_orders: list[dict[str, Any]] = []
@@ -888,27 +895,56 @@ class R01Ledger:
         pos: LedgerPosition | None,
         *,
         extra: str = "",
-    ) -> str | None:
-        """§3.3.8 零股申报校验（M4E1 收窄到已证关系；run_day/manual_sell 共享）。
+    ) -> tuple[str | None, dict[str, Any] | None]:
+        """§3.3.8 零股申报校验（M4E1 收窄到已证关系；M4E2 放行审计）。
 
         **唯一强制**：总仓≈可卖（|差|<1e-9，双方强证场景：总仓=可卖<100）
         且 0<申报<可卖（部分零股申报）→ 拒 sublot_partial_sell_not_allowed。
         total≠available（如 T+1 锁定）**不强制**——分歧场景无官方依据不判，
-        现状放行（审计记录 total/available/declared 供复核）。
-        仅 trade_date ≥ sublot_rule_effective（默认 2026-07-06）；此前放行。
-        不扩大卖量、不整手化合法部分成交。返回拒单原因或 None（放行）。
+        现状放行。仅 trade_date ≥ sublot_rule_effective（默认 2026-07-06）。
+        不扩大卖量、不整手化合法部分成交。
+
+        返回 (reject_reason | None, audit_note | None)：
+        - 拒单：reason + audit（记 total/available/declared）；
+        - 放行（≥生效日）：audit 含 sublot_check 状态标记——
+          `enforced_reject` 不适用；`skipped_unproven_scope`（total≠available
+          或余额≥100 等未证关系，放行留痕）/`full_declaration`（全额放行）；
+        - 生效日前/非卖出：。调用方把 audit 落到当日 summary（留痕）。
         """
-        if trade_date < self.config.sublot_rule_effective:
-            return None
-        total = round(pos.qty, 9) if pos else 0.0
-        available = round(pos.available_qty, 9) if pos else 0.0
+        if pos is None:
+            return None, None
+        total = round(pos.qty, 9)
+        available = round(pos.available_qty, 9)
         total_eq_available = abs(total - available) < 1e-9
-        if not (total_eq_available and 0 < available < 100 and 0 < declared_qty < available):
-            return None  # 未证关系/全额/余额≥100：放行（无判据不判）
+        audit: dict[str, Any] = {
+            "symbol": symbol,
+            "trade_date": trade_date.isoformat(),
+            "total": total,
+            "available": available,
+            "declared": declared_qty,
+        }
+        if extra:
+            audit["context"] = extra
+        if trade_date < self.config.sublot_rule_effective:
+            audit["sublot_check"] = "skipped_pre_effective"
+            return None, audit
+        if not total_eq_available:
+            # 分歧场景（如 T+1 锁定）：无官方依据不判，放行留痕
+            audit["sublot_check"] = "skipped_unproven_scope"
+            return None, audit
+        if not (0 < available < 100):
+            audit["sublot_check"] = "skipped_balance_ge_100"
+            return None, audit
+        if declared_qty >= available:
+            audit["sublot_check"] = "full_declaration"
+            return None, audit
+        if declared_qty <= 0:
+            return None, None
+        audit["sublot_check"] = "enforced_reject"
         detail = f"total={total},available={available},declared={declared_qty}"
         if extra:
             detail += f",{extra}"
-        return f"sublot_partial_sell_not_allowed:{detail}"
+        return f"sublot_partial_sell_not_allowed:{detail}", audit
 
     def _signal_reference(
         self, trade_date: date, signal_date: date | None
@@ -1021,12 +1057,15 @@ class R01Ledger:
                 signal_date=signal_date,
                 ideal_weight=weight,
             )
-            # M2E1/M3E1/M4E1（§3.3.8，仅 trade_date ≥ sublot_rule_effective）：
-            # 共享申报校验（run_day 与 manual_sell 统一入口），量截断/撮合前。
+            # M2E1/M3E1/M4E1/M4E2（§3.3.8）：共享申报校验（run_day 与
+            # manual_sell 统一入口），量截断/撮合前；放行亦留审计痕迹
             if side == "sell":
-                reject_reason = self._sublot_declaration_check(
+                reject_reason, sublot_audit = self._sublot_declaration_check(
                     trade_date, symbol, qty, pos, extra=f"target_weight={weight}"
                 )
+                if sublot_audit is not None:
+                    sublot_audit["client_order_id"] = order.client_order_id
+                    summary.sublot_checks.append(sublot_audit)
                 if reject_reason:
                     order.status = ORDER_STATUS_REJECTED
                     order.reject_reason = reject_reason
@@ -1380,11 +1419,16 @@ class R01Ledger:
                 }
             )
             return order
-        # M4E1（项2）：manual_sell 与 run_day 统一申报入口——量截断/撮合前
-        # 走同一 §3.3.8 校验（同一 helper），不可绕过
-        sublot_reason = self._sublot_declaration_check(
+        # M4E1/M4E2（项2）：manual_sell 与 run_day 统一申报入口——量截断/
+        # 撮合前走同一 §3.3.8 校验（同一 helper），不可绕过；放行亦留痕
+        sublot_reason, sublot_audit = self._sublot_declaration_check(
             trade_date, symbol, int(qty), position, extra=f"manual,reason={reason}"
         )
+        if sublot_audit is not None:
+            sublot_audit["client_order_id"] = make_client_order_id(
+                self.ledger_run_id, trade_date, symbol, "sell"
+            )
+            self.sublot_check_log.append(sublot_audit)
         if sublot_reason:
             order = self.submit_order(trade_date, symbol, "sell", qty, origin="manual")
             order.status = ORDER_STATUS_REJECTED
@@ -1492,7 +1536,9 @@ class R01Ledger:
             "input_binding": self.input_binding,
             "config": self.config.to_dict(),
             "contract_versions": dict(self.contract_versions),
-            "precision_semantics": "full_precision",  # v6 标记（M4E1 项4）
+            # M4E2（项2）：语义链——本快照数值的精度来源（legacy 恢复的
+            # 账本导出标记 legacy，不冒充 full；schema 仍为 6 结构兼容）
+            "precision_semantics": self.checkpoint_precision_origin,
             "cash": self.cash,
             "positions": {sym: pos.to_dict() for sym, pos in self.positions.items()},
             "executed_dates": sorted(self._executed_dates),
@@ -1564,6 +1610,16 @@ class R01Ledger:
                 f"checkpoint_config_mismatch: 不支持的 schema_version={cp_schema}"
                 f"（允许 5=legacy_precision / 6=full_precision）"
             )
+        # M4E2（项2）：precision_semantics 语义链——v6 必须带
+        # full_precision 标记（缺失/异值=损坏拒绝）；v5 无标记即 legacy。
+        # 恢复后 ledger 保留 origin 精度标记：再导出 schema 6 时标记
+        # legacy（不冒充 full）。
+        cp_precision = checkpoint.get("precision_semantics")
+        if cp_schema == 6 and cp_precision not in ("full_precision", "legacy_precision"):
+            raise CheckpointConfigMismatch(
+                f"checkpoint_config_mismatch: schema 6 缺/错 precision_semantics="
+                f"{cp_precision!r}（允许 full/legacy，损坏快照拒绝）"
+            )
         cp_config = checkpoint.get("config")
         if not isinstance(cp_config, dict) or "initial_cash" not in cp_config:
             raise CheckpointConfigMismatch(
@@ -1630,6 +1686,12 @@ class R01Ledger:
         ledger.deposit_rejections = list(checkpoint.get("deposit_rejections", []))
         ledger.risk_blocked_orders = list(checkpoint.get("risk_blocked_orders", []))
         ledger.risk = RiskStateMachine.from_dict(checkpoint["risk_state"])
+        # M4E2：origin 精度标记（legacy 恢复的账本不冒充 full）
+        ledger.checkpoint_precision_origin = (
+            cp_precision
+            if cp_precision in ("full_precision", "legacy_precision")
+            else ("legacy_precision" if cp_schema == 5 else "full_precision")
+        )
         return ledger
 
 
