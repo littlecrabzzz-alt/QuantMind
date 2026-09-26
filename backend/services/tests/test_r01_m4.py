@@ -209,11 +209,11 @@ class TestItem3CheckpointFullPrecision:
     def test_order_json_roundtrip_exact_fields(self, tmp_path):
         """订单 fees/realized_pnl/avg_fill_price JSON 往返全精度。"""
         pkg = build_fixture_package(tmp_path / "p")
-        led = R01Ledger(pkg, _cfg())
-        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        led = R01Ledger(pkg, _cfg(initial_cash=2000.0))
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.8}, signal_date=date(2025, 9, 9))
         cp = json.loads(json.dumps(led.export_checkpoint()))
         assert cp["schema_version"] == 6
-        restored = R01Ledger.restore(pkg, _cfg(), cp)
+        restored = R01Ledger.restore(pkg, _cfg(initial_cash=2000.0), cp)
         for coid, o in restored.orders.items():
             orig = led.orders[coid]
             assert o.fees == orig.fees
@@ -228,8 +228,8 @@ class TestItem3CheckpointFullPrecision:
         """L901：目标额度取精确 NAV（nav_exact）——构造 nav 与 nav_exact
         差异（4dp 舍入边缘），验证 sizing 用精确值。"""
         pkg = build_fixture_package(tmp_path / "p")
-        led = R01Ledger(pkg, _cfg())
-        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        led = R01Ledger(pkg, _cfg(initial_cash=2000.0))
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.8}, signal_date=date(2025, 9, 9))
         # 注入小数 NAV（对齐 nav_exact≠round(nav,4) 的边缘）
         snap = led.equity[-1]
         snap["nav_exact"] = snap["nav"] + 0.00004  # 4dp 舍入边缘差异
@@ -243,8 +243,8 @@ class TestItem4VersionBinding:
 
     def test_checkpoint_schema_v6_full_precision(self, tmp_path):
         pkg = build_fixture_package(tmp_path / "p")
-        led = R01Ledger(pkg, _cfg())
-        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        led = R01Ledger(pkg, _cfg(initial_cash=2000.0))
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.8}, signal_date=date(2025, 9, 9))
         cp = led.export_checkpoint()
         assert cp["schema_version"] == 6
         assert cp["precision_semantics"] == "full_precision"
@@ -252,8 +252,8 @@ class TestItem4VersionBinding:
     def test_v5_legacy_accepted_not_compensated(self, tmp_path):
         """v5（legacy_precision，ledger_contract=v3）接受；不补造已丢精度。"""
         pkg = build_fixture_package(tmp_path / "p")
-        led = R01Ledger(pkg, _cfg())
-        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        led = R01Ledger(pkg, _cfg(initial_cash=2000.0))
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.8}, signal_date=date(2025, 9, 9))
         cp = led.export_checkpoint()
         # 伪装为 v5 时代快照（schema 5 + v3 合同 + 4dp 舍入的订单费用）
         cp["schema_version"] = 5
@@ -264,34 +264,34 @@ class TestItem4VersionBinding:
             for f in o.get("fills", []):
                 f["commission"] = round(f["commission"], 4)
                 f["total_fee"] = round(f["total_fee"], 4)
-        restored = R01Ledger.restore(pkg, _cfg(), cp)  # legacy 接受
+        restored = R01Ledger.restore(pkg, _cfg(initial_cash=2000.0), cp)  # legacy 接受
         o = next(iter(restored.orders.values()))
         assert o.fees == round(o.fees, 4)  # 按原样恢复（4dp），不补造
 
     def test_v4_rejected_missing_binding(self, tmp_path):
         pkg = build_fixture_package(tmp_path / "p")
-        led = R01Ledger(pkg, _cfg())
-        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        led = R01Ledger(pkg, _cfg(initial_cash=2000.0))
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.8}, signal_date=date(2025, 9, 9))
         cp = led.export_checkpoint()
         cp["schema_version"] = 4
         cp.pop("input_binding", None)
         with pytest.raises(CheckpointPackageMismatch, match="input_binding"):
-            R01Ledger.restore(pkg, _cfg(), cp)
+            R01Ledger.restore(pkg, _cfg(initial_cash=2000.0), cp)
 
     def test_unknown_schema_rejected(self, tmp_path):
         pkg = build_fixture_package(tmp_path / "p")
-        led = R01Ledger(pkg, _cfg())
-        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        led = R01Ledger(pkg, _cfg(initial_cash=2000.0))
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.8}, signal_date=date(2025, 9, 9))
         cp = led.export_checkpoint()
         cp["schema_version"] = 7
         with pytest.raises(CheckpointConfigMismatch, match="schema_version"):
-            R01Ledger.restore(pkg, _cfg(), cp)
+            R01Ledger.restore(pkg, _cfg(initial_cash=2000.0), cp)
 
     def test_v5_vs_v6_distinguishable(self, tmp_path):
         """同配置 v5/v6 可区分（schema 字段不同、恢复语义标记不同）。"""
         pkg = build_fixture_package(tmp_path / "p")
-        led = R01Ledger(pkg, _cfg())
-        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        led = R01Ledger(pkg, _cfg(initial_cash=2000.0))
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.8}, signal_date=date(2025, 9, 9))
         v6 = led.export_checkpoint()
         v5 = copy.deepcopy(v6)
         v5["schema_version"] = 5
@@ -360,8 +360,8 @@ class TestM4E2PrecisionChain:
     def test_v5_restore_then_reexport_marks_legacy(self, tmp_path):
         """项2：v5→恢复→再导出 schema6 标记 legacy（不冒充 full）。"""
         pkg = build_fixture_package(tmp_path / "p")
-        led = R01Ledger(pkg, _cfg())
-        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        led = R01Ledger(pkg, _cfg(initial_cash=2000.0))
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.8}, signal_date=date(2025, 9, 9))
         cp = led.export_checkpoint()
         # 伪装 v5（legacy：schema 5、v3 合同、4dp 订单费用、无 precision 标记）
         cp["schema_version"] = 5
@@ -372,14 +372,14 @@ class TestM4E2PrecisionChain:
             for f in o.get("fills", []):
                 f["commission"] = round(f["commission"], 4)
                 f["total_fee"] = round(f["total_fee"], 4)
-        restored = R01Ledger.restore(pkg, _cfg(), cp)
+        restored = R01Ledger.restore(pkg, _cfg(initial_cash=2000.0), cp)
         assert restored.checkpoint_precision_origin == "legacy_precision"
         # 再导出：schema 6 结构 + legacy 标记（语义链正确传递）
         cp2 = restored.export_checkpoint()
         assert cp2["schema_version"] == 6
         assert cp2["precision_semantics"] == "legacy_precision"
         # legacy 链再次恢复仍正确
-        r2 = R01Ledger.restore(pkg, _cfg(), cp2)
+        r2 = R01Ledger.restore(pkg, _cfg(initial_cash=2000.0), cp2)
         assert r2.checkpoint_precision_origin == "legacy_precision"
         # 不冒充 full：legacy 恢复的费用保持原样（4dp）
         o = next(iter(r2.orders.values()))
@@ -388,19 +388,19 @@ class TestM4E2PrecisionChain:
     def test_v6_missing_precision_rejected(self, tmp_path):
         """schema 6 缺 precision_semantics → 损坏拒绝。"""
         pkg = build_fixture_package(tmp_path / "p")
-        led = R01Ledger(pkg, _cfg())
-        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        led = R01Ledger(pkg, _cfg(initial_cash=2000.0))
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.8}, signal_date=date(2025, 9, 9))
         cp = led.export_checkpoint()
         cp.pop("precision_semantics")
         with pytest.raises(CheckpointConfigMismatch, match="precision_semantics"):
-            R01Ledger.restore(pkg, _cfg(), cp)
+            R01Ledger.restore(pkg, _cfg(initial_cash=2000.0), cp)
 
     def test_fresh_ledger_marks_full(self, tmp_path):
         """新建账本导出标记 full_precision。"""
         pkg = build_fixture_package(tmp_path / "p")
-        led = R01Ledger(pkg, _cfg())
-        led.run_day(date(2025, 9, 10), {"510300.SH": 0.5}, signal_date=date(2025, 9, 9))
+        led = R01Ledger(pkg, _cfg(initial_cash=2000.0))
+        led.run_day(date(2025, 9, 10), {"510300.SH": 0.8}, signal_date=date(2025, 9, 9))
         cp = led.export_checkpoint()
         assert cp["precision_semantics"] == "full_precision"
-        r = R01Ledger.restore(pkg, _cfg(), cp)
+        r = R01Ledger.restore(pkg, _cfg(initial_cash=2000.0), cp)
         assert r.checkpoint_precision_origin == "full_precision"

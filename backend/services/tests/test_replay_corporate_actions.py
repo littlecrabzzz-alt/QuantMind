@@ -254,14 +254,15 @@ class TestOrderStateMachine:
     def test_status_lifecycle_fields(self, pkg):
         ledger = _ledger(pkg)
         ledger.run_day(date(2025, 9, 10), {"510300.SH": 1.0})
-        # fixture 09-10 开盘 4.012：原始目标 24925 份 → 整手成交 24900，
-        # 余 25 转 expired_unfilled（部分成交当日收口，ledger-contract §4）
+        # M5E1 买初报 floor 整手：信号日收盘 4.008 → raw≈24950 → 申报
+        # 24900（floor）→ 全额成交无剩余；成交价=执行日开盘 4.012
         o = ledger.orders[
             f"{ledger.ledger_run_id}:2025-09-10:510300.SH:buy"
         ]
+        assert o.qty_target == 24900
         assert o.qty_filled == 24900
-        assert o.qty_remaining == 50
-        assert o.status == "expired_unfilled"
+        assert o.qty_remaining == 0
+        assert o.status == "filled"
         assert o.avg_fill_price > 0
         assert o.fills[0].stamp_duty == 0.0  # ETF 无印花税
         assert o.fills[0].transfer_fee == 0.0

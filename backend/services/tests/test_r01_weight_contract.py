@@ -83,15 +83,10 @@ class TestWeightContract:
             _config(initial=20000.0),
             [(date(2025, 9, 10), {"511010.SH": 0.35})],
         )
-        order = ledger.orders[
-            f"{ledger.ledger_run_id}:2025-09-10:511010.SH:buy"
-        ]
-        # 0.35×20000=7000 < 10700 → 零手 → 无成交（lot_inexpressible 留痕）
-        assert order.status == "rejected"
-        assert order.reject_reason == "lot_inexpressible"
-        assert order.ideal_weight == 0.35
+        # M5E1 买初报 floor 整手：0.35×20000≈7000 < 单手 10700 → 0 手
+        # 不下单（min_lot_unreachable 审计，原目标保留；残余现金计息 0 入 nav）
+        assert not [o for o in ledger.orders.values() if o.symbol == "511010.SH"]
         snap = ledger.equity[-1]
-        # 残余现金计入 nav、计息 0（无持仓 → nav=现金=本金）
         assert snap["nav"] == pytest.approx(20000.0)
 
     def test_treasury_lot_granularity_3w(self, pkg):
@@ -104,11 +99,11 @@ class TestWeightContract:
         order = ledger.orders[
             f"{ledger.ledger_run_id}:2025-09-10:511010.SH:buy"
         ]
-        # 原始目标 112 份，整手可表达 100 份：部分成交后剩余 12 份
-        # 当日收盘转 expired_unfilled（ledger-contract §4，不隔日挂单）
-        assert order.status == "expired_unfilled"
+        # M5E1 买初报 floor 整手：原始目标 ~112 份 → 申报=100（floor 1 手）
+        # 全额成交、无剩余（整手约束前移到申报，非撮合截断）
+        assert order.status == "filled"
         assert order.qty_filled == 100
-        assert order.qty_remaining == 12
+        assert order.qty_remaining == 0
         snap = ledger.equity[-1]
         # ideal=0.40；realized=100×close/nav（DG-001 粗粒度偏差入证据）
         assert order.ideal_weight == pytest.approx(0.40)

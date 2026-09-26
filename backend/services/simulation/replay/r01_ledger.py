@@ -932,6 +932,12 @@ class R01Ledger:
             # 分歧场景（如 T+1 锁定）：无官方依据不判，放行留痕
             audit["sublot_check"] = "skipped_unproven_scope"
             return None, audit
+        # M5E1（项4b）：小数份余额为模型域（现实券商不存在非整数可卖）——
+        # 法律已证仅覆盖整数 total=available<100；可卖非整数不强制，放行
+        # + fractional_model_domain 审计痕迹
+        if available != int(available):
+            audit["sublot_check"] = "fractional_model_domain"
+            return None, audit
         if not (0 < available < 100):
             audit["sublot_check"] = "skipped_balance_ge_100"
             return None, audit
@@ -1038,16 +1044,32 @@ class R01Ledger:
                 summary.orders.append(order.to_dict())
                 continue
             target_amount = weight * nav_ref
-            # 原始目标份额（按信号日收盘价，不预先取整）：整手约束交由
-            # 撮合器统一执行；不足一手的买入以 lot_inexpressible 显式拒单
+            # 原始目标份额（按信号日收盘价）。M5E1（项1）：买差额初始
+            # 申报按冻结方法"先 floor 整手"——申报量=floor(delta/100)*100
+            # （delta 精确值含小数）；0 手→不下单+审计（min_lot_unreachable，
+            # 含 raw_delta；不静默改目标）。卖侧零股规则不动；合法申报后的
+            # 市场量部分成交不整手化。
             raw_target = target_amount / price
             pos = self.positions.get(symbol)
             current_qty = pos.qty if pos else 0.0
             delta = raw_target - current_qty
-            if abs(delta) < 1:
-                continue
             side = "buy" if delta > 0 else "sell"
-            qty = int(delta) if delta > 0 else int(math.ceil(-delta - 1e-9))
+            if side == "buy":
+                qty = int(math.floor(delta / 100.0)) * 100
+                if qty <= 0:
+                    summary.sublot_checks.append({
+                        "symbol": symbol,
+                        "trade_date": trade_date.isoformat(),
+                        "buy_declaration": "min_lot_unreachable",
+                        "raw_delta": round(delta, 6),
+                        "target_weight": weight,
+                        "sublot_check": "skipped_buy_min_lot_unreachable",
+                    })
+                    continue
+            else:
+                if abs(delta) < 1:
+                    continue
+                qty = int(math.ceil(-delta - 1e-9))
             order = self.submit_order(
                 trade_date,
                 symbol,
@@ -1554,6 +1576,7 @@ class R01Ledger:
                 for k, rec in self.dividend_entitlements.items()
             ],
             "dividend_receivable": self.dividend_receivable,
+            "sublot_check_log": list(self.sublot_check_log),  # M5E1 项3：manual 审计恢复
             "manual_actions": list(self.manual_actions),
             "deposit_rejections": list(self.deposit_rejections),
             "risk_blocked_orders": list(self.risk_blocked_orders),
@@ -1615,6 +1638,13 @@ class R01Ledger:
         # 恢复后 ledger 保留 origin 精度标记：再导出 schema 6 时标记
         # legacy（不冒充 full）。
         cp_precision = checkpoint.get("precision_semantics")
+        # M5E1（项2）：v5 禁止携带 precision_semantics 标记——原生 v5 从不
+        # 写该字段，出现即矛盾标记=损坏，拒绝（防 v5 被洗成 v6/full）。
+        if cp_schema == 5 and cp_precision is not None:
+            raise CheckpointConfigMismatch(
+                "checkpoint_config_mismatch: schema 5 携带 precision_semantics="
+                f"{cp_precision!r}（原生 v5 无此字段，矛盾标记=损坏快照拒绝）"
+            )
         if cp_schema == 6 and cp_precision not in ("full_precision", "legacy_precision"):
             raise CheckpointConfigMismatch(
                 f"checkpoint_config_mismatch: schema 6 缺/错 precision_semantics="
@@ -1682,15 +1712,36 @@ class R01Ledger:
             for rec in checkpoint.get("dividend_log", [])
         }
         ledger.dividend_receivable = float(checkpoint.get("dividend_receivable", 0.0))
+        ledger.sublot_check_log = list(checkpoint.get("sublot_check_log", []))
         ledger.manual_actions = list(checkpoint.get("manual_actions", []))
         ledger.deposit_rejections = list(checkpoint.get("deposit_rejections", []))
         ledger.risk_blocked_orders = list(checkpoint.get("risk_blocked_orders", []))
+        # M5E1（项3）：nested risk_state.config 与顶层冻结风险配置一致性
+        # 校验——不一致=混合口径快照，显式拒绝
+        cp_risk_cfg = (checkpoint.get("risk_state") or {}).get("config") or {}
+        exp_loss = (
+            config.loss_line_amount
+            if config.loss_line_amount is not None
+            else config.initial_cash * 0.30
+        )
+        exp_dd = config.drawdown_pct
+        if (
+            cp_risk_cfg.get("initial_cash") != config.initial_cash
+            or cp_risk_cfg.get("loss_line_amount") != exp_loss
+            or cp_risk_cfg.get("drawdown_pct") != exp_dd
+        ):
+            raise CheckpointConfigMismatch(
+                "checkpoint_config_mismatch: nested risk_state.config 与顶层"
+                f"冻结风险配置不一致：checkpoint={cp_risk_cfg} vs"
+                f" config(initial={config.initial_cash}, loss={exp_loss},"
+                f" dd={exp_dd})"
+            )
         ledger.risk = RiskStateMachine.from_dict(checkpoint["risk_state"])
         # M4E2：origin 精度标记（legacy 恢复的账本不冒充 full）
+        # M5E1：legacy 判定只认 schema_version（v5=无条件 legacy）；
+        # 仅原生 v6（schema6 + full 标记）可为 full
         ledger.checkpoint_precision_origin = (
-            cp_precision
-            if cp_precision in ("full_precision", "legacy_precision")
-            else ("legacy_precision" if cp_schema == 5 else "full_precision")
+            "legacy_precision" if cp_schema == 5 else cp_precision
         )
         return ledger
 
