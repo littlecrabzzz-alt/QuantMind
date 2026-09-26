@@ -1,0 +1,207 @@
+"""Publication checks: replay, revision, interruption, corruption and time gaps."""
+
+import json
+from datetime import date
+
+import pandas as pd
+import pytest
+
+from backend.scripts import blockchain_sync as sync
+from backend.services.engine.rd_agent.data_pipeline import crypto_data as fetch
+from backend.tests.test_binance_data_fetch import bar
+
+
+def frame(
+    symbol="BTCUSDT", days=("2026-09-22", "2026-09-23", "2026-09-24"), close="105"
+):
+    return fetch._parse_klines(
+        [bar(d, close=close) for d in days],
+        symbol,
+        "1d",
+        {
+            "request": {"url": "https://data-api.binance.vision/api/v3/klines"},
+            "sha256": "a" * 64,
+            "collected_at": "2026-09-25T00:01:00Z",
+        },
+    )
+
+
+@pytest.fixture
+def intake(monkeypatch, tmp_path):
+    monkeypatch.setenv("QM_QUANTBC_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        fetch,
+        "get_binance_exchange_info",
+        lambda symbols, **kwargs: {
+            "symbols": [
+                {
+                    "symbol": s,
+                    "baseAsset": s[:-4],
+                    "quoteAsset": "USDT",
+                    "status": "TRADING",
+                    "isSpotTradingAllowed": True,
+                    "filters": [],
+                }
+                for s in symbols
+            ],
+            "provenance": {"collected_at": "2026-09-25T00:01:00Z"},
+        },
+    )
+    monkeypatch.setattr(
+        fetch, "download_binance_klines", lambda symbol, **kwargs: frame(symbol)
+    )
+    monkeypatch.setattr(
+        fetch,
+        "get_binance_first_kline",
+        lambda symbol, **kwargs: frame(symbol).iloc[:1],
+    )
+    return {
+        "symbols": "BTCUSDT,ETHUSDT",
+        "start_date": "2026-09-22",
+        "end_date": "2026-09-25",
+    }
+
+
+def test_publication_replay_revision_and_old_input_unchanged(
+    intake, tmp_path, monkeypatch
+):
+    first = sync.run(**intake)
+    path, manifest, stored = sync._previous(tmp_path)
+    old_manifest = (path / "manifest.json").read_bytes()
+    assert len(stored) == 6
+    assert stored.amount.eq(stored.quote_volume).all()
+    assert manifest["quality"]["symbols"]["BTCUSDT"]["gaps"] == 0
+    assert sync.run(**intake)["release_id"] == first["release_id"]
+    assert len(list((tmp_path / "releases").iterdir())) == 1
+    monkeypatch.setattr(
+        fetch,
+        "download_binance_klines",
+        lambda symbol, **kwargs: frame(symbol, close="106"),
+    )
+    revised = sync.run(**intake)
+    assert revised["release_id"] != first["release_id"]
+    assert revised["revised_rows"] == 6
+    assert (path / "manifest.json").read_bytes() == old_manifest
+    assert len(sync._previous(tmp_path)[2]) == 6
+
+
+def test_gap_failure_does_not_publish_or_advance_checkpoint(
+    intake, tmp_path, monkeypatch
+):
+    first = sync.run(**intake)
+    pointer = (tmp_path / "CURRENT.json").read_bytes()
+    # The requested final closed day is absent; old data must not masquerade as current.
+    with pytest.raises(ValueError, match="Daily gaps"):
+        sync.run(**{**intake, "end_date": "2026-09-26"})
+    assert (tmp_path / "CURRENT.json").read_bytes() == pointer
+    attempt = json.loads((tmp_path / "last_attempt.json").read_text())
+    assert attempt["status"] == "failed"
+    assert sync._previous(tmp_path)[1]["release_id"] == first["release_id"]
+
+
+def test_unchanged_release_returns_its_published_quality(intake, monkeypatch):
+    first = sync.run(**intake)
+    validate = sync.validate_daily
+
+    def check(*args, **kwargs):
+        return {
+            **validate(*args, **kwargs),
+            "source_revisions": [{"check": "new provenance"}],
+        }
+
+    monkeypatch.setattr(sync, "validate_daily", check)
+    replay = sync.run(**intake)
+    assert replay["release_id"] == first["release_id"]
+    assert replay["quality"] == first["quality"]
+    assert replay["checked_quality"] != replay["quality"]
+
+
+def test_corrupt_published_file_rejected(intake, tmp_path):
+    result = sync.run(**intake)
+    path = sync.Path(result["data_dir"]) / "quality.json"
+    path.write_text("{}")
+    with pytest.raises(ValueError, match="checksum"):
+        sync.run(**intake)
+
+
+def test_current_commit_failure_preserves_old_reader(intake, tmp_path, monkeypatch):
+    first = sync.run(**intake)
+    monkeypatch.setattr(
+        fetch,
+        "download_binance_klines",
+        lambda symbol, **kwargs: frame(symbol, close="106"),
+    )
+    write_json = sync._json
+
+    def fail_commit(path, value):
+        if path.name == "CURRENT.json":
+            raise OSError("simulated interruption at publication")
+        return write_json(path, value)
+
+    monkeypatch.setattr(sync, "_json", fail_commit)
+    with pytest.raises(OSError, match="interruption"):
+        sync.run(**intake)
+    assert sync._previous(tmp_path)[1]["release_id"] == first["release_id"]
+
+
+def test_invalid_boundary_missing_native_amount_and_wrong_product(intake):
+    raw = frame()
+    with pytest.raises(ValueError, match="Missing original"):
+        sync._normalise_kline(raw.drop(columns="quote_volume"), "BTCUSDT")
+    normal = sync._normalise_kline(raw, "BTCUSDT")
+    with pytest.raises(ValueError, match="Unclosed"):
+        sync.validate_daily(normal, ["BTCUSDT"], date(2026, 9, 24))
+    with pytest.raises(ValueError, match="derivatives"):
+        sync.run(**intake, product_type="equity_perpetual")
+
+
+def test_backfill_earlier_history_then_use_overlap(intake, tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        fetch,
+        "get_binance_first_kline",
+        lambda symbol, **kw: frame(symbol, ("2026-09-01",)),
+    )
+
+    def download(symbol, **kwargs):
+        calls.append(kwargs["start_date"])
+        days = pd.date_range(kwargs["start_date"], "2026-09-24").strftime("%Y-%m-%d")
+        return frame(symbol, days)
+
+    monkeypatch.setattr(fetch, "download_binance_klines", download)
+    limited = sync.run(**{**intake, "start_date": "2026-09-10"})
+    assert limited["quality"]["history_complete"] is False
+    complete = sync.run(**{**intake, "start_date": "2010-01-01"})
+    assert complete["quality"]["history_complete"] is True
+    assert complete["quality"]["rows"] == 48
+    replay = sync.run(**{**intake, "start_date": "2010-01-01"})
+    assert calls[-2:] == ["2026-09-17", "2026-09-17"]
+    assert replay["release_id"] == complete["release_id"]
+    refreshed = sync.run(**intake, refresh_history=True)
+    assert calls[-2:] == ["2026-09-01", "2026-09-01"]
+    assert refreshed["release_id"] == complete["release_id"]
+
+
+def test_unlisted_payload_is_rejected(intake, tmp_path):
+    result = sync.run(**intake)
+    path = sync.Path(result["data_dir"])
+    (path / "unlisted.json").write_text("{}")
+    with pytest.raises(ValueError, match="inventory"):
+        sync.run(**intake)
+
+
+def test_committed_release_survives_attempt_journal_failure(
+    intake, tmp_path, monkeypatch
+):
+    write_json = sync._json
+
+    def fail_journal(path, value):
+        if path.name == "last_attempt.json" and value.get("status") == "completed":
+            raise OSError("journal unavailable")
+        return write_json(path, value)
+
+    monkeypatch.setattr(sync, "_json", fail_journal)
+    result = sync.run(**intake)
+    assert result["status"] == "completed"
+    assert result["journal_warning"] == "journal unavailable"
+    assert sync._previous(tmp_path)[1]["release_id"] == result["release_id"]

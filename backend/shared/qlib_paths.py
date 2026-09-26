@@ -58,6 +58,15 @@ def resolve_qlib_provider_uri(market: str = "CN") -> str:
     market: "CN", "HK", "US", "CRYPTO" — 仅 CN 走 QuantDB 路径，
     其他市场仍使用 db/qlib_data/{market}_data。
     """
+    if market.upper() == "CRYPTO":
+        from backend.services.engine.data_platform.quantbc_hub import (
+            _resolve_quantbc_data_dir, quantbc_derived_dir,
+        )
+        release = _resolve_quantbc_data_dir()
+        if (release / "manifest.json").is_file():
+            # Published releases never select another generation's shared cache.
+            return str(quantbc_derived_dir(release) / "bc_data")
+
     env_val = os.getenv("QLIB_PROVIDER_URI", "").strip()
     if env_val:
         return env_val

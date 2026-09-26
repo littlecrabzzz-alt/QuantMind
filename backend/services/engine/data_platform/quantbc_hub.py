@@ -10,8 +10,11 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+import json
 import os
 import threading
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from backend.services.engine.data_platform.quantdb_hub import (
@@ -44,15 +47,118 @@ def _resolve_quantbc_data_dir() -> Path:
         return Path(_QUANTBC_DATA_DIR_ENV)  # 非目录，不可用
     env_val = os.getenv(_QUANTBC_DATA_DIR_ENV, "").strip()
     if env_val:
-        p = Path(env_val)
-        if p.is_dir():
-            return p
-        logger.warning("QM_QUANTBC_DATA_DIR=%s 不存在，尝试默认路径", env_val)
+        return resolve_quantbc_release_dir(Path(env_val))
     for d in _QUANTBC_DEFAULT_DATA_DIRS:
         p = Path(d)
         if p.is_dir():
-            return p
+            return resolve_quantbc_release_dir(p)
     return Path(_QUANTBC_DEFAULT_DATA_DIRS[-1])
+
+
+def resolve_quantbc_release_dir(root: str | Path) -> Path:
+    """Pin CURRENT once; a broken pointer must not fall back to another dataset."""
+    root = Path(root).expanduser().resolve()
+    pointer = root / "CURRENT.json"
+    if not pointer.exists():
+        return root  # Legacy flat datasets remain readable outside research admission.
+    current = json.loads(pointer.read_text())
+    if current.get("schema_version") != 1:
+        raise ValueError("Unsupported QuantBC pointer schema")
+    release_id = current.get("release_id")
+    if (
+        not isinstance(release_id, str) or release_id in {"", ".", ".."}
+        or Path(release_id).name != release_id
+        or current.get("path") != f"releases/{release_id}"
+        or pointer.is_symlink() or (root / "releases").is_symlink()
+        or (root / current["path"]).is_symlink()
+    ):
+        raise ValueError("Invalid QuantBC release pointer")
+    release = root / current["path"]
+    manifest = release / "manifest.json"
+    if hashlib.sha256(manifest.read_bytes()).hexdigest() != current["manifest_sha256"]:
+        raise ValueError("QuantBC manifest checksum mismatch")
+    load_quantbc_release_manifest(release, require_spot=False)
+    return release
+
+
+def load_quantbc_release_manifest(
+    data_dir: str | Path, *, verify_files: bool = False, require_spot: bool = True
+) -> dict:
+    """Research admits only published spot daily bars closed in UTC."""
+    release = Path(data_dir)
+    manifest = json.loads((release / "manifest.json").read_text())
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("quality"), dict):
+        raise ValueError("Invalid QuantBC manifest schema")
+    quality = manifest.get("quality") or {}
+    symbols = manifest.get("symbols")
+    required_columns = {
+        "symbol", "time", "open", "high", "low", "close", "volume", "amount",
+        "quote_volume", "open_time", "close_time", "available_at", "venue", "product_type",
+    }
+    if (
+        manifest.get("schema_version") != 1
+        or manifest.get("status") != "complete"
+        or manifest.get("venue") != "binance"
+        or manifest.get("frequency") != "1d"
+        or manifest.get("timezone") != "UTC"
+        or manifest.get("product_type") not in {"crypto_spot", "tokenized_equity_spot"}
+        or (require_spot and manifest.get("product_type") != "crypto_spot")
+        or manifest.get("release_id") != release.name
+        or not isinstance(symbols, list) or not symbols or len(set(symbols)) != len(symbols)
+        or not required_columns.issubset(manifest.get("columns") or [])
+        or quality.get("status") != "passed" or quality.get("timezone") != "UTC"
+        or not isinstance(quality.get("history_complete"), bool)
+        or not isinstance(manifest.get("files"), dict) or not manifest["files"]
+    ):
+        raise ValueError("QuantBC release is not a validated UTC daily spot dataset")
+    # Historical bars can support research without proving what was available then.
+    # available_at is only the earliest possible availability at the bar boundary.
+    if (
+        manifest.get("available_at_semantics") != "bar_period_end_lower_bound"
+        or manifest.get("point_in_time_verified") is not False
+        or manifest.get("history_complete_scope") != "current_public_api_daily_bar_coverage"
+    ):
+        raise ValueError("QuantBC release lacks the declared historical availability semantics")
+    start, end = date.fromisoformat(manifest["data_start"]), date.fromisoformat(manifest["data_end"])
+    exclusive = (end + timedelta(days=1)).isoformat()
+    coverage = quality.get("symbols") or {}
+    if not isinstance(coverage, dict) or any(not isinstance(row, dict) for row in coverage.values()):
+        raise ValueError("Invalid QuantBC coverage schema")
+    if (
+        start > end or end >= datetime.now(timezone.utc).date()
+        or manifest.get("end_exclusive") != exclusive or quality.get("end_exclusive") != exclusive
+    ):
+        raise ValueError("QuantBC release contains unclosed UTC daily bars")
+    if set(coverage) != set(symbols) or any(
+        row.get("rows", 0) <= 0 or row.get("last") != end.isoformat()
+        or any(row.get(field) != 0 for field in ("gaps", "duplicates", "unclosed"))
+        for row in coverage.values()
+    ) or sum(row["rows"] for row in coverage.values()) != quality.get("rows"):
+        raise ValueError("QuantBC daily coverage failed research admission")
+    listed = manifest["files"]
+    paths = list(release.rglob("*"))
+    actual = {str(path.relative_to(release)) for path in paths if path.is_file() and path != release / "manifest.json"}
+    if release.is_symlink() or any(path.is_symlink() for path in paths) or actual != set(listed):
+        raise ValueError("QuantBC release file inventory mismatch")
+    for name, checksum in listed.items():
+        path = release / name
+        if Path(name).is_absolute() or ".." in Path(name).parts or str(Path(name)) != name:
+            raise ValueError("Invalid QuantBC release file path")
+        if verify_files and hashlib.sha256(path.read_bytes()).hexdigest() != checksum:
+            raise ValueError(f"QuantBC source checksum mismatch: {name}")
+    if "quality.json" not in listed or json.loads((release / "quality.json").read_text()) != quality:
+        raise ValueError("QuantBC quality report differs from its manifest")
+    return manifest
+
+
+def quantbc_derived_dir(data_dir: str | Path) -> Path:
+    release = Path(data_dir).resolve()
+    manifest = load_quantbc_release_manifest(release)
+    root = release.parent.parent if release.parent.name == "releases" else release.parent
+    derived = root / "derived" / manifest["release_id"]
+    if derived.resolve().is_relative_to((root / "releases").resolve()) or derived.resolve().is_relative_to(release):
+        raise ValueError("QuantBC derived output must not point inside raw releases")
+    return derived
 
 
 class QuantBCDataHub(QuantDBDataHub):
@@ -62,14 +168,18 @@ class QuantBCDataHub(QuantDBDataHub):
     _instance_lock = threading.Lock()
 
     def __init__(self, data_dir: str | Path | None = None) -> None:
-        super().__init__(data_dir=data_dir or _resolve_quantbc_data_dir())
+        release = resolve_quantbc_release_dir(data_dir) if data_dir else _resolve_quantbc_data_dir()
+        if (release / "manifest.json").is_file():
+            load_quantbc_release_manifest(release, verify_files=True, require_spot=False)
+        super().__init__(data_dir=release)
 
     @classmethod
     def get_instance(cls) -> QuantBCDataHub:
-        if cls._instance is None:
+        data_dir = _resolve_quantbc_data_dir()
+        if cls._instance is None or cls._instance.data_dir != data_dir:
             with cls._instance_lock:
-                if cls._instance is None:
-                    cls._instance = cls()
+                if cls._instance is None or cls._instance.data_dir != data_dir:
+                    cls._instance = cls(data_dir)
         return cls._instance
 
     def _mount_views(self, conn) -> None:
@@ -101,13 +211,24 @@ class QuantBCDataHub(QuantDBDataHub):
     # ---- 区块链查询（视图名带 qbc_ 前缀） ----
     def fetch_daily_kline(self, symbol: str, start, end, *, adjust: str = "qfq"):
         """区块链日线。symbol 为币种交易对（BTCUSDT）。"""
+        return self.fetch_daily_kline_batch([symbol], start, end, adjust=adjust)
+
+    def fetch_daily_kline_batch(self, symbols: list[str], start, end, *, adjust: str = "qfq"):
+        """批量读取同一 QuantBC 版本，不能继承 A 股 qdb_* 视图。"""
+        import pandas as pd
+
+        if not symbols:
+            return pd.DataFrame()
         view_name = "qbc_daily_forward"
         if not self._view_exists(view_name):
-            return self._read_daily_kline_from_files(symbol, start, end, adjust="qfq")
+            frames = [self._read_daily_kline_from_files(symbol, start, end, adjust="qfq") for symbol in symbols]
+            return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
         conn = self._get_duck_conn()
-        conditions = [f"symbol = '{symbol}'"] + _dt_conditions(start, end)
+        conditions = [f"symbol IN ({', '.join('?' for _ in symbols)})"] + _dt_conditions(start, end)
         where = " AND ".join(conditions)
-        df = conn.execute(f"SELECT * FROM {view_name} WHERE {where} ORDER BY dt").fetchdf()
+        df = conn.execute(
+            f"SELECT * FROM {view_name} WHERE {where} ORDER BY symbol, dt", list(symbols)
+        ).fetchdf()
         return self._normalize_kline(df)
 
     def fetch_valuation(self, symbol: str | None = None, start=None, end=None):

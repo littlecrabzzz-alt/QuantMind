@@ -920,8 +920,13 @@ def make_market_router(
                         "FUTURES": "FUTURES",
                     }
                     qlib_market = market_map.get(market, market)
-                    provider_uri = ensure_qlib_cache(market=qlib_market)
-                    qlib_cache = {"status": "ok", "provider_uri": provider_uri}
+                    if market == "BC":
+                        from backend.scripts.quantbc_daily_sync import prepare_research_data
+                        prepared = prepare_research_data(result["data_dir"])
+                        qlib_cache = {"status": "ok", "provider_uri": prepared["qlib_dir"], "research_data": prepared}
+                    else:
+                        provider_uri = ensure_qlib_cache(market=qlib_market)
+                        qlib_cache = {"status": "ok", "provider_uri": provider_uri}
                 except Exception as exc:  # noqa: BLE001
                     logger.error(
                         "%s sync job %s: qlib cache failed: %s",
@@ -934,7 +939,7 @@ def make_market_router(
 
             _job_update(
                 job_id,
-                status="completed",
+                status="partial" if market == "BC" and qlib_cache and qlib_cache.get("status") == "error" else "completed",
                 stage="done",
                 done=len(req.datasets),
                 results=[{"dataset": d, "status": "synced"} for d in req.datasets],

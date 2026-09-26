@@ -15,6 +15,7 @@ from __future__ import annotations
 import ctypes
 import fcntl
 import logging
+import shutil
 import os
 import struct
 import sys
@@ -174,7 +175,11 @@ class QlibDataBuilder:
             if data_dir is None:
                 data_dir = quantbc_hub._resolve_quantbc_data_dir()
             hub = quantbc_hub.QuantBCDataHub(data_dir)
-            default_qlib = Path("/data/qlib/bc_data")
+            default_qlib = (
+                quantbc_hub.quantbc_derived_dir(hub.data_dir) / "bc_data"
+                if (hub.data_dir / "manifest.json").is_file()
+                else Path("/data/qlib/bc_data")
+            )
         elif market_upper == "FUTURES":
             if data_dir is None:
                 data_dir = quantfutures_hub._resolve_quantfutures_data_dir()
@@ -194,6 +199,9 @@ class QlibDataBuilder:
         return self._hub
 
     def build_all(self, *, incremental=True, symbols=None, progress_cb=None) -> dict:
+        if self._market == "CRYPTO" and (self._hub.data_dir / "manifest.json").is_file():
+            from backend.services.engine.data_platform.quantbc_hub import load_quantbc_release_manifest
+            load_quantbc_release_manifest(self._hub.data_dir, verify_files=True)
         live = self._qlib_dir.absolute()
         live.parent.mkdir(parents=True, exist_ok=True)
         if symbols is not None and live.exists():
@@ -206,6 +214,10 @@ class QlibDataBuilder:
                 try:
                     result = self._build_all(incremental=incremental, symbols=symbols, progress_cb=progress_cb)
                     self._validate_generation()
+                    if self._market == "CRYPTO" and (self._hub.data_dir / "manifest.json").is_file():
+                        from backend.services.engine.data_platform.quantbc_hub import load_quantbc_release_manifest
+                        load_quantbc_release_manifest(self._hub.data_dir)
+                        shutil.copyfile(self._hub.data_dir / "manifest.json", staged / "source_manifest.json")
                     _publish_directory(staged, live)
                     return result
                 finally:

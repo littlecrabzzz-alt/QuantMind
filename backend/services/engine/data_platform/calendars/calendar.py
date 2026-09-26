@@ -138,12 +138,14 @@ class CryptoCalendar(TradingCalendar):
     market = "CRYPTO"
     tz = ZoneInfo("UTC")
     regular_open = time(0, 0)
-    regular_close = time(23, 59)
+    regular_close = time(0, 0)
 
     def _lookup(self, d: date) -> tuple[bool, bool]:
         return (True, False)
-    regular_open = time(9, 30)
-    regular_close = time(16, 0)
+
+    def market_close(self, d: date) -> datetime:
+        """UTC 日线在次日零点闭合。"""
+        return self.market_open(d + timedelta(days=1))
 
 
 _CALENDARS: dict[str, TradingCalendar] = {}

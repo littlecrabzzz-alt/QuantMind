@@ -14,6 +14,7 @@ import os
 import pickle
 import re
 import shutil
+import tempfile
 import time
 from datetime import date
 from pathlib import Path
@@ -95,8 +96,12 @@ class RDLoopWrapper:
             "LOG_TRACE_PATH": task_log_dir,
             "PYTHONPATH": os.getenv("PYTHONPATH") or "/app",
         }
+        if self.market == "crypto" and getattr(self, "_crypto_provider_uri", None):
+            env["QLIB_PROVIDER_URI"] = self._crypto_provider_uri
         # 设置数据文件路径环境变量
         data_file = "/app/alphaagent/scenarios/qlib/experiment/factor_data_template/daily_pv_all.h5"
+        if self.market == "crypto":
+            data_file = str(Path(task_log_dir) / "git_ignore_folder/factor_implementation_source_data/daily_pv.h5")
         if os.path.exists(data_file):
             env["FACTOR_DATA_PATH"] = data_file
         # Ensure critical LLM settings are present
@@ -223,13 +228,16 @@ class RDLoopWrapper:
         self._direction = direction
 
         try:
+            # Pin the release and prepare its task-local inputs before configuring Qlib.
+            if self.market == "crypto":
+                self._ensure_data_file(task_log_dir)
             # 配置环境变量
             env = self._configure_env(task_log_dir)
             for k, v in env.items():
                 os.environ[k] = v
 
-            # 确保 daily_pv.h5 数据文件可用
-            self._ensure_data_file(task_log_dir)
+            if self.market != "crypto":
+                self._ensure_data_file(task_log_dir)
 
             # RD-Agent workspace / 数据目录对齐：设绝对路径 env 变量 + 切 cwd。
             # RD-Agent 的 FACTOR_COSTEER_SETTINGS.data_folder 与 workspace_path 默认用
@@ -314,12 +322,6 @@ class RDLoopWrapper:
 
         # 根据市场选择数据源
         market_data_map = {
-            "crypto": {
-                "source_all": "/app/db/crypto_data/5min_pv.h5",
-                "source_debug": "/app/db/crypto_data/5min_pv.h5",
-                "qlib_source": "/app/db/qlib_data/crypto_data",
-                "qlib_target_name": "crypto_data",
-            },
             "hong_kong": {
                 "source_all": "/app/db/hk_data/daily_pv.h5",
                 "source_debug": "/app/db/hk_data/daily_pv.h5",
@@ -357,6 +359,34 @@ class RDLoopWrapper:
         # RD-Agent data folders (relative to subprocess cwd)
         target_all = os.path.join(base_dir, "git_ignore_folder/factor_implementation_source_data/daily_pv.h5")
         target_debug = os.path.join(base_dir, "git_ignore_folder/factor_implementation_source_data_debug/daily_pv.h5")
+
+        if self.market == "crypto":
+            release = self.adapter.get_release_dir()
+            if not self.adapter.is_data_ready():
+                raise RuntimeError("Published crypto daily Qlib cache is not ready; prepare data first")
+            source_manifest = (release / "manifest.json").read_bytes()
+            task_manifest = Path(base_dir) / "source_manifest.json"
+            pinned = Path(base_dir) / "data" / "bc_data"
+            for previous in (task_manifest, pinned / "source_manifest.json"):
+                if previous.exists() and previous.read_bytes() != source_manifest:
+                    raise RuntimeError("Research workspace already belongs to another crypto release")
+            for target, debug in ((target_all, False), (target_debug, True)):
+                if not self._generate_h5_from_parquet(str(release), target, debug=debug):
+                    raise RuntimeError("Failed to prepare published crypto daily H5")
+            # Each task owns its provider copy; no shared ~/.qlib link can switch its input.
+            if pinned.exists():
+                if (pinned / "source_manifest.json").read_bytes() != source_manifest:
+                    raise RuntimeError("Research workspace already belongs to another crypto release")
+            else:
+                pinned.parent.mkdir(parents=True, exist_ok=True)
+                with tempfile.TemporaryDirectory(prefix=".crypto-input-", dir=pinned.parent) as staging:
+                    staged = Path(staging) / "bc_data"
+                    shutil.copytree(self.adapter.get_qlib_provider_uri(), staged)
+                    staged.rename(pinned)
+            task_manifest.write_bytes(source_manifest)
+            self._crypto_provider_uri = str(pinned.resolve())
+            self._base_features_path = None
+            return
 
         # A 股：优先从 QuantDB parquet 生成 .h5，失败则 fallback 到预生成文件
         if self.market == "a_share":
@@ -522,29 +552,40 @@ class RDLoopWrapper:
         Returns:
             True if h5 file was generated/already current, False on failure.
         """
-        cache_dir = os.path.join(quantdb_dir, ".h5_cache")
+        crypto = self.market == "crypto"
+        manifest = None
+        if crypto:
+            from backend.services.engine.data_platform.quantbc_hub import load_quantbc_release_manifest, quantbc_derived_dir
+            manifest = load_quantbc_release_manifest(quantdb_dir, verify_files=True)
+            cache_dir = str(quantbc_derived_dir(quantdb_dir))
+        else:
+            cache_dir = os.path.join(quantdb_dir, ".h5_cache")
         cache_path = os.path.join(
             cache_dir, "daily_pv_debug.h5" if debug else "daily_pv_all.h5"
         )
 
         # 共享缓存命中：直接链接到任务目录（避免重复生成）
-        if os.path.exists(cache_path) and self._h5_cache_fresh(quantdb_dir, cache_path):
+        if not crypto and os.path.exists(cache_path) and self._h5_cache_fresh(quantdb_dir, cache_path):
             logger.info("[%s] h5 cache hit: %s", self.market, cache_path)
             self._link_h5(cache_path, output_path)
             return True
 
         try:
             from backend.services.engine.data_platform.quantdb_hub import QuantDBDataHub
-            hub = QuantDBDataHub(quantdb_dir)
+            if crypto:
+                from backend.services.engine.data_platform.quantbc_hub import QuantBCDataHub
+                hub = QuantBCDataHub(quantdb_dir)
+            else:
+                hub = QuantDBDataHub(quantdb_dir)
             if not hub.available:
                 logger.error("[%s] QuantDBDataHub not available for h5 generation", self.market)
-                return self._use_stale_cache(cache_path, output_path)
+                return False if crypto else self._use_stale_cache(cache_path, output_path)
 
             # 获取股票列表
             df_stocks = hub.fetch_stock_list()
             if df_stocks.empty:
                 logger.error("[%s] No stock list from QuantDB", self.market)
-                return self._use_stale_cache(cache_path, output_path)
+                return False if crypto else self._use_stale_cache(cache_path, output_path)
 
             symbol_col = "Symbol" if "Symbol" in df_stocks.columns else "symbol"
             symbols = df_stocks[symbol_col].dropna().unique()
@@ -557,20 +598,26 @@ class RDLoopWrapper:
 
             symbols = [str(s) for s in symbols]
             start_d, end_d = date(2020, 1, 1), date(2026, 12, 31)
+            if crypto:
+                symbols = list(manifest["symbols"])
+                start_d = date.fromisoformat(manifest["data_start"])
+                end_d = date.fromisoformat(manifest["data_end"])
 
             # 批量读取：一次查全部 symbol，避免逐股票 N 次分区扫描
             # （早期实现对 ~5400 只股票各查 2 次，单次生成需 40 分钟以上）
             df = hub.fetch_daily_kline_batch(symbols, start_d, end_d, adjust="qfq")
             if df is None or df.empty:
                 logger.error("[%s] No K-line data read from QuantDB", self.market)
-                return self._use_stale_cache(cache_path, output_path)
-            df_unadj = hub.fetch_daily_kline_batch(symbols, start_d, end_d, adjust="none")
+                return False if crypto else self._use_stale_cache(cache_path, output_path)
+            df_unadj = None if crypto else hub.fetch_daily_kline_batch(symbols, start_d, end_d, adjust="none")
 
             # 前复权价可能为负（高分红股票多年除权后 qfq 价转负），会污染 Qlib 因子
             # 计算，这里整体剔除这些行。
             valid = df["close"].to_numpy(dtype="float64") > 0
             dropped = int((~valid).sum())
             if dropped:
+                if crypto:
+                    raise ValueError("Invalid prices in published crypto daily input")
                 logger.warning(
                     "[%s] Dropped %d rows with non-positive qfq close (negative 前复权价)",
                     self.market,
@@ -579,7 +626,7 @@ class RDLoopWrapper:
                 df = df.loc[valid].reset_index(drop=True)
             if df.empty:
                 logger.error("[%s] No positive-price K-line rows from QuantDB", self.market)
-                return self._use_stale_cache(cache_path, output_path)
+                return False if crypto else self._use_stale_cache(cache_path, output_path)
 
             # 按 (symbol, trade_date) 对齐不复权收盘价以计算 $factor
             if df_unadj is not None and not df_unadj.empty:
@@ -597,11 +644,12 @@ class RDLoopWrapper:
                 factor = np.ones(len(df))
 
             # 合并 QuantDB 富化列（技术指标/估值/资金流/筹码等），供因子直接引用
-            df = self._merge_enrich(
-                df, hub, start_d, end_d, None if not debug else symbols
-            )
+            if not crypto:
+                df = self._merge_enrich(
+                    df, hub, start_d, end_d, None if not debug else symbols
+                )
 
-            instruments = [self._to_qlib_symbol(str(s)) for s in df["symbol"]]
+            instruments = [f"bc_{s}" if crypto else self._to_qlib_symbol(str(s)) for s in df["symbol"]]
             data: dict[str, Any] = {
                 "$open": df["open"].to_numpy(dtype="float64"),
                 "$high": df["high"].to_numpy(dtype="float64"),
@@ -626,9 +674,12 @@ class RDLoopWrapper:
             combined = combined.sort_index()
 
             os.makedirs(cache_dir, exist_ok=True)
-            tmp_path = cache_path + ".tmp"
-            combined.to_hdf(tmp_path, key="data", mode="w")
-            os.replace(tmp_path, cache_path)
+            with tempfile.TemporaryDirectory(prefix=".h5-build-", dir=cache_dir) as staging:
+                tmp_path = os.path.join(staging, "daily_pv.h5")
+                combined.to_hdf(tmp_path, key="data", mode="w")
+                os.replace(tmp_path, cache_path)
+            if crypto:
+                shutil.copyfile(Path(quantdb_dir) / "manifest.json", Path(cache_dir) / "source_manifest.json")
             self._link_h5(cache_path, output_path)
             logger.info(
                 "[%s] Generated enriched h5 from parquet: %s (%d rows, %d cols)",
@@ -638,7 +689,7 @@ class RDLoopWrapper:
 
         except Exception as exc:
             logger.error("[%s] Failed to generate h5 from parquet: %s", self.market, exc)
-            return self._use_stale_cache(cache_path, output_path)
+            return False if crypto else self._use_stale_cache(cache_path, output_path)
 
     def _merge_enrich(
         self,
@@ -705,6 +756,8 @@ class RDLoopWrapper:
     @staticmethod
     def _link_h5(src: str, dst: str) -> None:
         """把共享缓存的 h5 链接（优先硬链）到任务目录，失败则复制。"""
+        if os.path.abspath(src) == os.path.abspath(dst):
+            return
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         try:
             if os.path.islink(dst) or os.path.exists(dst):

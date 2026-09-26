@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -23,7 +23,7 @@ from .model_management_utils import _scan_feature_snapshots_status
 
 
 # 市场 → Qlib 子目录
-# parquet 单源市场（A股/HK/US/期货）读各自 .qlib_cache；crypto 仍用 legacy 5min
+# 各市场均读取日线 Qlib 缓存；crypto 以 UTC 已闭合日线为准。
 _QDB_DATA_DIR = Path(os.getenv("QM_QUANTDB_DATA_DIR", str(Path(os.getcwd()) / "data" / "quantdb")))
 _QUANTHK_DATA_DIR = Path(
     os.getenv("QM_QUANTHK_DATA_DIR", str(Path(os.getcwd()) / "data" / "quanthk"))
@@ -55,7 +55,7 @@ def _resolve_market_qlib_dir(market: str, fallback: Path) -> Path:
 _MARKET_QLIB_DIRS: dict[str, Path] = {
     "a_share": _resolve_market_qlib_dir("CN", _QDB_DATA_DIR / ".qlib_cache" / "cn_data"),
     "crypto": _resolve_market_qlib_dir(
-        "CRYPTO", Path(os.getcwd()) / "db" / "qlib_data" / "crypto_data"
+        "CRYPTO", Path(os.getenv("QM_QUANTBC_DATA_DIR", "/data/quantbc")) / ".qlib_cache" / "bc_data"
     ),
     "hong_kong": _resolve_market_qlib_dir("HK", _QUANTHK_DATA_DIR / ".qlib_cache" / "hk_data"),
     "us_stock": _resolve_market_qlib_dir("US", _QUANTUS_DATA_DIR / ".qlib_cache" / "us_data"),
@@ -67,7 +67,6 @@ _MARKET_QLIB_DIRS: dict[str, Path] = {
 # 市场 → 交易日历服务 market 代码
 _CALENDAR_MARKET_MAP: dict[str, str] = {
     "a_share": "SSE",
-    "crypto": "SSE",  # 7x24，用 A 股日历近似
     "hong_kong": "HKEX",
     "us_stock": "NYSE",
 }
@@ -75,13 +74,15 @@ _CALENDAR_MARKET_MAP: dict[str, str] = {
 # 市场 → xcals 日历代码（Celery 同步路径用）
 _XCALS_MARKET_MAP: dict[str, str] = {
     "a_share": "XSHG",
-    "crypto": "XSHG",
     "hong_kong": "XHKG",
     "us_stock": "XNYS",
 }
 
 
 def _resolve_qlib_dir(market: str) -> Path:
+    if market == "crypto":
+        from backend.shared.qlib_paths import resolve_qlib_provider_uri
+        return Path(resolve_qlib_provider_uri("CRYPTO"))
     return _MARKET_QLIB_DIRS.get(market, _MARKET_QLIB_DIRS["a_share"])
 
 
@@ -94,6 +95,8 @@ def resolve_trade_date_sync(market: str) -> str:
 
     优先使用 exchange_calendars；不可用时回退到当前日期。
     """
+    if market == "crypto":
+        return (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
     now_local = datetime.now(ZoneInfo("Asia/Shanghai"))
     if xcals is None:
         return now_local.date().isoformat()
@@ -115,6 +118,8 @@ def resolve_trade_date_sync(market: str) -> str:
 
 async def _resolve_trade_date(market: str, tenant_id: str, user_id: str) -> str:
     """根据市场日历返回当前应参照的交易日 ISO 字符串。"""
+    if market == "crypto":
+        return resolve_trade_date_sync(market)
     now_local = datetime.now(ZoneInfo("Asia/Shanghai"))
     cal_market = _resolve_calendar_market(market)
 
@@ -153,11 +158,7 @@ def _scan_qlib_info(qlib_data_dir: Path, market: str) -> dict[str, Any]:
             if f.suffix == ".txt":
                 calendar_files.append(f.name)
 
-    cal_file = (
-        "5min.txt"
-        if market == "crypto" and (cal_dir / "5min.txt").exists()
-        else "day.txt"
-    )
+    cal_file = "day.txt"
     calendars_path = qlib_data_dir / "calendars" / cal_file
     instruments_all_path = qlib_data_dir / "instruments" / "all.txt"
     features_root = qlib_data_dir / "features"

@@ -568,7 +568,7 @@ async def backtest_factor(
     """对因子发起轻量验证（多市场 + 数据源可选）
 
     data_source=qlib_bin (默认): 用 Qlib 二进制 (5 个市场均支持)；
-    data_source=h5: 走 RD-Agent daily_pv.h5（A股/港股/美股有预生成，期货从 parquet 自动生成，crypto 预生成）。
+    data_source=h5: 走 RD-Agent daily_pv.h5（crypto 仅消费发布现货日线版本的派生 H5）。
     """
     factor = await _require_owned_factor(factor_id, request, for_write=True)
 
@@ -1423,6 +1423,22 @@ async def _backtest_via_h5(
 
 def _resolve_factor_h5_path_for_market(market: str) -> str | None:
     """按市场找 H5 文件；不存在返回 None。"""
+    if market == "crypto":
+        from backend.services.engine.rd_agent.market_adapters.crypto import CryptoAdapter
+        from backend.services.engine.data_platform.quantbc_hub import quantbc_derived_dir
+        try:
+            adapter = CryptoAdapter()
+            release = adapter.get_release_dir()
+            derived = quantbc_derived_dir(release)
+            h5 = derived / "daily_pv_all.h5"
+            if (
+                adapter.is_data_ready() and h5.is_file()
+                and (derived / "source_manifest.json").read_bytes() == (release / "manifest.json").read_bytes()
+            ):
+                return str(h5)
+        except (OSError, ValueError, KeyError):
+            pass
+        return None
     candidates = {
         "a_share": [
             "/app/alphaagent/scenarios/qlib/experiment/factor_data_template/daily_pv_all.h5",
@@ -1430,7 +1446,6 @@ def _resolve_factor_h5_path_for_market(market: str) -> str | None:
         ],
         "us_stock": ["/app/db/us_data/daily_pv.h5"],
         "hong_kong": ["/app/db/hk_data/daily_pv.h5"],
-        "crypto": ["/app/db/crypto_data/5min_pv.h5"],
         "futures": [],  # H5 未生成
     }
     for p in candidates.get(market, []):

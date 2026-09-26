@@ -201,10 +201,15 @@ def run_market_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
                     "BC": "CRYPTO",
                     "FUTURES": "FUTURES",
                 }[market]
-                result["qlib"] = {
-                    "status": "ok",
-                    "provider_uri": ensure_qlib_cache(market=qlib_market),
-                }
+                if market == "BC":
+                    from backend.scripts.quantbc_daily_sync import prepare_research_data
+                    prepared = prepare_research_data(result["result"]["data_dir"])
+                    result["qlib"] = {"status": "ok", "provider_uri": prepared["qlib_dir"], "research_data": prepared}
+                else:
+                    result["qlib"] = {
+                        "status": "ok",
+                        "provider_uri": ensure_qlib_cache(market=qlib_market),
+                    }
             except Exception as exc:  # noqa: BLE001
                 logger.error("%s 定时同步 qlib 缓存失败: %s", market, exc, exc_info=True)
                 result["qlib"] = {"status": "error", "reason": str(exc)}
