@@ -901,7 +901,7 @@ class Pipeline:
         collection_apis = config.get("collection_api_names") if not task_scope else None
         if collection_apis is not None:
             if (not isinstance(collection_apis, list) or not collection_apis
-                    or any(not isinstance(api, str) or api not in EXTENDED_CONTRACTS
+                    or any(not isinstance(api, str) or api not in (EXTENDED_CONTRACTS | RRG_CONTRACTS)
                            for api in collection_apis)
                     or len(collection_apis) != len(set(collection_apis))):
                 raise ValueError("Invalid collection API scope")
@@ -6237,11 +6237,16 @@ class Pipeline:
                     raise ValueError("Current manifest identity mismatch")
                 if previous_id.startswith("data-"):
                     previous = manifest_at(self.root, previous_id)
-                if research and (
-                    previous.get("scope") != "research_structured"
-                    or previous.get("selected_api_names") != sorted(selected)
-                ):
-                    raise ValueError("Research publication scope mismatch")
+                if research:
+                    old_scope = (previous or {}).get("selected_api_names")
+                    if ((previous or {}).get("scope") != "research_structured"
+                            or not isinstance(old_scope, list) or not old_scope
+                            or any(not isinstance(api, str) or api not in (EXTENDED_CONTRACTS | RRG_CONTRACTS)
+                                   for api in old_scope)
+                            or old_scope != sorted(set(old_scope))):
+                        raise ValueError("Research publication scope mismatch")
+                    # Valid older scopes remain immutable; this publication is
+                    # rebuilt from the current selection and receives a new ID.
 
         def preserve_release_mapping(archive):
             known = (
@@ -6980,16 +6985,22 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                         successful_at = current["published_at"]
                         if (
                             current.get("manifest_sha256") != release[5:]
-                            or current.get("selected_api_names") != sorted(RESEARCH_APIS)
                             or type(successful_at) is not int or successful_at < 0
                         ):
                             raise ValueError("Invalid research publication checkpoint")
+                        previous_scope = current.get("selected_api_names")
+                        if (not isinstance(previous_scope, list) or not previous_scope
+                                or any(not isinstance(api, str) or api not in (EXTENDED_CONTRACTS | RRG_CONTRACTS)
+                                       for api in previous_scope)
+                                or previous_scope != sorted(set(previous_scope))):
+                            raise ValueError("Invalid research publication scope")
+                        scope_changed = previous_scope != sorted(RESEARCH_APIS)
                         verify_manifest_identity_at(ROOT, release)
                         research_publication.update(
                             current_release_id=release, last_success_at=successful_at,
                             next_due_at=successful_at + research_interval,
                         )
-                        if 0 <= time.time() - successful_at < research_interval:
+                        if not scope_changed and 0 <= time.time() - successful_at < research_interval:
                             research_publication["status"] = "deferred"
                             return False
                     research_publication["status"] = "publishing"
