@@ -7,6 +7,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Empty, Select, Table, Tag, Tooltip } from "antd";
 import { FileText } from "lucide-react";
+import ReactECharts from 'echarts-for-react';
+import { ledgerPerformance } from './ledgerPerformance';
 import {
   AdapterFormatError,
   classifyRunKinds,
@@ -53,24 +55,16 @@ const kindColor: Record<string, string> = {
   未知: "default",
 };
 
-function drawdownSeries(nav: number[]): number {
-  let peak = nav[0];
-  let maxDd = 0;
-  for (const v of nav) {
-    peak = Math.max(peak, v);
-    maxDd = Math.max(maxDd, peak > 0 ? (peak - v) / peak : 0);
-  }
-  return maxDd;
-}
-
 export default function LedgerDetailView({
   node,
   caseId,
   artifact,
+  showCurve = false,
 }: {
   node: string;
   caseId: string;
-  artifact: { name: string; uri: string; fixture?: boolean; not_ready?: boolean };
+  artifact: { name: string; uri: string; fixture?: boolean; not_ready?: boolean; sha256?: string };
+  showCurve?: boolean;
 }) {
   const [raw, setRaw] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState("");
@@ -80,20 +74,28 @@ export default function LedgerDetailView({
 
   useEffect(() => {
     let stopped = false;
+    setRaw(null);
+    setError('');
     (async () => {
       try {
         const blob = await researchAgent.file(node, caseId, relativeUri(artifact.uri));
-        const parsed = JSON.parse(await blob.text());
+        const bytes = await blob.arrayBuffer();
+        if (artifact.sha256) {
+          const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
+            .map(b => b.toString(16).padStart(2, '0')).join('');
+          if (hash !== artifact.sha256) throw new Error('账本原件 SHA256 与登记不一致');
+        }
+        const parsed = JSON.parse(new TextDecoder().decode(bytes));
         if (stopped) return;
         setRaw(parsed);
-      } catch {
-        if (!stopped) setError("账本文件不可读（节点受控目录）");
+      } catch (exc) {
+        if (!stopped) setError(exc instanceof Error ? exc.message : "账本文件不可读（节点受控目录）");
       }
     })();
     return () => {
       stopped = true;
     };
-  }, [node, caseId, artifact.uri]);
+  }, [node, caseId, artifact.uri, artifact.sha256]);
 
   const format = useMemo(() => (raw ? identifyExportFormat(raw) : null), [raw]);
   const conversion = useMemo(() => {
@@ -107,16 +109,16 @@ export default function LedgerDetailView({
   const adapterError = conversion.error;
 
   const view = conversion.view;
-  const [viewError, setViewError] = useState("");
-  const normalized = useMemo(() => {
-    if (adapterError || format !== "view") return null;
+  const normalization = useMemo(() => {
+    if (adapterError || format !== "view") return { view: null, error: '' };
     try {
-      return normalizeView(raw);
+      return { view: normalizeView(raw), error: '' };
     } catch (exc) {
-      setViewError(exc instanceof Error ? exc.message : String(exc));
-      return null;
+      return { view: null, error: exc instanceof Error ? exc.message : String(exc) };
     }
   }, [raw, format, adapterError]);
+  const normalized = normalization.view;
+  const viewError = normalization.error;
   const days: LedgerDay[] | null = useMemo(() => {
     if (adapterError || viewError) return null;
     if (format === "view") return normalized?.days ?? null;
@@ -199,12 +201,8 @@ R01Ledger.export_view()/export_evidence() 公共入口生成。"
   const session = (activeView.session ?? {}) as Record<string, unknown>;
   const firstDay = days[0].date;
   const lastDay = days[days.length - 1].date;
-  const totalReturn =
-    navs.length >= 2 && navs[0] !== 0 ? navs[navs.length - 1] / navs[0] - 1 : null;
-  const totalFees = days
-    .flatMap((d) => d.orders ?? [])
-    .reduce((acc, o) => acc + (typeof o.fees === "number" ? o.fees : 0), 0);
-  const maxDd = navs.length >= 2 ? drawdownSeries(navs) : null;
+  const performance = ledgerPerformance(days, session.initial_cash);
+  const { totalReturn, totalFees, maxDrawdown: maxDd } = performance;
 
   return (
     <div className="mt-1 space-y-2" data-testid="ledger-detail-view">
@@ -226,9 +224,29 @@ R01Ledger.export_view()/export_evidence() 公共入口生成。"
           本视图为研究账本回放明细；非 fixture ≠ 真实成交，与实盘/交易记录无关
         </span>
       </div>
+      {showCurve && <div data-testid="ledger-history-chart">
+        <p className="text-sm">{firstDay} ～ {lastDay} · {days.length.toLocaleString()} 个交易日 · {performance.orderCount} 张订单</p>
+        <p className="text-sm">初始本金 {performance.initial ?? '未提供'} 元 · 期末权益 {performance.nav.at(-1) ?? '缺失'} 元 · 累计收益 {totalReturn === null ? '无法计算' : `${(totalReturn * 100).toFixed(2)}%`} · 最大回撤 {maxDd === null ? '无法计算' : `${(maxDd * 100).toFixed(2)}%`}</p>
+        <ReactECharts style={{ height: 330 }} option={{
+          animation: false,
+          tooltip: { trigger: 'axis', valueFormatter: (v: number) => v == null ? '缺失' : Number(v).toFixed(2) },
+          legend: { data: ['账户权益（元）', '回撤（%）'] },
+          grid: { left: 75, right: 55, bottom: 65, top: 35 },
+          xAxis: { type: 'category', data: days.map(d => d.date), boundaryGap: false },
+          yAxis: [{ type: 'value', scale: true, name: '元' }, { type: 'value', max: 0, name: '%' }],
+          dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 10 }],
+          series: [
+            { name: '账户权益（元）', type: 'line', showSymbol: false, data: performance.nav, connectNulls: false },
+            { name: '回撤（%）', type: 'line', showSymbol: false, yAxisIndex: 1, data: performance.drawdown, connectNulls: false },
+          ],
+        }} onEvents={{ click: (p: { name: string }) => { if (days.some(d => d.date === p.name)) setDate(p.name); } }} />
+        <p className="text-xs text-muted-foreground">历史模拟结果，收益从初始本金计算，含首日损益与账本费用；金额单位为元。下方可检索日期查看原始持仓和订单。</p>
+      </div>}
       <div className="flex flex-wrap gap-3 items-center text-xs">
         <span>查看日期：</span>
         <Select
+          aria-label="账本日期"
+          showSearch
           size="small"
           value={day.date}
           style={{ minWidth: 140 }}
@@ -401,7 +419,7 @@ R01Ledger.export_view()/export_evidence() 公共入口生成。"
         <summary className="cursor-pointer text-xs">净值与回撤（口径说明）</summary>
         <div className="text-xs space-y-1">
           <p>
-            单位：元 · 起点：{firstDay} nav={navs[0] ?? "缺失"} · 区间：
+            单位：元 · 初始本金={performance.initial ?? "缺失"} · 首日收盘 {firstDay} nav={navs[0] ?? "缺失"} · 区间：
             {firstDay}~{lastDay}（{days.length} 个账本日）
           </p>
           <p>
@@ -421,7 +439,7 @@ R01Ledger.export_view()/export_evidence() 公共入口生成。"
             ) : (
               `${(maxDd * 100).toFixed(4)}%`
             )}{" "}
-            · 累计费用：{totalFees.toFixed(4)} 元 · 换手：
+            · 累计费用：{totalFees === null ? '缺失' : totalFees.toFixed(4)} 元 · 换手：
             <Tooltip title="输入不足以按冻结口径计算换手（无冻结换手定义的成交额基数）">
               <Tag>未知（null）</Tag>
             </Tooltip>

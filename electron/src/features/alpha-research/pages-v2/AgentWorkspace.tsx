@@ -33,6 +33,7 @@ import R01ProjectView, {
 } from "../components-v2/R01ProjectView";
 import { SERVICE_ENDPOINTS } from "../../../config/services";
 import { authService } from "../../auth/services/authService";
+import ResearchLedgerPanel from '../components-v2/ResearchLedgerPanel';
 
 const labels: Record<string, string> = {
   idle: "等待你的决定",
@@ -492,6 +493,7 @@ export default function AgentWorkspace() {
                   请求外部停止
                 </Button>
               </div>
+              <ResearchLedgerPanel node={cap!.node_id} research={current} />
               {current.external?.stale && (
                 <Alert
                   type="warning"

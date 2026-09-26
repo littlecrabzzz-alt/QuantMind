@@ -21,6 +21,10 @@ export interface StrategyFile {
   is_verified?: boolean;     // 是否通过回测验证
   is_system?: boolean;       // 是否为系统内置策略
   parameters?: Record<string, unknown>;
+  status?: string;
+  base_status?: string;
+  runtime_state?: string | null;
+  effective_status?: string;
   execution_config?: {
     max_buy_drop?: number;
     stop_loss?: number;
