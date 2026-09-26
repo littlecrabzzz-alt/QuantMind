@@ -255,7 +255,13 @@ def collect(root, market):
         if result.get("errors") or result.get("cancelled"):
             raise RuntimeError("QuantDB collection incomplete: " + json.dumps(result, ensure_ascii=False))
         from backend.scripts.backfill_l1_ohlcv import backfill_l1_ohlcv
-        result["l1_ohlcv"] = backfill_l1_ohlcv(qdb.QUANTDB_DATA_DIR, start=now().date() - timedelta(days=10))
+        history_marker = root / "A-history-prepared.json"
+        result["l1_ohlcv"] = backfill_l1_ohlcv(
+            qdb.QUANTDB_DATA_DIR,
+            start=None if not history_marker.exists() else now().date() - timedelta(days=10),
+        )
+        if not history_marker.exists():
+            write_json(history_marker, {"completed_at": now(), "result": result["l1_ohlcv"]})
     else:
         from backend.scripts.quantbc_daily_sync import run
         result = run(days=5, symbols="BTCUSDT,ETHUSDT")
