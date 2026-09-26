@@ -29,3 +29,15 @@ it.each([['BC', true], ['HK', false]] as const)(
         ));
     },
 );
+
+
+it('shows the Mac source and removes cloud collection controls', async () => {
+    vi.mocked(adminService.getSyncSchedule).mockResolvedValue({
+        data: { enabled: false, upstream_collection_allowed: false, source_time: '03:00',
+            received_status: 'applied', data_end: '20260924' },
+    });
+    render(<SyncSchedulePanel market="A" />);
+    expect(await screen.findByText('由 Mac 本地采集，云端接收已校验版本')).toBeInTheDocument();
+    expect(screen.getByText(/数据截止 20260924/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '保存定时配置' })).not.toBeInTheDocument();
+});

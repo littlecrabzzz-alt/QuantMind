@@ -655,6 +655,8 @@ def run(
     refresh_history: bool = False,
 ) -> dict:
     """Publish a validated daily release; legacy valuation flags are ignored."""
+    from backend.shared.data_source_config import require_upstream_collection
+    require_upstream_collection()
     if minute_freqs:
         raise ValueError(
             "Versioned intake currently accepts daily bars only; minute data needs a separate dataset"

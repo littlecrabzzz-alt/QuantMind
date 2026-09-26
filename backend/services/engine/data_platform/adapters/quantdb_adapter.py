@@ -42,6 +42,8 @@ except ImportError:
 
 
 def _get_client() -> QuantDBClient:
+    from backend.shared.data_source_config import require_upstream_collection
+    require_upstream_collection()
     if not _QDB_AVAILABLE:
         raise DataUnavailable("quantdb-sdk 未安装，请运行 pip install quantdb-sdk")
     from backend.shared.runtime_secrets import get_secret

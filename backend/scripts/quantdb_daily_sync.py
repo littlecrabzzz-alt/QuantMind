@@ -113,6 +113,8 @@ DB_PASS = os.getenv("DB_PASSWORD", "quantmind")
 # SDK client
 # ---------------------------------------------------------------------------
 def _make_client():
+    from backend.shared.data_source_config import require_upstream_collection
+    require_upstream_collection()
     from backend.shared.runtime_secrets import get_secret
     from quantdb_sdk import QuantDBClient
     # 任务执行时动态读取：管理台换 key 后，下一次同步（含 Celery 定时任务）
@@ -521,6 +523,7 @@ def reseed_state(datasets: list[dict] | None = None) -> dict:
         sub, cat_id = ds["sub_category"], ds["category_id"]
         is_v2 = ds in V2_DATASETS
         rows = []
+        releases = []  # Do not carry a preceding V2 cursor into a V1 dataset.
 
         if is_v2:
             data = client._get("/api/v1/data/releases", {"datasets": sub, "after_release": ""})
@@ -1017,6 +1020,10 @@ def _sync_extra_sources(
     except Exception:  # noqa: BLE001
         north_enabled = True
         south_enabled = True
+
+    from backend.shared.data_source_config import upstream_collection_allowed
+    if not upstream_collection_allowed():
+        return {"collection": {"status": "skipped", "reason": "local source owns upstream acquisition"}}
 
     want_north = (datasets is None or "hsgt_north" in datasets) and north_enabled
     want_north_daily = datasets is not None and "hsgt_north_daily" in datasets and north_enabled

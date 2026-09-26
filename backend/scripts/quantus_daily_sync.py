@@ -42,6 +42,8 @@ def _refresh_l1_dataset(result: dict) -> None:
 def run(*, days: int = 5, symbols: str | None = None, datasets: list[str] | None = None,
         fast: bool = False, **kwargs: Any) -> dict:
     """同步美股数据。datasets 为勾选的数据集名；None 时全量同步雅虎数据。"""
+    from backend.shared.data_source_config import require_upstream_collection
+    require_upstream_collection()
     if not datasets:
         result = dict(_yahoo_run("US", days=days, symbols=symbols, fast=fast))
         result["market"] = "US"

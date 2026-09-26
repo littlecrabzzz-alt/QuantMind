@@ -36,6 +36,7 @@ export const SyncSchedulePanel: React.FC<SyncSchedulePanelProps> = ({
     const [days, setDays] = useState(defaultDays);
     const [datasets, setDatasets] = useState<string[]>([]);
     const [withQlib, setWithQlib] = useState(false);
+    const [localSource, setLocalSource] = useState<{ time?: string; date?: string; status?: string } | null>(null);
 
     useEffect(() => {
         loadSchedule();
@@ -48,6 +49,8 @@ export const SyncSchedulePanel: React.FC<SyncSchedulePanelProps> = ({
             const resp = await adminService.getSyncSchedule(market);
             if (resp?.data) {
                 const s = resp.data;
+                setLocalSource(s.upstream_collection_allowed === false
+                    ? { time: s.source_time, date: s.data_end, status: s.received_status } : null);
                 setEnabled(!!s.enabled);
                 setTime(dayjs(s.time, 'HH:mm').isValid() ? dayjs(s.time, 'HH:mm') : dayjs('00:30', 'HH:mm'));
                 setDays(s.days ?? defaultDays);
@@ -93,6 +96,14 @@ export const SyncSchedulePanel: React.FC<SyncSchedulePanelProps> = ({
             setRunning(false);
         }
     };
+
+    if (localSource) {
+        return <Alert className="mt-4" type="info" showIcon
+            message="由 Mac 本地采集，云端接收已校验版本"
+            description={localSource.time
+                ? `本地每天 ${localSource.time}（北京时间）采集，休眠或离线时延后。${localSource.status === 'applied' ? `云端已应用，数据截止 ${localSource.date ?? '待核验'}。` : '云端等待本地版本完成应用。'}`
+                : '该市场尚未启用本地每日采集。'} />;
+    }
 
     return (
         <div className="mt-4 p-3 rounded-lg border border-dashed border-amber-400/60 bg-amber-50/40">

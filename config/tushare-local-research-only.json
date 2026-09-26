@@ -1,0 +1,20 @@
+{
+  "collection_api_names": [
+    "daily", "adj_factor", "daily_basic", "stk_limit", "suspend_d", "moneyflow",
+    "stock_basic", "index_basic", "index_daily", "trade_cal", "index_weight",
+    "ci_daily", "sw_daily", "fund_basic", "fund_daily", "fund_adj",
+    "index_classify", "index_member_all"
+  ],
+  "structured_apis": ["stock_basic", "daily", "adj_factor", "daily_basic", "stk_limit", "suspend_d", "moneyflow", "index_basic", "index_daily"],
+  "market_apis": ["fund_basic", "index_weight", "sw_daily", "index_classify", "index_member_all"],
+  "enable_structured": true,
+  "enable_market": true,
+  "enable_documents": false,
+  "enable_catalog_watch": false,
+  "planning_interval_seconds": 3600,
+  "research_publish_interval_seconds": 3600,
+  "publish_interval_seconds": 86400,
+  "archive_worker_cycle_seconds": 300,
+  "batch_requests": 240,
+  "batch_seconds": 45
+}

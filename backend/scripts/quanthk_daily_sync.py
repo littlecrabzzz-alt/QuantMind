@@ -103,6 +103,8 @@ def run(*, days: int = 5, symbols: str | None = None, datasets: list[str] | None
     按数据集分发到对应数据源脚本。hsgt_south（南向资金/港股通）走独立
     爬虫同步脚本，落盘 {quanthk}/2_base_sector/hsgt_south。
     """
+    from backend.shared.data_source_config import require_upstream_collection
+    require_upstream_collection()
     result: dict[str, Any] = {"market": "HK", "days": days, "datasets": datasets or []}
 
     if not datasets:
