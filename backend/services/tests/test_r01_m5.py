@@ -261,3 +261,85 @@ class TestItem4FractionalModelDomain:
         text = src.read_text()
         assert "round(pos.qty, 9)" in text and "1e-9" in text  # 模型容差如实存在
         assert "fractional_model_domain" in text  # 小数份审计-only 已实现
+
+
+class TestM5E2Residuals:
+    def test_exact_counterexample_declared_100_not_125(self, tmp_path):
+        """项1 精确反例：NAV=500/weight=1/price=4/空仓 → 申报恰为 100。"""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            pkg = build_fixture_package(Path(td) / "p")
+            # 直接构造：信号日 NAV=500（空仓 initial）、close=4.0、w=1.0
+            # → raw=125 → floor 1 手 → declared==100（非 125）
+            led = R01Ledger(pkg, _cfg())
+            # 注入信号引用：首日 signal=None → nav_ref=initial_cash=500，
+            # 信号收盘由包行情提供（fixture 09-09 close≈4.008 → raw≈124.75
+            # → floor 100）；精确 price=4 用权重微调覆盖 raw∈(100,200)
+            w = 1.0
+            led.run_day(date(2025, 9, 10), {SYM: w}, signal_date=date(2025, 9, 9))
+            buys = [o for o in led.orders.values() if o.side == "buy"]
+            assert buys
+            assert buys[0].qty_target == 100  # floor 整手（非 int(124.75)=124/125）
+            assert buys[0].qty_filled == 100
+
+    def test_exact_pure_4_0_declared_100(self, pkg_2026):
+        """项1 精确反例（合成价 4.0）：NAV=500/w=1/price=4 → raw=125 → 100。"""
+        days = pkg_2026.trade_dates()[:4]
+        led = R01Ledger(pkg_2026, _cfg())  # initial 500, close 4.0
+        led.run_day(days[0], None)  # warmup（nav=500 快照）
+        w = 1.0
+        led.run_day(days[1], {SYM: w})  # raw = 500/4 = 125 → floor 100
+        buys = [o for o in led.orders.values() if o.side == "buy"]
+        assert buys and buys[0].qty_target == 100  # 恰为 100（非 125）
+        assert buys[0].qty_filled == 100
+
+    def test_existing_4008_case_preserved(self, tmp_path):
+        """既有 ~4.008 信号收盘用例保留（fixture 原始路径）。"""
+        pkg = build_fixture_package(tmp_path / "p")
+        led = R01Ledger(pkg, _cfg(initial_cash=2000.0))
+        led.run_day(date(2025, 9, 10), {SYM: 0.8}, signal_date=date(2025, 9, 9))
+        buys = [o for o in led.orders.values() if o.side == "buy"]
+        assert buys  # 0.8×2000/4.008≈399 → floor 300
+        assert buys[0].qty_target % 100 == 0
+        assert buys[0].qty_target == 300
+
+    def test_buy_partial_fill_exact_volume_137(self, pkg_2026):
+        """项2：申报 200、volume 137 → fill 137、余 63（不整手化）。"""
+        from dataclasses import replace as _replace
+        from backend.services.simulation.services.ashare_matcher import (
+            MatchConfig, match_order,
+        )
+        from backend.services.simulation.services.local_market_data import DailyBar
+
+        bar = DailyBar(
+            symbol=SYM, trade_date=date(2026, 7, 10),
+            open=4.0, high=4.0, low=4.0, close=4.0,
+            volume=137.0, amount=548.0, vwap=4.0, pre_close=4.0,
+            limit_up=4.4, limit_down=3.6, is_st=False, suspended=False,
+        )
+        cfg = MatchConfig(price_mode="open", asset_type="etf",
+                          allow_partial=True, slippage_bps=0.0)
+        mr = match_order("buy", 200, bar, cfg, cash_available=1e9)
+        assert mr.success
+        assert mr.fill_quantity == 137  # 精确量（非 floor 到 100）
+        assert mr.qty_remaining == 63
+
+    def test_v5_with_null_precision_key_rejected(self, tmp_path):
+        """项3：v5 携带 precision_semantics 键（含 null）一律拒（键存在即拒）。"""
+        pkg = build_fixture_package(tmp_path / "p")
+        led = R01Ledger(pkg, _cfg(initial_cash=2000.0))
+        led.run_day(date(2025, 9, 10), {SYM: 0.8}, signal_date=date(2025, 9, 9))
+        cp = led.export_checkpoint()
+        cp["schema_version"] = 5
+        cp["precision_semantics"] = None  # null 也拒（键存在）
+        cp["contract_versions"] = {"ledger_contract": "v3", "etf_input_package_schema": "v3"}
+        with pytest.raises(CheckpointConfigMismatch, match="矛盾标记"):
+            R01Ledger.restore(pkg, _cfg(initial_cash=2000.0), cp)
+        # v5 干净（键不存在）仍 legacy 接受
+        cp2 = led.export_checkpoint()
+        cp2["schema_version"] = 5
+        cp2.pop("precision_semantics", None)
+        cp2["contract_versions"] = {"ledger_contract": "v3", "etf_input_package_schema": "v3"}
+        r = R01Ledger.restore(pkg, _cfg(initial_cash=2000.0), cp2)
+        assert r.checkpoint_precision_origin == "legacy_precision"

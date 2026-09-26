@@ -1640,7 +1640,7 @@ class R01Ledger:
         cp_precision = checkpoint.get("precision_semantics")
         # M5E1（项2）：v5 禁止携带 precision_semantics 标记——原生 v5 从不
         # 写该字段，出现即矛盾标记=损坏，拒绝（防 v5 被洗成 v6/full）。
-        if cp_schema == 5 and cp_precision is not None:
+        if cp_schema == 5 and "precision_semantics" in checkpoint:
             raise CheckpointConfigMismatch(
                 "checkpoint_config_mismatch: schema 5 携带 precision_semantics="
                 f"{cp_precision!r}（原生 v5 无此字段，矛盾标记=损坏快照拒绝）"

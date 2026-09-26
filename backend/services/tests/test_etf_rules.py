@@ -205,9 +205,11 @@ class TestMatcherEtfRules:
         assert mr_eq.fill_price == pytest.approx(4.00)
 
     def test_buy_lot_constraint(self):
+        """M5E2 项2：撮合层不再对申报量重复 floor——整手性由初始申报
+        （M5E1 买初报 floor）保证；撮合层仅拒不足一手的申报。"""
         cfg = MatchConfig(price_mode="open", asset_type="etf")
         mr = match_order("buy", 150, _bar(), cfg)
-        assert mr.success and mr.fill_quantity == 100  # 整手向下
+        assert mr.success and mr.fill_quantity == 150  # 申报量保持（不再 floor）
         mr0 = match_order("buy", 50, _bar(), cfg)
         assert not mr0.success and mr0.reason == "BELOW_LOT_SIZE"
 

@@ -224,8 +224,11 @@ def match_order(
     # ── 整手 ──
     lot_size = max(1, int(lot_size_for_symbol(bar.symbol) or cfg.lot_size or _LOT_SIZE))
     if side == "buy":
-        fill_qty = _floor_to_lot(quantity, lot_size)
-        if fill_qty <= 0:
+        # 初始申报的整手性由调用方（M5E1 买初报 floor）保证；撮合层不再
+        # 对申报量重复 floor——市场量约束的部分成交保持精确量
+        # （M5E2 项2：申报 200、volume 137 → fill 137、余 63，不整手化）。
+        fill_qty = int(quantity)
+        if fill_qty < lot_size:
             return MatchResult(
                 success=False,
                 reason="BELOW_LOT_SIZE",

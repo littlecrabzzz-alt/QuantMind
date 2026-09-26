@@ -206,11 +206,13 @@ class TestVolumeCap:
         return MatchConfig(**kw)
 
     def test_buy_capped_by_volume(self):
-        bar = _vbar(volume=12345)  # 123 手
+        """M5E2 项2：量约束部分成交保持精确量（申报 10 万、量 12345 →
+        fill 12345、余 87655，不整手化；整手性由初始申报保证）。"""
+        bar = _vbar(volume=12345)
         mr = match_order("buy", 100000, bar, self._cfg(), cash_available=1e9)
         assert mr.success
-        assert mr.fill_quantity == 12300  # 整手化
-        assert mr.qty_remaining == 100000 - 12300
+        assert mr.fill_quantity == 12345  # 精确量（M5E2 前为 12300 整手化）
+        assert mr.qty_remaining == 100000 - 12345
 
     def test_sell_capped_by_volume(self):
         bar = _vbar(volume=5000)
