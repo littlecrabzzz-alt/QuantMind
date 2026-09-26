@@ -27,12 +27,25 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from dual_node_inventory import stat_key
-from dual_node_snapshot import digest, transfer
 
 MARKETS = {"A": ("quantdb", "03:00"), "BC": ("quantbc", "08:15")}
 RELEASE = re.compile(r"market-[a-f0-9]{64}")
 DEFAULT_ROOT = Path.home() / "Library/Application Support/QuantMind/market-source"
 REMOTE_PROJECT = "/root/data/disk/quantmind/project"
+
+
+def digest(path):
+    sha = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(4 * 1024 * 1024), b""):
+            sha.update(block)
+    return sha.hexdigest()
+
+
+def transfer(*args):
+    # Host topology belongs to the Mac transport, not the container receiver.
+    from dual_node_snapshot import transfer as send
+    return send(*args)
 
 
 def now():
