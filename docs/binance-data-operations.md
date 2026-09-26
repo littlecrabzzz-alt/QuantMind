@@ -31,6 +31,7 @@ python3 -m backend.scripts.quantbc_daily_sync \
 - `available_at` 是 bar 结束的理论下界；`collected_at` 是本次实际采集时间。manifest 明确 `point_in_time_verified=false`，历史回填不能证明当年当时已经收到该数据。`history_complete` 仅指当前公共接口可提供的这组 symbol 日线覆盖。
 - `releases/<release_id>/` 保存日线、标的元数据、质量报告和文件 SHA-256；仅在整体检查通过后原子更新 `CURRENT.json`。失败保持旧指针，旧研究输入不随指针移动。
 - 同样行情及元数据重复发布保持原版本；交易规则等元数据变化会生成新版本，即使行情行数和价格未变。无变化响应返回该固定版本的质量报告，本轮检查结果另存 `checked_quality`。
+- 经济数值由原始十进制字符串统一转换为 Python binary64，manifest 记录 `numeric_semantics=python_float_binary64_from_source_decimal`。从旧解析口径升级时自动完整回采已有历史，成功后发布新版本；不能只更新尾部再将全部旧历史标为新口径。首次迁移的浮点末位变化属于解析归一化，需结合相同原始响应哈希判断，不能直接称为上游行情修订。
 - 2018-02-08 的 BTC/ETH REST 收盘时间异常：仅在校验通过的月归档与 REST 全部经济数值一致时采用归档行，记录 `source_revision`、原始 REST 收盘时间及哈希。价格或量额不一致时阻止发布。
 
 ## 研究数据与真实验收

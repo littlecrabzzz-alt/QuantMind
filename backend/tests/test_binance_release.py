@@ -286,3 +286,74 @@ def test_same_raw_decimal_response_is_idempotent_across_numeric_parsers(
     stored = sync._previous(tmp_path)[2].iloc[0]
     assert float(stored.quote_volume).hex() == "0x1.c2125088a08fap+30"
     assert stored.amount == stored.quote_volume
+
+
+@pytest.mark.parametrize("old_numeric_semantics", [None, "pandas_to_numeric"])
+def test_numeric_contract_migration_replays_history_then_is_idempotent(
+    intake, tmp_path, monkeypatch, old_numeric_semantics
+):
+    calls = []
+    monkeypatch.setattr(
+        fetch,
+        "get_binance_first_kline",
+        lambda symbol, **kwargs: frame(symbol, ("2026-09-01",)),
+    )
+
+    def download(symbol, **kwargs):
+        calls.append(kwargs["start_date"])
+        days = pd.date_range(
+            kwargs["start_date"], kwargs["end_date"], inclusive="left"
+        ).strftime("%Y-%m-%d")
+        return frame(symbol, days)
+
+    monkeypatch.setattr(fetch, "download_binance_klines", download)
+    old_contract = dict(sync.MANIFEST_SEMANTICS)
+    if old_numeric_semantics is None:
+        old_contract.pop("numeric_semantics")
+    else:
+        old_contract["numeric_semantics"] = old_numeric_semantics
+    with monkeypatch.context() as old_context:
+        old_context.setattr(sync, "MANIFEST_SEMANTICS", old_contract)
+        legacy = sync.run(**{**intake, "start_date": "2026-09-01"})
+    legacy_path = sync.Path(legacy["data_dir"])
+    legacy_bytes = (legacy_path / "manifest.json").read_bytes()
+    legacy_manifest = json.loads(legacy_bytes)
+
+    # A normal five-day scheduler run must not relabel untouched older rows.
+    args = {"symbols": intake["symbols"], "days": 5, "end_date": "2026-09-25"}
+    legacy_pointer = (tmp_path / "CURRENT.json").read_bytes()
+
+    def incomplete_download(symbol, **kwargs):
+        observations = download(symbol, **kwargs)
+        return observations[observations.open_time.dt.date != date(2026, 9, 10)]
+
+    with monkeypatch.context() as failed_context:
+        failed_context.setattr(fetch, "download_binance_klines", incomplete_download)
+        with pytest.raises(ValueError, match="Daily gaps"):
+            sync.run(**args)
+    assert calls[-2:] == ["2026-09-01"] * 2
+    assert (tmp_path / "CURRENT.json").read_bytes() == legacy_pointer
+    assert (legacy_path / "manifest.json").read_bytes() == legacy_bytes
+    assert sync._previous(tmp_path)[1]["release_id"] == legacy["release_id"]
+
+    migrated = sync.run(**args)
+    assert calls[-2:] == ["2026-09-01"] * 2
+    assert migrated["release_id"] != legacy["release_id"]
+    assert migrated["unchanged"] is False
+    assert (
+        migrated["revised_rows"] == 0
+    )  # Exact fixture values need only a contract upgrade.
+    _, manifest, _ = sync._previous(tmp_path)
+    assert manifest["numeric_semantics"] == "python_float_binary64_from_source_decimal"
+    assert manifest["data_digest"] == legacy_manifest["data_digest"]
+    assert manifest["previous_release_id"] == legacy["release_id"]
+    assert (legacy_path / "manifest.json").read_bytes() == legacy_bytes
+    pointer = (tmp_path / "CURRENT.json").read_bytes()
+
+    replay = sync.run(**args)
+    assert calls[-2:] == ["2026-09-17"] * 2
+    assert replay["release_id"] == migrated["release_id"]
+    assert replay["unchanged"] is True
+    assert replay["revised_rows"] == 0
+    assert (tmp_path / "CURRENT.json").read_bytes() == pointer
+    assert len(list((tmp_path / "releases").iterdir())) == 2

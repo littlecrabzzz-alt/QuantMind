@@ -79,6 +79,7 @@ MANIFEST_SEMANTICS = {
     "available_at_semantics": "bar_period_end_lower_bound",
     "point_in_time_verified": False,
     "history_complete_scope": "current_public_api_daily_bar_coverage",
+    "numeric_semantics": "python_float_binary64_from_source_decimal",
 }
 
 
@@ -342,6 +343,9 @@ def _publish_daily(
     )
 
     _, previous, old = _previous(root)
+    numeric_migration = bool(previous) and previous.get(
+        "numeric_semantics"
+    ) != MANIFEST_SEMANTICS.get("numeric_semantics")
     if previous and (
         set(previous["symbols"]) != set(symbols)
         or previous["product_type"] != product_type
@@ -409,7 +413,9 @@ def _publish_daily(
             if not prior.empty:
                 # Replay the overlap so revisions are visible in a new release.
                 old_start = pd.Timestamp(prior["time"].min()).date()
-                if refresh_history:
+                # A new numeric contract must cover the complete stored history,
+                # even when its first run comes from a short scheduler window.
+                if refresh_history or numeric_migration:
                     symbol_start = min(effective_start, old_start)
                 elif effective_start >= old_start:
                     # Resume from stored coverage even when a short scheduler
@@ -439,8 +445,12 @@ def _publish_daily(
             attempt["last_downloaded_symbol"] = symbol
             _json(last_path, attempt)
         incoming = pd.concat(frames, ignore_index=True)
+        # A numeric migration cannot fill newly missing observations with rows
+        # decoded under the previous contract. Validate the full fresh intake.
         data = (
-            pd.concat([old, incoming], ignore_index=True) if not old.empty else incoming
+            pd.concat([old, incoming], ignore_index=True)
+            if not old.empty and not numeric_migration
+            else incoming
         )
         data = data.drop_duplicates(["symbol", "open_time"], keep="last").sort_values(
             ["symbol", "open_time"]
