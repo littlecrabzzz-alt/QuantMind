@@ -73,7 +73,18 @@ DEFAULT_SYMBOLS = ["BTCUSDT", "ETHUSDT"]
 SPOT_PRODUCTS = {
     "BTCUSDT": ("crypto_spot", None, None),
     "ETHUSDT": ("crypto_spot", None, None),
+    "BNBUSDT": ("crypto_spot", None, None),
+    "SOLUSDT": ("crypto_spot", None, None),
+    "XRPUSDT": ("crypto_spot", None, None),
+    "DOGEUSDT": ("crypto_spot", None, None),
+    "ADAUSDT": ("crypto_spot", None, None),
+    "LINKUSDT": ("crypto_spot", None, None),
+    "AVAXUSDT": ("crypto_spot", None, None),
+    "LTCUSDT": ("crypto_spot", None, None),
     "AAPLBUSDT": ("tokenized_equity_spot", "US", "AAPL"),
+    "AMZNBUSDT": ("tokenized_equity_spot", "US", "AMZN"),
+    "NVDABUSDT": ("tokenized_equity_spot", "US", "NVDA"),
+    "TSLABUSDT": ("tokenized_equity_spot", "US", "TSLA"),
 }
 MANIFEST_SEMANTICS = {
     "available_at_semantics": "bar_period_end_lower_bound",

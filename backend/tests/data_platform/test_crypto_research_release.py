@@ -28,7 +28,7 @@ from backend.shared.qlib_paths import resolve_qlib_provider_uri
 from backend.tests.test_binance_release import intake
 
 
-def _publish(root, release_id, offset=0):
+def _publish(root, release_id, offset=0, *, eth_start=date(2024, 1, 6)):
     release = root / "releases" / release_id
     for day in (date(2024, 1, 6), date(2024, 1, 7)):
         target = (
@@ -57,6 +57,7 @@ def _publish(root, release_id, offset=0):
                     "release_id": release_id,
                 }
                 for symbol in ("BTCUSDT", "ETHUSDT")
+                if symbol != "ETHUSDT" or day >= eth_start
             ]
         )
         bars.to_parquet(target, index=False)
@@ -70,12 +71,12 @@ def _publish(root, release_id, offset=0):
         "timezone": "UTC",
         "history_complete": True,
         "end_exclusive": "2024-01-08",
-        "rows": 4,
+        "rows": 2 + (date(2024, 1, 8) - eth_start).days,
         "source_revisions": [],
         "symbols": {
             s: {
-                "rows": 2,
-                "first": "2024-01-06",
+                "rows": 2 if s == "BTCUSDT" else (date(2024, 1, 8) - eth_start).days,
+                "first": "2024-01-06" if s == "BTCUSDT" else eth_start.isoformat(),
                 "last": "2024-01-07",
                 "gaps": 0,
                 "duplicates": 0,
@@ -121,6 +122,74 @@ def _publish(root, release_id, offset=0):
         )
     )
     return release
+
+
+@pytest.fixture
+def staggered_crypto(tmp_path):
+    release = _publish(tmp_path / "quantbc", "lifetimes", eth_start=date(2024, 1, 7))
+    adapter = CryptoAdapter(release)
+    assert adapter.prepare_data()
+    return adapter
+
+
+def test_crypto_instruments_follow_each_symbols_verified_coverage(staggered_crypto):
+    provider = Path(staggered_crypto.get_qlib_provider_uri())
+    assert (provider / "instruments/all.txt").read_text().splitlines() == [
+        "bc_BTCUSDT\t2024-01-06\t2024-01-07",
+        "bc_ETHUSDT\t2024-01-07\t2024-01-07",
+    ]
+    close = np.fromfile(provider / "features/bc_ethusdt/close.day.bin", dtype="<f4")
+    assert close.tolist() == [1.0, 105.0]
+
+
+def test_qlib_universe_excludes_crypto_before_its_first_bar(staggered_crypto):
+    qlib = pytest.importorskip("qlib")
+    from qlib.data import D
+
+    qlib.init(
+        provider_uri=staggered_crypto.get_qlib_provider_uri(), region="cn", kernels=1
+    )
+    assert set(
+        D.list_instruments(
+            D.instruments("all"),
+            start_time="2024-01-06",
+            end_time="2024-01-06",
+            as_list=True,
+        )
+    ) == {"bc_BTCUSDT"}
+    assert set(
+        D.list_instruments(
+            D.instruments("all"),
+            start_time="2024-01-07",
+            end_time="2024-01-07",
+            as_list=True,
+        )
+    ) == {"bc_BTCUSDT", "bc_ETHUSDT"}
+
+
+@pytest.mark.parametrize("missing", ["manifest", "first"])
+def test_crypto_lifetimes_cannot_fall_back_to_global_calendar(tmp_path, missing):
+    from backend.services.engine.qlib_data_builder import QlibDataBuilder
+
+    release = _publish(tmp_path / "quantbc", "missing-lifetime")
+    builder = QlibDataBuilder.for_market(
+        "CRYPTO", data_dir=release, qlib_dir=tmp_path / "derived"
+    )
+    manifest_path = release / "manifest.json"
+    if missing == "manifest":
+        manifest_path.unlink()
+    else:
+        manifest = json.loads(manifest_path.read_text())
+        manifest["quality"]["symbols"]["ETHUSDT"].pop("first")
+        quality_path = release / "quality.json"
+        quality_path.write_text(json.dumps(manifest["quality"]))
+        manifest["files"]["quality.json"] = hashlib.sha256(
+            quality_path.read_bytes()
+        ).hexdigest()
+        manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="manifest|coverage dates"):
+        builder.build_all()
+    assert not (tmp_path / "derived/instruments/all.txt").exists()
 
 
 def test_release_bound_hub_qlib_and_closed_utc_calendar(tmp_path, monkeypatch):
