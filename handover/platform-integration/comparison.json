@@ -1,0 +1,46 @@
+{
+  "first": "r01bt-00102ba3637bde41d37f62e2dd3542ab",
+  "second": "r01bt-1983d53fa1b2cadc8b39712d741e244d",
+  "metrics": [
+    {
+      "metric": "\u5e74\u5316\u6536\u76ca\u7387",
+      "metric_key": "annual_return",
+      "value1": 0.06020303493718382,
+      "value2": 0.055502333991667596,
+      "unit": "%",
+      "higher_is_better": true
+    },
+    {
+      "metric": "\u590f\u666e\u6bd4\u7387",
+      "metric_key": "sharpe_ratio",
+      "value1": 0.7135699502221622,
+      "value2": 0.5639225844291829,
+      "unit": "",
+      "higher_is_better": true
+    },
+    {
+      "metric": "\u6700\u5927\u56de\u64a4",
+      "metric_key": "max_drawdown",
+      "value1": 0.19276965433288784,
+      "value2": 0.25780330715518696,
+      "unit": "%",
+      "higher_is_better": false
+    },
+    {
+      "metric": "\u603b\u6536\u76ca\u7387",
+      "metric_key": "total_return",
+      "value1": 0.9756114982850006,
+      "value2": 0.8759661241666667,
+      "unit": "%",
+      "higher_is_better": true
+    },
+    {
+      "metric": "\u80dc\u7387",
+      "metric_key": "win_rate",
+      "value1": 0.0,
+      "value2": 0.0,
+      "unit": "%",
+      "higher_is_better": true
+    }
+  ]
+}

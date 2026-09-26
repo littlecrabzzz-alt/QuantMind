@@ -1,0 +1,39 @@
+[
+  {
+    "name": "same request returns same completed run",
+    "passed": true
+  },
+  {
+    "name": "key conflict",
+    "passed": true
+  },
+  {
+    "name": "holdout blocked",
+    "passed": true
+  },
+  {
+    "name": "revision ownership",
+    "passed": true
+  },
+  {
+    "name": "untested B cannot freeze",
+    "passed": true
+  },
+  {
+    "name": "anonymous and forged identity rejected",
+    "passed": true
+  },
+  {
+    "name": "all five versions source downloads byte/hash identical",
+    "passed": true,
+    "files": 50
+  },
+  {
+    "name": "Backtest Center filters actual strategy ID",
+    "passed": true
+  },
+  {
+    "name": "9 research and 130 archived engineering cases",
+    "passed": true
+  }
+]

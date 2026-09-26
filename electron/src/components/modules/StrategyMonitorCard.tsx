@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useStrategies } from '../../hooks/useStrategies';
 import { StrategyMonitorSkeleton } from '../common/CardSkeletons';
 import { formatBackendTime } from '../../utils/format';
+import PublishedPaperRuns from '../../pages/trading/components/PublishedPaperRuns';
 
 interface StrategyMonitorCardProps {
   expanded?: boolean;
@@ -155,6 +156,7 @@ export const StrategyMonitorCard: React.FC<StrategyMonitorCardProps> = ({
         </div>
       </div>
 
+      <PublishedPaperRuns compact />
       <div className="grid grid-cols-4 gap-1.5 mb-2.5 relative z-10 strategy-modal-surface">
         <div className="bg-slate-50 rounded-xl p-1 border border-slate-100/80 text-center">
           <div className="w-5.5 h-5.5 bg-indigo-50 rounded-lg flex items-center justify-center mx-auto mb-1">

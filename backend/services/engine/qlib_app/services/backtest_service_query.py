@@ -26,7 +26,7 @@ class QlibBacktestServiceQueryMixin:
     ) -> QlibBacktestResult | None:
         """获取回测结果，优先从内存、缓存，最后从持久化层获取"""
         try:
-            if not self._initialized:
+            if not self._initialized and not backtest_id.startswith("r01bt-"):
                 self.initialize()
         except Exception as exc:
             task_logger.warning("initialize_failed", "get_result 初始化 Qlib 失败，将继续返回原始结果", error=str(exc))
@@ -43,7 +43,8 @@ class QlibBacktestServiceQueryMixin:
                 if cached_result:
                     task_logger.debug("cache_hit_result", "从缓存读取回测结果", backtest_id=backtest_id)
                     model = QlibBacktestResult(**cached_result)
-                    return self._normalize_result_trades(model)
+                    if model.status in ("completed", "failed"):
+                        return self._normalize_result_trades(model)
             except Exception as e:
                 task_logger.warning("cache_read_result_failed", "从缓存读取失败", error=str(e))
 
@@ -78,7 +79,7 @@ class QlibBacktestServiceQueryMixin:
         if result:
             if not exclude_trades:
                 result = self._normalize_result_trades(result)
-                if self._cache:
+                if self._cache and result.status in ("completed", "failed"):
                     try:
                         self._cache.set_backtest_result(cache_key, result.dict())
                     except Exception as e:
@@ -392,8 +393,8 @@ class QlibBacktestServiceQueryMixin:
             raise ValueError("无法找到指定的回测结果")
 
         if (
-            result1.config.get("user_id") != user_id
-            or result2.config.get("user_id") != user_id
+            normalize_user_id(result1.user_id) != user_id
+            or normalize_user_id(result2.user_id) != user_id
             or result1.tenant_id != tenant_id
             or result2.tenant_id != tenant_id
         ):

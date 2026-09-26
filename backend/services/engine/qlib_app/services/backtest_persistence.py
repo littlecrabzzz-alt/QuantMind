@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -37,6 +37,9 @@ class BacktestPersistence:
         "stratified_returns",
         "style_attribution",
         "rebalance_suggestions",
+        "ledger_view",
+        "ledger_evidence",
+        "strategy_decisions",
     )
 
     def __init__(self) -> None:
@@ -217,6 +220,44 @@ class BacktestPersistence:
                 tenant_id=tenant_id,
                 result_file_path=result_file_path,
             )
+
+    async def reserve_run(self, backtest_id: str, user_id: str, tenant_id: str,
+                          config: dict[str, Any]) -> bool:
+        """Reserve an immutable execution request; retry keys cannot change inputs."""
+        user_id = normalize_user_id(user_id)
+        created_at = datetime.now(timezone.utc)
+        pending = QlibBacktestResult(backtest_id=backtest_id, user_id=user_id,
+            tenant_id=tenant_id, status="pending", created_at=created_at, config=config,
+            annual_return=None, sharpe_ratio=None, max_drawdown=None)
+        async with get_session() as session:
+            row = await session.execute(text("""
+                INSERT INTO qlib_backtest_runs
+                    (backtest_id, user_id, tenant_id, status, created_at, config_json, result_json)
+                VALUES (:id, :user, :tenant, 'pending', :created, CAST(:config AS jsonb), CAST(:result AS jsonb))
+                ON CONFLICT(backtest_id) DO NOTHING RETURNING backtest_id
+            """), {"id": backtest_id, "user": user_id, "tenant": tenant_id,
+                   "created": created_at, "result": pending.model_dump_json(),
+                   "config": json.dumps(config, ensure_ascii=False, allow_nan=False)})
+            created = row.scalar_one_or_none() is not None
+            if not created:
+                old = await session.execute(text("""
+                    SELECT user_id, tenant_id, config_json FROM qlib_backtest_runs
+                    WHERE backtest_id=:id
+                """), {"id": backtest_id})
+                old = old.mappings().one()
+                if old["user_id"] != user_id or old["tenant_id"] != tenant_id or old["config_json"] != config:
+                    raise ValueError("idempotency_key_conflict")
+            return created
+
+    async def get_run(self, backtest_id: str, user_id: str, tenant_id: str) -> dict | None:
+        async with get_session(read_only=True) as session:
+            row = await session.execute(text("""
+                SELECT backtest_id, status, config_json, created_at, completed_at
+                FROM qlib_backtest_runs
+                WHERE backtest_id=:id AND user_id=:user AND tenant_id=:tenant
+            """), {"id": backtest_id, "user": normalize_user_id(user_id), "tenant": tenant_id})
+            value = row.mappings().first()
+            return dict(value) if value else None
 
     async def get_result(
         self,

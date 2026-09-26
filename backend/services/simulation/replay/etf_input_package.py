@@ -94,6 +94,27 @@ def sha256_of_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def verify_package_files(root: Path, expected_sums_sha256: str | None = None) -> str:
+    """Verify the closed set of published package files, binding the checksum list."""
+    root = Path(root).resolve()
+    sums = root / "SHA256SUMS.txt"
+    digest = sha256_of_file(sums)
+    if expected_sums_sha256 and digest != expected_sums_sha256:
+        raise EtfInputPackageError("package_checksum_list_changed")
+    listed = set()
+    for line in sums.read_text().splitlines():
+        expected, relative = line.split(maxsplit=1)
+        relative = relative.lstrip("*")
+        path = (root / relative).resolve()
+        if not path.is_relative_to(root) or relative in listed or sha256_of_file(path) != expected:
+            raise EtfInputPackageError(f"package_file_checksum_mismatch:{relative}")
+        listed.add(relative)
+    payloads = {str(p.relative_to(root)) for p in root.rglob("*.parquet")} | {"manifest.json"}
+    if not payloads <= listed:
+        raise EtfInputPackageError("package_checksum_list_incomplete")
+    return digest
+
+
 # ---------------------------------------------------------------------------
 # typed event（$defs.typed_event 的 Python 视图）
 # ---------------------------------------------------------------------------

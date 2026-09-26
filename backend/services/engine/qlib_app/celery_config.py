@@ -147,8 +147,14 @@ if os.getenv("R01_VIRTUAL_RUN_SCHEDULE_ENABLED", "true").lower() == "true":
     beat_schedule["r01-virtual-run-dispatch"] = {
         "task": "engine.tasks.dispatch_r01_virtual_runs",
         "schedule": crontab(minute="*/5", hour="*"),
-        "options": {"expires": 240},
+        "options": {"expires": 240, "queue": os.getenv("R01_VR_TASK_QUEUE", "default")},
     }
+    if os.getenv("R01_SOURCE_ARCHIVE"):
+        beat_schedule["r01-publish-daily-inputs"] = {
+            "task": "engine.tasks.r01_publish_daily_inputs",
+            "schedule": crontab(minute="*/30"),
+            "options": {"queue": os.getenv("R01_VR_TASK_QUEUE", "default"), "expires": 1700},
+        }
 
 # Strategy Lab daily scan — runs after the data sync settles (Day 16)
 if os.getenv("STRATEGY_LAB_SCAN_ENABLED", "true").lower() == "true":
@@ -218,6 +224,7 @@ celery_app.conf.update(
         "backend.services.engine.qlib_app.tasks",
         "backend.services.engine.tasks.celery_tasks",
         "backend.services.engine.tasks.tushare_tasks",
+        "backend.services.engine.tasks.r01_strategy_tasks",
     ),
     # 监控配置
     worker_send_task_events=True,

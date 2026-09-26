@@ -60,11 +60,13 @@ export default function LedgerDetailView({
   caseId,
   artifact,
   showCurve = false,
+  data,
 }: {
   node: string;
   caseId: string;
   artifact: { name: string; uri: string; fixture?: boolean; not_ready?: boolean; sha256?: string };
   showCurve?: boolean;
+  data?: Record<string, unknown>;
 }) {
   const [raw, setRaw] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState("");
@@ -76,6 +78,7 @@ export default function LedgerDetailView({
     let stopped = false;
     setRaw(null);
     setError('');
+    if (data) { setRaw(data); return; }
     (async () => {
       try {
         const blob = await researchAgent.file(node, caseId, relativeUri(artifact.uri));
@@ -95,7 +98,7 @@ export default function LedgerDetailView({
     return () => {
       stopped = true;
     };
-  }, [node, caseId, artifact.uri, artifact.sha256]);
+  }, [node, caseId, artifact.uri, artifact.sha256, data]);
 
   const format = useMemo(() => (raw ? identifyExportFormat(raw) : null), [raw]);
   const conversion = useMemo(() => {
@@ -261,6 +264,7 @@ R01Ledger.export_view()/export_evidence() 公共入口生成。"
               setOpenOriginal(false);
               return;
             }
+            if (data) { setOriginal(JSON.stringify(data, null, 2)); setOpenOriginal(true); return; }
             researchAgent
               .file(node, caseId, relativeUri(artifact.uri))
               .then(async (blob) => {

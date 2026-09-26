@@ -102,6 +102,7 @@ async def get_my_backtest_history(
     status: str | None = Query(None, description="状态过滤"),
     symbol: str | None = Query(None, description="股票代码过滤"),
     strategy_name: str | None = Query(None, description="策略名称过滤"),
+    strategy_id: str | None = Query(None, description="已保存的策略ID"),
     service: Any = Depends(get_qlib_service),
 ):
     """获取当前用户的回测历史 (支持分页和排序)。使用认证 token 自动识别用户。"""
@@ -121,6 +122,7 @@ async def get_my_backtest_history(
         status=status,
         symbol=symbol,
         strategy_name=strategy_name,
+        strategy_id=strategy_id,
     )
 
 
@@ -137,6 +139,7 @@ async def get_backtest_history(
     status: str | None = Query(None, description="状态过滤"),
     symbol: str | None = Query(None, description="股票代码过滤"),
     strategy_name: str | None = Query(None, description="策略名称过滤"),
+    strategy_id: str | None = Query(None, description="已保存的策略ID"),
     service: Any = Depends(get_qlib_service),
 ):
     """获取回测历史 (支持分页和排序)"""
@@ -157,6 +160,7 @@ async def get_backtest_history(
         status=status,
         symbol=symbol,
         strategy_name=strategy_name,
+        strategy_id=strategy_id,
     )
 
 
@@ -173,6 +177,7 @@ async def _build_history_response(
     status: str | None = None,
     symbol: str | None = None,
     strategy_name: str | None = None,
+    strategy_id: str | None = None,
 ) -> dict[str, Any]:
     """Shared logic for building paginated backtest history response."""
     results = await service.list_history(user_id, tenant_id, limit=max(page * page_size * 5, 200))
@@ -201,6 +206,9 @@ async def _build_history_response(
 
     if symbol:
         results = [r for r in results if _field(r, "symbol") == symbol]
+
+    if strategy_id:
+        results = [r for r in results if str((_field(r, "config", {}) or {}).get("strategy_id")) == strategy_id]
 
     if strategy_name:
         results = [

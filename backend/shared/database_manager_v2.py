@@ -125,7 +125,7 @@ class DatabaseManager:
 
         # 创建主库引擎
         master_url = self.config.get_master_url()
-        logger.info(f"Creating master database engine with URL: {master_url}")
+        logger.info("Creating master database engine")
         self._master_engine = create_async_engine(
             master_url,
             pool_size=self.config.pool_size,

@@ -203,6 +203,22 @@ class VirtualRunPipeline:
     def _run_locked(self, decision_date: date, now: datetime) -> DayRunResult:
         run_id = self.config.ledger_run_id
         day_key = decision_date.isoformat()
+        if self.config.start_date and day_key < self.config.start_date:
+            return DayRunResult(day_key, OUTCOME_PENDING_DECISION, "before frozen forward start; no historical decisions")
+        if self.config.program:
+            for earlier in self.store.list_days(run_id):
+                if earlier >= day_key:
+                    continue
+                if (self.store.get_stage(run_id, earlier, "signal") is not None
+                    and self.store.get_stage(run_id, earlier, "execute") is None):
+                    if self._decision_window_verdict(decision_date, now) == "missed":
+                        break  # Record the missed window below; never backdate it.
+                    detail = f"waiting_previous_settlement: {earlier} 的冻结决策尚未完成记账"
+                    self.store.set_day(run_id, day_key, {"ledger_run_id": run_id,
+                        "decision_date": day_key, "outcome": OUTCOME_DATA_BLOCKED,
+                        "detail": detail, "pending_actions": ["等待前日记账；若已超窗需人工复核"]})
+                    self._write_status_from_records(now)
+                    return DayRunResult(day_key, OUTCOME_DATA_BLOCKED, detail)
 
         # -- 错过决策窗口（R3/R4）：无任何阶段状态且已过截止+超时 ----
         if self.store.get_stage(run_id, day_key, "data_check") is None:
@@ -347,317 +363,13 @@ class VirtualRunPipeline:
 
         # -- 各阶段实现 ------------------------------------------------------
 
-    def _stage_data_check(
-        self, decision_date: date, now: datetime, *, retry_blocked: bool = False
-    ) -> dict:
-        run_id, day_key = self.config.ledger_run_id, decision_date.isoformat()
-        cached = self.store.get_stage(run_id, day_key, "data_check")
-        if cached is not None:
-            # J4R2 #4：data_blocked 不永久缓存——窗口内重试重新门控，
-            # 数据补齐则恢复当日决策（仍受阻则更新原因/重试计数）
-            if not (retry_blocked and cached.get("status") == "data_blocked"):
-                return cached
-        gate: GateResult = self.provider.resolve(
-            decision_date,
-            symbols=sorted(self.config.target_weights),
-            now=now,
-        )
-        payload: dict[str, Any] = {
-            "task_id": make_task_id(run_id, day_key, "data_check"),
-            "status": gate.status,
-            "reason": gate.reason,
-            "checks": [c.to_dict() for c in gate.checks],
-            "completed_at": now.isoformat(),
-        }
-        if gate.status == "ready":
-            payload["identity"] = gate.identity.to_dict()  # type: ignore[union-attr]
-        self.store.set_stage(run_id, day_key, "data_check", payload)
-        self._crash("after_data_check_state")
-        return payload
 
-    def _stage_freeze(
-        self, decision_date: date, identity: DailyDataIdentity, now: datetime
-    ) -> dict:
-        run_id, day_key = self.config.ledger_run_id, decision_date.isoformat()
-        cached = self.store.get_stage(run_id, day_key, "freeze_input")
-        frozen = {
-            "task_id": make_task_id(run_id, day_key, "freeze_input"),
-            "identity": identity.to_dict(),
-            # 冻结哈希清单（J4R2 #2）：基线+截至决策日的已发布非修订日增量；
-            # 后续 load 一律按此清单取内容（不重取最新），修订包不入
-            "input_lock": self.provider.input_lock(upto=decision_date, now=now),
-            "strategy_frozen": self.config.to_dict(),
-            "frozen_at": now.isoformat(),
-        }
-        if cached is not None:
-            if cached.get("identity") != frozen["identity"]:
-                raise NeedsManualReview(
-                    f"{day_key} 冻结输入被要求改为不同身份"
-                    f"（{cached.get('identity')} → {frozen['identity']}）："
-                    "当日输入已冻结；修订须走修订轨迹，不回填原始决策"
-                )
-            return cached
-        self.store.set_stage(run_id, day_key, "freeze_input", frozen)
-        self._crash("after_freeze_state")
-        return frozen
 
-    def _ledger_package(self, identity: DailyDataIdentity):
-        """账本输入视图：最新锁定清单（基线+已发布非修订日增量）。"""
-        return self.provider.load(identity, lock=self.provider.input_lock(upto=None))
 
-    def _decision_lock(self, decision_date: date) -> dict:
-        frozen = self.store.get_stage(
-            self.config.ledger_run_id, decision_date.isoformat(), "freeze_input"
-        )
-        return (frozen or {}).get("input_lock")
 
-    def _stage_signal(
-        self, decision_date: date, identity: DailyDataIdentity, now: datetime
-    ) -> dict:
-        run_id, day_key = self.config.ledger_run_id, decision_date.isoformat()
-        cached = self.store.get_stage(run_id, day_key, "signal")
-        if cached is not None:
-            return cached
-        # J5R3 #2：主链消费**已保存的决策锁清单**（freeze 阶段落盘，
-        # gating 锁定加载逐项复验哈希；obtained_at 迟到过滤在冻结时已做），
-        # 不另取最新；检查点恢复经 J4E1 绑定前缀兼容（已消费 ⊆ 决策清单）
-        pkg = self.provider.load(identity, lock=self._decision_lock(decision_date))
 
-        action, targets, no_trade_reason, rule = "no_trade", None, None, ""
-        is_entry = (
-            self.config.entry_policy == "first_decision_day"
-            and self.checkpoints.load(pkg, self.config.to_ledger_config()) is None
-        )
-        forced = self._consume_re_evaluate_flag(pkg, decision_date)
-        if is_entry:
-            action, targets, rule = (
-                "entry",
-                dict(self.config.target_weights),
-                "entry:first_decision_day（冻结配置的一次性建仓）",
-            )
-        elif self._is_month_end(decision_date):
-            action, targets, rule = (
-                "rebalance",
-                dict(self.config.target_weights),
-                "monthly:signal_on_last_trade_day_of_month",
-            )
-        elif forced:
-            action, targets, rule = (
-                "rebalance",
-                dict(self.config.target_weights),
-                "missed_window_policy=execute_next_window 的下一窗口重估"
-                "（事前冻结策略，不回填旧决策）",
-            )
-        else:
-            no_trade_reason = (
-                "monthly_rebalance_not_due：每日审查日，月末调仓规则未触发"
-                "（不逐日择时）"
-            )
-            rule = "daily_review_only"
-        payload = {
-            "task_id": make_task_id(run_id, day_key, "signal"),
-            "action": action,
-            "targets": targets,
-            "no_trade_reason": no_trade_reason,
-            "rule": rule,
-            "signal_date": day_key,
-            # 收盘信号 → 次一交易日约定时点执行（不可倒用当天开盘成交）
-            "execution_semantics": "signal_close_T_execute_next_trade_day_open_window",
-            "completed_at": now.isoformat(),
-        }
-        self.store.set_stage(run_id, day_key, "signal", payload)
-        self._crash("after_signal_state")
-        return payload
 
-    def _is_month_end(self, decision_date: date) -> bool:
-        """月末信号日（日历口径）：下一开市日已知且跨月；前沿不发信号。"""
-        nxt = self.provider.next_open_trade_date(decision_date)
-        return nxt is not None and (nxt.year, nxt.month) != (
-            decision_date.year,
-            decision_date.month,
-        )
 
-    def _stage_risk_check(
-        self, decision_date: date, identity: DailyDataIdentity, sig: dict, now: datetime
-    ) -> dict:
-        run_id, day_key = self.config.ledger_run_id, decision_date.isoformat()
-        cached = self.store.get_stage(run_id, day_key, "risk_check")
-        if cached is not None:
-            return cached
-        pkg = self.provider.load(identity, lock=self._decision_lock(decision_date))
-        ledger = self.checkpoints.load(pkg, self.config.to_ledger_config())
-        pending_actions: list[dict] = []
-        if ledger is None:
-            review = {
-                "state": "pre_entry",
-                "buys_allowed": True,
-                "note": "账本未建立（建仓决策日）",
-            }
-        else:
-            risk_state = ledger.export_evidence()["risk_state"]
-            unconfirmed = [
-                ev for ev in risk_state.get("events", []) if not ev.get("confirmed_by")
-            ]
-            review = {
-                "state": risk_state.get("status"),
-                "buys_allowed": ledger.risk.buys_allowed,
-                "high_water_mark": risk_state.get("high_water_mark"),
-                "unconfirmed_risk_events": [ev["risk_event_id"] for ev in unconfirmed],
-            }
-            for ev in unconfirmed:
-                pending_actions.append(
-                    {
-                        "kind": "risk_confirm_pending",
-                        "risk_event_id": ev["risk_event_id"],
-                        "detail": "待用户逐线确认后恢复买入（反弹不自动恢复）",
-                    }
-                )
-        has_buys = bool(sig.get("targets"))
-        if has_buys and review.get("buys_allowed") is False:
-            review["note"] = (
-                "风险暂停新增买入：买入腿将由账本拒单（risk_paused），"
-                "既定卖出仍执行；额外减仓/清仓/恢复由用户决定"
-            )
-        payload = {
-            "task_id": make_task_id(run_id, day_key, "risk_check"),
-            "review": review,
-            "pending_actions": pending_actions,
-            "completed_at": now.isoformat(),
-        }
-        self.store.set_stage(run_id, day_key, "risk_check", payload)
-        self._crash("after_risk_state")
-        return payload
-
-    def _stage_execute(
-        self, decision_date: date, identity: DailyDataIdentity, sig: dict, now: datetime
-    ) -> dict:
-        run_id, day_key = self.config.ledger_run_id, decision_date.isoformat()
-        cached = self.store.get_stage(run_id, day_key, "execute")
-        # 执行输入清单（J4R2 #2）：决策冻结清单 + 截至执行日已发布非修订
-        # 日增量（执行日行情包在决策后才发布，属合法后到输入）；首次执行
-        # 即记录清单，重试/恢复按记录清单取内容，不重取最新
-        exec_lock = (
-            cached.get("input_lock_exec")
-            if cached is not None
-            else self.provider.input_lock(upto=None, now=now)
-        )
-        # 决策清单必须完全包含于执行清单（决策输入不可被替换）
-        pkg = self.provider.load(identity, lock=exec_lock)
-        exec_date = pkg.next_trade_date(decision_date)  # 行情视图内的执行日
-        if cached is not None:
-            # 幂等重入：核对账本权威状态（结果不明不盲目续）
-            self._verify_executed_consistency(cached, pkg, exec_date)
-            return cached
-
-        # H2-AC01（L2R1）：执行日语义分立——日历未知/执行行情未到/休市
-        # （data_check 层）/已错过窗口/真实执行完成。前两类为**可恢复**
-        # pending/blocked：不写 execute 终态、不推进 last_success、不产生
-        # 账本外"成功"；持续运行的数据前沿不得沿用有限回放的"包到末尾
-        # 即结束"口径。
-        if exec_date is None:
-            exec_date = self.provider.next_open_trade_date(decision_date)
-            if exec_date is None:
-                # 日历未知（日历前沿）：可恢复等待，不写任何终态
-                return {
-                    "status": "calendar_unknown",
-                    "detail": (
-                        "执行日历未知（数据/日历前沿）：保留可恢复等待，"
-                        "不写终态、不计成功；日历扩展后按冻结窗口继续"
-                    ),
-                }
-            # 日历已知执行日，但执行日行情未取得（前沿常态：d 包在执行日
-            # 收盘后至次日清晨取得）
-            win = self._execution_window(exec_date)
-            if now < win[0]:
-                return {
-                    "status": "waiting_execution_data",
-                    "detail": (
-                        f"执行日 {exec_date.isoformat()} 已知（日历）但行情"
-                        f"未取得；窗口 {win[0].isoformat()} 开窗后按冻结"
-                        "可用时间与窗口继续（不用未来日线）"
-                    ),
-                    "window": [win[0].isoformat(), win[1].isoformat()],
-                }
-            if now <= win[1]:
-                # 窗口内行情仍未取得：可恢复受阻（调度窗口内重派重试）
-                return {
-                    "status": "execution_data_blocked",
-                    "detail": (
-                        f"执行日 {exec_date.isoformat()} 行情未取得（窗口内"
-                        f"受阻，可恢复）：数据补齐后继续；超窗 "
-                        f"{win[1].isoformat()} 按冻结策略收口"
-                    ),
-                    "window": [win[0].isoformat(), win[1].isoformat()],
-                }
-            # 超窗且行情缺失：走 missed 收口（下方分支；无可跑 session 时
-            # 仅记录订单跳过，不补写成交）
-
-        win = self._execution_window(exec_date)
-        if now < win[0]:  # 行情已取得、窗口未开（bars 路径；日历路径已在上方返回）
-            return {
-                "status": "pending_window",
-                "detail": f"执行窗口未到（{win[0].isoformat()} 开窗）",
-                "window": [win[0].isoformat(), win[1].isoformat()],
-            }
-        missed = now > win[1]
-
-        ledger = self.checkpoints.load(pkg, self.config.to_ledger_config())
-        if missed:
-            # 错过执行窗口：按事前冻结策略处理，不补写"当时已成交"
-            executed_sessions, orders_summary = [], []
-            if ledger is not None:
-                executed_sessions = self._catch_up_sessions(
-                    ledger, pkg, upto=exec_date, reason="missed_execution_window"
-                )
-                # 补齐的估值 session 也要落检查点（否则丢 session 破坏日历连续）
-                self.checkpoints.save(ledger)
-            payload = {
-                "task_id": make_task_id(run_id, day_key, "execute"),
-                "status": "missed_window",
-                "input_lock_exec": exec_lock,
-                "policy": self.config.missed_window_policy,
-                "detail": (
-                    f"执行窗口 [{win[0].isoformat()}~{win[1].isoformat()}] 已错过："
-                    f"policy={self.config.missed_window_policy}；订单未执行、"
-                    "不回填（补算走修订轨迹）"
-                ),
-                "execution": self._four_tuple(decision_date, exec_date, executed=False),
-                "executed_sessions": [d.isoformat() for d in executed_sessions],
-                "orders": [],
-                "completed_at": now.isoformat(),
-            }
-            self.store.set_stage(run_id, day_key, "execute", payload)
-            return payload
-
-        # 窗口内：加载/新建账本 → 补齐缺session → 约定时点执行
-        if ledger is None:
-            ledger = R01Ledger(pkg, self.config.to_ledger_config())
-        catchup = self._catch_up_sessions(
-            ledger, pkg, upto=exec_date, reason="no_decision_evidence_that_day"
-        )
-        last_exec = self._last_executed(ledger)
-        if last_exec is None or last_exec < exec_date:
-            ledger.run_day(exec_date, sig.get("targets"), signal_date=decision_date)
-            self._crash("after_execute_ledger_before_checkpoint")
-            orders_summary = self._orders_summary(ledger, exec_date)
-        else:
-            # 检查点已含执行日（崩溃恢复：checkpoint 先于阶段标记落盘）
-            orders_summary = self._orders_summary(ledger, exec_date)
-        self._crash("after_execute_ledger")  # 检查点保存前崩溃注入点
-        payload = {
-            "task_id": make_task_id(run_id, day_key, "execute"),
-            "status": "executed",
-            "input_lock_exec": exec_lock,
-            "execution": self._four_tuple(decision_date, exec_date, executed=True),
-            "executed_sessions": [d.isoformat() for d in catchup]
-            + [exec_date.isoformat()],
-            "orders": orders_summary,
-            "completed_at": now.isoformat(),
-        }
-        self.checkpoints.save(ledger)
-        self._crash("after_execute_checkpoint_before_state")
-        self.store.set_stage(run_id, day_key, "execute", payload)
-        return payload
 
     # -- 前沿可恢复状态的回报（H2-AC01：不写终态/不计成功） ----------------
 
@@ -788,7 +500,31 @@ class VirtualRunPipeline:
             and self.checkpoints.load(pkg, self.config.to_ledger_config()) is None
         )
         forced = self._consume_re_evaluate_flag(pkg, decision_date)
-        if is_entry:
+        if self.config.program:
+            from backend.services.simulation.replay.strategy_program import (
+                decision_context, evaluate_program, execution_digest)
+            import hashlib
+            program = self.config.program
+            if (hashlib.sha256(program["code"].encode()).hexdigest() != program["code_sha256"]
+                or program["engine_sha256"] != execution_digest()):
+                raise NeedsManualReview("published program or execution engine identity changed")
+            ledger = self.checkpoints.load(pkg, self.config.to_ledger_config())
+            ctx = decision_context(pkg, program["parameters"], decision_date,
+                is_entry=is_entry,
+                snapshot=ledger.equity[-1] if ledger and ledger.equity else None,
+                next_trade_date=self.provider.next_open_trade_date(decision_date))
+            previous = [d for d in self.store.list_days(run_id) if d < day_key]
+            ctx["state"] = {}
+            for d in reversed(previous):
+                prior = self.store.get_stage(run_id, d, "signal") or {}
+                if "strategy_state" in prior:
+                    ctx["state"] = prior["strategy_state"]
+                    break
+            result = evaluate_program(program["code"], ctx)
+            targets, rule = result["targets"], result["reason"]
+            action = "entry" if is_entry and targets is not None else "rebalance" if targets is not None else "no_trade"
+            no_trade_reason = rule if targets is None else None
+        elif is_entry:
             action, targets, rule = (
                 "entry",
                 dict(self.config.target_weights),
@@ -821,7 +557,10 @@ class VirtualRunPipeline:
             "rule": rule,
             "signal_date": day_key,
             # 收盘信号 → 次一交易日约定时点执行（不可倒用当天开盘成交）
-            "execution_semantics": "signal_close_T_execute_next_trade_day_open_window",
+            "execution_semantics": self.config.execution_mode,
+            "strategy_revision": (self.config.program or {}).get("revision_id"),
+            **({"strategy_state": result.get("state", ctx["state"]),
+                "calendar_binding": getattr(self.provider, "calendar_binding", None)} if self.config.program else {}),
             "completed_at": now.isoformat(),
         }
         self.store.set_stage(run_id, day_key, "signal", payload)
@@ -958,6 +697,10 @@ class VirtualRunPipeline:
                 "detail": f"执行窗口未到（{win[0].isoformat()} 开窗）",
                 "window": [win[0].isoformat(), win[1].isoformat()],
             }
+        if (self.config.execution_mode == "post_close_next_open_accounting"
+            and local_wall(now, self._tz).date() == exec_date
+            and local_wall(now, self._tz).time() < time(15, 0)):
+            return {"status": "pending_window", "detail": "daily bar accounting requires market close"}
         missed = now > win[1]
 
         ledger = self.checkpoints.load(pkg, self.config.to_ledger_config())
@@ -1173,9 +916,9 @@ class VirtualRunPipeline:
         if now < cutoff:
             return "early"
         pkg = self.provider.package
-        exec_date = pkg.next_trade_date(decision_date) if pkg is not None else None
+        exec_date = (pkg.next_trade_date(decision_date) if pkg is not None else None) or self.provider.next_open_trade_date(decision_date)
         if exec_date is not None:
-            if now >= self._wall_time(exec_date, self.config.execution_time):
+            if now >= self._wall_time(exec_date, self.config.decision_deadline_time or self.config.execution_time):
                 return "missed"
         return "open"
 
@@ -1291,6 +1034,8 @@ class VirtualRunPipeline:
             "execution_date": exec_date.isoformat(),
             "price_mode": self.config.price_mode,
             "executed": executed,
+            **({"execution_mode": self.config.execution_mode,
+                "accounting_observed_at": self.clock.now().isoformat()} if self.config.program else {}),
         }
 
     def _today_decision(self, sig: dict, risk: dict, ex: dict) -> dict:

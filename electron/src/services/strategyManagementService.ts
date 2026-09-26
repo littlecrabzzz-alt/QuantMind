@@ -16,6 +16,13 @@ import {
 class StrategyManagementService {
   private client: AxiosInstance;
 
+  async executionRequest<T = any>(path: string, body?: unknown): Promise<T> {
+    const response = body === undefined
+      ? await this.client.get(`/api/v1/${path}`)
+      : await this.client.post(`/api/v1/${path}`, body);
+    return response.data;
+  }
+
   constructor() {
     this.client = axios.create({
       timeout: 30000,

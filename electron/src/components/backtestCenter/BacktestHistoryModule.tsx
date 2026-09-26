@@ -3,7 +3,10 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Alert, Button } from 'antd';
+import { strategyManagementService } from '../../services/strategyManagementService';
+import LedgerDetailView from '../../features/alpha-research/components-v2/LedgerDetailView';
 import { backtestService } from '../../services/backtestService';
 import { AnimatePresence, motion } from 'framer-motion';
 import ReactECharts from 'echarts-for-react';
@@ -35,10 +38,16 @@ export const BacktestHistoryModule: React.FC = () => {
   useEffect(() => {
     const id = new URLSearchParams(location.search).get('backtest');
     if (!id) return;
+    setSelectedBacktest(null);
     let cancelled = false;
-    void backtestService.getResult(id).then(result => { if (!cancelled) setSelectedBacktest(result); })
-      .catch(() => { if (!cancelled) setOpenError('无法打开该回测，请确认当前账户和节点。'); });
-    return () => { cancelled = true; };
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = () => void backtestService.getResult(id).then(result => {
+      if (cancelled) return;
+      setSelectedBacktest(result); setOpenError('');
+      if (result.status === 'running' || result.status === 'pending') timer = setTimeout(poll, 3000);
+    }).catch(() => { if (!cancelled) { setOpenError('回测记录正在登记或连接中断，将重试读取。'); timer = setTimeout(poll, 3000); } });
+    poll();
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [location.search, userId]);
 
   return (
@@ -53,6 +62,7 @@ export const BacktestHistoryModule: React.FC = () => {
       >
         <BacktestHistory
           userId={userId}
+          strategyId={new URLSearchParams(location.search).get('strategyId') || undefined}
           onViewDetail={(backtest) => setSelectedBacktest(backtest)}
         />
       </motion.div>
@@ -82,6 +92,9 @@ const BacktestDetailModal: React.FC<BacktestDetailModalProps> = ({
   backtest,
   onClose,
 }) => {
+  const navigate = useNavigate();
+  const [rerunBusy, setRerunBusy] = useState(false);
+  const [rerunError, setRerunError] = useState('');
   const config = (backtest as BacktestResult & { config?: Record<string, unknown> }).config || {};
   const strategyName = String(config.research_title || resolveStrategyName(backtest));
   const detailStartDate = String(backtest.start_date || config.start_date || '-');
@@ -106,7 +119,7 @@ const BacktestDetailModal: React.FC<BacktestDetailModalProps> = ({
   const metrics = [
     {
       label: '总收益率',
-      value: `${((backtest.total_return || 0) * 100).toFixed(2)}%`,
+      value: backtest.total_return == null ? '未计算' : `${(backtest.total_return * 100).toFixed(2)}%`,
       icon: TrendingUp,
       color: (backtest.total_return || 0) > 0 ? 'text-red-600' : 'text-green-600',
     },
@@ -124,7 +137,7 @@ const BacktestDetailModal: React.FC<BacktestDetailModalProps> = ({
     },
     {
       label: '最大回撤',
-      value: `${((backtest.max_drawdown || 0) * 100).toFixed(2)}%`,
+      value: backtest.max_drawdown == null ? '未计算' : `${(backtest.max_drawdown * 100).toFixed(2)}%`,
       icon: TrendingDown,
       color: 'text-green-600',
     },
@@ -244,7 +257,29 @@ const BacktestDetailModal: React.FC<BacktestDetailModalProps> = ({
         </div>
 
         <div className="p-4 space-y-6">
-          <div className="grid grid-cols-3 gap-4">
+          {config.executor_kind === 'r01_ledger' && <div className="space-y-2">
+            <Alert type={backtest.status === 'failed' ? 'error' : 'info'} message={`运行状态：${backtest.status} · v${config.strategy_version} · 开发期回测`}
+              description={backtest.error_message || '由已发布策略版本执行；费用、整手、分红与风险由公共 ETF 账本处理。'} />
+            <p className="text-xs break-all">版本 {String(config.strategy_revision)}<br />代码 {String(config.code_sha256)}</p>
+            <div className="flex gap-2 flex-wrap">
+              <Button onClick={() => navigate(`/user-center?tab=strategies&strategyId=${config.strategy_id}`)}>策略版本与脚本</Button>
+              <Button onClick={() => navigate(`/alpha-research?research=${config.research_case_id}`)}>研究来源</Button>
+              <Button loading={rerunBusy} onClick={async () => {
+                setRerunBusy(true); setRerunError('');
+                try {
+                  const run = await strategyManagementService.executionRequest(`strategies/${config.strategy_id}/backtests`, {
+                    revision_id: config.strategy_revision, key: crypto.randomUUID(),
+                    start_date: config.start_date, end_date: config.end_date, rerun_of: backtest.backtest_id,
+                  }); navigate(`/backtest?backtest=${run.backtest_id}`);
+                } catch (e: any) { setRerunError(String(e?.response?.data?.detail || e.message)); }
+                finally { setRerunBusy(false); }
+              }}>按原版本复跑</Button>
+            </div>
+            {rerunError && <Alert type="error" message={rerunError} />}
+          </div>}
+          {(backtest as any).ledger_view && <LedgerDetailView node="" caseId="" data={(backtest as any).ledger_view}
+            artifact={{ name: '公共账本明细', uri: backtest.backtest_id, fixture: false }} />}
+          {(config.executor_kind !== 'r01_ledger' || backtest.status === 'completed') && <div className="grid grid-cols-3 gap-4">
             {metrics.map((metric) => (
               <div
                 key={metric.label}
@@ -257,7 +292,7 @@ const BacktestDetailModal: React.FC<BacktestDetailModalProps> = ({
                 <div className={`text-2xl font-bold ${metric.color}`}>{metric.value}</div>
               </div>
             ))}
-          </div>
+          </div>}
 
           {backtest.equity_curve && backtest.equity_curve.length > 0 && (
             <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">

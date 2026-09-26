@@ -92,6 +92,10 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       host: '0.0.0.0', // 允许外部访问
       proxy: {
+        // Optional isolated Engine checkout; all other services keep the normal gateway.
+        ...(process.env.VITE_ENGINE_CANDIDATE_URL ? Object.fromEntries([
+          '/api/v1/strategies', '/api/v1/qlib', '/api/v1/strategy-paper-runs', '/api/v1/research-catalog',
+        ].map(path => [path, { target: process.env.VITE_ENGINE_CANDIDATE_URL, changeOrigin: true }])) : {}),
         '/api': {
           target: process.env.VITE_API_URL || 'http://localhost:8000',
           changeOrigin: true,

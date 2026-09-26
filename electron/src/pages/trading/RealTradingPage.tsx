@@ -19,10 +19,12 @@ import { getMarketConfig } from '../../config/marketConfig';
 import { useTradeWebSocket } from '../../hooks/useTradeWebSocket';
 import { buildTradingTopBarAccountInfo, resolveTradingAccountMode } from './utils/accountAdapter';
 import LiveTradeConfigWizard from './components/LiveTradeConfigWizard';
+import { useLocation } from 'react-router-dom';
+import PublishedPaperRuns from './components/PublishedPaperRuns';
 import type { DeployMode, ExecutionConfig, LiveTradeConfig } from '../../types/liveTrading';
 
 type TradingMode = 'real' | 'simulation';  // 支持实盘(通达信桥)与模拟盘
-type ActiveTab = 'manage' | 'manual-task' | 'personal' | 'position' | 'history' | 'settings' | 'replay';
+type ActiveTab = 'paper' | 'manage' | 'manual-task' | 'personal' | 'position' | 'history' | 'settings' | 'replay';
 type PreflightStage = 'trading-readiness' | 'preflight';
 const TRADING_MODE_PREF_KEY = 'qm:trading_mode_pref';
 type PendingDeploy = {
@@ -83,6 +85,10 @@ const BROKER_LABELS: Record<string, string> = {
 
 const RealTradingPage: React.FC = () => {
     const dispatch = useAppDispatch();
+    const location = useLocation();
+    useEffect(() => {
+        if (new URLSearchParams(location.search).has('paper')) { dispatch(setTradingMode('simulation')); setActiveTab('paper'); }
+    }, [location.search, dispatch]);
     const currentMarket = useAppSelector(selectCurrentMarket);
     const marketConfig = getMarketConfig(currentMarket);
     const [activeTab, setActiveTab] = useState<ActiveTab>('manage');
@@ -506,6 +512,7 @@ const RealTradingPage: React.FC = () => {
 
     const tabs: Array<{ id: ActiveTab; label: string; icon: LucideIcon }> = [
         { id: 'manage', label: '策略管理', icon: LayoutDashboard },
+        { id: 'paper', label: '策略虚拟账户', icon: Clock },
         // 时光回放功能尚存多处问题，暂时隐藏入口，完善后取消注释即可恢复（ReplayPage 渲染分支保留）
         // { id: 'replay', label: '时光回放', icon: Clock },
         { id: 'manual-task', label: '手动任务', icon: ClipboardList },
@@ -520,7 +527,7 @@ const RealTradingPage: React.FC = () => {
             {/* Unified Frame Container with 32px Border Radius (BacktestCenter Style) */}
             <div className="bg-white border border-gray-200 shadow-sm w-full h-full rounded-[32px] flex flex-col overflow-hidden">
                 {/* Integrated Top Header - Account Overview（占可用高度 3/10） */}
-                <div className="flex-[3] min-h-0 flex flex-col bg-white border-b border-gray-200 overflow-hidden z-10">
+                {activeTab !== 'paper' && <div className="flex-[3] min-h-0 flex flex-col bg-white border-b border-gray-200 overflow-hidden z-10">
                     <TopBar
                         isConnected={!!status}
                         strategyStatus={strategyStatus}
@@ -531,21 +538,21 @@ const RealTradingPage: React.FC = () => {
                             return accountInfo ? buildTradingTopBarAccountInfo(accountInfo, status) : undefined;
                         })()}
                     />
-                </div>
+                </div>}
 
                 {/* Bottom Section - Sidebar & Content（占可用高度 7/10） */}
-                <div className="flex-[7] min-h-0 flex overflow-hidden">
+                <div className={`flex-[7] min-h-0 flex overflow-hidden ${activeTab === 'paper' ? 'flex-col md:flex-row' : ''}`}>
                     {/* Left Sidebar - Navigation */}
-                    <div className="w-[200px] flex flex-col border-r border-gray-200 bg-white shrink-0">
-                        <div className="flex-1 overflow-y-auto py-3.5 px-3 space-y-1.5 custom-scrollbar">
-                            <div className="px-2.5 py-1 mb-1">
+                    <div className={`${activeTab === 'paper' ? 'w-full md:w-[200px]' : 'w-[200px]'} flex flex-col border-r border-gray-200 bg-white shrink-0`}>
+                        <div className={`flex-1 overflow-y-auto py-3.5 px-3 space-y-1.5 custom-scrollbar ${activeTab === 'paper' ? 'flex md:block overflow-x-auto' : ''}`}>
+                            <div className={`px-2.5 py-1 mb-1 ${activeTab === 'paper' ? 'hidden md:block' : ''}`}>
                                 <span className="text-[12px] font-black text-slate-400 uppercase tracking-widest">功能导航</span>
                             </div>
                             {tabs.map(tab => (
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[17px] tracking-wide transition-all duration-150
+                                    className={`${activeTab === 'paper' ? 'w-auto md:w-full shrink-0 whitespace-nowrap md:shrink' : 'w-full'} flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[17px] tracking-wide transition-all duration-150
                                         ${activeTab === tab.id
                                             ? 'bg-blue-50 text-blue-600 border border-blue-200/80 shadow-2xs font-bold'
                                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 font-medium'
@@ -560,8 +567,10 @@ const RealTradingPage: React.FC = () => {
                     </div>
 
                     {/* Right Content Area */}
-                    <div className="flex-1 overflow-hidden relative bg-gray-50/50">
+                    <div className="flex-1 min-h-0 min-w-0 overflow-hidden relative bg-gray-50/50">
+                    {activeTab === 'paper' && <div className="h-full overflow-auto"><PublishedPaperRuns /></div>}
                     {activeTab === 'manage' && (
+                        <div className="h-full overflow-auto">
                             <TopologyConsole
                                 tenantId={tenantId}
                                 userId={userId}
@@ -571,6 +580,7 @@ const RealTradingPage: React.FC = () => {
                                 onOpenManualTask={() => setActiveTab('manual-task')}
                                 onOpenHistory={() => setActiveTab('history')}
                             />
+                        </div>
                     )}
                     {activeTab === 'manual-task' && (
                         <ManualTaskPage tenantId={tenantId} userId={userId} tradingMode={tradingMode} onBack={() => setActiveTab('manage')} />

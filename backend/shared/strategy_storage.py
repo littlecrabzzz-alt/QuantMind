@@ -515,6 +515,94 @@ class StrategyStorageService:
                 "parameters": row[7] or {},
             }
 
+    @staticmethod
+    def _ensure_revision_table(session) -> None:
+        # Published versions are immutable; editing the existing draft never
+        # changes code/configuration consumed by a historical or virtual run.
+        session.execute(text("""
+            CREATE TABLE IF NOT EXISTS strategy_revisions (
+                revision_id TEXT PRIMARY KEY,
+                strategy_id INTEGER NOT NULL REFERENCES strategies(id),
+                tenant_id TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                payload JSONB NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                UNIQUE(strategy_id, tenant_id, version)
+            )
+        """))
+
+    async def publish_revision(
+        self, strategy_id: str, user_id: str, tenant_id: str,
+        *, expected_code_hash: str, definition: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Publish an owned draft atomically; content-identical retries are idempotent.
+
+        The execution API validates the program/data contract. This storage
+        boundary checks the draft has not changed since that validation.
+        Original source files live in the version payload, not host-path links.
+        """
+        uid = _ensure_int_user_id(user_id)
+        with get_db() as session:
+            self._ensure_revision_table(session)
+            row = session.execute(text("""
+                SELECT id, name, code FROM strategies
+                WHERE id=:sid AND user_id=:uid AND status != 'ARCHIVED'
+                FOR UPDATE
+            """), {"sid": int(strategy_id), "uid": uid}).mappings().first()
+            if row is None:
+                raise KeyError("strategy_not_found")
+            if _code_hash(row["code"] or "") != expected_code_hash:
+                raise ValueError("draft_changed: refresh the code before publishing")
+            payload = {
+                **definition, "strategy_id": str(strategy_id),
+                "name": row["name"], "code": row["code"],
+                "code_sha256": expected_code_hash,
+                "tenant_id": tenant_id, "user_id": user_id,
+            }
+            encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False,
+                                 separators=(",", ":"), allow_nan=False)
+            revision_id = hashlib.sha256(encoded.encode()).hexdigest()
+            existing = session.execute(text("""
+                SELECT version, payload, created_at FROM strategy_revisions
+                WHERE revision_id=:revision
+            """), {"revision": revision_id}).mappings().first()
+            if existing:
+                return {**existing["payload"], "revision_id": revision_id,
+                        "version": existing["version"],
+                        "created_at": existing["created_at"].isoformat()}
+            version = session.execute(text("""
+                SELECT COALESCE(MAX(version), 0) + 1 FROM strategy_revisions
+                WHERE strategy_id=:sid AND tenant_id=:tenant
+            """), {"sid": int(strategy_id), "tenant": tenant_id}).scalar_one()
+            created = session.execute(text("""
+                INSERT INTO strategy_revisions
+                    (revision_id, strategy_id, tenant_id, version, payload)
+                VALUES (:revision, :sid, :tenant, :version, CAST(:payload AS jsonb))
+                RETURNING created_at
+            """), {"revision": revision_id, "sid": int(strategy_id),
+                   "tenant": tenant_id, "version": version, "payload": encoded}).scalar_one()
+            return {**payload, "revision_id": revision_id, "version": version,
+                    "created_at": created.isoformat()}
+
+    async def revisions(
+        self, strategy_id: str, user_id: str, tenant_id: str,
+        revision_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        uid = _ensure_int_user_id(user_id)
+        with get_db() as session:
+            self._ensure_revision_table(session)
+            rows = session.execute(text("""
+                SELECT r.revision_id, r.version, r.payload, r.created_at
+                FROM strategy_revisions r JOIN strategies s ON s.id=r.strategy_id
+                WHERE s.id=:sid AND s.user_id=:uid AND r.tenant_id=:tenant
+            """ + (" AND r.revision_id=:revision" if revision_id else "") +
+                " ORDER BY r.version DESC"),
+                {"sid": int(strategy_id), "uid": uid, "tenant": tenant_id,
+                 "revision": revision_id}).mappings().all()
+            return [{**r["payload"], "revision_id": r["revision_id"],
+                     "version": r["version"], "created_at": r["created_at"].isoformat()}
+                    for r in rows]
+
     async def rename(self, user_id: str, strategy_id: str, name: str) -> bool:
         """只更新策略名称，编号不变。"""
         if not str(strategy_id).isdigit():

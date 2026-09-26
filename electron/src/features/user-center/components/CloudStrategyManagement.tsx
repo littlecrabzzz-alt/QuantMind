@@ -12,6 +12,7 @@ import {
 import { strategyManagementService } from '../../../services/strategyManagementService';
 import { useAuth } from '../../../features/auth/hooks';
 import type { StrategyFile } from '../../../types/backtest/strategy';
+import StrategyRevisionPanel from './StrategyRevisionPanel';
 
 const { confirm } = Modal;
 
@@ -190,7 +191,7 @@ const CloudStrategyManagement: React.FC = () => {
             render: (_: any, record: StrategyFile) => (
                 <Space size="middle">
                     <Button size="small" onClick={() => setSelected(record)}>查看配置</Button>
-                    {researchLink(record) && <Button size="small" onClick={() => navigate(researchLink(record)!)}>历史回测</Button>}
+                    {researchLink(record) && <Button size="small" onClick={() => navigate(`/backtest?strategyId=${record.id}`)}>历史回测</Button>}
                     <Tooltip title="删除策略">
                         <Button
                             type="text"
@@ -252,16 +253,17 @@ const CloudStrategyManagement: React.FC = () => {
                     ),
                 }}
             />
-            <Drawer title={selected?.name || '策略配置'} open={!!selected} width={660} onClose={() => {
+            <Drawer title={selected?.name || '策略配置'} open={!!selected} width={800} onClose={() => {
                 setSelected(null);
                 if (new URLSearchParams(location.search).has('strategyId')) navigate('/user-center?tab=strategies', { replace: true });
             }}>
                 {selected && <div className="space-y-4">
                     <p>{selected.description || '暂无策略说明'}</p>
+                    {researchLink(selected) && <StrategyRevisionPanel key={selected.id} strategyId={selected.id} />}
                     <p>保存状态：{getStatusTag((selected.base_status || selected.status || 'unknown').toLowerCase())} 运行状态：{getStatusTag(selected.effective_status || 'unknown')}</p>
                     {selected.parameters?.configuration_only === true && <Alert type="info" showIcon message="候选配置已保存，持续虚拟盘尚未启动" description="历史研究与未来虚拟盘分别记录。保存配置不会自动启动调度或成交。" />}
                     {Array.isArray(selected.parameters?.activation_blockers) && selected.parameters.activation_blockers.map((reason, i) => <Alert key={i} type="warning" message={String(reason)} />)}
-                    {researchLink(selected) && <Button type="primary" onClick={() => navigate(researchLink(selected)!)}>查看历史净值、持仓与订单</Button>}
+                    {researchLink(selected) && <Button onClick={() => navigate(researchLink(selected)!)}>研究结论与证据</Button>}
                     <h3 className="font-semibold">已保存的规则与验证约定</h3>
                     <Descriptions bordered size="small" column={1}>
                         {typeof selected.parameters?.initial_cash_cny === 'number' && <Descriptions.Item label="初始虚拟本金">{selected.parameters.initial_cash_cny.toLocaleString()} 元</Descriptions.Item>}

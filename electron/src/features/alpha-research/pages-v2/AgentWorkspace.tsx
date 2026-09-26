@@ -34,6 +34,7 @@ import R01ProjectView, {
 import { SERVICE_ENDPOINTS } from "../../../config/services";
 import { authService } from "../../auth/services/authService";
 import ResearchLedgerPanel from '../components-v2/ResearchLedgerPanel';
+import { strategyManagementService } from '../../../services/strategyManagementService';
 
 const labels: Record<string, string> = {
   idle: "等待你的决定",
@@ -85,6 +86,8 @@ export default function AgentWorkspace() {
   const queryProject = new URLSearchParams(location.search).get("project");
   const [cap, setCap] = useState<AgentCapabilities | null>(null);
   const [cases, setCases] = useState<AgentCase[]>([]);
+  const [otherNodeArchives, setOtherNodeArchives] = useState<any[]>([]);
+  const [category, setCategory] = useState(queryProject === "r01" ? "engineering" : "research");
   const [current, setCurrent] = useState<AgentCase | null>(null);
   const [creating, setCreating] = useState(!queryId);
   const [error, setError] = useState("");
@@ -142,6 +145,7 @@ export default function AgentWorkspace() {
         if (scope.current && scope.current !== nextScope) {
           setCurrent(null);
           setCases([]);
+          setOtherNodeArchives([]);
           setPreview(null);
           setReviewed(false);
           requestKeys.current.clear();
@@ -153,7 +157,10 @@ export default function AgentWorkspace() {
         if (!next.ready) return;
         const rows = await researchAgent.list(next.node_id);
         if (stopped || scope.current !== nextScope) return;
-        setCases(rows);
+        const catalog = await strategyManagementService.executionRequest<any[]>('research-catalog').catch(() => null);
+        if (stopped || scope.current !== nextScope) return;
+        setCases(catalog ? catalog.filter(c => c.node_id === next.node_id).map(c => ({ ...c, ...rows.find(r => r.id === c.id), workspace_category: c.workspace_category })) : rows);
+        setOtherNodeArchives(catalog?.filter(c => c.node_id !== next.node_id && c.workspace_category === 'engineering') || []);
         const id = active.current;
         if (id) {
           const detail = await researchAgent.detail(next.node_id, id);
@@ -334,12 +341,12 @@ export default function AgentWorkspace() {
               })
             }
           >
-            R01 项目总览
+            R01 工程接入与验收总览
           </Button>
-          <p className="text-xs text-muted-foreground">
-            我的研究 · {cases.length}
-          </p>
-          {cases.map((c) => (
+          <Select aria-label="研究或工程归档" className="w-full" value={category} onChange={setCategory}
+            options={[{ value: 'research', label: '研究课题' }, { value: 'engineering', label: '工程验收归档' }]} />
+          <p className="text-xs text-muted-foreground">{category === 'research' ? '问题、进展与结论' : '验收记录与原始证据（可恢复）'} · {cases.filter(c => ((c as any).workspace_category || 'research') === category).length}</p>
+          {cases.filter(c => ((c as any).workspace_category || 'research') === category).map((c) => (
             <button
               key={c.id}
               onClick={() => open(c.id)}
@@ -364,6 +371,11 @@ export default function AgentWorkspace() {
               </span>
             </button>
           ))}
+          {category === 'engineering' && otherNodeArchives.length > 0 && <details className="text-xs p-3">
+            <summary>其他节点工程归档（{otherNodeArchives.length} 条）</summary>
+            <p>以下记录与原件引用已保留；打开附件需要原节点可用。</p>
+            {otherNodeArchives.map(c => <p key={c.id} className="my-2 break-all">{c.input?.question} · 节点 {c.node_id} · {c.id}</p>)}
+          </details>}
           {!cases.length && (
             <p className="text-xs text-muted-foreground">
               课题、对话和文件会保存在当前节点，关闭页面也能继续执行。
@@ -493,6 +505,13 @@ export default function AgentWorkspace() {
                   请求外部停止
                 </Button>
               </div>
+              <div className="flex gap-2">
+                <Button size="small" onClick={async () => {
+                  const target = category === 'research' ? 'engineering' : 'research';
+                  try { await strategyManagementService.executionRequest(`research-catalog/${current.id}/category`, { category: target, reason: '用户在研究工作台调整归档分类' }); setCategory(target); }
+                  catch (e) { setError(errorText(e)); }
+                }}>{category === 'research' ? '移到工程验收归档' : '恢复到研究课题'}</Button>
+              </div>
               <ResearchLedgerPanel node={cap!.node_id} research={current} />
               {current.external?.stale && (
                 <Alert
@@ -513,8 +532,8 @@ export default function AgentWorkspace() {
                   summary={current.external!}
                 />
               </div>
-              <div className={panel}>
-                <h3 className="font-medium mb-2">回报事件（原始证据，长期保留）</h3>
+              <details className={panel}>
+                <summary className="font-medium mb-2 cursor-pointer">回报事件（原始证据，长期保留）</summary>
                 <div className="space-y-1 max-h-96 overflow-auto">
                   {current.events
                     ?.filter(
@@ -556,7 +575,7 @@ export default function AgentWorkspace() {
                     <Empty description="尚无外部回报" />
                   )}
                 </div>
-              </div>
+              </details>
             </div>
           ) : (
           <div className="min-w-0 space-y-3">

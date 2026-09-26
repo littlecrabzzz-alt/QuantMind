@@ -281,7 +281,7 @@ const BacktestSelectorModal: React.FC<BacktestSelectorModalProps> = ({
   onClose,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const { data: history = [] } = useBacktestHistory(userId, {
+  const { data: history = [], isLoading, error, refetch } = useBacktestHistory(userId, {
     sort_by: 'created_at',
     sort_order: 'desc',
     page_size: 50,
@@ -341,7 +341,7 @@ const BacktestSelectorModal: React.FC<BacktestSelectorModalProps> = ({
 
         {/* 列表 */}
         <div className="flex-1 overflow-auto p-4">
-          {filteredHistory.length === 0 ? (
+          {isLoading ? <p>正在加载回测记录…</p> : error ? <p role="alert">读取回测记录失败。<button onClick={() => void refetch()}>重试</button></p> : filteredHistory.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-gray-600">
               <AlertCircle className="w-12 h-12 mb-4 opacity-50" />
               <p>没有可用的回测记录</p>
@@ -357,6 +357,7 @@ const BacktestSelectorModal: React.FC<BacktestSelectorModalProps> = ({
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-gray-800">
                       {resolveStrategyName(backtest)}
+                      {backtest.config?.strategy_version && ` · v${backtest.config.strategy_version}`}
                     </span>
                     <span className="text-xs text-gray-600">
                       {format(new Date(backtest.created_at || ''), 'yyyy-MM-dd', { locale: zhCN })}

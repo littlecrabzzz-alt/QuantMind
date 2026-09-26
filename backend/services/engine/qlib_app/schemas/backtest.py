@@ -275,6 +275,11 @@ class QlibBacktestResult(BaseModel):
     style_attribution: dict[str, Any] | None = None
     rebalance_suggestions: list[RebalanceInstruction] | None = None
     advanced_stats: dict[str, Any] | None = None
+    # R01 uses the shared backtest history/result contract with an explicitly
+    # named execution engine. Its accounting source remains the public ledger.
+    ledger_view: dict[str, Any] | None = None
+    ledger_evidence: dict[str, Any] | None = None
+    strategy_decisions: list[dict[str, Any]] | None = None
 
     execution_time: float | None = None
     error_message: str | None = None

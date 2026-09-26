@@ -190,6 +190,7 @@ export interface Trade {
 
 /** 历史查询过滤器 */
 export interface HistoryFilter {
+  strategy_id?: string;
   status?: 'pending' | 'running' | 'completed' | 'failed';
   symbol?: string;
   start_date?: string;
@@ -886,6 +887,7 @@ class BacktestService {
 
     if (filters?.status) params.append('status', filters.status);
     if (filters?.symbol) params.append('symbol', filters.symbol);
+    if (filters?.strategy_id) params.append('strategy_id', filters.strategy_id);
     if (filters?.start_date) params.append('start_date', filters.start_date);
     if (filters?.end_date) params.append('end_date', filters.end_date);
     if (filters?.sort_by) params.append('sort_by', filters.sort_by);

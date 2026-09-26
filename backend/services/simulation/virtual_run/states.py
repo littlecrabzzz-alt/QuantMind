@@ -76,6 +76,13 @@ class VirtualRunConfig:
     loss_line_amount: float | None = None  # None=initial×30%（3 万=9000）
     drawdown_pct: float = 0.30
     stale_mark_limit: int = 5
+    volume_participation: float = 1.0
+    sublot_rule_effective: str = "2026-07-06"
+    # Published program is immutable; same code/parameters as historical runs.
+    program: dict | None = None
+    execution_mode: str = "open_window"
+    start_date: str | None = None
+    decision_deadline_time: str | None = None
     # 调度语义（冻结；未配置调度=待启用不运行）
     timezone_name: str = "Asia/Shanghai"
     decision_cutoff: str = "15:10"  # 决策截止（收盘后）
@@ -91,6 +98,10 @@ class VirtualRunConfig:
     notes: str = ""
 
     def __post_init__(self) -> None:
+        if self.execution_mode not in ("open_window", "post_close_next_open_accounting"):
+            raise ValueError("invalid execution_mode")
+        if self.program and self.execution_mode != "post_close_next_open_accounting":
+            raise ValueError("published daily-bar programs require honest post-close accounting")
         if self.missed_window_policy not in ("skip_and_record", "execute_next_window"):
             raise ValueError(
                 "missed_window_policy ∈ {skip_and_record, execute_next_window}"
@@ -130,6 +141,8 @@ class VirtualRunConfig:
             slippage_bps=self.slippage_bps,
             price_mode=self.price_mode,
             stale_mark_limit=self.stale_mark_limit,
+            volume_participation=self.volume_participation,
+            sublot_rule_effective=date.fromisoformat(self.sublot_rule_effective),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -156,6 +169,13 @@ class VirtualRunConfig:
             "package_root": self.package_root,
             "manifest_sha256": self.manifest_sha256,
             "notes": self.notes,
+            "stale_mark_limit": self.stale_mark_limit,
+            "volume_participation": self.volume_participation,
+            "sublot_rule_effective": self.sublot_rule_effective,
+            "program": self.program,
+            "execution_mode": self.execution_mode,
+            "start_date": self.start_date,
+            "decision_deadline_time": self.decision_deadline_time,
         }
 
     @classmethod
@@ -182,6 +202,13 @@ class VirtualRunConfig:
             package_root=str(d.get("package_root", "")),
             manifest_sha256=str(d.get("manifest_sha256", "")),
             notes=str(d.get("notes", "")),
+            stale_mark_limit=int(d.get("stale_mark_limit", 5)),
+            volume_participation=float(d.get("volume_participation", 1.0)),
+            sublot_rule_effective=str(d.get("sublot_rule_effective", "2026-07-06")),
+            program=d.get("program"),
+            execution_mode=str(d.get("execution_mode", "open_window")),
+            start_date=d.get("start_date"),
+            decision_deadline_time=d.get("decision_deadline_time"),
         )
 
 

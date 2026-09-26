@@ -738,10 +738,27 @@ class DailyIncrementProvider:
                 )
                 if f.is_file():
                     df = pd.read_parquet(f)
-                    self._cal = {
+                    self._cal.update({
                         str(r["cal_date"]): int(r["is_open"]) for _, r in df.iterrows()
-                    }
-                    break
+                    })
+            # A calendar is known before future prices. The private observed
+            # snapshot extends history without admitting any future market bars.
+            from pathlib import Path
+            import hashlib
+            registry_file = Path(self._registry_path)
+            registry = self._json.loads(registry_file.read_text()) if registry_file.is_file() else {}
+            snapshot = registry.get("calendar_snapshot")
+            self.calendar_binding = None
+            if snapshot:
+                raw = Path(snapshot["path"]).read_bytes()
+                if hashlib.sha256(raw).hexdigest() != snapshot["sha256"]:
+                    raise ValueError("calendar_snapshot_checksum_mismatch")
+                self.calendar_binding = {k: snapshot[k] for k in ("sha256", "obtained_at", "source")}
+                payload = self._json.loads(raw)["data"]
+                for values in payload["items"]:
+                    row = dict(zip(payload["fields"], values))
+                    if row["exchange"] == "SSE":
+                        self._cal[str(row["cal_date"])] = int(row["is_open"])
         key = d.strftime("%Y%m%d")
         if key in self._cal:
             return self._cal[key] == 1

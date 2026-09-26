@@ -257,7 +257,8 @@ async def auth_middleware(request: Request, call_next):
     if not user_id and auth_header and auth_header.startswith("Bearer "):
         try:
             token = auth_header.split(" ")[1]
-            payload = AuthManager().verify_token(token)
+            from backend.shared.auth import decode_jwt_token
+            payload = decode_jwt_token(token)
             user_id = str(payload.get("sub") or payload.get("user_id") or "")
             tenant_id = str(payload.get("tenant_id") or "default")
         except Exception:
@@ -320,6 +321,12 @@ try:
     from backend.services.engine.qlib_app.api.user_strategies import router as strategies_router
 
     app.include_router(strategies_router, prefix="/api/v1/strategies", tags=["Strategies"])
+    from backend.services.engine.routers.r01_strategy import router as r01_strategy_router
+    app.include_router(r01_strategy_router, prefix="/api/v1")
+    from backend.services.engine.routers.r01_paper import router as r01_paper_router
+    app.include_router(r01_paper_router, prefix="/api/v1")
+    from backend.services.engine.routers.research_catalog import router as research_catalog_router
+    app.include_router(research_catalog_router, prefix="/api/v1")
 except ImportError as e:
     logger.error(f"❌ Failed to load Strategies router: {e}")
 

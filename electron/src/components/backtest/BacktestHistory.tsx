@@ -37,6 +37,7 @@ import { zhCN } from 'date-fns/locale';
 import { Modal, message } from 'antd';
 
 interface BacktestHistoryProps {
+  strategyId?: string;
   userId: string;
   onViewDetail?: (backtest: BacktestResult) => void;
 }
@@ -53,6 +54,7 @@ type BacktestRecordExt = BacktestResult & {
     start_date?: string;
     end_date?: string;
     initial_capital?: number | string;
+    initial_cash?: number | string;
   };
 };
 
@@ -63,6 +65,7 @@ type HistoryApiPayload = BacktestResult[] | {
 
 export const BacktestHistory: React.FC<BacktestHistoryProps> = ({
   userId,
+  strategyId,
   onViewDetail,
 }) => {
   // ========== 状态管理 ==========
@@ -76,7 +79,7 @@ export const BacktestHistory: React.FC<BacktestHistoryProps> = ({
   });
 
   // ========== React Query ==========
-  const { data: response, isLoading, isFetching, error, refetch } = useBacktestHistory(userId, filter);
+  const { data: response, isLoading, isFetching, error, refetch } = useBacktestHistory(userId, { ...filter, strategy_id: strategyId });
   const deleteBacktest = useDeleteBacktest(userId);
   const batchDelete = useBatchDeleteBacktests(userId);
   const exportCSV = useExportCSV();
@@ -608,7 +611,7 @@ export const resolveBacktestPeriod = (backtest: BacktestResult): string => {
 
 const resolveInitialCapital = (backtest: BacktestResult): number | null => {
   const config = (backtest as BacktestRecordExt).config ?? {};
-  const raw = backtest.initial_capital ?? config.initial_capital;
+  const raw = backtest.initial_capital ?? config.initial_capital ?? config.initial_cash;
   const value = Number(raw);
   return Number.isFinite(value) && value > 0 ? value : null;
 };
@@ -681,6 +684,9 @@ const BacktestHistoryRow: React.FC<BacktestHistoryRowProps> = ({
         <span className="block truncate text-sm font-medium text-gray-800" title={resolveStrategyName(backtest)}>
           {resolveStrategyName(backtest)}
         </span>
+        {backtest.config?.executor_kind === 'r01_ledger' && <span className="text-xs text-gray-500">
+          v{backtest.config.strategy_version} · 开发回测 · {backtest.status}{backtest.config.rerun_of ? ' · 复跑' : ''}
+        </span>}
       </td>
 
       {/* 模型 */}

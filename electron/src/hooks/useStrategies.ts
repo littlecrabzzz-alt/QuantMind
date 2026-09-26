@@ -191,6 +191,9 @@ export const useStrategies = (options: UseStrategiesOptions = {}): UseStrategies
         nextStrategies: Strategy[],
         nextIsSimulated: boolean,
     ) => {
+        // Published ledger accounts have their own actual-state monitor; never
+        // mix their historical backtest return into legacy live P&L.
+        nextStrategies = nextStrategies.filter(s => s.parameters?.executor_kind !== "r01_ledger");
         const nextStats = calculateStats(nextStrategies);
         const snapshot = {
             strategies: nextStrategies,

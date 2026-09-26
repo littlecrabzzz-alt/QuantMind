@@ -92,6 +92,17 @@ def build_pipeline(config: VirtualRunConfig, schedule_cfg: dict | None = None):
     )
 
     redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+    if config.program:
+        from pathlib import Path
+        import json
+        from backend.services.simulation.replay.etf_input_package import verify_package_files
+        verify_package_files(Path(config.package_root), config.program["data_binding"]["package_sums_sha256"])
+        registry_file = Path(os.environ["R01_VR_REGISTRY"])
+        for e in json.loads(registry_file.read_text()).get("packages", {}).values():
+            if e.get("kind") == "daily_increment":
+                if not e.get("package_sums_sha256"):
+                    raise ValueError("daily_package_missing_checksum_binding")
+                verify_package_files(Path(e["absolute_path"]), e["package_sums_sha256"])
     provider = DailyIncrementProvider(
         config.package_root,
         baseline_manifest_sha256=config.manifest_sha256,
@@ -163,8 +174,14 @@ def dispatch_due_runs(
     store = store or RedisRunStateStore(redis_url)
     dispatched: list[str] = []
     skipped: list[str] = []
+    r.set("quantmind:r01:vr:dispatcher_heartbeat", now.isoformat(), ex=1800)
 
     for run_id, sched in list_redis_schedules(r).items():
+        run_prefix = os.getenv("R01_VR_RUN_PREFIX", "")
+        if run_prefix and not run_id.startswith(run_prefix):
+            continue
+        if os.getenv("R01_VR_PLATFORM_ONLY") == "true" and not (sched.get("program") or {}).get("revision_id"):
+            continue
         if not sched.get("enabled"):
             continue
         try:
@@ -176,6 +193,8 @@ def dispatch_due_runs(
         tz = config.tz
         wall = local_wall(now, tz)
         today = wall.date()
+        if config.start_date and today.isoformat() < config.start_date:
+            continue
         wall_hm = wall.strftime("%H:%M")
 
         provider = DailyIncrementProvider(
@@ -186,15 +205,44 @@ def dispatch_due_runs(
         )
         pkg = provider.package
 
+        # -- 执行相位（H2-AC02：按交易日回看，非自然日）：近 8 个交易日内
+        #    的待执行决策（signal 有、execute 无）、执行日=今天（行情视图
+        #    或日历口径——前沿无行情时也派发，任务内如实记录可恢复受阻）、
+        #    窗口已开；长休市（相距 8/9+ 自然日）不漏派 -------------
+        for d in _recent_trade_dates(provider, pkg, today, 8):
+            if config.start_date and d.isoformat() < config.start_date:
+                continue
+            if not (pkg.is_trade_date(d) or provider.next_open_trade_date(d - timedelta(days=1)) == d):
+                continue
+            exec_date = pkg.next_trade_date(d) or provider.next_open_trade_date(d)
+            if exec_date is None or (exec_date != today and not (config.program and exec_date < today)):
+                continue
+            gate = provider.resolve(d, symbols=sorted(config.target_weights), now=now)
+            if gate.status != "ready":
+                continue  # 数据受阻/休市：无待执行
+            if store.get_stage(run_id, d.isoformat(), "execute") is not None:
+                continue  # 执行阶段已收口
+            if store.get_stage(run_id, d.isoformat(), "signal") is None:
+                continue  # 决策未发生（错过→不补写）
+            win_start = datetime.combine(
+                exec_date, parse_hhmm(config.execution_time), tzinfo=tz
+            )
+            if wall < win_start:
+                continue
+            if _dispatch_once(r, run_id, d, "execute", ttl=600):
+                _send(run_id, d)
+                dispatched.append(f"{run_id}:execute:{d}")
+
         # -- 决策相位：今天是包交易日、过决策截止、当日未收口 --------
-        if pkg.is_trade_date(today) and wall_hm >= config.decision_cutoff:
+        calendar_open = pkg.is_trade_date(today) or provider.next_open_trade_date(today - timedelta(days=1)) == today
+        if (calendar_open or config.program) and wall_hm >= config.decision_cutoff:
             day_rec = store.get_day(run_id, today.isoformat())
             outcome = (day_rec or {}).get("outcome")
             needs_run = day_rec is None or not outcome or outcome == "data_blocked"
             if needs_run and outcome == "data_blocked":
                 exec_day = pkg.next_trade_date(today)
                 if exec_day is not None and wall >= datetime.combine(
-                    exec_day, parse_hhmm(config.execution_time), tzinfo=tz
+                    exec_day, parse_hhmm(config.decision_deadline_time or config.execution_time), tzinfo=tz
                 ):
                     needs_run = False  # 窗口已过：受阻终态（近3日循环标注）
             if needs_run:
@@ -208,16 +256,18 @@ def dispatch_due_runs(
         #    口径，周一可覆盖周五；非自然日）内的受阻日（含隔夜补数），
         #    窗口（次一交易日执行时点）内数据补齐后自动重新门控执行 ----
         for d in _recent_trade_dates(provider, pkg, today, 3):
-            if d == today or not pkg.is_trade_date(d):
+            if config.start_date and d.isoformat() < config.start_date:
+                continue
+            if d == today or not (pkg.is_trade_date(d) or provider.next_open_trade_date(d - timedelta(days=1)) == d):
                 continue
             rec = store.get_day(run_id, d.isoformat())
             if (rec or {}).get("outcome") != "data_blocked":
                 continue
             if store.get_stage(run_id, d.isoformat(), "execute") is not None:
                 continue  # 已恢复执行
-            exec_day = pkg.next_trade_date(d)
+            exec_day = pkg.next_trade_date(d) or provider.next_open_trade_date(d)
             if exec_day is not None and wall >= datetime.combine(
-                exec_day, parse_hhmm(config.execution_time), tzinfo=tz
+                exec_day, parse_hhmm(config.decision_deadline_time or config.execution_time), tzinfo=tz
             ):
                 skipped.append(f"{run_id}:decision:{d}(blocked-final)")
                 continue  # 窗口已过：受阻终态，不补写
@@ -225,31 +275,6 @@ def dispatch_due_runs(
                 _send(run_id, d)
                 dispatched.append(f"{run_id}:decision:{d}")
 
-        # -- 执行相位（H2-AC02：按交易日回看，非自然日）：近 8 个交易日内
-        #    的待执行决策（signal 有、execute 无）、执行日=今天（行情视图
-        #    或日历口径——前沿无行情时也派发，任务内如实记录可恢复受阻）、
-        #    窗口已开；长休市（相距 8/9+ 自然日）不漏派 -------------
-        for d in _recent_trade_dates(provider, pkg, today, 8):
-            if not pkg.is_trade_date(d):
-                continue
-            exec_date = pkg.next_trade_date(d) or provider.next_open_trade_date(d)
-            if exec_date != today:
-                continue
-            gate = provider.resolve(d, symbols=sorted(config.target_weights), now=now)
-            if gate.status != "ready":
-                continue  # 数据受阻/休市：无待执行
-            if store.get_stage(run_id, d.isoformat(), "execute") is not None:
-                continue  # 执行阶段已收口
-            if store.get_stage(run_id, d.isoformat(), "signal") is None:
-                continue  # 决策未发生（错过→不补写）
-            win_start = datetime.combine(
-                today, parse_hhmm(config.execution_time), tzinfo=tz
-            )
-            if wall < win_start:
-                continue
-            if _dispatch_once(r, run_id, d, "execute", ttl=600):
-                _send(run_id, d)
-                dispatched.append(f"{run_id}:execute:{d}")
 
     return {"now": now.isoformat(), "dispatched": dispatched, "skipped": skipped}
 
@@ -294,7 +319,8 @@ def _dispatch_once(r, run_id: str, d: date, phase: str, *, ttl: int) -> bool:
 def _send(run_id: str, decision_date: date) -> None:
     from backend.services.engine.qlib_app.celery_config import celery_app
 
-    celery_app.send_task(_TASK_NAME, args=[run_id, decision_date.isoformat()])
+    celery_app.send_task(_TASK_NAME, args=[run_id, decision_date.isoformat()],
+                        queue=os.getenv("R01_VR_TASK_QUEUE", "default"))
 
 
 # ---------------------------------------------------------------------------
@@ -326,13 +352,27 @@ def run_scheduled_day(
             "detail": "调度已被禁用：入口即停，不推进决策日",
         }
     config, sched = got
-    pipeline = build_pipeline(config, schedule_cfg=sched)
+    try:
+        pipeline = build_pipeline(config, schedule_cfg=sched)
+    except Exception as exc:
+        from backend.services.simulation.virtual_run.states import RedisRunStateStore
+        from datetime import timezone
+        store = RedisRunStateStore(os.environ["REDIS_URL"])
+        status = store.get_status(ledger_run_id) or {}
+        status.update(error=f"{type(exc).__name__}: {exc}", failed_at=datetime.now(timezone.utc).isoformat())
+        store.set_status(ledger_run_id, status)
+        raise
     try:
         if decision_date is None:
             wall = local_wall(pipeline.clock.now(), config.tz)
             decision_date = wall.date().isoformat()
         result = pipeline.run_day(date.fromisoformat(decision_date))
         return {"ledger_run_id": ledger_run_id, **result.to_dict()}
+    except Exception as exc:
+        status = pipeline.store.get_status(ledger_run_id) or {}
+        status.update(error=f"{type(exc).__name__}: {exc}", failed_at=pipeline.clock.now().isoformat())
+        pipeline.store.set_status(ledger_run_id, status)
+        raise
     finally:
         cp = getattr(pipeline.checkpoints, "close", None)
         if callable(cp):
@@ -355,6 +395,13 @@ def virtual_run_config_from_pg_row(row) -> VirtualRunConfig:
     启用候选由研究冻结方案写入该表；本函数只读映射，不改表。
     """
     ew = dict(getattr(row, "execution_window", None) or {})
+    if ew.get("config", {}).get("program"):
+        cfg = VirtualRunConfig.from_dict(ew["config"])
+        if (cfg.ledger_run_id != row.ledger_run_id or cfg.strategy_id != row.strategy_id
+            or cfg.strategy_version != row.strategy_version or cfg.group != row.group
+            or cfg.initial_cash != row.initial_cash):
+            raise ValueError("published PG configuration identity mismatch")
+        return cfg
     ds = dict(getattr(row, "data_source", None) or {})
     risk = dict(getattr(row, "risk_config", None) or {})
     cfg = VirtualRunConfig(

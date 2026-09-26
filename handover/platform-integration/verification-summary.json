@@ -1,0 +1,112 @@
+{
+  "observed_at": "2026-09-26T14:58:28.169604+00:00",
+  "frontend": "http://127.0.0.1:13001",
+  "engine": "http://127.0.0.1:18083",
+  "branch": "codex/r01-platform-integration",
+  "validation_kind": "implementation_and_local_engineering_verification_not_independent_research_acceptance",
+  "runs": [
+    {
+      "backtest_id": "r01bt-00102ba3637bde41d37f62e2dd3542ab",
+      "status": "completed",
+      "total_return": 0.9756114982850006,
+      "annual_return": 0.06020303493718382,
+      "max_drawdown": 0.19276965433288784,
+      "sharpe_ratio": 0.7135699502221622,
+      "total_trades": 169,
+      "revision": "bdf38e77eef5ba6074d4fa277277e3e4ab878ac6b45392470c795108d5dfa6d4",
+      "sessions": 2828
+    },
+    {
+      "backtest_id": "r01bt-1983d53fa1b2cadc8b39712d741e244d",
+      "status": "completed",
+      "total_return": 0.8759661241666667,
+      "annual_return": 0.055502333991667596,
+      "max_drawdown": 0.25780330715518696,
+      "sharpe_ratio": 0.5639225844291829,
+      "total_trades": 3,
+      "revision": "d80117a56f7c70ed044b851b251f593116acb802baa46c3e092dec8c6ac136a5",
+      "sessions": 2828
+    }
+  ],
+  "checks": {
+    "pytest_passed": 55,
+    "container_comparison_ownership_passed": 1,
+    "typecheck_exit_code": 0,
+    "build_exit_code": 0,
+    "api_checks_passed": 9,
+    "source_downloads_identical": 50,
+    "ui_rerun_nav_points_identical": 2828,
+    "paper_stop_and_resume": "effective"
+  },
+  "research_cases": 9,
+  "engineering_archived": {
+    "current_node": 105,
+    "prior_mac_node_catalog_only": 25
+  },
+  "paper": {
+    "ledger_run_id": "r01vr-A-platform-s61-bdf38e77eef5-v4",
+    "strategy_version": 4,
+    "revision_id": "bdf38e77eef5ba6074d4fa277277e3e4ab878ac6b45392470c795108d5dfa6d4",
+    "initial_cash": 30000.0,
+    "start_date": "2026-09-27",
+    "data_date": null,
+    "nav": null,
+    "enabled": true,
+    "engine_matches": true,
+    "control": {
+      "command": "resume",
+      "state": "effective",
+      "requested_by": "10000001",
+      "requested_at": "2026-09-26T14:51:27.251710+00:00",
+      "received_at": "2026-09-26T14:51:27.521897+00:00",
+      "effective_at": "2026-09-26T14:51:27.521897+00:00"
+    },
+    "status": {
+      "ledger_run_id": "r01vr-A-platform-s61-bdf38e77eef5-v4",
+      "strategy_id": "platform-s61-bdf38e77eef5",
+      "strategy_version": 4,
+      "group": "A",
+      "input_date": {
+        "decision_date": null,
+        "daily_data_identity": null
+      },
+      "last_heartbeat": "2026-09-26T14:51:04.496974+00:00",
+      "last_success_at": null,
+      "today_decision": null,
+      "positions": null,
+      "cash": null,
+      "dividend_receivable": null,
+      "orders": null,
+      "nav": null,
+      "drawdown": null,
+      "hwm": null,
+      "risk_state": {
+        "buys_allowed": null,
+        "unconfirmed_events": null,
+        "blocked_orders_count": 0
+      },
+      "anomalies": [],
+      "pending_actions": [],
+      "next_run_at": "2026-09-28T16:15:00+08:00",
+      "schedule_enabled": true,
+      "stop_restore_status": {
+        "command": "stop",
+        "state": "effective",
+        "requested_by": "10000001",
+        "requested_at": "2026-09-26T14:51:03.932823+00:00",
+        "received_at": "2026-09-26T14:51:04.496974+00:00",
+        "effective_at": "2026-09-26T14:51:04.496974+00:00"
+      },
+      "generated_at": "2026-09-26T14:51:04.496974+00:00"
+    },
+    "publisher": {
+      "status": "published",
+      "source_release_id": "data-091385e6b21446b4221550b04047fb34e7bd5546cba4c2c04211f5566edbc31c",
+      "calendar_through": "20271231",
+      "calendar_sha256": "26d05498c0cec76a0a0d822c0de642af7b4ac1502994bb51ab9bf76ed2625b11",
+      "input_source_release_id": "data-fed9777c8559bccf804a1bf17407123953295acdc1494a361efcc9063609ee90",
+      "data_date": "2026-09-24",
+      "checked_at": "2026-09-26T14:45:50.566607+00:00"
+    }
+  }
+}

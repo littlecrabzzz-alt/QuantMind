@@ -340,6 +340,7 @@ function ArtifactEntry({
   >[number] & { not_ready_reason?: string };
 }) {
   const [content, setContent] = useState<string | null>(null);
+  const [showLedger, setShowLedger] = useState(false);
   const [error, setError] = useState("");
   const open = async () => {
     if (content !== null) {
@@ -390,7 +391,10 @@ function ArtifactEntry({
       )}
       {error && <span className="text-red-500">{error}</span>}
       {/replay|ledger|evidence|nav/i.test(artifact.name + artifact.kind) && (
-        <LedgerDetailView node={node} caseId={caseId} artifact={artifact} />
+        <div>
+          <Button size="small" aria-expanded={showLedger} onClick={() => setShowLedger(!showLedger)}>历史账本附件预览</Button>
+          {showLedger && <LedgerDetailView node={node} caseId={caseId} artifact={artifact} />}
+        </div>
       )}
     </div>
   );
@@ -493,10 +497,17 @@ function ExternalCasePanel({
       )}
       {summary.artifacts.length > 0 && (
         <div>
-          <h4 className="font-medium mb-1">文件 / 证据（可打开原件）</h4>
-          {summary.artifacts.map((a, i) => (
-            <ArtifactEntry key={i} node={node} caseId={caseId} artifact={a} />
-          ))}
+          {summary.artifacts.some(a => /findings.*final|结论报告/i.test(a.name)) && <div className="mb-3">
+            <h4 className="font-medium mb-1">研究结论（来源报告）</h4>
+            {summary.artifacts.filter(a => /findings.*final|结论报告/i.test(a.name)).map(a =>
+              <ArtifactEntry key={a.sha256} node={node} caseId={caseId} artifact={a} />)}
+          </div>}
+          <details>
+            <summary className="cursor-pointer font-medium mb-1">全部文件与证据（{summary.artifacts.length} 份，展开查原件）</summary>
+            {summary.artifacts.map((a, i) => (
+              <ArtifactEntry key={i} node={node} caseId={caseId} artifact={a} />
+            ))}
+          </details>
         </div>
       )}
     </div>
