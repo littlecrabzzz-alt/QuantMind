@@ -65,8 +65,7 @@ def prepare_research_data(data_dir=None) -> dict:
     if not adapter.prepare_data() or not adapter.is_data_ready():
         raise RuntimeError("Crypto daily Qlib preparation failed")
     derived = quantbc_derived_dir(release)
-    wrapper = RDLoopWrapper("crypto")
-    wrapper.adapter = adapter
+    wrapper = RDLoopWrapper("crypto", adapter=adapter)
     for debug, name in ((False, "daily_pv_all.h5"), (True, "daily_pv_debug.h5")):
         if not wrapper._generate_h5_from_parquet(str(release), str(derived / name), debug=debug):
             raise RuntimeError("Crypto daily H5 preparation failed")

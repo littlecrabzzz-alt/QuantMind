@@ -49,6 +49,23 @@ python3 scripts/binance_data_acceptance.py \
 
 验收实际调用 QuantBCDataHub、CryptoAdapter、RD 的数据准备入口和 Qlib `D.features`，比较全部原始/H5 行数，并将最近七天的收盘价、原生成交额、一日收益率与原始 Parquet 比对；最后重新核验原始版本文件哈希。此脚本只做数据准备和读取，不运行模型训练、策略、回测或交易。
 
+## 后续增加币种或股票
+
+当前入口审核产品类型并固定每个目录的 symbol 集合，尚无页面一键扩池功能。新增标的需要一次明确的代码/配置变更：
+
+1. 核实交易场所、产品类型、上市日、计价资产和底层证券映射，在 `backend/scripts/blockchain_sync.py` 的 `SPOT_PRODUCTS` 登记审核结果。不能仅因名字以 USDT 结尾就归为加密现货。
+2. 扩大的币种池使用新数据根，明确传入完整 `--symbols` 列表并从上市起补采。当前 publisher 会拒绝在既有目录增删 symbol；不能直接修改旧 manifest 或 CURRENT 来绕过校验。
+3. 新池完成质量、完整覆盖、成本字段及 Qlib/H5 消费验收后，才切换新任务的默认数据根和采集配置。现有 BC 调度采用代码中的默认 BTC/ETH 池；只在命令行采了新币不会自动改变日更池。
+4. 已有研究继续读取原 release；新研究显式记录新币种池与新 release。资产数量扩展不等于策略逻辑、交易成本及回测执行模型已经适用。
+
+股票代币沿用独立产品目录，进一步核验公司行动、转换倍数和底层证券关系；不能当作底层证券复权价。股票永续需独立合约适配，补充资金费、标记价、指数价、结算与合约生命周期。真正的 A股、美股证券优先使用现有 QuantDB/QuantUS 入口，分别保留本地交易日历、币种及复权合同。两类入口不能通过同名 ticker 直接合并。
+
+## 定时更新口径
+
+BC 建议时间为北京时间 08:15，即 UTC 日线闭合后 15 分钟。既有调度每天补派一次；当天错过时刻可补派，但任务失败后当天不自动重试，需检查失败原因再手动执行。长停机后的增量按已存最后一日回补，不再被 `days` 的短窗口截断。要求构建研究数据时，BC 的 Qlib/H5 跳过或失败会将总体结果标记为 partial。
+
+管理员 QuantBC 数据页独立于全局 crypto 研究开关；可保持 `ENABLE_CRYPTO=false`、`VITE_ENABLE_CRYPTO=false`。日更使用显式已验证 release 准备 Qlib/H5，不因数据构建把全局研究市场打开。
+
 ## 当前部署边界
 
 本次真实数据保存于 Mac 沙盒的 `.local-dev/project/data/quantbc` 和 `.local-dev/project/data/binance-tokenized-equity`；不属于主工作树 `data/`，也不会经 Syncthing 传到云端。实际版本、测试结果和消费报告见 `coordination/binance-data/` 最新验收记录。

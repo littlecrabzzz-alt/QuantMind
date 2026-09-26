@@ -74,8 +74,8 @@ _ENRICH_OUTPUT_COLUMNS: tuple[str, ...] = tuple(
 class RDLoopWrapper:
     """封装 RD-Agent FactorRDLoop，提供 QuantMind 兼容接口"""
 
-    def __init__(self, market: str = "a_share") -> None:
-        self.adapter: MarketAdapter = get_adapter(market)
+    def __init__(self, market: str = "a_share", *, adapter: MarketAdapter | None = None) -> None:
+        self.adapter: MarketAdapter = adapter if adapter is not None else get_adapter(market)
         if self.adapter is None:
             raise ValueError(f"Unknown market: {market}. Available: {[m['market_id'] for m in list_markets()]}")
         self.market = market

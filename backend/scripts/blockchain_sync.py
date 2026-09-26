@@ -412,8 +412,10 @@ def _publish_daily(
                 if refresh_history:
                     symbol_start = min(effective_start, old_start)
                 elif effective_start >= old_start:
+                    # Resume from stored coverage even when a short scheduler
+                    # window starts after an outage; otherwise the gap never heals.
                     symbol_start = max(
-                        effective_start,
+                        old_start,
                         pd.Timestamp(prior["time"].max()).date() - timedelta(days=7),
                     )
                 expected_starts[symbol] = max(

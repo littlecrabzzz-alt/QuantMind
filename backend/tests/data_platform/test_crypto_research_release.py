@@ -242,15 +242,24 @@ def test_research_rejects_wrong_daily_contract(tmp_path, field, value):
         CryptoAdapter(release).get_release_dir()
 
 
-def test_current_publisher_contract_is_admitted(intake, monkeypatch):  # noqa: F811 - shared pytest fixture
+@pytest.mark.parametrize("enabled", ["true", "false"])
+def test_current_publisher_contract_is_admitted(intake, monkeypatch, enabled):  # noqa: F811 - shared pytest fixture
     from backend.scripts import blockchain_sync
+    from backend.services.engine.rd_agent.market_adapters import (
+        get_adapter,
+        list_markets,
+    )
 
-    monkeypatch.setenv("ENABLE_CRYPTO", "true")
+    monkeypatch.setenv("ENABLE_CRYPTO", enabled)
     published = blockchain_sync.run(**intake)
     adapter = CryptoAdapter(published["data_dir"])
     assert adapter.prepare_data()
     assert adapter.is_data_ready()
     assert adapter.get_data_config().extra["release_id"] == published["release_id"]
+    if enabled == "false":
+        assert "crypto" not in {item["market_id"] for item in list_markets()}
+        with pytest.raises(ValueError, match="disabled"):
+            get_adapter("crypto")
 
 
 def test_release_inventory_symlinks_and_derived_output_are_protected(
@@ -397,6 +406,31 @@ def test_crypto_status_uses_previous_utc_day_without_stock_calendar():
         asyncio.run(scope["_resolve_trade_date"]("crypto", "test", "test"))
         == "2024-01-06"
     )
+
+
+def test_data_preparation_keeps_disabled_crypto_research_hidden(tmp_path, monkeypatch):
+    pytest.importorskip("tables")
+    from backend.scripts.quantbc_daily_sync import prepare_research_data
+    from backend.services.engine.rd_agent.market_adapters import (
+        get_adapter,
+        list_markets,
+    )
+    from backend.services.engine.rd_agent.rd_loop_wrapper import RDLoopWrapper
+
+    release = _publish(tmp_path / "quantbc", "data-only")
+    monkeypatch.setenv("ENABLE_CRYPTO", "false")
+    prepared = prepare_research_data(release)
+    assert prepared["release_id"] == release.name
+    assert (
+        Path(prepared["qlib_dir"], "source_manifest.json").read_bytes()
+        == (release / "manifest.json").read_bytes()
+    )
+    assert len(pd.read_hdf(Path(prepared["h5_dir"], "daily_pv_all.h5"), "data")) == 4
+    assert "crypto" not in {item["market_id"] for item in list_markets()}
+    with pytest.raises(ValueError, match="disabled"):
+        get_adapter("crypto")
+    with pytest.raises(ValueError, match="disabled"):
+        RDLoopWrapper("crypto")
 
 
 def test_h5_and_rd_workspace_stay_on_published_release(tmp_path, monkeypatch):

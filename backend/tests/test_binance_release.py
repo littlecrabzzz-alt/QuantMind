@@ -205,3 +205,48 @@ def test_committed_release_survives_attempt_journal_failure(
     assert result["status"] == "completed"
     assert result["journal_warning"] == "journal unavailable"
     assert sync._previous(tmp_path)[1]["release_id"] == result["release_id"]
+
+
+def test_short_scheduler_window_recovers_more_than_two_weeks_offline(
+    intake, tmp_path, monkeypatch
+):
+    calls = []
+    monkeypatch.setattr(
+        fetch,
+        "get_binance_first_kline",
+        lambda symbol, **kwargs: frame(symbol, ("2026-08-01",)),
+    )
+
+    def download(symbol, **kwargs):
+        calls.append((kwargs["start_date"], kwargs["end_date"]))
+        days = pd.date_range(
+            kwargs["start_date"], kwargs["end_date"], inclusive="left"
+        ).strftime("%Y-%m-%d")
+        return frame(symbol, days)
+
+    monkeypatch.setattr(fetch, "download_binance_klines", download)
+    initial = sync.run(
+        symbols=intake["symbols"], start_date="2026-08-01", end_date="2026-09-09"
+    )
+    initial_path = sync.Path(initial["data_dir"])
+    initial_manifest = (initial_path / "manifest.json").read_bytes()
+
+    # Last stored bar is September 8; resume 17 days later with scheduler days=5.
+    recovered = sync.run(symbols=intake["symbols"], days=5, end_date="2026-09-26")
+    assert calls[-2:] == [("2026-09-01", "2026-09-26")] * 2
+    assert recovered["release_id"] != initial["release_id"]
+    assert recovered["quality"]["history_complete"] is True
+    assert recovered["quality"]["rows"] == 112
+    _, _, stored = sync._previous(tmp_path)
+    for symbol in ("BTCUSDT", "ETHUSDT"):
+        rows = stored[stored.symbol == symbol]
+        assert rows.time.min() == date(2026, 8, 1)
+        assert rows.time.max() == date(2026, 9, 25)
+        assert len(rows) == 56
+        assert recovered["quality"]["symbols"][symbol]["gaps"] == 0
+    assert (initial_path / "manifest.json").read_bytes() == initial_manifest
+
+    replay = sync.run(symbols=intake["symbols"], days=5, end_date="2026-09-26")
+    assert calls[-2:] == [("2026-09-18", "2026-09-26")] * 2
+    assert replay["unchanged"] is True
+    assert replay["release_id"] == recovered["release_id"]

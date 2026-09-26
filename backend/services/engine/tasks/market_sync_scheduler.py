@@ -44,13 +44,13 @@ DEFAULT_SCHEDULE = {
 # 各海外市场默认时间：
 #   HK       23:50  雅虎/akshare/CCASS 晚间陆续就绪，晚间错峰
 #   US       05:30  美股收盘(北京约 04:00/05:00)后，EOD 数据已稳定
-#   BC       04:15  加密市场全天候交易，选凌晨低谷时段拉取
+#   BC       08:15  UTC 日线于北京时间 08:00 闭合，随后拉取
 #   US       05:30  美股收盘(北京约 04:00/05:00)后，EOD 数据已稳定
 MARKET_SUGGESTED_TIMES: dict[str, str] = {
     "A": "01:00",
     "HK": "02:00",
     "FUTURES": "03:00",
-    "BC": "04:15",
+    "BC": "08:15",
     "US": "05:30",
 }
 
@@ -214,7 +214,10 @@ def run_market_sync(market: str, cfg: dict[str, Any]) -> dict[str, Any]:
                 logger.error("%s 定时同步 qlib 缓存失败: %s", market, exc, exc_info=True)
                 result["qlib"] = {"status": "error", "reason": str(exc)}
 
-    result["status"] = "partial" if _has_sync_errors(result) else "completed"
+    research_incomplete = (
+        market == "BC" and with_qlib and (result.get("qlib") or {}).get("status") != "ok"
+    )
+    result["status"] = "partial" if research_incomplete or _has_sync_errors(result) else "completed"
     result["finished"] = datetime.now().isoformat()
     return result
 

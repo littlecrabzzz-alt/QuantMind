@@ -19,6 +19,8 @@ def register_adapter(cls: type[MarketAdapter]) -> type[MarketAdapter]:
 
 def get_adapter(market_id: str) -> MarketAdapter:
     """获取市场适配器实例"""
+    if market_id == "crypto" and not _crypto_enabled():
+        raise ValueError("Crypto research market is disabled")
     if market_id not in _registry:
         available = list(_registry.keys())
         raise ValueError(f"Unknown market: {market_id}. Available: {available}")
@@ -34,6 +36,7 @@ def list_markets() -> list[dict[str, str]]:
             "description": cls.description,
         }
         for cls in _registry.values()
+        if cls.market_id != "crypto" or _crypto_enabled()
     ]
 
 

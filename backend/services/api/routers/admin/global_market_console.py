@@ -755,16 +755,46 @@ def make_market_router(
     def _root() -> Path:
         return _data_dir(env_var, default_dir)
 
+    def _read_context() -> tuple[Path, dict[str, Any]]:
+        root = _root()
+        if market != "BC":
+            return root, {}
+        from backend.services.engine.data_platform.quantbc_hub import (
+            load_quantbc_release_manifest,
+            resolve_quantbc_release_dir,
+        )
+
+        # Pin CURRENT once for this request; keep _root() as the writer's root.
+        release = resolve_quantbc_release_dir(root)
+        if not (release / "manifest.json").is_file():
+            return release, {}
+        manifest = load_quantbc_release_manifest(release, require_spot=False)
+        return release, {
+            key: manifest[key]
+            for key in (
+                "release_id", "timezone", "data_start", "data_end", "product_type",
+                "available_at_semantics", "point_in_time_verified", "history_complete_scope",
+            )
+        }
+
     # ------------------------------------------------------------------
     # 目录
     # ------------------------------------------------------------------
     @router.get("/catalog")
     async def get_catalog(current_user: dict = Depends(require_admin)):
         try:
-            root = _root()
+            root, release_info = await asyncio.to_thread(_read_context)
             payload = await asyncio.to_thread(
                 _build_catalog_payload, market, DATASETS, _GROUPS, root
             )
+            payload.update(release_info)
+            if release_info:
+                for item in payload["datasets"]:
+                    if item["synced"]:
+                        item["note"] = (
+                            f"{item['note']} · {release_info['timezone']} · "
+                            f"截止 {release_info['data_end']} · {release_info['release_id']}"
+                        ).strip(" ·")
             return {
                 "success": True,
                 "data": payload,
@@ -784,7 +814,7 @@ def make_market_router(
         current_user: dict = Depends(require_admin),
     ):
         spec = _spec(dataset)
-        root = _root()
+        root, release_info = await asyncio.to_thread(_read_context)
         file_path = _pick_local_file(spec, root, symbol)
         if file_path is None:
             return {
@@ -796,12 +826,16 @@ def make_market_router(
                     "rows_total": 0,
                     "columns": [],
                     "data": [],
+                    "data_dir": str(root),
+                    **release_info,
                     **_symbol_choices(spec, root, market),
                     "timestamp": _now_iso(),
                 },
             }
         try:
             df = pd.read_parquet(file_path)
+            if market == "BC" and spec.layout == "partition" and symbol and "symbol" in df:
+                df = df.loc[df["symbol"].astype(str).str.upper() == symbol.strip().upper()]
         except Exception as exc:  # noqa: BLE001
             logger.error(
                 "%s preview failed (%s): %s", market, dataset, exc, exc_info=True
@@ -820,6 +854,8 @@ def make_market_router(
                 "column_count": len(columns),
                 "columns": columns,
                 "data": records,
+                "data_dir": str(root),
+                **release_info,
                 **_symbol_choices(spec, root, market),
                 "timestamp": _now_iso(),
             },
