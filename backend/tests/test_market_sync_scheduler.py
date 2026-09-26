@@ -64,10 +64,19 @@ def test_market_suggested_time_is_prefilled_without_enabling(stub_redis):
 
 
 def test_suggested_times_are_staggered_and_after_midnight():
-    # Assert：各市场建议时间互不错峰，且都落在次日 00:00 以后的凌晨窗口
+    # BC 的 UTC 日线需在北京时间 08:00 闭合；其余市场保留凌晨错峰。
     times = list(MARKET_SUGGESTED_TIMES.values())
     assert len(times) == len(set(times)), "各市场建议触发时间必须错开"
-    assert all("00:00" <= t <= "06:00" for t in times), times
+    assert MARKET_SUGGESTED_TIMES["BC"] == "08:15"
+    assert all("00:00" <= t <= "06:00" for market, t in MARKET_SUGGESTED_TIMES.items() if market != "BC"), times
+
+
+def test_bc_suggestion_does_not_override_saved_time_or_research_setting(stub_redis):
+    assert get_schedule("BC")["time"] == "08:15"
+    assert get_schedule("BC")["enabled"] is False
+    save_schedule("BC", {"enabled": True, "time": "09:00", "with_qlib": True})
+    assert get_schedule("BC")["time"] == "09:00"
+    assert get_schedule("BC")["with_qlib"] is True
 
 
 def test_ashare_has_no_market_default_and_stays_disabled_without_config(stub_redis):
@@ -219,3 +228,42 @@ def test_pg_partial_is_not_completed(monkeypatch):
 def test_nested_source_failure_is_not_reported_as_success(result, failed):
     from backend.services.engine.tasks.market_sync_scheduler import _has_sync_errors
     assert _has_sync_errors(result) is failed
+
+
+@pytest.mark.parametrize("market,with_qlib,preparation,expected", [
+    ("BC", True, "slow", "partial"),
+    ("BC", True, "error", "partial"),
+    ("BC", True, "missing", "partial"),
+    ("BC", True, "ok", "completed"),
+    ("BC", False, "slow", "completed"),
+    ("US", True, "slow", "completed"),
+])
+def test_bc_requires_requested_research_data_to_complete(monkeypatch, market, with_qlib, preparation, expected):
+    import sys
+    from datetime import datetime, timedelta
+    from types import ModuleType
+    from unittest.mock import Mock
+    from backend.services.engine.tasks import market_sync_scheduler as scheduler
+
+    start = datetime(2026, 9, 26, 8, 15)
+    clock = Mock(wraps=datetime)
+    elapsed = 901 if preparation == "slow" else 1
+    clock.now.side_effect = [start, start + timedelta(seconds=elapsed), start + timedelta(seconds=elapsed + 1)]
+    monkeypatch.setattr(scheduler, "datetime", clock)
+    monkeypatch.setenv("MARKET_SYNC_SOFT_TIME_LIMIT", "1800")
+    source = ModuleType(f"backend.scripts.quant{'bc' if market == 'BC' else 'us'}_daily_sync")
+    source.run = Mock(return_value={"status": "completed", "data_dir": "/fixed/release"})
+    source.prepare_research_data = Mock(
+        return_value={} if preparation == "missing" else {"qlib_dir": "/fixed/derived"},
+        side_effect=RuntimeError("build failed") if preparation == "error" else None,
+    )
+    builder = ModuleType("backend.services.engine.qlib_data_builder")
+    builder.ensure_qlib_cache = Mock(return_value="/fixed/derived")
+    monkeypatch.setitem(sys.modules, source.__name__, source)
+    monkeypatch.setitem(sys.modules, builder.__name__, builder)
+
+    result = scheduler.run_market_sync(market, {"with_qlib": with_qlib})
+    assert result["status"] == expected
+    if with_qlib and preparation == "slow":
+        assert result["qlib"]["status"] == "skipped"
+        source.prepare_research_data.assert_not_called()

@@ -107,35 +107,46 @@ class CryptoAdapter(MarketAdapter):
 
     market_id = "crypto"
     market_name = "加密货币"
-    description = "Binance 加密货币合约 (7×24)，CryptoAlpha 因子集 (90+ 因子)"
+    description = "Binance 现货日线 (UTC，7×24)，CryptoAlpha 因子集"
+
+    def __init__(self, data_dir: str | Path | None = None) -> None:
+        self._release_dir: Path | None = None
+        self._requested_data_dir = data_dir
+
+    def get_release_dir(self) -> Path:
+        from backend.services.engine.data_platform.quantbc_hub import (
+            _resolve_quantbc_data_dir, load_quantbc_release_manifest, resolve_quantbc_release_dir,
+        )
+        if self._release_dir is None:
+            release = (
+                resolve_quantbc_release_dir(self._requested_data_dir)
+                if self._requested_data_dir is not None else _resolve_quantbc_data_dir()
+            )
+            load_quantbc_release_manifest(release, verify_files=True)
+            self._release_dir = release
+        return self._release_dir
 
     def get_data_config(self) -> DataConfig:
-        from backend.services.engine.data_platform.quantbc_hub import (
-            _resolve_quantbc_data_dir,
-        )
-
+        from backend.services.engine.data_platform.quantbc_hub import load_quantbc_release_manifest
+        release = self.get_release_dir()
+        manifest = load_quantbc_release_manifest(release)
         return DataConfig(
             provider_uri=self.get_qlib_provider_uri(),
-            data_dir=_resolve_quantbc_data_dir(),
+            data_dir=str(release),
             calendar="day",
             market="all",
-            extra={"symbols": "bc_BTCUSDT,bc_ETHUSDT,...", "freq": "day"},
+            extra={
+                "symbols": ",".join(f"bc_{symbol}" for symbol in manifest["symbols"]),
+                "freq": "day", "timezone": "UTC", "product_type": "crypto_spot",
+                "release_id": manifest["release_id"], "source_manifest": str(release / "manifest.json"),
+            },
         )
 
     def get_qlib_provider_uri(self) -> str:
         from backend.services.engine.data_platform.quantbc_hub import (
-            _resolve_quantbc_data_dir,
+            quantbc_derived_dir,
         )
-
-        # 统一固定目录优先（/data/qlib/{sub}）
-        try:
-            from backend.shared.qlib_paths import resolve_qlib_provider_uri
-            fixed = resolve_qlib_provider_uri("CRYPTO")
-            if os.path.isdir(fixed):
-                return fixed
-        except Exception:
-            pass
-        return str(Path(_resolve_quantbc_data_dir()) / ".qlib_cache" / "bc_data")
+        return str(quantbc_derived_dir(self.get_release_dir()) / "bc_data")
 
     def get_backtest_config(self) -> BacktestConfig:
         return BacktestConfig(
@@ -175,7 +186,9 @@ class CryptoAdapter(MarketAdapter):
         from backend.services.engine.qlib_data_builder import QlibDataBuilder
 
         try:
-            builder = QlibDataBuilder.for_market("CRYPTO")
+            builder = QlibDataBuilder.for_market(
+                "CRYPTO", data_dir=self.get_release_dir(), qlib_dir=self.get_qlib_provider_uri()
+            )
             builder.build_all(incremental=True)
             return True
         except Exception as e:
@@ -185,11 +198,13 @@ class CryptoAdapter(MarketAdapter):
 
     def is_data_ready(self) -> bool:
         """检查 Qlib 目录 + calendars + instruments + features 是否齐全。"""
-        p = Path(self.get_qlib_provider_uri())
-        return (
-            p.is_dir()
-            and (p / "calendars" / "day.txt").is_file()
-            and (p / "instruments" / "all.txt").is_file()
-            and (p / "features").is_dir()
-            and len(list((p / "features").iterdir())) > 0
-        )
+        try:
+            from backend.shared.qlib_paths import is_qlib_provider_ready
+            p = Path(self.get_qlib_provider_uri())
+            return (
+                is_qlib_provider_ready(p)
+                and any((p / "features").iterdir())
+                and (p / "source_manifest.json").read_bytes() == (self.get_release_dir() / "manifest.json").read_bytes()
+            )
+        except (OSError, ValueError, KeyError):
+            return False

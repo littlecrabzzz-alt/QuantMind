@@ -15,6 +15,7 @@ from __future__ import annotations
 import ctypes
 import fcntl
 import logging
+import shutil
 import os
 import struct
 import sys
@@ -174,7 +175,11 @@ class QlibDataBuilder:
             if data_dir is None:
                 data_dir = quantbc_hub._resolve_quantbc_data_dir()
             hub = quantbc_hub.QuantBCDataHub(data_dir)
-            default_qlib = Path("/data/qlib/bc_data")
+            default_qlib = (
+                quantbc_hub.quantbc_derived_dir(hub.data_dir) / "bc_data"
+                if (hub.data_dir / "manifest.json").is_file()
+                else Path("/data/qlib/bc_data")
+            )
         elif market_upper == "FUTURES":
             if data_dir is None:
                 data_dir = quantfutures_hub._resolve_quantfutures_data_dir()
@@ -194,6 +199,9 @@ class QlibDataBuilder:
         return self._hub
 
     def build_all(self, *, incremental=True, symbols=None, progress_cb=None) -> dict:
+        if self._market == "CRYPTO" and (self._hub.data_dir / "manifest.json").is_file():
+            from backend.services.engine.data_platform.quantbc_hub import load_quantbc_release_manifest
+            load_quantbc_release_manifest(self._hub.data_dir, verify_files=True)
         live = self._qlib_dir.absolute()
         live.parent.mkdir(parents=True, exist_ok=True)
         if symbols is not None and live.exists():
@@ -206,6 +214,10 @@ class QlibDataBuilder:
                 try:
                     result = self._build_all(incremental=incremental, symbols=symbols, progress_cb=progress_cb)
                     self._validate_generation()
+                    if self._market == "CRYPTO" and (self._hub.data_dir / "manifest.json").is_file():
+                        from backend.services.engine.data_platform.quantbc_hub import load_quantbc_release_manifest
+                        load_quantbc_release_manifest(self._hub.data_dir)
+                        shutil.copyfile(self._hub.data_dir / "manifest.json", staged / "source_manifest.json")
                     _publish_directory(staged, live)
                     return result
                 finally:
@@ -409,10 +421,35 @@ class QlibDataBuilder:
         end_date = cal_dates[-1]
 
         qlib_symbols = sorted({s for s in raw_symbols if s})
+        lifetimes = dict.fromkeys(qlib_symbols, (start_date, end_date))
+        if self._market == "CRYPTO":
+            from backend.services.engine.data_platform.quantbc_hub import load_quantbc_release_manifest
+
+            if not (self._hub.data_dir / "manifest.json").is_file():
+                raise ValueError("Crypto instrument lifetimes require a verified release manifest")
+            manifest = load_quantbc_release_manifest(self._hub.data_dir, verify_files=True)
+            lifetimes = {}
+            for symbol, coverage in manifest["quality"]["symbols"].items():
+                try:
+                    first = date.fromisoformat(coverage["first"])
+                    last = date.fromisoformat(coverage["last"])
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise ValueError(f"Missing or invalid crypto coverage dates: {symbol}") from exc
+                if (
+                    first.isoformat() not in cal_dates
+                    or last.isoformat() not in cal_dates
+                    or first > last
+                    or coverage["rows"] != (last - first).days + 1
+                ):
+                    raise ValueError(f"Crypto coverage does not match its calendar: {symbol}")
+                lifetimes[self._to_qlib_symbol(symbol)] = (first.isoformat(), last.isoformat())
+            if set(lifetimes) != set(qlib_symbols):
+                raise ValueError("Crypto instruments differ from the verified coverage metadata")
 
         with open(inst_file, "w") as f:
             for sym in qlib_symbols:
-                f.write(f"{sym}\t{start_date}\t{end_date}\n")
+                first, last = lifetimes[sym]
+                f.write(f"{sym}\t{first}\t{last}\n")
 
         logger.info("Qlib[%s] instruments: %d symbols -> %s", self._market, len(qlib_symbols), inst_file)
 

@@ -53,6 +53,26 @@ class ResearchCache(unittest.TestCase):
         cache.atomic_bytes(root / 'releases' / ('data-' + sha) / 'manifest.json', raw)
         cache.atomic_json(root / 'CURRENT.json', {'release_id': 'data-' + sha, 'manifest_sha256': sha})
 
+    def test_research_pointer_selection_scope_and_corruption(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.fixture(root)
+            old = cache.source_pointer(root, ['daily'])
+            manifest = cache.manifest_at(root, old['release_id'])
+            manifest.update(scope='research_structured', selected_api_names=['daily'])
+            raw = json.dumps(manifest, sort_keys=True).encode()
+            sha = hashlib.sha256(raw).hexdigest()
+            pointer = dict(release_id='data-' + sha, manifest_sha256=sha,
+                           selected_api_names=['daily'], published_at=1)
+            cache.atomic_bytes(root / 'releases' / pointer['release_id'] / 'manifest.json', raw)
+            cache.atomic_json(root / 'RESEARCH_CURRENT.json', pointer)
+            self.assertEqual(cache.source_pointer(root, ['fund_daily']), old)
+            self.assertEqual(cache.prepare(root, ['daily'])['source_release_id'], pointer['release_id'])
+            pointer['manifest_sha256'] = '0' * 64
+            cache.atomic_json(root / 'RESEARCH_CURRENT.json', pointer)
+            with self.assertRaisesRegex(ValueError, 'Invalid research pointer'):
+                cache.prepare(root, ['daily'])
+
     def test_repeated_provenance_retains_all_sources_and_rejects_corruption(self):
         for corrupt in (False, True):
             with self.subTest(corrupt=corrupt), tempfile.TemporaryDirectory() as folder:
@@ -234,6 +254,36 @@ class ResearchCache(unittest.TestCase):
                                  / 'manifest.json').read_bytes())
             self.assertEqual([d['api_name'] for d in result['datasets']], ['daily'])
             self.assertEqual(len(result['files']), 2)
+
+    def test_api_expansion_reuses_verified_files_and_checks_added_api(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.fixture(root)
+            old = cache.prepare(root, ['daily'])
+            old_manifest = json.loads((root / '.research-exports' / old['release_id']
+                                       / 'manifest.json').read_bytes())
+            full = cache.manifest_at(root, old['source_release_id'])
+            with patch.object(cache, 'checked', wraps=cache.checked) as integrity:
+                pointer = cache.prepare(root, ['daily', 'fund_daily'])
+            checked_names = {call.args[1] for call in integrity.call_args_list}
+            self.assertFalse(checked_names & set(old_manifest['files']))
+            self.assertEqual(checked_names, set(full['files']) - set(old_manifest['files']))
+            result = cache.cached_export(root, ['daily', 'fund_daily'])[1]
+            self.assertEqual(result['files'], full['files'])
+            self.assertEqual(result['selected_api_names'], ['daily', 'fund_daily'])
+            self.assertEqual(pointer['source_release_id'], old['source_release_id'])
+
+    def test_corrupt_narrower_manifest_cannot_authorize_file_reuse(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.fixture(root)
+            old = cache.prepare(root, ['daily'])
+            path = root / '.research-exports' / old['release_id'] / 'manifest.json'
+            manifest = json.loads(path.read_bytes())
+            path.write_bytes(b'corrupt')
+            (root / next(iter(manifest['files']))).write_bytes(b'corrupt')
+            with self.assertRaisesRegex(ValueError, 'checksum'):
+                cache.prepare(root, ['daily', 'fund_daily'])
 
 
 if __name__ == '__main__':

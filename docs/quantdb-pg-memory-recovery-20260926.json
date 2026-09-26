@@ -1,0 +1,436 @@
+{
+  "code_commit": "7b5dcea5caeec8c6c26de40b68a0111f6212d58d",
+  "unit_tests_passed": 11,
+  "read_only_real_input_validation": {
+    "status": "passed",
+    "result": {
+      "status": "ok",
+      "rows": 38966,
+      "trade_dates": 7,
+      "failed_batches": []
+    },
+    "rows_by_date": {
+      "2026-09-16": 5565,
+      "2026-09-17": 5565,
+      "2026-09-18": 5566,
+      "2026-09-21": 5565,
+      "2026-09-22": 5567,
+      "2026-09-23": 5568,
+      "2026-09-24": 5570
+    },
+    "logical_rows_sha256": "12d3576579badebe9a5e4d90881721d38576133d94862288b1fb51079d469662",
+    "symbols": 5572,
+    "max_symbol_rows": 117,
+    "elapsed_seconds": 229.64,
+    "peak_rss_mib": 497.06,
+    "samples": [
+      {
+        "trade_date": "2026-09-24",
+        "symbol": "SZ000001",
+        "adj_factor": 1.0,
+        "open": 11.35,
+        "high": 11.47,
+        "low": 11.29,
+        "close": 11.3,
+        "volume": 104381872.0,
+        "amount": 118673.69,
+        "pe_ttm": 5.045833468768265,
+        "pb": 0.4000023169228945,
+        "total_mv": 219286875750.40002,
+        "float_mv": 219284237516.80002,
+        "return_1d": null,
+        "return_3d": null,
+        "return_5d": null,
+        "return_10d": null,
+        "return_20d": null,
+        "return_60d": null,
+        "vol_std_5": 0.656574464708149,
+        "vol_std_20": 0.8567504588200398,
+        "vol_std_60": 1.0036974432299937,
+        "rsi_14": 46.60548700881575,
+        "rsi_6": 32.386407621673925,
+        "macd_hist": -0.15387268466070564,
+        "kdj_k": 22.165308827300937,
+        "beta_20": 0.3103216856947531,
+        "volume_ma_5": 90333389.33333333,
+        "amount_ma_5": 101611.158,
+        "pct_change": -0.4492996211787448,
+        "volume_ratio_5": 1.191412110362951,
+        "volume_ratio_20": 1.178741040599495,
+        "ma5": 11.407340344827585,
+        "ma10": 11.449624655172414,
+        "ma20": 11.49816577586207,
+        "ma60": 11.071593850574713,
+        "ma_gap_5": -0.9409760871757933,
+        "ma_gap_10": -1.3068083861143887,
+        "ma_gap_20": -1.7234555469540669,
+        "vol_atr_14": 0.17624108636381752
+      },
+      {
+        "trade_date": "2026-09-24",
+        "symbol": "SZ002832",
+        "adj_factor": 1.0,
+        "open": 25.45,
+        "high": 25.690000000000005,
+        "low": 25.100000000000005,
+        "close": 25.15,
+        "volume": 3347039.0,
+        "amount": 8498.0,
+        "pe_ttm": 22.893113702089035,
+        "pb": 2.646117334768193,
+        "total_mv": 14353282860.8,
+        "float_mv": 9731475811.199999,
+        "return_1d": null,
+        "return_3d": null,
+        "return_5d": null,
+        "return_10d": null,
+        "return_20d": null,
+        "return_60d": null,
+        "vol_std_5": 0.9978164170902416,
+        "vol_std_20": 1.7572076071569134,
+        "vol_std_60": 2.493512631954362,
+        "rsi_14": 48.47783149269474,
+        "rsi_6": 39.24941427765155,
+        "macd_hist": -1.118912088974914,
+        "kdj_k": 44.43184296292348,
+        "beta_20": 0.24907241136067904,
+        "volume_ma_5": 3732175.0,
+        "amount_ma_5": 10263.144,
+        "pct_change": -1.178781925343808,
+        "volume_ratio_5": 0.835636237079247,
+        "volume_ratio_20": 0.47464371700040603,
+        "ma5": 25.54,
+        "ma10": 25.402,
+        "ma20": 25.567500000000003,
+        "ma60": 24.31366666666667,
+        "ma_gap_5": -1.5270164447924839,
+        "ma_gap_10": -0.9920478702464486,
+        "ma_gap_20": -1.6329324337538087,
+        "vol_atr_14": 0.8205015105977937
+      },
+      {
+        "trade_date": "2026-09-24",
+        "symbol": "SH600036",
+        "adj_factor": 1.0,
+        "open": 40.60000000000001,
+        "high": 41.14,
+        "low": 40.58,
+        "close": 40.69,
+        "volume": 50352356.0,
+        "amount": 205794.55,
+        "pe_ttm": 6.764816122551232,
+        "pb": 0.7629519729665506,
+        "total_mv": 1026195539599.36,
+        "float_mv": 839391767818.24,
+        "return_1d": null,
+        "return_3d": null,
+        "return_5d": null,
+        "return_10d": null,
+        "return_20d": null,
+        "return_60d": null,
+        "vol_std_5": 0.6793442996656776,
+        "vol_std_20": 1.0608699913044872,
+        "vol_std_60": 1.1920155892805828,
+        "rsi_14": 52.92310529710329,
+        "rsi_6": 45.06666573275969,
+        "macd_hist": -0.43803353898589403,
+        "kdj_k": 26.669825775889123,
+        "beta_20": 0.10492731337417642,
+        "volume_ma_5": 45176298.666666664,
+        "amount_ma_5": 194242.75,
+        "pct_change": 0.2216748768472776,
+        "volume_ratio_5": 1.0574372713459272,
+        "volume_ratio_20": 0.782057712493885,
+        "ma5": 40.748000000000005,
+        "ma10": 40.954,
+        "ma20": 40.902,
+        "ma60": 39.3254834442965,
+        "ma_gap_5": -0.14233827427114765,
+        "ma_gap_10": -0.6446256775894943,
+        "ma_gap_20": -0.5183120629798088,
+        "vol_atr_14": 0.6469068221344207
+      },
+      {
+        "trade_date": "2026-09-24",
+        "symbol": "SH600519",
+        "adj_factor": 1.0,
+        "open": 1250.01,
+        "high": 1256.1299999999999,
+        "low": 1231.05,
+        "close": 1237.0,
+        "volume": 3123935.0,
+        "amount": 386731.09,
+        "pe_ttm": 18.989013222332957,
+        "pb": 6.154543029112665,
+        "total_mv": 1546351018368.0,
+        "float_mv": 1546351018368.0,
+        "return_1d": null,
+        "return_3d": null,
+        "return_5d": null,
+        "return_10d": null,
+        "return_20d": null,
+        "return_60d": null,
+        "vol_std_5": 0.4863837460389293,
+        "vol_std_20": 0.8376009125665207,
+        "vol_std_60": 1.5015580942315536,
+        "rsi_14": 33.13840786455599,
+        "rsi_6": 18.287418398074138,
+        "macd_hist": -12.278064025378786,
+        "kdj_k": 9.87228106857328,
+        "beta_20": -0.1015804079406066,
+        "volume_ma_5": 2893117.0,
+        "amount_ma_5": 342444.53,
+        "pct_change": -1.1380710335347266,
+        "volume_ratio_5": 1.1426137445540923,
+        "volume_ratio_20": 1.262082856574712,
+        "ma5": 1250.346,
+        "ma10": 1260.2579999999998,
+        "ma20": 1281.3380000000002,
+        "ma60": 1286.3223333333333,
+        "ma_gap_5": -1.0673845479571287,
+        "ma_gap_10": -1.8454951287752097,
+        "ma_gap_20": -3.460289166480679,
+        "vol_atr_14": 19.67841834217313
+      },
+      {
+        "trade_date": "2026-09-24",
+        "symbol": "SH688001",
+        "adj_factor": 1.0,
+        "open": 69.43,
+        "high": 70.98,
+        "low": 67.4,
+        "close": 67.57,
+        "volume": 12232172.0,
+        "amount": 83807.59,
+        "pe_ttm": 330.3493965821666,
+        "pb": 7.3993188296503645,
+        "total_mv": 31863689754.239998,
+        "float_mv": 31863689754.239998,
+        "return_1d": null,
+        "return_3d": null,
+        "return_5d": null,
+        "return_10d": null,
+        "return_20d": null,
+        "return_60d": null,
+        "vol_std_5": 4.5824741314731,
+        "vol_std_20": 6.423250171088263,
+        "vol_std_60": 6.555428736902972,
+        "rsi_14": 56.85304020544502,
+        "rsi_6": 47.56926020183353,
+        "macd_hist": 1.4483975431939253,
+        "kdj_k": 71.61458931035344,
+        "beta_20": 5.532704600384488,
+        "volume_ma_5": 13167470.333333334,
+        "amount_ma_5": 92609.84400000001,
+        "pct_change": -4.48119875600792,
+        "volume_ratio_5": 0.9515526340375517,
+        "volume_ratio_20": 0.9426926601418639,
+        "ma5": 72.442,
+        "ma10": 69.20417229787233,
+        "ma20": 62.521767170212755,
+        "ma60": 56.7997514107036,
+        "ma_gap_5": -6.7253803042434,
+        "ma_gap_10": -2.3613782863241894,
+        "ma_gap_20": 8.07436043201346,
+        "vol_atr_14": 5.079680318347325
+      }
+    ],
+    "input_snapshot": "snapshot-quantdb-20260925T211728455924Z",
+    "pg_writes": false,
+    "container_memory_peak_bytes": 490409984
+  },
+  "cloud": {
+    "recovery": {
+      "job_id": "qdb-recovery-20260926-111118",
+      "status": "completed",
+      "started": "2026-09-26T11:11:18.539347",
+      "start_date": "2026-09-16",
+      "end_date": "2026-09-24",
+      "stages": {
+        "pg_fill": {
+          "status": "ok",
+          "rows": 38966,
+          "trade_dates": 7,
+          "failed_batches": []
+        },
+        "qlib_cache": {
+          "status": "ok",
+          "provider_uri": "/app/db/qlib_data"
+        }
+      },
+      "code_commit": "7b5dcea5caeec8c6c26de40b68a0111f6212d58d",
+      "sync_module_sha256": "d3cfc6764c443510f14e416a51c16529d8cd10f5c7f09e3d0687716b2da01d84",
+      "stage": "done",
+      "elapsed_seconds": 277.62,
+      "pg_before": [
+        {
+          "trade_date": "2026-09-16",
+          "rows": 5565
+        },
+        {
+          "trade_date": "2026-09-17",
+          "rows": 5565
+        },
+        {
+          "trade_date": "2026-09-18",
+          "rows": 5566
+        },
+        {
+          "trade_date": "2026-09-21",
+          "rows": 5565
+        },
+        {
+          "trade_date": "2026-09-22",
+          "rows": 5567
+        },
+        {
+          "trade_date": "2026-09-23",
+          "rows": 5568
+        }
+      ],
+      "qlib_live": "/app/db/qlib_data",
+      "qlib_before_calendar": "2026-09-23",
+      "pg_backup_sha256": "80bcd8f717ff61a774b7ca7bf08fddbb1e7783e8ff5ea8038df77f15dd264c29",
+      "backup_complete": true,
+      "pg_samples": [
+        {
+          "trade_date": "2026-09-24",
+          "symbol": "SH600036",
+          "close": 40.69,
+          "ma60": 39.3254834442965,
+          "pe_ttm": 6.764816122551232
+        },
+        {
+          "trade_date": "2026-09-24",
+          "symbol": "SH600519",
+          "close": 1237.0,
+          "ma60": 1286.3223333333333,
+          "pe_ttm": 18.989013222332957
+        },
+        {
+          "trade_date": "2026-09-24",
+          "symbol": "SH688001",
+          "close": 67.57,
+          "ma60": 56.7997514107036,
+          "pe_ttm": 330.3493965821666
+        },
+        {
+          "trade_date": "2026-09-24",
+          "symbol": "SZ000001",
+          "close": 11.3,
+          "ma60": 11.071593850574713,
+          "pe_ttm": 5.045833468768265
+        },
+        {
+          "trade_date": "2026-09-24",
+          "symbol": "SZ002832",
+          "close": 25.15,
+          "ma60": 24.31366666666667,
+          "pe_ttm": 22.893113702089035
+        }
+      ],
+      "pg_rows_by_date": {
+        "2026-09-16": 5565,
+        "2026-09-17": 5565,
+        "2026-09-18": 5566,
+        "2026-09-21": 5565,
+        "2026-09-22": 5567,
+        "2026-09-23": 5568,
+        "2026-09-24": 5570
+      },
+      "source_rows_by_date": {
+        "2026-09-22": 5567,
+        "2026-09-23": 5568,
+        "2026-09-18": 5566,
+        "2026-09-16": 5565,
+        "2026-09-24": 5570,
+        "2026-09-17": 5565,
+        "2026-09-21": 5565
+      },
+      "qlib_calendar": "2026-09-24",
+      "finished": "2026-09-26T11:15:56.163874",
+      "peak_rss_mib": 580.21
+    },
+    "acceptance": {
+      "status": "passed",
+      "pg_latest": "2026-09-24",
+      "qlib_latest": "2026-09-24",
+      "qlib_expected_current_stocks": 5570,
+      "qlib_verified_current_stocks": 5570,
+      "qlib_latest_close_factor_max_abs_error": 8.346519393853669e-05,
+      "errors": [],
+      "pg_samples": [
+        {
+          "symbol": "SH600036",
+          "close": 40.69,
+          "ma60": 39.3254834442965
+        },
+        {
+          "symbol": "SH600519",
+          "close": 1237.0,
+          "ma60": 1286.3223333333333
+        },
+        {
+          "symbol": "SH688001",
+          "close": 67.57,
+          "ma60": 56.7997514107036
+        },
+        {
+          "symbol": "SZ000001",
+          "close": 11.3,
+          "ma60": 11.071593850574713
+        },
+        {
+          "symbol": "SZ002832",
+          "close": 25.15,
+          "ma60": 24.31366666666667
+        }
+      ]
+    },
+    "qlib-read": {
+      "provider_uri": "/app/db/qlib_data",
+      "calendar": [
+        "2026-09-24 00:00:00"
+      ],
+      "rows": [
+        {
+          "instrument": "sh600036",
+          "datetime": "2026-09-24 00:00:00",
+          "$close / $factor": 40.689998626708984,
+          "$close": 63.01874923706055
+        },
+        {
+          "instrument": "sz000001",
+          "datetime": "2026-09-24 00:00:00",
+          "$close / $factor": 11.300000190734863,
+          "$close": 18.64706039428711
+        }
+      ],
+      "status": "passed"
+    },
+    "tushare-read": {
+      "release_id": "data-0b0146f71e0d6403a5c266482b6ef79b2a4b3dd31a2e09e36b037f67125c5076",
+      "source_release_id": "data-ec9d25c4b8110573b98178125d15c37c85c9cbd8a2d48116a230ae68f8f4d327",
+      "source_lagged": true,
+      "api": "daily",
+      "rows": 5557,
+      "dates": [
+        "20260924"
+      ],
+      "seconds": 31.31,
+      "upstream_calls": 0
+    },
+    "checked_at": "2026-09-26T03:17:59.346168+00:00",
+    "health_exit": 0,
+    "memory_events": "low 0\nhigh 0\nmax 8843\noom 0\noom_kill 0\noom_group_kill 0",
+    "container_started": [
+      "/quantmind 2026-09-26T03:09:57.781356049Z",
+      "/quantmind-celery 2026-09-26T03:09:50.759079575Z"
+    ]
+  },
+  "known_data_gaps": [
+    "128 Qlib instruments lack corporate-action event tables and retain the existing hfq/raw fallback; latest-day price equality does not verify historical total returns.",
+    "Northbound and southbound private crawler modules remain absent; source errors remain visible and do not block PG/Qlib stages.",
+    "Tushare verified cache advanced and core daily data is readable through 20260924; source_lagged remains true for newer publications."
+  ]
+}

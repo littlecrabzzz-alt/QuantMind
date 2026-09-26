@@ -441,7 +441,7 @@ export function AdminQuantMarketPanel({ market, marketLabel, color }: AdminQuant
                     type="info"
                     showIcon
                     message={market === 'quantbc'
-                        ? '数据源为 Binance 公开 API，实时拉取后按 QuantDB 格式落盘本地 parquet（A股格式一致）。'
+                        ? 'Binance UTC 已收盘日线经数据校验后按固定版本发布，成交额保留原始 USDT 计价；当前支持日线和交易对信息。'
                         : '数据源按勾选分发：日线/财务/分析师走 Yahoo Finance，估值/财务指标/公司资料/指数走 akshare，落盘后按 QuantDB 格式存本地 parquet（A股格式一致）。'}
                 />
             </div>

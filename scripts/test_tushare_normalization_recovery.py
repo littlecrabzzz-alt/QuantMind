@@ -138,6 +138,8 @@ class NormalizationRecoveryTest(unittest.TestCase):
             dataset["normalization_recovery"]["previous_error"], "TimeoutError"
         )
         self.assertNotIn(task, {gap["id"] for gap in manifest["gaps"]})
+        research = manifest_at(self.root, self.pipeline.publish(research=True))
+        self.assertEqual(research["datasets"], manifest["datasets"])
 
     def test_non_transient_error_stays_blocked(self):
         task, _ = self.seed(error="ValueError")

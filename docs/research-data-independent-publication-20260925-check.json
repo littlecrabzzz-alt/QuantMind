@@ -1,0 +1,331 @@
+{
+  "checked_at": "2026-09-25T02:09:20.086242+00:00",
+  "code_commit": "3aabc7d77bfd20678dbdf6e0a3717790ae568132",
+  "tests": {
+    "passed": 121,
+    "scope": "publication, cache, cadence, overlays, timing, archive retention"
+  },
+  "source_manifest": {
+    "release_id": "data-4bbdff18a0e466a483ae12efb22c15384024ff1b4c06339622f8fcdb304547dc",
+    "manifest_bytes": 201120753,
+    "scope": "research_structured",
+    "api_partitions": {
+      "fund_daily": 13880,
+      "adj_factor": 8794,
+      "index_daily": 161844,
+      "index_weight": 6096,
+      "suspend_d": 6688,
+      "daily_basic": 9770,
+      "daily": 5733,
+      "ci_daily": 1398,
+      "moneyflow": 4121,
+      "stk_limit": 4853,
+      "stock_basic": 112,
+      "index_basic": 114,
+      "sw_daily": 47,
+      "trade_cal": 192,
+      "fund_basic": 73
+    },
+    "total_partitions": 223715,
+    "file_count": 812719,
+    "prior_cache_retained": true,
+    "missing_old_partitions": 0,
+    "new_partitions_by_api": {
+      "index_daily": 6069,
+      "daily": 1699,
+      "index_weight": 49,
+      "fund_basic": 8
+    },
+    "history_complete": false,
+    "documents": null,
+    "published_at": 1790301359
+  },
+  "first_publication": {
+    "planning_cadence": {
+      "interval_seconds": 900,
+      "performed": false,
+      "status": "not_checked"
+    },
+    "publication": {
+      "current_release_id": null,
+      "interval_seconds": 21600,
+      "mirror_status": "not_checked",
+      "pending": true,
+      "performed": false,
+      "status": "not_attempted"
+    },
+    "rate_policy": {
+      "account_ceiling": 500,
+      "cyq_chips_daily_cap": 200000,
+      "cyq_perf_daily_cap": 200000,
+      "daily_quota_ledger": {
+        "apis": {
+          "cyq_chips": {
+            "day": "2026-09-25",
+            "limit": 200000,
+            "remaining": 199854,
+            "scope": "this_root_capture_sample_only",
+            "status": "ready",
+            "timezone": "Asia/Shanghai",
+            "used": 146
+          },
+          "cyq_perf": {
+            "day": "2026-09-25",
+            "limit": 200000,
+            "remaining": 199854,
+            "scope": "this_root_capture_sample_only",
+            "status": "ready",
+            "timezone": "Asia/Shanghai",
+            "used": 146
+          }
+        },
+        "day": "2026-09-25",
+        "limit": 200000,
+        "remaining": 199854,
+        "scope": "this_root_capture_sample_only",
+        "status": "ready",
+        "timezone": "Asia/Shanghai",
+        "used": 146
+      },
+      "daily_timezone": "Asia/Shanghai",
+      "entitlement": {
+        "days_until_expiry": 71,
+        "effective_points_conservative": 10100,
+        "expected_points_after_expiry": 8100,
+        "independent_days_until_expiry": 348,
+        "independent_notice_window_days": null,
+        "independent_permissions_expiry": "2027-09-08",
+        "notice": "expires_within_90_days",
+        "notices": [
+          {
+            "days": 71,
+            "expires": "2026-12-05",
+            "points": 2000,
+            "window_days": 90
+          }
+        ],
+        "point_tranches": [
+          {
+            "expires": "2027-09-08",
+            "points": 8000
+          },
+          {
+            "expires": "2026-12-05",
+            "points": 2000
+          },
+          {
+            "expires": null,
+            "points": 100
+          }
+        ],
+        "points_expiry_date": "2026-12-05",
+        "reported_points": 10100,
+        "source": "user_reported_not_supplier_verified"
+      },
+      "mode": "tiered_v1",
+      "permission_grant": false,
+      "rollout_account_rpm": 500
+    },
+    "requests": 0,
+    "research_publication": {
+      "current_release_id": "data-4bbdff18a0e466a483ae12efb22c15384024ff1b4c06339622f8fcdb304547dc",
+      "interval_seconds": 900,
+      "last_success_at": 1790301359,
+      "next_due_at": 1790302259,
+      "performed": true,
+      "status": "published"
+    },
+    "status": "research_publish_only",
+    "timing": {
+      "completed_stages": [
+        "open",
+        "research_publication",
+        "close"
+      ],
+      "failed_stage": null,
+      "included_stages": {
+        "reconciliation": "acquire"
+      },
+      "research_publish": {
+        "attempt_scan": {
+          "artifacts_checked": 771815,
+          "attempts_scanned": 274071,
+          "elapsed_seconds": 45.417520417133346,
+          "stat_batches": 95,
+          "stat_workers": 8
+        },
+        "completed_stages": [
+          "read_current",
+          "scan_gaps",
+          "scan_attempts_and_stat",
+          "contract_reassessment_overlays",
+          "normalization_recovery_overlays",
+          "schema_metadata",
+          "archive_inventory_before",
+          "document_index",
+          "metadata_inventory",
+          "coverage_and_closure",
+          "compare_previous",
+          "serialize_manifest",
+          "write_manifest"
+        ],
+        "failed_stage": null,
+        "serialization": {
+          "bytes": 201120753,
+          "chunk_generation_seconds": 2.3748872498981655,
+          "chunks": 192,
+          "eager_chunks": true,
+          "largest_chunk_bytes": 1048576,
+          "total_seconds": 2.504416499985382
+        },
+        "stage_seconds": {
+          "archive_inventory_before": 0.15119612496346235,
+          "compare_previous": 1.209089532494545e-06,
+          "contract_reassessment_overlays": 0.021084166830405593,
+          "coverage_and_closure": 41.38343699998222,
+          "document_index": 3.748573362827301e-07,
+          "metadata_inventory": 7.499475032091141e-07,
+          "normalization_recovery_overlays": 0.0036236669402569532,
+          "read_current": 1.2375181540846825e-05,
+          "scan_attempts_and_stat": 46.28936241706833,
+          "scan_gaps": 24.54845670913346,
+          "schema_metadata": 0.00894708395935595,
+          "serialize_manifest": 2.504821917042136,
+          "write_manifest": 0.0014287079684436321
+        },
+        "total_elapsed_seconds": 114.91249304194935
+      },
+      "stage_seconds": {
+        "close": 0.0014206659980118275,
+        "open": 0.0043672078754752874,
+        "research_publication": 115.01926412503235
+      },
+      "total_elapsed_seconds": 115.02797162509523
+    },
+    "updated_at": "2026-09-25T01:55:59.853097+00:00"
+  },
+  "source_export": {
+    "manifest_sha256": "076e45d2fad667fdf71e52300260b3dbe557fd3f819147f1e4f8d8daeae34e36",
+    "release_id": "data-076e45d2fad667fdf71e52300260b3dbe557fd3f819147f1e4f8d8daeae34e36",
+    "source_release_id": "data-4bbdff18a0e466a483ae12efb22c15384024ff1b4c06339622f8fcdb304547dc",
+    "latest_source_release_id": "data-4bbdff18a0e466a483ae12efb22c15384024ff1b4c06339622f8fcdb304547dc",
+    "latest_source_published_at": 1790301359,
+    "source_lagged": false
+  },
+  "full_pointer_unchanged": true,
+  "cloud_read_status": "passed",
+  "pit_verified": false,
+  "history_complete": false,
+  "strategy_experiments_started": 0,
+  "cloud_cache": {
+    "cache_status": {
+      "budget_bytes": 53687091200,
+      "cache_bytes": 12156949871,
+      "downloaded_files": 15650,
+      "latest_source_published_at": 1790301359,
+      "latest_source_release_id": "data-4bbdff18a0e466a483ae12efb22c15384024ff1b4c06339622f8fcdb304547dc",
+      "manifest_sha256": "076e45d2fad667fdf71e52300260b3dbe557fd3f819147f1e4f8d8daeae34e36",
+      "release_id": "data-076e45d2fad667fdf71e52300260b3dbe557fd3f819147f1e4f8d8daeae34e36",
+      "selected_api_names": [
+        "adj_factor",
+        "ci_daily",
+        "daily",
+        "daily_basic",
+        "fund_basic",
+        "fund_daily",
+        "index_basic",
+        "index_daily",
+        "index_weight",
+        "moneyflow",
+        "stk_limit",
+        "stock_basic",
+        "suspend_d",
+        "sw_daily",
+        "trade_cal"
+      ],
+      "source_lagged": false,
+      "source_release_id": "data-4bbdff18a0e466a483ae12efb22c15384024ff1b4c06339622f8fcdb304547dc",
+      "status": "verified",
+      "upstream_calls": 0
+    },
+    "checked_at": "2026-09-25T02:06:19.532317+00:00"
+  },
+  "cloud_reads": [
+    {
+      "api": "daily",
+      "rows": 5557,
+      "expected_rows": 5557,
+      "dates": [
+        "20260924"
+      ],
+      "seconds": 25.416,
+      "release_id": "data-076e45d2fad667fdf71e52300260b3dbe557fd3f819147f1e4f8d8daeae34e36",
+      "upstream_calls": 0
+    },
+    {
+      "api": "adj_factor",
+      "rows": 5569,
+      "expected_rows": 5569,
+      "dates": [
+        "20260924"
+      ],
+      "seconds": 25.974,
+      "release_id": "data-076e45d2fad667fdf71e52300260b3dbe557fd3f819147f1e4f8d8daeae34e36",
+      "upstream_calls": 0
+    },
+    {
+      "api": "daily_basic",
+      "rows": 5557,
+      "expected_rows": 5557,
+      "dates": [
+        "20260924"
+      ],
+      "seconds": 33.28,
+      "release_id": "data-076e45d2fad667fdf71e52300260b3dbe557fd3f819147f1e4f8d8daeae34e36",
+      "upstream_calls": 0
+    },
+    {
+      "api": "stk_limit",
+      "rows": 5648,
+      "expected_rows": 5648,
+      "dates": [
+        "20260924"
+      ],
+      "seconds": 21.623,
+      "release_id": "data-076e45d2fad667fdf71e52300260b3dbe557fd3f819147f1e4f8d8daeae34e36",
+      "upstream_calls": 0
+    },
+    {
+      "api": "suspend_d",
+      "rows": 13,
+      "expected_rows": 13,
+      "dates": [
+        "20260924"
+      ],
+      "seconds": 7.302,
+      "release_id": "data-076e45d2fad667fdf71e52300260b3dbe557fd3f819147f1e4f8d8daeae34e36",
+      "upstream_calls": 0
+    },
+    {
+      "api": "moneyflow",
+      "rows": 5557,
+      "expected_rows": 5557,
+      "dates": [
+        "20260924"
+      ],
+      "seconds": 22.225,
+      "release_id": "data-076e45d2fad667fdf71e52300260b3dbe557fd3f819147f1e4f8d8daeae34e36",
+      "upstream_calls": 0
+    }
+  ],
+  "cloud_transfer": {
+    "new_files": 15650,
+    "new_bytes": 275572789,
+    "service_exit_code": 0,
+    "completed_at": "2026-09-25T02:06:09.552348+00:00"
+  },
+  "full_publication_checkpoint_unchanged": 1790293507,
+  "configuration_changes": {
+    "research_publish_interval_seconds": 900
+  }
+}

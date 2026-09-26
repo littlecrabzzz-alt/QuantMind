@@ -170,6 +170,7 @@ def cycle_log(report):
                 'status', 'requests', 'done', 'empty', 'pending', 'blocked',
                 'split_pending', 'permission_blocked', 'resolved',
                 'snapshot_disabled', 'deferred_legacy_period_plan',
+                'research_publication',
             )
             if key in acquisition
         }

@@ -493,6 +493,110 @@ class PublicationInterval(unittest.TestCase):
         self.assertFalse((target / "pipeline.sqlite").exists())
         self.assertFalse((target / "documents.sqlite").exists())
 
+    def test_research_publish_ignores_document_lock_and_keeps_full_checkpoint(self):
+        self.config["publish_interval_seconds"] = 3600
+        full = self.tick()["release_id"]
+        checkpoint = self.checkpoint()
+        self.config["research_publish_interval_seconds"] = 900
+        (self.root / "documents.sqlite").touch()
+        with (self.root / "documents.lock").open("a") as lock, patch.object(
+            docs, "document_index", side_effect=AssertionError("document lane unavailable")
+        ):
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            first = self.tick()
+            self.assertEqual(first["status"], "research_publish_only")
+            research = first["research_publication"]["current_release_id"]
+            self.assertEqual(self.tick(899)["research_publication"]["status"], "deferred")
+            due = self.tick(1)
+        self.assertEqual(due["research_publication"]["current_release_id"], research)
+        self.assertTrue(due["research_publication"]["performed"])
+        self.assertEqual(self.checkpoint(), checkpoint)
+        self.assertEqual(json.loads((self.root / "CURRENT.json").read_bytes())["release_id"], full)
+        manifest = module.manifest_at(self.root, research)
+        self.assertEqual(manifest["scope"], "research_structured")
+        self.assertFalse(manifest["history_complete"])
+        self.assertIsNone(manifest["documents"])
+        # Research publication survives a later failing full publication.
+        self.tick(2699)
+        old = (self.root / "RESEARCH_CURRENT.json").read_bytes()
+        with patch.object(docs, "document_index", side_effect=RuntimeError("index failure")):
+            failed = self.tick(1)
+            self.assertEqual(failed["status"], "partial")
+            self.assertEqual(failed["publication"]["status"], "failed")
+            self.assertEqual(self.acquisitions, 2)
+        with (self.root / "documents.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            busy = self.tick(1)
+            self.assertEqual(busy["publication"]["status"], "deferred_documents_active")
+            self.assertEqual(self.acquisitions, 3)
+        self.assertEqual((self.root / "RESEARCH_CURRENT.json").read_bytes(), old)
+
+    def test_research_failure_is_partial_preserves_pointer_and_acquires(self):
+        self.config["publish_interval_seconds"] = 3600
+        self.tick()
+        self.config["research_publish_interval_seconds"] = 900
+        self.tick()
+        old = (self.root / "RESEARCH_CURRENT.json").read_bytes()
+        with patch.object(module.Pipeline, "publish", side_effect=ValueError("missing artifact")):
+            failed = self.tick(900)
+        self.assertEqual(failed["status"], "partial")
+        self.assertEqual(failed["research_publication"]["status"], "failed")
+        self.assertEqual(self.acquisitions, 1)
+        self.assertEqual((self.root / "RESEARCH_CURRENT.json").read_bytes(), old)
+        recovered = self.tick()
+        self.assertEqual(recovered["research_publication"]["status"], "published")
+        self.assertEqual(recovered["status"], "research_publish_only")
+
+    def test_research_retains_attempt_overlays_and_archived_only_data(self):
+        from backend.shared import tushare_archive as archive
+        import test_tushare_research_cache as cache_fixture
+        from scripts import tushare_research_cache as cache
+
+        cache_fixture.ResearchCache().fixture(self.root)
+        full_pointer = (self.root / "CURRENT.json").read_bytes()
+        source = module.manifest_at(self.root, json.loads(full_pointer)["release_id"])
+        by_path = {d["path"]: d for d in source["datasets"]}
+        p = module.Pipeline(self.root, {"entries": []})
+        self.addCleanup(p.close)
+        # fund_daily exists only in the verified historical archive.
+        db = archive._db(self.root)
+        for name, item in source["files"].items():
+            archive._register(db, name, item["sha256"], item["bytes"], by_path.get(name))
+        db.commit()
+        db.close()
+        daily = next(d for d in source["datasets"] if d["api_name"] == "daily")
+        obs = next(name for name in source["files"] if name.startswith("observations/")
+                   and json.loads((self.root / name).read_bytes())["request"]["api_name"] == "daily")
+        raw = b'{}'
+        sha = module.digest(raw)
+        module.atomic_bytes(self.root / "objects" / (sha + ".json"), raw)
+        result = dict(api_name="daily", status="schema_gap", parquet=daily,
+                      observation=obs.split("/")[1], observation_sha256=source["files"][obs]["sha256"],
+                      object_sha256=sha)
+        p.db.execute("INSERT INTO attempts VALUES(?,?,?)", ("daily-job", 1, json.dumps(result)))
+        result.update(status="sample_ok", contract_reassessment={"reassessed_status": "sample_ok", "upstream_calls": 0})
+        p.db.execute("INSERT INTO contract_reassessments VALUES(?,?,?,?)", ("daily-job", "now", "test", json.dumps(result)))
+        # A nonpriority broken artifact must not gate this lane.
+        p.db.execute("INSERT INTO attempts VALUES(?,?,?)", ("other-job", 1, json.dumps({
+            "api_name": "fund_adj", "status": "sample_ok", "parquet": {"path": "parquet/missing.parquet"}
+        })))
+        p.db.commit()
+        release = p.publish(research=True)
+        manifest = module.manifest_at(self.root, release)
+        self.assertEqual({d["api_name"] for d in manifest["datasets"]}, {"daily", "fund_daily"})
+        selected = next(d for d in manifest["datasets"] if d["api_name"] == "daily")
+        self.assertEqual(selected["quality_state"], "sample_ok")
+        self.assertIn("contract_reassessment", selected)
+        self.assertFalse(any(name.startswith(("documents/", "archives/")) for name in manifest["files"]))
+        exported = cache.prepare(self.root, ["daily", "fund_daily"])
+        self.assertEqual(exported["source_release_id"], release)
+        self.assertEqual((self.root / "CURRENT.json").read_bytes(), full_pointer)
+        old = (self.root / "RESEARCH_CURRENT.json").read_bytes()
+        (self.root / obs).unlink()
+        with self.assertRaises(FileNotFoundError):
+            p.publish(research=True)
+        self.assertEqual((self.root / "RESEARCH_CURRENT.json").read_bytes(), old)
+
 
 if __name__ == "__main__":
     unittest.main()

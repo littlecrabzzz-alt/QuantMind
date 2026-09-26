@@ -1,4 +1,5 @@
 {
+  "research_publish_interval_seconds": 900,
   "group_weights": {"rrg": 10, "structured": 10, "market": 4},
   "throughput_fast_lane_apis": [
     "adj_factor", "daily_basic", "stk_limit", "suspend_d", "moneyflow",

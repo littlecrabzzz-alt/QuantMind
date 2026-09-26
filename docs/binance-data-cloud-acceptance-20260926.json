@@ -1,0 +1,171 @@
+{
+  "status": "PASS",
+  "verified_at": "2026-09-26T05:29:16.580232+00:00",
+  "runtime_code_commit": "bd5f2782729a60db6210bc41e9b96d17a1f8df4f",
+  "cloud_release": {
+    "manifest_sha256": "0793a67fdbb09c44e2e1f338057ccb607bb0320a9e52e645586a03649750ce15",
+    "path": "releases/binance-20260926T052342682336Z-69ea91b2d8",
+    "release_id": "binance-20260926T052342682336Z-69ea91b2d8",
+    "schema_version": 1
+  },
+  "coverage": {
+    "status": "passed",
+    "timezone": "UTC",
+    "end_exclusive": "2026-09-26",
+    "symbols": {
+      "BTCUSDT": {
+        "rows": 3327,
+        "first": "2017-08-17",
+        "last": "2026-09-25",
+        "gaps": 0,
+        "duplicates": 0,
+        "unclosed": 0
+      },
+      "ETHUSDT": {
+        "rows": 3327,
+        "first": "2017-08-17",
+        "last": "2026-09-25",
+        "gaps": 0,
+        "duplicates": 0,
+        "unclosed": 0
+      }
+    },
+    "rows": 6654,
+    "source_revisions": [
+      {
+        "symbol": "BTCUSDT",
+        "date": "2018-02-08",
+        "reason": "archive_corrected_rest_close_time"
+      },
+      {
+        "symbol": "ETHUSDT",
+        "date": "2018-02-08",
+        "reason": "archive_corrected_rest_close_time"
+      }
+    ],
+    "history_complete": true,
+    "first_available": {
+      "BTCUSDT": "2017-08-17",
+      "ETHUSDT": "2017-08-17"
+    }
+  },
+  "numeric_semantics": "python_float_binary64_from_source_decimal",
+  "natural_scheduled_task": {
+    "task_id": "5ca4be66-8dff-4089-abe3-66498d7b78d5",
+    "status": "completed",
+    "finished": "2026-09-26T13:10:40.739311",
+    "release_id": "binance-20260926T051012327557Z-d4e064872e",
+    "qlib_status": "ok"
+  },
+  "migration_task": {
+    "task_id": "1207f682-fb1c-4512-b285-9fe3b26c8865",
+    "status": "completed",
+    "revised_rows": 2236
+  },
+  "normalization_audit": {
+    "rows": 6654,
+    "original_decimal_changes": 0,
+    "original_close_boundary_changes": 0,
+    "normalized_rows": 2236,
+    "normalized_rows_by_symbol": {
+      "BTCUSDT": 1457,
+      "ETHUSDT": 779
+    },
+    "changed_fields": {
+      "quote_volume": 1303,
+      "taker_buy_quote_volume": 1293
+    },
+    "max_ulp": 2,
+    "ohlc_volume_trades_unchanged": true,
+    "source_sha_equal_rows": 6638,
+    "source_sha_different_due_to_pagination_rows": 16,
+    "verified_distinct_raw_responses": 12,
+    "old_payload_files_verified": 3330,
+    "old_manifest_sha256": "07eac1e4e68b0ac304c0c590dbcd0b3893fe390265fa91b80d58d7a169581c55"
+  },
+  "incremental_replay": {
+    "task_id": "fc53b986-6ba6-43fb-aa35-32f96bf19171",
+    "status": "completed",
+    "unchanged": true,
+    "revised_rows": 0,
+    "qlib_status": "ok"
+  },
+  "research_input": {
+    "status": "PASS",
+    "release_id": "binance-20260926T052342682336Z-69ea91b2d8",
+    "source_manifest_sha256": "0793a67fdbb09c44e2e1f338057ccb607bb0320a9e52e645586a03649750ce15",
+    "symbols": [
+      "BTCUSDT",
+      "ETHUSDT"
+    ],
+    "data_start": "2017-08-17",
+    "data_end": "2026-09-25",
+    "raw_rows": 6654,
+    "h5_rows": 6654,
+    "qlib_sample_rows": 14,
+    "computed_factor": "$close/Ref($close,1)-1",
+    "qlib_provider": "/data/maintenance/binance-data-20260926/fixed-task-normalized/data/bc_data",
+    "derived": {
+      "status": "previously_built",
+      "release_id": "binance-20260926T052342682336Z-69ea91b2d8"
+    },
+    "raw_release_unchanged": true,
+    "strategy_research_started": false,
+    "trading_started": false
+  },
+  "admin_ui_api": {
+    "catalog_http": 200,
+    "preview_http": 200,
+    "schedule_http": 200,
+    "supported_datasets": 2,
+    "synced_datasets": 2,
+    "btc_preview_rows": 1,
+    "native_amount_verified": true,
+    "timezone": "UTC",
+    "data_end": "2026-09-25",
+    "schedule": {
+      "market": "BC",
+      "label": "QuantBC 区块链",
+      "enabled": true,
+      "time": "08:15",
+      "days": 5,
+      "datasets": [
+        "daily_forward",
+        "instrument_detail"
+      ],
+      "with_qlib": true
+    },
+    "save_preserves_with_qlib": true
+  },
+  "flags": {
+    "crypto": "false",
+    "real_trading": "false"
+  },
+  "other_market_schedules_unchanged": true,
+  "tokenized_equity": {
+    "release_id": "binance-20260926T031232984445Z-cf1cf774f3",
+    "symbol": "AAPLBUSDT",
+    "rows": 59,
+    "start": "2026-07-29",
+    "end": "2026-09-25",
+    "product_type": "tokenized_equity_spot",
+    "raw_numbers_equal": 590,
+    "raw_timestamps_equal": 236,
+    "crypto_adapter_rejects": true,
+    "automatic_updates": false
+  },
+  "mac_sandbox": {
+    "release_id": "binance-20260926T031215207598Z-42a749f1ae",
+    "rows": 6654,
+    "cloud_binance_auto_pull": false
+  },
+  "tests": {
+    "backend_passed": 95,
+    "frontend_schedule_tests_passed": 2,
+    "frontend_typecheck": "PASS",
+    "frontend_build": "PASS"
+  },
+  "historical_point_in_time_verified": false,
+  "strategy_research_started": false,
+  "trading_started": false
+}

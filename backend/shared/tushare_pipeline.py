@@ -216,6 +216,14 @@ INDEX_PERIOD_REPLACEMENT_GAP = "replaced_by_index_period_plan_v1"
 REPLACEMENT_GAPS = frozenset(
     (RANGE_REPLACEMENT_GAP, INDEX_PERIOD_REPLACEMENT_GAP)
 )
+# Shared by the native publisher and the private research-cache export.
+RESEARCH_APIS = (
+    "daily", "index_daily", "fund_daily", "adj_factor", "daily_basic",
+    "index_weight", "ci_daily", "sw_daily", "stock_basic", "index_basic",
+    "fund_basic", "trade_cal", "stk_limit", "suspend_d", "moneyflow",
+)
+
+
 ROOT = Path(os.getenv("QM_TUSHARE_ARCHIVE_ROOT", "/data/tushare"))
 MAX_DOCUMENT_REGISTRATION_RECORDS = 200_000
 DOCUMENT_REGISTRATION_CHUNK_RECORDS = 1_000
@@ -6150,15 +6158,30 @@ class Pipeline:
             )
             self.db.execute("DELETE FROM scheduler_state WHERE name GLOB 'publish_intent:*'")
 
-    def publish(self):
+    def publish(self, *, research=False):
         from contextlib import contextmanager
 
         publish_started = time.monotonic()
-        timing = self.publish_timing = {
+        timing = {
             "stage_seconds": {},
             "completed_stages": [],
             "failed_stage": None,
         }
+
+        if research:
+            self.research_publish_timing = timing
+        else:
+            self.publish_timing = timing
+        pointer = self.root / ("RESEARCH_CURRENT.json" if research else "CURRENT.json")
+        selected = set(RESEARCH_APIS) if research else None
+
+        def commit_pointer(release):
+            value = {"release_id": release, "manifest_sha256": release[5:]}
+            if research:
+                value.update(selected_api_names=sorted(selected), published_at=int(time.time()))
+            else:
+                self._publication_intent(release)
+            atomic_json(pointer, value)
 
         @contextmanager
         def measure(name):
@@ -6177,11 +6200,20 @@ class Pipeline:
 
         with measure("read_current"):
             previous_id, previous = None, None
-            pointer = self.root / "CURRENT.json"
+            if pointer.is_symlink():
+                raise ValueError("Unsafe current pointer")
             if pointer.exists():
-                previous_id = json.loads(pointer.read_bytes())["release_id"]
+                current = json.loads(pointer.read_bytes())
+                previous_id = current["release_id"]
+                if current.get("manifest_sha256") != previous_id[5:]:
+                    raise ValueError("Current manifest identity mismatch")
                 if previous_id.startswith("data-"):
                     previous = manifest_at(self.root, previous_id)
+                if research and (
+                    previous.get("scope") != "research_structured"
+                    or previous.get("selected_api_names") != sorted(selected)
+                ):
+                    raise ValueError("Research publication scope mismatch")
 
         def preserve_release_mapping(archive):
             known = (
@@ -6206,13 +6238,15 @@ class Pipeline:
             return {**archive, "recovery": recovery}
 
         with measure("scan_gaps"):
-            files = dict(previous["files"]) if previous else {}
+            files = dict(previous["files"]) if previous and not research else {}
             active, gaps = {}, []
             for row in self.db.execute(
                 "SELECT * FROM jobs "
                 "WHERE state NOT IN ('done','pending','superseded') ORDER BY rowid"
             ):
                 result = json.loads(row["result"]) if row["result"] else {}
+                if research and json.loads(row["job"])["api_name"] not in selected:
+                    continue
                 if row["state"] not in ("done", "pending", "resolved"):
                     gaps.append(
                         {
@@ -6229,7 +6263,11 @@ class Pipeline:
             timing["attempt_scan"] = _scan_attempt_artifacts(
                 self.root,
                 self.db.execute(
-                    "SELECT result FROM attempts ORDER BY job_id,attempt"
+                    "SELECT result FROM attempts "
+                    + ("WHERE json_extract(result,'$.api_name') IN ("
+                       + ",".join("?" for _ in RESEARCH_APIS) + ") " if research else "")
+                    + "ORDER BY job_id,attempt",
+                    RESEARCH_APIS if research else (),
                 ),
                 files,
                 active,
@@ -6239,6 +6277,8 @@ class Pipeline:
                 "SELECT result FROM contract_reassessments ORDER BY job_id"
             ):
                 result = json.loads(row[0])
+                if research and result.get("api_name") not in selected:
+                    continue
                 parquet = result.get("parquet")
                 reassessment = result.get("contract_reassessment")
                 retirement = result.get("capability_probe_retirement")
@@ -6294,6 +6334,8 @@ class Pipeline:
                 "JOIN jobs j ON j.id=r.job_id ORDER BY r.job_id"
             ):
                 result = json.loads(row["result"])
+                if research and result.get("api_name") not in selected:
+                    continue
                 marker = result.get("normalization_recovery")
                 parquet = result.get("parquet")
                 job = json.loads(row["job"])
@@ -6364,13 +6406,24 @@ class Pipeline:
                     and "archives/" + previous_id.removeprefix("data-") + ".json"
                     in archived["files"]
                 )
-                files.update(archived["files"])
-                for dataset in archived["datasets"]:
-                    active.setdefault(dataset["path"], dataset)
-                archive = {"recovery": archived["recovery"], "gaps": archived["gaps"]}
+                if research:
+                    archived_datasets = [d for d in archived["datasets"] if d["api_name"] in selected]
+                    archived_paths = {d["path"] for d in archived_datasets}
+                    # Preserve provenance for recovered partitions, including ones
+                    # absent from the v2 attempts table. Export still verifies and
+                    # serves only the observations referenced by selected parquet.
+                    files.update({name: item for name, item in archived["files"].items()
+                                  if name in archived_paths or name.startswith(("objects/", "observations/"))})
+                    for dataset in archived_datasets:
+                        active.setdefault(dataset["path"], dataset)
+                else:
+                    files.update(archived["files"])
+                    for dataset in archived["datasets"]:
+                        active.setdefault(dataset["path"], dataset)
+                    archive = {"recovery": archived["recovery"], "gaps": archived["gaps"]}
         with measure("document_index"):
             documents = None
-            if (self.root / "documents.sqlite").exists():
+            if not research and (self.root / "documents.sqlite").exists():
                 from backend.shared.tushare_documents import document_index
 
                 inventory = document_index(self.root)
@@ -6387,7 +6440,7 @@ class Pipeline:
         with measure("metadata_inventory"):
             # Retain prior immutable metadata versions as well as the current index.
             # A fresh Mac must not depend on having mirrored every earlier release.
-            for family in ("documents", "schemas", "archives"):
+            for family in (() if research else ("documents", "schemas", "archives")):
                 if (self.root / family).is_symlink():
                     raise ValueError("Unsafe immutable metadata directory")
                 for path in (self.root / family).glob("*.json"):
@@ -6411,6 +6464,8 @@ class Pipeline:
             ]
             coverage = {}
             scope = []
+            if research:
+                coverage_by_api = [r for r in coverage_by_api if r["api_name"] in selected]
             for row in coverage_by_api:
                 state = row["state"]
                 coverage[state] = coverage.get(state, 0) + row["partitions"]
@@ -6424,7 +6479,7 @@ class Pipeline:
                 "coverage_by_api": coverage_by_api,
                 "gaps": gaps,
                 "history_complete": False,
-                "partition_closure": self.partition_inventory(),
+                "partition_closure": None if research else self.partition_inventory(),
                 "rrg_status": "blocked_data",
                 "scope": scope,
                 "implemented_contracts": sorted(set(CONTRACTS) | set(EXTENDED_CONTRACTS)),
@@ -6444,8 +6499,16 @@ class Pipeline:
                 "catalogued_interfaces": len(self.catalog["entries"]),
                 "unimplemented_catalog_scope": True,
             }
+            if research:
+                # No global completeness or document readiness claims in this lane.
+                content.update(scope="research_structured", selected_api_names=sorted(selected))
+                content.pop("capabilities")
+                content.pop("planning")
         with measure("compare_previous"):
-            if previous:
+            if research and previous == content:
+                commit_pointer(previous_id)
+                return previous_id
+            if previous and not research:
                 # A crash after retaining CURRENT must not manufacture a new release
                 # solely because CURRENT's own archived manifest now exists.
                 def comparable(document):
@@ -6508,7 +6571,7 @@ class Pipeline:
                     # local containers are being released on function return.
                     self._publication_intent(previous_id)
                     return previous_id
-        if previous_id:
+        if previous_id and not research:
             from backend.shared.tushare_archive import archive_inventory, retain_release
 
             with measure("retain_previous"):
@@ -6567,10 +6630,7 @@ class Pipeline:
                         os.fsync(fd)
                     finally:
                         os.close(fd)
-                self._publication_intent(release)
-                atomic_json(
-                    self.root / "CURRENT.json", {"release_id": release, "manifest_sha256": sha}
-                )
+                commit_pointer(release)
         finally:
             temporary.unlink(missing_ok=True)
         return release
@@ -6591,6 +6651,7 @@ def _planning_config_fingerprint(config):
             "enable_documents",
             "documents_per_tick",
             "archive_worker_acquire_after_planning",
+            "research_publish_interval_seconds",
             "reconciliation_parents_per_tick",
             "reconciliation_resolved_audit_per_tick",
         }
@@ -6758,6 +6819,11 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
         publish_interval = config.get("publish_interval_seconds", 0)
         if type(publish_interval) is not int or publish_interval < 0:
             raise ValueError("Invalid publication interval")
+        research_interval = config.get("research_publish_interval_seconds", 0)
+        if type(research_interval) is not int or research_interval < 0:
+            raise ValueError("Invalid research publication interval")
+        if research_interval and not publish_interval:
+            raise ValueError("Research cadence requires a positive publication interval")
         planning_interval = config.get("planning_interval_seconds", 0)
         if type(planning_interval) is not int or planning_interval < 0:
             raise ValueError("Invalid planning interval")
@@ -6792,6 +6858,12 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
             "rate_policy": policy_report(config),
             "planning_cadence": planning_cadence,
         }
+        research_publication = {
+            "interval_seconds": research_interval,
+            "status": "not_checked" if research_interval else "disabled",
+            "performed": False,
+        }
+        report["research_publication"] = research_publication
         nonpublication_work_started = False
 
         def start_nonpublication_work():
@@ -6866,6 +6938,47 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                     document_lock.close()
             return True
 
+        def publish_research_if_due():
+            if not research_interval:
+                return False
+            try:
+                with measure("research_publication"):
+                    pointer = ROOT / "RESEARCH_CURRENT.json"
+                    if pointer.is_symlink():
+                        raise ValueError("Unsafe research pointer")
+                    if pointer.exists():
+                        current = json.loads(pointer.read_bytes())
+                        release = current["release_id"]
+                        successful_at = current["published_at"]
+                        if (
+                            current.get("manifest_sha256") != release[5:]
+                            or current.get("selected_api_names") != sorted(RESEARCH_APIS)
+                            or type(successful_at) is not int or successful_at < 0
+                        ):
+                            raise ValueError("Invalid research publication checkpoint")
+                        verify_manifest_identity_at(ROOT, release)
+                        research_publication.update(
+                            current_release_id=release, last_success_at=successful_at,
+                            next_due_at=successful_at + research_interval,
+                        )
+                        if 0 <= time.time() - successful_at < research_interval:
+                            research_publication["status"] = "deferred"
+                            return False
+                    research_publication["status"] = "publishing"
+                    release = pipeline.publish(research=True)
+                    successful_at = json.loads(pointer.read_bytes())["published_at"]
+                    research_publication.update(
+                        status="published", performed=True, current_release_id=release,
+                        last_success_at=successful_at,
+                        next_due_at=successful_at + research_interval,
+                    )
+                    return True
+            except Exception as exc:
+                # Retain the old pointer and keep acquisition alive. A broken
+                # structured artifact must not also starve its recovery work.
+                research_publication.update(status="failed", error_type=type(exc).__name__)
+                return False
+
         pipeline = None
         failed = False
         try:
@@ -6876,6 +6989,11 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                     # acquisition budget. Do not stack the two bounded operations.
                     with measure("open"):
                         pipeline = Pipeline(ROOT, catalog)
+                    # This lane requires pipeline.lock only, never documents.lock.
+                    # Give each expensive publication its own worker cycle.
+                    if publish_research_if_due():
+                        report.update(status="research_publish_only", requests=0)
+                        return report
                     with measure("publication_check"):
                         due = True
                         pointer = ROOT / "CURRENT.json"
@@ -6929,11 +7047,22 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
                     if due:
                         report.update(status="publish_only", requests=0)
                         publication["mode"] = "publish_only"
-                        if not publish_existing():
+                        try:
+                            if publish_existing():
+                                return report
+                        except Exception as exc:
+                            if not research_interval:
+                                raise
+                            publication.update(status="failed", error_type=type(exc).__name__)
+                        if not research_interval:
                             report["status"] = "publish_deferred_documents_active"
-                        return report
+                            return report
+                        # A busy/broken document publication must not prevent
+                        # collecting the next structured research release.
+                        report["status"] = "acquire_full_publication_deferred"
+                    else:
+                        publication["status"] = "deferred"
                     report["release_id"] = publication["current_release_id"]
-                    publication["status"] = "deferred"
                     publication["mode"] = "acquire_only"
                     start_nonpublication_work()
                 planning_due = not planning_interval
@@ -7153,6 +7282,13 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
             planning_timing = getattr(pipeline, "planning_timing", None)
             if isinstance(planning_timing, dict):
                 report["timing"]["planning"] = planning_timing
+            research_timing = getattr(pipeline, "research_publish_timing", None)
+            if isinstance(research_timing, dict):
+                report["timing"]["research_publish"] = research_timing
+            if not failed and "failed" in (
+                research_publication["status"], publication["status"]
+            ):
+                report["status"] = "partial"
             publish_timing = getattr(pipeline, "publish_timing", None)
             if isinstance(publish_timing, dict):
                 report["timing"]["publish"] = publish_timing

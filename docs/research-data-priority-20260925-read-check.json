@@ -147,5 +147,11 @@
     "same_image_id": true,
     "differences": [],
     "difference_count": 0
+  },
+  "browser_check": {
+    "url": "http://127.0.0.1:3000",
+    "result": "blocked_at_login",
+    "authenticated_market_analysis_page_verified": false,
+    "backend_market_analysis_trade_date": "2026-09-23"
   }
 }

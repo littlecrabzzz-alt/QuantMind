@@ -33,8 +33,10 @@ import json
 import logging
 import os
 import sys
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import closing
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from collections.abc import Callable
@@ -780,12 +782,17 @@ def fill_pg_from_parquet(
 ) -> dict:
     """从 QuantDB parquet 批量填充 PG stock_daily_latest。
 
-    按交易日分批，单条 SQL join kline+valuation+technical_indicators，
-    用 execute_values 批量 upsert（逐行 execute 在全量场景下不可用）。
+    按交易日分批，受限 SQL 排序后逐标的计算，避免全市场回看窗口进入 Pandas。
+    每批交易日使用一个事务，execute_values 分页 upsert，失败整批回滚。
     """
+    import duckdb
     from psycopg2.extras import execute_values
 
     from backend.services.engine.data_platform.quantdb_hub import QuantDBDataHub
+    from backend.services.engine.qlib_data_builder import _duckdb_config, _symbol_frames
+
+    if batch_days < 1:
+        raise ValueError("batch_days must be positive")
 
     hub = QuantDBDataHub(QUANTDB_DATA_DIR)
     if not hub.available:
@@ -824,12 +831,6 @@ def fill_pg_from_parquet(
         f"ON CONFLICT (trade_date, symbol) DO UPDATE SET {update_set}"
     )
 
-    conn_duck = hub._get_duck_conn()
-    engine = _get_engine()
-    has_feat = hub._view_exists("qdb_features_daily")
-    if not has_feat:
-        log.warning("qdb_features_daily 视图缺失，仅写入 OHLCV")
-
     sym_filter = ""
     if symbols:
         qdb_syms = {s for s in symbols} | {
@@ -840,77 +841,81 @@ def fill_pg_from_parquet(
 
     total_rows = 0
     failed_days: list[str] = []
-
-    for i in range(0, len(days), batch_days):
-        chunk = days[i:i + batch_days]
-        lo, hi = chunk[0], chunk[-1]
-        feat_sel = "".join(
-            f", f.{src} AS {dst}" for src, dst in _FEATURE_COLS.items()
-        ) if has_feat else "".join(
-            f", NULL AS {dst}" for dst in _FEATURE_COLS.values()
-        )
-        feat_join = (
-            " LEFT JOIN qdb_features_daily f ON f.symbol = k.symbol AND f.dt = k.dt"
-            if has_feat else ""
-        )
-        # 回看 160 自然日（≈110 交易日），覆盖 ma60 窗口与 ATR Wilder 预热，
-        # 产出时再裁到本批 [lo, hi]
-        lookback = (lo - timedelta(days=160)).strftime("%Y%m%d")
-        sql = (
-            f"SELECT k.dt, k.symbol, k.open, k.high, k.low, k.close, "
-            f"k.volume, k.amount{feat_sel} "
-            f"FROM qdb_daily_forward k{feat_join} "
-            f"WHERE k.dt >= {lookback} AND k.dt <= {hi:%Y%m%d}{sym_filter}"
-        )
-
-        try:
-            df = conn_duck.execute(sql).fetchdf()
-        except Exception as exc:
-            log.warning("duckdb query failed %s~%s: %s", lo, hi, exc)
-            failed_days.append(f"{lo}~{hi}")
-            continue
-
-        if df.empty:
-            continue
-
-        df["symbol"] = df["symbol"].map(lambda s: _to_internal(str(s)))
-        df["adj_factor"] = 1.0
-
-        for c in _KLINE_COLS:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-
-        # dt 为 Hive 分区整数 YYYYMMDD -> PG DATE
-        df["trade_date"] = pd.to_datetime(
-            df["dt"].astype("int64").astype(str), format="%Y%m%d"
-        ).dt.date
-        df = df.drop(columns=["dt"])
-
-        # 价格派生指标：基于 forward close（前复权，与 OHLCV 同口径）重算，
-        # 与 features_daily 的后复权 ma*/ma_gap*/vol_atr_14 口径对齐问题见
-        # 模块顶部注释（2026-08-17 修复）
-        df = _add_price_derived_cols(df)
-
-        df = df.replace([float("inf"), float("-inf")], None)
-        df = df.astype(object).where(pd.notna(df), None)
-        # 裁掉回看窗口，只写本批区间
-        df = df[df["trade_date"] >= lo]
-        if df.empty:
-            continue
-
-        records = [tuple(r) for r in df[pg_cols].itertuples(index=False, name=None)]
-        try:
-            raw = engine.raw_connection()
-            try:
-                with raw.cursor() as cur:
-                    execute_values(cur, insert_sql, records, page_size=5000)
-                raw.commit()
-            finally:
-                raw.close()
-            total_rows += len(records)
-            log.info("PG fill %s~%s: %d rows (total %d)", lo, hi, len(records), total_rows)
-        except Exception as exc:
-            log.warning("PG upsert failed %s~%s: %s", lo, hi, exc)
-            failed_days.append(f"{lo}~{hi}")
+    engine = _get_engine()
+    try:
+        with tempfile.TemporaryDirectory(prefix="quantdb-pg-") as spill, closing(
+            duckdb.connect(config=dict(_duckdb_config(), temp_directory=spill))
+        ) as conn_duck:
+            for i in range(0, len(days), batch_days):
+                chunk = days[i:i + batch_days]
+                lo, hi = chunk[0], chunk[-1]
+                lookback = lo - timedelta(days=160)
+                paths = []
+                for rel, begin in (("1_kline_data/daily_forward", lookback),
+                                   ("6_ml_datasets/features_daily", lo)):
+                    paths.append([
+                        str(path)
+                        for day in hub._partition_dates(rel, begin, hi)
+                        for path in sorted((hub.data_dir / rel / f"dt={day}").glob("*.parquet"))
+                    ])
+                has_feat = bool(paths[1])
+                feat_sel = "".join(
+                    f", f.{src} AS {dst}" for src, dst in _FEATURE_COLS.items()
+                ) if has_feat else "".join(f", NULL AS {dst}" for dst in _FEATURE_COLS.values())
+                feat_join = (
+                    " LEFT JOIN read_parquet(?, hive_partitioning=true, union_by_name=true) f"
+                    " ON f.symbol = k.symbol AND f.dt = k.dt" if has_feat else ""
+                )
+                # Only OHLCV needs the 160-day warm-up. Feature values are used on output dates.
+                sql = (
+                    f"SELECT k.dt, k.symbol, k.open, k.high, k.low, k.close, k.volume, k.amount{feat_sel} "
+                    f"FROM read_parquet(?, hive_partitioning=true, union_by_name=true) k{feat_join} "
+                    f"WHERE k.dt >= {lookback:%Y%m%d} AND k.dt <= {hi:%Y%m%d}{sym_filter} "
+                    "ORDER BY k.symbol, k.dt"
+                )
+                raw = None
+                try:
+                    conn_duck.execute(sql, paths if has_feat else paths[:1])
+                    raw = engine.raw_connection()
+                    batch_rows = 0
+                    records = []
+                    with raw.cursor() as cur:
+                        for _, df in _symbol_frames(conn_duck, max_symbol_rows=(hi - lookback).days + 1):
+                            if df["dt"].duplicated().any():
+                                raise ValueError("Duplicate symbol/date in QuantDB PG input")
+                            df = df.copy()
+                            df["symbol"] = df["symbol"].map(lambda s: _to_internal(str(s)))
+                            df["adj_factor"] = 1.0
+                            for c in _KLINE_COLS:
+                                df[c] = pd.to_numeric(df[c], errors="coerce")
+                            df["trade_date"] = pd.to_datetime(
+                                df["dt"].astype("int64").astype(str), format="%Y%m%d"
+                            ).dt.date
+                            df = _add_price_derived_cols(df.drop(columns=["dt"]))
+                            df = df.loc[df["trade_date"] >= lo, pg_cols]
+                            df = df.replace([float("inf"), float("-inf")], None)
+                            df = df.astype(object).where(pd.notna(df), None)
+                            records.extend(df.itertuples(index=False, name=None))
+                            if len(records) >= 5000:
+                                execute_values(cur, insert_sql, records, page_size=5000)
+                                batch_rows += len(records)
+                                records.clear()
+                        if records:
+                            execute_values(cur, insert_sql, records, page_size=5000)
+                            batch_rows += len(records)
+                    raw.commit()
+                    total_rows += batch_rows
+                    log.info("PG fill %s~%s: %d rows (total %d)", lo, hi, batch_rows, total_rows)
+                except Exception as exc:
+                    if raw is not None:
+                        raw.rollback()
+                    log.warning("PG fill failed %s~%s: %s", lo, hi, exc)
+                    failed_days.append(f"{lo}~{hi}")
+                finally:
+                    if raw is not None:
+                        raw.close()
+    finally:
+        engine.dispose()
 
     log.info("PG fill done: %d rows, %d failed batches", total_rows, len(failed_days))
     return {
