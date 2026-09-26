@@ -189,6 +189,11 @@ class CryptoAdapter(MarketAdapter):
             builder = QlibDataBuilder.for_market(
                 "CRYPTO", data_dir=self.get_release_dir(), qlib_dir=self.get_qlib_provider_uri()
             )
+            if self.is_data_ready():
+                # A fixed raw release already has a complete matching generation.
+                # Validate and reuse it instead of replacing a live Mac bind mount.
+                builder._validate_generation()
+                return True
             builder.build_all(incremental=True)
             return True
         except Exception as e:

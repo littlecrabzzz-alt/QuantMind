@@ -448,6 +448,7 @@ def tick(root, project, secrets, host, market=None, force=False):
                                     "--release", release_id], check=True)
                     item["local_release"] = release_id
                 item.update(status="applied", checked_at=now().isoformat())
+                item.pop("error", None)
                 retain_transport_copies(root / "releases" / name, protected=[release_id, item.get("local_release")])
             except Exception as exc:
                 item.update(status="retry_pending", error=str(exc), checked_at=now().isoformat())
@@ -470,7 +471,7 @@ def install(project, root, secrets, host):
     log = root.parent / "logs"
     log.mkdir(parents=True, exist_ok=True)
     definition = {"Label": label, "RunAtLoad": True, "WorkingDirectory": str(runtime),
-                  "StartCalendarInterval": [{"Minute": m} for m in (5, 20, 35, 50)],
+                  "StartCalendarInterval": [{"Minute": m} for m in (0, 15, 30, 45)],
                   "ProgramArguments": [sys.executable, str(runtime / "scripts/local_market_source.py"), "tick",
                                        "--root", str(root), "--project", str(project), "--secrets", str(secrets), "--host", host],
                   "EnvironmentVariables": {"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"},
