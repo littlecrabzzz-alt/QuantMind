@@ -2,6 +2,8 @@
 
 首期为 BTCUSDT、ETHUSDT 的加密现货 UTC 日线；AAPLBUSDT 单独归为美股代币化证券。产品依据与合约限制见 [产品核实](binance-data-products.md)。当前研究输入准入只开放 `crypto_spot`，不将代币、股票永续或底层证券行情混合。
 
+2026-09-26 扩充批次采用独立根目录，范围与实际验收见 [批量补录记录](binance-data-batch-20260926.md)。默认 BTC/ETH 币池、现有调度和已有研究的固定版本不随登记表扩充而改变。
+
 ## 采集与增量
 
 在项目根目录执行，明确指定本节点的数据目录。公开现货行情不需要账户或 API key。首次使用早于上市的开始日期；后续运行自动保留全部已发布历史，从最新已存日向前回看一周，重拉重叠区间。
@@ -32,11 +34,13 @@ python3 -m backend.scripts.quantbc_daily_sync \
 - `releases/<release_id>/` 保存日线、标的元数据、质量报告和文件 SHA-256；仅在整体检查通过后原子更新 `CURRENT.json`。失败保持旧指针，旧研究输入不随指针移动。
 - 同样行情及元数据重复发布保持原版本；交易规则等元数据变化会生成新版本，即使行情行数和价格未变。无变化响应返回该固定版本的质量报告，本轮检查结果另存 `checked_quality`。
 - 经济数值由原始十进制字符串统一转换为 Python binary64，manifest 记录 `numeric_semantics=python_float_binary64_from_source_decimal`。从旧解析口径升级时自动完整回采已有历史，成功后发布新版本；不能只更新尾部再将全部旧历史标为新口径。首次迁移的浮点末位变化属于解析归一化，需结合相同原始响应哈希判断，不能直接称为上游行情修订。
-- 2018-02-08 的 BTC/ETH REST 收盘时间异常：仅在校验通过的月归档与 REST 全部经济数值一致时采用归档行，记录 `source_revision`、原始 REST 收盘时间及哈希。价格或量额不一致时阻止发布。
+- 已核实 2018-02-08 的 BTC/ETH/BNB/LTC REST 收盘时间异常：仅在校验通过的月归档与 REST 全部经济数值一致时采用归档行，记录 `source_revision`、原始 REST 收盘时间及哈希。价格或量额不一致时阻止发布。
 
 ## 研究数据与真实验收
 
 `--build-research` 在发布后构建 Qlib/H5；需要现有后端镜像中的 Qlib 与 PyTables。派生文件位于 `derived/<release_id>/`，不会写回不可变原始版本。每个 RD 任务复制固定 Qlib/H5，并携带 `source_manifest.json`；已有任务拒绝换用另一个 release。
+
+加密现货 Qlib 的 `instruments/all.txt` 必须按每个标的的实际数据首尾日期写入；不能把全池日历首日当作所有币种的上市日。扩池验收同时核对文件数值、时间偏移和标的生命周期，并验证上市前日期不会选入该币。
 
 ```sh
 python3 -m backend.scripts.quantbc_daily_sync \
@@ -60,6 +64,16 @@ python3 scripts/binance_data_acceptance.py \
 4. 已有研究继续读取原 release；新研究显式记录新币种池与新 release。资产数量扩展不等于策略逻辑、交易成本及回测执行模型已经适用。
 
 股票代币沿用独立产品目录，进一步核验公司行动、转换倍数和底层证券关系；不能当作底层证券复权价。股票永续需独立合约适配，补充资金费、标记价、指数价、结算与合约生命周期。真正的 A股、美股证券优先使用现有 QuantDB/QuantUS 入口，分别保留本地交易日历、币种及复权合同。两类入口不能通过同名 ticker 直接合并。
+
+已审核的股票永续可用独立归档入口保存日线。该入口只读取官方公开归档和 CHECKSUM，不调用 Futures API；每个合约使用独立根，避免一项归档延迟阻止其他合约发布：
+
+```sh
+python3 -m backend.scripts.equity_perpetual_archive \
+  --symbols CXMTUSDT --start-date 2010-01-01 --end-date 2026-09-26 \
+  --data-dir /absolute/path/to/equity-perpetual/CXMTUSDT
+```
+
+`--end-date` 仍为 UTC 不含端点。缺文件产生不可变 partial 版本和 `missing.json`，退出码为 2，保留旧 `CURRENT.json`；无旧版时不创建指针。补采已知完整前缀必须显式指定较早截止日，脚本不会自动缩短窗口。401/403/451 等限制立即终止，不自动更换入口。所有 ZIP、校验文件、采集时间、原生 USDT 量价和上市首日部分交易标记均保留。即使日线窗口完整，manifest 的 `research_ready` 仍为 false，当前加密现货研究入口拒绝该产品。
 
 ## 定时更新口径
 

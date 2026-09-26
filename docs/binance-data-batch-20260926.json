@@ -1,0 +1,244 @@
+{
+  "batch": "binance-batch-20260926",
+  "unique_rows": 29550,
+  "symbols": 16,
+  "datasets": {
+    "crypto-spot": {
+      "current": {
+        "manifest_sha256": "5c3208a61a51592f37144f89ae935d8699d7190f7fc632a408884c93fd8d262b",
+        "path": "releases/binance-20260926T071358782081Z-36b7be2570",
+        "release_id": "binance-20260926T071358782081Z-36b7be2570",
+        "schema_version": 1
+      },
+      "product_type": "crypto_spot",
+      "rows": 29142,
+      "coverage": {
+        "ADAUSDT": {
+          "duplicates": 0,
+          "first": "2018-04-17",
+          "gaps": 0,
+          "last": "2026-09-25",
+          "rows": 3084,
+          "unclosed": 0
+        },
+        "AVAXUSDT": {
+          "duplicates": 0,
+          "first": "2020-09-22",
+          "gaps": 0,
+          "last": "2026-09-25",
+          "rows": 2195,
+          "unclosed": 0
+        },
+        "BNBUSDT": {
+          "duplicates": 0,
+          "first": "2017-11-06",
+          "gaps": 0,
+          "last": "2026-09-25",
+          "rows": 3246,
+          "unclosed": 0
+        },
+        "BTCUSDT": {
+          "duplicates": 0,
+          "first": "2017-08-17",
+          "gaps": 0,
+          "last": "2026-09-25",
+          "rows": 3327,
+          "unclosed": 0
+        },
+        "DOGEUSDT": {
+          "duplicates": 0,
+          "first": "2019-07-05",
+          "gaps": 0,
+          "last": "2026-09-25",
+          "rows": 2640,
+          "unclosed": 0
+        },
+        "ETHUSDT": {
+          "duplicates": 0,
+          "first": "2017-08-17",
+          "gaps": 0,
+          "last": "2026-09-25",
+          "rows": 3327,
+          "unclosed": 0
+        },
+        "LINKUSDT": {
+          "duplicates": 0,
+          "first": "2019-01-16",
+          "gaps": 0,
+          "last": "2026-09-25",
+          "rows": 2810,
+          "unclosed": 0
+        },
+        "LTCUSDT": {
+          "duplicates": 0,
+          "first": "2017-12-13",
+          "gaps": 0,
+          "last": "2026-09-25",
+          "rows": 3209,
+          "unclosed": 0
+        },
+        "SOLUSDT": {
+          "duplicates": 0,
+          "first": "2020-08-11",
+          "gaps": 0,
+          "last": "2026-09-25",
+          "rows": 2237,
+          "unclosed": 0
+        },
+        "XRPUSDT": {
+          "duplicates": 0,
+          "first": "2018-05-04",
+          "gaps": 0,
+          "last": "2026-09-25",
+          "rows": 3067,
+          "unclosed": 0
+        }
+      },
+      "point_in_time_verified": false
+    },
+    "tokenized-equity": {
+      "current": {
+        "manifest_sha256": "fe87dd7eed5e507a0bff518189cc79674a052b3634aa0945bda7bef1bf80a9f8",
+        "path": "releases/binance-20260926T071421983421Z-eb6b3d6660",
+        "release_id": "binance-20260926T071421983421Z-eb6b3d6660",
+        "schema_version": 1
+      },
+      "product_type": "tokenized_equity_spot",
+      "rows": 332,
+      "coverage": {
+        "AAPLBUSDT": {
+          "duplicates": 0,
+          "first": "2026-07-29",
+          "gaps": 0,
+          "last": "2026-09-25",
+          "rows": 59,
+          "unclosed": 0
+        },
+        "AMZNBUSDT": {
+          "duplicates": 0,
+          "first": "2026-07-29",
+          "gaps": 0,
+          "last": "2026-09-25",
+          "rows": 59,
+          "unclosed": 0
+        },
+        "NVDABUSDT": {
+          "duplicates": 0,
+          "first": "2026-06-11",
+          "gaps": 0,
+          "last": "2026-09-25",
+          "rows": 107,
+          "unclosed": 0
+        },
+        "TSLABUSDT": {
+          "duplicates": 0,
+          "first": "2026-06-11",
+          "gaps": 0,
+          "last": "2026-09-25",
+          "rows": 107,
+          "unclosed": 0
+        }
+      },
+      "point_in_time_verified": false
+    },
+    "equity-perpetual/CXMTUSDT": {
+      "current": {
+        "manifest_sha256": "b0455f3e58282046621ee3e9251059acee8f4310855f09ce864c56df23287ce7",
+        "path": "releases/equity-perpetual-128943f5e911e12c5af36e8e",
+        "release_id": "equity-perpetual-128943f5e911e12c5af36e8e",
+        "schema_version": 1
+      },
+      "product_type": "equity_perpetual",
+      "rows": 39,
+      "coverage": {
+        "CXMTUSDT": {
+          "expected_rows": 39,
+          "first": "2026-08-18",
+          "last": "2026-09-25",
+          "listing_time": "2026-08-18T05:00:00+00:00",
+          "missing_days": [],
+          "rows": 39
+        }
+      },
+      "point_in_time_verified": false
+    },
+    "equity-perpetual/UNITREEUSDT": {
+      "current": {
+        "manifest_sha256": "6053ae1b919d9564ad436f084c45fb62644d31e26bb9b70798702cbd7b3dc521",
+        "path": "releases/equity-perpetual-55dd930575654680ba9963ec",
+        "release_id": "equity-perpetual-55dd930575654680ba9963ec",
+        "schema_version": 1
+      },
+      "product_type": "equity_perpetual",
+      "rows": 37,
+      "coverage": {
+        "UNITREEUSDT": {
+          "expected_rows": 37,
+          "first": "2026-08-19",
+          "last": "2026-09-24",
+          "listing_time": "2026-08-19T02:45:00+00:00",
+          "missing_days": [],
+          "rows": 37
+        }
+      },
+      "point_in_time_verified": false
+    }
+  },
+  "target_end_exclusive": "2026-09-26",
+  "unitree_missing_dates": [
+    "2026-09-25"
+  ],
+  "new_batch_schedule_enabled": false,
+  "strategy_or_trading_started": false,
+  "status": "completed_with_declared_unitree_tail_gap",
+  "implementation_commit": "6c2c0d1ba1c443ddc9cf49e0aa7ac0afee20a49c",
+  "cloud_data_root": "/data/binance-batch-20260926",
+  "cloud_evidence_root": "/data/maintenance/binance-batch-20260926",
+  "verification": {
+    "batch-spot-audit.json": {
+      "status": "passed_with_declared_scope_limits",
+      "sha256": "909238418caa64362ee10594e19dfb2ed1399af7a5143d86166e1d1cdfcf73e5"
+    },
+    "equity-archive-audit.json": {
+      "status": "passed",
+      "sha256": "beb153ca26351811670a4393008bacc7eb6592aa29ce8ccf2b7f0a5bb4bf97d0"
+    },
+    "derived-value-audit-after-fix.json": {
+      "status": "passed",
+      "sha256": "0e73bb73b7bc186c77af77f7975cd41197da1b59c7deca274da38c39e3c4eff5"
+    },
+    "tests-final.json": {
+      "status": "PASS",
+      "sha256": "df7d1e0ad811fd99def2d0b52f2db646831dd88dacc42bd9783184b602cb7b0d"
+    },
+    "cloud-publication.json": {
+      "status": "PUBLISHED",
+      "sha256": "00fa98855b1d1d70d7626c0b47636baf4a8aad1f3d7c4855b7198fb5f534578f"
+    },
+    "cloud-consumers.json": {
+      "status": "PASS",
+      "sha256": "c75936e90dbda6971ec86b4b08589b3581f70f701e20d4366c97cf47b884d2d8"
+    },
+    "cloud-equity-archive-audit.json": {
+      "status": "passed",
+      "sha256": "6e7adc2845ff4eb933a14bd23611ece4d091aa29fdb2b50b858bac35230ba915"
+    },
+    "cloud-crypto-acceptance.json": {
+      "status": "PASS",
+      "sha256": "15f1de792575ac0dbb16ea3a6e195a7d8f2b265856a3715b3046940aba5b42a7"
+    },
+    "cloud-derived-value-audit.json": {
+      "status": "passed",
+      "sha256": "e01bf7cf9fe479bcfdc20723149b6b6965239dfefbcc42a7abbdfb7b9d3be5bc"
+    }
+  },
+  "tests_passed": 73,
+  "crypto_derived_rows": 29142,
+  "qlib_feature_sample_rows": 70,
+  "global_crypto_enabled": false,
+  "real_trading_enabled": false,
+  "default_crypto_pool_changed": false,
+  "ui_default_data_root_changed": false,
+  "services_restarted": false,
+  "existing_cloud_pointers_preserved": true
+}
