@@ -26,8 +26,9 @@ def freeze(end_date):
         cfg = new
     base = runtime.frozen.read(Path(cfg["source"]) / "snapshot/config.json")
     base = copy.deepcopy(base)
-    # Existing snapshot contains later dates. Only trusted template code receives
-    # the read-only data and all loader/label/backtest upper bounds are clipped.
+    # Existing snapshot contains later dates. This clips configuration only;
+    # it does not prove loader/label enforcement. See stock-boundary-20260927
+    # in DEEP-RESEARCH.md; the affected live stock scope is operator-held.
     for dates in base["split"].values():
         dates[1] = min(dates[1], end_date)
         if dates[0] > dates[1]:
