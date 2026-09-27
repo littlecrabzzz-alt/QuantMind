@@ -1,0 +1,131 @@
+{
+  "a_before": "2c9b4c843bdebbbc773f99b76063bcb1f7b82c38dc092b367d5cf34fcc61666d",
+  "exhausted_no_dispatch": true,
+  "unknown_no_dispatch": true,
+  "restored_dispatch": true,
+  "holdout_denied": true,
+  "existing_strategy_denied": true,
+  "shell_denied": true,
+  "idempotent_public_run": {
+    "strategy_id": "73",
+    "backtest_id": "r01bt-d410bbcfeda7b164d7bfa43204a80a08",
+    "revision_id": "7eaa667cf43f49629d07067bccaaff217eb3a15b817c00df52055c860af5f683"
+  },
+  "public_result": {
+    "44c51f9d99fa5df9259d51feb6369495295786d75fceb13ec266efb543ab2fb3": {
+      "backtest_id": "r01bt-d410bbcfeda7b164d7bfa43204a80a08",
+      "status": "completed",
+      "error": null,
+      "metrics": {
+        "beta": null,
+        "alpha": null,
+        "config": {
+          "end_date": "2014-08-08",
+          "rerun_of": null,
+          "execution": {
+            "price_mode": "open",
+            "drawdown_pct": 0.3,
+            "initial_cash": 30000,
+            "slippage_bps": 5,
+            "commission_min": 5,
+            "commission_rate": 0.0003,
+            "loss_line_amount": 9000,
+            "stale_mark_limit": 5,
+            "volume_participation": 0.1,
+            "sublot_rule_effective": "2014-08-01"
+          },
+          "parameters": {
+            "symbols": [
+              "510300.SH",
+              "511010.SH",
+              "518880.SH"
+            ],
+            "lookback": 1,
+            "frequency": "monthly",
+            "target_weights": {
+              "510300.SH": 0.4,
+              "511010.SH": 0.5,
+              "518880.SH": 0.1
+            }
+          },
+          "start_date": "2014-08-01",
+          "code_sha256": "4f8238eb76ca05ac647840dab6befb07fb96e6b9060cafef5bbc5539357fc2a3",
+          "research_id": "02a3b0dc9734702200245027f8f581f6",
+          "strategy_id": "73",
+          "data_binding": {
+            "policy_id": "r01-holdout-6m-20260926-v1",
+            "package_id": "r01-etf-daily-fcbabbb7f133",
+            "holdout_end": "2026-09-24",
+            "holdout_start": "2026-03-25",
+            "development_end": "2026-03-24",
+            "manifest_sha256": "a0d88429301685aa3939b294c38bb942013de4befe29e8a01e7a1f03a80fc622",
+            "package_sums_sha256": "4e549cbdb7117c04e7b21b8e013b800e781e906c7afe45ef1d7138058a1849d8"
+          },
+          "initial_cash": 30000,
+          "engine_sha256": "a86e6cbb2f76114ca34f9e4ecb9c8d3542e53e4f428873dcce122b7ffc8e8c27",
+          "executor_kind": "r01_ledger",
+          "ledger_run_id": "r01-B1-s73-r01bt-d410bbcfeda7b164d7bfa43204a80a08-v1-a0001",
+          "strategy_name": "GLM·工程验收·公共固定配置五日",
+          "research_title": "GLM·工程验收·公共固定配置五日",
+          "initial_capital": 30000,
+          "research_case_id": "02a3b0dc9734702200245027f8f581f6",
+          "strategy_version": 1,
+          "metric_convention": "net return from initial cash; drawdown from initial/high-water equity; Sharpe rf=0,252 sessions",
+          "strategy_revision": "7eaa667cf43f49629d07067bccaaff217eb3a15b817c00df52055c860af5f683",
+          "validation_status": "development_only"
+        },
+        "status": "completed",
+        "avg_win": null,
+        "task_id": null,
+        "user_id": "10000001",
+        "avg_loss": null,
+        "progress": null,
+        "win_rate": null,
+        "tenant_id": "default",
+        "created_at": "2026-09-26T16:01:20.042485+00:00",
+        "deal_price": "open",
+        "full_error": null,
+        "model_name": null,
+        "volatility": 0.07811020341560086,
+        "backtest_id": "r01bt-d410bbcfeda7b164d7bfa43204a80a08",
+        "completed_at": "2026-09-26T16:01:24.570591+00:00",
+        "max_drawdown": 0.00743315791566701,
+        "sharpe_ratio": -0.10559858928989745,
+        "total_return": -0.0002566666666665718,
+        "total_trades": 3,
+        "annual_return": -0.011651530626137996,
+        "error_message": null,
+        "profit_factor": null,
+        "advanced_stats": {
+          "engine": "r01_ledger",
+          "read_through": "2014-08-08",
+          "reconciliation": {
+            "ok": true,
+            "note": "严格判定=全精度值直接相减≤1e-6（无 round/format）；展示字段（4dp）仅为报告；残差~4e-5 只存在于展示层（账本 equity nav 与复算输出默认 4dp），全精度层无该舍入",
+            "judgment": "full_precision_direct_diff(<=1e-6)",
+            "mismatches": [],
+            "strict_1e_6": true,
+            "days_compared": 6,
+            "legacy_equity": false,
+            "max_full_precision_diff": 0.0
+          },
+          "validation_status": "development_only",
+          "actual_max_input_date": "2014-08-08"
+        },
+        "analysis_ready": null,
+        "execution_time": null,
+        "signal_lag_days": 1,
+        "benchmark_return": null,
+        "benchmark_symbol": null,
+        "information_ratio": null,
+        "portfolio_metrics": null,
+        "avg_holding_period": null,
+        "long_short_is_theoretical": false
+      }
+    }
+  },
+  "stop_resume_keeps_backtest": true,
+  "a_after": "2c9b4c843bdebbbc773f99b76063bcb1f7b82c38dc092b367d5cf34fcc61666d",
+  "program_id": "02a3b0dc9734702200245027f8f581f6",
+  "at": 1790438486.753029
+}

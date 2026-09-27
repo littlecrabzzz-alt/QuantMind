@@ -1,0 +1,12 @@
+> quantmind@1.0.0 dashboard:build
+> npm run build -w QuantMind
+> QuantMind@2.4.3 build
+> npm run build:react && npm run build:electron
+> QuantMind@2.4.3 build:react
+> node ../scripts/frontend/copy-monaco-assets.js && vite build
+▲ [WARNING] Expected identifier but found "-4" [css-syntax-error]
+    <stdin>:7229:2:
+(!) Some chunks are larger than 500 kB after minification. Consider:
+✓ built in 20.92s
+> QuantMind@2.4.3 build:electron
+> npx tsc -p tsconfig.electron.json && node -e "const fs=require('fs');const d='dist-electron/electron';fs.mkdirSync(d,{recursive:true});const cp=(s,t)=>fs.existsSync(s)?(fs.copyFileSync(s,t),true):false;cp('build/logo.ico',d+'/logo.ico')||cp('public/favicon.ico',d+'/logo.ico');cp('public/logo.png',d+'/logo.png');"

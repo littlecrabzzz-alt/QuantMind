@@ -92,6 +92,9 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       host: '0.0.0.0', // 允许外部访问
       proxy: {
+        ...(process.env.VITE_CONTINUOUS_RESEARCH_URL ? {
+          "/api/v1/continuous-research": { target: process.env.VITE_CONTINUOUS_RESEARCH_URL, changeOrigin: true },
+        } : {}),
         // Optional isolated Engine checkout; all other services keep the normal gateway.
         ...(process.env.VITE_ENGINE_CANDIDATE_URL ? Object.fromEntries([
           '/api/v1/strategies', '/api/v1/qlib', '/api/v1/strategy-paper-runs', '/api/v1/research-catalog',

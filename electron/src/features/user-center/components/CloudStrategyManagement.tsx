@@ -82,6 +82,20 @@ const CloudStrategyManagement: React.FC = () => {
         if (id) setSelected(strategies.find(s => s.id === id) ?? null);
     }, [location.search, strategies]);
 
+    useEffect(() => {
+        if (!selected?.id || selected.code) return;
+        let cancelled = false;
+        // The list response deliberately omits source; load the existing detail
+        // endpoint before deciding whether executable versions are available.
+        strategyManagementService.getStrategy(selected.id).then(detail => {
+            if (!cancelled) setSelected({ ...selected, ...detail,
+                status: detail.status ?? selected.status,
+                base_status: detail.base_status ?? selected.base_status,
+                effective_status: detail.effective_status ?? selected.effective_status });
+        }).catch(() => { if (!cancelled) message.error('策略源码加载失败，请刷新后重试'); });
+        return () => { cancelled = true; };
+    }, [selected?.id, selected?.code]);
+
     const researchLink = (strategy: StrategyFile) => {
         const id = strategy.parameters?.research_case_id;
         return typeof id === 'string' && /^[a-zA-Z0-9_-]+$/.test(id)
@@ -259,7 +273,7 @@ const CloudStrategyManagement: React.FC = () => {
             }}>
                 {selected && <div className="space-y-4">
                     <p>{selected.description || '暂无策略说明'}</p>
-                    {researchLink(selected) && <StrategyRevisionPanel key={selected.id} strategyId={selected.id} />}
+                    {(researchLink(selected) || /^def on_signal\(/m.test(selected.code)) && <StrategyRevisionPanel key={selected.id} strategyId={selected.id} />}
                     <p>保存状态：{getStatusTag((selected.base_status || selected.status || 'unknown').toLowerCase())} 运行状态：{getStatusTag(selected.effective_status || 'unknown')}</p>
                     {selected.parameters?.configuration_only === true && <Alert type="info" showIcon message="候选配置已保存，持续虚拟盘尚未启动" description="历史研究与未来虚拟盘分别记录。保存配置不会自动启动调度或成交。" />}
                     {Array.isArray(selected.parameters?.activation_blockers) && selected.parameters.activation_blockers.map((reason, i) => <Alert key={i} type="warning" message={String(reason)} />)}

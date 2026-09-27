@@ -1,0 +1,78 @@
+# GLM 持续研究运行说明
+
+本地独立研究协调程序使用 Pi 的 GLM Coding Plan；平台复用 `research_drafts` 保存任务、步骤、租约、额度、报告，复用策略版本 API 与 R01 公共回测。没有第二套撮合、手续费或净值计算。
+
+## 当前研究范围
+
+研究主线由用户授权扩展为：① A股量价与横截面因子（动量、反转、量价确认）；② A股风险与流动性因子（低波动、流动性、拥挤代理）；③ 资产配置（趋势、动量/轮动、风险仓位/组合三个课题）。ETF 是第三条主线的一种载体。主题优先使用已有可复现数据；基本面、期货、海外市场等须先补齐相应数据与执行合同，不能因主题放开就假装底座已具备。
+
+模型先提交可证伪假设，通过公共入口生成因子候选或新策略版本和回测，再根据结果写结论、提出有证据的后续问题。每任务至多 6 个实验、3 个后续问题，待执行队列上限 20；没有新问题时空闲。问题按文本指纹、ETF 实验按代码 AST/参数/日期去重。股票同输入/配置的公共结果跨任务复用，并标记不是独立重复验证。尚不具备可靠的语义去重或独立科学审查。
+
+Pi 显式指定 `--provider glm --model glm-5.3 --thinking max`，不依赖个人默认 effort。运行采用 3 个 GLM 任务并发，计算队列 `glm-research` 的公共回测 worker 并发 1。每次模型调用只有一个 JSON 动作，默认工具、扩展、技能、项目文件发现全部关闭；模型没有 shell、任意 HTTP、数据库凭据、旧策略修改或交易权限。可执行代码受现有 AST/步数/因果数据限制；源码、参数和输入身份进入平台策略版本。
+
+开发边界沿用冻结政策：最多到 2026-03-24，2026-03-25 至 2026-09-24 不提供给这些研究任务。ETF 固定执行合同：3 万元、次交易日开盘、佣金 0.03%/最低 5 元、滑点 5bp、成交量参与 10%、损失线 9000 元、回撤线 30%。这些是同条件研究假设，并非已核验券商报价。现有 A/B 策略和虚拟账户均不在协调程序写入能力内；新产物标记 `development_only_unreviewed`，不会自动晋级。
+
+股票复用 `engine.research.runtime` 的冻结 LightGBM + TopkDropout 模板，受限因子表达式写入现有因子库、源代码与数据身份可追溯，结果写入现有 `qlib_backtest_runs`（曲线、成交、费用、逐日持仓与因子统计），复权数量/价格在结果页明确标注。先跑冻结基线，成功后才准许因子增量；计算失败归工程问题，不交给模型判断因子有效性。计算容器离线、只读输入、2 CPU/8GB。
+
+股票训练 2023-01-03 至 2024-12-31，调参验证 2025-01-06 至 2025-03-31，已暴露开发比较 2025-04-07 至 2026-03-24；既有包中更晚的数据不会经加载/标签/结果边界进入任务上下文。100只主板股票、1000万实验资金仅用于模型与因子诊断，不代表用户2–3万元可以直接执行。
+
+首次接入发现旧冻结包漏了 `model_trainers/data/diagnostics` 依赖。`repair_stock_input.py` 创建派生包，逐文件核验、保留父包哈希与新增文件清单，原数据/config/既有代码不变。覆盖设置只对持续股票研究生效，不改公共 settings。`repair_stock_input` 操作必须先停止、核对旧清单、归档旧合同与失败任务，再建立新任务；旧回测记录保留。完整打包逻辑已修为递归收集 training 下所有 Python 依赖。
+
+## 额度与重试
+
+使用供应商 [usage-query 实现](https://github.com/zai-org/zai-coding-plugins/blob/main/plugins/glm-plan-usage/skills/usage-query-skill/scripts/query-usage.mjs) 对应的 `GET /api/monitor/usage/quota/limit`。密钥只通过 `pi auth print-api-key --provider glm` 的内存管道取得，作为进程环境传给独立 Pi，不进入命令参数、模型上下文、平台事件或报告。
+
+- 每 60 秒查一次真实额度。5 小时百分比与 MCP 工具额度分开；实际没有返回周额度时，不增加周限制。供应商不提供可可靠换算的精确剩余 token 数。
+- 额度未知、响应含糊或超过 180 秒未更新时停止新模型派发；仍显示上次查询时间。
+- 余量不超过 1% 时等待，不靠模型调用轮询时间。运行中收到 `1308/1310` 时保存任务，设置恢复门槛。
+- 新查询时间、最小等待时间和余量恢复证据必须同时满足；仅旧的正余额重复返回不能清除拒绝。供应商重置时间只是提示，经过时间后仍须查得可用余量。
+- `429` 频率限制、`503`、网络/流中断按 30 秒起步、最高 15 分钟退避；连续 8 次无进展转需检查。额度等待不计入这个失败预算。认证/套餐权限问题不会无限付费重试。
+- 各模型步骤、待提交动作和成功回执保存在 PG。策略创建附持久身份标记，版本及回测使用稳定键。崩溃后租约到期，再接续已有步骤；旧租约不可提交。
+- 停止先撤销租约，协调程序随后终止自身 Pi 进程；已提交的公共回测保留并可以完成。停止不影响 A 虚拟盘。
+
+等待公共计算的任务释放模型槽，由普通程序轮询结果，其他问题可继续分析。Pi 调用的输入/输出量按实际返回累计；未返回用量单列“未统计”。中间思考流不进入平台报告。
+
+## 本地运行
+
+候选代码在独立 worktree。`scripts/start_r01_platform_candidate.py --continuous-research` 只启动 `glm-research-engine`（18084）和 `glm-research-worker`；不启动 paper beat。现有 A 的 18083/worker/beat 继续工作。前端 `VITE_CONTINUOUS_RESEARCH_URL` 仅转发新增路由，原策略/回测/虚拟盘仍走原 Engine。
+
+主机私有目录为 `~/Library/Application Support/QuantMind/continuous-research/`。`runtime.json` 权限 0600，包含已有登录的短期 access/refresh token、平台地址和 programme ID；不包含 GLM API key。协调程序通过现有认证 API 刷新登录。不要提交、打印或同步这个文件。
+
+```sh
+python3 scripts/continuous_research/manage.py status
+python3 scripts/continuous_research/manage.py start
+python3 scripts/continuous_research/manage.py stop
+python3 scripts/continuous_research/manage.py install
+# 仅卸载协调进程，不删除研究记录
+python3 scripts/continuous_research/manage.py uninstall
+```
+
+LaunchAgent `com.quantmind.glm-continuous-research` 持续管理协调程序；容器使用 `unless-stopped`。Mac 关机/休眠、Docker 未启动或登录凭据失效时不能工作。恢复机器和服务后按 PG 状态接续；平台心跳陈旧不等于完成。当前不承诺离线运行或无人值守科学结论可靠。
+
+平台研究工作台的“GLM 持续研究”面板可看额度、重置提示、心跳、任务、尝试次数、当前步骤、失败原因、报告及公共回测链接。策略管理保存真实源码和版本。工程验证 programme 单独归档，不混入研究成果。
+
+## 验证入口与限制
+
+```sh
+python3 -m unittest discover -s tests/continuous_research -v
+python3 scripts/continuous_research/smoke.py
+python3 scripts/continuous_research/quota_recovery_probe.py
+npm run typecheck
+npm run dashboard:build
+```
+
+后两项工程脚本需要本地私有运行配置。smoke 创建并归档独立验收课题、执行短回测，检查重复/停止恢复不新增、保留集/旧策略/终端操作被拒绝，并对比 A 版本摘要；quota probe 在这个工程课题注入模型 `1308`，等待后恢复同一任务和回测。不是故意耗尽真实套餐的测试。
+
+首次交付包含真实 GLM 调用、公共回测和页面验证。未完成长达数天的稳定性观察。自动文献搜索、跨市场交易、独立审稿以及候选晋级不在本版自动动作中；这些需要继续复用现有研究收集/因子/验收模块接入。当前新任务来源是五个种子课题和基于已完成实验提出的后续问题。
+
+## 每小时巡检
+
+Codex 当前会话定时跟进 `glm` 已启用，每小时检查真实调用、额度窗口、公共计算、失败原因和一份以上新报告，并按证据优化。默认仍3个模型槽/1个计算槽；额度富余不意味着增加计算并发有效，先找瓶颈。报告与后续问题排队已解耦，队列满时保存结论及提案，空位出现再幂等派发。
+
+只读巡检快照入口（输出到仓库外目录，供增量对比）：
+
+```sh
+python3 scripts/continuous_research/audit.py --output "/Users/lizeyu/Documents/ChatGPT/投资/投资学习与研究/研究/GLM持续研究/巡检"
+```
+
+同目录当日汇总.md由巡检人工判断后更新。input/output为模型上报累计，包含输入缓存统计，不能直接换算套餐余量；中断未上报部分可能缺失。calls从晨间修复后记录，不回填历史，领取次数不当作调用次数。

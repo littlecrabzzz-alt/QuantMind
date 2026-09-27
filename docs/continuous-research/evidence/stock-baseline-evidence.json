@@ -1,0 +1,91 @@
+{
+  "backtest_id": "glmstock-da321ef634e6264aacdd3a511cef7730",
+  "manifest_sha256": "aee884ffa42a55a46af483077ba2654d7b52d6daea7684920fe08bf0b715541e",
+  "summary": {
+    "checks_passed": true,
+    "research_status": "needs_validation",
+    "purpose": "development_comparison",
+    "comparison": {
+      "model": {
+        "total_return": 0.08403082801412243,
+        "max_drawdown": -0.1322032928890664,
+        "trades": 1858,
+        "transaction_cost": 539903.0087565285,
+        "cash_error": 0.0,
+        "account_error": 0.0,
+        "sharpe": 0.6200762514918934,
+        "trading_days": 234,
+        "final_value": 10840308.280141225,
+        "native_benchmark_return": 0.15880254160493745,
+        "benchmark_return": 0.24663345098000478
+      },
+      "single_factor": {
+        "total_return": 0.22816601944099935,
+        "max_drawdown": -0.2012301133288027,
+        "trades": 1442,
+        "transaction_cost": 405626.56231236237,
+        "cash_error": 0.0,
+        "account_error": 0.0,
+        "sharpe": 0.886515494872665,
+        "trading_days": 234,
+        "final_value": 12281660.194409993,
+        "native_benchmark_return": 0.15880254160493745,
+        "benchmark_return": 0.24663345098000478
+      },
+      "equal_weight": {
+        "total_return": 0.23724141882467542,
+        "max_drawdown": -0.11613044605051626,
+        "trades": 7741,
+        "transaction_cost": 46140.012357040454,
+        "cash_error": 0.0,
+        "account_error": 0.0,
+        "sharpe": 1.3596194798895276,
+        "trading_days": 234,
+        "final_value": 12372414.188246755,
+        "native_benchmark_return": 0.15880254160493745,
+        "benchmark_return": 0.24663345098000478
+      }
+    },
+    "model_minus_single_factor_pp": -14.413519142687692,
+    "replay_days": 234,
+    "replay_rows": 23400,
+    "replay_max_error": 0.0,
+    "limitations": [
+      "Previously inspected development interval; no final holdout claim",
+      "Inherited CnExchange quote fallback and historical limit/ST rules remain unaudited",
+      "Frozen files do not prove original factors were point-in-time correct",
+      "Equal weight holds the whole pool; Top20 controls match each other more closely",
+      "Standalone research results are not registered in the platform database"
+    ]
+  },
+  "verification": {
+    "model": {
+      "net_return": 0.08403082801412243,
+      "max_drawdown": -0.1322032928890664,
+      "fees": 539903.0087565285,
+      "fills": 1858,
+      "cash_error": 0.0,
+      "asset_error": 7.450580596923828e-09
+    },
+    "single_factor": {
+      "net_return": 0.22816601944099935,
+      "max_drawdown": -0.2012301133288027,
+      "fees": 405626.56231236237,
+      "fills": 1442,
+      "cash_error": 0.0,
+      "asset_error": 5.587935447692871e-09
+    },
+    "equal_weight": {
+      "net_return": 0.23724141882467542,
+      "max_drawdown": -0.11613044605051626,
+      "fees": 46140.012357040454,
+      "fills": 7741,
+      "cash_error": 0.0,
+      "asset_error": 9.313225746154785e-09
+    }
+  },
+  "curve_rows": 234,
+  "curve_start": "2025-04-07",
+  "curve_end": "2026-03-24",
+  "ui_observed": "completed; net curve, final value, 1858 trades, costs/adjusted basis and independent review label visible 2026-09-27 morning"
+}

@@ -1,3 +1,4 @@
+import ContinuousResearchPanel from "./ContinuousResearchPanel";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -162,7 +163,10 @@ export default function AgentWorkspace() {
         setCases(catalog ? catalog.filter(c => c.node_id === next.node_id).map(c => ({ ...c, ...rows.find(r => r.id === c.id), workspace_category: c.workspace_category })) : rows);
         setOtherNodeArchives(catalog?.filter(c => c.node_id !== next.node_id && c.workspace_category === 'engineering') || []);
         const id = active.current;
-        if (id) {
+        if (id && catalog?.some(c => c.id === id && c.node_id === 'mac-glm-continuous-v1')) {
+          // The continuous programme is rendered above; it is not a frozen H1 case.
+          setCurrent(null); setCreating(true); setError('');
+        } else if (id) {
           const detail = await researchAgent.detail(next.node_id, id);
           if (!stopped && active.current === id && scope.current === nextScope)
             setCurrent(detail);
@@ -306,6 +310,7 @@ export default function AgentWorkspace() {
       : "";
   return (
     <section data-testid="agent-workspace" className="space-y-4 select-text">
+      <ContinuousResearchPanel />
       <div className="flex flex-wrap justify-between items-start gap-3">
         <div>
           <h1 className="text-2xl font-semibold">研究工作台</h1>

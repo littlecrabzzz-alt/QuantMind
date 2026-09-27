@@ -26,6 +26,7 @@ type Trade = {
   cash_after?: number;
   position_value_after?: number;
   equity_after?: number;
+  quantity_price_basis?: 'adjusted';
 };
 
 export const QlibResultDisplay: React.FC<{ result: BacktestResult | QlibBacktestResult; fallbackConfig?: BacktestConfig | QlibBacktestConfig | null }> = ({
@@ -216,6 +217,9 @@ export const QlibResultDisplay: React.FC<{ result: BacktestResult | QlibBacktest
 
   return (
     <div className="space-y-6">
+      {displayConfig?.executor_kind === 'frozen_stock_research' && <div className="p-3 rounded-xl bg-amber-50 text-sm text-amber-900">
+        股票因子开发实验，结论待独立复核。成交价格和数量采用复权口径，交易费用为全部执行成本；固定资金规模用于模型诊断，不代表小账户可直接执行。
+      </div>}
       {/* 信号延迟警告 */}
       {((result as any)?.signal_lag_days === 0) && (
         <div className="flex items-start gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-2xl">
@@ -480,7 +484,7 @@ const normalizeTradeRows = (
         ? explicitQuantity
         : 0;
 
-    const qtyInt = normalizeQty(String(t.symbol || ''), displayQuantity);
+    const qtyInt = t.quantity_price_basis === 'adjusted' ? displayQuantity : normalizeQty(String(t.symbol || ''), displayQuantity);
     const amount = Number.isFinite(Number(t.totalAmount))
       ? Number(t.totalAmount)
       : displayPrice * displayQuantity;

@@ -1,0 +1,17 @@
+test_existing_id_cannot_be_supplied (test_api_contract.ContractTests) ... ok
+test_full_queue_saves_report_and_defers_followup_without_duplication (test_api_contract.ContractTests) ... ok
+test_holdout_rejected_before_storage (test_api_contract.ContractTests) ... ok
+test_malformed_types_and_unknown_tools (test_api_contract.ContractTests) ... ok
+test_missing_symbols_rejected_before_storage (test_api_contract.ContractTests) ... ok
+test_report_invalid_followup_does_not_expand_scope (test_api_contract.ContractTests) ... ok
+test_report_without_results_rejected (test_api_contract.ContractTests) ... ok
+test_same_code_parameters_dates_reuses_version_across_title_changes (test_api_contract.ContractTests) ... ok
+test_failed_or_pending_baseline_cannot_admit_factor (test_stock_scope.StockAdmissionTests) ... Executing <Task pending name='Task-25' coro=<IsolatedAsyncioTestCase._asyncioLoopRunner() running at /usr/local/lib/python3.10/unittest/async_case.py:95> wait_for=<Future pending cb=[Task.task_wakeup()] created at /usr/local/lib/python3.10/asyncio/base_events.py:429> created at /usr/local/lib/python3.10/unittest/async_case.py:117> took 0.253 seconds
+ok
+test_existing_template_is_clipped_without_mutating_source (test_stock_scope.StockScopeTests) ... ok
+test_no_future_lag_or_python_in_factor_expression (test_stock_scope.StockScopeTests) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.316s
+
+OK

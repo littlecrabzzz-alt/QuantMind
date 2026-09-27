@@ -1,0 +1,14 @@
+{
+  "model_error_injected": "1308",
+  "same_task": "02d03cd2d0a5a60139dce6df",
+  "same_backtests": [
+    "r01bt-d410bbcfeda7b164d7bfa43204a80a08"
+  ],
+  "calls": [
+    "denied",
+    "resumed"
+  ],
+  "status": "done",
+  "at": 1790440877.210678,
+  "test_only": true
+}

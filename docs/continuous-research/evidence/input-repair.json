@@ -1,0 +1,25 @@
+{
+  "original_files": 47765,
+  "derived_files": 47782,
+  "original_file_hashes_unchanged": true,
+  "new_dependencies": [
+    "code/docker/training/data/__init__.py",
+    "code/docker/training/data/factor_selection.py",
+    "code/docker/training/data/loading.py",
+    "code/docker/training/data/splits.py",
+    "code/docker/training/diagnostics/__init__.py",
+    "code/docker/training/diagnostics/drift.py",
+    "code/docker/training/diagnostics/explain.py",
+    "code/docker/training/diagnostics/utils.py",
+    "code/docker/training/diagnostics/wfa.py",
+    "code/docker/training/model_trainers/__init__.py",
+    "code/docker/training/model_trainers/metrics.py",
+    "code/docker/training/model_trainers/predict.py",
+    "code/docker/training/model_trainers/registry.py",
+    "code/docker/training/model_trainers/trainers_dl.py",
+    "code/docker/training/model_trainers/trainers_gbdt.py",
+    "code/docker/training/test_research_integrity.py",
+    "code/docker/training/test_tree_runtime.py"
+  ],
+  "source_manifest_sha256": "f56adb4a5db06138c3e72ef862de352e59ee0cd36449299133c18ee64083f48c"
+}

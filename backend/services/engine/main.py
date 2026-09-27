@@ -327,6 +327,8 @@ try:
     app.include_router(r01_paper_router, prefix="/api/v1")
     from backend.services.engine.routers.research_catalog import router as research_catalog_router
     app.include_router(research_catalog_router, prefix="/api/v1")
+    from backend.services.engine.routers.continuous_research import router as continuous_research_router
+    app.include_router(continuous_research_router, prefix="/api/v1")
 except ImportError as e:
     logger.error(f"❌ Failed to load Strategies router: {e}")
 

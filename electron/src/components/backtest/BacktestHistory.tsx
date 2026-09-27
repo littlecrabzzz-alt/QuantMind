@@ -587,6 +587,9 @@ export const formatStrategyName = (raw?: string | null) => {
 export const resolveStrategyName = (backtest: BacktestResult): string => {
   const ext = backtest as BacktestRecordExt;
   const config = ext.config ?? {};
+  if (['r01_ledger', 'frozen_stock_research'].includes(config.executor_kind) && (config.research_title || config.strategy_name)) {
+    return String(config.research_title || config.strategy_name);
+  }
   const candidates = [
     ext.strategy_display_name,
     backtest.strategy_name,
@@ -639,11 +642,11 @@ const BacktestHistoryRow: React.FC<BacktestHistoryRowProps> = ({
   onExportCSV,
   onExportJSON,
 }) => {
-  const totalReturn = backtest.total_return || 0;
-  const sharpeRatio = backtest.sharpe_ratio || 0;
+  const totalReturn = backtest.total_return == null ? null : backtest.total_return;
+  const sharpeRatio = backtest.sharpe_ratio == null ? null : backtest.sharpe_ratio;
   const initialCapital = resolveInitialCapital(backtest);
-  const isProfit = totalReturn > 0;
-  const isLoss = totalReturn < 0;
+  const isProfit = totalReturn != null && totalReturn > 0;
+  const isLoss = totalReturn != null && totalReturn < 0;
   const modelDisplayName =
     (backtest as any).model_name ||
     (backtest as any).config?.model_id ||
@@ -687,6 +690,9 @@ const BacktestHistoryRow: React.FC<BacktestHistoryRowProps> = ({
         {backtest.config?.executor_kind === 'r01_ledger' && <span className="text-xs text-gray-500">
           v{backtest.config.strategy_version} · 开发回测 · {backtest.status}{backtest.config.rerun_of ? ' · 复跑' : ''}
         </span>}
+        {backtest.config?.executor_kind === 'frozen_stock_research' && <span className="text-xs text-gray-500">
+          股票因子开发实验 · {backtest.status}
+        </span>}
       </td>
 
       {/* 模型 */}
@@ -728,7 +734,7 @@ const BacktestHistoryRow: React.FC<BacktestHistoryRowProps> = ({
             <TrendingUp className="w-4 h-4 text-gray-400" />
           )}
           <span className={`text-sm font-medium ${isProfit ? 'text-red-500' : isLoss ? 'text-green-500' : 'text-gray-500'}`}>
-            {(totalReturn * 100).toFixed(2)}%
+            {totalReturn == null ? '未计算' : `${(totalReturn * 100).toFixed(2)}%`}
           </span>
         </div>
       </td>
@@ -736,7 +742,7 @@ const BacktestHistoryRow: React.FC<BacktestHistoryRowProps> = ({
       {/* 夏普比率 */}
       <td className="px-6 py-4 whitespace-nowrap text-center">
         <span className="text-sm font-medium text-red-500">
-          {sharpeRatio.toFixed(2)}
+          {sharpeRatio == null ? '未计算' : sharpeRatio.toFixed(2)}
         </span>
       </td>
 

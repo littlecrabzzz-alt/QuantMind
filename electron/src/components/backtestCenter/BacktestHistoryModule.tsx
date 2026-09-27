@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { BacktestHistory, resolveStrategyName } from '../backtest/BacktestHistory';
+import { QlibResultDisplay } from '../backtest/QlibResultComponents';
 import { useBacktestCenterStore } from '../../stores/backtestCenterStore';
 import type { BacktestResult } from '../../services/backtestService';
 import { authService } from '../../features/auth/services/authService';
@@ -277,9 +278,22 @@ const BacktestDetailModal: React.FC<BacktestDetailModalProps> = ({
             </div>
             {rerunError && <Alert type="error" message={rerunError} />}
           </div>}
+          {config.executor_kind === 'frozen_stock_research' && <div className="space-y-3">
+            <Alert type={backtest.status === 'failed' ? 'error' : 'info'} message={`运行状态：${backtest.status} · 股票因子开发实验`}
+              description={backtest.error_message || '冻结 LightGBM + TopkDropout 基线；同输入、同配置结果复用。完成后的研究判断仍需独立复核。'} />
+            <p className="text-xs break-all">输入：{config.data_binding?.snapshot_id} · {config.data_binding?.manifest_sha256}</p>
+            <div className="flex gap-2">
+              <Button onClick={() => navigate(`/alpha-research?research=${config.research_id}`)}>研究来源</Button>
+              {config.factor_id&&<Button onClick={() => navigate(`/alpha-research?page=library&factor=${config.factor_id}`)}>因子代码与定义</Button>}
+            </div>
+            {backtest.status === 'completed' && <>
+              <QlibResultDisplay result={backtest} />
+              <details><summary className="cursor-pointer">固定对照与因子诊断</summary><pre className="text-xs whitespace-pre-wrap">{JSON.stringify({comparison:(backtest as any).advanced_stats?.comparison, factor:(backtest as any).advanced_stats?.factor_summary},null,2)}</pre></details>
+            </>}
+          </div>}
           {(backtest as any).ledger_view && <LedgerDetailView node="" caseId="" data={(backtest as any).ledger_view}
             artifact={{ name: '公共账本明细', uri: backtest.backtest_id, fixture: false }} />}
-          {(config.executor_kind !== 'r01_ledger' || backtest.status === 'completed') && <div className="grid grid-cols-3 gap-4">
+          {config.executor_kind !== 'frozen_stock_research' && (config.executor_kind !== 'r01_ledger' || backtest.status === 'completed') && <div className="grid grid-cols-3 gap-4">
             {metrics.map((metric) => (
               <div
                 key={metric.label}
@@ -294,14 +308,14 @@ const BacktestDetailModal: React.FC<BacktestDetailModalProps> = ({
             ))}
           </div>}
 
-          {backtest.equity_curve && backtest.equity_curve.length > 0 && (
+          {config.executor_kind !== 'frozen_stock_research' && backtest.equity_curve && backtest.equity_curve.length > 0 && (
             <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
               <h3 className="text-lg font-bold text-slate-800 tracking-tight mb-4">权益曲线</h3>
               <ReactECharts option={equityCurveOption} style={{ height: '280px' }} />
             </div>
           )}
 
-          {backtest.drawdown_curve && backtest.drawdown_curve.length > 0 && (
+          {config.executor_kind !== 'frozen_stock_research' && backtest.drawdown_curve && backtest.drawdown_curve.length > 0 && (
             <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
               <h3 className="text-lg font-bold text-slate-800 tracking-tight mb-4">回撤曲线</h3>
               <ReactECharts option={drawdownOption} style={{ height: '280px' }} />

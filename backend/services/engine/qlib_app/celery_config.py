@@ -225,6 +225,7 @@ celery_app.conf.update(
         "backend.services.engine.tasks.celery_tasks",
         "backend.services.engine.tasks.tushare_tasks",
         "backend.services.engine.tasks.r01_strategy_tasks",
+        "backend.services.engine.tasks.continuous_stock_tasks",
     ),
     # 监控配置
     worker_send_task_events=True,

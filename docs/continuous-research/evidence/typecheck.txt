@@ -1,0 +1,8 @@
+
+> quantmind@1.0.0 typecheck
+> npm run typecheck -w QuantMind
+
+
+> QuantMind@2.4.3 typecheck
+> tsc --noEmit
+

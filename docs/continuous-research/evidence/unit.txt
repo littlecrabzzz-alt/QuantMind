@@ -1,0 +1,22 @@
+test_classifier (test_recovery.QuotaTests.test_classifier) ... ok
+test_errors_do_not_leak (test_recovery.QuotaTests.test_errors_do_not_leak) ... ok
+test_freshness_and_reserve (test_recovery.QuotaTests.test_freshness_and_reserve) ... ok
+test_invalid_percentage (test_recovery.QuotaTests.test_invalid_percentage) ... ok
+test_missing_ambiguous_not_zero (test_recovery.QuotaTests.test_missing_ambiguous_not_zero) ... ok
+test_real_vendor_shape_no_invented_week (test_recovery.QuotaTests.test_real_vendor_shape_no_invented_week) ... ok
+test_retry_after (test_recovery.QuotaTests.test_retry_after) ... ok
+test_compute_wait_is_not_completion_or_new_progress (test_recovery.RecoveryTests.test_compute_wait_is_not_completion_or_new_progress) ... ok
+test_crash_recovery_preserves_receipt (test_recovery.RecoveryTests.test_crash_recovery_preserves_receipt) ... ok
+test_done_requires_report (test_recovery.RecoveryTests.test_done_requires_report) ... ok
+test_duplicates_and_queue_cap (test_recovery.RecoveryTests.test_duplicates_and_queue_cap) ... ok
+test_fresh_but_unchanged_positive_quota_does_not_clear_denial (test_recovery.RecoveryTests.test_fresh_but_unchanged_positive_quota_does_not_clear_denial) ... ok
+test_quota_does_not_consume_network_retry_budget (test_recovery.RecoveryTests.test_quota_does_not_consume_network_retry_budget) ... ok
+test_quota_exhaust_restore_continues_same_task (test_recovery.RecoveryTests.test_quota_exhaust_restore_continues_same_task) ... ok
+test_stop_idempotent_and_fenced (test_recovery.RecoveryTests.test_stop_idempotent_and_fenced) ... ok
+test_unknown_prevents_dispatch (test_recovery.RecoveryTests.test_unknown_prevents_dispatch) ... ok
+test_training_subpackages_are_part_of_frozen_inventory (test_snapshot_dependencies.SnapshotDependencyTests.test_training_subpackages_are_part_of_frozen_inventory) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.087s
+
+OK
