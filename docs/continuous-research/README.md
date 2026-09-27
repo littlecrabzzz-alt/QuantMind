@@ -86,3 +86,9 @@ python3 scripts/continuous_research/audit.py --output "/Users/lizeyu/Documents/C
 ```
 
 同目录当日汇总.md由巡检人工判断后更新。input/output为模型上报累计，包含输入缓存统计，不能直接换算套餐余量；中断未上报部分可能缺失。calls从晨间修复后记录，不回填历史，领取次数不当作调用次数。
+
+### 运维暂缓未派发的后续提案
+
+`scripts/continuous_research/hold_followup.py` 供主控处理已有证据复核发现的无依据提案，不是模型动作。它在本组 Engine 内复用 `get_auth_context` 和 `continuous_research.edit`：校验已有本地 JWT、课题所有者/租户/节点，并在同一行锁事务中，按原提案完整 SHA256 把 `followups` 中的待派提案移至 `withheld_followups`。原报告、提案全文、理由、复核 ID 与事件全部保留；已有任务 ID 或同指纹任务存在时拒绝，绝不取消在途计算。重复调用幂等。
+
+请求通过 stdin 传入 `token/program_id/parent_id/proposal_sha256/review_id/reason`；token 仅从本地私有运行配置取到内存管道，不写命令参数或日志。必须有已完成的 evidence_review，但主控仍须核对其具体主张，不能将 GLM 复核自动视为正确。可在服务运行中调用，无需重启；当前模型接口没有此能力。恢复研究应先补齐所需证据再明确派发新任务，不自动解除暂缓。该记录通过现有课题 API 和事件可追溯，前端没有单独的暂缓管理按钮。
