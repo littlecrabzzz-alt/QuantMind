@@ -208,7 +208,7 @@ try:
                 "worker",
                 "-Q",
                 prefix,
-                "--concurrency=" + ("1" if continuous else "2"),
+                "--concurrency=2",
                 "--loglevel=WARNING",
             ],
             [],
