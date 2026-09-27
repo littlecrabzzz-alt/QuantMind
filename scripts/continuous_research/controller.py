@@ -26,6 +26,8 @@ from backend.services.research_agent.glm_quota import (
     quota_decision,
 )
 
+MAX_MODEL_WORKERS = 6
+
 SYSTEM = """你是 QuantMind 的量化研究员。任务是提出可证伪假设，通过统一公共回测检验，保留失败结果。
 你没有 shell、文件、网页或交易工具。只输出一个 JSON 动作，不要 Markdown、前后解释。
 根据 task.kind 选择研究入口：research 为 ETF 组合研究；stock_factor 为 A股因子研究。
@@ -401,7 +403,7 @@ class Controller:
         futures = {}
         quota = {"status": "unknown", "remaining_percent": None}
         check_at = 0
-        with ThreadPoolExecutor(max_workers=3) as pool:
+        with ThreadPoolExecutor(max_workers=MAX_MODEL_WORKERS) as pool:
             while not self.stop.is_set():
                 now = time.time()
                 try:
@@ -426,7 +428,10 @@ class Controller:
                         active if state["desired"] == "running" else set()
                     )
                     futures = {k: f for k, f in futures.items() if not f.done()}
-                    for _ in range(state["contract"]["concurrency"] - len(futures)):
+                    slots = min(
+                        MAX_MODEL_WORKERS, state["contract"]["concurrency"]
+                    ) - len(futures)
+                    for _ in range(max(0, slots)):
                         reply = self.api.call("claim")
                         task = reply.get("task")
                         if not task:
