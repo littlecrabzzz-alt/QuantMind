@@ -96,6 +96,26 @@ class EvidenceReview(BaseModel):
     evidence: dict
 
 
+def reject_quarantined_metric_fields(evidence):
+    """Reject known contaminated structured fields, not incident descriptions.
+
+    This key barrier cannot identify contaminated metrics copied into free text.
+    """
+    forbidden = {"model_metadata_metrics", "test_metrics", "model_metrics"}
+    pending = [evidence]
+    while pending:
+        item = pending.pop()
+        if isinstance(item, dict):
+            blocked = forbidden.intersection(item)
+            if blocked:
+                raise ValueError(
+                    "evidence_contains_quarantined_metric_field:" + sorted(blocked)[0]
+                )
+            pending.extend(item.values())
+        elif isinstance(item, list):
+            pending.extend(item)
+
+
 @asynccontextmanager
 async def edit(ident, auth):
     async with get_session() as db:
@@ -473,6 +493,7 @@ async def command(
         if body.op == "add_evidence_review":
             request = EvidenceReview.model_validate(body.data)
             evidence = request.evidence
+            reject_quarantined_metric_fields(evidence)
             if evidence.get("boundary") != c["contract"]["end_date"]:
                 raise ValueError("evidence_development_boundary_required")
             sources = evidence.get("sources") or []
@@ -501,6 +522,8 @@ async def command(
             )
             return {"task_id": task_id, "evidence_id": digest[:32]}
         if body.op in ("expand_stock", "repair_stock_input"):
+            if "stock_scope_hold" in c:
+                raise ValueError("stock_scope_held_pending_boundary_acceptance")
             if c["desired"] != "stopped":
                 raise ValueError("stop_before_expanding_research_scope")
             from backend.services.research_agent.continuous_stock import freeze
@@ -661,8 +684,20 @@ async def command(
                     "builtins": "abs min max sum len float int dict list sorted enumerate zip round all any range sqrt fsum stdev ValueError".split(),
                     "unavailable_builtins": ["str", "isinstance", "Exception"],
                     "history_rule": "history requires lookback > 1; signal_on_month_end=true leaves history and monthly_prices empty on other days. Test availability before indexing; daily re-entry requires daily signal data.",
-                    "snapshot_rule": "snapshot contains account cash/nav/positions/risk, not a quote channel. Use history/monthly_prices for adjusted prices and respect warmup dates.",
+                    "snapshot_rule": (
+                        "First-entry snapshot is empty even when is_month_end is true. "
+                        "nav_exact and other account fields are available only after the first ledger day; "
+                        "handle is_entry before monthly logic, or use declared initial_cash only for initial sizing. "
+                        "snapshot contains account cash/nav/positions/risk, not market quotes. "
+                        "Use history/monthly_prices for adjusted prices and respect warmup dates."
+                    ),
                     "state_rule": "state must be a small JSON mapping; no unbounded daily history.",
+                    "result_artifact_rule": (
+                        "The model result summary omits full saved ledger evidence and strategy decisions. "
+                        "Missing from this summary means not provided here, not unrecorded by the engine. "
+                        "Request an evidence review of existing artifacts for paths, weights and fills; "
+                        "do not launch another backtest solely to retrieve them."
+                    ),
                 },
                 "prior_questions": [
                     x["question"] for x in list(c["tasks"].values())[-100:]

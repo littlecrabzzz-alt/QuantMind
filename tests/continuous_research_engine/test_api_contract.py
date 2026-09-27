@@ -1,12 +1,16 @@
 """Run in the Engine image (shares existing platform dependencies)."""
 
 import asyncio
+import copy
+from contextlib import asynccontextmanager
 import unittest
 from unittest.mock import patch, AsyncMock
 from backend.services.engine.routers.continuous_research import (
     act,
     ExperimentAction,
     ReportAction,
+    Command,
+    command,
 )
 from backend.services.research_agent import continuous_state as st
 
@@ -186,6 +190,92 @@ class ContractTests(unittest.IsolatedAsyncioTestCase):
             st.add_task(
                 self.c, "data_coverage", "overflow", "evidence", kind="evidence_review"
             )
+
+
+class IncidentAdmissionTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.c = st.initial({"end_date": "2026-03-24", "concurrency": 6})
+        self.c["stock_contract"] = None
+        self.c["stock_scope_hold"] = {"incident_id": "stock-boundary-20260927"}
+        existing = next(iter(self.c["tasks"].values()))
+        existing["reports"] = [{"text": "original report remains unchanged"}]
+        self.data = {
+            "topic": "method_review",
+            "question": "D3 更正：核对已知污染字段与最小补证要求",
+            "reason": "仅复核开发边界事故，不提供或重用被污染的模型指标。",
+            "evidence": {
+                "boundary": "2026-03-24",
+                "sources": [{"path": "incident-review.json", "sha256": "a" * 64}],
+                "checks": [{"status": "insufficient_evidence"}],
+            },
+        }
+
+    async def run_command(self, op, data):
+        @asynccontextmanager
+        async def edit(ident, auth):
+            yield self.c, None
+
+        with patch(
+            "backend.services.engine.routers.continuous_research.edit", new=edit
+        ):
+            return await command("this-program", Command(op=op, data=data), None)
+
+    async def test_held_scope_cannot_expand_or_repair_even_when_stopped(self):
+        for op in ("expand_stock", "repair_stock_input"):
+            for hold in ({"incident_id": "stock-boundary-20260927"}, {}, None):
+                self.c["stock_scope_hold"] = hold
+                before = copy.deepcopy(self.c)
+                with (
+                    self.subTest(op=op, hold=hold),
+                    patch(
+                        "backend.services.research_agent.continuous_stock.freeze"
+                    ) as freeze,
+                ):
+                    with self.assertRaisesRegex(ValueError, "held_pending_boundary"):
+                        await self.run_command(op, {})
+                    freeze.assert_not_called()
+                    self.assertEqual(self.c, before)
+
+    async def test_contaminated_fields_are_rejected_at_every_nested_shape(self):
+        for key in ("model_metadata_metrics", "test_metrics", "model_metrics"):
+            for fragment in (
+                {key: {"value": 0.9}},
+                {"rows": [{"nested": [{key: None}]}]},
+                {"nested": {"rows": [{"deeper": {key: "not admitted"}}]}},
+            ):
+                data = copy.deepcopy(self.data)
+                data["evidence"].update(fragment)
+                before = copy.deepcopy(self.c)
+                original_data = copy.deepcopy(data)
+                with self.subTest(key=key, fragment=fragment):
+                    with self.assertRaisesRegex(ValueError, "quarantined_metric_field"):
+                        await self.run_command("add_evidence_review", data)
+                    self.assertEqual(self.c, before)
+                    self.assertEqual(data, original_data)
+
+    async def test_d3_correction_can_name_fields_in_text_without_new_experiments(self):
+        data = copy.deepcopy(self.data)
+        data["evidence"]["checks"] = [
+            {
+                "finding": "model_metadata_metrics、test_metrics、model_metrics 来自受影响路径，旧结论不可据此升级。",
+                "quarantined_field_names": [
+                    "model_metadata_metrics",
+                    "test_metrics",
+                    "model_metrics",
+                ],
+                "required_evidence": "仅在边界隔离另行验收后恢复；当前未提供污染指标数值。",
+            }
+        ]
+        previous = copy.deepcopy(self.c["tasks"])
+        response = await self.run_command("add_evidence_review", data)
+        task = self.c["tasks"][response["task_id"]]
+        self.assertEqual(task["kind"], "evidence_review")
+        self.assertEqual(task["experiments"], {})
+        self.assertEqual(task["evidence"]["checks"], data["evidence"]["checks"])
+        self.assertEqual(task["evidence"]["sha256"], st.fingerprint(data["evidence"]))
+        self.assertIsNone(self.c["stock_contract"])
+        for ident, old in previous.items():
+            self.assertEqual(self.c["tasks"][ident], old)
 
 
 if __name__ == "__main__":

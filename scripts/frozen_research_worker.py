@@ -15,6 +15,7 @@ from qlib.contrib.strategy.signal_strategy import TopkDropoutStrategy, WeightStr
 from qlib.data import D
 
 import train
+from data.loading import development_cutoff, read_development_range
 from backend.services.engine.data_platform.quantdb_factor_reader import QuantDBFactorReader
 from backend.services.engine.qlib_app.utils.cn_exchange import CnExchange
 from backend.shared.stock_utils import StockCodeUtil
@@ -160,6 +161,12 @@ def main():
     if not Path(train.__file__).resolve().is_relative_to(FROZEN / "code"):
         raise RuntimeError("Training module was imported outside the frozen code tree")
     cfg = json.loads((FROZEN / "config.json").read_text())
+    development_end = cfg.get("development_end")
+    cutoff = development_cutoff(development_end)
+    for name in ("train", "valid", "test"):
+        start, end = map(pd.Timestamp, cfg["split"][name])
+        if pd.isna(start) or pd.isna(end) or start > end or end > cutoff:
+            raise ValueError("frozen research split outside development_end")
     features = cfg["features"]
     derived = cfg.get("derived_factor")
     source_features = cfg.get("source_features", features) if derived else features
@@ -168,6 +175,7 @@ def main():
     write("runtime.json", {"packages": {name: importlib.metadata.version(name) for name in
           ("numpy", "pandas", "lightgbm", "pyqlib", "duckdb", "pyarrow")},
           "training_code": str(Path(train.__file__).resolve()),
+          "development_end": development_end,
           "factor_root": "/frozen/quantdb", "provider": "/frozen/qlib",
           "network": "none", "signal_lag": "Qlib strategy reads previous trading day; no extra shift"})
     qlib.init(provider_uri="/frozen/qlib", region="cn", kernels=1,
@@ -175,10 +183,12 @@ def main():
               exp_manager={"class": "MLflowExpManager", "module_path": "qlib.workflow.expm",
                            "kwargs": {"uri": "file:/tmp/mlruns", "default_exp_name": "research"}})
     reader = QuantDBFactorReader("/frozen/quantdb", market="CN")
+    def read_range(**kwargs):
+        return read_development_range(reader, source, development_end=development_end, **kwargs)
     train_start, train_end = cfg["split"]["train"]
     test_start, test_end = cfg["split"]["test"]
     liquidity_start = (pd.Timestamp(train_end) - timedelta(days=180)).date().isoformat()
-    history = reader.read_range(source, features=source_features, start=liquidity_start, end=train_end)
+    history = read_range(features=source_features, start=liquidity_start, end=train_end)
     available = {StockCodeUtil.to_prefix(symbol) for symbol in D.list_instruments(
         D.instruments("all"), start_time=liquidity_start, end_time=train_end, as_list=True)}
     # Keep main-board names only: the inherited 9.5% limit approximation is not
@@ -192,7 +202,8 @@ def main():
     frame, actual_features = train.load_data(
         train_start, train_end, source_features, target_horizon_days=1,
         valid_end=cfg["split"]["valid"][1], test_end=test_end,
-        local_dir="/frozen/quantdb", quantdb_dir="/frozen/quantdb", factor_source=source)
+        local_dir="/frozen/quantdb", quantdb_dir="/frozen/quantdb", factor_source=source,
+        development_end=development_end)
     if actual_features != source_features:
         raise RuntimeError("Training silently changed requested features")
     frame = frame[frame["symbol"].isin(universe)].copy()
@@ -203,7 +214,7 @@ def main():
         validate(derived["expression"], source_features)
         if derived["name"] != "research_signal" or features != source_features + [derived["name"]]:
             raise ValueError("Derived factor must augment the frozen baseline once")
-        raw_factor = reader.read_range(source, features=source_features,
+        raw_factor = read_range(features=source_features,
             start=train_start, end=test_end)
         raw_factor = raw_factor[raw_factor.symbol.isin(universe)].copy()
         trading_calendar = D.calendar(start_time=raw_factor.trade_date.min(), end_time=test_end, freq="day")
@@ -232,13 +243,16 @@ def main():
     write("model-metadata.json", {"features": features, "fill_values": model_result["fill_values"],
           "training_metrics": model_result["train_m"], "validation_metrics": model_result["val_m"],
           "test_metrics": model_result["test_m"], "best_iteration": model_result["best_iteration"],
+          "development_end": development_end,
+          "label_purge": {name: part.attrs["label_purge"] for name, part in
+                          (("train", fit), ("valid", valid), ("test", test))},
           "fit_rows": len(fit), "validation_rows": len(valid), "test_rows": len(test)})
     calendar = pd.DatetimeIndex(D.calendar(start_time=pd.Timestamp(test_start) - timedelta(days=30),
                                          end_time=test_end, freq="day"))
     previous_day = calendar[calendar < pd.Timestamp(test_start)][-1]
     signal_days = calendar[(calendar >= previous_day) & (calendar < pd.Timestamp(test_end))]
     batch = (raw_factor.copy() if derived else
-             reader.read_range(source, features=features, start=str(previous_day.date()), end=test_end))
+             read_range(features=features, start=str(previous_day.date()), end=test_end))
     batch = eligible(batch, universe, features, factor)
     batch = batch[batch["trade_date"].isin(signal_days)].copy()
     model = lgb.Booster(model_file=str(OUT / "model.lgb"))
@@ -256,7 +270,7 @@ def main():
             prefix[derived["name"]] = evaluate(prefix, derived["expression"], source_features)
             daily = eligible(prefix[prefix.trade_date == day], universe, features, factor)
         else:
-            daily = eligible(reader.read_day(source, features=features, trade_date=str(day.date())),
+            daily = eligible(read_range(features=features, start=str(day.date()), end=str(day.date())),
                              universe, features, factor)
         daily["score"] = predict(daily)
         replay.append(daily[["trade_date", "symbol", "score"]])

@@ -100,8 +100,29 @@ def _split_data(df: pd.DataFrame, cfg: dict) -> tuple:
             f"  test[{len(test_df)}] {pd.Timestamp(test_start).date()}~"
         )
 
-    train_df = _purge_label_tail(train_df, cfg)
-    val_df = _purge_label_tail(val_df, cfg)
+    if cfg.get("development_end") is not None:
+        from data.loading import check_development_rows, development_cutoff
+
+        cutoff = development_cutoff(cfg["development_end"])
+        check_development_rows(df, cfg["development_end"])
+        if "_label_end_date" not in df or not all(split_cfg.get(k) for k in ("train", "valid", "test")):
+            raise ValueError("development splits require explicit ranges and label end dates")
+        frames = []
+        for name, frame in (("train", train_df), ("valid", val_df), ("test", test_df)):
+            end = pd.Timestamp(split_cfg[name][1])
+            if end > cutoff:
+                raise ValueError("requested split exceeds development_end")
+            purged = _purge_label_tail(frame, cfg, end=end)
+            purged.attrs["label_purge"] = {
+                "segment_end": str(end.date()), "rows_before": len(frame),
+                "rows_after": len(purged), "rows_removed": len(frame) - len(purged),
+                "max_label_end": str(purged["_label_end_date"].max().date()) if len(purged) else None,
+            }
+            frames.append(purged)
+        train_df, val_df, test_df = frames
+    else:
+        train_df = _purge_label_tail(train_df, cfg)
+        val_df = _purge_label_tail(val_df, cfg)
 
     train_df = train_df.reset_index(drop=True)
     val_df = val_df.reset_index(drop=True)
@@ -167,14 +188,15 @@ def _prepare_arrays(
     return fill_values, X_train, y_train, X_val, y_val, _fill
 
 
-def _purge_label_tail(frame: pd.DataFrame, cfg: dict) -> pd.DataFrame:
+def _purge_label_tail(frame: pd.DataFrame, cfg: dict, end: pd.Timestamp | None = None) -> pd.DataFrame:
     """Keep labels inside a segment, including stocks with missing trading dates.
 
     Labels shift by rows within each symbol, so a market-wide calendar gap is
     insufficient for sparse stocks. Short segments become empty and fail closed.
     """
     if "_label_end_date" in frame:
-        return frame.loc[frame["_label_end_date"] <= frame["trade_date"].max()].copy()
+        boundary = frame["trade_date"].max() if end is None else end
+        return frame.loc[frame["_label_end_date"] <= boundary].copy()
     # Legacy/test frames without label provenance use conservative per-stock tails.
     span = max(1, int((cfg.get("label") or {}).get("target_horizon_days") or 1)) + _EXECUTION_LAG_DAYS
     ordered = frame.sort_values(["symbol", "trade_date"])

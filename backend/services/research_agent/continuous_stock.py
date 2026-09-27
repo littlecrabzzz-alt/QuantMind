@@ -33,6 +33,7 @@ def freeze(end_date):
         dates[1] = min(dates[1], end_date)
         if dates[0] > dates[1]:
             raise ValueError("stock_split_outside_development_boundary")
+    base["development_end"] = end_date
     return {
         **cfg,
         "base_config": base,

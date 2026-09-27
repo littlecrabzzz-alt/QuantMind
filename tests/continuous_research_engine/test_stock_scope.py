@@ -33,6 +33,8 @@ class StockScopeTests(unittest.TestCase):
             frozen = freeze("2026-03-24")
         self.assertEqual(base["split"]["test"][1], "2026-08-31")
         self.assertEqual(frozen["base_config"]["split"]["test"][1], "2026-03-24")
+        self.assertEqual(frozen["base_config"]["development_end"], "2026-03-24")
+        self.assertNotIn("development_end", base)
         self.assertNotIn("source", inventory(frozen))
 
     def test_no_future_lag_or_python_in_factor_expression(self):

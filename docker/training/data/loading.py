@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -17,6 +18,37 @@ import pyarrow.parquet as pq
 from data.splits import _EXECUTION_LAG_DAYS
 
 logger = logging.getLogger("quantmind.train")
+
+
+def development_cutoff(value: str) -> pd.Timestamp:
+    """A frozen research boundary must be explicit, canonical and date-only."""
+    if not isinstance(value, str):
+        raise ValueError("development_end must be an explicit YYYY-MM-DD date")
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError("development_end must be an explicit YYYY-MM-DD date") from exc
+    if parsed.isoformat() != value:
+        raise ValueError("development_end must be an explicit YYYY-MM-DD date")
+    return pd.Timestamp(parsed)
+
+
+def check_development_rows(frame: pd.DataFrame, development_end: str) -> None:
+    cutoff = development_cutoff(development_end)
+    dates = pd.to_datetime(frame["trade_date"], errors="coerce")
+    if dates.isna().any() or (dates > cutoff).any():
+        raise ValueError("reader returned dates outside development_end")
+
+
+def read_development_range(reader, source: str, *, development_end: str, **kwargs):
+    """Reject an invalid request before I/O and an over-return before consumption."""
+    cutoff = development_cutoff(development_end)
+    start, end = pd.Timestamp(kwargs["start"]), pd.Timestamp(kwargs["end"])
+    if pd.isna(start) or pd.isna(end) or start > end or end > cutoff:
+        raise ValueError("read request outside development_end")
+    frame = reader.read_range(source, **kwargs)
+    check_development_rows(frame, development_end)
+    return frame
 
 
 def _to_prefix_symbol(sym: str) -> str:
@@ -109,6 +141,7 @@ def load_data(
     quantdb_dir: str | None = None,
     factor_field_sources: dict[str, str] | None = None,
     pool_symbols: list[str] | None = None,
+    development_end: str | None = None,
 ) -> tuple:
     local_root = Path(local_dir).expanduser() if local_dir else None
     if local_root is None:
@@ -142,6 +175,13 @@ def load_data(
     range_end = pd.Timestamp(upper_bound) + pd.Timedelta(days=max(7, horizon + 3))
 
     direct_factor_source = str(factor_source or "").strip()
+    if development_end is not None:
+        cutoff = development_cutoff(development_end)
+        if not direct_factor_source or market_upper not in _MARKET_DATA_DIR_ENV:
+            raise ValueError("development_end requires a bounded direct factor source")
+        if any(pd.Timestamp(end) > cutoff for end in (train_end, valid_end, test_end) if end):
+            raise ValueError("requested split exceeds development_end")
+        range_end = min(range_end, cutoff)
     if direct_factor_source and market_upper in _MARKET_DATA_DIR_ENV:
         # Direct QuantDB mode: one factor source only, never materialise or merge snapshots.
         # 与 A 股一致：直接读该市场 6_ml_datasets 下的因子分区
@@ -165,7 +205,10 @@ def load_data(
             range_start.date(),
             range_end.date(),
         )
-        df = reader.read_range(
+        read_range = reader.read_range if development_end is None else (
+            lambda source, **kw: read_development_range(
+                reader, source, development_end=development_end, **kw))
+        df = read_range(
             direct_factor_source,
             features=features,
             feature_sources=factor_field_sources,
