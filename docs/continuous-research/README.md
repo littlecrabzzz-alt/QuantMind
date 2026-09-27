@@ -121,3 +121,12 @@ python3 scripts/continuous_research/audit.py --output "/Users/lizeyu/Documents/C
 `link_evidence_request.py` 在可信程序构建并通过 `add_evidence_review` 注册证据后，将原 `awaiting_evidence` 请求关联到该复核任务。认证请求只从 stdin 传入，字段为 `token/program_id/parent_id/proposal_sha256/review_id`，在本组 Engine 中运行；复用既有 JWT、所有者/租户/节点和行锁。
 
 请求指纹排除可变的 `task_id/awaiting_evidence/evidence_resolution`。证据须包含精确的 `origin_request`（父任务、原请求指纹、排序后的 backtest_ids）、合同开发截止及有效内容哈希；父任务须为已完成 ETF 研究。错来源/错截止/冲突关联拒绝，同请求同任务重放不新增事件。仅保存关联与审计记录，不生成证据、不验证 GLM 结论，也不把原报告改写成已验收。新脚本按需启动，无服务重启。
+
+
+### 9月27日18时候选：物理读取范围与容器恢复身份
+
+QuantDBFactorReader.read_range 把日期上下界传入 schema 采样、主因子、daily_backward 和 L1 donor；DuckDB 接收已按分区日期选定的文件清单，范围外非法 footer/schema 不再参与打开。bounded describe 的 min/max 对应选中分区，整体覆盖检查只读目录名；缺两端日期、坏dt日期、空选择明确失败，不回退外部 schema。无界 describe 保持完整来源描述；依赖分区命名真实，未证明全部数据语义。
+
+research.runtime 候选对新建启动前、重连启动前、observe 三条路径统一检查不可变 image ID、输入/配置/代码/输出四处挂载及读写权限、network none/readonly rootfs、命令/加载环境/工作目录。launch-intent 新增输入manifest、冻结worker代码、config和proposal文件身份；重连校验合同与原记录，同身份created只start一次、不重写文件。旧intent无身份失败关闭，不原地补盖章。完整输入包内容仍沿用原frozen.verify的新建/完成检查，未新增每次心跳整包验证。
+
+**本轮只提交隔离候选并做临时合成/Mock Docker测试，未重启或加载运行服务，未改变旧冻结包或恢复股票。** 仍需新包物理裁剪、独立Qlib provider、实际import/容器身份验收和已暴露范围处置；不能把本地源码测试当股票准入。

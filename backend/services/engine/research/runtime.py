@@ -108,14 +108,58 @@ def inspect(name):
         raise RuntimeError("暂时无法查询研究容器，保留原任务等待恢复") from None
 
 
-def check_container(info, experiment, directory, node):
+def container_identity(directory, contract):
+    """Bind reconnects to the files recorded before the original launch."""
+    source = Path(contract["source"])
+    manifest = frozen.sha256(source / "manifest.json")
+    hashes = {
+        name: frozen.sha256(directory.parent.parent / "code" / name)
+        for name in contract["code_hashes"]
+    }
+    if manifest != contract["manifest_sha256"] or hashes != contract["code_hashes"]:
+        raise ValueError("研究输入清单或冻结执行代码身份发生变化")
+    return {
+        "manifest_sha256": manifest,
+        "code_hashes": hashes,
+        "config_sha256": frozen.sha256(directory / "config.json"),
+        "proposal_sha256": frozen.sha256(directory / "proposal.json"),
+    }
+
+
+def check_container(info, experiment, directory, contract, config=None):
     labels = info["Config"].get("Labels") or {}
-    if labels.get("quantmind.research.node") != node or labels.get("quantmind.research.id") != experiment["id"]:
+    if labels.get("quantmind.research.node") != contract["node_id"] or labels.get("quantmind.research.id") != experiment["id"]:
         raise ValueError("容器所有权不匹配")
-    if not any(m["Destination"] == "/output" and m["Source"] == host_path(str(directory), runtime_only=True) for m in info["Mounts"]):
-        raise ValueError("容器输出挂载不匹配")
-    if info["HostConfig"]["NetworkMode"] != "none":
-        raise ValueError("研究容器没有网络隔离")
+    if info.get("Image") != contract["image"]["Id"]:
+        raise ValueError("研究容器镜像身份不匹配")
+    host = info["HostConfig"]
+    if host["NetworkMode"] != "none" or host.get("ReadonlyRootfs") is not True:
+        raise ValueError("研究容器网络或只读隔离不匹配")
+    expected = {
+        "/output": (host_path(str(directory), runtime_only=True), True),
+        "/frozen": (host_path(str(Path(contract["source"]) / "snapshot"), runtime_only=True), False),
+        "/frozen/config.json": (host_path(str(directory / "config.json"), runtime_only=True), False),
+        "/research-code": (host_path(str(directory.parent.parent / "code"), runtime_only=True), False),
+    }
+    mounts = [m for m in info["Mounts"] if not (
+        m.get("Type") == "tmpfs" and m["Destination"] == "/tmp"
+    )]
+    actual = {m["Destination"]: (m["Source"], m.get("RW")) for m in mounts}
+    if actual != expected or len(mounts) != len(expected):
+        raise ValueError("研究容器输入、代码或输出挂载不匹配")
+    intent = frozen.read(directory / "launch-intent.json")
+    if intent.get("identity") != container_identity(directory, contract):
+        raise ValueError("研究容器缺少原始文件身份或文件发生变化")
+    if config is not None and frozen.read(directory / "config.json") != config:
+        raise ValueError("恢复请求与原始实验配置不匹配")
+    if frozen.read(directory / "proposal.json") != experiment["proposal"]:
+        raise ValueError("恢复请求与原始实验提案不匹配")
+    spec = intent["spec"]
+    if info["Config"].get("Cmd") != spec["command"] or info["Config"].get("Entrypoint") != [spec["entrypoint"]]:
+        raise ValueError("研究容器执行入口发生变化")
+    environment = dict(item.split("=", 1) for item in info["Config"].get("Env", []))
+    if any(environment.get(k) != str(v) for k, v in spec["environment"].items()) or info["Config"].get("WorkingDir") != spec["working_dir"]:
+        raise ValueError("研究容器数据或模块加载环境发生变化")
 
 
 def launch(case_dir, experiment, config, contract, deadline):
@@ -130,7 +174,7 @@ def _launch(case_dir, experiment, config, contract, deadline):
     directory.mkdir(parents=True, exist_ok=True)
     info = inspect(experiment["container_name"])
     if info:
-        check_container(info, experiment, directory, contract["node_id"])
+        check_container(info, experiment, directory, contract, config)
         if info["State"]["Status"] == "created":
             with docker_client() as client:
                 client.api.start(info["Id"])
@@ -172,11 +216,12 @@ def _launch(case_dir, experiment, config, contract, deadline):
             "OMP_NUM_THREADS": "4", "PYTHONHASHSEED": "42", "QM_QUANTDB_DATA_DIR": "/frozen/quantdb",
             "QUANTDB_DATA_DIR": "/frozen/quantdb", "QLIB_PROVIDER_URI": "/frozen/qlib"},
         "entrypoint": "python", "command": ["-c", watchdog, str(deadline)]}
-    frozen.write(directory / "launch-intent.json", {"spec": spec, "deadline_epoch": deadline, "created_epoch": time.time()})
+    frozen.write(directory / "launch-intent.json", {"spec": spec, "identity": container_identity(directory, contract), "deadline_epoch": deadline, "created_epoch": time.time()})
     import docker
     try:
         with docker_client() as client:
             container = client.containers.create(**spec)
+            check_container(client.api.inspect_container(container.id), experiment, directory, contract, config)
             container.start()
             return container.id
     except docker.errors.DockerException:
@@ -188,7 +233,7 @@ def observe(case_dir, experiment, contract, stop=False):
     info = inspect(experiment["container_name"])
     if info is None:
         raise ValueError("已提交的容器不存在，不能证明实验已停止或完成")
-    check_container(info, experiment, directory, contract["node_id"])
+    check_container(info, experiment, directory, contract, experiment.get("config"))
     if stop and info["State"]["Running"]:
         with docker_client() as client:
             client.api.stop(experiment["container_name"], timeout=10)

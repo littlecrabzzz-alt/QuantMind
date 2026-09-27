@@ -185,11 +185,58 @@ class QuantDBFactorReader:
     def source_path(self, source: str) -> Path:
         return self.data_dir / FACTOR_SOURCE_DIRS[self.validate_source(source)]
 
-    def _files(self, source: str) -> list[Path]:
-        root = self.source_path(source)
+    @staticmethod
+    def _partition_files(
+        root: Path,
+        *,
+        start: str | date | None = None,
+        end: str | date | None = None,
+    ) -> list[Path]:
+        """Select physical files before DuckDB can inspect any parquet footer.
+
+        Non-partition/staging files are ignored. Invalid dt= dates fail closed;
+        an empty selection never falls back to opening files outside the range.
+        """
+        try:
+            start_date = (
+                date.fromisoformat(str(start)[:10]) if start is not None else None
+            )
+            end_date = date.fromisoformat(str(end)[:10]) if end is not None else None
+        except ValueError as exc:
+            raise QuantDBFactorError("Invalid QuantDB date range") from exc
+        if start_date and end_date and start_date > end_date:
+            raise QuantDBFactorError("QuantDB start date must not exceed end date")
+        files = []
         # 只统计已发布的 dt= 分区文件，排除 _stage 等非分区暂存目录，
         # 否则暂存 parquet 会被计入分区文件数，与实际可读数据不一致。
-        return sorted(root.glob("dt=*/*.parquet")) if root.is_dir() else []
+        candidates = sorted(root.glob("dt=*/*.parquet")) if root.is_dir() else []
+        for path in candidates:
+            partition = path.parent.name[3:]
+            try:
+                if not re.fullmatch(r"[0-9]{8}", partition):
+                    raise ValueError("expected YYYYMMDD")
+                partition_date = date(
+                    int(partition[:4]), int(partition[4:6]), int(partition[6:])
+                )
+            except ValueError as exc:
+                raise QuantDBFactorError(
+                    f"Invalid QuantDB date partition: {path.parent}"
+                ) from exc
+            if start_date and partition_date < start_date:
+                continue
+            if end_date and partition_date > end_date:
+                continue
+            files.append(path)
+        return files
+
+    def _files(
+        self,
+        source: str,
+        *,
+        start: str | date | None = None,
+        end: str | date | None = None,
+    ) -> list[Path]:
+        return self._partition_files(self.source_path(source), start=start, end=end)
 
     @staticmethod
     def _partition_date_range(root: Path) -> tuple[str | None, str | None]:
@@ -215,6 +262,13 @@ class QuantDBFactorReader:
         return min(dates), max(dates)
 
     @staticmethod
+    def _files_relation(files: list[Path]) -> str:
+        paths = ", ".join(
+            "'" + p.as_posix().replace("'", "''") + "'" for p in files
+        )
+        return f"read_parquet([{paths}], hive_partitioning=true, union_by_name=true)"
+
+    @staticmethod
     def _sample_schema_relation(files: list[Path]) -> str:
         """用单个文件做 schema 采样，避免打开全量 2581 文件。
 
@@ -222,15 +276,19 @@ class QuantDBFactorReader:
         也要逐个开文件，耗时数秒~数十秒。刻意只取 1 个文件：多文件 UNION
         需要子查询别名，容易写出无效 SQL，且无额外收益。
         """
-        p = files[0].as_posix().replace("'", "''")
-        return f"read_parquet('{p}', hive_partitioning=true, union_by_name=true)"
+        return QuantDBFactorReader._files_relation(files[:1])
 
-    def _donor_has_ohlcv(self) -> bool:
+    def _donor_has_ohlcv(
+        self,
+        *,
+        start: str | date | None = None,
+        end: str | date | None = None,
+    ) -> bool:
         """检查 l1 donor 是否含 OHLCV：同样只采样 1 个文件，避免全扫。"""
         root = self.data_dir / FACTOR_SOURCE_DIRS[OHLCV_DONOR_SOURCE]
         if not root.is_dir():
             return False
-        files = sorted(root.glob("dt=*/*.parquet"))
+        files = self._partition_files(root, start=start, end=end)
         if not files:
             return False
         duckdb = self._duckdb()
@@ -255,17 +313,27 @@ class QuantDBFactorReader:
             ) from exc
         return duckdb
 
-    def _relation(self, source: str) -> str:
+    def _relation(
+        self,
+        source: str,
+        *,
+        start: str | date | None = None,
+        end: str | date | None = None,
+    ) -> str:
         root = self.source_path(source)
         if not root.is_dir():
             raise QuantDBFactorError(f"QuantDB factor directory does not exist: {root}")
-        # 只读取已发布分区 dt=YYYYMMDD/*.parquet（hive 分区）。若用 **/*.parquet 把
-        # _stage 等暂存目录一并 glob，暂存文件 schema 与分区不一致会抛
-        # "Hive partition mismatch"，导致整个因子源无法直读训练。
-        parquet_glob = str(root / "dt=*" / "*.parquet").replace("'", "''")
-        return f"read_parquet('{parquet_glob}', hive_partitioning=true, union_by_name=true)"
+        files = self._files(source, start=start, end=end)
+        if not files:
+            raise QuantDBFactorError(f"No parquet files in requested range: {root}")
+        return self._files_relation(files)
 
-    def _daily_backward_relation(self) -> str | None:
+    def _daily_backward_relation(
+        self,
+        *,
+        start: str | date | None = None,
+        end: str | date | None = None,
+    ) -> str | None:
         """返回后复权日线关系；数据未部署时保持因子表原有行为。
 
         严格按 dt=YYYYMMDD/ 的 Hive 分区布局读取，只匹配已发布分区文件。
@@ -274,22 +342,23 @@ class QuantDBFactorReader:
         Hive 结构一并读入，抛出 "Hive partition mismatch" 导致训练失败。
         """
         root = self.data_dir / DAILY_BACKWARD_DIR
-        if not root.is_dir() or not any(root.glob("dt=*/*.parquet")):
-            return None
-        parquet_glob = str(root / "dt=*" / "*.parquet").replace("'", "''")
-        return f"read_parquet('{parquet_glob}', hive_partitioning=true, union_by_name=true)"
+        files = self._partition_files(root, start=start, end=end)
+        return self._files_relation(files) if files else None
 
-    def _ohlcv_donor_relation(self) -> str | None:
+    def _ohlcv_donor_relation(
+        self,
+        *,
+        start: str | date | None = None,
+        end: str | date | None = None,
+    ) -> str | None:
         """返回同目录 l1_factors 关系，作为无 OHLCV 次要源（ccass/south）的行情补给。
 
         与全库统一，严格读取已发布的 dt=YYYYMMDD/ 分区布局，避免误把顶层
         残留单文件 glob 进来造成 "Hive partition mismatch"。
         """
         root = self.data_dir / FACTOR_SOURCE_DIRS[OHLCV_DONOR_SOURCE]
-        if not root.is_dir() or not any(root.glob("dt=*/*.parquet")):
-            return None
-        parquet_glob = str(root / "dt=*" / "*.parquet").replace("'", "''")
-        return f"read_parquet('{parquet_glob}', hive_partitioning=true, union_by_name=true)"
+        files = self._partition_files(root, start=start, end=end)
+        return self._files_relation(files) if files else None
 
     @staticmethod
     def _relation_columns(relation: str) -> set[str]:
@@ -303,9 +372,15 @@ class QuantDBFactorReader:
         finally:
             con.close()
 
-    def describe(self, source: str) -> FactorSourceStatus:
+    def describe(
+        self,
+        source: str,
+        *,
+        start: str | date | None = None,
+        end: str | date | None = None,
+    ) -> FactorSourceStatus:
         source = self.validate_source(source)
-        files = self._files(source)
+        files = self._files(source, start=start, end=end)
         root = self.source_path(source)
         if not files:
             return FactorSourceStatus(
@@ -319,11 +394,14 @@ class QuantDBFactorReader:
                 max_date=None,
                 ready=False,
                 missing_required=list(REQUIRED_COLUMNS),
-                reason="No parquet files found",
+                reason="No parquet files found in requested range",
             )
 
-        # 快路径：min/max 先走分区目录名（<0.2s），避免 SELECT 全表扫描 50s+
-        part_min, part_max = self._partition_date_range(root)
+        # files 已按合法分区日期排序；范围描述只包含实际选中的分区。
+        date_row = tuple(
+            f"{value[:4]}-{value[4:6]}-{value[6:]}"
+            for value in (files[0].parent.name[3:], files[-1].parent.name[3:])
+        )
 
         duckdb = self._duckdb()
         con = duckdb.connect(config={"memory_limit": "2GB", "threads": "2"})
@@ -333,15 +411,6 @@ class QuantDBFactorReader:
             described = con.execute(f"DESCRIBE SELECT * FROM {sampled}").fetchall()
             columns = [str(row[0]) for row in described]
             column_types = {str(row[0]): str(row[1]) for row in described}
-            if part_min is not None and part_max is not None:
-                date_row = (part_min, part_max)
-            else:
-                # 兜底：非分区存储才回退全表 min/max 扫描
-                relation = self._relation(source)
-                date_expr = self._date_expression(columns)
-                date_row = con.execute(
-                    f"SELECT min({date_expr}), max({date_expr}) FROM {relation}"
-                ).fetchone()
         except Exception as exc:
             return FactorSourceStatus(
                 dataset_id=source,
@@ -371,7 +440,7 @@ class QuantDBFactorReader:
         if missing and set(missing) <= set(OHLCV_COLUMNS):
             # 次要源（ccass/south）：OHLCV 由同目录 l1_factors 补给，标签可构建。
             # 用采样检查代替全量 _relation_columns，避免又一次全扫。
-            if self._donor_has_ohlcv():
+            if self._donor_has_ohlcv(start=start, end=end):
                 missing = []
             else:
                 reason = "Missing OHLCV columns (l1_factors donor unavailable)"
@@ -422,21 +491,23 @@ class QuantDBFactorReader:
         start: str | date | None = None,
         end: str | date | None = None,
     ) -> FactorSourceStatus:
-        status = self.describe(source)
+        status = self.describe(source, start=start, end=end)
         if not status.ready:
             detail = (
-                ", ".join(status.missing_required) or status.reason or "unknown reason"
+                status.reason or ", ".join(status.missing_required) or "unknown reason"
             )
             raise QuantDBFactorError(
                 f"{source} is not ready for direct training: {detail}"
             )
-        if start and status.min_date and str(start)[:10] < status.min_date:
+        # 覆盖范围只查目录名；请求首尾可能为休市日，不能与裁剪后首尾交易日比较。
+        available_min, available_max = self._partition_date_range(self.source_path(source))
+        if start and available_min and str(start)[:10] < available_min:
             raise QuantDBFactorError(
-                f"{source} starts at {status.min_date}; requested {start}"
+                f"{source} starts at {available_min}; requested {start}"
             )
-        if end and status.max_date and str(end)[:10] > status.max_date:
+        if end and available_max and str(end)[:10] > available_max:
             raise QuantDBFactorError(
-                f"{source} ends at {status.max_date}; requested {end}"
+                f"{source} ends at {available_max}; requested {end}"
             )
         return status
 
@@ -458,6 +529,8 @@ class QuantDBFactorReader:
         include_ohlcv: bool = True,
     ) -> pd.DataFrame:
         """Project raw source columns for a date range into an in-memory DataFrame."""
+        if start is None or end is None:
+            raise QuantDBFactorError("QuantDB read_range requires both date bounds")
         status = self.assert_ready(source, start=start, end=end)
         available = set(status.columns)
         requested = list(dict.fromkeys(features))
@@ -480,17 +553,17 @@ class QuantDBFactorReader:
                 f"{source} is missing mapped fields: {', '.join(missing[:10])}"
             )
 
-        factor_relation = self._relation(source)
+        factor_relation = self._relation(source, start=start, end=end)
         factor_date = self._qualified_date_expression(status.columns, "f")
         selected = [
             'f."symbol"',
             f"{factor_date} AS trade_date",
         ]
-        daily_relation = self._daily_backward_relation()
+        daily_relation = self._daily_backward_relation(start=start, end=end)
         # 次要源（ccass/south 等）无 OHLCV 列：从同目录 l1_factors 补给行情，
         # 用于构建无泄漏的未来收益标签；含 OHLCV 的源不触发。
         ohlcv_donor = (
-            self._ohlcv_donor_relation()
+            self._ohlcv_donor_relation(start=start, end=end)
             if include_ohlcv and not set(OHLCV_COLUMNS) <= set(status.columns)
             else None
         )
