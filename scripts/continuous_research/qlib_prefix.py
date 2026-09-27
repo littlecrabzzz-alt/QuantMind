@@ -13,7 +13,9 @@ import struct
 from pathlib import Path
 
 
-def feature_prefix(source: Path, cutoff_index: int) -> tuple[bytes, dict]:
+def feature_prefix(
+    source: Path, cutoff_index: int, *, dir_fd: int | None = None
+) -> tuple[bytes, dict]:
     """Read header + allowed float32 values without reading or hashing the future tail.
 
     Short series retain their real endpoint; missing values retain their bits.
@@ -22,7 +24,7 @@ def feature_prefix(source: Path, cutoff_index: int) -> tuple[bytes, dict]:
     """
     if type(cutoff_index) is not int or cutoff_index < 0:
         raise ValueError("cutoff_index must be a nonnegative global calendar index")
-    fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
     try:
         before = os.fstat(fd)
         if not stat.S_ISREG(before.st_mode) or before.st_size < 8 or before.st_size % 4:
@@ -42,7 +44,8 @@ def feature_prefix(source: Path, cutoff_index: int) -> tuple[bytes, dict]:
         if len(values) != count * 4:
             raise ValueError("Source truncated during prefix read")
         after = os.fstat(fd)
-        current = os.stat(source, follow_symlinks=False)
+        current = os.stat(source, dir_fd=dir_fd, follow_symlinks=False)
+
         def identity(s):
             return (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
 
