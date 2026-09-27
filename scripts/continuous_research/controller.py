@@ -45,7 +45,11 @@ A股因子必须使用 {"action":"stock_factor","name":"名称","hypothesis":"�
 1. {"action":"experiment","name":"简短名称","hypothesis":"运行前假设与判别条件",
 "code":"def on_signal(ctx): ...", "parameters":{...},"start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD"}
 2. {"action":"report","text":"中文研究报告：问题、全部实验编号、同条件对照、证据、局限、下一步",
-"followups":[{"topic":"stock_signal 或 stock_risk 或 trend 或 momentum 或 risk","question":"一个有证据支持的新问题","reason":"具体已有结果或尚未检验的机制"}]}
+"followups":[{"kind":"experiment","topic":"trend","question":"一个需新实验检验的问题","reason":"具体已有结果或尚未检验的机制"}]}
+followups.kind 只允许 experiment（省略时默认）或 evidence_review，不能填 task.kind 的 research。
+只需读取现有原件时提出 {"kind":"evidence_review","topic":"trend","question":"核对逐日持仓和同窗归因","reason":"当前摘要缺逐日原件","backtest_ids":["本 programme 已登记的 ETF backtest_id"]}。
+evidence_review 可引用本 programme 的父链或其他任务已登记 ETF 结果，最多6个唯一ID，不接受股票、未知或其他programme的ID；保存在报告中 awaiting_evidence，不自动创建任务，也不会立即返回原件。
+主控校验版本和开发边界、构建证据包后通过 add_evidence_review 派发。原报告仍必须有当前任务公共实验；无实验任务需补包后复核，不得重复改写零实验报告。
 parameters 必须显式带 symbols（非空字符串数组），ctx.symbols 来自该字段，不能只依赖 contract.symbols。
 例如格式（仅示例；资产由课题选择，并不默认沿用 A）：
 {"symbols":["510300.SH","510500.SH"],"target_weights":{"510300.SH":0.5,"510500.SH":0.5},"frequency":"monthly","lookback":1}
@@ -364,6 +368,13 @@ class Controller:
                 try:
                     self.api.call("action", task, {"action": action})
                 except APIError as e:
+                    if (
+                        e.status in (400, 409, 422)
+                        and e.detail == "report_requires_public_experiment"
+                    ):
+                        reason = "report_requires_public_experiment: 需主控补充绑定证据包后通过 add_evidence_review 派发，停止重复改写"
+                        outcome = "blocked"
+                        break
                     if e.status in (400, 409, 422) and malformed < 3:
                         malformed += 1
                         self.api.call("feedback", task, {"message": e.detail})

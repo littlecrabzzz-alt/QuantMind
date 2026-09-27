@@ -62,7 +62,14 @@ def main():
                 {e["factor_id"] for e in experiments if e.get("factor_id")}
             ),
             "deferred_followups": sum(
-                not f.get("task_id") for r in reports for f in r.get("followups", [])
+                not f.get("task_id") and f.get("kind", "experiment") == "experiment"
+                for r in reports
+                for f in r.get("followups", [])
+            ),
+            "pending_evidence_requests": sum(
+                not f.get("task_id") and f.get("awaiting_evidence", False)
+                for r in reports
+                for f in r.get("followups", [])
             ),
         },
         "usage": usage,

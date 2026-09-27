@@ -73,9 +73,11 @@ class ExperimentAction(BaseModel):
 
 class Followup(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    kind: Literal["experiment", "evidence_review"] = "experiment"
     topic: Literal["trend", "momentum", "risk", "stock_signal", "stock_risk"]
     question: str = Field(min_length=1, max_length=2000)
     reason: str = Field(min_length=1, max_length=2000)
+    backtest_ids: list[str] = Field(default_factory=list, max_length=6)
 
 
 class ReportAction(BaseModel):
@@ -456,6 +458,28 @@ async def act(ident, c, t, action, auth, db):
                 or not proposal.get("reason", "").strip()
             ):
                 raise ValueError("followup_scope_or_evidence_missing")
+            if proposal["kind"] == "evidence_review":
+                ids = proposal["backtest_ids"]
+                allowed = {
+                    e["backtest_id"]
+                    for source in c["tasks"].values()
+                    if source["kind"] == "research"
+                    for e in source["experiments"].values()
+                    if e.get("kind") != "stock_factor" and e.get("backtest_id")
+                }
+                if (
+                    t["kind"] != "research"
+                    or proposal["topic"].startswith("stock_")
+                    or not proposal["question"].strip()
+                    or not ids
+                    or len(ids) != len(set(ids))
+                    or not set(ids) <= allowed
+                ):
+                    raise ValueError("evidence_request_requires_programme_etf_results")
+                proposal["awaiting_evidence"] = True
+                continue
+            if proposal["backtest_ids"]:
+                raise ValueError("experiment_followup_cannot_request_evidence")
             st.add_task(
                 preview,
                 proposal["topic"],
@@ -673,6 +697,24 @@ async def command(
                     if k not in ("lease", "tool_receipts", "rejected_actions")
                 },
                 "results": rs,
+                "followup_contract": {
+                    "experiment_example": {
+                        "kind": "experiment",
+                        "topic": "trend",
+                        "question": "一个需新实验检验的问题",
+                        "reason": "已有结果依据",
+                    },
+                    "evidence_review_example": {
+                        "kind": "evidence_review",
+                        "topic": "trend",
+                        "question": "复核现有回测的逐日持仓与归因",
+                        "reason": "摘要未提供原件",
+                        "backtest_ids": [
+                            "本 programme 已登记的 ETF backtest_id，可引用父链或其他任务"
+                        ],
+                    },
+                    "rule": "省略 kind 等同 experiment。evidence_review 仅申请本 programme 已登记 ETF 结果，可引用父链或其他任务，最多6个唯一 backtest_ids；保存为 awaiting_evidence，不创建任务、不立即返回原件。由主控校验归属、终态、版本与边界、构建证据包后经 add_evidence_review 派发。",
+                },
                 "parent_report": c["tasks"]
                 .get(t.get("parent"), {})
                 .get("reports", [])[-1:],

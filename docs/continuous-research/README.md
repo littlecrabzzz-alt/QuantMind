@@ -108,3 +108,9 @@ python3 scripts/continuous_research/audit.py --output "/Users/lizeyu/Documents/C
 冻结worker候选要求显式development_end，在Qlib初始化/市场读取前校验配置；直接QuantDB请求上界钳制且对越界返回拒绝，train/valid/test按各自段末清除越界标签。未配置的普通训练入口行为保留，冻结worker旧配置则失败关闭。新包必须携带对应loading/splits源码与显式配置；本次没有替换旧包、重训或恢复股票。
 
 模型上下文补充首日snapshot为空（即使恰逢月末）以及摘要不含全部已存原件的说明。现有净值、目标权重、成交须先经只读证据复核，不为取这些字段重复回测。独立临时进程19项API/身份/股票范围测试与无网络只读容器11项合成/数据回归通过；真实HTTP验证5个拒绝与1个原任务幂等正例，任务数不增。
+
+## 9月27日16时：证据请求与实验派发分离
+
+模型 report.followups 现在可选 kind=experiment（缺省保持原实验路径）或 kind=evidence_review。后者必须引用本课题已登记 ETF backtest_ids（1–6个唯一ID，可为父链或其他任务），保存为 awaiting_evidence，等待主控补包，不进入实验/模型队列。拒绝股票、未知及跨课题ID。模型尚不能自动读取原件；主控继续复用 review_packets.validate_run 核对归属、终态、版本及开发截止，生成白名单证据后经 add_evidence_review 派发。页面区分“待补原件”与“等待队列空位”，巡检分别统计 pending_evidence_requests 与 deferred_followups。完成补包时须把新任务ID关联回原请求，原报告保留。
+
+若旧误派任务没有实验、报告被 report_requires_public_experiment 拒绝，controller立即 blocked，停止无效改写；没有放宽研究报告或证据绑定门槛。额度/服务端故障重试保持。原39d567e3、40e14931两项失败记录留存，补证任务87ff010c、58f5dfc3分别读取已有原件，不为获得路径重复回测。

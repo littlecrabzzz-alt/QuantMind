@@ -158,6 +158,79 @@ class ContractTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "read_only"):
             await act("x", self.c, self.t, self.action, None, None)
 
+    async def test_evidence_followup_saved_without_task_and_can_reference_parent(self):
+        self.t["experiments"]["own"] = {"backtest_id": "owned"}
+        parent = next(t for t in self.c["tasks"].values() if t is not self.t)
+        parent["experiments"]["prior"] = {"backtest_id": "parent-owned"}
+        for i in range(17):
+            st.add_task(self.c, "risk", f"queued-{i}", "evidence")
+        request = {
+            "kind": "evidence_review",
+            "topic": "trend",
+            "question": "核对原件",
+            "reason": "摘要不含逐日持仓",
+            "backtest_ids": ["owned", "parent-owned"],
+        }
+        with patch(
+            "backend.services.engine.routers.continuous_research.results",
+            new=AsyncMock(
+                return_value={"own": {"backtest_id": "owned", "status": "completed"}}
+            ),
+        ):
+            response = await act(
+                "x",
+                self.c,
+                self.t,
+                {"action": "report", "text": "a" * 100, "followups": [request]},
+                None,
+                None,
+            )
+        self.assertTrue(response["saved"])
+        self.assertEqual(len(self.c["tasks"]), 20)
+        saved = self.t["reports"][0]["followups"][0]
+        self.assertTrue(saved["awaiting_evidence"])
+        self.assertEqual(saved["backtest_ids"], ["owned", "parent-owned"])
+        self.assertNotIn("task_id", saved)
+
+    async def test_invalid_evidence_requests_cannot_mutate_reports_or_queue(self):
+        self.t["experiments"]["own"] = {"backtest_id": "owned"}
+        stock = st.add_task(self.c, "stock_signal", "stock question", "reason")
+        self.c["tasks"][stock]["experiments"]["s"] = {"backtest_id": "stock-run"}
+        proposal = {
+            "kind": "evidence_review",
+            "topic": "trend",
+            "question": "review",
+            "reason": "missing",
+        }
+        invalid = (
+            dict(proposal, backtest_ids=[]),
+            dict(proposal, backtest_ids=["unknown-or-other-programme"]),
+            dict(proposal, backtest_ids=["stock-run"]),
+            dict(proposal, backtest_ids=["owned", "owned"]),
+            dict(proposal, backtest_ids=["owned"] * 7),
+            dict(proposal, backtest_ids=["owned"], topic="stock_signal"),
+            dict(proposal, backtest_ids=["owned"], kind="research"),
+            dict(proposal, backtest_ids=["owned"], kind="experiment"),
+        )
+        with patch(
+            "backend.services.engine.routers.continuous_research.results",
+            new=AsyncMock(
+                return_value={"own": {"backtest_id": "owned", "status": "completed"}}
+            ),
+        ):
+            for request in invalid:
+                before = copy.deepcopy(self.c)
+                with self.subTest(request=request), self.assertRaises(ValueError):
+                    await act(
+                        "x",
+                        self.c,
+                        self.t,
+                        {"action": "report", "text": "a" * 100, "followups": [request]},
+                        None,
+                        None,
+                    )
+                self.assertEqual(self.c, before)
+
     async def test_review_requires_bound_evidence_and_accepts_no_new_backtest(self):
         self.t.update(kind="evidence_review", evidence={"id": "trusted-packet"})
         report = {"action": "report", "text": "a" * 100}

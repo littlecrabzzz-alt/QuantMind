@@ -114,6 +114,9 @@ def promote_followups(c):
             for proposal in report.get("followups", []):
                 if proposal.get("task_id"):
                     continue
+                if proposal.get("kind", "experiment") == "evidence_review":
+                    proposal["awaiting_evidence"] = True
+                    continue
                 try:
                     proposal["task_id"] = add_task(
                         c,

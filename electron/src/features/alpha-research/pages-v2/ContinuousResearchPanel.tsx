@@ -6,7 +6,7 @@ type Task = { id: string; question: string; topic: string; status: string; step:
   kind?:string; evidence?:{id:string;sha256:string;title:string;[key:string]:unknown};
   last_error?: string; last_activity?: number; retry_at?: number; usage: {input:number; output:number; unknown_calls:number};
   experiments: Record<string, {name:string; strategy_id?:string; revision_id?:string; factor_id?:string; kind?:string; backtest_id:string; hypothesis:string}>;
-  reports: {text:string; at:number; followups?:{question:string;task_id?:string}[]}[]; };
+  reports: {text:string; at:number; followups?:{question:string;task_id?:string;kind?:string;awaiting_evidence?:boolean;backtest_ids?:string[]}[]}[]; };
 type Program = { id:string; status:string; desired:string; heartbeat_stale:boolean; last_heartbeat?:number;
   runtime?:{model:string;thinking:string}; contract:{end_date:string; concurrency:number}; quota_state?:string; quota_check_at?:number;
   quota:{status:string; remaining_percent:number|null; reset_at?:number; observed_at?:number;
@@ -39,6 +39,7 @@ export default function ContinuousResearchPanel() {
       </div>
       <div className="text-sm rounded bg-muted p-3">
         共 {Object.keys(p.tasks).length} 个研究问题 · 已交报告 {Object.values(p.tasks).filter(t=>t.reports.length).length} 个 · 待检查 {Object.values(p.tasks).filter(t=>t.status==='blocked'||t.status==='failed').length} 个 · 独立公共回测 {new Set(Object.values(p.tasks).flatMap(t=>Object.values(t.experiments).map(e=>e.backtest_id))).size} 份
+        <p>待补原件的复核请求 {Object.values(p.tasks).flatMap(t=>t.reports.flatMap(r=>r.followups||[])).filter(f=>!f.task_id&&(f.awaiting_evidence||f.kind==='evidence_review')).length} 个；补齐并核验原件后才派发，不占模型槽。</p>
         <p>累计模型上报：输入 {Object.values(p.tasks).reduce((n,t)=>n+t.usage.input,0).toLocaleString()} / 输出 {Object.values(p.tasks).reduce((n,t)=>n+t.usage.output,0).toLocaleString()} token；跨额度窗口累计，不等于当前窗口消耗。报告均为开发研究，数量不代表已验证策略。</p>
       </div>
       <div className="grid md:grid-cols-2 gap-4 text-sm">
@@ -68,7 +69,7 @@ export default function ContinuousResearchPanel() {
           <b>{x.name}</b> · {x.strategy_id?<a className="text-blue-500 underline" href={`#/user-center?tab=strategies&strategyId=${encodeURIComponent(x.strategy_id)}`}>策略 {x.strategy_id} / 版本 {x.revision_id?.slice(0,10)}</a>:x.factor_id?<a className="text-blue-500 underline" href={`#/alpha-research?page=library&factor=${encodeURIComponent(x.factor_id)}`}>因子库候选</a>:<span>股票冻结基线</span>} · <a className="text-blue-500 underline" href={`#/backtest?backtest=${encodeURIComponent(x.backtest_id)}`}>查看公共回测</a>
           <details><summary className="cursor-pointer text-muted-foreground">预登记假设与判别条件</summary><p>{x.hypothesis}</p></details></div>)}
         {t.reports.map((r,i)=><details key={i}><summary className="cursor-pointer">研究报告 · {date(r.at)} · 待独立复核</summary><pre className="whitespace-pre-wrap text-sm bg-muted p-3 mt-2">{r.text}</pre>
-          {r.followups?.filter(f=>!f.task_id).map((f,j)=><p key={j} className="text-sm">后续问题已保存，等待队列空位：{f.question}</p>)}</details>)}
+          {r.followups?.filter(f=>!f.task_id).map((f,j)=><p key={j} className="text-sm">{f.awaiting_evidence||f.kind==='evidence_review'?'待补原件，尚未派发复核：':'后续问题已保存，等待队列空位：'}{f.question}</p>)}</details>)}
       </details>)}</div>
       {!!p.stock_scope_history?.length&&<details><summary className="cursor-pointer text-sm">工程输入修复归档（不计为因子研究结论）</summary>
         {p.stock_scope_history.map((h,i)=><div key={i} className="text-sm mt-2"><p>{date(h.at)} · {h.contract.snapshot_id} · {h.reason}</p>
