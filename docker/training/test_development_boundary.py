@@ -77,6 +77,79 @@ class DevelopmentBoundaryTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "returned dates outside development_end"):
             self.load(over_return=True)
 
+    def test_frozen_all_unknown_volume_date_cannot_be_silently_dropped(self):
+        day = self.days[5]
+        mask = self.source.trade_date == day
+        original = self.source.loc[mask, "volume"].copy()
+        self.source.loc[mask, "volume"] = float("nan")
+        with self.assertRaisesRegex(ValueError, "Frozen volume unknown on 1 dates"):
+            self.load()
+        # Ordinary training remains unchanged; this is a frozen-scope guard.
+        ordinary, _ = self.load(bounded=False)
+        self.assertNotIn(day, ordinary.trade_date.tolist())
+        self.source.loc[mask, "volume"] = original
+        # Partial unknown volume is not sufficient evidence to delete the day.
+        self.source.loc[mask & (self.source.symbol == "SH600000"), "volume"] = float("nan")
+        partial, _ = self.load()
+        self.assertIn(day, partial.trade_date.tolist())
+
+    def test_description_is_bounded_and_source_start_is_still_clamped(self):
+        _, reader = self.load()
+        self.assertEqual(reader.describe.call_args.args, ("l1_factors",))
+        self.assertEqual(
+            reader.describe.call_args.kwargs,
+            {
+                "start": (pd.Timestamp(self.cfg["split"]["train"][0])
+                          - pd.Timedelta(days=7)).date(),
+                "end": pd.Timestamp(self.cutoff).date(),
+            },
+        )
+        self.assertEqual(
+            pd.Timestamp(reader.read_range.call_args.kwargs["start"]),
+            self.source.trade_date.min(),
+        )
+        _, ordinary = self.load(bounded=False)
+        ordinary.describe.assert_called_once_with("l1_factors")
+
+    def test_bounded_description_never_samples_future_only_donor(self):
+        from backend.services.engine.data_platform.quantdb_factor_reader import (
+            QuantDBFactorReader,
+        )
+
+        class StopAtRange(Exception):
+            pass
+
+        original_schema = QuantDBFactorReader._sample_schema_relation
+        sampled = []
+
+        def schema(files):
+            sampled.extend(files)
+            return original_schema(files)
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            allowed = root / "6_ml_datasets/ccass_factors/dt=20260324/data.parquet"
+            allowed.parent.mkdir(parents=True)
+            pd.DataFrame([{
+                "symbol": "600001.SH", "date": "2026-03-24", "factor": 1.0,
+            }]).to_parquet(allowed, index=False)
+            future = root / "6_ml_datasets/l1_factors/dt=20260325/future.parquet"
+            future.parent.mkdir(parents=True)
+            future.write_bytes(b"FUTURE_DONOR_FOOTER_MUST_NOT_BE_OPENED")
+            with patch.object(QuantDBFactorReader, "_sample_schema_relation",
+                              side_effect=schema), \
+                 patch.object(QuantDBFactorReader, "read_range",
+                              side_effect=StopAtRange) as read:
+                with self.assertRaises(StopAtRange):
+                    load_data(
+                        "2026-03-24", "2026-03-24", ["factor"],
+                        local_dir=str(root), quantdb_dir=str(root),
+                        factor_source="ccass_factors", development_end="2026-03-24",
+                    )
+            self.assertEqual(sampled, [allowed])
+            self.assertEqual(str(read.call_args.kwargs["start"]), "2026-03-24")
+            self.assertEqual(str(read.call_args.kwargs["end"]), "2026-03-24")
+
     def test_worker_reader_guard_rejects_outside_request_before_io(self):
         reader = Mock()
         for boundary in (None, "", "NaT", "2024-03-25T00:00:00"):

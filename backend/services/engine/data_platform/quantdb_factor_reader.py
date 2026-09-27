@@ -378,6 +378,7 @@ class QuantDBFactorReader:
         *,
         start: str | date | None = None,
         end: str | date | None = None,
+        include_ohlcv: bool = True,
     ) -> FactorSourceStatus:
         source = self.validate_source(source)
         files = self._files(source, start=start, end=end)
@@ -434,8 +435,11 @@ class QuantDBFactorReader:
             # 自定义市场（用户自传数据）：仅扫描因子列，不强制 OHLCV 完备性。
             # 有分区文件即 ready；标签构建仍需数据源自带 close 列，否则训练时按缺列报错。
             missing = []
-        elif "date" in missing and "dt" in columns:
-            missing.remove("date")  # dt 分区列即日期（HK l1_factors 无 date 列）
+        else:
+            if not include_ohlcv:
+                missing = [column for column in missing if column not in OHLCV_COLUMNS]
+            if "date" in missing and "dt" in columns:
+                missing.remove("date")  # dt 分区列即日期（HK l1_factors 无 date 列）
         reason = None
         if missing and set(missing) <= set(OHLCV_COLUMNS):
             # 次要源（ccass/south）：OHLCV 由同目录 l1_factors 补给，标签可构建。
@@ -490,8 +494,11 @@ class QuantDBFactorReader:
         *,
         start: str | date | None = None,
         end: str | date | None = None,
+        include_ohlcv: bool = True,
     ) -> FactorSourceStatus:
-        status = self.describe(source, start=start, end=end)
+        status = self.describe(
+            source, start=start, end=end, include_ohlcv=include_ohlcv
+        )
         if not status.ready:
             detail = (
                 status.reason or ", ".join(status.missing_required) or "unknown reason"
@@ -500,7 +507,9 @@ class QuantDBFactorReader:
                 f"{source} is not ready for direct training: {detail}"
             )
         # 覆盖范围只查目录名；请求首尾可能为休市日，不能与裁剪后首尾交易日比较。
-        available_min, available_max = self._partition_date_range(self.source_path(source))
+        available_min, available_max = self._partition_date_range(
+            self.source_path(source)
+        )
         if start and available_min and str(start)[:10] < available_min:
             raise QuantDBFactorError(
                 f"{source} starts at {available_min}; requested {start}"
@@ -531,7 +540,9 @@ class QuantDBFactorReader:
         """Project raw source columns for a date range into an in-memory DataFrame."""
         if start is None or end is None:
             raise QuantDBFactorError("QuantDB read_range requires both date bounds")
-        status = self.assert_ready(source, start=start, end=end)
+        status = self.assert_ready(
+            source, start=start, end=end, include_ohlcv=include_ohlcv
+        )
         available = set(status.columns)
         requested = list(dict.fromkeys(features))
         reserved = set(REQUIRED_COLUMNS) | {"trade_date", "dt"}
@@ -559,7 +570,11 @@ class QuantDBFactorReader:
             'f."symbol"',
             f"{factor_date} AS trade_date",
         ]
-        daily_relation = self._daily_backward_relation(start=start, end=end)
+        daily_relation = (
+            self._daily_backward_relation(start=start, end=end)
+            if include_ohlcv
+            else None
+        )
         # 次要源（ccass/south 等）无 OHLCV 列：从同目录 l1_factors 补给行情，
         # 用于构建无泄漏的未来收益标签；含 OHLCV 的源不触发。
         ohlcv_donor = (
@@ -568,6 +583,13 @@ class QuantDBFactorReader:
             else None
         )
         ohlcv_join = ohlcv_donor or daily_relation
+        donor_source = (
+            OHLCV_DONOR_SOURCE
+            if ohlcv_donor
+            else "daily_backward"
+            if daily_relation
+            else None
+        )
         if include_ohlcv:
             for column in REQUIRED_COLUMNS[2:]:
                 if column in status.columns:
@@ -598,21 +620,42 @@ class QuantDBFactorReader:
             date_expr = factor_date
             from_clause = f"{factor_relation} AS f"
             if ohlcv_join:
+                # Reuse the shared symbol contract; do not reimplement markets in SQL.
+                con.create_function(
+                    "qm_symbol", StockCodeUtil.to_prefix, ["VARCHAR"], "VARCHAR"
+                )
+                # The uniqueness check and JOIN use the same bounded donor snapshot.
+                # Only six value columns are materialized, not a wide L1 factor table.
+                con.execute(
+                    "CREATE TEMP TABLE qm_ohlcv AS SELECT "
+                    "qm_symbol(CAST(symbol AS VARCHAR)) AS symbol, "
+                    "CAST(dt AS VARCHAR) AS dt, "
+                    f"{', '.join(_quote(column) for column in OHLCV_COLUMNS)} "
+                    f"FROM {ohlcv_join} "
+                    "WHERE CAST(dt AS VARCHAR) BETWEEN ? AND ? AND symbol IS NOT NULL",
+                    [start_s.replace("-", ""), end_s.replace("-", "")],
+                )
+                duplicate = con.execute(
+                    "SELECT symbol, dt, count(*) FROM qm_ohlcv "
+                    "GROUP BY symbol, dt HAVING count(*) > 1 LIMIT 1"
+                ).fetchone()
+                if duplicate:
+                    raise QuantDBFactorError(
+                        f"Duplicate canonical OHLCV donor key in {donor_source}: "
+                        f"{duplicate[0]}/{duplicate[1]} ({duplicate[2]} rows)"
+                    )
                 # factors.date 为实际交易日，补给表 dt 为 hive 分区整数。
                 # 用日期格式化连接可同时兼容 int/string 两种 dt 物理类型。
                 from_clause += (
-                    f" LEFT JOIN (SELECT * FROM {ohlcv_join} "
-                    "WHERE CAST(dt AS VARCHAR) BETWEEN ? AND ?) AS k"
-                    " ON k.symbol = f.symbol"
+                    " LEFT JOIN qm_ohlcv AS k"
+                    " ON k.symbol = qm_symbol(CAST(f.symbol AS VARCHAR))"
                     f" AND CAST(k.dt AS VARCHAR) = strftime({date_expr}, '%Y%m%d')"
                 )
             sql = (
                 f"SELECT {', '.join(selected)} FROM {from_clause} "
                 f"WHERE {date_expr} BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)"
             )
-            params = ([start_s.replace("-", ""), end_s.replace("-", "")]
-                      if ohlcv_join else []) + [start_s, end_s]
-            frame = con.execute(sql, params).fetchdf()
+            frame = con.execute(sql, [start_s, end_s]).fetchdf()
         finally:
             con.close()
         frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="coerce")
@@ -627,6 +670,42 @@ class QuantDBFactorReader:
         frame["symbol"] = frame["symbol"].map(
             lambda value: StockCodeUtil.to_prefix(str(value))
         )
+        # Keep existing same-raw-key deduplication above, but never hide collisions
+        # between distinct raw codes that normalize to the same output key.
+        collisions = frame.duplicated(subset=["symbol", "trade_date"], keep=False)
+        if collisions.any():
+            key = frame.loc[collisions, ["symbol", "trade_date"]].iloc[0]
+            raise QuantDBFactorError(
+                f"Canonical factor key collision in {source}: "
+                f"{key['symbol']}/{key['trade_date'].date()}"
+            )
+        if include_ohlcv:
+            missing = frame.reindex(columns=OHLCV_COLUMNS).isna()
+            missing_rows = missing.any(axis=1)
+            examples = []
+            for index, row in (
+                frame.loc[missing_rows, ["symbol", "trade_date"]].head(20).iterrows()
+            ):
+                examples.append(
+                    {
+                        "symbol": row["symbol"],
+                        "trade_date": str(row["trade_date"].date()),
+                        "fields": [
+                            column
+                            for column in OHLCV_COLUMNS
+                            if missing.at[index, column]
+                        ],
+                    }
+                )
+            frame.attrs["ohlcv_availability"] = {
+                "donor_source": donor_source,
+                "missing_rows": int(missing_rows.sum()),
+                "missing_by_column": {
+                    column: int(missing[column].sum()) for column in OHLCV_COLUMNS
+                },
+                "examples": examples,
+                "examples_truncated": int(missing_rows.sum()) > len(examples),
+            }
         return frame
 
     def read_day(

@@ -10,6 +10,18 @@ import run_frozen_research as runner
 class FrozenResearchTest(unittest.TestCase):
     def setUp(self):
         self.cfg = runner.read(runner.ROOT / "config/research_controls_cn_l1.json")
+        # Tests explicitly declare a boundary; the historical config is not
+        # silently granted a current research admission date.
+        self.cfg["development_end"] = self.cfg["split"]["test"][1]
+
+    def test_missing_boundary_rejected_before_source_inventory(self):
+        cfg = copy.deepcopy(self.cfg)
+        cfg.pop("development_end")
+        with tempfile.TemporaryDirectory() as temp, patch.object(runner, "snapshot_files") as inventory:
+            with self.assertRaisesRegex(ValueError, "development_end"):
+                runner.freeze(Path(temp), Path(temp) / "out", cfg, {"Id": "synthetic"})
+            inventory.assert_not_called()
+            self.assertFalse((Path(temp) / "out").exists())
 
     def test_invalid_period_is_rejected(self):
         cfg = copy.deepcopy(self.cfg)
@@ -34,8 +46,8 @@ class FrozenResearchTest(unittest.TestCase):
 
     def test_separate_runtime_supplies_data_while_code_stays_in_source(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / "source"
-            runtime = Path(temp) / "runtime"
+            root = Path(temp).resolve() / "source"
+            runtime = Path(temp).resolve() / "runtime"
             for dataset in ("6_ml_datasets/l1_factors", "1_kline_data/daily_backward"):
                 path = runtime / "data/quantdb" / dataset / "dt=20240102/part.parquet"
                 path.parent.mkdir(parents=True)

@@ -194,7 +194,12 @@ def load_data(
         )
         # 标签构建缓冲(range_start)可能早于数据可用起点(如 train_start 恰为数据首日)。
         # 数据缺失部分无法提供，钳制到数据起点即可，避免 assert_ready 越界抛错。
-        _status = reader.describe(direct_factor_source)
+        if development_end is None:
+            _status = reader.describe(direct_factor_source)
+        else:
+            _status = reader.describe(
+                direct_factor_source, start=range_start.date(), end=range_end.date()
+            )
         if _status.min_date:
             range_start = max(range_start, pd.Timestamp(_status.min_date))
         if _status.max_date:
@@ -497,6 +502,16 @@ def load_data(
     # 必须在 label 构造前剔除：shift(-N) 按行位移，若序列含假日，
     # "未来 N 个交易日收益" 实际只跨 N-k 个真实交易日，导致标签时间尺度不一致。
     if "volume" in df.columns:
+        if development_end is not None:
+            # Unknown volume cannot establish a holiday. Dropping this date
+            # would silently move shift-based execution/label endpoints.
+            known_volume = df.groupby("trade_date")["volume"].count()
+            unknown_days = known_volume.index[known_volume == 0]
+            if len(unknown_days):
+                examples = ", ".join(str(day.date()) for day in unknown_days[:5])
+                raise ValueError(
+                    f"Frozen volume unknown on {len(unknown_days)} dates: {examples}"
+                )
         _day_vol = df.groupby("trade_date")["volume"].max()
         _real_days = _day_vol[_day_vol > 0].index
         _dropped_days = len(_day_vol) - len(_real_days)

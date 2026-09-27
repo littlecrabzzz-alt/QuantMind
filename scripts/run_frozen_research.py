@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -34,6 +35,7 @@ def sha256(path):
 
 
 def validate_config(cfg):
+    snapshot_date_bounds(cfg)
     if cfg["market"] != "CN" or cfg["factor_source"] != "l1_factors":
         raise ValueError("Frozen baseline currently supports CN L1 only")
     if cfg["model"]["type"] != "lightgbm" or cfg.get("preprocessing", {}).get(
@@ -71,19 +73,40 @@ def validate_config(cfg):
         raise ValueError("The one-day baseline requires next-day close execution")
 
 
+def snapshot_date_bounds(cfg):
+    """Do not inventory Parquet buffers beyond the requested development window."""
+    cutoff = cfg.get("development_end")
+    if not isinstance(cutoff, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", cutoff):
+        raise ValueError("Frozen inputs require explicit ISO development_end")
+    cutoff = date.fromisoformat(cutoff)
+    segments = [
+        [date.fromisoformat(value) for value in segment]
+        for segment in cfg["split"].values()
+    ]
+    if any(len(segment) != 2 or segment[0] > segment[1] or segment[1] > cutoff
+           for segment in segments):
+        raise ValueError("Frozen input split outside development_end")
+    start = date.fromisoformat(cfg["split"]["train"][0]) - timedelta(days=30)
+    end = date.fromisoformat(cfg["split"]["test"][1])
+    if start > end:
+        raise ValueError("Invalid frozen input range")
+    return start, end
+
+
 def snapshot_files(root, cfg, data_root=None):
     data_root = Path(data_root or root).resolve()
-    start = (
-        date.fromisoformat(cfg["split"]["train"][0]) - timedelta(days=30)
-    ).strftime("%Y%m%d")
-    end = (date.fromisoformat(cfg["split"]["test"][1]) + timedelta(days=30)).strftime(
-        "%Y%m%d"
-    )
+    start, end = snapshot_date_bounds(cfg)
     files = {}
     for dataset in ("6_ml_datasets/l1_factors", "1_kline_data/daily_backward"):
         selected = []
         for partition in (data_root / "data/quantdb" / dataset).glob("dt=*"):
-            if start <= partition.name[3:] <= end:
+            raw = partition.name[3:]
+            if not re.fullmatch(r"\d{8}", raw):
+                raise ValueError(f"Invalid frozen partition date: {partition.name}")
+            day = datetime.strptime(raw, "%Y%m%d").date()
+            if start <= day <= end:
+                if partition.is_symlink():
+                    raise RuntimeError(f"Frozen partition must not be a symlink: {partition}")
                 selected.extend(partition.glob("*.parquet"))
         if not selected:
             raise RuntimeError(f"No frozen input partitions: {dataset}")
