@@ -1,5 +1,7 @@
 import importlib.util
 import tempfile
+import struct
+import hashlib
 import unittest
 from pathlib import Path
 
@@ -8,6 +10,40 @@ spec = importlib.util.spec_from_file_location(
 )
 frozen = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(frozen)
+
+
+from scripts.continuous_research.qlib_provider import build_provider
+
+
+def provider_args(root, cfg):
+    base = root.resolve()
+    cutoff = cfg["split"]["test"][1]
+    raw = base / ("synthetic-provider-source-" + cutoff)
+    manifest = (
+        base / ("generated-provider-" + cutoff) / "provider/provider_manifest.json"
+    )
+    if not manifest.exists():
+        calendar = [cfg["split"]["train"][0], cutoff]
+        (raw / "calendars").mkdir(parents=True)
+        (raw / "calendars/day.txt").write_text("\n".join(calendar) + "\n")
+        (raw / "features/syn_a").mkdir(parents=True)
+        (raw / "features/syn_a/close.day.bin").write_bytes(
+            struct.pack("<3f", 0, 11, 12)
+        )
+        build_provider(
+            raw,
+            manifest.parents[1],
+            calendar_prefix=calendar,
+            cutoff=cutoff,
+            symbols=["syn_a"],
+            fields=["close"],
+            lifetimes={"syn_a": calendar},
+            benchmark=None,
+        )
+    return {
+        "provider_manifest": manifest,
+        "provider_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+    }
 
 
 class SnapshotDependencyTests(unittest.TestCase):
@@ -28,16 +64,14 @@ class SnapshotDependencyTests(unittest.TestCase):
                 file = root / relative
                 file.parent.mkdir(parents=True, exist_ok=True)
                 file.write_text("")
-            inventory = frozen.snapshot_files(
-                root,
-                {
-                    "development_end": "2025-02-02",
-                    "split": {
-                        "train": ["2025-01-01", "2025-01-02"],
-                        "test": ["2025-02-01", "2025-02-02"],
-                    }
+            cfg = {
+                "development_end": "2025-02-02",
+                "split": {
+                    "train": ["2025-01-01", "2025-01-02"],
+                    "test": ["2025-02-01", "2025-02-02"],
                 },
-            )
+            }
+            inventory = frozen.snapshot_files(root, cfg, **provider_args(root, cfg))
             for relative in (
                 "model_trainers/__init__.py",
                 "model_trainers/metrics.py",
@@ -60,29 +94,41 @@ class SnapshotDependencyTests(unittest.TestCase):
                 path = root / "db/qlib_data" / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("")
-            cfg = {"development_end": "2026-03-24", "split": {
-                "train": ["2026-01-01", "2026-01-31"],
-                "valid": ["2026-02-01", "2026-02-28"],
-                "test": ["2026-03-01", "2026-03-24"],
-            }}
-            selected = frozen.snapshot_files(root, cfg)
+            cfg = {
+                "development_end": "2026-03-24",
+                "split": {
+                    "train": ["2026-01-01", "2026-01-31"],
+                    "valid": ["2026-02-01", "2026-02-28"],
+                    "test": ["2026-03-01", "2026-03-24"],
+                },
+            }
+            selected = frozen.snapshot_files(root, cfg, **provider_args(root, cfg))
             market = [str(p) for p in selected.values() if p.parts[0] == "quantdb"]
             self.assertEqual(len(market), 4)
             self.assertTrue(all("20260323" in p or "20260324" in p for p in market))
             # An earlier test end also cannot be expanded up to the policy cutoff.
             cfg["split"]["test"][1] = "2026-03-23"
-            market = [str(p) for p in frozen.snapshot_files(root, cfg).values()
-                      if p.parts[0] == "quantdb"]
+            market = [
+                str(p)
+                for p in frozen.snapshot_files(
+                    root, cfg, **provider_args(root, cfg)
+                ).values()
+                if p.parts[0] == "quantdb"
+            ]
             self.assertEqual(len(market), 2)
             self.assertTrue(all("20260323" in p for p in market))
             invalid = root / "data/quantdb/6_ml_datasets/l1_factors/dt=20260230"
             invalid.mkdir()
             with self.assertRaises(ValueError):
-                frozen.snapshot_files(root, cfg)
+                frozen.snapshot_files(root, cfg, **provider_args(root, cfg))
 
     def test_boundary_is_required_and_every_split_is_bounded(self):
-        cfg = {"split": {"train": ["2026-01-01", "2026-01-31"],
-                         "test": ["2026-03-01", "2026-03-24"]}}
+        cfg = {
+            "split": {
+                "train": ["2026-01-01", "2026-01-31"],
+                "test": ["2026-03-01", "2026-03-24"],
+            }
+        }
         for cutoff in (None, "", "20260324", "2026-02-30", "2026-03-23"):
             with self.subTest(cutoff=cutoff), self.assertRaises(ValueError):
                 frozen.snapshot_date_bounds({**cfg, "development_end": cutoff})

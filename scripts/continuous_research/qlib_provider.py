@@ -1,9 +1,10 @@
-"""Offline bounded provider candidate; never called by freeze/runtime.
+"""Offline bounded provider generation and generated-output validation.
 
 Callers declare the original global calendar prefix and a required universe.
 Declarations and observed file stability do NOT establish PIT, an atomic input
 snapshot, source authenticity, or research admission. No directory discovery or
 live fallback. Output is destination/provider, published only after completion.
+Freeze validates generated outputs; it never calls generation or reads raw sources.
 """
 
 import bisect
@@ -12,12 +13,14 @@ import json
 import os
 import re
 import stat
+import struct
+import math
 import uuid
 from contextlib import ExitStack
 from datetime import date
 from pathlib import Path
 
-from scripts.continuous_research.qlib_prefix import feature_prefix
+from .qlib_prefix import feature_prefix
 
 
 # Explicit offline contract matching QlibDataBuilder's CN binary fields.
@@ -164,39 +167,202 @@ def _remove_tree(parent, name):
     os.rmdir(name, dir_fd=parent)
 
 
-def build_provider(
-    source: Path,
-    destination: Path,
-    *,
-    calendar_prefix: list[str],
-    cutoff: str,
-    symbols: list[str],
-    fields: list[str],
-    lifetimes: dict[str, tuple[str, str]],
-    benchmark: str | None,
-    day_future_endpoint: str | None = None,
-) -> dict:
-    """Build an offline candidate from explicit declarations, never infer a pool.
+def generated_bytes(path: Path, expected_size: int | None = None) -> bytes:
+    """Read only a declared generated file, with anchored paths and a size cap.
 
-    All symbols are mandatory. An explicitly selected future listing is an error,
-    not silently filtered. Benchmark gets the same declared fields but is excluded
-    from instruments/all.txt unless also explicitly in symbols. Lifetimes are
-    caller declarations: no unbounded instruments file is opened to validate them.
-    Paths must be absolute with no symlink components (including /tmp aliases).
-    Existing destination, even empty, is never replaced.
+    This is NOT a raw-provider reader. A growing/replaced source cannot make the
+    read extend beyond its initial declared output size. The manifest alone is
+    capped at 8 MiB when expected_size is omitted.
     """
-    source, destination = Path(source), Path(destination)
-    for path in (source, destination):
-        if not path.is_absolute() or ".." in path.parts or path == Path(path.anchor):
-            raise ValueError(
-                "Absolute non-root paths without parent traversal required"
-            )
-    if (
-        source in destination.parents
-        or destination in source.parents
-        or source == destination
+    path = Path(path)
+    if ".." in path.parts:
+        raise ValueError("Generated path traversal")
+    checks = []
+    with ExitStack() as stack:
+        parent = _absolute_directory(path.parent, stack, checks)
+        fd = os.open(
+            path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent
+        )
+        stack.callback(os.close, fd)
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError("Generated artifact must be regular")
+        if expected_size is None:
+            if before.st_size > 8 * 1024**2:
+                raise ValueError("Provider manifest exceeds size limit")
+            expected_size = before.st_size
+        if (
+            type(expected_size) is not int
+            or expected_size < 0
+            or before.st_size != expected_size
+        ):
+            raise ValueError("Generated artifact size mismatch")
+        parts, remaining = [], expected_size
+        while remaining:
+            chunk = os.read(fd, min(remaining, 1024**2))
+            if not chunk:
+                raise ValueError("Generated artifact truncated")
+            parts.append(chunk)
+            remaining -= len(chunk)
+        if _identity(os.fstat(fd)) != _identity(before):
+            raise ValueError("Generated artifact changed during read")
+        _unchanged(checks, [(parent, path.name, _identity(before))])
+    return b"".join(parts)
+
+
+def _inventory(directory, prefix=""):
+    """Metadata-only walk of the GENERATED provider, without following links."""
+    result = set()
+    for name in os.listdir(directory):
+        path = prefix + name
+        info = os.stat(name, dir_fd=directory, follow_symlinks=False)
+        if stat.S_ISDIR(info.st_mode):
+            fd = os.open(name, DIR_FLAGS, dir_fd=directory)
+            try:
+                result.update(_inventory(fd, path + "/"))
+            finally:
+                os.close(fd)
+        elif stat.S_ISREG(info.st_mode):
+            result.add(path)
+        else:
+            raise ValueError("Generated inventory contains symlink or special file")
+    return result
+
+
+def validate_provider(
+    manifest_path: Path, expected_sha256: str, *, cutoff: str
+) -> dict:
+    """Validate generated bytes only. Never open source_root or sources entries."""
+    if not isinstance(expected_sha256, str) or not re.fullmatch(
+        r"[0-9a-f]{64}", expected_sha256
     ):
-        raise ValueError("Source and destination must be disjoint")
+        raise ValueError("Explicit provider manifest SHA256 required")
+    manifest_path = Path(manifest_path)
+    if manifest_path.name != "provider_manifest.json":
+        raise ValueError("Expected provider_manifest.json")
+    raw = generated_bytes(manifest_path)
+    if hashlib.sha256(raw).hexdigest() != expected_sha256:
+        raise ValueError("Provider manifest identity mismatch")
+
+    def unique_object(pairs):
+        obj = {}
+        for key, value in pairs:
+            if key in obj:
+                raise ValueError("Duplicate JSON key in provider manifest")
+            obj[key] = value
+        return obj
+
+    manifest = json.loads(raw, object_pairs_hook=unique_object)
+    if (
+        manifest.get("schema") != "offline_qlib_provider_v1"
+        or manifest.get("status") != "offline_candidate"
+    ):
+        raise ValueError("Unsupported provider manifest")
+    if manifest.get("provider_path") != str(manifest_path.parent):
+        raise ValueError("Provider directory identity mismatch")
+    declared = manifest["declaration"]
+    spec, bounded = _declaration(**declared)
+    declaration_sha = hashlib.sha256(
+        json.dumps(spec, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    if declaration_sha != manifest.get("declaration_sha256") or spec != declared:
+        raise ValueError("Provider declaration identity mismatch")
+    if spec["cutoff"] != _date(cutoff) or manifest.get("bounded_lifetimes") != bounded:
+        raise ValueError("Provider cutoff/lifetimes mismatch")
+    calendar = spec["calendar_prefix"]
+    expected = {"calendars/day.txt", "instruments/all.txt"}
+    if spec["day_future_endpoint"]:
+        expected.add("calendars/day_future.txt")
+    for symbol in bounded:
+        expected.update(
+            f"features/{symbol}/{field}.day.bin" for field in spec["fields"]
+        )
+    outputs = {}
+    for item in manifest["outputs"]:
+        relative = item.get("path")
+        if relative not in expected or relative in outputs:
+            raise ValueError("Unknown, duplicate or unsafe generated output path")
+        if (
+            item.get("identity_scope") != "output_whole_file"
+            or type(item.get("size")) is not int
+            or item["size"] < 0
+            or not isinstance(item.get("sha256"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", item["sha256"])
+        ):
+            raise ValueError("Invalid whole-output identity")
+        outputs[relative] = item
+    if set(outputs) != expected:
+        raise ValueError("Provider output inventory incomplete")
+    checks = []
+    with ExitStack() as stack:
+        directory = _absolute_directory(manifest_path.parent, stack, checks)
+        if _inventory(directory) != expected | {manifest_path.name}:
+            raise ValueError("Generated provider actual inventory changed")
+        _unchanged(checks, [])
+    calendar_bytes = ("\n".join(calendar) + "\n").encode()
+    metadata = {
+        "calendars/day.txt": calendar_bytes,
+        "instruments/all.txt": "".join(
+            f"{s}\t{bounded[s][0]}\t{bounded[s][1]}\n" for s in spec["symbols"]
+        ).encode(),
+    }
+    if spec["day_future_endpoint"]:
+        metadata["calendars/day_future.txt"] = (
+            calendar_bytes + (spec["day_future_endpoint"] + "\n").encode()
+        )
+    files = {}
+    for relative, item in outputs.items():
+        # A generated binary cannot be longer than the declared global calendar.
+        if relative.startswith("features/") and item["size"] > 4 * (len(calendar) + 1):
+            raise ValueError("Generated feature size exceeds calendar")
+        payload = generated_bytes(manifest_path.parent / relative, item["size"])
+        if hashlib.sha256(payload).hexdigest() != item["sha256"]:
+            raise ValueError("Generated output checksum mismatch")
+        if relative in metadata:
+            if payload != metadata[relative]:
+                raise ValueError("Generated metadata differs from declaration")
+        else:
+            if len(payload) < 8 or len(payload) % 4:
+                raise ValueError("Malformed generated feature")
+            start = struct.unpack("<f", payload[:4])[0]
+            symbol = relative.split("/")[1]
+            lo, hi = (calendar.index(d) for d in bounded[symbol])
+            if (
+                not math.isfinite(start)
+                or not start.is_integer()
+                or start < lo
+                or start + len(payload) // 4 - 2 > hi
+            ):
+                raise ValueError("Generated feature outside declared lifetime/calendar")
+        files[manifest_path.parent / relative] = {
+            "size": item["size"],
+            "sha256": item["sha256"],
+        }
+    if generated_bytes(manifest_path, len(raw)) != raw:
+        raise ValueError("Provider manifest changed during verification")
+    files[manifest_path] = {"size": len(raw), "sha256": expected_sha256}
+    return {
+        "manifest": manifest,
+        "files": files,
+        "binding": {
+            "manifest_sha256": expected_sha256,
+            "declaration_sha256": declaration_sha,
+            "cutoff": cutoff,
+            "snapshot_manifest": "qlib/provider_manifest.json",
+        },
+    }
+
+
+def _declaration(
+    *,
+    calendar_prefix,
+    cutoff,
+    symbols,
+    fields,
+    lifetimes,
+    benchmark,
+    day_future_endpoint=None,
+):
     if not isinstance(calendar_prefix, (list, tuple)) or not calendar_prefix:
         raise ValueError("Original global calendar prefix required")
     calendar = [_date(value) for value in calendar_prefix]
@@ -238,6 +404,53 @@ def build_provider(
         "benchmark": benchmark,
         "day_future_endpoint": day_future_endpoint,
     }
+    return spec, bounded
+
+
+def build_provider(
+    source: Path,
+    destination: Path,
+    *,
+    calendar_prefix: list[str],
+    cutoff: str,
+    symbols: list[str],
+    fields: list[str],
+    lifetimes: dict[str, tuple[str, str]],
+    benchmark: str | None,
+    day_future_endpoint: str | None = None,
+) -> dict:
+    """Build an offline candidate from explicit declarations, never infer a pool.
+
+    All symbols are mandatory. An explicitly selected future listing is an error,
+    not silently filtered. Benchmark gets the same declared fields but is excluded
+    from instruments/all.txt unless also explicitly in symbols. Lifetimes are
+    caller declarations: no unbounded instruments file is opened to validate them.
+    Paths must be absolute with no symlink components (including /tmp aliases).
+    Existing destination, even empty, is never replaced.
+    """
+    source, destination = Path(source), Path(destination)
+    for path in (source, destination):
+        if not path.is_absolute() or ".." in path.parts or path == Path(path.anchor):
+            raise ValueError(
+                "Absolute non-root paths without parent traversal required"
+            )
+    if (
+        source in destination.parents
+        or destination in source.parents
+        or source == destination
+    ):
+        raise ValueError("Source and destination must be disjoint")
+    spec, bounded = _declaration(
+        calendar_prefix=calendar_prefix,
+        cutoff=cutoff,
+        symbols=symbols,
+        fields=fields,
+        lifetimes=lifetimes,
+        benchmark=benchmark,
+        day_future_endpoint=day_future_endpoint,
+    )
+    calendar, symbols, fields = spec["calendar_prefix"], spec["symbols"], spec["fields"]
+    required = sorted(bounded)
     encoded_spec = json.dumps(spec, sort_keys=True, separators=(",", ":")).encode()
     calendar_bytes = ("\n".join(calendar) + "\n").encode("ascii")
     directory_checks, file_checks, sources, outputs = [], [], [], []

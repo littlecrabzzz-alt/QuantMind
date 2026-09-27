@@ -168,3 +168,14 @@ research.runtime 候选对新建启动前、重连启动前、observe 三条路�
 初次消费者守卫错误拒绝必要父目录fd，失败原文/脚本留存后修正。最终进程审计曾拦截依赖的 socket.bind 与 subprocess 探测，不能称零尝试或OS隔离。作者首次未禁全局coverage时50断言通过但无关后端阈值失败，完整原日志未归档；最终52 PASS的范围测试日志与源码哈希绑定。GLM定向反证任务 `687732560216b311b34ae762`，不是独立验收。
 
 剩余明确缺口是将生成后白名单产物与公共冻结清单连接，并在纯合成的实际编排中覆盖三个旧源hash调用点；本轮没有改 `run_frozen_research.py`、运行真实freeze、恢复股票、重训或改A账户。随后仍须真实数据准入、完整worker/身份验收及旧间接暴露处置。证据在仓库外巡检 `20260927T2000-evidence/`。
+
+
+## 9月28日05时：生成物连接公共冻结流程
+
+新建 `run_frozen_research.py freeze` 必须显式提供 `--provider-manifest /绝对路径/provider_manifest.json` 和 `--provider-manifest-sha256 <已固定SHA256>`。`--data-root` 继续只选择日期范围内的 QuantDB 分区；Qlib 清单仅来自已生成 provider 的实际白名单文件，缺身份、错截止、额外/缺失文件、链接或篡改均失败，不再枚举原始 `db/qlib_data`。构建 provider 与冻结是两步，冻结器不自动生成或补原始数据。
+
+生成物保留整文件 SHA256；三个原 source hash 阶段及复制均约束到声明大小，读前大小已不符时立即拒绝，读中修改仍限制读取范围并在结束时复查身份。来源范围 hash 仅留作 provenance，不替换整文件校验。新包保存 provider/declaration/cutoff 绑定；verify 对照包内 manifest/config，篡改或删除绑定拒绝。无显式外部参数的恢复可只依赖冻结副本；若显式提供 provider 则必须同身份，真正旧包的核验/恢复兼容，不补造新身份。冻结的代码清单加入 provider/prefix 两个依赖，非repo目录下执行冻结CLI验证成功。
+
+87项纯合成测试与5子测试通过。主控另造带毒尾源、非零索引和基准的输入，经实际 snapshot_files→freeze→verify；8个生成文件分别经过三个source hash阶段，复制原件一致，移走外部provider后恢复和独立CLI通过。QuantDB fixture是不可消费的合成字节，只验证清单选择，没有运行模型worker。局限：声明真实性、完整字段/基准/endpoint执行合同、PIT、原子来源和旧暴露处置均未完成。原始输入/股票暂停/A账户/运行服务保持；只提交隔离分支候选。证据见仓库外 `巡检/20260927T2100-evidence/`。
+
+GLM46e38e503d2ab75bf9fe8341已回报1真实调用（输入22112、输出7526），未建立新增可复现缺陷。其“下一步真实CN分区freeze”建议不采纳：当前授权仍是纯合成，源真实性与旧暴露处置未准入。保留原报告及主控纠偏，下一项只准备完整worker合成输入合同；不因报告done解除股票暂停。

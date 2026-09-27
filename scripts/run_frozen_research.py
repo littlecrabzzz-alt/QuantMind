@@ -14,6 +14,10 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.continuous_research.qlib_provider import generated_bytes, validate_provider
 
 
 def read(path):
@@ -26,7 +30,9 @@ def write(path, value):
     temp.replace(path)
 
 
-def sha256(path):
+def sha256(path, *, expected_size=None):
+    if expected_size is not None:
+        return hashlib.sha256(generated_bytes(path, expected_size)).hexdigest()
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
@@ -83,8 +89,10 @@ def snapshot_date_bounds(cfg):
         [date.fromisoformat(value) for value in segment]
         for segment in cfg["split"].values()
     ]
-    if any(len(segment) != 2 or segment[0] > segment[1] or segment[1] > cutoff
-           for segment in segments):
+    if any(
+        len(segment) != 2 or segment[0] > segment[1] or segment[1] > cutoff
+        for segment in segments
+    ):
         raise ValueError("Frozen input split outside development_end")
     start = date.fromisoformat(cfg["split"]["train"][0]) - timedelta(days=30)
     end = date.fromisoformat(cfg["split"]["test"][1])
@@ -93,10 +101,23 @@ def snapshot_date_bounds(cfg):
     return start, end
 
 
-def snapshot_files(root, cfg, data_root=None):
+def snapshot_files(
+    root, cfg, data_root=None, *, provider_manifest=None, provider_manifest_sha256=None
+):
     data_root = Path(data_root or root).resolve()
     start, end = snapshot_date_bounds(cfg)
-    files = {}
+    if provider_manifest is None or provider_manifest_sha256 is None:
+        raise ValueError(
+            "New snapshot requires explicit bounded provider manifest and SHA256"
+        )
+    provider = validate_provider(
+        provider_manifest, provider_manifest_sha256, cutoff=end.isoformat()
+    )
+    provider_root = Path(provider_manifest).parent
+    files = {
+        path: Path("qlib") / path.relative_to(provider_root)
+        for path in provider["files"]
+    }
     for dataset in ("6_ml_datasets/l1_factors", "1_kline_data/daily_backward"):
         selected = []
         for partition in (data_root / "data/quantdb" / dataset).glob("dt=*"):
@@ -106,18 +127,14 @@ def snapshot_files(root, cfg, data_root=None):
             day = datetime.strptime(raw, "%Y%m%d").date()
             if start <= day <= end:
                 if partition.is_symlink():
-                    raise RuntimeError(f"Frozen partition must not be a symlink: {partition}")
+                    raise RuntimeError(
+                        f"Frozen partition must not be a symlink: {partition}"
+                    )
                 selected.extend(partition.glob("*.parquet"))
         if not selected:
             raise RuntimeError(f"No frozen input partitions: {dataset}")
         for path in selected:
             files[path] = Path("quantdb") / path.relative_to(data_root / "data/quantdb")
-    for path in (data_root / "db/qlib_data").rglob("*"):
-        if path.is_file():
-            files[path] = Path("qlib") / path.relative_to(data_root / "db/qlib_data")
-    for required in ("calendars/day.txt", "instruments/all.txt"):
-        if not (data_root / "db/qlib_data" / required).is_file():
-            raise RuntimeError(f"Qlib provider missing {required}")
     for path in (root / "backend").rglob("*.py"):
         files[path] = Path("code") / path.relative_to(root)
     # train.py imports local data, diagnostics and model_trainers packages.
@@ -126,23 +143,66 @@ def snapshot_files(root, cfg, data_root=None):
         files[path] = Path("code") / path.relative_to(root)
     for name in ("frozen_research_worker.py", "run_frozen_research.py"):
         files[root / "scripts" / name] = Path("code/scripts") / name
+    for name in ("qlib_provider.py", "qlib_prefix.py"):
+        path = Path("scripts/continuous_research") / name
+        files[root / path] = Path("code") / path
     return files
 
 
-def freeze(root, out, cfg, image, data_root=None):
+def freeze(
+    root,
+    out,
+    cfg,
+    image,
+    data_root=None,
+    *,
+    provider_manifest=None,
+    provider_manifest_sha256=None,
+):
     validate_config(cfg)
-    out.mkdir(parents=True, exist_ok=True)
     if (out / "manifest.json").exists():
         manifest = verify(out)
         if read(out / "snapshot/config.json") != cfg:
             raise RuntimeError(
                 "Frozen configuration differs; use a new experiment directory"
             )
+        if provider_manifest is not None or provider_manifest_sha256 is not None:
+            if (
+                provider_manifest is None
+                or provider_manifest_sha256 is None
+                or manifest.get("provider_binding", {}).get("manifest_sha256")
+                != provider_manifest_sha256
+            ):
+                raise ValueError(
+                    "Frozen provider identity differs or is unbound; use a new output"
+                )
+            candidate = validate_provider(
+                provider_manifest,
+                provider_manifest_sha256,
+                cutoff=cfg["split"]["test"][1],
+            )
+            if candidate["binding"] != manifest["provider_binding"]:
+                raise ValueError("Frozen provider binding differs")
         return manifest
+    if provider_manifest is None or provider_manifest_sha256 is None:
+        raise ValueError(
+            "New freeze requires explicit bounded provider manifest and SHA256"
+        )
+    provider = validate_provider(
+        provider_manifest, provider_manifest_sha256, cutoff=cfg["split"]["test"][1]
+    )
+    provider_files = provider["files"]
+    out.mkdir(parents=True, exist_ok=True)
     snapshot = out / "snapshot"
     if snapshot.exists():
         raise RuntimeError("Incomplete snapshot retained; use a new output directory")
-    sources = snapshot_files(root, cfg, data_root=data_root)
+    sources = snapshot_files(
+        root,
+        cfg,
+        data_root=data_root,
+        provider_manifest=provider_manifest,
+        provider_manifest_sha256=provider_manifest_sha256,
+    )
     total = sum(path.stat().st_size for path in sources)
     if shutil.disk_usage(out).free < total + 1024**3:
         raise RuntimeError("Insufficient disk space for snapshot and research outputs")
@@ -153,9 +213,16 @@ def freeze(root, out, cfg, image, data_root=None):
             raise RuntimeError(f"Snapshot inputs must be physical files: {source}")
         target = snapshot / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        before = sha256(source)
-        shutil.copyfile(source, target)
-        if before != sha256(target) or before != sha256(source):
+        expected = provider_files.get(source)
+        size = expected["size"] if expected else None
+        before = sha256(source, expected_size=size)
+        if expected:
+            if before != expected["sha256"]:
+                raise ValueError("Bounded provider changed before copy")
+            target.write_bytes(generated_bytes(source, size))
+        else:
+            shutil.copyfile(source, target)
+        if before != sha256(target) or before != sha256(source, expected_size=size):
             raise RuntimeError(f"Source changed while freezing: {source}")
         entries.append(
             {
@@ -166,8 +233,15 @@ def freeze(root, out, cfg, image, data_root=None):
         )
     # Detect writes during the whole multi-file copy, not just individual copies.
     for (source, _), entry in zip(sorted(sources.items()), entries, strict=True):
-        if sha256(source) != entry["sha256"]:
+        expected = provider_files.get(source)
+        if (
+            sha256(source, expected_size=expected["size"] if expected else None)
+            != entry["sha256"]
+        ):
             raise RuntimeError(f"Source changed during snapshot: {source}")
+    validate_provider(
+        provider_manifest, provider_manifest_sha256, cutoff=cfg["split"]["test"][1]
+    )
     write(snapshot / "config.json", cfg)
     entries.append(
         {
@@ -184,6 +258,7 @@ def freeze(root, out, cfg, image, data_root=None):
             ["git", "rev-parse", "HEAD"], cwd=root, text=True
         ).strip(),
         "files": entries,
+        "provider_binding": provider["binding"],
         "total_bytes": sum(e["bytes"] for e in entries),
     }
     write(out / "manifest.json", manifest)
@@ -203,6 +278,34 @@ def verify(out):
         path = snapshot / entry["path"]
         if path.is_symlink() or sha256(path) != entry["sha256"]:
             raise RuntimeError(f"Frozen checksum mismatch: {entry['path']}")
+    if (
+        snapshot / "qlib/provider_manifest.json"
+    ).exists() and "provider_binding" not in manifest:
+        raise RuntimeError("Frozen provider binding missing for bounded provider")
+    if "provider_binding" in manifest:
+        provider_path = snapshot / "qlib/provider_manifest.json"
+        provider = read(provider_path)
+        cfg = read(snapshot / "config.json")
+        _, end = snapshot_date_bounds(cfg)
+        declaration_sha = hashlib.sha256(
+            json.dumps(
+                provider["declaration"], sort_keys=True, separators=(",", ":")
+            ).encode()
+        ).hexdigest()
+        expected_binding = {
+            "manifest_sha256": sha256(provider_path),
+            "declaration_sha256": declaration_sha,
+            "cutoff": end.isoformat(),
+            "snapshot_manifest": "qlib/provider_manifest.json",
+        }
+        if (
+            manifest["provider_binding"] != expected_binding
+            or provider.get("declaration_sha256") != declaration_sha
+            or provider["declaration"].get("cutoff") != end.isoformat()
+        ):
+            raise RuntimeError(
+                "Frozen provider binding inconsistent with stored inputs"
+            )
     return manifest
 
 
@@ -262,8 +365,10 @@ def main():
     parser.add_argument(
         "--data-root",
         type=Path,
-        help="Runtime root containing data/quantdb and db/qlib_data; defaults to source root",
+        help="Runtime root containing data/quantdb; raw Qlib is never selected",
     )
+    parser.add_argument("--provider-manifest", type=Path)
+    parser.add_argument("--provider-manifest-sha256")
     parser.add_argument("--image", help="Defaults to the running QuantMind image ID")
     args = parser.parse_args()
     out = args.output.resolve()
@@ -278,8 +383,20 @@ def main():
     )
     cfg = read(cfg_path)
     if (out / "manifest.json").exists():
-        manifest = freeze(ROOT, out, cfg, None, data_root=args.data_root)
+        manifest = freeze(
+            ROOT,
+            out,
+            cfg,
+            None,
+            data_root=args.data_root,
+            provider_manifest=args.provider_manifest,
+            provider_manifest_sha256=args.provider_manifest_sha256,
+        )
     else:
+        if args.provider_manifest is None or args.provider_manifest_sha256 is None:
+            raise ValueError(
+                "New freeze requires --provider-manifest and --provider-manifest-sha256"
+            )
         image_id = (
             args.image
             or subprocess.check_output(
@@ -295,6 +412,8 @@ def main():
             cfg,
             {key: image[key] for key in ("Id", "Os", "Architecture", "RepoDigests")},
             data_root=args.data_root,
+            provider_manifest=args.provider_manifest,
+            provider_manifest_sha256=args.provider_manifest_sha256,
         )
     print("Frozen", len(manifest["files"]), "files before execution", flush=True)
     if args.stage == "freeze":
