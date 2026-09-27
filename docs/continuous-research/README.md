@@ -136,3 +136,12 @@ QuantDBFactorReader.read_range 把日期上下界传入 schema 采样、主因�
 research.runtime 候选对新建启动前、重连启动前、observe 三条路径统一检查不可变 image ID、输入/配置/代码/输出四处挂载及读写权限、network none/readonly rootfs、命令/加载环境/工作目录。launch-intent 新增输入manifest、冻结worker代码、config和proposal文件身份；重连校验合同与原记录，同身份created只start一次、不重写文件。旧intent无身份失败关闭，不原地补盖章。完整输入包内容仍沿用原frozen.verify的新建/完成检查，未新增每次心跳整包验证。
 
 **本轮只提交隔离候选并做临时合成/Mock Docker测试，未重启或加载运行服务，未改变旧冻结包或恢复股票。** 仍需新包物理裁剪、独立Qlib provider、实际import/容器身份验收和已暴露范围处置；不能把本地源码测试当股票准入。
+
+
+### 9月27日20时：Qlib 单文件受限读取候选（未接入）
+
+`scripts/continuous_research/qlib_prefix.py` 只读取显式文件的允许字节前缀，暂未被 freeze/runtime 调用，不构建或发布 provider。保留原全局日历起始索引 s，值数为 min(现有完整值数, 截止索引 e − s + 1)；通过未缓冲 os.read 避免读取器预取截止后尾部，保留 NaN 原位和短序列真实终点，不填零。返回的 SHA256 只绑定 `[0, N)` 字节范围，不能写成整源身份。文件末级 symlink、非法头/长度、可观测修改或替换明确拒绝。
+
+调用方未来仍须绑定原日历与截止索引、源/字段白名单、父路径可信度、上市退市及不可变多文件输入；本 helper 的 stat 检查不是原子快照。已通过18项纯合成测试及8个独立临时反例；完整 provider 消费、PIT、真实新包和股票准入均不由这些检查授予。现有 QlibDataBuilder 依赖尚未准入来源且有无界读取路径，本轮不调用它重建真实包，也不接管其发布职责。
+
+此候选限本地 Unix 普通文件：仅头部的空序列明确拒绝，短读立即失败，不为未来远程文件系统加补读逻辑。测试观察应用 os.read 的请求范围，不计作内核缓存预读或上游 PIT 证明。GLM复核未发现本步阻塞；其“尚缺 header-only 测试”判断已由已有测试与独立探针纠正，不重复加测试。
