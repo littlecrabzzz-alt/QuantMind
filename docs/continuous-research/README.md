@@ -114,3 +114,10 @@ python3 scripts/continuous_research/audit.py --output "/Users/lizeyu/Documents/C
 模型 report.followups 现在可选 kind=experiment（缺省保持原实验路径）或 kind=evidence_review。后者必须引用本课题已登记 ETF backtest_ids（1–6个唯一ID，可为父链或其他任务），保存为 awaiting_evidence，等待主控补包，不进入实验/模型队列。拒绝股票、未知及跨课题ID。模型尚不能自动读取原件；主控继续复用 review_packets.validate_run 核对归属、终态、版本及开发截止，生成白名单证据后经 add_evidence_review 派发。页面区分“待补原件”与“等待队列空位”，巡检分别统计 pending_evidence_requests 与 deferred_followups。完成补包时须把新任务ID关联回原请求，原报告保留。
 
 若旧误派任务没有实验、报告被 report_requires_public_experiment 拒绝，controller立即 blocked，停止无效改写；没有放宽研究报告或证据绑定门槛。额度/服务端故障重试保持。原39d567e3、40e14931两项失败记录留存，补证任务87ff010c、58f5dfc3分别读取已有原件，不为获得路径重复回测。
+
+
+### 已补原件请求的幂等回填
+
+`link_evidence_request.py` 在可信程序构建并通过 `add_evidence_review` 注册证据后，将原 `awaiting_evidence` 请求关联到该复核任务。认证请求只从 stdin 传入，字段为 `token/program_id/parent_id/proposal_sha256/review_id`，在本组 Engine 中运行；复用既有 JWT、所有者/租户/节点和行锁。
+
+请求指纹排除可变的 `task_id/awaiting_evidence/evidence_resolution`。证据须包含精确的 `origin_request`（父任务、原请求指纹、排序后的 backtest_ids）、合同开发截止及有效内容哈希；父任务须为已完成 ETF 研究。错来源/错截止/冲突关联拒绝，同请求同任务重放不新增事件。仅保存关联与审计记录，不生成证据、不验证 GLM 结论，也不把原报告改写成已验收。新脚本按需启动，无服务重启。
