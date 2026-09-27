@@ -1,0 +1,120 @@
+{
+  "at": "2026-09-27T01:15:15.885769+00:00",
+  "program_id": "84616e70fd47a50e2cbfe7a6a15da54b",
+  "runtime": {
+    "model": "glm-5.3",
+    "provider": "glm",
+    "thinking": "max"
+  },
+  "reviews": [
+    {
+      "id": "0960643db0f0124fe6faf5a4",
+      "title": "研究扩展可行性：现有量价、基本面、公告事件与跨资产",
+      "status": "done",
+      "evidence_sha256": "b5f8cf5989a9a3e7bde68a5982ac2a2802877723b1241196ff527c72e18e138e",
+      "report_sha256": "4c67b5d6f72f51c93476367e4db74e7ee771a0de7fed7556f8ed6d7389a6273d",
+      "validation": "evidence_review_unverified",
+      "new_backtests": 0,
+      "usage": {
+        "calls": 1,
+        "input": 13692,
+        "output": 12326,
+        "unknown_calls": 0
+      }
+    },
+    {
+      "id": "218c3c8b6b9225094adc3231",
+      "title": "回撤归因的证据复核",
+      "status": "done",
+      "evidence_sha256": "3534d212ef494f7e20cf080801b83c0c4746c03a3cec47f15b2120e5f686db57",
+      "report_sha256": "f23a49c90a98acfe636972c7c1f7dfc48b6d090d195aaf136a713ce2e792474d",
+      "validation": "evidence_review_unverified",
+      "new_backtests": 0,
+      "usage": {
+        "calls": 1,
+        "input": 14534,
+        "output": 15218,
+        "unknown_calls": 0
+      }
+    },
+    {
+      "id": "95e3ae58fc8f529cae462a2d",
+      "title": "ETF固定包开发段原始数据审计",
+      "status": "done",
+      "evidence_sha256": "f4688d7397ee6464d717b16af87aaf3b8f6c60c6a48657137f048d0a7b83fa33",
+      "report_sha256": "26e2d6666c26d36c45447f3af776b68a49b50d4bf9ab4c1dd255ef611d18cd84",
+      "validation": "evidence_review_unverified",
+      "new_backtests": 0,
+      "usage": {
+        "calls": 1,
+        "input": 6693,
+        "output": 9492,
+        "unknown_calls": 0
+      }
+    },
+    {
+      "id": "a2b7909cbcb2809358f6f41f",
+      "title": "固定股票池八特征开发段原始数据审计",
+      "status": "done",
+      "evidence_sha256": "f48712bf96ba09beaae8f6d45df2ee003ad34ebf950203139070908dcbf2bf4a",
+      "report_sha256": "046b88f3b03743779a083f22fb74127898bf1e5d20ffa9b0033c2ab6f2b3fc1c",
+      "validation": "evidence_review_unverified",
+      "new_backtests": 0,
+      "usage": {
+        "calls": 1,
+        "input": 8567,
+        "output": 7186,
+        "unknown_calls": 0
+      }
+    },
+    {
+      "id": "a358e340b08b8570b5fdb8cd",
+      "title": "同条件对照与工程故障归因复核",
+      "status": "done",
+      "evidence_sha256": "7b70f40fd6c22ad7d694025acaec5b3b08bc1c71113989305d43ded640f383f3",
+      "report_sha256": "86895e779bc6f00e303a6338f92a4223cba474d30649fe143f69cfa67c8731b4",
+      "validation": "evidence_review_unverified",
+      "new_backtests": 0,
+      "usage": {
+        "calls": 1,
+        "input": 16815,
+        "output": 14100,
+        "unknown_calls": 0
+      }
+    },
+    {
+      "id": "e1e6ae9fa070600d231e2bd3",
+      "title": "统计显著性与自适应探索复核",
+      "status": "done",
+      "evidence_sha256": "33e5c568b8507611c256512c3d43c12ef474fb26883df86e56abd866f07697c7",
+      "report_sha256": "143fe6d835abb7bd2617727ed57b9b691fb6c247a788bb2ebec21c71f6e50731",
+      "validation": "evidence_review_unverified",
+      "new_backtests": 0,
+      "usage": {
+        "calls": 1,
+        "input": 39578,
+        "output": 22391,
+        "unknown_calls": 0
+      }
+    }
+  ],
+  "scope": "Development inputs only, through 2026-03-24; model review is not independent acceptance",
+  "source_identity_checks": "All existing report runs owner/program/terminal/revision/code/manifest checked; data manifests and baseline universe matched; final builder counts identical",
+  "validation": {
+    "local_tests": 17,
+    "engine_tests": 16,
+    "data_self_test": "PASS",
+    "ruff": "PASS",
+    "typecheck": "PASS",
+    "ui_filter_preview_report": "PASS",
+    "iab_download_event": "TIMEOUT; file download not independently verified"
+  },
+  "quality_disposition": {
+    "method_review": "Two proposals overlap existing seeds and zero-return provenance overstated; not adopted or dispatched as experiments"
+  },
+  "logs": {
+    "glm-continuous-review-engine-tests.log": "916fafb3ba549f4a156933b6f0893d4cdae7843382366b4e21490e6c453f367c",
+    "glm-continuous-review-local-tests.log": "bdb2e31e9d098a74eb905728ce3c7876b1b12af955d8862032269b68b200b1d8",
+    "glm-continuous-review-typecheck.log": "563e22a3922147ba095334ab7ed5d105315e99f2dab72df8dc14dd56b5140ed7"
+  }
+}

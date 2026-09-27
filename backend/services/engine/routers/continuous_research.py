@@ -83,6 +83,17 @@ class ReportAction(BaseModel):
     action: Literal["report"]
     text: str = Field(min_length=100, max_length=20000)
     followups: list[Followup] = Field(default_factory=list, max_length=3)
+    evidence_ids: list[str] = Field(default_factory=list, max_length=6)
+
+
+class EvidenceReview(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    topic: Literal[
+        "data_coverage", "data_semantics", "research_review", "method_review"
+    ]
+    question: str = Field(min_length=10, max_length=1800)
+    reason: str = Field(min_length=10, max_length=2000)
+    evidence: dict
 
 
 @asynccontextmanager
@@ -260,6 +271,8 @@ async def act(ident, c, t, action, auth, db):
     if not isinstance(action, dict):
         raise ValueError("action must be an object")
     kind = action.get("action")
+    if t["kind"] == "evidence_review" and kind != "report":
+        raise ValueError("evidence_review_is_read_only")
     if kind == "stock_factor":
         from backend.services.research_agent.continuous_stock import submit
 
@@ -397,11 +410,18 @@ async def act(ident, c, t, action, auth, db):
         return dict(strategy_id=sid, revision_id=revision["revision_id"], **result)
     if kind == "report":
         if (
-            set(action) - {"action", "text", "followups"}
+            set(action) - {"action", "text", "followups", "evidence_ids"}
             or not 100 <= len(action.get("text", "")) <= 20000
         ):
             raise ValueError("report_requires_100_to_20000_characters")
-        if not t["experiments"]:
+        review = t["kind"] == "evidence_review"
+        if review:
+            evidence = t.get("evidence") or {}
+            if action.get("evidence_ids") != [evidence.get("id")]:
+                raise ValueError("review_must_cite_bound_evidence")
+            if action.get("followups"):
+                raise ValueError("review_proposals_require_new_evidence_assignment")
+        elif not t["experiments"]:
             raise ValueError("report_requires_public_experiment")
         rs = await results(t, auth)
         if len(rs) != len(t["experiments"]) or any(
@@ -427,8 +447,11 @@ async def act(ident, c, t, action, auth, db):
             "text": action["text"],
             "at": time.time(),
             "results": rs,
-            "validation": "development_only_unreviewed",
+            "validation": "evidence_review_unverified"
+            if review
+            else "development_only_unreviewed",
             "followups": copy.deepcopy(action.get("followups", [])),
+            "evidence_ids": action.get("evidence_ids", []),
         }
         t["reports"].append(report)
         st.promote_followups(c)
@@ -440,11 +463,43 @@ async def act(ident, c, t, action, auth, db):
 async def command(
     ident: str, body: Command, auth: AuthContext = Depends(get_auth_context)
 ):
-    if len(json.dumps(body.data)) > 120000:
+    if len(json.dumps(body.data)) > (
+        450000 if body.op == "add_evidence_review" else 120000
+    ):
         raise HTTPException(413, "command_too_large")
     async with edit(ident, auth) as (c, db):
         now = time.time()
         st.recover(c, now)
+        if body.op == "add_evidence_review":
+            request = EvidenceReview.model_validate(body.data)
+            evidence = request.evidence
+            if evidence.get("boundary") != c["contract"]["end_date"]:
+                raise ValueError("evidence_development_boundary_required")
+            sources = evidence.get("sources") or []
+            if not sources or any(
+                not isinstance(s, dict)
+                or not s.get("path")
+                or not isinstance(s.get("sha256"), str)
+                or len(s["sha256"]) != 64
+                or any(x not in "0123456789abcdef" for x in s["sha256"])
+                for s in sources
+            ):
+                raise ValueError("evidence_sources_require_sha256")
+            digest = st.fingerprint(evidence)
+            task_id = st.add_task(
+                c,
+                request.topic,
+                request.question + " 证据版本：" + digest[:12],
+                request.reason,
+                kind="evidence_review",
+            )
+            t = c["tasks"][task_id]
+            t.setdefault("evidence", dict(evidence, id=digest[:32], sha256=digest))
+            t["priority"] = 5
+            st.record(
+                c, "evidence_review_assigned", task_id=task_id, evidence_sha256=digest
+            )
+            return {"task_id": task_id, "evidence_id": digest[:32]}
         if body.op in ("expand_stock", "repair_stock_input"):
             if c["desired"] != "stopped":
                 raise ValueError("stop_before_expanding_research_scope")
@@ -558,6 +613,20 @@ async def command(
             return {"saved": True}
         if body.op == "context":
             rs = await results(t, auth)
+            if t["kind"] == "evidence_review":
+                return {
+                    "task": {
+                        k: v
+                        for k, v in t.items()
+                        if k not in ("lease", "tool_receipts", "rejected_actions")
+                    },
+                    "results": rs,
+                    "quota_state": st.quota_update(c, c["quota"], now),
+                    "contract": {
+                        "end_date": c["contract"]["end_date"],
+                        "validation": "read_only_evidence_review",
+                    },
+                }
             manifest = json.loads((public.package_root() / "manifest.json").read_text())
             availability = [
                 {

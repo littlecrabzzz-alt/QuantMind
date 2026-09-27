@@ -149,6 +149,44 @@ class ContractTests(unittest.IsolatedAsyncioTestCase):
             sum(t["status"] not in st.TERMINAL for t in self.c["tasks"].values()), 20
         )
 
+    async def test_review_cannot_launch_experiments(self):
+        self.t["kind"] = "evidence_review"
+        with self.assertRaisesRegex(ValueError, "read_only"):
+            await act("x", self.c, self.t, self.action, None, None)
+
+    async def test_review_requires_bound_evidence_and_accepts_no_new_backtest(self):
+        self.t.update(kind="evidence_review", evidence={"id": "trusted-packet"})
+        report = {"action": "report", "text": "a" * 100}
+        with self.assertRaisesRegex(ValueError, "cite_bound"):
+            await act("x", self.c, self.t, report, None, None)
+        with patch(
+            "backend.services.engine.routers.continuous_research.results",
+            new=AsyncMock(return_value={}),
+        ):
+            result = await act(
+                "x",
+                self.c,
+                self.t,
+                dict(report, evidence_ids=["trusted-packet"]),
+                None,
+                None,
+            )
+        self.assertTrue(result["saved"])
+        self.assertEqual(self.t["experiments"], {})
+        self.assertEqual(self.t["reports"][0]["evidence_ids"], ["trusted-packet"])
+
+    def test_review_slots_do_not_require_extra_compute_tasks(self):
+        for i in range(17):
+            st.add_task(self.c, "risk", str(i), "evidence")
+        for i in range(6):
+            st.add_task(
+                self.c, "data_coverage", str(i), "evidence", kind="evidence_review"
+            )
+        with self.assertRaisesRegex(ValueError, "queue_full"):
+            st.add_task(
+                self.c, "data_coverage", "overflow", "evidence", kind="evidence_review"
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

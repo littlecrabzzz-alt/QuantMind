@@ -48,7 +48,11 @@ def main():
         "counts": {
             "tasks": len(tasks),
             "task_status": dict(Counter(t["status"] for t in tasks)),
+            "task_kind": dict(Counter(t["kind"] for t in tasks)),
             "reports": len(reports),
+            "evidence_review_reports": sum(
+                len(t["reports"]) for t in tasks if t["kind"] == "evidence_review"
+            ),
             "experiment_references": len(experiments),
             "unique_backtests": len({e["backtest_id"] for e in experiments}),
             "strategy_ids": len(
@@ -71,9 +75,11 @@ def main():
         "reports": [
             {
                 "task_id": t["id"],
+                "kind": t["kind"],
                 "at": r["at"],
                 "question": t["question"],
                 "text": r["text"],
+                "evidence_ids": r.get("evidence_ids", []),
                 "backtest_ids": [v["backtest_id"] for v in r["results"].values()],
             }
             for t in tasks

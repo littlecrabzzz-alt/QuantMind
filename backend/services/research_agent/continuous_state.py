@@ -8,6 +8,14 @@ import uuid
 from .glm_quota import quota_decision, retry_delay
 
 TOPICS = {
+    "data_coverage": ("数据覆盖与完整性", "核对固定输入覆盖、缺失与重复。", "D"),
+    "data_semantics": ("数据口径与时点", "核对复权、分红、证券池及可用时点。", "D"),
+    "research_review": (
+        "研究证据复核",
+        "检查归因、对照与统计主张是否受证据支持。",
+        "R",
+    ),
+    "method_review": ("研究方法与可行性", "比较新机制与所需数据的可行性。", "R"),
     "trend": ("趋势规则研究", "研究可解释的趋势信号及反弹/震荡失效情境。", "B1"),
     "momentum": (
         "动量与资产轮动",
@@ -43,7 +51,11 @@ def add_task(c, topic, question, reason, parent=None, kind="research"):
     key = fingerprint([topic, question.strip(), kind])[:24]
     if key in c["tasks"]:
         return key
-    if sum(t["status"] not in TERMINAL for t in c["tasks"].values()) >= 20:
+    review = kind == "evidence_review"
+    if sum(
+        t["status"] not in TERMINAL and (t["kind"] == "evidence_review") == review
+        for t in c["tasks"].values()
+    ) >= (6 if review else 20):
         raise ValueError("ready_queue_full")
     c["tasks"][key] = {
         "id": key,

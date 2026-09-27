@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Progress, Tag } from 'antd';
+import { Alert, Button, Progress, Select, Tag } from 'antd';
 import { strategyManagementService as api } from '../../../services/strategyManagementService';
 
 type Task = { id: string; question: string; topic: string; status: string; step: string; attempts: number;
+  kind?:string; evidence?:{id:string;sha256:string;title:string;[key:string]:unknown};
   last_error?: string; last_activity?: number; retry_at?: number; usage: {input:number; output:number; unknown_calls:number};
   experiments: Record<string, {name:string; strategy_id?:string; revision_id?:string; factor_id?:string; kind?:string; backtest_id:string; hypothesis:string}>;
   reports: {text:string; at:number; followups?:{question:string;task_id?:string}[]}[]; };
@@ -18,6 +19,7 @@ const labels:Record<string,string> = {running:'运行中', stopped:'已停止', 
 const date = (v?:number) => v ? new Date(v*1000).toLocaleString('zh-CN',{hour12:false}) : '未记录';
 export default function ContinuousResearchPanel() {
   const [programs,setPrograms]=useState<Program[]>([]), [error,setError]=useState(''), [busy,setBusy]=useState(false);
+  const [taskFilter,setTaskFilter]=useState('all');
   const refresh=async()=>{try{setPrograms(await api.executionRequest('continuous-research'));setError('');}
     catch{setError('持续研究服务暂不可达；这里不据此判定任务成功或失败。');}};
   useEffect(()=>{void refresh();const timer=setInterval(()=>void refresh(),10000);return()=>clearInterval(timer);},[]);
@@ -26,7 +28,7 @@ export default function ContinuousResearchPanel() {
   if(!programs.length) return error ? <Alert type="warning" message={error}/> : null;
   return <div data-testid="continuous-research" className="rounded-xl border border-border p-4 space-y-4">
     <div className="flex justify-between"><div><h2 className="font-semibold text-lg">GLM 持续研究</h2>
-      <p className="text-sm text-muted-foreground">研究 A股量价、风险因子与 ETF 组合，产物进入因子库、策略管理与回测中心。现有虚拟账户独立运行。</p></div>
+      <p className="text-sm text-muted-foreground">研究数据完整性、方法与证据，探索 A股因子和资产配置。因子、策略、回测进入原生模块，复核报告关联原始证据。</p></div>
       <Button onClick={()=>void refresh()}>刷新</Button></div>
     {error&&<Alert type="warning" message={error}/>}
     {programs.map(p=><div key={p.id} className="space-y-3">
@@ -50,9 +52,13 @@ export default function ContinuousResearchPanel() {
           <p>保留验证集不开放；开发结果均待独立复核，不自动进入虚拟盘或实盘。</p>
           <p>停止会撤销研究写入租约；已经提交的公共回测可以继续完成并留存。</p></div>
       </div>
-      <div className="space-y-2">{Object.values(p.tasks).map(t=><details key={t.id} className="border border-border rounded p-3" open={t.status==='running'}>
-        <summary className="cursor-pointer"><Tag>{labels[t.status]||t.status}</Tag>{t.question}</summary>
+      <Select aria-label="研究任务类型" value={taskFilter} onChange={setTaskFilter} style={{minWidth:220}} options={[{value:'all',label:'全部研究任务'},{value:'evidence_review',label:'数据检查与证据复核'},{value:'experiments',label:'因子与策略实验'}]}/>
+      <div className="space-y-2">{Object.values(p.tasks).filter(t=>taskFilter==='all'||(taskFilter==='evidence_review'?t.kind==='evidence_review':t.kind!=='evidence_review')).sort((a,b)=>(b.last_activity||0)-(a.last_activity||0)).map(t=><details key={t.id} className="border border-border rounded p-3" open={t.status==='running'}>
+        <summary className="cursor-pointer"><Tag>{labels[t.status]||t.status}</Tag>{t.kind==='evidence_review'&&<Tag color="blue">数据/证据复核</Tag>}{t.question}</summary>
         <p className="text-sm mt-2">当前：{t.step} · 领取 {t.attempts} 次 · 最近进展 {date(t.last_activity)}</p>
+        {t.evidence&&<details className="my-2 text-sm"><summary className="cursor-pointer">只读证据包：{t.evidence.title} · {t.evidence.sha256.slice(0,12)}</summary>
+          <p>证据复核不要求新回测，模型结论仍待独立核验。</p><Button size="small" onClick={()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(t.evidence,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`evidence-${t.evidence!.id}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}>下载原始证据包</Button>
+          <pre className="whitespace-pre-wrap max-h-80 overflow-auto">{JSON.stringify(t.evidence,null,2)}</pre></details>}
         {!!t.retry_at&&['retrying','waiting_quota'].includes(t.status)&&<p className="text-sm">下次可尝试：{date(t.retry_at)}，仍需额度通过。</p>}
         <p className="text-sm text-amber-700">{t.last_error&&t.last_error!=="cancelled"?`最近受阻原因：${t.last_error}`:""}</p>
         {["blocked","failed"].includes(t.status)&&<Button size="small" onClick={()=>void control(p.id,"retry_task",t.id)}>问题处理后重新入队</Button>}
