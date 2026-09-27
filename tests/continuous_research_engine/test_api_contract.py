@@ -252,6 +252,74 @@ class ContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.t["experiments"], {})
         self.assertEqual(self.t["reports"][0]["evidence_ids"], ["trusted-packet"])
 
+    async def test_model_feedback_survives_successful_report_without_raw_output(self):
+        await self.check_feedback_survives_report(calls=1)
+
+    async def test_model_feedback_without_call_count_preserves_unknown(self):
+        await self.check_feedback_survives_report(calls=None)
+
+    async def check_feedback_survives_report(self, calls):
+        self.c.update(desired="running", controller={"id": "worker", "until": 1e20})
+        self.t.update(
+            kind="evidence_review",
+            evidence={"id": "packet"},
+            status="running",
+            lease="lease",
+            lease_until=1e20,
+            generation=self.c["generation"],
+        )
+        if calls is not None:
+            self.t["usage"]["calls"] = calls
+        self.assertEqual(self.t["usage"].get("calls"), calls)
+        self.t["pending_action"] = {"raw": "must not be archived in feedback"}
+
+        @asynccontextmanager
+        async def edit(ident, auth):
+            yield self.c, None
+
+        async def send(op, data):
+            return await command(
+                "x",
+                Command(
+                    op=op,
+                    worker="worker",
+                    task_id=self.t["id"],
+                    lease="lease",
+                    data=data,
+                ),
+                None,
+            )
+
+        with patch(
+            "backend.services.engine.routers.continuous_research.edit", new=edit
+        ):
+            await send("feedback", {"message": "invalid single JSON"})
+            with patch(
+                "backend.services.engine.routers.continuous_research.results",
+                new=AsyncMock(return_value={}),
+            ):
+                await send(
+                    "action",
+                    {
+                        "action": {
+                            "action": "report",
+                            "text": "a" * 100,
+                            "evidence_ids": ["packet"],
+                            "followups": [],
+                        }
+                    },
+                )
+        self.assertNotIn("feedback", self.t)
+        self.assertNotIn("pending_action", self.t)
+        events = [e for e in self.c["events"] if e["kind"] == "model_feedback"]
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["reason"], "invalid single JSON")
+        self.assertEqual(events[0]["model_calls"], calls)
+        self.assertEqual(events[0]["task_id"], self.t["id"])
+        self.assertNotIn("raw", str(events[0]))
+        self.assertEqual(self.t["usage"].get("calls"), calls)
+        self.assertEqual(len(self.t["reports"]), 1)
+
     def test_review_slots_do_not_require_extra_compute_tasks(self):
         for i in range(17):
             st.add_task(self.c, "risk", str(i), "evidence")

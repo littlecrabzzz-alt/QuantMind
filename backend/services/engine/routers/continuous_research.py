@@ -657,6 +657,13 @@ async def command(
         if body.op == "feedback":
             t.pop("pending_action", None)
             t["feedback"] = str(body.data.get("message", ""))[:2000]
+            st.record(
+                c,
+                "model_feedback",
+                task_id=t["id"],
+                reason=t["feedback"],
+                model_calls=t["usage"].get("calls"),
+            )
             return {"saved": True}
         if body.op == "context":
             rs = await results(t, auth)
