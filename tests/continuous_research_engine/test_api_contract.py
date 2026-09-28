@@ -270,6 +270,8 @@ class ContractTests(unittest.IsolatedAsyncioTestCase):
         )
         if calls is not None:
             self.t["usage"]["calls"] = calls
+        else:
+            self.t["usage"].pop("calls", None)  # Explicit legacy fixture.
         self.assertEqual(self.t["usage"].get("calls"), calls)
         self.t["pending_action"] = {"raw": "must not be archived in feedback"}
 
