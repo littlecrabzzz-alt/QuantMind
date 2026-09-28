@@ -323,3 +323,16 @@ GLM任务5ca7f95ca732355be412ec55、证据5fd476ceba4075e37303ef3a52181359一次
 当前b690982b源码已分训练frame与推理输入：基线独立read_range、derived独立raw_factor/prefix，不直接以训练目标mask筛推理名单。核6文件28引用，精确提取eligible函数及真实单表达式rank(close)人工对照：未来诊断列改变不改受测名单/特征；故意套目标mask才会少行。详见[合同](MEMBERSHIP-CONTRACT.md)和巡检20260928T1000-evidence。
 
 此轮不新增运行实现，不训练/回测、不恢复股票，不把AST函数检查当完整worker实跑。实际配置列名单/运行归属/来源PIT仍须限定核对。接受这一反证后复用现有分路，停止重复建设推理适配；无收益、费用或IC结论。
+
+
+## 2026-09-28 19时：实际冻结配置与历史代码身份
+
+只读SQL白名单核本programme 73条股票记录：68完成/5失败，其中71条仍由当前任务引用（68完成/3失败），另外2条旧失败保留在库。70个derived配置为8个源特征加research_signal，3个基线配置为原8特征；single_factor均为mom_ret_20d，没有把label/forward_return等目标诊断列列为模型输入。名称/选择核对不能证明源值PIT，也不能把对照single_factor不变说成新因子未进模型。
+
+71份现存磁盘config与DB语义一致，2条失败记录缺config/intent；71份旧launch-intent都没有新版identity，按未知处理，不判篡改。DB save_run允许更新同ID配置，当前文件/哈希相等不认证历史容器实际导入。合同manifest和overlay声明与现存文件相符，但未重验真实数据内容。
+
+旧冻结worker为6ec96f02，当前e685c656；deps-v2的loading/splits/reader也均不同。旧worker的eligible/predict AST与当前一致，且训练frame与推理batch/daily的独立路径明确，因此18时有限分路反证有旧源码支持；当前development_end硬上界和purge不能追认到旧运行。按原件保留两层代码身份与逐文件差异，未执行旧worker/模型/真实行情或打开旧绩效文件。
+
+本轮只补配置/来源身份证据，不更新股票包或放行股票。股票hold、已确认间接暴露、原保留期、A账户保持；恢复仍需新包/暴露处置及独立边界验收。详细原件与主控复核见仓库外巡检20260928T1100-evidence。
+
+GLM66f7198fb1a5cb64fad39830（证据34ca1edd001d1e849aecf8cde533cc45）实际一次调用，6291输入/4974输出，无重试；原报告保留。主控纠正其“2条DB未查”混淆：73条DB已查，2条缺磁盘文件；另2旧失败属于同programme但非当前引用，failed也不推出没有部分产物。否决重复扫描建议，有限分支收口。官方刷新到100%，本轮低用量不能称持续满载；6槽/2计算进程保持。

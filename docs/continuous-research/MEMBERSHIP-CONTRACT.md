@@ -108,3 +108,10 @@ source/config/input等外部身份是调用方声明，适配器不认证其真�
 原件及源码绑定见仓库外巡检20260928T1000-evidence/inference-flow.json、inference-probe-result.json、root-inference-check.json。与17时“不能复用训练frame作为推理名单”约束一致：该约束是防误接入，不是对当前worker的已确认缺陷声明。
 
 18时GLM ee0014ad60bc97efb0b61113 一次复核支持保留分路。主控限定：eligible的volume>0不等于实际成交或可成交性；补证不得打开/转发旧model-metadata全文（可能含test_metrics），只能可信程序白名单投影配置列名和输入/代码身份，必要时metadata仅feature顺序。目标名列命中先列准入阻塞，定性仍须字段语义和实际消费证据；模型建议的重跑未执行，stock hold不因“同条件”而例外。原报告与主控修正在巡检中并存。
+
+
+### 9月28日19时实际配置核对的适用范围
+
+本programme现存73条股票配置及71份磁盘配置白名单核对补齐18时的列名单缺口：基线8个源列，derived增加research_signal，single_factor仍mom_ret_20d；未选择目标诊断列。旧worker也有独立batch/daily路径，eligible/predict AST与当前一致。此结论只排除当前保存配置的直接目标列选择/源码直接训练mask路径疑虑，不保证源特征PIT或历史执行身份。
+
+旧worker和冻结loading/splits/reader与当前修复版不同，71旧intent缺identity、2失败缺config，不追补伪造身份，也不据文件等值追认硬上界/purge修复。输入manifest只核声明与文件hash，未读真实行情；股票新包与独立准入仍未完成。详见DEEP-RESEARCH 19时与20260928T1100-evidence/config-summary.json、code-identity-diff.json。
