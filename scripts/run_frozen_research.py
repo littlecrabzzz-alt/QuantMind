@@ -94,7 +94,9 @@ def snapshot_date_bounds(cfg):
         for segment in segments
     ):
         raise ValueError("Frozen input split outside development_end")
-    start = date.fromisoformat(cfg["split"]["train"][0]) - timedelta(days=30)
+    # Loading uses a start buffer; universe selection needs 180 days before train end.
+    train_start, train_end = map(date.fromisoformat, cfg["split"]["train"])
+    start = min(train_start - timedelta(days=30), train_end - timedelta(days=180))
     end = date.fromisoformat(cfg["split"]["test"][1])
     if start > end:
         raise ValueError("Invalid frozen input range")

@@ -3,6 +3,7 @@ import tempfile
 import struct
 import hashlib
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location(
@@ -47,6 +48,65 @@ def provider_args(root, cfg):
 
 
 class SnapshotDependencyTests(unittest.TestCase):
+    def test_inventory_includes_loading_and_universe_history(self):
+        for train_start, expected_start in (
+            ("2026-01-01", "2025-08-04"),  # Short training needs earlier pool history.
+            ("2025-05-01", "2025-04-01"),  # Long training keeps the loading buffer.
+            ("2025-09-03", "2025-08-04"),  # Exactly 150 calendar days: same bound.
+        ):
+            with (
+                self.subTest(train_start=train_start),
+                tempfile.TemporaryDirectory() as d,
+            ):
+                root = Path(d)
+                cfg = frozen.read(frozen.ROOT / "config/research_controls_cn_l1.json")
+                cfg.update(
+                    development_end="2026-03-24",
+                    split={
+                        "train": [train_start, "2026-01-31"],
+                        "valid": ["2026-02-01", "2026-02-28"],
+                        "test": ["2026-03-01", "2026-03-20"],
+                    },
+                )
+                frozen.validate_config(
+                    cfg
+                )  # A short, ordered training split stays legal.
+                lower = date.fromisoformat(expected_start)
+                upper = date(2026, 3, 20)
+                included = {
+                    lower,
+                    date.fromisoformat(train_start) - timedelta(days=30),
+                    date(2025, 8, 4),  # 180 calendar days before this training end.
+                    date(2026, 1, 31),
+                    upper,
+                }
+                excluded = {
+                    lower - timedelta(days=1),
+                    upper + timedelta(days=1),
+                    date(
+                        2026, 3, 24
+                    ),  # Policy cutoff does not extend the requested end.
+                    date(2026, 3, 25),  # Invented holdout sentinel; never selected.
+                }
+                expected_files = set()
+                for dataset in (
+                    "6_ml_datasets/l1_factors",
+                    "1_kline_data/daily_backward",
+                ):
+                    for day in included | excluded:
+                        relative = Path(dataset) / f"dt={day:%Y%m%d}/a.parquet"
+                        path = root / "data/quantdb" / relative
+                        path.parent.mkdir(parents=True)
+                        path.write_bytes(b"synthetic inventory only; not Parquet")
+                        if day in included:
+                            expected_files.add(Path("quantdb") / relative)
+                selected = frozen.snapshot_files(root, cfg, **provider_args(root, cfg))
+                self.assertEqual(
+                    {p for p in selected.values() if p.parts[0] == "quantdb"},
+                    expected_files,
+                )
+                self.assertEqual(frozen.snapshot_date_bounds(cfg), (lower, upper))
+
     def test_training_subpackages_are_part_of_frozen_inventory(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
