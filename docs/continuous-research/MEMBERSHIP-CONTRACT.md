@@ -95,3 +95,16 @@ source/config/input等外部身份是调用方声明，适配器不认证其真�
 原件、命令、exit code、代码hash、原始/修正结果及主控核对：仓库外`巡检/20260928T0900-evidence/`。股票hold、已确认间接暴露、真实来源/生命周期及独立签署仍未关闭。
 
 17时GLM36f8f310d14fde034759eea9一次返回；主控接受有限投影及禁止未来target mask充当推理资格的结论。纠正两处：缺行例03-02为SH目标缺entry，03-03为SH信号行本身不存在，不可统称entry缺失；建议`_split_data(..., end=03-05)`不符合真实签名/三段非空合同，未照做。固定日历同lag/horizon下，两端点列在本样例数值相等，不能伪造互异价格日期来制造区分度；实际可得时戳仍待另一合同验证。原报告及主控限制均归档，无重复改写调用。
+
+
+## 18时：现有推理分路的反证（无需另建适配）
+
+核固定b690982b的6份源码/文档、28处引用。当前worker的训练frame经load_data、选池、可选derived特征合并和split送入训练；推理使用其模型与训练填充值，但名单不直接使用该frame。基线batch/daily重新read_range；derived取独立raw_factor.copy，daily用当日及之前的prefix重算因子。raw_factor即使携带forward_return/label_end，eligible也只按symbol、volume及配置single_factor筛行，predict只选features。evaluate仅允许声明source_features内名称及已准许历史运算。不能因表里有未来列就判定模型使用它，也不能把训练产生模型/填充值的正常依赖混同于未来目标mask筛推理名单。
+
+主控沿已存五日人工输入，精确提取真实worker的eligible函数AST（未导入/执行整个worker），导入实际research_expression.evaluate，仅检rank(close)。两case×基线/derived四组，03-02当前字段相同；改变额外forward_return/label_end/label/valid_label后，筛选名单和所选特征相同，全量与前缀在该日也相同。volume=0及single_factor缺失会剔除A，非single_factor派生特征缺失则保留A，体现现行不同用途规则。特意把17时training目标有效mask套入当前行，缺行case会少A；这是**未接入的错误用法对照**，不是当前worker存在该bug的证据。
+
+有限分支收口，保留现有读取、eligible、evaluate和predict路径，不新增重复推理适配或重训。本轮没有调用真实provider、完整loader/worker、模型fit/Booster、组合/费用或诊断IC。实际冻结配置的feature名单、代码/镜像归属、上游特征PIT及真实时点仍未知；单表达式前缀一致不能推广为所有输入/表达式或完整无泄漏证明。后续只需限定核对固定配置和来源身份的非绩效证据，不重复此人工例，不读取保留结果；股票hold及确认的间接暴露仍未关闭。
+
+原件及源码绑定见仓库外巡检20260928T1000-evidence/inference-flow.json、inference-probe-result.json、root-inference-check.json。与17时“不能复用训练frame作为推理名单”约束一致：该约束是防误接入，不是对当前worker的已确认缺陷声明。
+
+18时GLM ee0014ad60bc97efb0b61113 一次复核支持保留分路。主控限定：eligible的volume>0不等于实际成交或可成交性；补证不得打开/转发旧model-metadata全文（可能含test_metrics），只能可信程序白名单投影配置列名和输入/代码身份，必要时metadata仅feature顺序。目标名列命中先列准入阻塞，定性仍须字段语义和实际消费证据；模型建议的重跑未执行，stock hold不因“同条件”而例外。原报告与主控修正在巡检中并存。

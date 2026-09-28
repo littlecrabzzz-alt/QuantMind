@@ -316,3 +316,10 @@ GLM任务5ca7f95ca732355be412ec55、证据5fd476ceba4075e37303ef3a52181359一次
 新增独立离线薄适配，复用15时已存人工目标，不接现行训练或worker。全池/B-only两种投影、训练rank/诊断raw同源、pool后不重排和排除原件保留；主控核16对投影与38行sidecar。现有`_purge_label_tail`4次人工调用通过，24项拒绝反例通过，含root审查后补入development_end硬上界；初版产物保留。
 
 本轮不是完整split/fit/推理/IC/执行验收，也无新公共回测、策略、因子或真实数据；训练frame依赖未来目标是否可算，不得直接复用为因果推理名单。hash只证明所传对象一致，不认证外部来源声明。股票hold/间接暴露处置/真实源PIT/独立签署仍待完成，细节见[合同](MEMBERSHIP-CONTRACT.md)和仓库外巡检20260928T0900-evidence。
+
+
+## 2026-09-28 18时：现有推理路径反证
+
+当前b690982b源码已分训练frame与推理输入：基线独立read_range、derived独立raw_factor/prefix，不直接以训练目标mask筛推理名单。核6文件28引用，精确提取eligible函数及真实单表达式rank(close)人工对照：未来诊断列改变不改受测名单/特征；故意套目标mask才会少行。详见[合同](MEMBERSHIP-CONTRACT.md)和巡检20260928T1000-evidence。
+
+此轮不新增运行实现，不训练/回测、不恢复股票，不把AST函数检查当完整worker实跑。实际配置列名单/运行归属/来源PIT仍须限定核对。接受这一反证后复用现有分路，停止重复建设推理适配；无收益、费用或IC结论。
