@@ -440,7 +440,11 @@ async def act(ident, c, t, action, auth, db):
         if review:
             evidence = t.get("evidence") or {}
             if action.get("evidence_ids") != [evidence.get("id")]:
-                raise ValueError("review_must_cite_bound_evidence")
+                raise ValueError(
+                    "review_must_cite_bound_evidence: expected evidence_ids="
+                    + json.dumps([evidence.get("id")], ensure_ascii=False)
+                    + "; copy task.evidence.id exactly, not sha256"
+                )
             if action.get("followups"):
                 raise ValueError("review_proposals_require_new_evidence_assignment")
         elif not t["experiments"]:

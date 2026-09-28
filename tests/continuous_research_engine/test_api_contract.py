@@ -2,6 +2,7 @@
 
 import asyncio
 import copy
+import json
 from contextlib import asynccontextmanager
 import unittest
 from unittest.mock import patch, AsyncMock
@@ -232,25 +233,48 @@ class ContractTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(self.c, before)
 
     async def test_review_requires_bound_evidence_and_accepts_no_new_backtest(self):
-        self.t.update(kind="evidence_review", evidence={"id": "trusted-packet"})
+        bound_id = "0123456789abcdef0123456789abcdef"
+        digest = "f" * 64
+        self.t.update(
+            kind="evidence_review", evidence={"id": bound_id, "sha256": digest}
+        )
         report = {"action": "report", "text": "a" * 100}
-        with self.assertRaisesRegex(ValueError, "cite_bound"):
-            await act("x", self.c, self.t, report, None, None)
+        before = copy.deepcopy(self.c)
         with patch(
             "backend.services.engine.routers.continuous_research.results",
             new=AsyncMock(return_value={}),
-        ):
+        ) as read_results:
+            invalid_reports = [report] + [
+                dict(report, evidence_ids=ids)
+                for ids in ([bound_id + "0"], ["wrong-id"], [], [digest])
+            ]
+            for invalid in invalid_reports:
+                with self.subTest(evidence_ids=invalid.get("evidence_ids")):
+                    with self.assertRaisesRegex(
+                        ValueError, "^review_must_cite_bound_evidence"
+                    ) as raised:
+                        await act("x", self.c, self.t, invalid, None, None)
+                    self.assertIn(
+                        "expected evidence_ids=" + json.dumps([bound_id]),
+                        str(raised.exception),
+                    )
+                    self.assertIn("not sha256", str(raised.exception))
+                    self.assertNotIn(digest, str(raised.exception))
+                    self.assertEqual(self.c, before)
+                    self.assertEqual(self.t["reports"], [])
+                    read_results.assert_not_awaited()
             result = await act(
                 "x",
                 self.c,
                 self.t,
-                dict(report, evidence_ids=["trusted-packet"]),
+                dict(report, evidence_ids=[bound_id]),
                 None,
                 None,
             )
         self.assertTrue(result["saved"])
         self.assertEqual(self.t["experiments"], {})
-        self.assertEqual(self.t["reports"][0]["evidence_ids"], ["trusted-packet"])
+        self.assertEqual(len(self.t["reports"]), 1)
+        self.assertEqual(self.t["reports"][0]["evidence_ids"], [bound_id])
 
     async def test_model_feedback_survives_successful_report_without_raw_output(self):
         await self.check_feedback_survives_report(calls=1)
