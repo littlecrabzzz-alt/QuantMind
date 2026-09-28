@@ -789,8 +789,13 @@ async def command(
             )
             return result
         if body.op == "usage":
+            if t["usage"].get("calls") is None and any(
+                t["usage"].get(k, 0) for k in ("input", "output", "unknown_calls")
+            ):
+                t["usage"]["calls_history_incomplete"] = True
             for k in ("input", "output", "unknown_calls", "calls"):
-                t["usage"][k] = t["usage"].get(k, 0) + max(0, int(body.data.get(k, 0)))
+                if k in body.data:
+                    t["usage"][k] = (t["usage"].get(k) or 0) + max(0, int(body.data[k]))
             if "step" in body.data:
                 t["step"] = str(body.data["step"])[:200]
             t["last_activity"] = now

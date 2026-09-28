@@ -75,7 +75,7 @@ def add_task(c, topic, question, reason, parent=None, kind="research"):
         "experiments": {},
         "reports": [],
         "tool_receipts": {},
-        "usage": {"input": 0, "output": 0, "unknown_calls": 0},
+        "usage": {"input": 0, "output": 0, "unknown_calls": 0, "calls": 0},
     }
     return key
 

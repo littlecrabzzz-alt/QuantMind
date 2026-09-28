@@ -7,10 +7,34 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import requests
-from controller import Client
+
+
+def summarize_usage(tasks):
+    usage = {
+        key: sum(t["usage"].get(key, 0) for t in tasks)
+        for key in ("input", "output", "unknown_calls")
+    }
+    missing = [
+        t["id"] for t in tasks
+        if type(t["usage"].get("calls")) is not int or t["usage"]["calls"] < 0
+    ]
+    usage["calls"] = sum(
+        t["usage"]["calls"] for t in tasks if t["id"] not in missing
+    )
+    return usage, {
+        "calls_are_recorded_lower_bound": True,
+        "call_count_missing_task_ids": missing,
+        "call_count_missing_task_count": len(missing),
+        "partial_call_count_task_ids": [
+            t["id"] for t in tasks if t["usage"].get("calls_history_incomplete")
+        ],
+        "unknown_calls_meaning": "Reported calls without returned token usage; not a count of missing legacy call records.",
+    }
 
 
 def main():
+    from controller import Client
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
@@ -33,10 +57,7 @@ def main():
     tasks = list(state["tasks"].values())
     experiments = [e for t in tasks for e in t["experiments"].values()]
     reports = [r for t in tasks for r in t["reports"]]
-    usage = {
-        key: sum(t["usage"].get(key, 0) for t in tasks)
-        for key in ("input", "output", "unknown_calls", "calls")
-    }
+    usage, usage_coverage = summarize_usage(tasks)
     snapshot = {
         "at": datetime.now(timezone.utc).isoformat(),
         "program_id": client.program,
@@ -73,7 +94,8 @@ def main():
             ),
         },
         "usage": usage,
-        "usage_basis": "Cumulative reported input/output across windows; interrupted calls may be missing. Calls instrumented from 2026-09-27 morning only; task attempts are not model calls.",
+        "usage_coverage": usage_coverage,
+        "usage_basis": "Cumulative reported input/output across windows; interrupted calls may be missing. Legacy call counts are incomplete; recorded counts are a lower bound, and task attempts are not model calls.",
         "blocked": [
             {"id": t["id"], "question": t["question"], "reason": t.get("last_error")}
             for t in tasks

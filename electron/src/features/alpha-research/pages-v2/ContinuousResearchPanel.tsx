@@ -4,7 +4,7 @@ import { strategyManagementService as api } from '../../../services/strategyMana
 
 type Task = { id: string; question: string; topic: string; status: string; step: string; attempts: number;
   kind?:string; evidence?:{id:string;sha256:string;title:string;[key:string]:unknown};
-  last_error?: string; last_activity?: number; retry_at?: number; usage: {input:number; output:number; unknown_calls:number};
+  last_error?: string; last_activity?: number; retry_at?: number; usage: {input:number; output:number; unknown_calls:number; calls?:number|null; calls_history_incomplete?:boolean};
   experiments: Record<string, {name:string; strategy_id?:string; revision_id?:string; factor_id?:string; kind?:string; backtest_id:string; hypothesis:string}>;
   reports: {text:string; at:number; followups?:{question:string;task_id?:string;kind?:string;awaiting_evidence?:boolean;backtest_ids?:string[]}[]}[]; };
 type Program = { id:string; status:string; desired:string; heartbeat_stale:boolean; last_heartbeat?:number;
@@ -16,6 +16,7 @@ type Program = { id:string; status:string; desired:string; heartbeat_stale:boole
 const labels:Record<string,string> = {running:'运行中', stopped:'已停止', starting:'正在启动', stopping:'正在停止',
   needs_attention:'有任务需要检查', waiting_compute:'等待公共计算', queued:'排队', retrying:'等待重试', waiting_quota:'等待额度恢复', quota_unknown:'额度未知，暂停派发',
   done:'已交研究报告', blocked:'需要检查', cancelled:'已停止', failed:'失败', idle:'队列已完成', available:'额度可用'};
+const recordedCalls = (value?:number|null):number|null => typeof value==='number' && Number.isSafeInteger(value) && value>=0 ? value : null;
 const date = (v?:number) => v ? new Date(v*1000).toLocaleString('zh-CN',{hour12:false}) : '未记录';
 export default function ContinuousResearchPanel() {
   const [programs,setPrograms]=useState<Program[]>([]), [error,setError]=useState(''), [busy,setBusy]=useState(false);
@@ -40,6 +41,7 @@ export default function ContinuousResearchPanel() {
       <div className="text-sm rounded bg-muted p-3">
         共 {Object.keys(p.tasks).length} 个研究问题 · 已交报告 {Object.values(p.tasks).filter(t=>t.reports.length).length} 个 · 待检查 {Object.values(p.tasks).filter(t=>t.status==='blocked'||t.status==='failed').length} 个 · 独立公共回测 {new Set(Object.values(p.tasks).flatMap(t=>Object.values(t.experiments).map(e=>e.backtest_id))).size} 份
         <p>待补原件的复核请求 {Object.values(p.tasks).flatMap(t=>t.reports.flatMap(r=>r.followups||[])).filter(f=>!f.task_id&&(f.awaiting_evidence||f.kind==='evidence_review')).length} 个；补齐并核验原件后才派发，不占模型槽。</p>
+        <p>已记录模型调用 {Object.values(p.tasks).reduce((n,t)=>n+(recordedCalls(t.usage.calls)??0),0).toLocaleString()} 次；{Object.values(p.tasks).filter(t=>recordedCalls(t.usage.calls)===null).length} 个任务缺少调用计数。历史调用未完整采集，不代表全部调用；任务领取次数不能替代调用数。</p>
         <p>累计模型上报：输入 {Object.values(p.tasks).reduce((n,t)=>n+t.usage.input,0).toLocaleString()} / 输出 {Object.values(p.tasks).reduce((n,t)=>n+t.usage.output,0).toLocaleString()} token；跨额度窗口累计，不等于当前窗口消耗。报告均为开发研究，数量不代表已验证策略。</p>
       </div>
       <div className="grid md:grid-cols-2 gap-4 text-sm">
@@ -63,7 +65,7 @@ export default function ContinuousResearchPanel() {
         {!!t.retry_at&&['retrying','waiting_quota'].includes(t.status)&&<p className="text-sm">下次可尝试：{date(t.retry_at)}，仍需额度通过。</p>}
         <p className="text-sm text-amber-700">{t.last_error&&t.last_error!=="cancelled"?`最近受阻原因：${t.last_error}`:""}</p>
         {["blocked","failed"].includes(t.status)&&<Button size="small" onClick={()=>void control(p.id,"retry_task",t.id)}>问题处理后重新入队</Button>}
-        <p className="text-sm">已报告输入 {t.usage.input.toLocaleString()} / 输出 {t.usage.output.toLocaleString()} token
+        <p className="text-sm">已记录调用 {recordedCalls(t.usage.calls)===null?'未记录':`${recordedCalls(t.usage.calls)} 次`}{t.usage.calls_history_incomplete?'（历史计数不完整）':''}；已报告输入 {t.usage.input.toLocaleString()} / 输出 {t.usage.output.toLocaleString()} token
           {t.usage.unknown_calls?`；${t.usage.unknown_calls} 次调用用量未返回`:''}</p>
         {Object.entries(t.experiments).map(([key,x])=><div key={key} className="my-2 text-sm">
           <b>{x.name}</b> · {x.strategy_id?<a className="text-blue-500 underline" href={`#/user-center?tab=strategies&strategyId=${encodeURIComponent(x.strategy_id)}`}>策略 {x.strategy_id} / 版本 {x.revision_id?.slice(0,10)}</a>:x.factor_id?<a className="text-blue-500 underline" href={`#/alpha-research?page=library&factor=${encodeURIComponent(x.factor_id)}`}>因子库候选</a>:<span>股票冻结基线</span>} · <a className="text-blue-500 underline" href={`#/backtest?backtest=${encodeURIComponent(x.backtest_id)}`}>查看公共回测</a>
