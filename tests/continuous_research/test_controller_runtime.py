@@ -153,6 +153,11 @@ const assert = require('node:assert/strict');
 let forwarded = 0;
 globalThis.fetch = async (_url, _init) => { forwarded++; return {ok:true}; };
 require(process.argv[1]);
+// Installed Pi's network initialization replaces global fetch with undici.
+// Its SDK must still receive the guard, forwarding to the new transport once.
+let replaced = 0;
+globalThis.fetch = async (_url, _init) => { replaced++; return {ok:true}; };
+globalThis.fetch = globalThis.fetch;
 (async () => {
  for (const body of [{model:'glm-5.3',reasoning_effort:'high'},
                      {model:'glm-5.3'}, {model:'other',reasoning_effort:'max'}]) {
@@ -165,7 +170,8 @@ require(process.argv[1]);
  await fetch('https://open.bigmodel.cn/api/coding/paas/v4/chat/completions',
    {headers:{Authorization:'SECRET-KEY'}, body:JSON.stringify({model:'glm-5.3',
     reasoning_effort:'max', max_tokens:131072,messages:['PRIVATE-PROMPT'],thinking:'PRIVATE-THINKING'})});
- assert.equal(forwarded,2);
+ assert.equal(forwarded,0);
+ assert.equal(replaced,2);
 })().catch(() => {process.exitCode=1;});
 """
             result = subprocess.run(

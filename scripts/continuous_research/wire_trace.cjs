@@ -1,16 +1,16 @@
 // Narrow local observation of Pi's actual fetch request. Never retain headers/body.
 const fs = require('node:fs');
-const originalFetch = globalThis.fetch;
+let transportFetch = globalThis.fetch;
 const callId = process.env.QM_TRACE_CALL_ID;
 const file = process.env.QM_TRACE_WIRE_FILE;
-if (!/^[0-9a-f]{32}$/.test(callId || '') || !file || typeof originalFetch !== 'function') {
+if (!/^[0-9a-f]{32}$/.test(callId || '') || !file || typeof transportFetch !== 'function') {
   throw new Error('glm_wire_trace_configuration_invalid');
 }
 let attempt = 0;
-globalThis.fetch = async function(input, init) {
+async function observedFetch(input, init) {
   const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
   if (url.origin !== 'https://open.bigmodel.cn' || url.pathname !== '/api/coding/paas/v4/chat/completions') {
-    return originalFetch(input, init);
+    return transportFetch(input, init);
   }
   let body;
   try {
@@ -36,5 +36,16 @@ globalThis.fetch = async function(input, init) {
     fs.writeSync(fd, JSON.stringify(event) + '\n');
     fs.fsyncSync(fd);
   } finally { fs.closeSync(fd); }
-  return originalFetch(input, init);
-};
+  return transportFetch(input, init);
+}
+// Pi installs undici after preloads. Keep observing its replacement transport,
+// rather than letting that ordinary initialization silently remove this guard.
+Object.defineProperty(globalThis, 'fetch', {
+  configurable: true,
+  enumerable: true,
+  get: () => observedFetch,
+  set: value => {
+    if (typeof value !== 'function') throw new Error('glm_wire_fetch_replacement_invalid');
+    if (value !== observedFetch) transportFetch = value;
+  },
+});
