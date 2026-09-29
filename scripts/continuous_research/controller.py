@@ -224,7 +224,7 @@ class Controller:
         if not hook.is_file():
             raise RuntimeError("glm_wire_trace_unavailable")
         env.update(
-            NODE_OPTIONS="--require=" + json.dumps(str(hook)),
+            NODE_OPTIONS="--require=" + json.dumps(str(hook), ensure_ascii=False),
             QM_TRACE_CALL_ID=call_id,
             QM_TRACE_WIRE_FILE=str(self.trace.wire),
         )

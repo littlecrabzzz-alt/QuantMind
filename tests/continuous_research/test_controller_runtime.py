@@ -193,6 +193,38 @@ require(process.argv[1]);
                 RuntimeTrace(trace.root, "programme").state["t0"], event["at"]
             )
 
+    def test_controller_preload_launches_with_unicode_and_spaces_in_path(self):
+        with tempfile.TemporaryDirectory(prefix="GLM 研究 ") as tmp:
+            root = Path(tmp)
+            (root / "wire_trace.cjs").write_bytes(
+                Path(controller.__file__).with_name("wire_trace.cjs").read_bytes()
+            )
+            worker = controller.Controller.__new__(controller.Controller)
+            worker.home = root
+            worker.pi = "not-executed"
+            worker.trace = RuntimeTrace(root / "trace", "programme")
+            worker.credential = lambda: "synthetic-not-a-key"
+            worker.children = {}
+            worker.child_lock = threading.Lock()
+            original_popen = subprocess.Popen
+            started = []
+
+            def offline_node(_argv, **kwargs):
+                # Execute the real NODE_OPTIONS parser and preload, without Pi,
+                # a provider request, or any credential access.
+                process = original_popen(["node", "--version"], **kwargs)
+                started.append(process)
+                return process
+
+            with (
+                patch.object(controller, "__file__", str(root / "controller.py")),
+                patch.object(controller.subprocess, "Popen", side_effect=offline_node),
+            ):
+                worker.model({}, {"id": "task"})
+            self.assertEqual(started[0].returncode, 0)
+            self.assertFalse(worker.trace.wire.exists())
+            self.assertIsNone(worker.trace.state["t0"])
+
     def test_rolling_checkpoint_empty_supply_unknown_and_restart(self):
         with tempfile.TemporaryDirectory() as tmp:
             trace = RuntimeTrace(Path(tmp) / "trace", "programme")
