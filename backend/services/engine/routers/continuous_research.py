@@ -98,6 +98,33 @@ class EvidenceReview(BaseModel):
     evidence: dict
 
 
+class ResearchAssignment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    topic: Literal["trend", "momentum", "risk"]
+    question: str = Field(min_length=10, max_length=1800)
+    reason: str = Field(min_length=10, max_length=2000)
+    family_key: str = Field(pattern=r"^[A-Za-z0-9_-]{8,80}$")
+    max_new_experiments: int = Field(ge=1, le=6, strict=True)
+    reference_backtest_ids: list[str] = Field(default_factory=list, max_length=6)
+    brief: dict
+
+
+def validate_evidence_header(evidence, boundary):
+    reject_quarantined_metric_fields(evidence)
+    if evidence.get("boundary") != boundary:
+        raise ValueError("evidence_development_boundary_required")
+    sources = evidence.get("sources") or []
+    if not sources or any(
+        not isinstance(s, dict)
+        or not s.get("path")
+        or not isinstance(s.get("sha256"), str)
+        or len(s["sha256"]) != 64
+        or any(x not in "0123456789abcdef" for x in s["sha256"])
+        for s in sources
+    ):
+        raise ValueError("evidence_sources_require_sha256")
+
+
 def reject_quarantined_metric_fields(evidence):
     """Reject known contaminated structured fields, not incident descriptions.
 
@@ -289,10 +316,34 @@ async def results(t, auth):
 
 
 async def act(ident, c, t, action, auth, db):
-    """No model-selected object IDs, execution fees, dates beyond contract, or URLs."""
+    """Writes create new objects; reads require registered, verified ETF IDs."""
     if not isinstance(action, dict):
         raise ValueError("action must be an object")
     kind = action.get("action")
+    if kind == "inspect_evidence":
+        from backend.services.research_agent.continuous_evidence import inspect_evidence
+
+        key = st.fingerprint(action)
+        inspections = t.get("inspections", {})
+        if key not in inspections and len(inspections) >= 24:
+            raise ValueError("evidence_inspection_budget_exhausted_24")
+        packet = await inspect_evidence(ident, c, t, action, auth, db)
+        t["inspections"] = inspections
+        inspections[key] = {
+            k: packet.get(k)
+            for k in (
+                "id",
+                "sha256",
+                "backtest_id",
+                "view",
+                "offset",
+                "total",
+                "next_offset",
+            )
+        }
+        # Keep the requested page, not every prior ledger page, in model context.
+        t["latest_evidence"] = packet
+        return packet
     if t["kind"] == "evidence_review" and kind != "report":
         raise ValueError("evidence_review_is_read_only")
     if kind == "stock_factor":
@@ -363,7 +414,68 @@ async def act(ident, c, t, action, auth, db):
         # Durable metadata recovers a strategy created before a controller/HTTP
         # crash. Row lock serializes this operation; source revision/backtest
         # keys then make the remaining public calls idempotent.
+        if t.get("research_brief", {}).get("required_precheck") == "delayed_targets_v1":
+            from backend.services.research_agent.delayed_target_check import (
+                check_delayed_targets,
+            )
+
+            family = c["research_families"][t["family_id"]]
+            root = c["tasks"][family["root_task_id"]]
+            references = [
+                p
+                for p in root.get("reference_overviews", [])
+                if p["metadata"]["start_date"] == start.isoformat()
+                and p["metadata"]["end_date"] == end.isoformat()
+                and all(
+                    params.get(k) == v for k, v in p["rows"][0]["parameters"].items()
+                )
+            ]
+            if len(references) != 1:
+                raise ValueError("delayed_target_requires_exactly_one_bound_control")
+            baseline = references[0]["rows"][0]
+            check = check_delayed_targets(
+                action["code"], params, baseline["code"], baseline["parameters"]
+            )
+            t.setdefault("prechecks", {})[key] = dict(
+                check, reference_backtest_id=references[0]["backtest_id"]
+            )
         marker = st.fingerprint([ident, t["id"], key])
+        if t.get("family_id"):
+            # Strategy creation commits separately from this state transaction.
+            # Recover its durable reservation before checking shared spend, even
+            # after process death or a backtest enqueue 503. Same identity resumes.
+            reserved = (
+                await db.execute(
+                    text("""SELECT
+              config->>'continuous_task', config->>'continuous_experiment_key',
+              config->>'continuous_marker' FROM strategies WHERE user_id=:user
+              AND config->>'continuous_program'=:program
+              AND config->>'continuous_family'=:family"""),
+                    {
+                        "user": int(auth.user_id),
+                        "program": ident,
+                        "family": t["family_id"],
+                    },
+                )
+            ).all()
+            for owner, experiment_key, saved_marker in reserved:
+                target = c["tasks"].get(owner)
+                if (
+                    not target
+                    or target.get("family_id") != t["family_id"]
+                    or saved_marker != st.fingerprint([ident, owner, experiment_key])
+                ):
+                    raise ValueError("research_family_reservation_identity_mismatch")
+                target.setdefault("experiment_reservations", {})[experiment_key] = (
+                    saved_marker
+                )
+            budget = st.family_budget(c, t)
+            if (
+                key not in t.get("experiment_reservations", {})
+                and budget["remaining"] == 0
+            ):
+                raise ValueError("research_family_experiment_budget_exhausted")
+            t.setdefault("experiment_reservations", {})[key] = marker
         row = (
             await db.execute(
                 text("""SELECT id,code FROM strategies WHERE user_id=:user
@@ -391,6 +503,14 @@ async def act(ident, c, t, action, auth, db):
                         "continuous_marker": marker,
                         "continuous_program": ident,
                         "continuous_task": t["id"],
+                        **(
+                            {
+                                "continuous_family": t["family_id"],
+                                "continuous_experiment_key": key,
+                            }
+                            if t.get("family_id")
+                            else {}
+                        ),
                         "hypothesis": action["hypothesis"],
                         "validation_status": "development_only",
                     },
@@ -447,7 +567,9 @@ async def act(ident, c, t, action, auth, db):
                 )
             if action.get("followups"):
                 raise ValueError("review_proposals_require_new_evidence_assignment")
-        elif not t["experiments"]:
+        elif not (
+            t["experiments"] or t.get("reference_overviews") or t.get("latest_evidence")
+        ):
             raise ValueError("report_requires_public_experiment")
         rs = await results(t, auth)
         if len(rs) != len(t["experiments"]) or any(
@@ -512,28 +634,86 @@ async def command(
     ident: str, body: Command, auth: AuthContext = Depends(get_auth_context)
 ):
     if len(json.dumps(body.data)) > (
-        450000 if body.op == "add_evidence_review" else 120000
+        450000 if body.op in ("add_evidence_review", "add_research") else 120000
     ):
         raise HTTPException(413, "command_too_large")
     async with edit(ident, auth) as (c, db):
         now = time.time()
         st.recover(c, now)
+        if body.op == "add_research":
+            from backend.services.research_agent.continuous_evidence import (
+                inspect_evidence,
+            )
+
+            request = ResearchAssignment.model_validate(body.data)
+            validate_evidence_header(request.brief, c["contract"]["end_date"])
+            if len(set(request.reference_backtest_ids)) != len(
+                request.reference_backtest_ids
+            ):
+                raise ValueError("duplicate_reference_backtest_ids")
+            digest = st.fingerprint(request.model_dump())
+            families = c.get("research_families", {})
+            previous = families.get(request.family_key)
+            if previous:
+                if previous["assignment_sha256"] != digest:
+                    raise ValueError("research_family_assignment_conflict")
+                return {
+                    "task_id": previous["root_task_id"],
+                    "family_id": request.family_key,
+                    "already_applied": True,
+                }
+            overviews = []
+            for bid in request.reference_backtest_ids:
+                overviews.append(
+                    await inspect_evidence(
+                        ident,
+                        c,
+                        {"kind": "research"},
+                        {
+                            "action": "inspect_evidence",
+                            "backtest_id": bid,
+                            "view": "overview",
+                        },
+                        auth,
+                        db,
+                    )
+                )
+            task_id = st.add_task(
+                c,
+                request.topic,
+                request.question + " 研究版本：" + digest[:12],
+                request.reason,
+            )
+            t = c["tasks"][task_id]
+            t.update(
+                family_id=request.family_key,
+                research_brief=request.brief,
+                reference_backtest_ids=request.reference_backtest_ids,
+                reference_overviews=overviews,
+                priority=4,
+            )
+            c.setdefault("research_families", {})[request.family_key] = {
+                "root_task_id": task_id,
+                "assignment_sha256": digest,
+                "max_new_experiments": request.max_new_experiments,
+                "created_at": now,
+            }
+            st.record(
+                c,
+                "research_family_assigned",
+                task_id=task_id,
+                family_id=request.family_key,
+                max_new_experiments=request.max_new_experiments,
+            )
+            return {
+                "task_id": task_id,
+                "family_id": request.family_key,
+                "already_applied": False,
+            }
         if body.op == "add_evidence_review":
             request = EvidenceReview.model_validate(body.data)
             evidence = request.evidence
-            reject_quarantined_metric_fields(evidence)
-            if evidence.get("boundary") != c["contract"]["end_date"]:
-                raise ValueError("evidence_development_boundary_required")
-            sources = evidence.get("sources") or []
-            if not sources or any(
-                not isinstance(s, dict)
-                or not s.get("path")
-                or not isinstance(s.get("sha256"), str)
-                or len(s["sha256"]) != 64
-                or any(x not in "0123456789abcdef" for x in s["sha256"])
-                for s in sources
-            ):
-                raise ValueError("evidence_sources_require_sha256")
+            validate_evidence_header(evidence, c["contract"]["end_date"])
             digest = st.fingerprint(evidence)
             task_id = st.add_task(
                 c,
@@ -679,6 +859,16 @@ async def command(
                         if k not in ("lease", "tool_receipts", "rejected_actions")
                     },
                     "results": rs,
+                    "evidence_tool": {
+                        "action": "inspect_evidence",
+                        "views": ["overview", "nav", "decisions", "orders", "fills"],
+                        "max_page_size": 120,
+                        "max_distinct_requests": 24,
+                        "allowed_backtest_ids": (t.get("evidence") or {}).get(
+                            "allowed_backtest_ids", []
+                        ),
+                        "rule": "仅按需要读取白名单ETF原件并在同任务继续；分页不代表全窗；报告仍须引用task.evidence.id。",
+                    },
                     "quota_state": st.quota_update(c, c["quota"], now),
                     "contract": {
                         "end_date": c["contract"]["end_date"],
@@ -697,7 +887,7 @@ async def command(
 
             return {
                 "stock_inventory": inventory(c["stock_contract"])
-                if c.get("stock_contract")
+                if t["kind"] == "stock_factor" and c.get("stock_contract")
                 else None,
                 "availability": availability,
                 "contract": c["contract"],
@@ -726,9 +916,17 @@ async def command(
                     },
                     "rule": "省略 kind 等同 experiment。evidence_review 仅申请本 programme 已登记 ETF 结果，可引用父链或其他任务，最多6个唯一 backtest_ids；保存为 awaiting_evidence，不创建任务、不立即返回原件。由主控校验归属、终态、版本与边界、构建证据包后经 add_evidence_review 派发。",
                 },
-                "parent_report": c["tasks"]
-                .get(t.get("parent"), {})
-                .get("reports", [])[-1:],
+                # Legacy free-text questions/reports can mix quarantined stock
+                # evaluations into ETF context. Explicit references replace them.
+                "parent_report": [],
+                "family_budget": st.family_budget(c, t),
+                "evidence_tool": {
+                    "action": "inspect_evidence",
+                    "views": ["overview", "nav", "decisions", "orders", "fills"],
+                    "max_page_size": 120,
+                    "max_distinct_requests": 24,
+                    "rule": "读取本programme已登记、身份和开发截止核验通过的终态ETF原件；同任务继续。分页只代表所给范围，不能把未给字段称未记录。",
+                },
                 "templates": {
                     "fixed": FIXED_ALLOCATION_SOURCE,
                     "dynamic": DYNAMIC_ALLOCATION_SOURCE,
@@ -748,18 +946,20 @@ async def command(
                     "result_artifact_rule": (
                         "The model result summary omits full saved ledger evidence and strategy decisions. "
                         "Missing from this summary means not provided here, not unrecorded by the engine. "
-                        "Request an evidence review of existing artifacts for paths, weights and fills; "
+                        "Use inspect_evidence on existing registered ETF artifacts for paths, weights and fills; "
                         "do not launch another backtest solely to retrieve them."
                     ),
                 },
-                "prior_questions": [
-                    x["question"] for x in list(c["tasks"].values())[-100:]
-                ],
+                "prior_questions": [],
             }
         if body.op == "action":
             action = body.data["action"]
             key = st.fingerprint(action)
             if key in t["tool_receipts"]:
+                if action.get("action") == "inspect_evidence":
+                    t["latest_evidence"] = t["tool_receipts"][key]
+                    t.pop("pending_action", None)
+                    t.pop("feedback", None)
                 return t["tool_receipts"][key]
             try:
                 result = await act(ident, c, t, action, auth, db)
@@ -781,6 +981,8 @@ async def command(
             t["step"] = (
                 "等待公共回测"
                 if action["action"] in ("experiment", "stock_factor")
+                else "原件已返回，继续研究"
+                if action["action"] == "inspect_evidence"
                 else "结论已保存"
             )
             st.record(

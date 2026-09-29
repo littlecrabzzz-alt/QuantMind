@@ -1,0 +1,33 @@
+# 五小时研究运行合同
+
+2026-09-29 用户批准。目标是新增可检验的研究证据，并要求每5小时官方模型额度使用率至少50%，运行目标60%。未知额度、队列空、进程存活或报告数量均不能算达标。
+
+## 真实调用与观测
+
+仍使用现有本地 controller → 隔离 Pi → GLM Coding endpoint → 公共研究 API。Pi 无 shell/任意文件/网页/交易工具；每次输出一个动作，controller 持久化后继续同一任务。计算时释放模型槽。6个模型槽、2个实际计算进程沿用，不通过扩大并发掩盖材料不足。
+
+隔离 provider 必须保留 `thinkingLevelMap.max=max`，API 为 `openai-completions`，兼容项支持 effort 且使用 zai 格式。NODE_OPTIONS 中的窄 fetch 包装仅核对实际 coding 请求的 model/effort/max_tokens；错误映射发出前拒绝，无 wire 观测的输出不进入动作。它证明发送前参数，不证明供应商内部推理过程或计费精度。
+
+`runtime.json` 同级 `runtime-trace/`（目录0700，文件0600）记录：
+
+- `calls.jsonl`：任务/调用ID、开始结束、输入和提示哈希、前次及失败重试父ID、input/cacheRead/cacheWrite/output、停止原因及动作类型。
+- `wire.jsonl`：真实 HTTP 尝试、model、reasoning_effort、max_tokens；不存认证、请求正文或推理内容。
+- `quota-curve.jsonl` 每5分钟保留供应商观测；`quota-evaluations.jsonl` 每15分钟记录使用率与供给状态；`quota-checkpoints.jsonl` 和 `quota-window.json` 保存五小时验收。
+
+T0 为首个实际研究出站请求；首次验收为T0+5小时，此后每5小时。验收必须有到期后的新鲜官方观测，使用率>=50%才通过；缺观测、未达标或错过观测均记录失败，重启不能覆盖历史失败。供应商恢复时间仅为提示，刷新不算负消耗。官方额度跨账户共享，本programme token与HTTP统计分列，不能声称完全归因或用token换算精确扣费。没有周额度门控。
+
+## 研究入口与预算
+
+`add_research` 接收 topic、question、reason、稳定 family_key、max_new_experiments（1..6）、最多6个reference_backtest_ids与brief。brief须含固定开发boundary及带SHA256的来源。参考运行经用户/租户、programme、终态、代码/策略版本、ETF名单、输入包和开发日期核验后才进入上下文。同 family_key 请求幂等，内容冲突拒绝。
+
+预算覆盖根及所有子任务，包括失败计算；同一实验身份重试不新增计数。预算耗尽保留后续建议待审，不自动扩容。子任务继承brief和参考ID，优先保留刚完成的父实验，任意历史问题/报告不自动注入ETF上下文。
+
+`inspect_evidence` 可读取 overview/nav/decisions/orders/fills，单页最多120行，每任务最多24种请求。先核对数据库元数据，再核对同版本本地原件，只输出白名单字段和来源哈希。evidence_review 另受 allowed_backtest_ids 限制。只保留最新页进模型上下文；分页不能外推未给范围、未给字段不能称引擎未记录。禁止为取路径重复回测。
+
+A使用既存净值/成交做新归因，无新回测预算；B最多4个新回测；C最多2个新回测。D/E仍须补齐覆盖和执行准入，不能为凑“ready数量”提前派发。报告保存不等于研究验收，负结果及未知必须保留。50%若未达标必须如实标失败并定位供给/服务原因，不能用空调用、重复上下文或参数网格补数。
+
+## 验证与边界
+
+离线测试覆盖 Pi实际clamp、fetch错误零转发、分项用量、首个wire计时、重启及失败验收保留、来源身份/越界拒绝、分页和家族预算。运行部署只排空本组模型，待Pi及运行租约归零后重启本组API/controller，旧领导租约自然过期；worker保持原2进程。实际部署与首个研究请求另存仓库外回执，不以代码测试代替上线证据。
+
+股票hold、已确认间接暴露和保留期维持；不运行新股票包/训练，不修改A，不自动晋级或交易，不云端发布。Codex小时定时任务保持取消。

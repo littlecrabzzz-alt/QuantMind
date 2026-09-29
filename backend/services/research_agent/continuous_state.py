@@ -1,6 +1,7 @@
 """Small state transitions stored in existing research_drafts JSON, not a new queue DB."""
 
 from __future__ import annotations
+import copy
 import hashlib
 import json
 import time
@@ -48,7 +49,11 @@ def add_task(c, topic, question, reason, parent=None, kind="research"):
         raise ValueError("invalid_task_scope")
     if topic.startswith("stock_"):
         kind = "stock_factor"
-    key = fingerprint([topic, question.strip(), kind])[:24]
+    ancestor = c["tasks"].get(parent, {})
+    identity = [topic, question.strip(), kind]
+    if ancestor.get("family_id"):
+        identity.append(ancestor["family_id"])
+    key = fingerprint(identity)[:24]
     if key in c["tasks"]:
         return key
     review = kind == "evidence_review"
@@ -77,7 +82,43 @@ def add_task(c, topic, question, reason, parent=None, kind="research"):
         "tool_receipts": {},
         "usage": {"input": 0, "output": 0, "unknown_calls": 0, "calls": 0},
     }
+    if ancestor.get("family_id"):
+        c["tasks"][key]["family_id"] = ancestor["family_id"]
+        # Same-family descendants use explicit trusted references, never a raw
+        # parent report containing arbitrary historical evaluation material.
+        c["tasks"][key]["reference_backtest_ids"] = list(
+            dict.fromkeys(
+                [
+                    *[
+                        e["backtest_id"]
+                        for e in ancestor["experiments"].values()
+                        if e.get("backtest_id")
+                    ],
+                    *ancestor.get("reference_backtest_ids", []),
+                ]
+            )
+        )[:6]
+        c["tasks"][key]["research_brief"] = copy.deepcopy(
+            ancestor.get("research_brief", {})
+        )
     return key
+
+
+def family_budget(c, t):
+    family = c.get("research_families", {}).get(t.get("family_id"))
+    if not family:
+        return None
+    spent = sum(
+        len(set(x["experiments"]) | set(x.get("experiment_reservations", {})))
+        for x in c["tasks"].values()
+        if x.get("family_id") == t["family_id"]
+    )
+    return {
+        "family_id": t["family_id"],
+        "limit": family["max_new_experiments"],
+        "used": spent,
+        "remaining": max(0, family["max_new_experiments"] - spent),
+    }
 
 
 def initial(contract):
@@ -116,6 +157,10 @@ def promote_followups(c):
                     continue
                 if proposal.get("kind", "experiment") == "evidence_review":
                     proposal["awaiting_evidence"] = True
+                    continue
+                budget = family_budget(c, task)
+                if budget and budget["remaining"] == 0:
+                    proposal["awaiting_family_budget_review"] = True
                     continue
                 try:
                     proposal["task_id"] = add_task(
