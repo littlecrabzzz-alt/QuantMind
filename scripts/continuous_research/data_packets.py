@@ -41,6 +41,7 @@ def _checked(path, relative, expected, checked):
 def _bounded(path, column, start, end, columns):
     """Arrow filters before pandas parsing/statistics; no full-file fallback."""
     import pyarrow as pa
+    import pyarrow.compute as pc
     import pyarrow.dataset as ds
 
     dataset = ds.dataset(str(path), format="parquet", partitioning=None)
@@ -56,14 +57,37 @@ def _bounded(path, column, start, end, columns):
         expression = (field >= datetime.combine(date.fromisoformat(start), time())) & (
             field <= datetime.combine(date.fromisoformat(end), time.max)
         )
-    elif pa.types.is_integer(kind):
-        expression = (field >= int(start.replace("-", ""))) & (
-            field <= int(end.replace("-", ""))
+    elif (
+        pa.types.is_integer(kind)
+        or pa.types.is_string(kind)
+        or pa.types.is_large_string(kind)
+    ):
+        text = field.cast(pa.string())
+        compact = pc.match_substring_regex(text, r"^[0-9]{8}$")
+        iso = pc.match_substring_regex(
+            text,
+            r"^[0-9]{4}-[0-9]{2}-[0-9]{2}"
+            r"([T ]([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]"
+            r"(\.[0-9]{1,9})?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])?)?$",
         )
-    elif pa.types.is_string(kind) or pa.types.is_large_string(kind):
-        compact = (field >= start.replace("-", "")) & (field <= end.replace("-", ""))
-        iso = (field >= start) & (field <= end + "T23:59:59.999999")
-        expression = compact | iso
+        # Match _dates' calendar-day semantics; do not shift timezone offsets.
+        day = pc.if_else(
+            compact,
+            text,
+            pc.replace_substring(
+                pc.utf8_slice_codeunits(text, start=0, stop=10),
+                pattern="-",
+                replacement="",
+            ),
+        )
+        parsed = pc.strptime(day, format="%Y%m%d", unit="s", error_is_null=True)
+        # strptime may normalize e.g. February 30; round-trip rejects it.
+        valid = (compact | iso) & (pc.strftime(parsed, format="%Y%m%d") == day)
+        expression = (
+            valid
+            & (parsed >= datetime.combine(date.fromisoformat(start), time()))
+            & (parsed <= datetime.combine(date.fromisoformat(end), time()))
+        )
     else:
         raise ValueError(f"Unsupported date type: {kind}")
     return dataset.to_table(
