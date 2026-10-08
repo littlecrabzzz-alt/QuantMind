@@ -862,9 +862,24 @@ def fill_pg_from_parquet(
                         for path in sorted((hub.data_dir / rel / f"dt={day}").glob("*.parquet"))
                     ])
                 has_feat = bool(paths[1])
+                feature_columns = set()
+                if has_feat:
+                    feature_columns = {
+                        row[0] for row in conn_duck.execute(
+                            "DESCRIBE SELECT * FROM read_parquet(?, "
+                            "hive_partitioning=true, union_by_name=true)",
+                            [paths[1]],
+                        ).fetchall()
+                    }
+                    missing = sorted(set(_FEATURE_COLS) - feature_columns)
+                    if missing:
+                        log.warning("QuantDB feature columns missing; stored as NULL: %s", missing)
+                # Future-return labels have different time visibility and must not
+                # be substituted for missing historical-return features.
                 feat_sel = "".join(
-                    f", f.{src} AS {dst}" for src, dst in _FEATURE_COLS.items()
-                ) if has_feat else "".join(f", NULL AS {dst}" for dst in _FEATURE_COLS.values())
+                    f", f.{src} AS {dst}" if src in feature_columns else f", NULL AS {dst}"
+                    for src, dst in _FEATURE_COLS.items()
+                )
                 feat_join = (
                     " LEFT JOIN read_parquet(?, hive_partitioning=true, union_by_name=true) f"
                     " ON f.symbol = k.symbol AND f.dt = k.dt" if has_feat else ""

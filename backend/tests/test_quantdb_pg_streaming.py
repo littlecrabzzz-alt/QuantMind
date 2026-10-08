@@ -149,3 +149,39 @@ def test_duplicate_feature_rows_fail_without_publishing(source, monkeypatch):
     result = sync.fill_pg_from_parquet(start_date=start, end_date=end, batch_days=100)
     assert result["status"] == "partial"
     assert result["rows"] == 0 and not sink.rows
+
+
+def test_missing_return_columns_preserve_rows_without_future_label_leakage(source, monkeypatch, caplog):
+    root, _, start, end = source
+    missing = [name for name in sync._FEATURE_COLS if name.startswith("return_")]
+    for day in pd.date_range(start, end):
+        path = root / "6_ml_datasets/features_daily" / f"dt={day:%Y%m%d}" / "data.parquet"
+        feat = pd.read_parquet(path).drop(columns=missing)
+        for name in missing:
+            feat["future_" + name] = 999.0
+        feat.to_parquet(path, index=False)
+    sink = Sink()
+    bind_sink(monkeypatch, sink)
+    result = sync.fill_pg_from_parquet(start_date=start, end_date=end, batch_days=100)
+    assert result["status"] == "ok", result
+    assert result["rows"] == len(sink.rows) == 90 * 66
+    assert all(value[name] is None for value in sink.rows.values() for name in missing)
+    assert sink.rows[(end, "SZ000001")]["pe_ttm"] == 139
+    assert sink.rows[(end, "SZ000001")]["volume_ma_5"] == pytest.approx(140.8)
+    assert "stored as NULL" in caplog.text
+
+
+def test_feature_schema_change_keeps_older_values_and_latest_nulls(source, monkeypatch):
+    root, _, start, end = source
+    path = root / "6_ml_datasets/features_daily" / f"dt={end:%Y%m%d}" / "data.parquet"
+    feat = pd.read_parquet(path).drop(columns=["return_1d"])
+    feat["future_return_1d"] = 999.0
+    feat.to_parquet(path, index=False)
+    sink = Sink()
+    bind_sink(monkeypatch, sink)
+    result = sync.fill_pg_from_parquet(start_date=start, end_date=end, batch_days=100)
+    assert result["status"] == "ok", result
+    assert result["rows"] == len(sink.rows) == 90 * 66
+    assert sink.rows[(end, "SZ000001")]["return_1d"] is None
+    previous = end - pd.Timedelta(days=1)
+    assert sink.rows[(previous, "SZ000001")]["return_1d"] == pytest.approx(138.4)
