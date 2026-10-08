@@ -3,6 +3,7 @@ from datetime import datetime
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 import tempfile
 import unittest
 from unittest.mock import patch, Mock
@@ -13,6 +14,35 @@ from backend.shared import data_source_config as policy
 
 
 class LocalMarketSourceTest(unittest.TestCase):
+    def test_ready_local_docker_is_reused(self):
+        with patch.object(source.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as run:
+            source.ensure_local_docker()
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.args[0][:2], ["docker", "info"])
+
+    def test_local_docker_is_started_and_readiness_is_awaited(self):
+        results = [SimpleNamespace(returncode=n) for n in (1, 0, 1, 0)]
+        with patch.object(source.subprocess, "run", side_effect=results) as run, \
+             patch.object(source.time, "sleep") as sleep:
+            source.ensure_local_docker()
+        self.assertEqual(run.call_args_list[1].args[0], ["open", "-g", "-a", "Docker"])
+        sleep.assert_called_once_with(5)
+
+    def test_local_docker_startup_timeout_preserves_retry(self):
+        with patch.object(source.subprocess, "run", return_value=SimpleNamespace(returncode=1)), \
+             patch.object(source.time, "monotonic", side_effect=[0, 0, 180]), \
+             patch.object(source.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "existing market data retained"):
+                source.ensure_local_docker()
+
+    def test_remote_docker_does_not_trigger_desktop_startup(self):
+        with patch.object(source.sys, "platform", "darwin"), \
+             patch.dict(source.os.environ, {"DOCKER_HOST": "tcp://remote:2375"}), \
+             patch.object(source, "ensure_local_docker") as ensure:
+            with self.assertRaisesRegex(RuntimeError, "local Docker"):
+                source.collect_on_mac(Path("/tmp/source"), "A", Path("/tmp/project"), Path("/tmp/secrets"))
+        ensure.assert_not_called()
+
     def bundle(self, base, name="data/quantdb/1_kline_data/daily_forward/dt=20260924/data.parquet"):
         payload = b"bounded-fixture"
         row = {"path": name, "bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()}

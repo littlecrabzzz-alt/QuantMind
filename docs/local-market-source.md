@@ -8,7 +8,7 @@
 | Binance | 每天08:15，15分钟补查/唤醒补跑 | 固定release核验、Qlib/H5 | BTCUSDT、ETHUSDT已收盘UTC日线 |
 | Tushare | 原生worker每5分钟有限批次；研究版每小时、全归档每日发布 | 私有SSH供数，15分钟轮询研究缓存 | `config/tushare-local-research-only.json` 的18个接口 |
 
-Mac离线或休眠时不采集；云端使用最后一个校验版本。联网唤醒后补跑；请求成功不等于发布成功，送达不等于PG/Qlib可用。固定研究输入不会跟随CURRENT变化。
+Mac离线或休眠时不采集；云端使用最后一个校验版本。联网唤醒后补跑；请求成功不等于发布成功，送达不等于PG/Qlib可用。固定研究输入不会跟随CURRENT变化。 本地采集任务发现Docker未运行时会启动Docker Desktop，并最多等待180秒；未就绪则保留原数据、下轮重试，不启动开发后端或研究任务。
 
 ## 原始数据与证据
 

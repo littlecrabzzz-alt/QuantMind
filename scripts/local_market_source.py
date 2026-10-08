@@ -269,9 +269,33 @@ def collect(root, market):
     return result
 
 
+def ensure_local_docker(timeout=180):
+    """Bring up the local collector dependency within one bounded retry window."""
+    def ready():
+        try:
+            result = subprocess.run(
+                ["docker", "info", "--format", "{{.ServerVersion}}"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10,
+            )
+            return result.returncode == 0
+        except subprocess.TimeoutExpired:
+            return False
+
+    if ready():
+        return
+    subprocess.run(["open", "-g", "-a", "Docker"], check=True, timeout=15)
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if ready():
+            return
+        time.sleep(5)
+    raise RuntimeError("Local Docker startup timed out; existing market data retained")
+
+
 def collect_on_mac(root, market, project, secrets):
     if sys.platform != "darwin" or os.getenv("DOCKER_HOST"):
         raise RuntimeError("Collector must run on the Mac with local Docker")
+    ensure_local_docker()
     endpoint = subprocess.check_output(["docker", "context", "inspect", "--format", "{{.Endpoints.docker.Host}}"], text=True).strip()
     if not endpoint.startswith("unix://"):
         raise RuntimeError("Refusing a remote Docker collector")
