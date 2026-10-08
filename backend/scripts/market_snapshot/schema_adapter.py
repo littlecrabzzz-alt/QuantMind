@@ -80,13 +80,23 @@ def create_views(con: duckdb.DuckDBPyConnection, data_dir: Path) -> duckdb.DuckD
         """)
     # 技术指标：跨分区合并 Symbol/symbol 大小写差异
     if _available(data_dir, DATASET_DIRS["technical_indicators"]):
+        parquet_glob = _partition_glob(data_dir, DATASET_DIRS["technical_indicators"])
+        present_cols = {
+            row[0].lower()
+            for row in con.execute(f"DESCRIBE SELECT * FROM read_parquet('{parquet_glob}', "
+                                   "hive_partitioning=1, union_by_name=true)").fetchall()
+        }
+        # Future-return columns are training labels, never substitutes for past returns.
+        returns = [f"return_{days}d" for days in (1, 3, 5, 10, 20, 60)]
+        return_projection = ", ".join(
+            column if column in present_cols else f"CAST(NULL AS DOUBLE) AS {column}"
+            for column in returns
+        )
         con.execute(f"""
             CREATE VIEW IF NOT EXISTS qdb_technical_indicators AS
             SELECT COALESCE(symbol, "Symbol") AS symbol,
-                   dt, time, close, pct_change,
-                   return_1d, return_3d, return_5d, return_10d, return_20d, return_60d
-            FROM read_parquet('{_partition_glob(data_dir, DATASET_DIRS["technical_indicators"])}',
-                              hive_partitioning=1, union_by_name=true)
+                   dt, time, close, pct_change, {return_projection}
+            FROM read_parquet('{parquet_glob}', hive_partitioning=1, union_by_name=true)
         """)
     # L2 资金流：只投影必要列（symbol + 资金流字段）
     if _available(data_dir, DATASET_DIRS["l2_factors"]):
