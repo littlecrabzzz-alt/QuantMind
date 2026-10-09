@@ -246,6 +246,73 @@ class GitHandoff(unittest.TestCase):
 
 
 class SnapshotSafety(unittest.TestCase):
+    def test_streaming_runtime_files_preserves_scope_set_and_default_order(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            names = ['data/z', 'data/a/nested', 'data/m', 'db/runtime',
+                     'results-run/z', 'results-run/a',
+                     'data/local-market-source/incoming/transport',
+                     'data/local-market-source/backups/transport',
+                     'data/local-market-source/receipt.json',
+                     'data/stocks/excluded', 'db/sql/excluded',
+                     'data/__pycache__/excluded', 'data/.DS_Store',
+                     'data/upgrade_v1.sql']
+            for name in names:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(name)
+            for scope in ('legacy', 'snapshot-v2'):
+                ordered = list(inv.runtime_files(root, scope))
+                streaming = list(inv.runtime_files(root, scope, ordered=False))
+                expected = [root / name for name in names
+                            if inv.runtime_path(Path(name), scope)]
+                self.assertEqual(set(streaming), set(expected))
+                self.assertEqual(len(streaming), len(set(streaming)))
+                self.assertEqual(ordered, [path for runtime_root in inv.runtime_roots(root)
+                    for path in sorted(expected) if path.is_relative_to(runtime_root)])
+                self.assertEqual([r['path'] for r in inv.inventory(root, scope=scope)],
+                                 [p.relative_to(root).as_posix() for p in ordered])
+                with patch.object(snapshot, 'runtime_files', wraps=inv.runtime_files) as walk:
+                    actual = snapshot.runtime_stats(root, scope)
+                    walk.assert_called_once_with(root, scope, ordered=False)
+                self.assertEqual(actual, {p.relative_to(root).as_posix(): inv.stat_key(p.lstat())
+                                          for p in ordered})
+
+    def test_streaming_yields_before_walking_remaining_tree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'data').mkdir()
+            def walk(*args, **kwargs):
+                yield str(root / 'data'), [], ['first']
+                raise AssertionError('remaining tree visited')
+            with patch.object(inv.os, 'walk', side_effect=walk):
+                paths = inv.runtime_files(root, ordered=False)
+                self.assertEqual(next(paths), root / 'data/first')
+                paths.close()
+                with self.assertRaisesRegex(AssertionError, 'remaining tree visited'):
+                    next(inv.runtime_files(root))
+
+    def test_streaming_keeps_symlink_rejection(self):
+        for link_directory in (False, True):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                project = root / 'project'
+                (project / 'data').mkdir(parents=True)
+                outside = root / 'outside'
+                if link_directory:
+                    outside.mkdir()
+                    (outside / 'child').write_text('do not follow')
+                else:
+                    outside.write_text('external')
+                link = project / 'data/link'
+                link.symlink_to(outside, target_is_directory=link_directory)
+                for scope in ('legacy', 'snapshot-v2'):
+                    self.assertEqual(list(inv.runtime_files(project, scope, ordered=False)), [link])
+                    with self.assertRaisesRegex(RuntimeError, 'Review runtime symlink'):
+                        snapshot.runtime_stats(project, scope)
+                    with self.assertRaisesRegex(RuntimeError, 'Review runtime symlink'):
+                        list(inv.inventory(project, scope=scope))
+
     def test_cache_detects_same_size_same_mtime_edits(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory); (root/'data').mkdir(); path=root/'data/input'

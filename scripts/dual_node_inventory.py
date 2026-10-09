@@ -37,7 +37,8 @@ def stat_key(stat):
     return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
 
 
-def runtime_files(project, scope="legacy"):
+def runtime_files(project, scope="legacy", *, ordered=True):
+    # Stats callers can release each directory list; manifests retain sorted order.
     # Prune transport trees before descending; they can contain millions of files.
     for root in runtime_roots(project):
         paths = []
@@ -46,7 +47,11 @@ def runtime_files(project, scope="legacy"):
             dirs[:] = [name for name in dirs if runtime_path((parent / name).relative_to(project), scope)]
             paths.extend(parent / name for name in dirs if (parent / name).is_symlink())
             paths.extend(parent / name for name in files if runtime_path((parent / name).relative_to(project), scope))
-        yield from sorted(paths)
+            if not ordered:
+                yield from paths
+                paths.clear()
+        if ordered:
+            yield from sorted(paths)
 
 
 def inventory(project, cache=None, tolerate_changes=False, scope="legacy"):

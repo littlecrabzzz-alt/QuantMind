@@ -33,7 +33,7 @@
 
 ## 发布与恢复证据
 
-- 候选代码 `0f8c179d` 已合入两端 `master`，handoff 验证通过；原有四个未提交文件保持原样。70 项相关回归通过，1 项 opt-in Docker 测试跳过。
+- 候选代码 `0f8c179d` 已合入两端 `master`，handoff 验证通过；原有四个未提交文件保持原样。该阶段运行 70 项相关回归，69 项通过、1 项 opt-in Docker 测试跳过。
 - Mac 已安装客户端通过 `.source.lock` 更新；保留安装副本原有的 L1 OHLCV 近 10 天采集差异，未重新安装定时任务或启动采集。旧客户端备份在 `~/Library/Application Support/QuantMind/client-backups/storage-recovery-20261009-1339/`。
 - 云端 12 个当时运行的 QuantMind 容器均已实测 `json-file / 20m / 3`。沿用原镜像 ID、环境变量及数据挂载；配置有历史差异，故此次通过 `cloud-compose -f /root/backups/quantmind-storage-recovery-20261009-1322/keep-running-config.yml` 保留真实运行参数。该文件含现有环境凭据，仅存服务器私有目录，不入 Git。以后发布前需重新核对运行参数，不能假定默认 Compose 与现场完全一致。
 - 远端真实 rsync 验证：超额预算在载荷上传前拒绝；允许的小文件完成传输并校验；临时测试数据已移除。
@@ -44,5 +44,9 @@
 ## 追加性能验证
 
 - `97804e00` 已在两端 master 对齐，7494 个源文件内容指纹一致。暂存文件仅在本轮内复用 stat/hash 缓存，最终校验仍独立读取全部文件；修改文件重新计算，篡改则拒绝 COMPLETE/latest。真实 rsync fixture 同时在 macOS 与 Linux 通过。
-- 最新相关回归 71 项通过，1 项 opt-in Docker 测试跳过。Mac 已安装快照模块同步更新，旧模块保存在 `~/Library/Application Support/QuantMind/client-backups/storage-recovery-20261009-1416/`。
+- 该阶段运行 71 项相关回归，70 项通过、1 项 opt-in Docker 测试跳过。Mac 已安装快照模块同步更新，旧模块保存在 `~/Library/Application Support/QuantMind/client-backups/storage-recovery-20261009-1416/`。
 - 13:55 启动的完整生产备份仍按启动时逻辑运行，不为追加缓存优化中断本轮验证。12 个容器约 15 分钟累计日志仅增长 397207 字节，约 26 KiB/分钟，证据为 VPS 恢复目录中的 `log-growth-report.json`。14:17 独立 readiness 通过，根盘可用约 34.6 GiB、数据盘约 132.5 GiB；备份暂存的额外写入已计入。
+
+- 生产备份在 14:59:49 开始停写，15:08:44 完成增量复制（3139 个变更文件、786631528 字节，移除 27 个仅暂存文件，复制 3.272 秒），随后导出约 7 GiB PostgreSQL 文件和冷卷；15:14:04 恢复所有原写入服务，停写总计 855.64 秒。恢复后四子服务、PG/Redis 独立 readiness 与 HAPI 均通过。元数据前后检查耗时明显，因此不把本轮描述为秒级无感备份。
+- 追加仅用于 runtime_stats 的逐目录流式遍历，避免保留整个运行树的 Path 列表；inventory 默认排序和清单顺序保持不变，两次停写一致性检查及最终全量哈希仍保留。3 万个实际临时文件的字典完全等价；该扫描基准 tracemalloc 峰值 42.389 → 10.028 MiB，中位耗时 0.8057 → 0.7922 秒。收益确认在内存，不据此承诺线上暂停明显缩短。未采用缺乏收益证据的额外元数据预热。
+- 最新相关回归运行 74 项，73 项通过、1 项 opt-in Docker 测试跳过；流式路径另经独立审查，覆盖默认顺序、集合/范围一致、惰性遍历与符号链接拒绝。

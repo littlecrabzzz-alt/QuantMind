@@ -92,7 +92,7 @@ def publish_link(base, target):
 
 def runtime_stats(project, scope="legacy"):
     records = {}
-    for path in runtime_files(project, scope):
+    for path in runtime_files(project, scope, ordered=False):
         relative = path.relative_to(project)
         info = path.lstat()
         if stat.S_ISLNK(info.st_mode):
