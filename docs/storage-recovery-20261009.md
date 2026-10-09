@@ -28,5 +28,15 @@
 - 容量采用 rsync dry-run 实际差异 + DB/卷导出预算 + 100 GiB 预留。bulk subprocess 每秒检查，在预留之上另保留 2 GiB 写入缓冲；信号中断先回收子进程再释放锁。接收派生也进入受监控进程，保留原收据续跑。
 - 只轮转新代码成功标记 `MANAGED-v2` 的运输/回滚副本，保留两版与当前版；未标记历史目录不清理。
 - 快照保护 `qm-research-*` 实验；自主研究协调器先检查真实活动状态，关闭 API 入口后再次检查，空闲才暂停并在 finally 恢复。
-- 独立审查已复核信号遗留进程、活动研究和接收派生三项修复。Linux 临时目录 18 项回归通过；复制/清单/完成标记走真实 rsync，未操作生产数据库。
+- 独立审查已复核信号遗留进程、活动研究和接收派生三项修复。Linux 临时目录 19 项回归通过；复制/清单/完成标记走真实 rsync，未操作生产数据库。
 - 线上只读容量预检：预计复制 7,414,806,283 字节，卷逻辑大小 5,179,086,414 字节，总额外预算 19,920,462,759 字节；当时可用 151,644,983,296 字节，符合 100 GiB 预留。该预检不是完整备份完成证明。
+
+## 发布与恢复证据
+
+- 候选代码 `0f8c179d` 已合入两端 `master`，handoff 验证通过；原有四个未提交文件保持原样。70 项相关回归通过，1 项 opt-in Docker 测试跳过。
+- Mac 已安装客户端通过 `.source.lock` 更新；保留安装副本原有的 L1 OHLCV 近 10 天采集差异，未重新安装定时任务或启动采集。旧客户端备份在 `~/Library/Application Support/QuantMind/client-backups/storage-recovery-20261009-1339/`。
+- 云端 12 个当时运行的 QuantMind 容器均已实测 `json-file / 20m / 3`。沿用原镜像 ID、环境变量及数据挂载；配置有历史差异，故此次通过 `cloud-compose -f /root/backups/quantmind-storage-recovery-20261009-1322/keep-running-config.yml` 保留真实运行参数。该文件含现有环境凭据，仅存服务器私有目录，不入 Git。以后发布前需重新核对运行参数，不能假定默认 Compose 与现场完全一致。
+- 远端真实 rsync 验证：超额预算在载荷上传前拒绝；允许的小文件完成传输并校验；临时测试数据已移除。
+- 本次重启暴露旧 AOF 中段损坏：磁盘恢复后 `INFO persistence` 状态为 ok 不能证明整个旧文件可回放。未使用会截断后半段的 `--fix`；依据 [Redis 持久化说明](https://redis.io/docs/latest/management/persistence/) 在隔离、无网络容器中，从本次正常退出生成的 `2026-10-09 13:47:42 +08:00` RDB 重建 AOF。RDB checksum OK；重建前后全库 DEBUG DIGEST 一致；新 AOF 全文件检查通过，随后生产启动成功。旧文件与原始 SHA256 全保留。校验工具需可写打开文件，因此检查在副本中执行，额外核对校验前后文件哈希未变；从未在原件上执行修复截断。
+- Redis 证据在 VPS `/root/backups/quantmind-storage-recovery-20261009-1322/redis-repair/`；原目录中的旧 AOF 另保留为 `.appendonly-before-repair-20261009`。修复使用刚退出的内存快照，不切换到历史业务备份；自然到期键按 Redis TTL 正常过期。
+- 已验证 PG 临时表事务写入并回滚、Redis 独立 TTL 测试键写入后删除、四子服务健康及独立存储 readiness。HAPI `https://lzy.me.uk/health` 返回 ok；系统盘约 35 GiB 可用，数据盘约 142 GiB 可用。完整快照验收从 13:55:28 开始，最终结果另记。原 `quantmind-snapshot.timer` 已恢复 active/enabled，原有每日北京时间 07:00 规则未改变；手动作业运行期间定时器不显示下次触发时间。
