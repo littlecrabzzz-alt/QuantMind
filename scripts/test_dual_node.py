@@ -75,6 +75,7 @@ w.close();"""
     def test_health_requires_all_four_child_services(self):
         opener = MagicMock()
         opener.open.return_value.__enter__.return_value.status = 200
+        opener.open.return_value.__enter__.return_value.read.return_value = b'{"status":"healthy"}'
         with patch.object(check_cloud_health.urllib.request, "build_opener", return_value=opener):
             self.assertTrue(check_cloud_health.healthy())
             self.assertEqual(opener.open.call_count, 4)
@@ -111,6 +112,7 @@ w.close();"""
     def test_completed_initial_snapshot_is_reused(self):
         opener = MagicMock()
         opener.open.return_value.__enter__.return_value.status = 200
+        opener.open.return_value.__enter__.return_value.read.return_value = b'{"status":"healthy"}'
         with patch.object(dual_node_deploy, "remote", return_value=subprocess.CompletedProcess([], 0)) as remote, \
              patch.object(dual_node_deploy, "stage"), \
              patch.object(dual_node_deploy, "run") as run, \

@@ -27,6 +27,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from dual_node_inventory import stat_key
+from storage_guard import storage_lock, transfer_bytes, require_capacity, WRITE_MARGIN, guarded_run, install_signal_handlers
 
 MARKETS = {"A": ("quantdb", "03:00"), "BC": ("quantbc", "08:15")}
 RELEASE = re.compile(r"market-[a-f0-9]{64}")
@@ -150,12 +151,13 @@ def install_quantdb_files(bundle, live, root, receipt_path, receipt, rows):
     return receipt
 
 
-def retain_transport_copies(directory, *, protected=(), backup=False):
+def retain_transport_copies(directory, *, protected=(), backup=False, managed_only=False):
     """Only our completed transport copies rotate; existing archives are untouched."""
     prefix = "quantdb-before-" if backup else ""
     candidates = [p for p in directory.iterdir() if p.is_dir() and not p.is_symlink()
                   and p.name.startswith(prefix) and RELEASE.fullmatch(p.name[len(prefix):])
-                  and (backup or (p / "VERIFIED").is_file())] if directory.exists() else []
+                  and (backup or (p / "VERIFIED").is_file())
+                  and (not managed_only or (p / "MANAGED-v2").is_file())] if directory.exists() else []
     candidates.sort(key=lambda p: p.stat().st_mtime_ns, reverse=True)
     keep = {p.name for p in candidates[:2]} | set(protected)
     removed = []
@@ -331,11 +333,19 @@ def send_cloud(bundle, market, host):
     if not resumable:
         remote = remote_root / "incoming" / market / bundle.name
         ssh(host, "sudo", "-n", "mkdir", "-p", str(remote / "project"))
-        transfer("rsync", "-a", "--checksum", "--safe-links", "--rsync-path=sudo -n rsync",
-                 "--link-dest=" + REMOTE_PROJECT, str(bundle / "project") + "/",
-                 host + ":" + str(remote / "project") + "/")
+        # Metadata first. No payload is written until rsync has estimated the
+        # actual delta (including existing incoming files and live link-dest).
         transfer("rsync", "-a", "--rsync-path=sudo -n rsync", str(bundle / "runtime-manifest.jsonl"),
                  host + ":" + str(remote) + "/")
+        copy = ["rsync", "-aH", "--checksum", "--safe-links",
+                "--link-dest=" + REMOTE_PROJECT]
+        paths = [str(bundle / "project") + "/", host + ":" + str(remote / "project") + "/"]
+        stats = subprocess.check_output([*copy, "--dry-run", "--stats", "--rsync-path=sudo -n rsync", *paths],
+                                        text=True, env={**os.environ, "LC_ALL": "C"})
+        required = transfer_bytes(stats)
+        guard = shlex.join(["sudo", "-n", "python3", REMOTE_PROJECT + "/scripts/storage_guard.py",
+                            "--root", str(remote_root), "--required-bytes", str(required), "--"])
+        transfer(*copy, "--rsync-path=" + guard, *paths)
     ssh(host, "sudo", "-n", "docker", "exec", "quantmind", "python", "scripts/local_market_source.py",
         "receive", "--root", "/data/local-market-source", "--market", market, "--release", bundle.name)
 
@@ -355,7 +365,7 @@ def receive(root, market, release_id, *, data_root=Path("/data")):
         raise ValueError("Invalid release identity")
     bundle = root / "incoming" / market / release_id
     receipt_path = root / (market + "-receipt.json")
-    with lock(root / (market + ".receive.lock")):
+    with storage_lock(root), lock(root / (market + ".receive.lock")):
         receipt = read_json(receipt_path, {})
         if receipt.get("release_id") == release_id and receipt.get("status") == "applied":
             return receipt
@@ -367,6 +377,12 @@ def receive(root, market, release_id, *, data_root=Path("/data")):
             rows = verify_bundle(bundle, market)
         else:
             rows = receipt["files"]
+        # Applying A swaps directories, but PG/Qlib derivation also needs room.
+        # BC additionally copies an immutable release before publishing CURRENT.
+        derivation_bytes = 10 * 2**30
+        if market == "BC":
+            derivation_bytes += 2 * sum(row["bytes"] for row in rows)
+        require_capacity(data_root, derivation_bytes + WRITE_MARGIN)
         source = bundle / "project/data" / MARKETS[market][0]
         live = data_root / MARKETS[market][0]
         from backend.shared.quantdb_sync_jobs import acquire_lock, release_lock, keep_lock
@@ -423,8 +439,17 @@ def receive(root, market, release_id, *, data_root=Path("/data")):
             receipt = {"status": "applied", "release_id": release_id, "source_node": "mac",
                        "completed_at": now(), "files_count": len(rows), "validation": validation}
             write_json(receipt_path, receipt)
+            # Only versions successfully managed by this code enter retention.
+            # Legacy/unmarked rollback and incomplete incoming copies are untouched.
+            (bundle / "VERIFIED").touch()
+            (bundle / "MANAGED-v2").touch()
             if market == "A":
-                retain_transport_copies(root / "backups", backup=True)
+                backup = root / "backups" / ("quantdb-before-" + release_id)
+                if backup.is_dir():
+                    (backup / "MANAGED-v2").touch()
+                retain_transport_copies(root / "backups", backup=True, managed_only=True,
+                                        protected=["quantdb-before-" + release_id])
+            retain_transport_copies(root / "incoming" / market, managed_only=True, protected=[release_id])
             return receipt
         finally:
             stop.set()
@@ -493,7 +518,7 @@ def install(project, root, secrets, host):
         raise RuntimeError("LaunchAgent installation is Mac-only")
     runtime = root.parent / "market-source-client"
     for relative in ("scripts/local_market_source.py", "scripts/dual_node_snapshot.py", "scripts/dual_node_inventory.py",
-                     "scripts/dual_node_sync.py", "scripts/dual_node_check.py", "scripts/quantdb_refresh.py", "deploy/dual-node.env"):
+                     "scripts/dual_node_sync.py", "scripts/dual_node_check.py", "scripts/storage_guard.py", "scripts/quantdb_refresh.py", "deploy/dual-node.env"):
         target = runtime / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(project / relative, target)
@@ -525,6 +550,7 @@ def main():
     parser.add_argument("--market", choices=tuple(MARKETS))
     parser.add_argument("--release")
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--_storage-worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.action in ("collect", "publish", "receive") and not args.market:
         parser.error("market is required")
@@ -533,7 +559,14 @@ def main():
     elif args.action == "publish":
         print(publish(args.root, args.market))
     elif args.action == "receive":
-        print(json.dumps(receive(args.root, args.market, args.release), default=str))
+        install_signal_handlers()
+        if args._storage_worker:
+            print(json.dumps(receive(args.root, args.market, args.release), default=str))
+        else:
+            # A process boundary lets the disk guard cancel PG/Qlib/BC derivation
+            # while the worker retains its recovery receipt and exclusive lock.
+            guarded_run([sys.executable, str(Path(__file__).resolve()), *sys.argv[1:],
+                         "--_storage-worker"], args.root)
     elif args.action == "install":
         install(args.project, args.root, args.secrets or args.project / "config", args.host)
     else:

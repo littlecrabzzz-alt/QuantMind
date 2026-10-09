@@ -201,7 +201,7 @@ class LocalMarketSourceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             scripts = root / "scripts"; scripts.mkdir()
-            for name in ("local_market_source.py", "dual_node_inventory.py"):
+            for name in ("local_market_source.py", "dual_node_inventory.py", "storage_guard.py"):
                 shutil.copy2(Path(source.__file__).parent / name, scripts / name)
             subprocess.run([sys.executable, "-I", str(scripts / "local_market_source.py"), "--help"],
                            stdout=subprocess.DEVNULL, check=True)

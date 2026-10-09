@@ -19,20 +19,27 @@ import shutil
 import signal
 import subprocess
 
-from dual_node_inventory import inventory, runtime_path, runtime_roots, stat_key
+from dual_node_inventory import inventory, runtime_roots, runtime_files, stat_key, SNAPSHOT_EXCLUDED
 from dual_node_sync import PROJECT, topology
+from storage_guard import storage_lock, require_capacity, guarded_run, transfer_bytes, WRITE_MARGIN
 
 SETTINGS = topology()
 REMOTE = SETTINGS["QM_REMOTE_ROOT"]
 WRITERS = ["quantmind-celery-beat", "quantmind", "quantmind-celery",
-           "quantmind-huntly", "qwenpaw", "quantmind-tushare-worker", "quantmind-tushare-document-worker", "quantmind-redis"]
+           "quantmind-huntly", "quantmind-research-worker", "quantmind-research-agent", "qwenpaw", "quantmind-tushare-worker", "quantmind-tushare-document-worker", "quantmind-redis"]
 
 
 class BusyError(RuntimeError):
     pass
 
 
+_guard_root = None
+SCOPE = "snapshot-v2"
+
+
 def run(*args, **kwargs):
+    if _guard_root is not None and (args[0] in {"rsync", "tar"} or args[:3] == ("docker", "exec", "quantmind-db")):
+        return guarded_run(args, _guard_root, **kwargs)
     return subprocess.run(args, check=True, **kwargs)
 
 
@@ -65,9 +72,14 @@ def digest(path):
     return h.hexdigest()
 
 
-def manifest(project):
+def snapshot_scope(target):
+    path = target / "snapshot-scope.json"
+    return json.loads(path.read_text())["scope"] if path.exists() else "legacy"
+
+
+def manifest(project, scope="legacy"):
     return "".join(json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n"
-                   for item in inventory(project))
+                   for item in inventory(project, scope=scope))
 
 
 def publish_link(base, target):
@@ -78,18 +90,15 @@ def publish_link(base, target):
     os.replace(temporary, base / "latest")
 
 
-def runtime_stats(project):
+def runtime_stats(project, scope="legacy"):
     records = {}
-    for root in runtime_roots(project):
-        for path in sorted(root.rglob("*")):
-            relative = path.relative_to(project)
-            if not runtime_path(relative):
-                continue
-            info = path.lstat()
-            if stat.S_ISLNK(info.st_mode):
-                raise RuntimeError(f"Review runtime symlink before migration: {relative}")
-            if stat.S_ISREG(info.st_mode):
-                records[relative.as_posix()] = stat_key(info)
+    for path in runtime_files(project, scope):
+        relative = path.relative_to(project)
+        info = path.lstat()
+        if stat.S_ISLNK(info.st_mode):
+            raise RuntimeError(f"Review runtime symlink before migration: {relative}")
+        if stat.S_ISREG(info.st_mode):
+            records[relative.as_posix()] = stat_key(info)
     return records
 
 
@@ -102,7 +111,7 @@ def copy_runtime_delta(source, target, copied, cache, expected_stats):
     removed = copied.keys() - expected_stats.keys()
     started_at = time.monotonic()
     if changed:
-        run("rsync", "-a", "--ignore-times", "--from0", "--files-from=-",
+        run("rsync", "-aH", "--ignore-times", "--from0", "--files-from=-",
             str(source) + "/", str(target) + "/",
             input=b"\0".join(p.encode() for p in changed) + b"\0")
     # Only unpublished staging files are removed, never the live tree or latest.
@@ -117,11 +126,14 @@ def copy_runtime_delta(source, target, copied, cache, expected_stats):
 
 
 def finish_snapshot(target):
-    require(manifest(target / "project") == (target / "runtime-manifest.jsonl").read_text(),
+    require(manifest(target / "project", scope=snapshot_scope(target)) == (target / "runtime-manifest.jsonl").read_text(),
             "Snapshot files do not match; unpublished staging retained")
     for archive in target.glob("*.tar"):
         with archive.open("rb") as src, gzip.open(str(archive) + ".gz", "wb", compresslevel=1) as dst:
-            shutil.copyfileobj(src, dst, 4 * 1024 * 1024)
+            for block in iter(lambda: src.read(4 * 1024 * 1024), b""):
+                if _guard_root is not None:
+                    require_capacity(_guard_root, WRITE_MARGIN)
+                dst.write(block)
         archive.unlink()
     hashes = {p.name: digest(p) for p in target.iterdir()
               if p.is_file() and p.name not in {"SHA256.json", "COMPLETE"}}
@@ -152,7 +164,49 @@ def prune_snapshots(base, apply=False):
     return len(candidates)
 
 
+RESEARCH_PREFIXES = ("qm-train-", "qm-agent-", "qm-frozen-", "qm-ide-run-", "qm-research-", "rdagent-")
+
+AGENT_IDLE_CHECK = """
+import asyncio, json, os, sys
+from psycopg.conninfo import make_conninfo
+from backend.services.research_agent.store import Store
+async def check():
+    node = json.load(open('/data/research/settings.json'))['node_id']
+    store = Store(make_conninfo(host=os.environ.get('DB_HOST', 'db'),
+        port=os.environ.get('DB_PORT', '5432'), dbname=os.environ['DB_NAME'],
+        user=os.environ['DB_USER'], password=os.environ['DB_PASSWORD']))
+    await store.pool.open()
+    try:
+        print(len(await store.active(node)))
+    finally:
+        await store.pool.close()
+try:
+    asyncio.run(check())
+except Exception as exc:
+    print(type(exc).__name__, file=sys.stderr)
+    raise SystemExit(2)
+"""
+
+
+def require_agent_idle(active):
+    if "quantmind-research-agent" in active:
+        count = output("docker", "exec", "quantmind-research-agent", "python", "-c", AGENT_IDLE_CHECK)
+        if count != "0":
+            raise BusyError("Research agent work active or unreadable; snapshot deferred")
+
+
 def cloud_snapshot():
+    global _guard_root
+    require(os.geteuid() == 0 and (Path(REMOTE) / "AUTHORITY").is_file(), "Run on the cloud authority after cutover")
+    with storage_lock(PROJECT / "data/local-market-source"):
+        _guard_root = Path(REMOTE)
+        try:
+            return _cloud_snapshot()
+        finally:
+            _guard_root = None
+
+
+def _cloud_snapshot():
     require(os.geteuid() == 0 and (Path(REMOTE) / "AUTHORITY").is_file(), "Run on the cloud authority after cutover")
     require(output("findmnt", "-n", "-o", "UUID", "-T", REMOTE) == SETTINGS["QM_DISK_UUID"], "Wrong or unmounted SSD")
     base = Path(REMOTE) / "snapshots"
@@ -166,26 +220,40 @@ def cloud_snapshot():
         name = "snapshot-" + datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
         # Resume an unpublished attempt rather than creating another full 65 GiB copy.
         target = base / ".building"
+        require(not target.exists() or snapshot_scope(target) == SCOPE,
+                "Legacy staging exists; preserve and inspect before new scoped snapshot")
         target.mkdir(mode=0o700, exist_ok=True)
+        (target / "snapshot-scope.json").write_text(json.dumps({"scope": SCOPE}))
         (target / "COMPLETE").unlink(missing_ok=True)
         (target / "project").mkdir(exist_ok=True)
         previous = (base / "latest").resolve()
         sources = [str(p) for p in runtime_roots(PROJECT)]
-        copy = ["rsync", "-a", "--exclude=.DS_Store", "--exclude=.rsync-partial",
+        copy = ["rsync", "-aH", "--exclude=.DS_Store", "--exclude=.rsync-partial",
                 "--exclude=__pycache__", "--exclude=data/stocks/", "--exclude=data/upgrade_v*.sql",
-                "--exclude=db/sql/"]
+                "--exclude=db/sql/", *["--exclude=" + path + "/" for path in SNAPSHOT_EXCLUDED]]
         if previous.is_dir():
             # Only link to an earlier IMMUTABLE snapshot, never to the live data tree.
             copy += ["--link-dest=" + str(previous / "project")]
-        run(*copy, *sources, str(target / "project") + "/")
+        copy += ["--delete"]
+        command = [*copy, *sources, str(target / "project") + "/"]
+        estimate = subprocess.check_output([*copy, "--dry-run", "--stats", *sources,
+            str(target / "project") + "/"], text=True, env={**os.environ, "LC_ALL": "C"})
+        # pg_dump plus cold volumes and compression coexist. Count logical bytes
+        # conservatively; postgres physical size also includes WAL and indexes.
+        volume_bytes = sum(p.stat().st_size for p in (Path(REMOTE) / "volumes").rglob("*") if p.is_file())
+        required = transfer_bytes(estimate) + 2 * volume_bytes + WRITE_MARGIN
+        free = require_capacity(REMOTE, required)
+        print(json.dumps({"phase": "capacity", "free": free, "required": required, "scope": SCOPE}), flush=True)
+        run(*command)
         # Hash while the application is online. The stat cache identifies files
         # that need no delta copy; the finished copy is independently hashed.
-        copied = {r["path"]: r for r in inventory(target / "project")}
+        copied = {r["path"]: r for r in inventory(target / "project", scope=SCOPE)}
         cache = {}
-        list(inventory(PROJECT, cache=cache, tolerate_changes=True))
+        list(inventory(PROJECT, cache=cache, tolerate_changes=True, scope=SCOPE))
         active = output("docker", "ps", "--format", "{{.Names}}").splitlines()
-        if any(n.startswith(("qm-train-", "qm-agent-", "qm-frozen-", "qm-ide-run-", "rdagent-")) for n in active):
+        if any(n.startswith(RESEARCH_PREFIXES) for n in active):
             raise BusyError("Research job active")
+        require_agent_idle(active)
         if "quantmind-celery" in active:
             jobs = json.loads(output("docker", "exec", "quantmind-celery", "celery", "-A",
                 "backend.services.engine.qlib_app.celery_config:celery_app", "inspect", "active", "--json", "--timeout=15"))
@@ -196,17 +264,21 @@ def cloud_snapshot():
         stopped = [name for name in WRITERS if name in active]
         started_at = time.monotonic()
         try:
-            applications = [name for name in stopped if name != "quantmind-redis"]
+            applications = [name for name in stopped if name not in {"quantmind-redis", "quantmind-research-agent"}]
             if applications:
                 run("docker", "stop", "--time", "240", *applications)
+            # Stop ingress before rechecking the autonomous coordinator. An
+            # active model turn is deferred, never cancelled for a backup.
+            require_agent_idle(active)
+            if "quantmind-research-agent" in stopped:
+                run("docker", "stop", "--time", "60", "quantmind-research-agent")
             if "quantmind-redis" in stopped:
                 run("docker", "stop", "--time", "60", "quantmind-redis")
             # Close the admission race: a child may have appeared during shutdown.
             active_now = output("docker", "ps", "--format", "{{.Names}}").splitlines()
-            require(not any(n.startswith(("qm-train-", "qm-agent-", "qm-frozen-",
-                                          "qm-ide-run-", "rdagent-")) for n in active_now),
+            require(not any(n.startswith(RESEARCH_PREFIXES) for n in active_now),
                     "Research job appeared during quiesce; snapshot aborted")
-            expected_stats = runtime_stats(PROJECT)
+            expected_stats = runtime_stats(PROJECT, scope=SCOPE)
             delta = copy_runtime_delta(
                 PROJECT, target / "project", copied, cache, expected_stats
             )
@@ -218,7 +290,7 @@ def cloud_snapshot():
             for volume in ("redis-data", "qwenpaw-data", "qwenpaw-secrets", "qwenpaw-backups", "qwenpaw-shared"):
                 run("tar", "-cf", str(target / (volume + ".tar")), "-C", REMOTE + "/volumes/" + volume, ".")
             # Reject an untracked writer instead of publishing a mixed-time copy.
-            require(runtime_stats(PROJECT) == expected_stats,
+            require(runtime_stats(PROJECT, scope=SCOPE) == expected_stats,
                     "Runtime changed during quiesced copy; unpublished staging retained")
         finally:
             if stopped:
@@ -227,7 +299,7 @@ def cloud_snapshot():
                 run("docker", "start", *ordered)
             print(json.dumps({"phase": "writers_restored", "pause_seconds": round(time.monotonic() - started_at, 2)}), flush=True)
         # Content hashing and manifest generation happen after writers are restored.
-        expected = list(inventory(target / "project"))
+        expected = list(inventory(target / "project", scope=SCOPE))
         (target / "runtime-manifest.jsonl").write_text(
             "".join(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n" for r in expected))
         # Independent full validation and compression touch only the frozen copy.
@@ -297,7 +369,7 @@ def pull_snapshot(base=None, only_new=False, remote_base="snapshots"):
         hashes = json.loads((target / "SHA256.json").read_text())
         require(all(Path(name).name == name for name in hashes), "Invalid checksum path")
         require(all(digest(target / name) == expected for name, expected in hashes.items()), "Archive checksum mismatch")
-        require(manifest(target / "project") == (target / "runtime-manifest.jsonl").read_text(), "Runtime file checksum mismatch")
+        require(manifest(target / "project", scope=snapshot_scope(target)) == (target / "runtime-manifest.jsonl").read_text(), "Runtime file checksum mismatch")
         (target / "VERIFIED").touch()
         (target / "COMPLETE").touch()
         if previous != target:
@@ -322,7 +394,7 @@ def install_mac_pull():
             original.rename(destination)
             original.symlink_to(destination)
     for name in ("scripts/dual_node_snapshot.py", "scripts/dual_node_inventory.py",
-                 "scripts/dual_node_sync.py", "scripts/dual_node_check.py", "scripts/quantdb_refresh.py", "deploy/dual-node.env"):
+                 "scripts/dual_node_sync.py", "scripts/dual_node_check.py", "scripts/storage_guard.py", "scripts/quantdb_refresh.py", "deploy/dual-node.env"):
         target = runtime / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(PROJECT / name, target)
@@ -401,4 +473,4 @@ if __name__ == "__main__":
                 pull_snapshot(args.root, args.only_new)
     except BusyError as exc:
         print(str(exc), flush=True)
-        raise SystemExit(75)
+        raise SystemExit(75) from exc

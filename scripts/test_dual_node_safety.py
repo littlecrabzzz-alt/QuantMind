@@ -251,6 +251,9 @@ class SnapshotSafety(unittest.TestCase):
             root=Path(directory); (root/'data').mkdir(); path=root/'data/input'
             path.write_text('old'); old=path.stat(); cache={}
             before=list(inv.inventory(root,cache))
+            # Linux ext4 ctime can coalesce mutations inside one clock tick.
+            import time
+            time.sleep(0.02)
             path.write_text('new'); os.utime(path,ns=(old.st_atime_ns,old.st_mtime_ns))
             after=list(inv.inventory(root,cache))
             self.assertNotEqual(before[0]['sha256'],after[0]['sha256'])
@@ -315,19 +318,29 @@ class SnapshotSafety(unittest.TestCase):
             self.assertFalse((target/'COMPLETE').exists())
 
     def test_restore_precedes_final_validation_even_on_failure(self):
-        for fail in (None,'finish','race'):
+        for fail in (None,'finish','race','agent'):
             with tempfile.TemporaryDirectory() as directory:
                 root=Path(directory); project=root/'project'; (project/'data').mkdir(parents=True)
                 (project/'data/input').write_text('fixed input'); (root/'AUTHORITY').touch()
+                os.link(project/'data/input', project/'data/hardlink')
+                excluded = project/'data/local-market-source/incoming/A/large'
+                excluded.parent.mkdir(parents=True)
+                excluded.write_text('transport payload')
                 for volume in ('redis-data','qwenpaw-data','qwenpaw-secrets','qwenpaw-backups','qwenpaw-shared'):
                     (root/'volumes'/volume).mkdir(parents=True); (root/'volumes'/volume/'file').write_text('cold')
                 events=[]
+                agent_checks=[]
+                stopped_commands=[]
                 def output(*args):
                     if args[0]=='findmnt': return 'fixture-uuid'
-                    return 'quantmind\nquantmind-redis'
+                    if args[:3] == ('docker','exec','quantmind-research-agent'):
+                        agent_checks.append(True)
+                        return '0' if len(agent_checks)==1 else '1'
+                    return 'quantmind\nquantmind-redis' + ('\nquantmind-research-agent' if fail=='agent' else '')
                 def run(*args,**kwargs):
                     if args[0]=='docker':
                         events.append(args[1])
+                        if args[1]=='stop': stopped_commands.append(args)
                         if args[1]=='exec': kwargs['stdout'].write(b'fixture dump')
                     else: subprocess.run(args,check=True,**kwargs)
                 original_inventory=snapshot.inventory
@@ -336,8 +349,8 @@ class SnapshotSafety(unittest.TestCase):
                     return _original(*args,**kwargs)
                 original_stats=snapshot.runtime_stats
                 stat_calls=[]
-                def tracked_stats(project,_calls=stat_calls,_fail=fail,_original=original_stats):
-                    result=_original(project)
+                def tracked_stats(project,_calls=stat_calls,_fail=fail,_original=original_stats,**kwargs):
+                    result=_original(project,**kwargs)
                     _calls.append(result)
                     if _fail=='race' and len(_calls)==2:
                         return {**result,'data/race':(0,0,0,0,0)}
@@ -358,15 +371,24 @@ class SnapshotSafety(unittest.TestCase):
                      patch.object(snapshot,'runtime_stats',side_effect=tracked_stats), \
                      patch.object(snapshot,'finish_snapshot',side_effect=finish), contextlib.redirect_stdout(io.StringIO()):
                     if fail:
-                        message='Runtime changed during quiesced copy' if fail=='race' else 'verification failed'
+                        message={'race':'Runtime changed during quiesced copy','agent':'Research agent work active'}.get(fail,'verification failed')
                         with self.assertRaisesRegex(RuntimeError,message):
                             snapshot.cloud_snapshot()
                     else:
                         snapshot.cloud_snapshot()
                 self.assertEqual((root/'snapshots/latest').is_symlink(),fail is None)
+                if fail is None:
+                    frozen = root/'snapshots/latest/project'
+                    self.assertFalse((frozen/'data/local-market-source/incoming').exists())
+                    self.assertEqual((frozen/'data/input').stat().st_ino, (frozen/'data/hardlink').stat().st_ino)
+                    self.assertNotEqual((frozen/'data/input').stat().st_ino, (project/'data/input').stat().st_ino)
                 self.assertIn('start',events)
-                if fail=='race':
+                if fail in ('race','agent'):
                     self.assertNotIn('finish',events)
+                    if fail=='agent':
+                        self.assertEqual(len(agent_checks), 2)
+                        self.assertTrue(stopped_commands)
+                        self.assertFalse(any('quantmind-research-agent' in call for call in stopped_commands))
                 else:
                     self.assertLess(events.index('start'),events.index('finish'))
                 self.assertNotIn('inventory',events[events.index('stop'):events.index('start')])
@@ -493,7 +515,7 @@ class ScheduledPull(unittest.TestCase):
             (project / ".local-dev").mkdir()
             fixed = project / ".local-dev/SNAPSHOT_ID"
             fixed.write_text("snapshot-fixed")
-            for name in ("scripts/dual_node_snapshot.py", "scripts/dual_node_inventory.py", "scripts/dual_node_sync.py", "scripts/dual_node_check.py", "scripts/quantdb_refresh.py", "deploy/dual-node.env"):
+            for name in ("scripts/dual_node_snapshot.py", "scripts/dual_node_inventory.py", "scripts/dual_node_sync.py", "scripts/dual_node_check.py", "scripts/storage_guard.py", "scripts/quantdb_refresh.py", "deploy/dual-node.env"):
                 path = project / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("fixture")

@@ -1,6 +1,12 @@
 # Always use scripts/dual-node.sh cloud-compose; paths are SSD-only.
+x-bounded-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
 services:
   research-agent:
+    logging: *bounded-logging
     container_name: quantmind-research-agent
     environment:
       QM_NODE_ROLE: authority
@@ -12,15 +18,18 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /root/data/disk/quantmind/secrets/glm-research-api.json:/run/secrets/research-llm.json:ro
   db:
+    logging: *bounded-logging
     ports: !reset []
     mem_limit: 1g
     cpus: 2.0
   redis:
+    logging: *bounded-logging
     image: redis:7
     ports: !reset []
     mem_limit: 320m
     command: redis-server --appendonly yes --maxmemory 192mb --maxmemory-policy noeviction --databases 16 --bind 0.0.0.0
   quantmind:
+    logging: *bounded-logging
     volumes:
       - /root/data/disk/quantmind/secrets/glm-research-api.json:/run/secrets/research-llm.json:ro
     ports: !override
@@ -47,6 +56,7 @@ services:
       ENABLE_TDX_PUSH: "false"
       QM_NODE_ROLE: authority
   celery-worker:
+    logging: *bounded-logging
     mem_limit: 1536m
     cpus: 1.5
     environment:
@@ -57,6 +67,7 @@ services:
       QM_NODE_ROLE: authority
     command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q market_sync,${QLIB_CELERY_QUEUE:-qlib_backtest_srv} --loglevel=info --concurrency=1
   tushare-worker:
+    logging: *bounded-logging
     profiles: [legacy-tushare-acquisition]
     extends:
       file: docker-compose.yml
@@ -72,6 +83,7 @@ services:
     cpus: 0.75
     command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q tushare_acquire --loglevel=info --concurrency=1 --prefetch-multiplier=1
   tushare-document-worker:
+    logging: *bounded-logging
     profiles: [legacy-tushare-acquisition]
     extends:
       file: docker-compose.yml
@@ -87,11 +99,13 @@ services:
     cpus: 0.5
     command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q tushare_documents --loglevel=info --concurrency=1 --prefetch-multiplier=1
   celery-beat:
+    logging: *bounded-logging
     mem_limit: 384m
     cpus: 0.5
     environment:
       QM_NODE_ROLE: authority
   research-worker:
+    logging: *bounded-logging
     extends:
       file: docker-compose.yml
       service: celery-worker
@@ -112,6 +126,7 @@ services:
       - /root/data/disk/quantmind/secrets/glm-research-api.json:/run/secrets/research-llm.json:ro
     command: celery -A backend.services.engine.research.tasks:app worker --beat -Q research --concurrency=1 --loglevel=info --schedule=/tmp/research-beat
   data-gateway:
+    logging: *bounded-logging
     build:
       dockerfile: docker/Dockerfile.data-gateway-cloud
     volumes:
@@ -120,6 +135,7 @@ services:
     mem_limit: 512m
     cpus: 0.5
   huntly:
+    logging: *bounded-logging
     image: lcomplete/huntly@sha256:6b9159588855a39f4340224eaba956d6a909ed7a94ca3156783b9f4dedaab648
     ports: !reset []
     mem_limit: 640m
@@ -127,6 +143,7 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: -Xms64m -Xmx384m
   rsshub:
+    logging: *bounded-logging
     ports: !reset []
     mem_limit: 384m
     cpus: 0.5
@@ -134,6 +151,7 @@ services:
       # DB 3 belongs to market data. RSSHub has its own unused logical DB.
       REDIS_URL: redis://redis:6379/15
   qwenpaw:
+    logging: *bounded-logging
     image: quantmind-qwenpaw:local
     platform: linux/amd64
     ports: !reset []
@@ -148,9 +166,11 @@ services:
       args:
         DOCKER_CLI_VERSION: "29.1.2"
   ib-gateway:
+    logging: *bounded-logging
     profiles: [disabled-trading]
     ports: !reset []
   web:
+    logging: *bounded-logging
     image: nginx:alpine
     container_name: quantmind-web
     ports:

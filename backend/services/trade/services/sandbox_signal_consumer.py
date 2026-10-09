@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import math
+import time
 from datetime import datetime
 from typing import Any
 
@@ -34,6 +35,9 @@ logger = logging.getLogger(__name__)
 _SIGNAL_QUEUE = "trade:simulation:signals"
 _BATCH_SIZE = 50
 _POLL_INTERVAL = 0.2
+_RETRY_INITIAL = 1.0
+_RETRY_MAX = 30.0
+_ERROR_LOG_INTERVAL = 60.0
 
 
 def _active_strategy_key(tenant_id: str, user_id: str) -> str:
@@ -73,6 +77,8 @@ class SandboxSignalConsumer:
 
     def __init__(self):
         self.is_running = False
+        self._stop_event = asyncio.Event()
+        self._queue_error = ""
         self._http: httpx.AsyncClient | None = None
         self._account_manager = SimulationAccountManager(redis_client)
 
@@ -84,11 +90,34 @@ class SandboxSignalConsumer:
     async def start(self):
         """启动信号消费循环"""
         self.is_running = True
+        self._stop_event.clear()
+        failures = 0
+        retry_delay = _RETRY_INITIAL
+        last_error_log = 0.0
         logger.info("[SandboxSignalConsumer] 已启动，监听队列: %s", _SIGNAL_QUEUE)
         try:
             while self.is_running:
-                await self._consume_batch()
-                await asyncio.sleep(_POLL_INTERVAL)
+                if await self._consume_batch():
+                    if failures:
+                        logger.info(
+                            "[SandboxSignalConsumer] Redis 队列恢复，累计失败次数: %d",
+                            failures,
+                        )
+                    failures = 0
+                    retry_delay = _RETRY_INITIAL
+                    delay = _POLL_INTERVAL
+                else:
+                    failures += 1
+                    now = time.monotonic()
+                    if failures == 1 or now - last_error_log >= _ERROR_LOG_INTERVAL:
+                        logger.warning(
+                            "[SandboxSignalConsumer] Redis 队列不可用 (%s)，累计失败 %d 次，%.1f 秒后重试",
+                            self._queue_error, failures, retry_delay,
+                        )
+                        last_error_log = now
+                    delay = retry_delay
+                    retry_delay = min(_RETRY_MAX, retry_delay * 2)
+                await self._wait_for_poll(delay)
         except asyncio.CancelledError:
             logger.info("[SandboxSignalConsumer] 收到取消信号，正在停止...")
         except Exception as e:
@@ -102,21 +131,35 @@ class SandboxSignalConsumer:
     async def stop(self):
         """停止信号消费"""
         self.is_running = False
+        self._stop_event.set()
 
-    async def _consume_batch(self):
-        """批量消费信号"""
+    async def _wait_for_poll(self, delay: float):
+        """Both stop() and task cancellation interrupt even the longest backoff."""
+        try:
+            await asyncio.wait_for(self._stop_event.wait(), timeout=delay)
+        except asyncio.TimeoutError:
+            pass
+
+    async def _consume_batch(self) -> bool:
+        """False means queue access failed; popped messages keep existing semantics."""
         if not redis_client.client:
-            return
+            self._queue_error = "client unavailable"
+            return False
 
         for _ in range(_BATCH_SIZE):
             try:
                 raw_sig = redis_client.client.lpop(_SIGNAL_QUEUE)
-                if not raw_sig:
-                    break
+            except Exception as exc:
+                self._queue_error = type(exc).__name__
+                return False
+            if not raw_sig:
+                break
+            try:
                 sig = json.loads(raw_sig)
                 await self._process_signal(sig)
             except Exception as e:
                 logger.error("[SandboxSignalConsumer] 处理信号失败: %s", e)
+        return True
 
     async def _process_signal(self, sig: dict[str, Any]):
         """处理单个信号"""
