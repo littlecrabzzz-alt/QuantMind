@@ -247,7 +247,8 @@ def _cloud_snapshot():
         run(*command)
         # Hash while the application is online. The stat cache identifies files
         # that need no delta copy; the finished copy is independently hashed.
-        copied = {r["path"]: r for r in inventory(target / "project", scope=SCOPE)}
+        target_cache = {}
+        copied = {r["path"]: r for r in inventory(target / "project", cache=target_cache, scope=SCOPE)}
         cache = {}
         list(inventory(PROJECT, cache=cache, tolerate_changes=True, scope=SCOPE))
         active = output("docker", "ps", "--format", "{{.Names}}").splitlines()
@@ -299,7 +300,7 @@ def _cloud_snapshot():
                 run("docker", "start", *ordered)
             print(json.dumps({"phase": "writers_restored", "pause_seconds": round(time.monotonic() - started_at, 2)}), flush=True)
         # Content hashing and manifest generation happen after writers are restored.
-        expected = list(inventory(target / "project", scope=SCOPE))
+        expected = list(inventory(target / "project", cache=target_cache, scope=SCOPE))
         (target / "runtime-manifest.jsonl").write_text(
             "".join(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n" for r in expected))
         # Independent full validation and compression touch only the frozen copy.

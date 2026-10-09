@@ -309,6 +309,72 @@ class SnapshotSafety(unittest.TestCase):
             self.assertEqual(report['changed_logical_bytes'],8)
             self.assertEqual(report['removed_files'],1)
 
+    def test_stage_cache_skips_unchanged_reads_but_final_validation_is_independent(self):
+        for tamper in (False, True):
+            with self.subTest(tamper=tamper), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                project = root / 'project'
+                (project / 'data').mkdir(parents=True)
+                (project / 'data/stable').write_text('fixed input')
+                (project / 'data/changed').write_text('before stop')
+                (root / 'AUTHORITY').touch()
+                for volume in ('redis-data', 'qwenpaw-data', 'qwenpaw-secrets',
+                               'qwenpaw-backups', 'qwenpaw-shared'):
+                    (root / 'volumes' / volume).mkdir(parents=True)
+                reads = {'stable': 0, 'changed': 0}
+                original_open = Path.open
+                stage = root / 'snapshots/.building/project/data'
+
+                def tracked_open(path, mode='r', *args, **kwargs):
+                    if path.parent == stage and mode == 'rb':
+                        reads[path.name] += 1
+                    return original_open(path, mode, *args, **kwargs)
+
+                def output(*args):
+                    if args[0] == 'findmnt':
+                        return 'fixture-uuid'
+                    return 'quantmind'
+
+                def run(*args, **kwargs):
+                    if args[0] != 'docker':
+                        return subprocess.run(args, check=True, **kwargs)
+                    if args[1] == 'stop':
+                        (project / 'data/changed').write_text('after stop: new content')
+                    elif args[1] == 'exec':
+                        kwargs['stdout'].write(b'fixture dump')
+
+                original_finish = snapshot.finish_snapshot
+
+                def finish(target):
+                    # Initial staging inventory hashes both. Expected inventory
+                    # must only rehash the changed rsync result, not stable data.
+                    self.assertEqual(reads, {'stable': 1, 'changed': 2})
+                    if tamper:
+                        (stage / 'stable').write_text('tampered input')
+                    original_finish(target)
+                    # Unchanged file is nevertheless read again independently.
+                    self.assertEqual(reads, {'stable': 2, 'changed': 3})
+
+                with patch.object(snapshot, 'PROJECT', project), \
+                     patch.object(snapshot, 'REMOTE', str(root)), \
+                     patch.object(snapshot, 'SETTINGS', {'QM_DISK_UUID': 'fixture-uuid'}), \
+                     patch.object(snapshot.os, 'geteuid', return_value=0), \
+                     patch.object(snapshot.shutil, 'disk_usage', return_value=shutil._ntuple_diskusage(300*1024**3, 0, 300*1024**3)), \
+                     patch.object(snapshot, 'output', side_effect=output), \
+                     patch.object(snapshot, 'run', side_effect=run), \
+                     patch.object(snapshot, 'finish_snapshot', side_effect=finish), \
+                     patch.object(Path, 'open', tracked_open), \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    if tamper:
+                        with self.assertRaisesRegex(RuntimeError, 'Snapshot files do not match'):
+                            snapshot.cloud_snapshot()
+                    else:
+                        snapshot.cloud_snapshot()
+                self.assertEqual(reads, {'stable': 2, 'changed': 3})
+                self.assertEqual((root / 'snapshots/latest').is_symlink(), not tamper)
+                if tamper:
+                    self.assertFalse((root / 'snapshots/.building/COMPLETE').exists())
+
     def test_validation_failure_never_publishes_complete(self):
         with tempfile.TemporaryDirectory() as directory:
             target=Path(directory); (target/'project/data').mkdir(parents=True)
