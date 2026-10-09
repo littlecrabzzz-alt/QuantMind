@@ -40,3 +40,9 @@
 - 本次重启暴露旧 AOF 中段损坏：磁盘恢复后 `INFO persistence` 状态为 ok 不能证明整个旧文件可回放。未使用会截断后半段的 `--fix`；依据 [Redis 持久化说明](https://redis.io/docs/latest/management/persistence/) 在隔离、无网络容器中，从本次正常退出生成的 `2026-10-09 13:47:42 +08:00` RDB 重建 AOF。RDB checksum OK；重建前后全库 DEBUG DIGEST 一致；新 AOF 全文件检查通过，随后生产启动成功。旧文件与原始 SHA256 全保留。校验工具需可写打开文件，因此检查在副本中执行，额外核对校验前后文件哈希未变；从未在原件上执行修复截断。
 - Redis 证据在 VPS `/root/backups/quantmind-storage-recovery-20261009-1322/redis-repair/`；原目录中的旧 AOF 另保留为 `.appendonly-before-repair-20261009`。修复使用刚退出的内存快照，不切换到历史业务备份；自然到期键按 Redis TTL 正常过期。
 - 已验证 PG 临时表事务写入并回滚、Redis 独立 TTL 测试键写入后删除、四子服务健康及独立存储 readiness。HAPI `https://lzy.me.uk/health` 返回 ok；系统盘约 35 GiB 可用，数据盘约 142 GiB 可用。完整快照验收从 13:55:28 开始，最终结果另记。原 `quantmind-snapshot.timer` 已恢复 active/enabled，原有每日北京时间 07:00 规则未改变；手动作业运行期间定时器不显示下次触发时间。
+
+## 追加性能验证
+
+- `97804e00` 已在两端 master 对齐，7494 个源文件内容指纹一致。暂存文件仅在本轮内复用 stat/hash 缓存，最终校验仍独立读取全部文件；修改文件重新计算，篡改则拒绝 COMPLETE/latest。真实 rsync fixture 同时在 macOS 与 Linux 通过。
+- 最新相关回归 71 项通过，1 项 opt-in Docker 测试跳过。Mac 已安装快照模块同步更新，旧模块保存在 `~/Library/Application Support/QuantMind/client-backups/storage-recovery-20261009-1416/`。
+- 13:55 启动的完整生产备份仍按启动时逻辑运行，不为追加缓存优化中断本轮验证。12 个容器约 15 分钟累计日志仅增长 397207 字节，约 26 KiB/分钟，证据为 VPS 恢复目录中的 `log-growth-report.json`。14:17 独立 readiness 通过，根盘可用约 34.6 GiB、数据盘约 132.5 GiB；备份暂存的额外写入已计入。
