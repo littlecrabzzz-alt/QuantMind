@@ -504,11 +504,21 @@ def tick(root, project, secrets, host, market=None, force=False):
                     item["local_release"] = release_id
                 item.update(status="applied", checked_at=now().isoformat())
                 item.pop("error", None)
-                retain_transport_copies(root / "releases" / name, protected=[release_id, item.get("local_release")])
             except Exception as exc:
                 item.update(status="retry_pending", error=str(exc), checked_at=now().isoformat())
                 failures.append(name)
-            write_json(status_path, state)
+            finally:
+                try:
+                    retain_transport_copies(
+                        root / "releases" / name,
+                        protected=[item[key] for key in
+                                   ("release_id", "local_release", "cloud_release")
+                                   if item.get(key)],
+                    )
+                    item.pop("rotation_error", None)
+                except Exception as exc:
+                    item["rotation_error"] = str(exc)
+                write_json(status_path, state)
         print(json.dumps(state, ensure_ascii=False, default=str), flush=True)
         return 2 if failures else 0
 

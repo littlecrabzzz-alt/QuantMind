@@ -139,6 +139,11 @@ def _json(value):
 
 def _save(root, directory, suffix, payload, mime):
     sha = hashlib.sha256(payload).hexdigest()
+    if directory == "attachments" and suffix == ".pdf":
+        from backend.shared.tushare_attachment_retirement import match_retired
+
+        if match_retired(root, f"attachments/{sha}.pdf"):
+            raise DocumentError("attachment_retired")
     parent = root / directory
     parent.mkdir(parents=True, exist_ok=True)
     if parent.is_symlink() or parent.resolve().parent != root:
@@ -644,6 +649,21 @@ def fetch_document(
                     result.update(status=reason, validation_status="unexpected_content")
                     result["files"].append(artifact)
                     return result
+                if is_pdf:
+                    from backend.shared.tushare_attachment_retirement import match_retired
+
+                    sha = hashlib.sha256(payload).hexdigest()
+                    name = f"attachments/{sha}.pdf"
+                    retired = match_retired(root, name)
+                    if retired:
+                        result.update(
+                            status="downloaded", mime=mime, document_sha256=sha,
+                            parse_status="parsed", validation_status="pdf_structure_valid",
+                            attachment_status="retired",
+                            files=[{"path": name, "sha256": sha, "bytes": len(payload),
+                                    "mime": mime}, *retired["extracted"]],
+                        )
+                        return result
                 artifact = _save(root, "attachments", suffix, payload, mime)
                 result.update(
                     status="downloaded", mime=mime, document_sha256=artifact["sha256"]
@@ -759,6 +779,9 @@ def _document_db(root, *, timeout=10, deadline=None):
     except BaseException:
         db.close()
         raise
+    from backend.shared.tushare_attachment_retirement import setup
+
+    setup(db)
     return db
 
 
@@ -1085,6 +1108,10 @@ def _parse_saved(root, result, timeout):
             "parse_status": "parse_failed",
             "parse_detail": {"reason": "saved_pdf_missing"},
         }
+    from backend.shared.tushare_attachment_retirement import match_retired
+
+    if match_retired(root, pdf["path"], pdf):
+        return {**result, "parse_status": "parsed", "attachment_status": "retired"}
     path = Path(root) / pdf["path"]
     if (
         path.is_symlink()
@@ -1252,6 +1279,9 @@ def _schedule_terminal_retries(
     rows = db.execute(
         "SELECT id,url,download_tries,retry_after,result FROM documents "
         "INDEXED BY document_status_counts WHERE download_status='blocked' "
+        "AND NOT EXISTS(SELECT 1 FROM attachment_retirements r "
+        "JOIN document_attachment_links l ON l.sha256=r.sha256 "
+        "WHERE l.document_id=documents.id) "
         "ORDER BY parse_status,id"
     ).fetchall()
     cutoff = now - interval_seconds
@@ -1362,7 +1392,11 @@ def _eligible_documents(db, phase, now, limit):
     rows = []
     unclaimed = (
         " AND NOT EXISTS(SELECT 1 FROM document_claims c "
-        "WHERE c.document_id=documents.id) ORDER BY id LIMIT ?"
+        "WHERE c.document_id=documents.id) "
+        "AND NOT EXISTS(SELECT 1 FROM attachment_retirements r "
+        "JOIN document_attachment_links l ON l.sha256=r.sha256 "
+        "WHERE l.document_id=documents.id) "
+        "ORDER BY id LIMIT ?"
     )
     if phase in (None, "download"):
         rows.extend(
@@ -1485,6 +1519,12 @@ def _finish_document(db, owner, job, result, phase, timing=None):
     try:
         with db:
             _timed_begin(db, timing, "finish")
+            if db.execute(
+                "SELECT 1 FROM attachment_retirements r JOIN document_attachment_links l "
+                "ON r.sha256=l.sha256 WHERE l.document_id=?",
+                (job["id"],),
+            ).fetchone():
+                raise DocumentError("attachment_retired")
             claim = db.execute(
                 "SELECT owner,claimed_at FROM document_claims WHERE document_id=?",
                 (job["id"],),
@@ -1994,6 +2034,9 @@ def document_inventory(root):
     left by a killed worker; the parent's release verifier checks their hashes.
     """
     root = Path(root).resolve()
+    from backend.shared.tushare_attachment_retirement import retired_files
+
+    retired = retired_files(root)
     db = _document_db(root)
     try:
         db.execute("BEGIN")
@@ -2062,7 +2105,8 @@ def document_inventory(root):
                     )
         return {
             "schema_version": 1,
-            "files": files,
+            "retired_files": retired,
+            "files": [f for f in files if f["path"] not in retired],
             "mappings": mappings,
             "attempts": attempts,
             "counts": counts,
@@ -2242,11 +2286,16 @@ def document_index(root):
     writers while encoding the initial shards. Later builds process dirty ranges.
     """
     root = Path(root).resolve()
+    from backend.shared.tushare_attachment_retirement import retired_files
+
+    retired = retired_files(root)
     db = _document_db(root)
     try:
         _index_setup(db)
         db.execute("BEGIN IMMEDIATE")
         _index_original_files(root, db)
+        for path in retired:
+            db.execute("DELETE FROM document_index_files WHERE path=?", (path,))
         dirty = list(
             db.execute(
                 "SELECT kind,bucket FROM document_index_dirty ORDER BY kind,bucket"
@@ -2421,6 +2470,10 @@ def document_index(root):
                 "DELETE FROM document_index_cache WHERE kind='state_descriptors' AND bucket=?",
                 (prefix,),
             )
+        if retired:
+            index["retired_files"] = retired
+            for item in retired.values():
+                files.append(item["receipt"])
         index["state_count"] = sum(
             item["state_count"] for item in index["states"].values()
         )
@@ -2438,6 +2491,7 @@ def document_index(root):
             "counts": index["counts"],
             "reference_counts": index["reference_counts"],
             "totals": index["totals"],
+            "retired_files": retired,
             "rebuilt_shards": len(dirty),
             "rebuilt_descriptor_shards": rebuilt_descriptors,
         }

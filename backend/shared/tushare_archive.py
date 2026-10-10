@@ -17,6 +17,8 @@ import stat
 import tempfile
 import time
 
+from backend.shared.tushare_attachment_retirement import receipt_cache
+
 DIRECTORIES = (
     "objects",
     "observations",
@@ -102,6 +104,11 @@ def _db(root):
             PRAGMA user_version=1;
             COMMIT;
         """)
+    columns = {row[1] for row in db.execute("PRAGMA table_info(files)")}
+    if "storage_state" not in columns:
+        with db:
+            db.execute("ALTER TABLE files ADD COLUMN storage_state TEXT NOT NULL DEFAULT 'available'")
+            db.execute("ALTER TABLE files ADD COLUMN retirement TEXT")
     return db
 
 
@@ -152,6 +159,12 @@ def _snapshot(root, db, rescan):
         for saved in db.execute("SELECT path FROM files").fetchall():
             _task(db, "file", saved[0])
     _queue_releases(root, db)
+    from backend.shared.tushare_attachment_retirement import scan_expectations
+
+    for item in scan_expectations(root):
+        _task(db, "file", item["path"], {"metadata": {
+            key: item[key] for key in ("sha256", "bytes") if key in item
+        }})
     for directory in DIRECTORIES:
         parent = root / directory
         if not parent.exists() and not parent.is_symlink():
@@ -501,10 +514,13 @@ def _expected_files(root, release, document, *, collect=True, inherited=None):
         if not name.startswith("observations/") and Path(name).stem != sha:
             raise ArchiveError("referenced_file_mismatch")
         expected = {"sha256": sha, "bytes": size}
-        if inherited is not None and (
-            name not in inherited or inherited[name] != expected
-        ):
-            raise ArchiveError("Conflicting inherited file metadata")
+        if inherited is not None and inherited.get(name) != expected:
+            from backend.shared.tushare_attachment_retirement import match_retired
+
+            # Only an exactly matched retirement may explain projection of the
+            # original out of the new physical closure. Other conflicts stay fatal.
+            if name in inherited or not match_retired(root, name, expected):
+                raise ArchiveError("Conflicting inherited file metadata")
         if output is not None:
             if name in output and output[name] != expected:
                 raise ArchiveError("conflicting_file_metadata")
@@ -512,6 +528,7 @@ def _expected_files(root, release, document, *, collect=True, inherited=None):
     return output
 
 
+@receipt_cache()
 def retain_release(
     root, release_id, *, _verified_predecessor=None, _inherited_files=None, timing=None
 ):
@@ -712,6 +729,24 @@ def _file(root, db, row, deadline):
     name = row["path"]
     if not FILE_PATTERN.fullmatch(name):
         raise ArchiveError("invalid_immutable_path")
+    from backend.shared.tushare_attachment_retirement import retired_files
+
+    retired = (
+        retired_files(root, path=name).get(name)
+        if name.startswith("attachments/") and name.endswith(".pdf") else None
+    )
+    if retired:
+        expected = json.loads(row["expected"])
+        metadata = expected.get("metadata", {})
+        if not isinstance(metadata, dict) or (expected and (
+            metadata.get("sha256") != retired["sha256"]
+            or ("bytes" in metadata and metadata["bytes"] != retired["bytes"])
+        )):
+            raise ArchiveError("referenced_file_mismatch")
+        _register(db, name, retired["sha256"], retired["bytes"])
+        db.execute("UPDATE files SET storage_state='retired',retirement=? WHERE path=?",
+                   (_json(retired), name))
+        return
     target = _safe(root, name)
     cached = db.execute(
         "SELECT sha256,bytes FROM files WHERE path=? AND valid=1", (name,)
@@ -782,6 +817,7 @@ def _progress(db):
     }
 
 
+@receipt_cache()
 def recover_archive(
     root, max_items=200, max_seconds=5, *, rescan=False, rescan_releases=False
 ):
@@ -803,6 +839,9 @@ def recover_archive(
         raise ValueError("Invalid archive recovery budget")
     root = Path(root).resolve()
     root.mkdir(parents=True, exist_ok=True)
+    from backend.shared.tushare_attachment_retirement import ensure_ready
+
+    ensure_ready(root)
     with (root / ".archive.lock").open("a") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -885,13 +924,17 @@ def archive_inventory(root):
     try:
         if db.execute("PRAGMA user_version").fetchone()[0] != 1:
             raise ArchiveError("unsupported_archive_schema")
-        files, datasets = {}, []
+        files, datasets, retired = {}, [], {}
         for row in db.execute("SELECT * FROM files WHERE valid=1 ORDER BY path"):
+            if "storage_state" in row.keys() and row["storage_state"] == "retired":
+                retired[row["path"]] = json.loads(row["retirement"])
+                continue
             files[row["path"]] = {"sha256": row["sha256"], "bytes": row["bytes"]}
             if row["dataset"]:
                 datasets.append(json.loads(row["dataset"]))
         return {
             "files": files,
+            "retired_files": retired,
             "datasets": datasets,
             "gaps": [
                 json.loads(row[0])

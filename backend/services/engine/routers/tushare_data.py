@@ -82,8 +82,19 @@ def _artifact(manifest, path):
     if not re.fullmatch(OBJECT, path):
         raise HTTPException(422, "Invalid document object path")
     expected = manifest["files"].get(path)
-    if not expected:
+    retired = manifest.get("retired_files", {}).get(path)
+    if not expected and not retired:
         raise HTTPException(404, "Object is not in this release")
+    if path.endswith(".pdf"):
+        from backend.shared.tushare_attachment_retirement import match_retired
+
+        try:
+            retired = retired or match_retired(ROOT, path, expected)
+        except (OSError, ValueError, KeyError, TypeError):
+            raise HTTPException(409, "Invalid attachment retirement evidence") from None
+        if retired:
+            raise HTTPException(410, {"code": "attachment_retired", "path": path,
+                                      **retired})
     raw = _path(path).read_bytes()
     sha = hashlib.sha256(raw).hexdigest()
     if (

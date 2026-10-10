@@ -32,6 +32,8 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from backend.shared.tushare_attachment_retirement import receipt_cache
+
 from backend.shared.tushare_registry import (
     REALTIME_RUNTIME_CONTRACTS, REALTIME_SOURCE_FAMILIES,
     realtime_runtime_prerequisites, realtime_dispatch_status, project_realtime_row,
@@ -6186,9 +6188,13 @@ class Pipeline:
             )
             self.db.execute("DELETE FROM scheduler_state WHERE name GLOB 'publish_intent:*'")
 
+    @receipt_cache()
     def publish(self, *, research=False):
         from contextlib import contextmanager
 
+        from backend.shared.tushare_attachment_retirement import retired_files, project_files
+
+        retirements = {} if research else retired_files(self.root)
         publish_started = time.monotonic()
         timing = {
             "stage_seconds": {},
@@ -6537,6 +6543,10 @@ class Pipeline:
                 content.update(scope="research_structured", selected_api_names=sorted(selected))
                 content.pop("capabilities")
                 content.pop("planning")
+        if retirements:
+            project_files(files, retirements)
+            content["retired_files"] = retirements
+            content["original_attachments_complete"] = False
         with measure("compare_previous"):
             if research and previous == content:
                 commit_pointer(previous_id)
@@ -6629,6 +6639,8 @@ class Pipeline:
                         "gaps": archived["gaps"],
                     }
                 )
+        if retirements:
+            project_files(files, retirements)
         with measure("serialize_manifest"):
             # Comparison and the final inherited archive mapping are finished.
             # Keep needed shared file/mapping entries through content, but release
@@ -7379,13 +7391,24 @@ def manifest_at(root, release_id):
             or re.fullmatch(r"attachments/[a-f0-9]{64}\.bin", path)
         ):
             raise ValueError("Invalid object path")
+    if manifest.get("retired_files"):
+        from backend.shared.tushare_attachment_retirement import validate_manifest
+
+        validate_manifest(root, manifest)
     return manifest
 
 
+@receipt_cache()
 def verify_data(root, release_id):
     root = Path(root)
     manifest = manifest_at(root, release_id)
+    from backend.shared.tushare_attachment_retirement import match_retired, validate_manifest
+
+    validate_manifest(root, manifest, check_text=True)
     for name, expected in manifest["files"].items():
+        if name.startswith("attachments/") and name.endswith(".pdf"):
+            if match_retired(root, name, expected, check_text=True):
+                continue
         path = root / name
         if (
             path.is_symlink()

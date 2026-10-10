@@ -412,6 +412,13 @@ def mirror(root):
         with mirror_stage("manifest_prepare"):
             fetch_manifest(root, host, source, release, pointer["manifest_sha256"])
         with mirror_stage("manifest_validate"):
+            candidate = json.loads((root / "releases" / release / "manifest.json").read_bytes())
+            if candidate.get("retired_files"):
+                raise ValueError("attachment_retirement_requires_receipt_aware_transfer")
+            from backend.shared.tushare_attachment_retirement import scan_expectations
+
+            if scan_expectations(root):
+                raise ValueError("attachment_retirement_requires_receipt_aware_transfer")
             manifest = manifest_at(root, release)
         missing, verified = [], {}
         for name, expected in manifest["files"].items():
