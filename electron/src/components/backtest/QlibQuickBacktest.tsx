@@ -126,6 +126,13 @@ export const QlibQuickBacktest: React.FC = () => {
   const [showTailTradeTooltip, setShowTailTradeTooltip] = useState(false);
   const tailTradeTimerRef = useRef<number | null>(null);
 
+  const [ashareLabEnabled, setAshareLabEnabled] = useState<boolean>(() =>
+    typeof window !== 'undefined' && window.localStorage.getItem('qm.quickBacktest.ashareLab') === '1'
+  );
+  useEffect(() => {
+    window.localStorage.setItem('qm.quickBacktest.ashareLab', ashareLabEnabled ? '1' : '0');
+  }, [ashareLabEnabled]);
+
   // 切换开关时同步缓存，并自动修正 dealPrice
   useEffect(() => {
     setStoredTailTradeMode(tailTradeEnabled);
@@ -413,6 +420,7 @@ export const QlibQuickBacktest: React.FC = () => {
         deal_price: getTailTradeDealPrice(tailTradeEnabled),
         signal_lag_days: getTailTradeSignalLagDays(tailTradeEnabled),
         allow_feature_signal_fallback: ALLOW_FEATURE_SIGNAL_FALLBACK,
+        use_vectorized: ashareLabEnabled,
         qlib_provider_uri: marketConfig.qlibProviderUri,
         qlib_region: marketConfig.qlibRegion,
       };
@@ -791,42 +799,67 @@ export const QlibQuickBacktest: React.FC = () => {
                   <span className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center"><Settings2 className="w-4 h-4 text-blue-600" /></span> 基础配置
                 </h3>
               </div>
-              <div
-                className="relative flex items-center gap-2 shrink-0"
-                onMouseEnter={() => {
-                  tailTradeTimerRef.current = window.setTimeout(() => setShowTailTradeTooltip(true), 1000);
-                }}
-                onMouseLeave={() => {
-                  if (tailTradeTimerRef.current) { clearTimeout(tailTradeTimerRef.current); tailTradeTimerRef.current = null; }
-                  setShowTailTradeTooltip(false);
-                }}
-              >
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setTailTradeEnabled(!tailTradeEnabled)}
+                  role="switch"
+                  aria-checked={ashareLabEnabled}
+                  onClick={() => setAshareLabEnabled(!ashareLabEnabled)}
+                  title={ashareLabEnabled
+                    ? 'ashare-lab 引擎：T日信号、T+1开盘成交，整手、涨跌停、停牌、退市按真实规则；仅 Mac 本地且股票池为沪深300/中证500/中证1000 时生效，否则自动按标准引擎运行'
+                    : '标准引擎（Qlib）'}
                   className={`flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all duration-200 ${
-                    tailTradeEnabled
+                    ashareLabEnabled
                       ? 'bg-blue-50 border-blue-200 text-blue-700'
                       : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                   }`}
                 >
-                  <span className="text-[11px] font-bold">尾盘交易</span>
+                  <span className="text-[11px] font-bold">A股真实撮合</span>
                   <span className={`px-1.5 py-0.5 rounded-lg text-[9px] font-black min-w-[28px] text-center transition-all ${
-                    tailTradeEnabled
+                    ashareLabEnabled
                       ? 'bg-blue-600 text-white'
                       : 'bg-white text-gray-500 border border-gray-100 shadow-sm'
                   }`}>
-                    {tailTradeEnabled ? 'ON' : 'OFF'}
+                    {ashareLabEnabled ? 'ON' : 'OFF'}
                   </span>
                 </button>
-                {showTailTradeTooltip && (
-                  <div className="absolute top-full right-0 mt-2 px-2.5 py-1.5 bg-gray-900 text-white text-[11px] rounded-lg whitespace-nowrap z-50 shadow-lg">
-                    {tailTradeEnabled
-                      ? '尾盘交易：T日信号+T+1收盘成交'
-                      : '标准口径：T日信号+T+1开盘成交'}
-                    <div className="absolute bottom-full right-3 border-4 border-transparent border-b-gray-900" />
-                  </div>
-                )}
+                <div
+                  className="relative flex items-center gap-2 shrink-0"
+                  onMouseEnter={() => {
+                    tailTradeTimerRef.current = window.setTimeout(() => setShowTailTradeTooltip(true), 1000);
+                  }}
+                  onMouseLeave={() => {
+                    if (tailTradeTimerRef.current) { clearTimeout(tailTradeTimerRef.current); tailTradeTimerRef.current = null; }
+                    setShowTailTradeTooltip(false);
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setTailTradeEnabled(!tailTradeEnabled)}
+                    className={`flex items-center gap-2 px-2.5 py-1 rounded-full border transition-all duration-200 ${
+                      tailTradeEnabled
+                        ? 'bg-blue-50 border-blue-200 text-blue-700'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span className="text-[11px] font-bold">尾盘交易</span>
+                    <span className={`px-1.5 py-0.5 rounded-lg text-[9px] font-black min-w-[28px] text-center transition-all ${
+                      tailTradeEnabled
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-500 border border-gray-100 shadow-sm'
+                    }`}>
+                      {tailTradeEnabled ? 'ON' : 'OFF'}
+                    </span>
+                  </button>
+                  {showTailTradeTooltip && (
+                    <div className="absolute top-full right-0 mt-2 px-2.5 py-1.5 bg-gray-900 text-white text-[11px] rounded-lg whitespace-nowrap z-50 shadow-lg">
+                      {tailTradeEnabled
+                        ? '尾盘交易：T日信号+T+1收盘成交'
+                        : '标准口径：T日信号+T+1开盘成交'}
+                      <div className="absolute bottom-full right-3 border-4 border-transparent border-b-gray-900" />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

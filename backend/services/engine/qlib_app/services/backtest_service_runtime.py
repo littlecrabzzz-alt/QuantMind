@@ -51,6 +51,12 @@ from backend.services.engine.qlib_app.utils.strategy_adapter import StrategyAdap
 from backend.services.engine.qlib_app.utils.structured_logger import (
     StructuredTaskLogger,
 )
+from backend.shared.ashare_lab_bridge import (
+    BridgeConfig,
+    BridgeResult,
+    ashare_lab_available,
+    run_signal_backtest,
+)
 from backend.shared.notification_publisher import publish_notification_async
 from backend.shared.utils import normalize_user_id
 from .backtest_service_query import QlibBacktestServiceQueryMixin
@@ -93,6 +99,51 @@ def _qlib_universe(universe):
 
         return read_instruments_file(universe)
     return universe
+
+
+def _ashare_lab_universe(universe) -> str | None:
+    """仅将支持的指数池映射到 ashare-lab 指数代码。"""
+    if not isinstance(universe, str):
+        return None
+    return {
+        "csi300": "000300.SH",
+        "csi500": "000905.SH",
+        "csi800": "000906.SH",
+        "csi1000": "000852.SH",
+    }.get(universe.lower())
+
+
+def _rebalance_days(request, strategy) -> int:
+    kwargs = strategy.get("kwargs", {}) if isinstance(strategy, dict) else {}
+    return int(
+        kwargs.get(
+            "rebalance_days", getattr(request.strategy_params, "rebalance_days", 1)
+        )
+    )
+
+
+def _sample_rebalance_dates(pred_df: pd.DataFrame, n: int) -> pd.DataFrame:
+    if n <= 1:
+        return pred_df
+    dates = pred_df.index.get_level_values("datetime")
+    return pred_df.loc[dates.isin(dates.unique().sort_values()[::n])]
+
+
+def _run_ashare_lab_vectorized(
+    pred_df, request, strategy, commission, transfer_fee
+) -> BridgeResult:
+    return run_signal_backtest(
+        _sample_rebalance_dates(pred_df, _rebalance_days(request, strategy)),
+        request.start_date,
+        request.end_date,
+        config=BridgeConfig(
+            initial_capital=request.initial_capital,
+            topk=request.strategy_params.topk,
+            universe=_ashare_lab_universe(request.universe),
+            commission=commission,
+            transfer=transfer_fee,
+        ),
+    )
 
 
 class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
@@ -576,7 +627,7 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                     if isinstance(strategy_signal, (pd.DataFrame, pd.Series)):
                         # step 引擎：qlib 策略已用 get_step_time(step, shift=1) 实现一天滞后，
                         # 信号层只补剩余 (signal_lag_days - 1) 天，避免双重滞后。
-                        # 向量化引擎不经过这里（走 _materialize_signal_dataframe 完整滞后）。
+                        # ashare-lab 也内置一天滞后，物化时只补剩余天数。
                         residual_lag = max(
                             0, int(getattr(request, "signal_lag_days", 1) or 0) - 1
                         )
@@ -729,91 +780,57 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                 use_vect = False
                 task_log.info(
                     "vectorized_safety_gate",
-                    "极速引擎尚未复现整手、最低佣金及成交价规则，已退回 step 模式",
+                    "ashare-lab 不可用或股票池不是支持的指数，已退回 step 模式",
                     strategy_type=request.strategy_type,
                 )
             task_log.info(
                 "engine_mode",
                 "回测引擎模式",
                 use_vectorized=use_vect,
-                mode="vectorized" if use_vect else "step",
+                mode="ashare-lab" if use_vect else "step",
                 safety_gate_applied=True,
             )
 
             if use_vect:
-                task_log.info("vectorized_start", "启动驻留内存的极速向量化回测引擎")
-                from backend.shared.vectorized_backtest.engine import (
-                    VectorizedBacktestEngine,
-                    VectorizedBacktestConfig,
+                task_log.info(
+                    "vectorized_start",
+                    "启动 ashare-lab 次日开盘整手撮合引擎",
+                    engine="ashare-lab",
+                    rebalance_days=_rebalance_days(request, strategy),
+                    universe=_ashare_lab_universe(request.universe),
                 )
 
                 if isinstance(signal_data, str) and signal_data.startswith("$"):
                     raise ValueError(
-                        "Vectorized backtest requires pre-computed predictions (DataFrame), not raw feature strings."
+                        "ashare-lab backtest requires pre-computed predictions (DataFrame), not raw feature strings."
                     )
 
-                # 将 SimpleSignal 配置/pred.pkl 物化为 DataFrame 供向量化引擎使用
-                pred_df = self._materialize_signal_dataframe(signal_data, request)
+                # ashare-lab 内置 T+1 成交，物化时不重复应用这一天滞后。
+                pred_df = self._materialize_signal_dataframe(
+                    signal_data, request, execution_lag_days=1
+                )
                 if pred_df.empty or "score" not in pred_df.columns:
                     raise ValueError(
-                        "向量化极速回测信号为空或缺少 score 列，无法执行。"
+                        "ashare-lab 回测信号为空或缺少 score 列，无法执行。"
                     )
                 if signal_meta.get("source") == "pred_pkl":
                     self._enforce_signal_quality(signal_meta, request=request)
 
-                # 只加载信号覆盖的股票池，避免对 universe=all 全市场做全量 D.features 加载
-                pred_instruments = sorted(
-                    set(map(str, pred_df.index.get_level_values("instrument")))
-                )
-                if pred_instruments:
-                    vectorized_universe = pred_instruments[
-                        : int(os.getenv("QLIB_SIGNAL_MAX_INSTRUMENTS", "2000"))
-                    ]
-                else:
-                    vectorized_universe = D.instruments(_qlib_universe(request.universe))
-
-                price_df = D.features(
-                    vectorized_universe,
-                    ["$close"],
-                    start_time=request.start_date,
-                    end_time=request.end_date,
-                )
-
-                # Load $change for limit-up/limit-down detection
-                try:
-                    change_df = D.features(
-                        vectorized_universe,
-                        ["$change"],
-                        start_time=request.start_date,
-                        end_time=request.end_date,
-                    )
-                except Exception:
-                    change_df = None
-
-                cfg = VectorizedBacktestConfig(
-                    initial_capital=request.initial_capital,
-                    # commission 是双向纯佣金；sell_cost 仅在卖出换手上计税费。
-                    commission=comm,
-                    slippage=request.impact_cost_coefficient,
-                    topk=request.strategy_params.topk,
-                    sell_cost=max(0, tax + tf),
-                )
-
-                v_engine = VectorizedBacktestEngine(cfg)
                 v_res = await asyncio.to_thread(
-                    v_engine.run_backtest,
-                    signals=pred_df,
-                    prices=price_df,
-                    changes=change_df,
+                    _run_ashare_lab_vectorized,
+                    pred_df,
+                    request,
+                    strategy,
+                    commission=comm,
+                    transfer_fee=tf,
                 )
 
                 if not v_res.success:
-                    raise RuntimeError(f"向量化极速回测执行失败: {v_res.error_message}")
+                    raise RuntimeError(f"ashare-lab 回测执行失败: {v_res.error_message}")
 
                 execution_time = time.time() - start_time
 
-                # 向量化引擎产出的是组合日收益曲线，回填 benchmark 对比指标与交易统计，
-                # 补齐与 step 引擎一致的呈现（annual_return/sharpe/max_drawdown 已由向量化引擎计算）
+                # 复用组合报告分析，回填 benchmark 对比指标与交易统计。
                 result = await RiskAnalyzer.analyze(
                     portfolio_dict=v_res.portfolio_dict or {"report": pd.DataFrame()},
                     request=request,
@@ -825,7 +842,7 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
                 )
                 task_log.info(
                     "vectorized_done",
-                    "向量化极速回测完成",
+                    "ashare-lab 回测完成",
                     execution_time=f"{execution_time:.2f}",
                 )
             else:
@@ -1207,14 +1224,11 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
         return config
 
     def _is_vectorized_safe(self, request: QlibBacktestRequest, strategy: Any) -> bool:
-        """Formal runs require CnExchange execution semantics.
-
-        Even full TopK is not equivalent: the diagnostic engine uses fractional
-        shares, close prices and proportional fees; CnExchange uses lot sizes,
-        configurable execution prices, minimum fees and volume-based impact.
-        Keep API runs on step until those semantics have verified parity.
-        """
-        return False
+        """仅允许有本地面板的指数池使用 ashare-lab，旧分数股引擎不启用。"""
+        return (
+            _ashare_lab_universe(getattr(request, "universe", None)) is not None
+            and ashare_lab_available()
+        )
 
     def _align_pred_instruments(
         self, pred: pd.DataFrame, request: QlibBacktestRequest
@@ -1301,15 +1315,20 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
         return result.sort_index()
 
     def _materialize_signal_dataframe(
-        self, signal_data: Any, request: QlibBacktestRequest
+        self,
+        signal_data: Any,
+        request: QlibBacktestRequest,
+        *,
+        execution_lag_days: int = 0,
     ) -> pd.DataFrame:
-        """将信号物化为 DataFrame 供向量化极速回测使用。
+        """将信号物化为 DataFrame 供打分回测使用。
 
         SimpleSignal 配置按 kwargs.pred_path 读取；已是 DataFrame/Series 则直接使用。
-        读取 pred_path 时会应用 signal_lag_days 滞后（与 SimpleSignal 内部行为一致），
-        避免向量化路径出现信号超前一天的前视偏差。
+        应用 signal_lag_days 扣除引擎内置成交滞后后的剩余天数。
         """
-        lag_days = int(getattr(request, "signal_lag_days", 1) or 0)
+        lag_days = max(
+            0, int(getattr(request, "signal_lag_days", 1) or 0) - execution_lag_days
+        )
         if isinstance(signal_data, pd.Series):
             frame = signal_data.to_frame("score")
             return self._lag_signal_frame(frame, lag_days) if lag_days > 0 else frame
@@ -1865,7 +1884,7 @@ class QlibBacktestServiceRuntimeMixin(QlibBacktestServiceQueryMixin):
             lag_days = int(getattr(request, "signal_lag_days", 1) or 0)
             # 注意：这里返回「未滞后」的特征信号，滞后由引擎各自补齐——
             # step 引擎由 qlib 策略的 shift=1 + SimpleSignal 残差实现，
-            # 向量化引擎由 _materialize_signal_dataframe 一次性应用完整 lag_days。
+            # ashare-lab 内置次日成交，_materialize_signal_dataframe 只补剩余天数。
             # 若在此处预先滞后，step 路径会与 qlib 的 shift 叠加成双重滞后。
             return df, {
                 "source": "feature_field",
