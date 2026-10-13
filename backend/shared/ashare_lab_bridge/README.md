@@ -56,3 +56,30 @@ run_signal_backtest(signals, start, end, config=BridgeConfig(), data=None, panel
 ## 信号时点
 
 Qlib 的 TopK 策略用 t−1 日的信号在 t 日成交；这里 t 日信号在 t 日收盘后生成、t+1 日开盘成交。两者都只用到 t 日及以前的信息。
+
+## 接入回测服务（2026-10-13 用户确认：合入并接页面，只在 Mac 上用）
+
+### 后端：`backend/services/engine/qlib_app/services/backtest_service_runtime.py`
+
+新增模块级函数：
+- `_ashare_lab_universe(universe) -> str | None`：`csi300→000300.SH`、`csi500→000905.SH`、`csi800→000906.SH`、`csi1000→000852.SH`（大小写不敏感）；其他（`all`、空、文件路径、`pool:` 自定义池）返回 None。
+- `_rebalance_days(request, strategy) -> int`：优先 `strategy["kwargs"]["rebalance_days"]`，其次 `request.strategy_params.rebalance_days`，都没有为 1。
+- `_sample_rebalance_dates(pred_df, n) -> DataFrame`：按 `datetime` 层的唯一日期排序，保留第 0、n、2n… 个日期的全部行；n<=1 原样返回。
+- `_run_ashare_lab_vectorized(pred_df, request, strategy, commission, transfer_fee) -> BridgeResult`：先 `_sample_rebalance_dates(pred_df, _rebalance_days(...))`，再 `run_signal_backtest(..., request.start_date, request.end_date, BridgeConfig(initial_capital=request.initial_capital, topk=request.strategy_params.topk, universe=_ashare_lab_universe(request.universe), commission=commission, transfer=transfer_fee))`。印花税用 ashare-lab 的历史分段（2023-08-28 前 0.1%，之后 0.05%），滑点用 ashare-lab 默认 0.1%。
+
+修改：
+- `_is_vectorized_safe(request, strategy)`：`_ashare_lab_universe(getattr(request, "universe", None))` 非空**且** `ashare_lab_available()` 时返回 True，否则 False。旧的分数股引擎永远不算安全。
+- `use_vect` 分支：不再使用 `VectorizedBacktestEngine` 和 `D.features` 取价；物化 `pred_df` 后调用 `_run_ashare_lab_vectorized`（在线程里跑，`asyncio.to_thread`），失败抛 `RuntimeError`；成功后照旧交给 `RiskAnalyzer.analyze(portfolio_dict=...)`。日志里写明引擎为 ashare-lab、实际调仓日数、股票池指数代码。
+- 没有面板或股票池不是上述指数时，`_is_vectorized_safe` 为 False，回测走原有 step 模式，**行为与改动前完全一致**（云端即此情况）。
+
+### Mac 本地挂载：`deploy/compose.local-dev.yml`（只被 scripts/local-dev.sh 使用，云端不用）
+
+`quantmind` 和 `celery-worker` 两个服务各加：
+- 卷：`${ASHARE_LAB_ROOT:-${HOME}/code/ashare-lab}/src:/opt/ashare-lab/src:ro` 和 `${ASHARE_LAB_ROOT:-${HOME}/code/ashare-lab}/data/panel:/opt/ashare-lab/data/panel:ro`
+- 环境变量：`ASHARE_LAB_SRC=/opt/ashare-lab/src`、`ASHARE_LAB_PANEL=/opt/ashare-lab/data/panel`
+
+`docker-compose.yml`（云端也用）不改。
+
+### 页面：`electron/src/components/backtest/QlibQuickBacktest.tsx`
+
+在"尾盘交易"开关旁边加一个同样样式的开关"A股真实撮合"（默认 OFF，记在 localStorage，键 `qm.quickBacktest.ashareLab`），ON 时请求带 `use_vectorized: true`，OFF 时带 `use_vectorized: false`。悬停提示：ON 时"ashare-lab 引擎：T日信号、T+1开盘成交，整手、涨跌停、停牌、退市按真实规则；仅 Mac 本地且股票池为沪深300/中证500/中证1000 时生效，否则自动按标准引擎运行"；OFF 时"标准引擎（Qlib）"。
