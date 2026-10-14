@@ -2,6 +2,11 @@
 
 Staging only reads the archive. Capped runs leave page checkpoints, never a
 retirement-ready partial extraction. Credentials are obtained lazily in memory.
+CLI stage uses document workers and page-workers (both default to 4): at most
+workers * page_workers model requests are in flight globally (16 by default).
+Quota waits retry only the affected page within its worker; choose both limits
+together to fit the model quota. Direct stage_document calls default to one
+page worker and require a thread-safe client when page_workers > 1.
 """
 
 import argparse
@@ -233,7 +238,14 @@ def _validate(body, sha):
         raise ValueError("invalid_staged_document")
 
 
-def stage_document(root, staging, item, client, *, sleep=time.sleep, max_pages=None):
+def stage_document(
+    root, staging, item, client, *, sleep=time.sleep, max_pages=None, page_workers=1
+):
+    """Checkpoint each finished page; retry missing pages with bounded concurrency.
+
+    Each call runs at most page_workers transcriptions at once. Concurrent
+    document calls multiply that bound by the number of document workers.
+    """
     import pypdf
 
     root, staging = _root(root), _root(staging)
@@ -243,6 +255,8 @@ def stage_document(root, staging, item, client, *, sleep=time.sleep, max_pages=N
     pdf = _pdf(root, sha)
     if max_pages is not None and (type(max_pages) is not int or max_pages < 1):
         raise ValueError("invalid_max_pages")
+    if type(page_workers) is not int or page_workers < 1:
+        raise ValueError("invalid_page_workers")
     staging.mkdir(parents=True, exist_ok=True)
     completed = staging / f"{sha}.json"
     if completed.exists():
@@ -282,9 +296,8 @@ def stage_document(root, staging, item, client, *, sleep=time.sleep, max_pages=N
     else:
         _write_json(meta_path, metadata)
     budget = page_count if max_pages is None else min(page_count, max_pages)
-    pages = []
     with tempfile.TemporaryDirectory(prefix="tushare-ocr-") as temporary:
-        for number in range(1, budget + 1):
+        def transcribe_page(number):
             checkpoint = progress / f"{number}.json"
             if checkpoint.exists():
                 if checkpoint.is_symlink():
@@ -302,7 +315,7 @@ def stage_document(root, staging, item, client, *, sleep=time.sleep, max_pages=N
                         executable = "/opt/homebrew/bin/pdftoppm"
                     if executable is None:
                         raise RuntimeError("pdftoppm is required")
-                    prefix = Path(temporary) / "page"
+                    prefix = Path(temporary) / f"page-{number}"
                     rendered = subprocess.run(
                         [executable, "-f", str(number), "-l", str(number),
                          "-r", "120", "-png", "-singlefile", str(pdf), str(prefix)],
@@ -321,7 +334,16 @@ def stage_document(root, staging, item, client, *, sleep=time.sleep, max_pages=N
                         raise ValueError("invalid_transcription")
                 page = {"page_number": number, "text": text}
                 _write_json(checkpoint, page)
-            pages.append(page)
+            return page
+
+        numbers = range(1, budget + 1)
+        if page_workers == 1:
+            pages = [transcribe_page(number) for number in numbers]
+        else:
+            # Workers persist their own checkpoints even if another page fails.
+            # Shutdown waits for running pages before removing rendered files.
+            with ThreadPoolExecutor(max_workers=page_workers) as pool:
+                pages = list(pool.map(transcribe_page, numbers))
     nonempty = any(p["text"].strip() for p in pages)
     if budget == page_count:
         _write_json(completed, {**metadata, "pages": pages,
@@ -425,6 +447,10 @@ def main():
         command.add_argument("--root", required=True)
         command.add_argument("--staging", required=True)
     stage.add_argument("--workers", type=int, default=4)
+    stage.add_argument(
+        "--page-workers", type=int, default=4,
+        help="pages per document; model concurrency is workers * page-workers",
+    )
     stage.add_argument("--model", default="glm-5.3-flash")
     stage.add_argument("--max-pages", type=int)
     stage.add_argument("--limit", type=int)
@@ -432,9 +458,10 @@ def main():
     if args.command == "ingest":
         print(json.dumps(ingest_staged(args.root, args.staging)))
         return
-    if (args.workers < 1 or (args.limit is not None and args.limit < 1)
+    if (args.workers < 1 or args.page_workers < 1
+            or (args.limit is not None and args.limit < 1)
             or (args.max_pages is not None and args.max_pages < 1)):
-        parser.error("workers, limit and max-pages must be positive")
+        parser.error("workers, page-workers, limit and max-pages must be positive")
     client = GLMClient(model=args.model)
     total = completed = attempted = 0
     cursor = None
@@ -442,7 +469,8 @@ def main():
     def run(item):
         try:
             return stage_document(args.root, args.staging, item, client,
-                                  max_pages=args.max_pages)
+                                  max_pages=args.max_pages,
+                                  page_workers=args.page_workers)
         except Exception as exc:
             logging.error("OCR failed sha=%s error=%s", item["sha256"], type(exc).__name__)
             return None
