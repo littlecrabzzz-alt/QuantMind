@@ -1581,13 +1581,14 @@ def _run_documents_overlapped(
     max_bytes,
     phase_counts,
     timing,
+    phases=("download", "parse"),
 ):
     """Overlap bounded transfers/parsers; keep every DB write here."""
     processed = 0
     download_futures = {}
     parse_futures = {}
-    parse_exhausted = False
-    download_exhausted = False
+    parse_exhausted = "parse" not in phases
+    download_exhausted = "download" not in phases
     download_admitted = 0
     parse_admitted = 0
     parse_completed = 0
@@ -1713,7 +1714,7 @@ def _run_documents_overlapped(
                     phase_counts["download"] += 1
                     processed += 1
                     # A successful transfer may have created a parseable row.
-                    parse_exhausted = False
+                    parse_exhausted = "parse" not in phases
             fill_parses()
             fill_downloads()
         account_state()
@@ -1748,6 +1749,7 @@ def run_documents(
     terminal_retry_max_documents=16,
     overlap_parse_download=False,
     parse_workers=1,
+    phases=None,
 ):
     """Advance bounded phases with optional transfer/parser overlap.
 
@@ -1755,7 +1757,19 @@ def run_documents(
     deadline plus grace. With parallel workers raw results commit before parsing.
     Failed/limited phases remain visible with the existing five-attempt backoff.
     Callers enforce authority; workers=1 preserves the sequential path.
+    phases=None runs both stages; explicit phases restrict work and recovery.
     """
+    if phases is not None and (
+        not isinstance(phases, (tuple, list))
+        or not phases
+        or any(
+            not isinstance(phase, str) or phase not in ("download", "parse")
+            for phase in phases
+        )
+    ):
+        raise ValueError("phases must be a nonempty tuple/list of download/parse")
+    phases = ("download", "parse") if phases is None else tuple(phases)
+    only_phase = phases[0] if len(set(phases)) == 1 else None
     if (
         isinstance(max_documents, bool)
         or not isinstance(max_documents, int)
@@ -1844,7 +1858,11 @@ def run_documents(
             except BlockingIOError:
                 return {"status": "already_running", "processed": 0}
             _claims_setup(db, timing)
-            if max_documents and terminal_retry_max_documents:
+            if (
+                "download" in phases
+                and max_documents
+                and terminal_retry_max_documents
+            ):
                 terminal_recovery = _schedule_terminal_retries(
                     db,
                     now=time.time(),
@@ -1864,13 +1882,14 @@ def run_documents(
                     max_bytes,
                     phase_counts,
                     timing,
+                    phases,
                 )
             parse_turns = 1  # Finish old pending parses before admitting more raw PDFs.
             while (
                 not overlap_parse_download or download_workers == 1
             ) and processed < max_documents and time.monotonic() < deadline:
                 remaining = deadline - time.monotonic()
-                phase = (
+                phase = only_phase or (
                     ("parse" if parse_turns else "download")
                     if download_workers > 1
                     else None
@@ -1881,7 +1900,7 @@ def run_documents(
                 )
                 seconds = _download_budget(max_bytes, remaining) if phase == "download" else remaining
                 jobs = _claim_documents(db, owner, phase, count, seconds, timing)
-                if not jobs and download_workers > 1:
+                if not jobs and download_workers > 1 and only_phase is None:
                     phase = "download" if phase == "parse" else "parse"
                     count = min(
                         download_workers if phase == "download" else 1,
@@ -1891,7 +1910,7 @@ def run_documents(
                     jobs = _claim_documents(db, owner, phase, count, seconds, timing)
                 if not jobs:
                     break
-                if phase == "download":
+                if phase == "download" and download_workers > 1:
                     wave_started = time.monotonic()
                     wave_job_seconds = 0.0
                     # Refill each slot within a short burst, then drain parses.
@@ -1985,6 +2004,11 @@ def run_documents(
                                 **(
                                     {"max_bytes": max_bytes}
                                     if max_bytes != DEFAULT_DOCUMENT_MAX_BYTES
+                                    else {}
+                                ),
+                                **(
+                                    {"download_only": True}
+                                    if "parse" not in phases
                                     else {}
                                 ),
                             )
