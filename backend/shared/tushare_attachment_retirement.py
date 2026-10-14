@@ -56,11 +56,15 @@ def setup(db):
     if db.execute("SELECT 1 FROM sqlite_master WHERE name='attachment_retirement_meta'").fetchone():
         if db.execute("SELECT version FROM attachment_retirement_meta").fetchone()[0] != 1:
             raise ValueError("unsupported_retirement_schema")
+        db.execute("""CREATE TABLE IF NOT EXISTS attachment_retirement_holds(
+            sha256 TEXT PRIMARY KEY, reason TEXT NOT NULL, held_at REAL NOT NULL)""")
         return
     db.executescript("""
         BEGIN IMMEDIATE;
         CREATE TABLE attachment_retirement_meta(version INTEGER NOT NULL);
         INSERT INTO attachment_retirement_meta VALUES(1);
+        CREATE TABLE IF NOT EXISTS attachment_retirement_holds(
+            sha256 TEXT PRIMARY KEY, reason TEXT NOT NULL, held_at REAL NOT NULL);
         CREATE TABLE attachment_retirement_plans(
             plan_sha256 TEXT PRIMARY KEY, root_identity TEXT NOT NULL,
             plan_path TEXT NOT NULL, schema_version INTEGER NOT NULL,
@@ -139,6 +143,71 @@ def _has_ledger(db):
     return db is not None and db.execute(
         "SELECT 1 FROM sqlite_master WHERE name='attachment_retirements'"
     ).fetchone() is not None
+
+
+def _is_held(db, sha):
+    return db is not None and db.execute(
+        "SELECT 1 FROM sqlite_master WHERE name='attachment_retirement_holds'"
+    ).fetchone() is not None and db.execute(
+        "SELECT 1 FROM attachment_retirement_holds WHERE sha256=?", (sha,)
+    ).fetchone() is not None
+
+
+def _hold_shas(sha256_list):
+    shas = list(sha256_list)
+    if any(not isinstance(sha, str) or not re.fullmatch(r"[a-f0-9]{64}", sha)
+           for sha in shas):
+        raise ValueError("invalid_sha")
+    return shas
+
+
+@contextmanager
+def _hold_db(root):
+    from backend.shared.tushare_documents import _document_db
+
+    root = _root(root)
+    root.mkdir(parents=True, exist_ok=True)
+    fd = os.open(root / "documents.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "a+") as stream:
+        try:
+            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise ValueError("retirement_busy") from exc
+        db = _document_db(root)
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
+
+
+def hold_attachments(root, sha256_list, *, reason):
+    shas = _hold_shas(sha256_list)
+    with _hold_db(root) as db:
+        before = db.total_changes
+        db.executemany(
+            "INSERT OR IGNORE INTO attachment_retirement_holds VALUES(?,?,?)",
+            [(sha, reason, time.time()) for sha in shas],
+        )
+        return {"held": db.total_changes - before}
+
+
+def held_attachments(root):
+    with _db(_root(root)) as db:
+        if db is None or not db.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='attachment_retirement_holds'"
+        ).fetchone():
+            return {}
+        return dict(db.execute("SELECT sha256,reason FROM attachment_retirement_holds"))
+
+
+def release_holds(root, sha256_list):
+    shas = _hold_shas(sha256_list)
+    with _hold_db(root) as db:
+        before = db.total_changes
+        db.executemany("DELETE FROM attachment_retirement_holds WHERE sha256=?",
+                       [(sha,) for sha in shas])
+        return {"released": db.total_changes - before}
 
 
 @contextmanager
@@ -305,6 +374,8 @@ def build_plan(root, plan_path, *, max_items=10_000, after=None):
                     continue
                 cursor = f"attachments/{sha}.pdf"
                 try:
+                    if _is_held(db, sha):
+                        raise ValueError("held")
                     if _has_ledger(db) and db.execute(
                         "SELECT 1 FROM attachment_retirements WHERE path=?", (cursor,)
                     ).fetchone():
@@ -486,6 +557,8 @@ def apply_plan(root, plan_path, *, confirm_sha, max_items=1_000):
         stack.callback(db.close)
         pending = []
         for item in items:
+            if _is_held(db, item["sha256"]):
+                raise ValueError("attachment_held")
             row = db.execute("SELECT * FROM attachment_retirements WHERE path=?", (item["path"],)).fetchone()
             if row is not None:
                 if row["plan_sha256"] != confirm_sha or json.loads(row["evidence_json"]) != item:
