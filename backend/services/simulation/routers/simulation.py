@@ -29,10 +29,12 @@ router = APIRouter()
 @router.get("/frozen-paper/accounts")
 async def frozen_paper_accounts(auth: AuthContext = Depends(get_auth_context)):
     """Read-only frozen observations; no order/deploy/account-reset side effects."""
-    from backend.services.simulation.services.frozen_paper_service import get_accounts
+    from backend.services.simulation.services.frozen_paper_service import LedgerUpdating, get_accounts
 
     try:
         return await get_accounts(auth.user_id, auth.tenant_id)
+    except LedgerUpdating as exc:
+        raise HTTPException(status_code=409, detail={"state": "updating", "message": str(exc)}) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except (OSError, RuntimeError, ValueError) as exc:

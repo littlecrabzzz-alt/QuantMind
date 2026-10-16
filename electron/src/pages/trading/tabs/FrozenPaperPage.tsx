@@ -49,6 +49,7 @@ export default function FrozenPaperPage({ tenantId }: { tenantId: string }) {
     const [scheduler, setScheduler] = useState<Schedule | null>(null);
     const [selected, setSelected] = useState('lowvol');
     const [loading, setLoading] = useState(false);
+    const [updating, setUpdating] = useState(false);
     const [error, setError] = useState('');
     const refresh = useCallback(async () => {
         setLoading(true);
@@ -58,13 +59,25 @@ export default function FrozenPaperPage({ tenantId }: { tenantId: string }) {
             const response = await axios.get<{ accounts: Account[]; scheduler?: Schedule }>(
                 `${SERVICE_ENDPOINTS.API_GATEWAY}/simulation/frozen-paper/accounts`,
                 { headers: { 'X-Tenant-ID': tenantId, ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+            setUpdating(false);
             setAccounts(response.data.accounts);
             setScheduler(response.data.scheduler ?? null);
         } catch (failure) {
-            setError(failure instanceof Error ? failure.message : String(failure));
+            if (axios.isAxiosError(failure) && failure.response?.status === 409
+                && failure.response.data?.detail?.state === 'updating') {
+                setUpdating(true);
+            } else {
+                setUpdating(false);
+                setError(failure instanceof Error ? failure.message : String(failure));
+            }
         } finally { setLoading(false); }
     }, [tenantId]);
-    useEffect(() => { void refresh(); }, [refresh]);
+    useEffect(() => {
+        setAccounts([]);
+        setScheduler(null);
+        setUpdating(false);
+        void refresh();
+    }, [refresh]);
     const account = accounts.find(item => item.name === selected);
     const latest = account?.nav?.[account.nav.length - 1];
     const positions = account?.positions?.filter(row => day(row.date) === day(latest?.date)) ?? [];
@@ -78,6 +91,10 @@ export default function FrozenPaperPage({ tenantId }: { tenantId: string }) {
         <Alert type="warning" showIcon message="历史补跑全部标记 replay，不计为历史真实前向证据；不代表策略通过或实盘授权。"
             description="原三个账户保留原账本字节和开户时间；其余账户使用本次真实创建时间，历史重放单独记录。期货为整手、合约乘数、逐日结算和双边移仓费用；不模拟保证金、强平或现金利息。页面只读，与每日命令读取同一份持久账本。" />
         {error && <Alert type="error" message={error} />}
+        {updating && <Alert type="info" showIcon message="账本更新中（updating）"
+            description={latest
+                ? `本次没有读取财务；保留上次成功读取的真实账本（末日 ${day(latest.date)}），不是本次更新结果。可在日更完成后手动刷新。`
+                : '本作用域尚无已读取的真实财务快照；更新期间不生成或填充现金、余额、持仓。可在日更完成后手动刷新。'} />}
         {scheduler && <Alert type={scheduler.state === 'blocked' ? 'error' : 'info'} showIcon
             message={`自动日更：${scheduler.state} · QA可用末日 ${scheduler.usable_date || '未就绪'}`}
             description={`UTC ${scheduler.wall_clock_utc || scheduler.checked_at}；上海 ${scheduler.wall_clock_shanghai || '未知'}；due=${String(scheduler.due)} ${scheduler.due_reason || ''}；来源QA ${scheduler.source_checked_at || '尚未发布'}；${scheduler.reasons?.join('；') || '逐户状态如下，不代表八户全部通过。'}${scheduler.fundamentals?.mode === 'pinned' ? `；PIT固定截至 ${scheduler.fundamentals.as_of}：${scheduler.fundamentals.lag_note}` : ''}`} />}

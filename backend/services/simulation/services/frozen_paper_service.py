@@ -1,6 +1,8 @@
 """Owner-scoped ashare ledgers, authorized through native strategy_storage versions."""
 from __future__ import annotations
 
+import asyncio
+import fcntl
 import hashlib
 import json
 import os
@@ -41,7 +43,7 @@ async def validate_bindings(bindings: dict, user_id: str, tenant_id: str, names=
     if bindings.get("user_id") != str(user_id) or bindings.get("tenant_id") != str(tenant_id):
         raise PermissionError("Frozen-paper owner/tenant does not match authenticated scope")
     storage = get_strategy_storage_service()
-    current_hash = runtime._source_hash()
+    current_hash = await asyncio.to_thread(runtime._source_hash)
     for name in names or runtime.ACCOUNTS:
         binding = bindings.get("accounts", {}).get(name)
         if not binding:
@@ -66,8 +68,30 @@ async def validate_bindings(bindings: dict, user_id: str, tenant_id: str, names=
     return bindings
 
 
+class LedgerUpdating(RuntimeError):
+    """The writer owns the ledger; no financial snapshot was read."""
+
+
+def _snapshot_if_available(runtime, root):
+    try:
+        lock = (root / ".paper.lock").open("rb")
+    except FileNotFoundError:
+        specs = runtime.frozen_specs()
+        return {"accounts": [{"name": name, "state": "not_initialized",
+                              "spec": specs[name]} for name in runtime.ACCOUNTS],
+                "scheduler": None}
+    with lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise LedgerUpdating("Ledger update in progress; no financial snapshot was read") from exc
+        # Retain this shared lock while the existing reader validates every seal.
+        # Its nested shared lock cannot race an exclusive commit.
+        return runtime.snapshot(root)
+
+
 async def get_accounts(user_id: str, tenant_id: str) -> dict:
-    runtime = paper_runtime()
+    runtime = await asyncio.to_thread(paper_runtime)
     root = scoped_ledger_root(user_id, tenant_id)
     binding_path = root / "bindings.json"
     if not binding_path.exists():
@@ -76,7 +100,7 @@ async def get_accounts(user_id: str, tenant_id: str) -> dict:
                 "disclaimer": runtime.DISCLAIMER, "trading_permission": False}
     bindings = json.loads(binding_path.read_text())
     await validate_bindings(bindings, user_id, tenant_id)
-    view = runtime.snapshot(root)
+    view = await asyncio.to_thread(_snapshot_if_available, runtime, root)
     for item in view["accounts"]:
         identity = item.get("identity")
         if identity and (identity.get("owner") != {"user_id": str(user_id), "tenant_id": str(tenant_id)} or

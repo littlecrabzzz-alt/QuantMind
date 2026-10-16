@@ -153,6 +153,10 @@ not_due 不证明已完成日更。延迟和首次补跑都标 replay；只有�
 只接受旧/新哈希恢复；代码、参数、输入、现金/NAV/持仓/成交/费用/目标/信号前缀漂移
 拒绝写入。API 只读不恢复事务：`GET /api/v1/simulation/frozen-paper/accounts`，
 模拟交易“冻结纸面观察”页显示同一八户账本及精确阻断原因，不造余额。
+读取先校验原生身份，再在线程中以非阻塞共享锁获取已封存快照；日更持有独占锁时，
+立即返回 HTTP 409、`detail.state=updating`，不读取半提交财务、不延长代理超时或重试。
+页面明确显示更新中并保留同作用域上次成功读取的真实财务；首次尚无快照时不填零。
+其它服务请求不等待账本锁；写入结束后手动刷新仍按原 seal/身份检查读取。
 CLI/native async run/API 均通过 strategy_storage 校验真实 owner/tenant、strategy ID、
 frozen_source_id、runtime_code_sha256 和 strategy_code_sha256。
 源码选择的 assembly hash 不等于实际扩展后的运行时代码哈希。

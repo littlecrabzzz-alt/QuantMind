@@ -43,3 +43,62 @@ def test_native_owner_tenant_and_registered_code_are_required(monkeypatch):
     row["parameters"]["trading_permission"] = True
     with pytest.raises(PermissionError, match="identity/tenant"):
         asyncio.run(service.validate_bindings(bindings, "owner", "tenant-a"))
+
+
+def test_snapshot_writer_busy_is_nonblocking_and_never_reads_financials(tmp_path):
+    import fcntl
+
+    calls = []
+    runtime = SimpleNamespace(snapshot=lambda root: calls.append(root))
+    path = tmp_path / ".paper.lock"
+    path.touch()
+    with path.open("rb") as writer:
+        fcntl.flock(writer, fcntl.LOCK_EX)
+        with pytest.raises(service.LedgerUpdating):
+            service._snapshot_if_available(runtime, tmp_path)
+    assert calls == []
+
+
+def test_snapshot_retains_shared_lock_during_seal_validation(tmp_path):
+    import fcntl
+
+    path = tmp_path / ".paper.lock"
+    path.touch()
+    expected = {"accounts": []}
+
+    def snapshot(root):
+        with path.open("rb") as writer:
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(writer, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return expected
+
+    assert service._snapshot_if_available(SimpleNamespace(snapshot=snapshot), tmp_path) is expected
+
+
+def test_snapshot_runs_off_event_loop_after_native_authorization(tmp_path, monkeypatch):
+    import json
+    import threading
+
+    root = service.scoped_ledger_root("owner", "tenant-a", tmp_path)
+    root.mkdir()
+    (root / "bindings.json").write_text(json.dumps({"owner": "binding"}))
+    (root / ".paper.lock").touch()
+    loop_thread = threading.get_ident()
+    authorized = []
+
+    async def validate(bindings, user_id, tenant_id):
+        authorized.append((bindings, user_id, tenant_id))
+
+    def snapshot(directory):
+        assert authorized
+        assert directory == root
+        assert threading.get_ident() != loop_thread
+        return {"accounts": []}
+
+    monkeypatch.setattr(service, "ledger_root", lambda: tmp_path)
+    monkeypatch.setattr(service, "paper_runtime", lambda: SimpleNamespace(
+        snapshot=snapshot, DISCLAIMER="existing observation disclosure"))
+    monkeypatch.setattr(service, "validate_bindings", validate)
+    assert asyncio.run(service.get_accounts("owner", "tenant-a")) == {
+        "accounts": [], "disclaimer": "existing observation disclosure",
+        "trading_permission": False}
