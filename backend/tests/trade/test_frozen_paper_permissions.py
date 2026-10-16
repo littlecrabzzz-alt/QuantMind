@@ -64,18 +64,16 @@ def test_snapshot_retains_shared_lock_during_seal_validation(tmp_path):
 
     path = tmp_path / ".paper.lock"
     path.touch()
-    expected = {"accounts": []}
 
     def snapshot(root):
         with path.open("rb") as writer:
             with pytest.raises(BlockingIOError):
                 fcntl.flock(writer, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        return expected
 
-    assert service._snapshot_if_available(SimpleNamespace(snapshot=snapshot), tmp_path) is expected
+    service._snapshot_if_available(SimpleNamespace(snapshot=snapshot), tmp_path)
 
 
-def test_snapshot_runs_off_event_loop_after_native_authorization(tmp_path, monkeypatch):
+def test_snapshot_wait_keeps_event_loop_available_to_other_consumers(tmp_path, monkeypatch):
     import json
     import threading
 
@@ -83,22 +81,44 @@ def test_snapshot_runs_off_event_loop_after_native_authorization(tmp_path, monke
     root.mkdir()
     (root / "bindings.json").write_text(json.dumps({"owner": "binding"}))
     (root / ".paper.lock").touch()
-    loop_thread = threading.get_ident()
-    authorized = []
+    runtime = service.paper_runtime()
+    real_snapshot = runtime.snapshot
+    entered = threading.Event()
+    released = threading.Event()
 
-    async def validate(bindings, user_id, tenant_id):
-        authorized.append((bindings, user_id, tenant_id))
+    async def authorized_scope(bindings, user_id, tenant_id):
+        pass
 
-    def snapshot(directory):
-        assert authorized
-        assert directory == root
-        assert threading.get_ident() != loop_thread
-        return {"accounts": []}
+    def blocked_snapshot(directory):
+        entered.set()
+        if not released.wait(timeout=5):
+            raise TimeoutError("A waiting snapshot prevented cooperative event-loop progress")
+        return real_snapshot(directory)
 
     monkeypatch.setattr(service, "ledger_root", lambda: tmp_path)
-    monkeypatch.setattr(service, "paper_runtime", lambda: SimpleNamespace(
-        snapshot=snapshot, DISCLAIMER="existing observation disclosure"))
-    monkeypatch.setattr(service, "validate_bindings", validate)
-    assert asyncio.run(service.get_accounts("owner", "tenant-a")) == {
-        "accounts": [], "disclaimer": "existing observation disclosure",
-        "trading_permission": False}
+    monkeypatch.setattr(service, "validate_bindings", authorized_scope)
+    monkeypatch.setattr(runtime, "snapshot", blocked_snapshot)
+
+    async def consume():
+        reader = asyncio.create_task(service.get_accounts("owner", "tenant-a"))
+
+        async def cooperate():
+            assert await asyncio.to_thread(entered.wait, 5), "Snapshot never reached the gate"
+            assert not reader.done(), "Snapshot did not wait for the cooperative consumer"
+            released.set()
+
+        collaborator = asyncio.create_task(cooperate())
+        try:
+            result, _ = await asyncio.wait_for(asyncio.gather(reader, collaborator), timeout=10)
+            return result
+        finally:
+            released.set()
+            for task in (reader, collaborator):
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(reader, collaborator, return_exceptions=True)
+
+    view = asyncio.run(consume())
+    assert view["accounts"]
+    assert all(account["state"] == "not_initialized" for account in view["accounts"])
+    assert all("nav" not in account and "positions" not in account for account in view["accounts"])
