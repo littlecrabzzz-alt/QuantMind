@@ -8,8 +8,8 @@ M="${QM_OCR_M:-$HOME/Library/Application Support/QuantMind/maintenance/pdf-text-
 RT="${QM_OCR_RT:-$HOME/Library/Application Support/QuantMind/tushare-client}"
 ROOT="${QM_OCR_ROOT:-$HOME/Library/Application Support/QuantMind/tushare}"
 ST="${QM_OCR_ST:-$HOME/Library/Application Support/QuantMind/maintenance/ocr-staging}"
-STAGE="${QM_OCR_STAGE:-timeout 86400 .venv/bin/python -u -m backend.shared.tushare_document_ocr stage --root $ROOT --staging $ST --workers 1 --page-workers 2 --model glm-5.3-flash}"
 BACKOFF="${QM_OCR_BACKOFF:-1800}"
+STAGE="${QM_OCR_STAGE:-timeout 86400 .venv/bin/python -u -m backend.shared.tushare_document_ocr stage --root \"$ROOT\" --staging \"$ST\" --workers 1 --page-workers 2 --model glm-5.3-flash}"
 PAUSE="${QM_OCR_PAUSE:-60}"
 PARSE_PATTERN="${QM_OCR_PARSE_PATTERN:-run_parse.sh}"
 while pgrep -f "$PARSE_PATTERN" >/dev/null; do sleep 300; done
