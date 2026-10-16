@@ -65,6 +65,9 @@ electron/out/
 .antigravityignore
 .workbuddy/
 .claude/settings.local.json
+# 本机助手循环状态与锁，不作为项目配置提交
+/.pi-loop.json
+/.pi-loop.json.lock
 
 # ==============================================================================
 # 4. Data, ML & Results
@@ -267,6 +270,8 @@ backend/scripts/evaluate_signal_factors.py
 scripts/cos-publish/
 REFACTOR_PLAN.md
 /.playwright-cli/
-/output/playwright/
+# 本地研究运行产物和诊断附件保留在磁盘，不纳入源码仓库
+/output/
+/diagnostics/
 /.local-dev/
 /docker-compose.override.yml
