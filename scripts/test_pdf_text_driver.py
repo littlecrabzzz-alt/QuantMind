@@ -18,7 +18,13 @@ DRIVER = Path(__file__).resolve().parents[1] / "scripts" / "pdf_text_driver.sh"
 CLIENT = Path.home() / "Library/Application Support/QuantMind/tushare-client"
 
 FIXTURE_STAGE = """#!/bin/sh
-# Fixture "python": prints a chosen stage marker per invocation cycle.
+# Fixture "python": prints a chosen stage marker per invocation cycle; when
+# invoked as the maintenance entry it exits with QM_FIX_MAINTAIN_RC (default 0).
+case "$*" in
+  *maintain.py*)
+    exit "${QM_FIX_MAINTAIN_RC:-0}"
+    ;;
+esac
 if [ ! -f "$QM_FIX_DIR/.cycle" ]; then
   touch "$QM_FIX_DIR/.cycle"
   printf '%s\\n' "$QM_FIX_FIRST"
@@ -29,6 +35,7 @@ fi
 
 
 class DriverCycle(unittest.TestCase):
+
     def fixture_home(self):
         home = tempfile.mkdtemp(prefix="qm driver test dir ")
         self.addCleanup(lambda: subprocess.run(["rm", "-rf", home], check=False))
@@ -96,6 +103,45 @@ class DriverCycle(unittest.TestCase):
         self.assertIn("no more candidates",
                       Path(home, "maintain.log").read_text(encoding="utf-8"))
 
+
+    def drain_home(self, maintain_rc=None):
+        home = self.fixture_home()
+        fixture_py = Path(home, "fake python bin")
+        fixture_py.write_text(FIXTURE_STAGE, encoding="utf-8")
+        fixture_py.chmod(fixture_py.stat().st_mode | stat.S_IXUSR)
+        Path(home, "maintain.py").write_text("# stub for fixture driver\n")
+        staging = Path(home, "staging with space")
+        staging.mkdir()
+        (staging / "abc.json").write_text("{}", encoding="utf-8")
+        env = self.base_env(home)
+        env.update({"QM_OCR_PY": str(fixture_py), "QM_FIX_DIR": home,
+                    "QM_FIX_FIRST": "stage=no_candidates attempted=0 completed=0 total_pages=0"})
+        if maintain_rc is not None:
+            env["QM_FIX_MAINTAIN_RC"] = str(maintain_rc)
+        return env, home
+
+    def test_final_drain_ingests_pending_staged_before_exit(self):
+        env, home = self.drain_home()
+        proc = subprocess.run(["zsh", str(DRIVER)], env=env,
+                              capture_output=True, text=True, timeout=60)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        maintain = Path(home, "maintain.log").read_text(encoding="utf-8")
+        self.assertIn("final drain start (1 staged)", maintain)
+        self.assertIn("final drain done", maintain)
+        self.assertTrue(Path(home, ".last-maintain").exists())
+
+    def test_final_drain_busy_keeps_retrying_instead_of_exiting(self):
+        env, home = self.drain_home(maintain_rc=75)
+        proc = subprocess.Popen(["zsh", str(DRIVER)], env=env,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                proc.communicate(timeout=6)
+        finally:
+            proc.kill()
+            proc.communicate()
+        maintain = Path(home, "maintain.log").read_text(encoding="utf-8")
+        self.assertGreaterEqual(maintain.count("final drain busy/failed"), 2)
 
 if __name__ == "__main__":
     unittest.main()
