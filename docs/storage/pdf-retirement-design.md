@@ -1,8 +1,10 @@
 # Tushare 公告 PDF 附件退役设计与红灯验收
 
-日期：2026-10-10。状态：设计，未实现、未部署、未删除数据。
+日期：2026-10-10（设计轮），当前状态更新：2026-10-16。状态：已实现、已部署并在生产运行——退役/分阶段清理/OCR/分页并发/hold 保护已合入 master（c1ae3c26、c37453fe、d2e81f17、808c66d7、5eb09120），历史批次已退役约 13.7 万 PDF/约 69GB，收据在 `~/Library/Application Support/QuantMind/maintenance/{storage-receipts,pdf-plans}`。下文第 1~9 节为设计轮的历史证据，行号对应当轮源码，保留不改；与现状冲突时以本段与 `coordination/tushare-data/` 记录为准。
 
-本轮只新增本文与 `scripts/test_tushare_attachment_retirement.py`，不修改现有代码，不建分支，不提交，不写协作记录。166 万个、约 1.2T 是任务提供的规模，未读取真实归档核实。节点只读核对为 Darwin/arm64、Mac 主工作树、Docker context `desktop-linux`；已有工作区修改保留。为遵守本单禁止访问真实数据、只新建两个文件的限制，没有执行可能检查部署数据的双端 handoff、worker、tick 或迁移入口。
+当前运行入口（2026-10-16）：常驻驱动 `~/Library/Application Support/QuantMind/maintenance/pdf-text-driver/driver.sh`（仅 OCR staging 循环：有界配额退避+显式 `stage=no_candidates`/`stage=quota_exceeded` 标记；**不自动执行归档维护**）；OCR 引擎 `backend/shared/tushare_document_ocr.py`（pypdf 无法读页数时 pdfinfo 回退、失败保持阻塞不伪造；逐页 checkpoint 在 `maintenance/ocr-staging/<sha>/`，完成件 `<sha>.json` 待 ingest）；归档维护 `pdf-text-driver/maintain.py`（停归档 worker→hold→ingest→退役→恢复 worker）仅在明确授权的维护窗口手动执行；定期报告保护名单 `maintenance/periodic-hold-shas.txt`（10737 项）。
+
+以下为设计轮（2026-10-10）当轮记录：
 
 ## 1. 现有实现与最小扩展
 
