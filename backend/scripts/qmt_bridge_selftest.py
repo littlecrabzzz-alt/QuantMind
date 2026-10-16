@@ -17,7 +17,7 @@
 
 退出码：0=全通；1=有失败；2=配置层就没过（后面无从谈起）。
 
-配套：Windows 侧部署见 ``docs/大QMT真单镜像_部署与上线手册.md`` §三；
+配套：Windows 侧部署见 ``docs/大QMT真单镜像_部署与上线手册.md`` 的「Windows 配置与启动」；
 开箱包用 ``python scripts/export_qmt_bridge_kit.py`` 生成。
 """
 

@@ -1,34 +1,21 @@
-# 可重复运行的简单量化基线
+# API 量化基线流程
 
-本流程通过 QuantMind 正常的本地 API，完成因子目录准备、训练、模型注册、独立推理、含费用事件驱动回测、资金核对和输入留档。不调用交易接口。
+用途：通过本地 QuantMind API 验证因子目录 → 训练 → 模型注册 → 独立推理 → 含费用事件驱动回测 → 账务核对链路。不调用交易接口。本入口执行后才生成输入快照；需要计算前冻结数据与同口径对照时，使用[冻结研究入口](frozen-research-workflow.md)。
 
-## 已验证的本次实验
+## 运行与恢复
 
-2026-09-05 的结果保存在 `results/baseline-20260905/attempt-02/README.md`。
-
-- 训练：2023-01-03 至 2024-12-31；验证：2025-01-06 至 2025-03-31；测试：2025-04-07 至 2025-06-30。
-- L1 的8个价量因子，LightGBM最佳迭代8轮；测试Rank IC约0.056895。
-- 100万元、Top20、每日最多淘汰5只，T+1收盘成交。57个交易日、578笔成交。
-- 净收益6.59697%，沪深300收益9.65722%，收益差为-3.06025个百分点；最大回撤-3.77016%。
-- 输入与模型快照约2.99GiB；原始数据、成功和失败数据库记录全部保留。
-
-这证明研究流程跑通，不证明具有稳定超额收益，也没有实盘验收。
-
-## 运行
-
-在项目根目录运行，使用已配置的本地 QuantMind 服务和管理员账户：
+前置条件：目标 API、管理员账户及标准 CN 数据布局 `data/quantdb`、`db/qlib_data`、`data/training_jobs` 均已配置。确认服务实际使用的数据根，不因源码在 Mac 就假定数据库和数据已迁移。首次留档按实际输入预留空间；原始数据、数据库记录及快照无自动清理。
 
 ```bash
-python3 scripts/run_quant_baseline.py run --output results/my-baseline
+python3 scripts/run_quant_baseline.py run \
+  --api http://127.0.0.1:8000 --output results/my-baseline
 ```
 
-默认用户名为admin；密码交互输入，不写进代码和结果。也可通过 `QM_USERNAME`、`QM_PASSWORD` 或 `QM_TOKEN` 环境变量传入。不要把密码写在共享命令记录中。
+默认用户 `admin`，密码交互输入；也支持 `QM_USERNAME`、`QM_PASSWORD`、`QM_TOKEN`，或 `--session <私有token文件>`。不要在共享命令、Git 或产物中写密码/token。
 
-第一次使用 `config/baseline_cn_l1.json`，之后从输出目录的 `baseline-config.json` 读取已冻结配置。首次网络请求前保存配置哈希与 API 地址；已有 `catalog.json` 则复用原版本。同一命令重跑会恢复既有任务、复用已验证推理和回测，不重复提交已取得ID的任务。修改参数或 API 地址要使用新目录；显式传入不同配置会被拒绝覆盖原实验。旧实验未记录 API 地址时，首次恢复会绑定本次地址，应先确认服务正确。
+首次默认读取 `config/baseline_cn_l1.json`，可用 `--config` 指定。后续从输出目录 `baseline-config.json` 恢复，配置哈希和 API 地址在首次请求前落盘；已有 `catalog.json` 复用原目录版本。改变配置/API 要新建目录；旧实验未记录 API 地址时，首次恢复会绑定本次地址，必须先确认目标。
 
-第一次留档会复制相关输入和产物，预留至少4GB磁盘。`snapshot/`、数据库和原始数据均无自动清理步骤。每次校验都会重新验证保留快照的内容哈希。
-
-各阶段也可单独执行：
+各阶段支持同一 `--api` 和 `--output`：
 
 ```bash
 python3 scripts/run_quant_baseline.py prepare --output results/my-baseline
@@ -40,49 +27,19 @@ python3 scripts/run_quant_baseline.py backtest-status --output results/my-baseli
 python3 scripts/run_quant_baseline.py verify --output results/my-baseline
 ```
 
-`verify`不需要登录。训练/回测失败立即保留任务及日志并停止；解决原因后用新实验目录重试。训练、推理、回测 POST 前先保存 `*-submission-intent.json`，收到响应后保存 `*-submission.json`。若存在意图文件而没有响应，恢复流程会停止，不自动重发。先在平台查明原任务，再将确认的原响应恢复到对应文件；服务端尚无实验幂等键，这只是客户端防重复保护。同一输出目录只运行一个进程。
+`verify` 不登录，但会重新校验保留快照的内容哈希。同一目录仅运行一个进程。失败保留任务与日志，解决原因后在新目录重试；不要删除意图文件来强制重发。
 
-## 本次优化
+## 提交结果不明时
 
-1. 去掉训练入口对PyTorch的强制导入。LightGBM可在现有OSS镜像运行；深度学习仍按需导入真实PyTorch，没有mock回退。
-2. 固定已发布因子版本和8个显式特征；关闭自动筛选、调参、集成和WFA，并限制LightGBM为4线程，不暂停其他容器。
-3. 使用模型注册返回的正式模型ID，验证推理和回测实际使用的模型一致，无预测缺失或模型回退。
-4. 回测通过8000端口的认证代理进入，身份由服务端认证上下文决定。
-5. 保存状态、请求、响应、CSV、实际配置、校验值和输入副本；区分平台注册成功、任务完成和资金核对通过。
-6. 独立核对逐日现金、资产恒等式、期末收益，并另算标准每日收益Sharpe，保留平台原指标供比较。
-7. 输出 `research-decision.json`，区分技术核对通过与研究结论。当前基线固定标为 `needs_validation`，列出缺少同口径对照、独立时期检验和全时段推理重放。该文件是研究报告，不是交易服务的权限开关；盈利或跑赢指数不会自动获得模拟盘资格。
+训练、推理和回测 POST 前保存 `*-submission-intent.json`，取得响应后保存 `*-submission.json`。只有意图、没有响应时，恢复会阻塞，不自动再次 POST。先在目标平台查询原任务，将核实的原响应恢复到对应文件；不能编造响应或借换目录再次提交同一不明任务。服务端没有本实验的幂等键，客户端留档只是防重复保护，不是恰好一次执行保证。
 
-## 训练可信度修正（2026-09-05）
+## 必须核对的产物
 
-- Stacking 复用单模型的逐日截面 RankIC 均值 / 标准差口径；删除用预测值标准差作 ICIR 分母的实现。指标不再随分数缩放而改变，旧 Stacking 指标不能直接用于比较新实验。
-- 构造标签时保留实际结束日期；截面排名标签记录该日所有参与股票的最晚结束日期，避免停牌或稀疏序列使未来价格越过切分边界。主切分、WFA 和 OOF 共用隔离函数，数据不足时不再跳过隔离。
-- WFA 和 OOF 从外层训练历史最后20%的日期另取早停集，拟合集与早停集也隔离。外层评估标签不参与选轮数；小窗口会跳过，不能靠取消隔离维持训练。
-- 修正多日收益备用构造路径，把未来位移放回各股票分组内，防止跨股票串行。
-- 上述修正只影响后续训练；此前的基线、模型、预测和回测产物保留原样。本次未重训全量历史模型。
+- 使用注册返回的正式模型 ID，核对独立推理、回测和保存的模型一致，不以训练任务 ID 或默认解析代替。
+- 保存真实请求/响应、状态、CSV、实际配置、快照和校验值；平台登记、计算完成、账务通过分别记录。
+- 从逐日现金、持仓、资产和费用核对净收益与回撤，另列标准每日净收益 Sharpe，不覆盖平台原指标。口径见[执行账务合同](execution-accounting.md)。
+- `research-decision.json` 区分技术核对与研究结论；当前基线标记 `needs_validation`，不构成模拟/实盘权限开关。历史已查看区间只能作为开发比较；新研究遵守[最近半年保留与冻结合同](frozen-research-workflow.md)。
 
-## 尚未完成的优化
+默认八因子 LightGBM 基线关闭自动筛选、调参、集成和 WFA，使用事件驱动回测。它没有自动提供同口径对照、全时段逐日重放、PIT 与全部历史市场规则证明。WFA 区间若反复用于调参同样属于研究反馈，不能称为最终独立测试；不同资金/执行器的历史收益不能直接拼成一次比较。
 
-本页描述的 API 入口仍在执行后生成快照。新增的[冻结研究入口](frozen-research-workflow.md)在执行前固定数据、代码、配置和镜像，使用隔离容器读取快照，并执行等权/单因子对照及逐日推理重放。两种入口暂未合并，离线研究结果保存在文件中。之前已查看的测试区间应视为研究数据。
-
-向量化回测的持仓漂移与费用口径、RiskGate 卖出和批量额度检查、完整 PIT 与历史交易规则覆盖仍需单独修正和验证，本流程继续使用事件驱动回测。WFA 窗口若用于反复调参，仍属于研究验证数据，不是最终独立测试。
-
-## 中途记录
-
-- 第一轮训练 `train_20260905024617_31a57afb` 因缺少torch失败，记录及配置位于 `results/baseline-20260905/` 和 `data/training_jobs/`。
-- 第二轮 `train_20260905024830_c495aa5e` 完成，平台注册模型ID为 `mdl_cn_train_20260905024830_c495aa5e_89dcf5b4`。
-- 首次独立推理用了训练任务ID，实际通过默认模型解析到了相同模型；原响应保存在 `attempt-02/initial-alias-inference/`，随后以正式模型ID重跑并验证。
-- 直接访问引擎的401、默认user_id不匹配导致的403发生在提交回测前，修正客户端调用后才创建正式回测。
-- 初始请求使用了无效的 `explain.enabled` 字段，平台实际按默认执行验证集SHAP。已保留原请求及实际配置，后续模板改为正确的显式 `enable_shap` 参数。
-
-## 检查
-
-```bash
-python3 -m unittest discover -s scripts -p test_quant_baseline.py
-docker exec -e QM_RESEARCH_TEST_OUTPUT=/data/research-integrity-20260905 quantmind python -m unittest discover -s /app/docker/training -p 'test_*.py'
-```
-
-13项检查通过：包括无PyTorch的真实LightGBM训练/预测、真实双模型Stacking及WFA、逐日ICIR独立重算和缩放不变性、标签日期及稀疏样本隔离、独立早停、费用与现金守恒、初始回撤、配置/API变更保护、丢失响应防重试和研究结论。
-
-本次训练检查日志位于 `results/research-integrity-20260905/training-checks.log`；合成输入、OOF预测、元模型及指标保留在 `data/research-integrity-20260905/`。后续运行请将 `QM_RESEARCH_TEST_OUTPUT` 指向新目录，避免覆盖之前的检查产物。未运行整个项目测试套件、全量新回测或券商端验收。
-
-本工具目前针对标准本地CN目录布局：`data/quantdb`、`db/qlib_data`、`data/training_jobs`。更换数据挂载位置前需要适配快照路径；不要把另一数据目录的快照当成本次运行输入。
+代码变更后的检查入口为 `scripts/test_quant_baseline.py`；真实训练依赖和账务回归需在隔离镜像/新产物目录另行验证，不复用真实基线目录。

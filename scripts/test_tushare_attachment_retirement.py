@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Red acceptance contract; see docs/storage/pdf-retirement-design.md.
+"""PDF retirement safety contract; see docs/tushare-document-storage.md.
 
 Only temporary fixtures. No worker, provider, production archive or migration.
-The proposed module is imported in setUp so pytest can collect every test.
-Until implemented, execution fails with ModuleNotFoundError (never skip/xfail).
+The implementation is imported in setUp; no test touches authoritative data.
 """
 
 import hashlib

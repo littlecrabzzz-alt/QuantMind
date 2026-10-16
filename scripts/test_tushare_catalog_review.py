@@ -11,7 +11,7 @@ class CatalogReview(unittest.TestCase):
     def test_purchased_permissions_use_current_mac_production_evidence(self):
         ledger = json.loads((ROOT / "config/tushare-coverage-ledger.json").read_bytes())
         by_doc = {row["doc_id"]: row for row in ledger["entries"]}
-        evidence_path = "docs/tushare-purchased-permissions-production-20260919.json"
+        evidence_path = "backend/tests/fixtures/tushare/tushare-purchased-permissions-production-20260919.json"
         evidence = json.loads((ROOT / evidence_path).read_bytes())
         expected = {
             "143": "news",
@@ -51,7 +51,7 @@ class CatalogReview(unittest.TestCase):
         for n in (1, 2, 3):
             evidence = json.loads(
                 (
-                    ROOT / f"docs/tushare-catalog-special-review-{n}.evidence.json"
+                    ROOT / f"backend/tests/fixtures/tushare/tushare-catalog-special-review-{n}.evidence.json"
                 ).read_bytes()
             )
             for row in evidence["review"]:

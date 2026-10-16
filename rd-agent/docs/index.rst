@@ -1,34 +1,17 @@
-.. RDAgent documentation master file, created by
-   sphinx-quickstart on Mon Jul 15 04:27:50 2024.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+RD-Agent integration references
+===============================
 
-Welcome to RDAgent's documentation!
-===================================
-
-.. image:: _static/logo.png
-   :alt: RD-Agent Logo
+These are upstream technical references for maintaining the vendored QuantMind
+integration, not a statement that every upstream scenario is enabled. Configure
+and operate the application through the QuantMind repository entry point.
 
 .. toctree::
-   :maxdepth: 3
-   :caption: Doctree:
+   :maxdepth: 2
 
-   introduction
    installation_and_configuration
-   scens/catalog
    project_framework_introduction
-   ui
-   research/catalog
-   development
+   scens/catalog
    api_reference
    policy
 
-   GitHub <https://github.com/microsoft/RD-Agent>
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+Upstream source: https://github.com/microsoft/RD-Agent

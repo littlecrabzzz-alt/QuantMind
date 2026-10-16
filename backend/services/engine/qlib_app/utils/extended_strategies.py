@@ -1227,8 +1227,7 @@ class RedisCrashBuyDipStrategy(DynamicRiskMixin, WeightStrategyBase, RedisLogger
 
         时序约定（与平台回测链路一致：T-1 收盘信号 → T 日开盘成交）：
         本函数在 T 日开盘前调用，因此**只读 T-1 日（prev）为止的数据**，选出的票在
-        T 日开盘买入。旧实现用 T 日自己的收盘数据选股、并依赖不存在的 self.trade_step，
-        结果全年 0 笔成交（详见 docs/A股策略模板_50个设计说明.md §6.15）。
+        T 日开盘买入。钩子合同见 docs/QuantMind策略编写手册_v2.md 的自定义选股钩子。
 
         返回值语义（qlib WeightStrategyBase + OrderGenWOInteract）：
         - None           → 不产生任何委托，维持现有持仓；

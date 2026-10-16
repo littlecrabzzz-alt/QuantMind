@@ -43,8 +43,8 @@ class GeneralRateRefinementTests(unittest.TestCase):
             self.assertIsNone(row['rpm_at_10100'])
 
     def test_exact_frozen_partition_no_omission_or_new_scope(self):
-        baseline = json.loads((ROOT / 'docs/tushare-rate-evidence-32fe472.json').read_bytes())
-        refined = json.loads((ROOT / 'docs/tushare-general-rate-refinement.json').read_bytes())
+        baseline = json.loads((ROOT / 'backend/tests/fixtures/tushare/tushare-rate-evidence-32fe472.json').read_bytes())
+        refined = json.loads((ROOT / 'backend/tests/fixtures/tushare/tushare-general-rate-refinement.json').read_bytes())
         expected = {a for a, r in baseline['apis'].items() if r['rate_class'] == 'points_general_candidate'}
         expected.add('fina_mainbz_vip')
         self.assertEqual(set(refined['apis']), expected)
@@ -57,7 +57,7 @@ class GeneralRateRefinementTests(unittest.TestCase):
             set(baseline['apis']) - expected,
         )
         self.assertNotIn('factor_value', refined['apis'])
-        self.assertEqual(refined['baseline_report_sha256'], hashlib.sha256((ROOT / 'docs/tushare-rate-evidence-32fe472.json').read_bytes()).hexdigest())
+        self.assertEqual(refined['baseline_report_sha256'], hashlib.sha256((ROOT / 'backend/tests/fixtures/tushare/tushare-rate-evidence-32fe472.json').read_bytes()).hexdigest())
 
     def test_cli_and_tampered_archive_refused(self):
         with tempfile.TemporaryDirectory() as tmp:

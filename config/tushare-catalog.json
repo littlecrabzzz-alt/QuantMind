@@ -4995,7 +4995,7 @@
       "permission_status": "unprobed",
       "coverage_status": "not_ingested",
       "input_field_review": {
-        "evidence": "docs/tushare-listing-extra-intake.md",
+        "evidence": "git:5ecb90288f6da5ac95e3e059e7fb36766a99f0dc:docs/tushare-listing-extra-intake.md",
         "reason": "Documented category codes are parameter values, not input names. Preserve every category and start in contract metadata.",
         "documented_category_starts": {
           "SZ_MARKET": "20041231",

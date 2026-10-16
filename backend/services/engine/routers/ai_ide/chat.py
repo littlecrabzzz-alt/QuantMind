@@ -61,9 +61,9 @@ class KnowledgeBase:
     def __init__(self, project_root: str):
         self.project_root = project_root
         self.doc_paths = [
-            "docs/Qlib内部策略开发规范.md",
-            "docs/QuantMind_152维特征方案规范.md",
-            "docs/Qlib回测API集成指南.md",
+            "docs/QuantMind策略编写手册_v2.md",
+            "docs/Strategy_Lab规范.md",
+            "backend/services/engine/qlib_app/README.md",
         ]
         self._cached_context = ""
         self._cached_at = 0.0

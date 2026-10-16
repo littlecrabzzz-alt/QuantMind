@@ -139,7 +139,7 @@ for _api, _doc, _cap, _axis, _keys in (
     )
     FACTOR_LIBRARY_CONTRACTS[_api] = spec
 FACTOR_LIBRARY_CONTRACTS["factor_list"].update(
-    catalog_note="Historical486 catalog mixed9 explanatory categories with4 real output fields. Parser/catalog correction f024021 is documented in docs/tushare-factor-catalog-schema.evidence.json with original HTML SHA and exact differences. Only the 名称/类型/默认显示/描述 schema table supplies fields; category/formula prose is not schema.",
+    catalog_note="Historical486 catalog mixed9 explanatory categories with4 real output fields. Parser/catalog correction f024021 is documented in backend/tests/fixtures/tushare/tushare-factor-catalog-schema.evidence.json with original HTML SHA and exact differences. Only the 名称/类型/默认显示/描述 schema table supplies fields; category/formula prose is not schema.",
     discovery_gap="factor_name is the actual lookup identifier; no factor_id exists. Snapshot all assets without filters, retain names/case/asset_type/factor_type/factor_desc, and discover values from actual STK rows. Current202-factor/9-category prose is neither a seed list nor a frozen universe.",
     history_scope_gap="List has no date/history filter or valid-from metadata. A snapshot cannot reconstruct old/removed definitions, and history_start must not be sent to this API.",
     saturation_gap="Page says one request returns the entire list but gives no numeric cap.10000 is a local guard, not a provider cap. Optional name/asset/type filters cannot certify the complete universe without separate evidence.",

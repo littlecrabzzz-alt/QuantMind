@@ -110,13 +110,13 @@ class Rates(unittest.TestCase):
         evidence = json.loads(
             (
                 Path(__file__).resolve().parents[1]
-                / "docs/tushare-general-rate-refinement.json"
+                / "backend/tests/fixtures/tushare/tushare-general-rate-refinement.json"
             ).read_bytes()
         )["api_sets"]
         delta = json.loads(
             (
                 Path(__file__).resolve().parents[1]
-                / "docs/tushare-general-rate-refinement.json"
+                / "backend/tests/fixtures/tushare/tushare-general-rate-refinement.json"
             ).read_bytes()
         )["catalog_delta_review"]
         self.assertEqual(

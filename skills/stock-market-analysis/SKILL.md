@@ -94,11 +94,11 @@ curl -s -H "$AUTH" "$BASE/api/v1/market-analysis/tags/by-tag?tag=半导体"
 **每层必须有具体数值、必须展示计算公式**，不做泛泛之谈。输出格式见第 7 节研报模板。
 
 > **⚡ 跑全流程先读 `REFERENCES/stock-9layer-runbook.md`**（端到端操作手册）：一键取数 `scripts/stock_9layer_fetch.py {code}` →
-> 九层判读模板 → 跨层合成 → 报告落盘命令 → 双案例校准（法拉电子/振华科技）→ 红线清单。设计原则看 design doc，执行标准看 runbook。
+> 九层判读模板 → 跨层合成 → 报告落盘命令 → 红线清单。框架与执行规则分开读取，不把历史个股案例作为当前证据。
 
 > 两个特化子方法（2026-08 集成）：
-> - **L4b 订单微结构**：按《L2 微观结构因子系统化分析报告》判 IC 方向 + 计算个股 vs 全市场**截面分位**。铁律：VPIN 族是正 IC（高位偏多，别当毒性利空）、vol_persistence/toxicity_persistence 是负 IC（高位偏空）、L2 是 T+5/T+10 持续信号（看状态分位而非单日变化）。
-> - **L7 新闻七维**：按 [[news-sentiment-research]] + `docs/news_sentiment_deep_report.md` §13 做**三步纵深**——①直接消息判定（无则明写）→ ②相关行业归类（禁止冒充个股消息）→ ③21 条规律对照打分（来源/时段/多篇/首日动量/反转/标签/板块）→ 输出明确新闻面结论。
+> - **L4b 订单微结构**：按本技能和 runbook 的因子方向计算个股相对全市场截面分位，不依赖历史研报作为当前输入。正文阈值是分析规则，不是本次已验证结果。
+> - **L7 新闻七维**：按 [[news-sentiment-research]] 的单股新闻面三步纵深——①直接消息判定（无则明写）→ ②相关行业归类（禁止冒充个股消息）→ ③来源/时段/多篇/首日动量/反转/标签/板块证据对照，输出明确新闻面结论。
 
 ### 3.1 数据采集（先全量拉取，再按需深挖）
 
@@ -141,8 +141,8 @@ for f in ["vol_persistence","micro_vpin_vol_ratio","flow_buy_amount","flow_sell_
 #       正IC族(vpin_vol_ratio/order_duration/cancel_lifetime/trade_interval_mean/vpin_50/ma_20)≤40%低位=缺资金
 EOF
 
-# ⑦ 新闻三步纵深（L7，方法论见 docs/news_sentiment_deep_report.md §13）
-#    ①直接消息：Huntly 库按标题/正文搜 {名称}/{代码}（窗口 T-2~T）；②相关行业归类；③21 条规律对照
+# ⑦ 新闻三步纵深（方法论见 skills/news-sentiment-research/SKILL.md）
+#    ①直接消息；②相关行业归类；③逐维度核对实际证据
 curl -s -H "$AUTH" "$BASE/api/v1/news/articles?tickers=600519&industries=白酒&limit=30&strong_only=true"
 curl -s -H "$AUTH" "$BASE/api/v1/news/articles?tickers=600519&sort=sentiment_bullish&limit=10"
 ```

@@ -6,7 +6,7 @@ rules; the actual broker / data layer lives in runner/* and engine/*
 (Days 2-3). User code that only references the SDK never imports those
 internals, which is what lets us swap engines later.
 
-Spec: §4 of docs/Strategy_Lab规范.md.
+Spec: docs/Strategy_Lab规范.md, "SDK".
 """
 
 from __future__ import annotations

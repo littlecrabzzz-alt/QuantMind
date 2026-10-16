@@ -13,7 +13,7 @@ read-only mounts, cgroup limits) for defence-in-depth — so we don't need
 to be exhaustive here, just reject the obvious foot-guns and any obvious
 sandbox escape attempt.
 
-Spec: §4.4 + §7.2 of docs/Strategy_Lab规范.md.
+Spec: docs/Strategy_Lab规范.md, "安全与运行边界".
 """
 
 from __future__ import annotations

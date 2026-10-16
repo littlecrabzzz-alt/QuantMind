@@ -1,7 +1,5 @@
-"""一次性生成 prompts/ 提示词库（技能中心数据源）。"""
+"""生成技能中心用户卡片；P 是唯一内容源，不写出重复 Markdown。"""
 import os
-
-os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "prompts"))
 
 # (name, title, category, description, outputs, body)
 P = []
@@ -12,8 +10,8 @@ P.append(("quantbot-init", "QuantBot 环境初始化", "平台运营",
     """请完成 QuantBot（QwenPaw）与 QuantMind 平台的对接检查：
 
 1. 检查技能池：确认 QuantMind 技能（daily-review、stock-research 等）是否已安装到我的工作区；
-2. 如缺失：读取 /quantmind/scripts/quantbot_init.sh 了解安装流程，或提示用户在服务器执行 `bash scripts/quantbot_init.sh --skills-only`（装技能）和 `--persona-only`（装人格）；
-3. 环境自检：确认你能访问后端 API（http://quantmind:8000，内部认证见 AGENTS.md）、能读写 /data/reports/、能 docker exec 到 quantmind 容器；
+2. 如缺失：读取 /quantmind/scripts/quantbot_init.sh 了解安装流程，确认目标 QwenPaw 实例与工作区后，选择 `--skills-only`（装技能）或 `--persona-only`（装人格）；不要默认操作旧服务器；
+3. 环境自检：核对实际 API 地址、认证、数据挂载与工具权限；Mac 是唯一开发源，但运行服务或数据库位置须另行确认，不假定已迁移；
 4. 输出一份环境就绪清单：哪些能力可用、哪些缺失、如何补齐。"""))
 
 # ---- 平台运营 ----
@@ -29,7 +27,7 @@ P.append(("quantmind-deploy", "部署与运维", "平台运营",
     "服务状态报告",
     """我需要部署或排查 QuantMind 平台：{部署新服务器 / 排查部署失败 / 检查服务健康}。
 
-请读取 skills/quantmind-deploy/SKILL.md，按其中对应章节执行；服务健康检查可用 docker compose ps 与各服务 /health 端点。发现问题给出根因和修复步骤，重大变更操作前先向我确认。"""))
+请读取 skills/quantmind-deploy/SKILL.md，先确认目标实例、Compose 项目、env 文件、override 与数据所有权，再用对应参数检查服务状态和 /health。Mac 是唯一开发源；部署是明确指定目标后的可选运维任务，不代表运行数据已迁移。发现问题给出根因和修复步骤，重大变更操作前先向我确认。"""))
 
 P.append(("quantdb-sdk", "QuantDB 数据查询", "平台运营",
     "QuantDB API Key 配置、数据集目录、K线/财务/因子远程查询",
@@ -146,9 +144,9 @@ P.append(("rd-agent-factor-mining", "因子挖掘（RD-Agent）", "策略·因�
 请读取 skills/rd-agent-factor-mining/SKILL.md：先跑 scripts/alpha_agent/factor_pipeline.py --check-env；再用 --direction / --universe / --loops 走一键管线（演化→回测→排名→可选 --explain-top / --export）。universe 支持内置指数与全局自定义池 code。产物落 /data/quantcustom（勿写 quantdb）。耗时长，分段汇报；最后给 Top 因子 IC/Sharpe 与是否 export 成功。"""))
 
 P.append(("model-train-infer-backtest-report", "训练-推理-回测-报告全流程", "策略·因子·模型·回测",
-    "T+N 周期模型训练（13 种模型）→ 批量推理 → 组合回测（阈值+大盘MA+止损）→ 研报输出",
+    "T+N 周期模型训练 → 批量推理 → 组合回测（阈值+大盘MA+止损）→ 研报输出",
     "研报 MD + PDF",
-    """请走完「训练 → 推理 → 回测 → 报告」全流程：模型类型 {lightgbm/xgboost/lstm/transformer 等 13 选 1}，周期 T+{N}，市场 {CN/HK/US/CRYPTO/FUTURES}。
+    """请走完「训练 → 推理 → 回测 → 报告」全流程：模型类型 {先读取 backend/shared/training/request.py 的 ALLOWED_MODEL_TYPES 再选择}，周期 T+{N}，市场 {CN/HK/US/CRYPTO/FUTURES}。
 
 请读取 skills/model-train-infer-backtest-report/SKILL.md 并按流程执行：提交训练 → 等待完成 → 批量推理 → 自定义组合回测（分数阈值 + 大盘 MA 过滤{+止损}）→ 导出研报 MD+PDF。训练耗时长，分段汇报；最后给我 T+N 周期对比与效益分析结论。"""))
 
@@ -175,30 +173,13 @@ P.append(("ibkr-cli", "IBKR 盈透证券操作", "交易",
 请读取 skills/ibkr-cli/SKILL.md 获取 ibkr-cli 用法并执行。涉及真实订单的操作先与我确认要素；输出用表格，注明币种与数据时点。"""))
 
 
-def write(name, title, category, desc, outputs, body):
-    content = "---\n"
-    content += "name: " + name + "\n"
-    content += "title: " + title + "\n"
-    content += "category: " + category + "\n"
-    content += "description: " + desc + "\n"
-    content += "outputs: " + outputs + "\n"
-    content += "---\n\n"
-    content += "> 复制下方提示词到 QuantBot（QwenPaw 控制台）即可使用；`{占位符}` 处替换为你的实际内容。\n\n"
-    content += body + "\n"
-    with open(name + ".md", "w", encoding="utf-8", newline="\n") as f:
-        f.write(content)
-
-
-for item in P:
-    write(*item)
-
-# 同步生成前端数据模块（技能中心提示词卡片数据源，构建期打包进 bundle）
-TS_OUT = os.path.join(os.getcwd(), "..", "electron", "src", "features", "skills-center",
-                      "prompts.generated.ts")
+# 生成前端数据模块，构建期打包进 bundle。
+TS_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "electron",
+                      "src", "features", "skills-center", "prompts.generated.ts")
 lines = [
     "/**",
     " * 本文件由 scripts/gen_prompts.py 自动生成，请勿手工编辑。",
-    " * 源数据：仓库根目录 prompts/*.md（人类可读版本）。",
+    " * 源数据：scripts/gen_prompts.py 的 P 列表。",
     " */",
     "",
     "export interface PromptMeta {",

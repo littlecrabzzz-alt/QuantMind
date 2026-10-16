@@ -3,7 +3,7 @@
 The worker pushes a ``RunResult`` JSON blob to ``qm:lab:result:{run_id}``;
 the API read endpoint pulls + decodes it.
 
-Keeps the schema in lock-step with §5.3.2 of docs/Strategy_Lab规范.md.
+Result contract: docs/Strategy_Lab规范.md, "HTTP".
 """
 
 from __future__ import annotations

@@ -141,7 +141,7 @@ LEGACY_CONNECT_CONTRACTS["hs_const"].update(
         "SZ:0": {"in_date": ["20161205", "20190617"], "out_date": ["20161230", "20191213"]},
         "SZ:1": {"in_date": ["20170703", "20191223"], "out_date": None},
     },
-    observed_probe_evidence="docs/tushare-hs-const-live-probe-20260918.evidence.json",
+    observed_probe_evidence="git:5ecb90288f6da5ac95e3e059e7fb36766a99f0dc:docs/tushare-hs-const-live-probe-20260918.evidence.json",
     row_identity_note="Keep source membership rows distinct by route, entry date, exit date and current/retired flag.",
     rate_note="30/min is the legacy-policy fallback. Tiered policy treats this removed-page leaf as unspecified and caps the current 10100-point account at 300/min with review_required=true; no official endpoint-specific minute limit is claimed.",
     history_gap="The live retired endpoint exposes a finite 2014-2019 snapshot, but does not prove coverage before its first observed row or after 2019. The 2020-2025 gap to stock_hsgt remains explicit.",

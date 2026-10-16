@@ -1,38 +1,35 @@
-# QuantMind 后端核心服务集群
+# 后端开发入口
 
-本项目后端采用收敛后的架构，由 4 个核心服务集群组成，通过核心边界进行物理隔离与资源优化。
+QuantMind 的业务边界保留为四个 FastAPI 服务；当前仓库 `docker-compose.yml` 的 OSS 部署把它们运行在同一个 `quantmind` 容器内，不是四个独立容器。
 
-## 服务概览 (V2 Consolidated)
+| 服务 | 默认端口 | 应用入口 | 负责范围 |
+|---|---|---|---|
+| API | 8000 | `services/api/main.py` | 认证、用户、管理与服务代理 |
+| Engine | 8001 | `services/engine/main.py` | 策略生成、回测、模型推理、投研计算 |
+| Trade | 8002 | `services/trade/main.py` | 订单、成交、账户、模拟撮合与交易控制面 |
+| Stream | 8003 | `services/stream/main.py` | 行情 REST 与 WebSocket 推送 |
 
-| 服务名称 | 端口 | 代码路径 | 整合模块 | 文档 |
-| :--- | :--- | :--- | :--- | :--- |
-| **quantmind-api** | 8000 | `services/api/` | 用户、社区、通知、管理、静态查询、运维回调 | [README](services/api/README.md) |
-| **quantmind-trade** | 8002 | `services/trade/` | 订单管理、持仓核算、模拟撮合、风控核心 | [README](services/trade/README.md) |
-| **quantmind-engine** | 8001 | `services/engine/` | AI 策略生成、模型推理、Qlib 回测引擎 | [README](services/engine/README.md) |
-| **quantmind-stream** | 8003 | `services/stream/` | 实时行情接入、WebSocket 高并发推送 | [README](services/stream/README.md) |
+端口表是代码默认值，不是服务正在运行的证明；本地开发源收敛不代表数据库或服务已迁移。
 
-## 核心架构原则
+## 启动与配置
 
-1.  **统一边界**：根据“业务、资金、算力、I/O”四个维度进行物理隔离。
-2.  **数据隔离**：各服务拥有独立的逻辑边界，严禁跨服务直接操作对方的私有状态。
-3.  **高性能通信**：集群内采用函数级调用，集群间采用 REST API 或消息队列。
-4.  **资源配额**：针对计算引擎等耗能大户，在 Docker 层实施严格的 CPU/内存限制。
+部署、环境准备和数据目录从[根 README](../README.md)进入。`main_oss.py` 根据 `SERVICE_MODE=all/api/engine/trade/stream` 调度上述服务，端口可由 `API_PORT/ENGINE_PORT/TRADE_PORT/STREAM_PORT` 覆盖。
 
-## 开发指南
+`main_oss.main()` 在启动服务前执行 schema 初始化、管理员播种和内置股票池准备，可能写数据库与成员文件；不要把运行它当只读检查。单独启动 `services/*/main.py` 与走 OSS 启动器的初始化行为不同。
 
-请参考项目根目录的 [GEMINI.md](../GEMINI.md) 获取详细的开发规范、环境设置及测试说明。
+- 配置来源由 `shared/config/` 及部署注入环境决定；不要在服务子目录另维护一套数据库凭据。
+- 普通客户端先访问 API 网关，由其转发鉴权上下文；内部调用密钥不得下发桌面端。
+- 保持 `shared/` 为跨服务公共能力；不要通过导入另一服务的私有实现绕过边界。
+- 运行态与资产归属以实际配置、数据库和挂载为准，不沿用旧 GKE 参数表或历史验收结论。
 
-## 共享模块
+## 领域合同与排障入口
 
-*   `shared/`：包含数据库管理器、Redis 客户端、统一配置加载、日志规范等跨服务复用的核心代码。详见 [shared/README.md](shared/README.md)。
-*   `shared/strategy_storage.py`：**统一策略存储服务**（PG + COS），是所有策略 CRUD 的唯一入口。
-*   `shared/schema_registry.py`：统一维护 `services/*` 的 SQLAlchemy schema 注册清单。
+- [Qlib 回测](services/engine/qlib_app/README.md)：异步任务、策略存储和结果查询。
+- [模型推理](services/engine/inference/README.md)：模型选择、数据日与信号生效日。
+- [因子挖掘集成](services/engine/rd_agent/README.md)：RDLoop、市场适配与运行资源。
+- [股票池](shared/stock_pool/README.md)：成员事实源、引用语法和空池语义。
+- [ashare-lab 桥接](shared/ashare_lab_bridge/README.md)：次日开盘撮合与适用条件。
+- [WebSocket 协议](services/stream/ws_core/README.md)：握手、订阅和心跳。
+- [最小联通检查](DOCS/backend_smoke_checklist.md)：只用于已配置实例，不代替业务回归。
 
-## Schema 巡检
-
-```bash
-source .venv/bin/activate
-python backend/scripts/schema_registry_audit.py
-# 可选：同时校验数据库缺失表
-python backend/scripts/schema_registry_audit.py --check-db
-```
+AI-IDE 的 `services/engine/routers/ai_ide/skill_templates/*.md` 由 `skill_engine.py` 加载为运行时模型指令，不是普通开发说明；修改时应按提示模板合同评审并随运行包保留。

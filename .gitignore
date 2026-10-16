@@ -154,7 +154,8 @@ redis/data/appendonlydir/appendonly.aof.2.incr.aof
 *.msi
 # 通达信交易桥 Windows 端（TDXBridge.exe）需要纳入版本管理
 !tools/bridge-windows/dist/TDXBridge.exe
-!tools/bridge-windows/dist/config.yaml
+# 安装后的桥接配置可能含凭据，只保留本机副本
+/tools/bridge-windows/dist/config.yaml
 
 # 桥运行时产物（日志/缓存/执行报告，不提交）
 tools/bridge-windows/data/
@@ -273,5 +274,7 @@ REFACTOR_PLAN.md
 # 本地研究运行产物和诊断附件保留在磁盘，不纳入源码仓库
 /output/
 /diagnostics/
+# 已退役的开发交接目录；旧任务重建的流水账也不进入源码
+/coordination/
 /.local-dev/
 /docker-compose.override.yml

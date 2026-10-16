@@ -1,3 +1,0 @@
-# 09:53Z hourly start
-
-Own worktree codex/glm-continuous-research @ c3be1a3f, initially clean. Local GLM only; stock_scope_hold remains. Root audits runtime/quota and M1, scoped synthetic candidate fixes for physical QuantDB reader and container reconnect identity. M1 agent readonly artifacts under /tmp only; reader agent owns backend/services/engine/data_platform/quantdb_factor_reader.py plus focused synthetic test; root owns research runtime identity helper/tests and docs. No frozen package mutation, training, holdout reads, A operations or service restarts. Initial dual-node handoff failed cloud content-hash command; direct cloud check now idle/drift={} so retry precheck before changes; do not override shared work.

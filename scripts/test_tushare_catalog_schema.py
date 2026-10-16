@@ -26,7 +26,7 @@ def table(rows):
 class CatalogSchema(unittest.TestCase):
     def setUp(self):
         self.evidence = json.loads(
-            (ROOT / "docs/tushare-factor-catalog-schema.evidence.json").read_text()
+            (ROOT / "backend/tests/fixtures/tushare/tushare-factor-catalog-schema.evidence.json").read_text()
         )
         guard = patch(
             "socket.socket.connect", side_effect=AssertionError("offline schema test")

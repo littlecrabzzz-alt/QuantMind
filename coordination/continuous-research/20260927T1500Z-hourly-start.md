@@ -1,3 +1,0 @@
-# 15:00Z hourly start
-
-Mac isolated codex/glm-continuous-research starts 04823512 clean. Continue14:00Z root corrections. Root: live quota/process/queue/source review and audit docs; hourly_quality_0448: /tmp/glm-worker-identity-1500 only, whitelist existing frozen job identity/launch metadata, no results/market; data_research_capabilities: /tmp/glm-financial-bridge-1500 only, synthetic reference identity/ambiguity cases, no actual records. No overlapping code writers, no planned runtime edits/restarts. Stock hold and old exposure retained; no A/holdout/new package/stock compute/cloud release.

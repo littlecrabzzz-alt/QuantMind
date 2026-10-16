@@ -38,12 +38,12 @@ This dataset is built on a raw corpus of ~27K biological protocols and provides 
 
 ## Data Files
 
-The JSON files for each task (train/test) are organized per task. If your fine-tuning pipeline expects local files, place them alongside this README or update paths accordingly.
+The following paths are relative to the downloaded dataset root, not files shipped in this source directory. Prepare the dataset before using them; source and licensing are listed above.
 
-- PQA: [bioprobench/PQA.json](bioprobench/PQA.json), [bioprobench/PQA_test.json](bioprobench/PQA_test.json)
-- ERR: [bioprobench/ERR.json](bioprobench/ERR.json), [bioprobench/ERR_test.json](bioprobench/ERR_test.json)
-- ORD: [bioprobench/ORD.json](bioprobench/ORD.json), [bioprobench/ORD_test.json](bioprobench/ORD_test.json)
-- GEN: [bioprobench/GEN.json](bioprobench/GEN.json), [bioprobench/GEN_test.json](bioprobench/GEN_test.json)
+- PQA: `PQA.json`, `PQA_test.json`
+- ERR: `ERR.json`, `ERR_test.json`
+- ORD: `ORD.json`, `ORD_test.json`
+- GEN: `GEN.json`, `GEN_test.json`
 
 ## Task Definitions and Fields
 

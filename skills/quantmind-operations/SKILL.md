@@ -22,7 +22,7 @@ description: "QuantMind 平台运营操作技能 — 覆盖模型训练、模型
 
 # QuantMind 运营操作技能
 
-QuantMind 量化平台的完整运营操作指南。所有 API 都通过 API 网关（默认 `http://127.0.0.1:8000` 或 `http://192.168.31.68:3080`）访问，统一加 `/api/v1` 前缀。
+QuantMind 平台运营 API 操作指南。请求统一加 `/api/v1` 前缀；地址取目标实例实际配置。同网络 QuantBot 示例为 `http://quantmind:8000`，宿主机端口不能照抄旧服务器。Mac 是唯一开发源，运行服务及数据库是否迁移须另行核实；数据同步、训练和服务变更只在已授权目标执行。
 
 ## 认证
 
@@ -58,7 +58,7 @@ curl -s -H "$AUTH" "$BASE/api/v1/models/feature-catalog?include_coverage=true"
 curl -s -H "$AUTH" "$BASE/api/v1/admin/models/feature-catalog"
 ```
 选择特征 key 列表（如 `["mom_ret_5d", "vol_std_20"]`）或按类别（`feature_categories`）。
-特征类别由后端特征目录**动态生成**，随 QuantDB `l1_factors` 数据版本变化（示例 version `20260831` 返回 10 类 110 特征：`momentum` / `fundamental` / `money_flow` / `style` / `technical` / `turnover` / `concept` / `volatility` / `chip` / `industry`）。**先读接口返回的 `categories[].id`，不要硬编码类别清单。**
+特征类别由后端特征目录动态生成，随 QuantDB 数据版本变化。先读接口返回的 `categories[].id` 与覆盖统计，不硬编码类别清单、数量或历史版本结果。
 
 ### 1.2 训练目标（定义 T+N 标签口径）
 - `target_horizon_days`：预测周期（T+1 / T+5 / T+20 等）
@@ -100,10 +100,7 @@ curl -s -X POST "$BASE/api/v1/models/run-training" -H "$AUTH" -H "$CT" -d '{
   "deploy_to_production": false
 }'
 ```
-**支持的 model_type（13 种，以 `backend/shared/training/request.py::ALLOWED_MODEL_TYPES` 为准）**：
-- 树/线性：`lightgbm` / `xgboost` / `catboost` / `linear` / `random_forest`
-- 深度学习：`gru` / `lstm` / `alstm` / `transformer` / `tabnet` / `tcn` / `nativetft`
-- 其他：`mlp`（sklearn 实现）
+**支持的 `model_type`**：提交前读取 `backend/shared/training/request.py::ALLOWED_MODEL_TYPES`，数量及名称以当前代码为准；目标实例还需具备对应依赖和硬件，不能由白名单推断已经端到端验收。
 - ⚠️ `hybrid_gru_tree` 已剔除（QLIB map 无实现），**勿再传**（会被 422 拒绝/落入不支持）。
 
 **ensemble 取值**：`none` / `stacking` / `blending` / `voting`（多模型训练时生效）

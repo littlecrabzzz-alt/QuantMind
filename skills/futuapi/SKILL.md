@@ -216,7 +216,7 @@ ret, data = trd_ctx.order_list_query(
 | 技术指标 / MA / MACD / RSI / KDJ / BOLL | `references/indicators.md` |
 | 榜单 / 财报日历 / 股息 / 产业链 / 宏观 / FedWatch / 热力图 | `references/rankings-calendar.md` |
 | 交易 / 下单 / 撤单 / 改单 / 持仓 / 资金 / 订单 / 组合下单 | `references/trade-commands.md` |
-| 期货 | `references/futures-trading.md`（完整文档见 `docs/FUTURES_TRADING.md`） |
+| 期货 | `docs/FUTURES_TRADING.md`（合约、账户、下单与撤单；必须使用 `OpenFutureTradeContext`） |
 | 加密货币 / BTC / ETH | `references/crypto-commands.md` |
 | 订阅 / 推送 | `references/subscribe-push.md` |
 | 分析框架（财报点评/持仓诊断/选股排序） | `references/analysis-frameworks.md` |

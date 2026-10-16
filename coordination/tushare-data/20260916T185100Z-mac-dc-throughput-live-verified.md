@@ -1,6 +1,0 @@
-# DC fanout throughput improvement verified live
-- Mac UTC2026-09-16 18:51; native PID98801 live; master8f15d9c6. Latest dual-node handoff passed with6677 files, source digest de35f50d7be794a94044bcef08c4219ad4994760c7634e2eae76cf7326f46627.
-- First production batch after graceful upgrade: updated_at18:50:22.175598Z, requests292, elapsed90.044s. Same batch resumed dc_indices parent d102b1459274db5e4a81f051a2753a391b4472da90581412b97d15a0864a1c4e into1050 children, universe_complete=false; no error_type. This proves DC partition recovery no longer consumes the entire batch without HTTP work, unlike the preceding0-request DC cycles. Not a claim of500 actual calls/minute or full-history completion.
-- Full result saved outside Git at ~/Library/Application Support/QuantMind/tushare-dc-projection-live-20260917.json. Offline equal-set benchmark and32 passing tests documented in prior record.
-- Archive ownership remains verified on lzydeMBP.lan, native ENABLED restored, cloud fenced and retired collectors stopped. Do not restart old migration LaunchAgents or overwrite local archive with cloud copies.
-- Continue full local acquisition; remaining application read-root cutovers and cloud full-archive/backup reclamation still need concrete runtime acceptance. This turn prioritized the demonstrated sustained-intake bottleneck before changing application services.

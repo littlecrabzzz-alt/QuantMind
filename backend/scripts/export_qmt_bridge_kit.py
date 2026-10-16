@@ -134,7 +134,7 @@ big-convert 版本：{version}
   详细手册：docs/大QMT真单镜像_部署与上线手册.md
   Redis 被券商沙箱拦截 → 可换 BIGQMT_ZMQ_DRYRUN.py 入口（QMT 侧需 pyzmq；
   注意 QuantMind 客户端侧目前只走 redis 传输，换 ZMQ 还需客户端侧接线，
-  属未验证路径，见手册 §三.4）
+  属未验证路径，见手册「Windows 配置与启动」的 Redis/ZMQ 边界）
 """
 
 

@@ -24,6 +24,8 @@ description: "TDX 通达信实盘交易 + 模拟/实盘全链路实时监控。�
 
 QuantMind 交易执行链路的**操作 + 监控手册**：从模型推理信号到通达信真实下单、再到交易记录与持仓的完整闭环，以及供 AI 周期性巡检的一键状态快照。
 
+**当前环境边界**：旧内网 TDX 桥已下线。本技能保留可选重新接入后的操作说明，不证明任何桥、账号或自动交易循环在线。先读仓库 `/quantmind/docs/integrations/tdx-bridge.md`（本地为 `docs/integrations/tdx-bridge.md`），核实真实配置与授权。Mac 是唯一开发源，Windows 仅作可选交易运行节点；不要默认恢复旧桥或启动自动交易。
+
 **定位**：`[[simulation-trading]]` 是模拟盘操作（下单/持仓/账户），本技能是**实盘（通达信桥）操作 + 模拟/实盘全链路监控**——链路任何一环出问题，先跑状态快照定位，再按手册处置。部署/重启见 `[[quantmind-operations]]`。
 
 ## ⚠️ 铁律（先读，最高优先级）
@@ -38,7 +40,7 @@ QuantMind 交易执行链路的**操作 + 监控手册**：从模型推理信号
 | **RedisClient 静默 no-op** | `get/set` 在 client 为 None 时静默返回 —— 独立脚本必须先 `r.connect()`，否则配置"保存成功"实际没写 |
 | **L2 分数中性=无生产推理** | 无当天推理时 `load_latest_scores` 为空 → 融合回退中性 50 → 不触发买卖（正确的稳定性行为，不是故障） |
 | **A股红涨绿跌** | 前端/报告里红色=涨/买入，绿色=跌/卖出 |
-| **桥运行时配置在 Redis** | 容器 env 的 `TDX_BRIDGE_URL` 可能是过期 IP；真实生效值在 `trade:tdx_config:runtime`（当前桥 = http://192.168.31.31:8550） |
+| **桥运行时配置在 Redis** | `TDX_BRIDGE_URL` 可能被运行时配置覆盖；实际地址从目标实例 `trade:tdx_config:runtime` 读取，不使用历史固定 IP |
 | **exe 不提交** | 桥的 build_exe 产物禁止入库（主仓库 .gitignore 已含 `*.exe`） |
 
 ## 链路架构
@@ -49,12 +51,12 @@ QuantMind 交易执行链路的**操作 + 监控手册**：从模型推理信号
        ▼
 trade 服务 (8002) 两个自动循环
   ├─ L2 实时推理循环  tdx_l2_realtime  (配置 Redis tdx:l2:config, db2)
-  │     打分(47标的) → 分数>65买入 / <45卖出 → 桥下单
+  │     打分股票池与买卖阈值以实际运行配置为准
   └─ 滚动买卖循环     tdx_rolling_trade (配置 tdx:rolling_config:{tenant}:{user})
         融合分>2.2买 / ≤2.2卖 / 上证MA20 只卖不买 → 桥下单
        │
        ▼
-Windows 桥 bridge-windows (8550, token 认证)  ←─ /home/zbox/projects/quantmind/bridge/windows
+Windows 桥 bridge-windows (端口以实际配置为准, token 认证)
        │  http://127.0.0.1:17709  (TQ 常驻策略, 在通达信客户端内)
        ▼
 通达信客户端 TdxW.exe (完整 Windows 客户端 = tdx-datatest) ──> 券商服务器

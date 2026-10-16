@@ -71,7 +71,7 @@ class ScopeAuditTests(unittest.TestCase):
         self.assertEqual(json.dumps(source, sort_keys=True), before)
 
     def test_frozen_parent_snapshot_keeps_full_denominator_and_evidence(self):
-        frozen = json.loads((ROOT / "docs/tushare-scope-gap-2abcd7f.evidence.json").read_bytes())
+        frozen = json.loads((ROOT / "backend/tests/fixtures/tushare/tushare-scope-gap-2abcd7f.evidence.json").read_bytes())
         self.assertEqual(frozen["counts"]["total_named_scope"], 236)
         self.assertEqual(frozen["counts"]["registered_union"], 227)
         self.assertEqual(frozen["counts"]["not_registered_in_scope"], 9)

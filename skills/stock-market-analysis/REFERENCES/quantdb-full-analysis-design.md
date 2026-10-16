@@ -5,7 +5,7 @@
 > 单位/口径错误 = 结论作废：所有计算前先对照 [[quantdb-fields]] 技能。
 >
 > **⚡ 执行版（先读这个）**：本文件是"设计原则"。要**跑起来**请用 [stock-9layer-runbook.md](./stock-9layer-runbook.md)——
-> 它含一键取数脚本 `scripts/stock_9layer_fetch.py`、每层判读模板、跨层合成规则、报告落盘命令、双案例校准与红线清单。
+> 它含一键取数脚本 `scripts/stock_9layer_fetch.py`、每层判读模板、跨层合成规则、报告落盘命令与红线清单。
 
 ## 数据 → 问题映射（9 层金字塔，L4 拆为资金筹码/订单微结构，L7 用七维新闻方法论）
 
@@ -111,7 +111,7 @@ for f in L2_REPORT_FACTORS:               # 报告 26 个确认因子
 
 ### L7 新闻舆情（催化剂 vs 印证，七维规律三步纵深）
 
-> 方法论底座：[[news-sentiment-research]] 技能 + `docs/news_sentiment_deep_report.md`（21 条实证规律）。**个股新闻分析的规范动作是「三步纵深」，不是"拉几条新闻贴上去"。**
+> 方法论入口：`skills/news-sentiment-research/SKILL.md` 的单股新闻面三步纵深；不依赖一次历史研报或其固定统计规律。
 
 **三步纵深（每一步都必须做）**：
 
@@ -202,7 +202,7 @@ curl -s -H "$AUTH" "$BASE/api/v1/models/inference/stock/600519.SH/history?days=1
 #   mkt = duckdb.connect().execute("SELECT * FROM read_parquet('/data/quantdb/6_ml_datasets/l2_factors/dt=最新/data.parquet')").df()
 #   pct = (mkt[f].astype(float) < float(mkt[mkt.symbol=='xxx.SH'].iloc[0][f])).mean()  # 逐因子算截面分位
 #   # 负IC族≥70%高位 / 正IC族≤40%低位 = 偏空；反之为偏多
-# L7: 新闻三步纵深（v3 规律对照，方法论见 news_sentiment_deep_report §13）
+# L7: 新闻三步纵深（见 skills/news-sentiment-research/SKILL.md）
 curl -s -H "$AUTH" "$BASE/api/v1/news/articles?tickers=600519&industries=白酒&limit=30&strong_only=true"
 curl -s -H "$AUTH" "$BASE/api/v1/news/articles?tickers=600519&sort=sentiment_bullish&limit=10"
 ```

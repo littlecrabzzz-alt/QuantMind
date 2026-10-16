@@ -1,6 +1,6 @@
 /**
  * 本文件由 scripts/gen_prompts.py 自动生成，请勿手工编辑。
- * 源数据：仓库根目录 prompts/*.md（人类可读版本）。
+ * 源数据：scripts/gen_prompts.py 的 P 列表。
  */
 
 export interface PromptMeta {
@@ -19,7 +19,7 @@ export const PROMPTS: PromptMeta[] = [
     category: '平台运营',
     description: '首次使用 QuantBot 时，检查并安装 QuantMind 技能与人格配置',
     outputs: 'QwenPaw 技能池 + default 工作区',
-    body: `请完成 QuantBot（QwenPaw）与 QuantMind 平台的对接检查：\n\n1. 检查技能池：确认 QuantMind 技能（daily-review、stock-research 等）是否已安装到我的工作区；\n2. 如缺失：读取 /quantmind/scripts/quantbot_init.sh 了解安装流程，或提示用户在服务器执行 \`bash scripts/quantbot_init.sh --skills-only\`（装技能）和 \`--persona-only\`（装人格）；\n3. 环境自检：确认你能访问后端 API（http://quantmind:8000，内部认证见 AGENTS.md）、能读写 /data/reports/、能 docker exec 到 quantmind 容器；\n4. 输出一份环境就绪清单：哪些能力可用、哪些缺失、如何补齐。`,
+    body: `请完成 QuantBot（QwenPaw）与 QuantMind 平台的对接检查：\n\n1. 检查技能池：确认 QuantMind 技能（daily-review、stock-research 等）是否已安装到我的工作区；\n2. 如缺失：读取 /quantmind/scripts/quantbot_init.sh 了解安装流程，确认目标 QwenPaw 实例与工作区后，选择 \`--skills-only\`（装技能）或 \`--persona-only\`（装人格）；不要默认操作旧服务器；\n3. 环境自检：核对实际 API 地址、认证、数据挂载与工具权限；Mac 是唯一开发源，但运行服务或数据库位置须另行确认，不假定已迁移；\n4. 输出一份环境就绪清单：哪些能力可用、哪些缺失、如何补齐。`,
   },
   {
     name: 'quantmind-operations',
@@ -35,7 +35,7 @@ export const PROMPTS: PromptMeta[] = [
     category: '平台运营',
     description: '一键部署、快速部署、数据库初始化、部署问题排查、服务健康检查',
     outputs: '服务状态报告',
-    body: `我需要部署或排查 QuantMind 平台：{部署新服务器 / 排查部署失败 / 检查服务健康}。\n\n请读取 skills/quantmind-deploy/SKILL.md，按其中对应章节执行；服务健康检查可用 docker compose ps 与各服务 /health 端点。发现问题给出根因和修复步骤，重大变更操作前先向我确认。`,
+    body: `我需要部署或排查 QuantMind 平台：{部署新服务器 / 排查部署失败 / 检查服务健康}。\n\n请读取 skills/quantmind-deploy/SKILL.md，先确认目标实例、Compose 项目、env 文件、override 与数据所有权，再用对应参数检查服务状态和 /health。Mac 是唯一开发源；部署是明确指定目标后的可选运维任务，不代表运行数据已迁移。发现问题给出根因和修复步骤，重大变更操作前先向我确认。`,
   },
   {
     name: 'quantdb-sdk',
@@ -169,9 +169,9 @@ export const PROMPTS: PromptMeta[] = [
     name: 'model-train-infer-backtest-report',
     title: '训练-推理-回测-报告全流程',
     category: '策略·因子·模型·回测',
-    description: 'T+N 周期模型训练（13 种模型）→ 批量推理 → 组合回测（阈值+大盘MA+止损）→ 研报输出',
+    description: 'T+N 周期模型训练 → 批量推理 → 组合回测（阈值+大盘MA+止损）→ 研报输出',
     outputs: '研报 MD + PDF',
-    body: `请走完「训练 → 推理 → 回测 → 报告」全流程：模型类型 {lightgbm/xgboost/lstm/transformer 等 13 选 1}，周期 T+{N}，市场 {CN/HK/US/CRYPTO/FUTURES}。\n\n请读取 skills/model-train-infer-backtest-report/SKILL.md 并按流程执行：提交训练 → 等待完成 → 批量推理 → 自定义组合回测（分数阈值 + 大盘 MA 过滤{+止损}）→ 导出研报 MD+PDF。训练耗时长，分段汇报；最后给我 T+N 周期对比与效益分析结论。`,
+    body: `请走完「训练 → 推理 → 回测 → 报告」全流程：模型类型 {先读取 backend/shared/training/request.py 的 ALLOWED_MODEL_TYPES 再选择}，周期 T+{N}，市场 {CN/HK/US/CRYPTO/FUTURES}。\n\n请读取 skills/model-train-infer-backtest-report/SKILL.md 并按流程执行：提交训练 → 等待完成 → 批量推理 → 自定义组合回测（分数阈值 + 大盘 MA 过滤{+止损}）→ 导出研报 MD+PDF。训练耗时长，分段汇报；最后给我 T+N 周期对比与效益分析结论。`,
   },
   {
     name: 'simulation-trading',

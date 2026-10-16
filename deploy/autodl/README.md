@@ -2,6 +2,8 @@
 
 在 AutoDL 的 Python 容器上部署免 docker 直跑训练（`RemoteSSHOrchestrator` 的 `native_python` 执行模式）。
 
+这是明确选用远程 GPU 后的可选运维任务，不是远端开发流程。Mac 保持唯一开发源；Worker 数据是经授权准备的训练输入副本，不拥有生产数据库或本地原始数据。主服务与数据库实际位置须单独确认，不能从本指南推断已部署或已迁移。
+
 ## 背景
 
 AutoDL 显卡实例默认是 Python 容器（有 torch + GPU，但**没有 docker**）。项目训练链路支持两种执行模式：
@@ -125,9 +127,9 @@ nodes:
 TRAINING_MASTER_HOST=<协调机公网IP>   # AutoDL 回调 API，勿填 127.0.0.1
 ```
 
-改完后 `docker compose restart quantmind`。密码 SSH 需要容器内有 `sshpass`。
+修改后先核对实际主服务所在实例和 Compose 项目参数，再在授权维护窗口应用配置；不要直接执行裸 `docker compose restart`。密码 SSH 需要目标服务容器内有 `sshpass`。
 
-端到端（架构、开训、排障）见 **[docs/部署指南.md 第十一节](../../docs/部署指南.md)**。
+架构和排障入口见 [部署指南](../../docs/部署指南.md)，以现有章节为准。
 
 ## 验证
 

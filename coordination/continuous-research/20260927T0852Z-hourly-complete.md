@@ -1,3 +1,0 @@
-# 08:52Z hourly complete
-
-Worktree branch codex/glm-continuous-research @ c3be1a3f5ed2158f63b9eb80273dba421c8bf572, pushed and clean. Scoped new helper links registered evidence to original requests through existing authenticated row lock; docs/test only otherwise. 38 tests + Ruff pass; live three links and idempotent replay verified. No service restarts/capacity changes; controller70847/model6, worker2. Three reviews returned; M1 3729243989b59d1e792b8377 new same-code dispatch interaction, max2 new runs using existing shared runner, first in-flight. Stock hold unchanged; no A/cloud/trading/holdout policy action. Full record: /Users/lizeyu/Documents/ChatGPT/投资/投资学习与研究/研究/GLM持续研究/巡检/20260927T0852-hourly-review.md.

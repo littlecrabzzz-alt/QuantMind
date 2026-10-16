@@ -1,257 +1,84 @@
-# 大 QMT 真单镜像 — 部署与上线手册
+# 大 QMT 执行端与真单镜像
 
-> 模拟盘虚拟成交 → 同一笔委托按限额同步到大 QMT 真实账户，并回收真实成交/持仓。
-> **双轨并行**：虚拟账本行为不变，真单独立记账，可逐笔对账（滑点/费用/拒单）。
+用途：配置 Windows QMT 内置执行端、只读排查连接，再明确启用真实订单镜像。本地 Mac 是唯一开发源；QuantMind 运行主机可以不同，不能假定执行端或数据库已经迁移。
 
----
+真单镜像是模拟成交旁路：虚拟账本与真实委托独立记账。开启镜像可能真实下单；“模拟交易”页面名称不代表不存在真单风险。
 
-## 一、这套东西是什么
+## 前置条件
 
-| 层 | 组件 | 位置 |
-|----|------|------|
-| 传输 | big-convert RPC（Redis 通道） | QMT 内置 Python 跑服务端；Linux 侧是客户端 |
-| 适配 | `QmtExecBroker` | `backend/services/live_trading/services/broker_client.py` |
-| 客户端 | `QmtExecClient` | `backend/services/live_trading/services/qmt_exec_client.py` |
-| 回收 | `qmt_exec_poller`（2s 轮询，日切重置、成交去重） | `.../services/qmt_exec_poller.py` |
-| 账户 | `run_qmt_account_sync_task`（30s 快照 → `real_account_snapshots`） | `.../services/qmt_account_sync_task.py` |
-| 镜像 | `real_mirror_service`（开关/限额/白黑名单/熔断/队列） | `.../services/real_mirror_service.py` |
-| 控制面 | `qmt_mirror` 路由（状态/开关/急停/限额/名单/补交/对账） | `backend/services/trade/routers/qmt_mirror.py` |
-| 前端 | 「模拟交易设置 → 大 QMT 真单镜像」卡片 | `electron/src/pages/trading/components/QmtMirrorCard.tsx` |
+- Windows 已安装并登录具备相应交易权限的大 QMT，已安装其 Python 组件。
+- QuantMind 客户端依赖与当前 `xtquant-big-convert[redis]` 版本匹配；QMT 内置 Python 服务端使用配套文件，不直接安装要求更高 Python 版本的客户端包。
+- 建议独立 Redis 实例，设置强密码和主机白名单，不暴露公网；不要因为代码存在回退就默认复用业务 Redis。
+- 券商权限、账户类型、报备和申报限制由实际账户核实。本项目不能证明某条技术通道天然合规。
 
-```
-┌─ QuantMind 容器（Linux） ─────────────────────────────────────┐
-│ 模拟盘 / 托管任务 → 虚拟成交（不变）                            │
-│        └─ real_mirror_service（默认关，白名单点名才镜像）        │
-│              └─ dispatch_internal_strategy_order（REAL 尾段）   │
-│                    └─ QmtExecBroker ──► RPC                     │
-│ qmt_exec_poller ── 轮询委托/成交 ──► orders / order_history      │
-│ qmt_account_sync_task ──► real_account_snapshots                │
-└───────────────────────────┬────────────────────────────────────┘
-                            │ Redis（专用实例，密码 + 防火墙白名单）
-┌───────────────────────────▼──── Windows（QMT 机器）────────────┐
-│ QMT 内置 Python：big-convert RPC 服务端（常驻 + 看门狗）          │
-│   入口 BIGQMT_REDIS_DRYRUN.py；rpc_allow_order_methods=True      │
-└─────────────────────────────────────────────────────────────────┘
-```
+## Windows 配置与启动
 
-**为什么不是外接 xtquant**：miniQMT/xtquant 外接通道已按监管下线（commit `b5e38d51`），
-大 QMT 上走「内置执行端」才是官方合规通道。
+1. 在安装客户端依赖的受控 Python 环境，从仓库根目录导出桥接包：
 
----
-
-## 二、前置条件
-
-| 条件 | 说明 |
-|------|------|
-| 大 QMT（投研版） | Windows 机器，QMT 已安装并登录，账号有交易权限 |
-| QMT 内置 Python | 3.6 解释器（big-convert 服务端跑在这里） |
-| 专用 Redis | 建议独立实例（默认 6380 + 密码），只监听局域网；**不要复用业务 Redis** |
-| 网络 | Windows 与 QuantMind 主机同一局域网互通（Redis 端口放行给 QuantMind 主机 IP） |
-| Linux 侧 | `pip install "xtquant-big-convert[redis]"`（`requirements.txt` 已固定 0.3.31） |
-
----
-
-## 三、Windows 侧部署（QMT 机器）
-
-1. **探测环境**（只读，绝不下单）
-   ```bat
-   :: 用 QMT 内置 Python 跑
-   D:\国金QMT交易端\bin.x64\python.exe probe_qmt_env.py --account <资金账号>
+   ```bash
+   python backend/scripts/export_qmt_bridge_kit.py
    ```
-   把生成的 `qmt_probe_report.json` 发回。结论决定走哪条分支：
-   - 分支 A：`xtquant.xttrader` 可用 → 可另议外接方案（本手册不覆盖）
-   - 分支 B（预期）：`xtquant-big-convert` 可导入 → 按下面继续
 
-2. **就位服务端文件**（拷到 QMT 的 `python` 目录，如 `D:\国金证券QMT交易端\python\`）：
-   `bigqmt_signal_trader/`（整个包）、`bigqmt_signal_trader_strategy.py`、
-   `bigqmt_signal_trader_redis_rpc_runtime.py`、`BIGQMT_REDIS_DRYRUN.py`。
+   默认生成 `dist/qmt-bridge-kit/` 及 zip。首次导出后核对版本；不要使用 `--force` 覆盖已有私有账号配置。
+2. 将包内配套文件复制到 QMT 的 `python` 目录。必需 `bigqmt_signal_trader/`、`bigqmt_signal_trader_strategy.py`、`bigqmt_signal_trader_redis_rpc_runtime.py`、`BIGQMT_REDIS_DRYRUN.py`。不要混用不同上游版本。
+3. 编辑该目录的私有 `bigqmt_signal_trader_local_config.py`：
 
-   > ⚠️ **不要在 QMT 内置 Python 里 `pip install xtquant-big-convert`**：
-   > 该包声明 `Requires-Python >=3.8`，而 QMT 自带的是 **Python 3.6**，装不上
-   > （且 QMT 的 pip 用旧 OpenSSL，连 HTTPS 镜像常报 SSL 错误）。
-   > 服务端只需要 **`redis` 这个 Python 包**（QMT 通常已内置），代码一律**文件拷贝**。
-   >
-   > **省事做法（推荐）**：在 QuantMind 主机生成开箱包（含 5 个服务端文件 +
-   > 配置模板 + 探测脚本 + 部署步骤.txt + zip）：
-   > ```bash
-   > docker exec -w /app quantmind python backend/scripts/export_qmt_bridge_kit.py
-   > docker cp quantmind:/app/dist/qmt-bridge-kit.zip .
-   > ```
-   > 解压后把 `qmt-bridge-kit\` **里面的文件**拷到 QMT 的 `python` 目录即可，
-   > 跳过下面这段手工拷贝。
-   >
-   > 手工做法（文件来源任选其一）：
-   > - 已在开发机装过 `xtquant-big-convert` → 从它的 site-packages 拷；
-   > - 从 QuantMind 容器拷（同一份源码，Linux 侧就是 pip 装的）：
-   >   ```bash
-   >   docker cp quantmind:/usr/local/lib/python3.10/site-packages/bigqmt_signal_trader /tmp/qmt_srv/
-   >   docker cp quantmind:/usr/local/lib/python3.10/site-packages/bigqmt_signal_trader_strategy.py /tmp/qmt_srv/
-   >   docker cp quantmind:/usr/local/lib/python3.10/site-packages/bigqmt_signal_trader_redis_rpc_runtime.py /tmp/qmt_srv/
-   >   docker cp quantmind:/usr/local/lib/python3.10/site-packages/BIGQMT_REDIS_DRYRUN.py /tmp/qmt_srv/
-   >   ```
-   >   再把 `/tmp/qmt_srv/` 拷到 Windows 的 QMT `python` 目录（`__pycache__` 不必拷）。
-
-   > 📌 **前置**：全新安装的 QMT 在 `bin.x64\` 下**没有 `Lib\`、也没有 `python.exe`** ——
-   > 那是 QMT 界面里下载「Python 组件」后才出现的，不要手动建 `Lib\`。
-
-3. **写 QMT 端私有配置**：在 QMT 的 `python` 目录新建 `bigqmt_signal_trader_local_config.py`
-   （含账号密码，**不要提交 git**）：
    ```python
-   # coding: utf-8
-   BIGQMT_ACCOUNT_ID = "资金账号"          # 必须与页面/环境变量里的 QMT_EXEC_ACCOUNT_ID 一致
-   BIGQMT_ACCOUNT_TYPE = "STOCK"          # ★ 服务端只认这里：STOCK 普通 / CREDIT 信用；
-                                          #   填错信用账户会返回「资产全 0」而不是报错
+   BIGQMT_ACCOUNT_ID = "<资金账号>"
+   BIGQMT_ACCOUNT_TYPE = "STOCK"  # 信用账户用 CREDIT，两端必须一致
    BIGQMT_REDIS_CONFIG = {
-       "host": "Redis地址", "port": 6380, "db": 0, "password": "Redis密码",
-       "rpc_allow_order_methods": False,  # ★ 下单开关：先 False 验只读链路，确认风控后改 True
+       "host": "<桥Redis主机>", "port": 6380, "db": 0,
+       "password": "<独立强密码>",
+       "rpc_allow_order_methods": False,
        "rpc_process_in_listener": True,
        "rpc_listener_methods": ("*",),
-       "rpc_background_threads": True,    # redis 传输保持 True；zmq/pipe 必须 False
+       "rpc_background_threads": True,
        "schedule_adjust": True,
        "schedule_adjust_interval": "100nMilliSecond",
    }
    ```
 
-4. **在 QMT 策略编辑器里加载运行 `BIGQMT_REDIS_DRYRUN.py`**（只加载这一个文件，它自己 import 其余模块）。
-   QMT 需处于**实盘模式**。启动成功时 QMT 输出面板会打印：
-   ```
-   [bigqmt_shell] local redis config loaded keys=[...]
-   [bigqmt_shell] local account config loaded=True
-   [bigqmt_rpc] started channel=bigqmt:rpc:req:你的账号
-   [bigqmt_signal_trader] init ok
-   ```
-   > ⚠️ **不要**用 `python.exe BIGQMT_REDIS_DRYRUN.py` 当普通脚本跑，也**不要**用「独立 Python 进程」
-   > 方式：那样 QMT 不会注入 `passorder`/`get_trade_detail_data`，`init()` 不会被调用，
-   > 服务端看起来"跑起来了"其实什么都没监听（面板日志以 `finished` 结尾）。
-   > QMT 重启后要在策略编辑器里重新运行该策略。
-   > 若券商沙箱拦截 `import redis`，可改用同目录的 `BIGQMT_ZMQ_DRYRUN.py` 入口
-   > （它把传输强制为 ZMQ，再 exec 同目录的 `BIGQMT_REDIS_DRYRUN.py`，两个文件都要在；
-   > **QMT 侧需另装 `pyzmq`**，装不上就只能换回 Redis 通道）。
-   > ⚠️ 这条路**尚未端到端验证**：QuantMind 客户端侧目前只走 redis 传输，换 ZMQ 还需
-   > 客户端侧接线（`BIGQMT_RPC_TRANSPORT` 之类），当前版本没有这个开关。
-   > 另外 `rpc_background_threads` 的取值随传输而变：**redis 用 `True`，zmq/pipe 用 `False`**
-   > （上游对 zmq 实测：True 592.9ms vs False 15.8ms，差 37 倍）。
+   保持下单开关 `False` 验只读。账号配置不得提交 Git、打入公开发行包或贴入诊断日志。
+4. 在 **QMT 策略编辑器**加载运行 `BIGQMT_REDIS_DRYRUN.py`，不是在命令行运行 `python.exe`，也不是独立 Python 进程。只有内置策略运行方式才注入 `passorder/get_trade_detail_data`。名称含 DRYRUN 不保证禁止下单，真正开关是配置。
+5. 检查面板出现 RPC started 和 init ok；若只显示 finished，检查加载方式。QMT 重启后须重新运行服务端策略。
 
-5. **放行防火墙**：Redis 端口只对 QuantMind 主机 IP 开放。
+本项目客户端当前使用 Redis。包中可选 ZMQ 入口不代表 QuantMind 已接好该传输，不把它作为可直接切换的容灾路径。
 
-6. **服务端排错日志**：QMT 的 `python` 目录下 `logs/bigqmt_*.log`（保留 7 天）。
+## QuantMind 配置与只读诊断
 
----
+设置页“券商实盘接入”选择“大 QMT（执行端）”，配置 `enabled/account_id/account_type/strategy_name` 及桥 Redis 地址、端口、库号、密码。页面配置存于 `broker:config:qmt_exec`，优先于 `QMT_EXEC_*` 环境配置；编辑环境变量不一定覆盖现有页面值。
 
-## 四、Linux 侧配置
+服务端账户类型由 `BIGQMT_ACCOUNT_TYPE` 决定，不能仅改客户端页面。信用账户按 STOCK 查询可能返回零资产，不应解释为空仓。
 
-### 4.1 页面配置（推荐）
+先点“测试连接”核对资产与持仓。逐层诊断脚本为 `backend/scripts/qmt_bridge_selftest.py`；在正确的后端 Python 环境、以 `backend` 为工作目录并使仓库根位于 `PYTHONPATH` 后执行：
 
-「模拟交易设置 → 券商实盘接入」选择 **大 QMT(执行端)**，填写：
-
-| 字段 | 说明 |
-|------|------|
-| `enabled` | `true` 启用执行端 |
-| `account_id` | QMT 资金账号 |
-| `account_type` | `STOCK` 普通 / `CREDIT` 信用 |
-| `strategy_name` | 默认 `quantmind`（用于识别本系统的委托） |
-| `redis_host/port/db/password` | QMT 那台机器的 Redis 地址与密码 |
-
-> 📌 `account_type` 页面这个值只用于 Linux 侧构造查询对象；**服务端以 QMT 端
-> `BIGQMT_ACCOUNT_TYPE` 为准**（客户端 `configure()` 传不过去）。两边不一致时自检
-> 会在监听层直接报「与页面配置的 account_type 不一致」。
-
-保存后点「**测试连接**」，应返回真实资金与持仓数量。再在「券商实盘接入」顶部把
-A 股通道选为「大 QMT(执行端)」（写入 `broker:selected:CN=qmt_exec`）。
-
-页面「测试连接」只给一句结论；要**逐层定位**断点，用命令行自检（只读，不下单）：
 ```bash
-docker exec -w /app/backend -e PYTHONPATH=/app quantmind \
-    python scripts/qmt_bridge_selftest.py
+python scripts/qmt_bridge_selftest.py
 ```
-5 层依次判定：配置层 → 网络层(Redis) → 监听层(RPC ping) → 账号层 → 委托层；
-哪层 `FAIL` 就按它给的「→ 下一步」修。网络层不通时后三层标 `SKIP`（不计通过）；
-监听层不通时**就此打住**不再往下查（RPC 都不通，查账号只会再等一遍超时）。
-退出码：0=5 层全通 / 1=有失败 / 2=配置层就没过。
 
-> 页面配置写入 `broker:config:qmt_exec`（Trade Redis），优先级高于 env；改完立即生效
-> （客户端会清缓存，下一次轮询重读）。
+它按配置 → Redis 网络 → RPC 监听 → 账号 → 委托逐层只读检查。失败/跳过不算通过；不要用下真实委托验证网络。代码入口在 `backend/services/live_trading/services/qmt_exec_client.py`。
 
-### 4.2 env 兜底（可选）
+## 从只读到镜像下单
 
-见 `docker-compose.yml` 的 `QMT_EXEC_*` 段；页面未填时按 env 走。
+这一步必须作为独立交易授权处理，不能由部署、文档检查或健康检查自动完成。
 
----
+1. 核对账户与券商规则，先设置可承受的单笔/单日金额、笔数、标的数及滑点限制。
+2. 确认真实交易开关与 A 股选择器：`ENABLE_REAL_TRADING=true` 且 `broker:selected:CN=qmt_exec`。Mac 隔离环境默认关闭实盘，不在其中绕过 overlay 开关。
+3. 确认 QMT 端允许订单方法后，再配置镜像白名单；空白名单不发单，不用 `*` 代替授权范围。
+4. 在“真单镜像”卡开启镜像，按已批准范围执行验证，逐笔核对真实委托、成交回报与虚拟账本。最小整手金额也可能很大，不能把“100 股”通称低风险小额。
+5. 核对成交/委托 poller、账户快照、对账及通知后，才考虑扩大范围。
 
-## 五、上线步骤（建议顺序）
+## 停止与排错
 
-1. **只读链路**：完成 §4.1 的「测试连接」；页面显示通道就绪。
-2. **开户镜像前先确认风控基线**：`ENABLE_REAL_TRADING=true` 且 `broker:selected:CN=qmt_exec`
-   （缺一不可，否则镜像只记日志不下单）。
-3. **打开镜像卡**：设置页「大 QMT 真单镜像」→ 设置限额（首期建议：单笔 ≤1 万、
-   单日 ≤5 万、最多 5 只、单日 ≤20 笔）→ 保存。
-4. **填白名单**：`tenant` 或 `tenant:user` 或 `tenant:user:strategy`。
-   **空名单 = 不下任何单**，这是有意设计（宁可不下，不可乱下）。
-5. **打开镜像开关**（热开关，无需重启）。
-6. **小额验证**：让白名单内策略产生一笔最小单（100 股），确认：
-   - 大 QMT 里出现同向同量委托，成交后 `orders`/`order_history` 落库；
-   - 对账卡当天能看到 虚拟价 / 真实成交价 / 滑点 / 费用差；
-   - 虚拟账本金额不变（双轨）。
-7. **异常演练**（择机）：急停 → 拒单熔断 → QMT 重启 → Redis 断连 → 重复回报。
-
----
-
-## 六、运维与风控
-
-| 能力 | 位置 | 说明 |
-|------|------|------|
-| 热开关 | `mirror:enabled` | 页面开关，随时停/开 |
-| 急停 | `mirror:kill` | 优先级最高；**读取失败时按「已急停」处理**（fail-closed） |
-| 白名单 | `mirror:whitelist` | `*` / tenant / tenant:user / tenant:user:strategy |
-| 黑名单 | `mirror:blacklist` | 按标的前缀式（如 `SH600519`）排除 |
-| 限额 | `mirror:config` | 单笔/单日金额、单日笔数、单日标的数、滑点上限 |
-| 日额度 | `mirror:daily:{date}:*` | Lua 原子预占/回滚，跨日自动失效（TTL 3 天） |
-| 熔断 | `mirror:rejects` | 连续拒单 ≥ 阈值 → 自动急停 + 通知 |
-| 快照新鲜度 | env | 交易时段内账户快照 >5 分钟未落库 → 站内通知（1 小时冷却；`QMT_SYNC_STALE_ALERT_SECONDS`/`_COOLDOWN_SECONDS` 可调） |
-| 非交易时段 | `mirror:queue` | 入队，开盘由 drainer 补交（队列 TTL 7 天） |
-| 对账 | `GET /api/v1/qmt-mirror/reconcile` | 虚拟 vs 真单逐笔，含滑点/费用差/拒单原因 |
-
-**限额校验顺序**（任一不满足即拒绝并记录原因）：
-黑名单 → 市场 → 白名单 → 急停 → 开关 → 通道就绪 → 价格漂移（滑点上限）→
-资金/持仓 → 单笔 → 单日金额 → 单日笔数 → 单日标的数。
-
----
-
-## 七、回滚
-
-1. 页面**急停**（或清空白名单）→ 立刻停发新单；
-2. 关闭镜像开关 → 退回纯模拟；
-3. `broker:selected:CN` 改回 `tdx` 或清空 → 实盘通道切走；
-4. QMT 侧服务端停掉不影响模拟盘（镜像只是旁路）。
-
----
-
-## 八、故障排查
+先急停并关闭镜像，确认不再发新单。**急停不等于撤销在途委托或清仓**；已有订单必须在券商端核对。不要为了回滚自动切到另一个实盘券商。
 
 | 现象 | 排查 |
-|------|------|
-| 不知道断在哪一层 | 跑 `python scripts/qmt_bridge_selftest.py`（见 §四.1）：5 层逐层报，按「→ 下一步」修 |
-| 页面「通道未就绪」 | `ENABLE_REAL_TRADING` 是否为 true；A 股券商是否已选 `qmt_exec` |
-| QMT 的 python.exe 里 `pip install xtquant-big-convert` 失败（SSL 错 / 提示需要 3.8+） | **正常**，服务端不装这个包：QMT 是 Python 3.6，代码走文件拷贝，只需 `redis` 包（通常已内置），见 §三.2 |
-| 测试连接报 `NOT_CONNECTED` | QMT 机器上的服务端没跑 / Redis 地址密码不对 / 防火墙未放行 |
-| 测试连接报 `ORDER_DISABLED` | 服务端 `rpc_allow_order_methods` 未开 |
-| 服务端面板日志以 `finished` 结尾、没有 `[bigqmt_rpc] started` | 用普通脚本/独立进程方式跑了入口 → 必须在 QMT **策略编辑器**里加载运行 `BIGQMT_REDIS_DRYRUN.py` |
-| 委托已下但状态不动 | poller 未跑（`trade` 服务日志 `qmt-exec-poller`）；或 QMT 未推送委托（重启服务端） |
-| 镜像单被跳过 | 对账卡「未找到真单」+ 原因；看 `blocked_reason` 与日志 `[Mirror]` |
-| 连续拒单熔断 | 看 `mirror:rejects` 与通知；处理后在页面「解除急停」 |
-| 收到「账户快照超时未更新」 | QMT 是否登录 / 服务端是否在跑 / Redis 通道；看日志 `[QmtSync]` |
-| 非交易时段下单 | 正常入队，开盘后 drainer 补交；也可页面「立即补交」 |
+| --- | --- |
+| RPC 不通 | Windows 策略是否运行、桥 Redis 网络/密码/防火墙；按自检失败层处理 |
+| `ORDER_DISABLED` | QMT 服务端订单方法开关；只读阶段保持关闭属于预期 |
+| 资产为零/账户类型不一致 | 两端账号及 STOCK/CREDIT，先确认查询对象 |
+| 镜像跳过 | 真实交易开关、通道选择、白名单、急停及限额；查看 `blocked_reason` |
+| 委托状态不更新 | `qmt_exec_poller`、Windows 服务端日志及真实券商委托 |
+| 快照超时 | QMT 登录状态、同步任务与 Redis 连通性，不根据旧快照继续扩大仓位 |
 
-日志关键词：`[Mirror]`、`[QmtExec]`、`[QmtExecPoller]`、`[MirrorAPI]`（trade 服务 `logs/`）。
-
----
-
-## 九、安全与合规
-
-- Redis 必须**独立实例 + 密码 + 局域网白名单**，不要暴露公网。
-- `account_id`/密码等敏感字段在页面上**只写不回读**。
-- 所有控制面写操作记审计日志（用户/租户/前后值）。
-- 程序化交易需按券商要求完成**报备**；单账户申报频率远低于高频线。
-- 首期务必保持小额限额；确认对账无误后再逐步放宽。
-
-> ⚠️ 本项目仅供学习研究与技术演示，不构成投资建议。真单交易风险自负。
+主要实现：`real_mirror_service.py`、`qmt_exec_poller.py`、`qmt_account_sync_task.py`；控制面为 `backend/services/trade/routers/qmt_mirror.py`。日志包含账号与交易信息，分享前脱敏。接口正常与历史验收均不能代替当次对账。

@@ -740,6 +740,7 @@ services:
       - ./scripts:/app/scripts:ro
       - ./strategy_templates:/app/strategy_templates:ro
       - ./CLAUDE.md:/app/CLAUDE.md:ro
+      - ./AGENTS.md:/app/AGENTS.md:ro
       # 项目根目录（只读，供 Agent 查找本地文件/技能 zip 等）
       - ./:/quantmind:ro
       # 研报 PDF 中文字体（md_to_pdf_report.py 按 /app/docker/training/fonts 解析）

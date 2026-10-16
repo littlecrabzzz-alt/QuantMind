@@ -1,54 +1,39 @@
-# 币安数据产品与接入范围
+# Binance 数据产品边界
 
-核实日期：2026-09-26。币安的加密现货、美股交易、代币化证券与股票永续是不同产品；同名标的不能直接合并价格、成交量或研究样本。
+用途：在采集、发布和研究准入前区分加密现货、代币化证券、美股证券与股票永续，防止同名行情混用。下述为仓库已审核产品合同，不代表账户或所在地可交易，也不证明当前上游可用；增量和固定版本操作见 [Binance 运维](binance-data-operations.md)。
 
-## 首期范围与产品分类
+## 审核范围与研究准入
 
-首期以 BTCUSDT、ETHUSDT 的 UTC 现货日线完成四步：历史补采、时间与字段规范、质量检查与增量更新、固定版本的研究入口消费验证。bStocks 使用独立数据集，AAPLBUSDT 的完整历史另行采集发布。下述股票永续归档只作为来源与格式样本，尚未接通合约研究。
-
-后续同日的 [批量补录记录](binance-data-batch-20260926.md) 将现货扩至十币、bStocks 扩至四项，并将 CXMT/UNITREE 官方日线归档保存为独立 `equity_perpetual` 版本。以下初期样本证据保留；批次记录给出扩充后的覆盖与缺口，股票永续仍未接通合约研究。
-
-| 产品 | 代表 symbol / 标的 | 行情来源与限制 | 本次数据边界 |
-| --- | --- | --- | --- |
-| 加密现货 | BTCUSDT、ETHUSDT | 无 key 的现货公共 REST 与日/月归档 | `crypto_spot` 首期研究池 |
-| 美股 Stocks Trading | AAPL、TSLA 等美股及 ETF | `/sapi/v1/equity/market/exchangeInfo`、`tokenized-assets`、`quote` 均要求 API key；现行行情文档未列历史 K 线端点 | 未访问账户或 SAPI；不使用代币/永续行情冒充美股现货 |
-| bStocks 代币化证券 | AAPLBUSDT / AAPL | 已实测公开现货 REST 与归档可读；代币化证券不等于直接持有标的股票 | 独立 dataset、独立发布与消费验收，不进入 `crypto_spot` |
-| TradFi 股票永续 | CXMTUSDT / 688825.SH；NETUSDT / NYSE: NET；BYDUSDT / HKEX:1211 | USDⓈ-M 行情及公开归档；本机 `fapi` 返回 451 | CXMT 历史归档样本；A 股、美股、港股永续均不进入 `crypto_spot` 或传统股票现货池 |
-
-币安 2026-08-17 的[官方公告](https://www.binance.com/en-NG/support/announcement/detail/0872245db74c4daaabd4f11984ba52c1)明确：CXMTUSDT 于 2026-08-18 05:00 UTC 上线，标的长鑫科技（上海证券交易所 688825），采用 USDT/CNH 汇率，USDT 计价结算，24/7 交易。因此 A 股相关产品已经存在，但该合约不是沪深现货。同一公告列出美股 NETUSDT；[BYD 上线公告](https://www.binance.com/zh-CN/support/announcement/detail/89a035c3ee0e4b7782bf0089323d8e78)明确其标的是比亚迪 H 股，不能按公司名称误归 A 股。
-
-[Stocks API 上线公告](https://www.binance.com/en/support/announcement/detail/95d746cb2b5e4d179c50d0026dd7dfbe)说明美股及 ETF 直接交易与 bStocks 转换分别存在；证券订单由 Nest Trading 路由至 Alpaca 执行、清算和托管。[bStocks FAQ](https://www.binance.com/zh-CN/support/faq/detail/f0c03cd6509a4085b4cce1636f16be38)说明代币化证券不赋予标的股票直接所有权。产品存在与行情可读不代表用户所在地或账户可交易。
-
-## 匿名接口实测
-
-所有请求使用系统 `/usr/bin/curl`，保留 TLS 校验，无 API key、签名或账户调用。以下时间均为 UTC。
-
-| 接口 / 对象 | 实测时间 | 结果 |
+| 产品 | 仓库入口与审核范围 | 不可混同的边界 |
 | --- | --- | --- |
-| `data-api.binance.vision/api/v3/exchangeInfo?symbol=AAPLBUSDT` | 2026-09-26 02:59:04 | HTTP 200，`TRADING`，base=`AAPLB`、quote=`USDT` |
-| 同域名 `/api/v3/klines?symbol=AAPLBUSDT&interval=1d&limit=3` | 2026-09-26 02:59:05 | HTTP 200；9/24、9/25 已收盘，9/26 未收盘，消费样本过滤后保留 2 根 |
-| AAPLBUSDT 2026-08 现货日线 ZIP 与官方 CHECKSUM | 2026-09-26 02:59；精确请求时间见 JSON | 两者 HTTP 200，SHA-256 一致，31 根，8/1–8/31 |
-| CXMTUSDT 2026-08 USDⓈ-M 日线 ZIP 与官方 CHECKSUM | 2026-09-26 02:59；精确请求时间见 JSON | 两者 HTTP 200，SHA-256 一致，14 根，8/18–8/31 |
-| `fapi.binance.com/fapi/v1/exchangeInfo` | 2026-09-26；早先探测只保留日期 | HTTP 451，地区限制；之后未重试或切换域名绕过 |
+| `crypto_spot` | `blockchain_sync.SPOT_PRODUCTS`：BTC、ETH、BNB、SOL、XRP、DOGE、ADA、LINK、AVAX、LTC 的 USDT 交易对 | 默认日更仍只有 BTCUSDT/ETHUSDT；登记扩展不自动改变默认池 |
+| `tokenized_equity_spot` | AAPLBUSDT、AMZNBUSDT、NVDABUSDT、TSLABUSDT 独立目录 | bStocks 不赋予底层股票直接所有权；OHLCV 不是标的证券复权价 |
+| 美股 Stocks Trading | Stocks SAPI 行情要求 API key；未接入此采集发布链路 | 不能用股票代币或永续代替证券历史行情 |
+| `equity_perpetual` | 独立 `equity_perpetual_archive`，当前内置 CXMTUSDT/UNITREEUSDT 归档登记 | A 股相关的 USDT 永续不是沪深现货，不进入现有加密现货研究入口 |
 
-公共现货接口的免认证范围见[官方 Market Data Only 文档](https://github.com/binance/binance-spot-api-docs/blob/master/faqs/market_data_only.md)。Stocks SAPI 的 API key 要求与字段见[官方 Stocks 行情文档](https://developers.binance.com/en/docs/catalog/advanced-trading-stocks-trading/api/rest-api/market-data)；本次没有请求该接口。`fapi` 的 451 不影响分别记录公开归档的可读结果，但不能因此宣称合约实时更新已经贯通。
+审核登记不等于已采齐、已发布、持续更新或研究就绪。股票永续 manifest 保持 `research_ready=false`；当前研究适配仅接受 `crypto_spot`。其他 symbol 必须先核对产品、上市时间、底层证券/市场、计价及结算资产；不能凭 `USDT` 后缀或公司名称分类。
 
-## 保存的原始证据与时间口径
+## 时间、字段与来源
 
-证据仅保存在本机主工作树 `.local-dev/binance-product-evidence/`，共两个 ZIP、两个官方 `.CHECKSUM` 和 `summary.json`；不作为研究发布目录。JSON 记录 URL、请求时间、HTTP 状态、哈希、行数、字段单位及未收盘过滤结果。
+- 来源为官方公共 REST 或官方日/月归档及 CHECKSUM；不调用账户、签名或订单。401/403/451 等限制不通过换域名或其他身份绕过。
+- 现货官方归档自 2025-01-01 使用微秒，REST 与衍生品归档可能为毫秒，表头也不同。解析必须识别时间单位/表头，统一 aware UTC，保存原始响应与哈希，不能直接按整数大小当交易日。
+- 自然键为 `(symbol, open_time)`，只接受来源 `close_time` 早于截止时间的已收盘日线。`available_at` 是 bar 结束理论下界，不是系统当年已经观察到的证明；实际 `collected_at` 单独保存。
+- `amount` 使用原生 quote_volume，价格/成交额按该产品 USDT 口径，不用收盘价乘 volume 估算，不替代底层证券交易所原币种价。
+- 保留全部来源 OHLC、基础/计价量额、成交笔数、主动买入量额、来源版本与产品映射。股票永续上市首日可是不完整交易时段，不能自动当整日可交易样本。
 
-| 原始文件 | SHA-256 | 时间单位 / 表头 |
-| --- | --- | --- |
-| `AAPLBUSDT-1d-2026-08.zip` | `d525c5c982b643975aa8161b6a8fc3b769bce5facb45d65305452301fc5813bb` | 微秒，无表头 |
-| `CXMTUSDT-1d-2026-08.zip` | `0e8b377fc6e959d7c5317f98bda82c10d5d079c992ec37fe458e65a749ecc766` | 毫秒，有表头 |
+## 研究前还需核对
 
-两份归档均保留 12 个来源字段：开盘时间、OHLC、基础资产成交量、收盘时间、计价资产成交额、成交笔数、主动买入基础资产量、主动买入计价资产额及来源保留字段。价格/成交额使用该交易对的 USDT 口径，不能替代标的证券交易所的原币种价格。CXMT 上市首根日线标记在 UTC 零点，其实际交易从 05:00 开始，属于上市首日的不完整交易时段。
+bStocks 需公司行动、转换倍数与底层证券关系；永续需合约生命周期、标记价、指数价、结算及资金费，包含股息相关的 `Special` 资金费。现有归档只有日线，不能据此声称这些数据已补齐。
 
-币安[历史数据说明](https://github.com/binance/binance-public-data)明确现货归档自 2025-01-01 使用微秒；本次现货 REST 返回仍为毫秒。解析应识别单位与表头，统一为 aware UTC，保留原始文件。研究仅接受来源 `close_time` 早于取数截止时刻的已收盘 bar；源收盘时间为区间末尾，标准化 `available_at` 应不早于下一日 UTC 零点，并与实际 `observed_at` 分开记录。历史回填的采集时间不能伪装为当时已观测到的发布时间。
+原始文件 CHECKSUM 通过只证明来源文件完整；固定发布、接收成功、Qlib/H5 派生和研究实际消费分别验收。`history_complete` 限于当前公共接口给出的所选 symbol 日线覆盖，不是 PIT、公司行动正确、策略有效或实盘准入。
 
-## 研究准入边界
+## 产品核实来源
 
-- 每份数据保留交易场所、产品类型、底层市场/证券、计价与结算资产、来源版本；未知资产类型不可默认归为加密现货。
-- bStocks 的公司行动与转换倍数单独处理；仅有 OHLCV 不代表已取得标的股票复权价格。
-- 股票永续还需合约元数据、标记价、指数价、资金费和公司行动。官方[期货行情文档](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/market-data)提供 `contractType`、`underlyingType`、`underlyingSubType` 等字段，并在资金费历史中区分 `Regular` 与股息相关的 `Special`；不能把后者丢弃。
-- 原始归档可读及 CHECKSUM 通过，只证明来源样本完整。是否已发布、云端可读、被研究消费，必须分别用对应 release 与实际读取证据验收。本文件不赋予合约研究或实盘执行准入。
+- [官方 Market Data Only](https://github.com/binance/binance-spot-api-docs/blob/master/faqs/market_data_only.md)：公共现货行情范围。
+- [官方历史数据说明](https://github.com/binance/binance-public-data)：归档格式、CHECKSUM 和时间单位。
+- [Stocks 行情文档](https://developers.binance.com/en/docs/catalog/advanced-trading-stocks-trading/api/rest-api/market-data)与[上线公告](https://www.binance.com/en/support/announcement/detail/95d746cb2b5e4d179c50d0026dd7dfbe)：证券交易与 bStocks 转换不是同一种产品。
+- [bStocks FAQ](https://www.binance.com/zh-CN/support/faq/detail/f0c03cd6509a4085b4cce1636f16be38)：代币化证券所有权边界。
+- [CXMT/NET 上线公告](https://www.binance.com/en-NG/support/announcement/detail/0872245db74c4daaabd4f11984ba52c1)与[BYD 公告](https://www.binance.com/zh-CN/support/announcement/detail/89a035c3ee0e4b7782bf0089323d8e78)：底层市场及 USDT 永续含义；BYD 标的是 H 股，不能按公司名归为 A 股。
+- [USDⓈ-M 行情文档](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/market-data)：合约元数据与资金费。
+
+产品变化时重新核实官方资料及实际接口；保留失败边界，不能把历史匿名探测成功或某次 451 结果写成永久能力判断。

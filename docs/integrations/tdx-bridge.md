@@ -1,185 +1,89 @@
-# 通达信实盘交易桥接指南
+# 通达信桥接配置与排错
 
-> 本文说明 QuantMind 与通达信交易桥的专项集成配置。
+用途：在明确需要时重新配置 Windows 通达信桥、连接 QuantMind 并进行只读诊断。这是可选集成，不是当前已有实例连接证明。基础 Compose 已注明旧通达信内网桥下线；不再沿用旧私有 IP、共享目录或凭据。
 
-> 把 QuantMind 的信号送到 Windows 通达信客户端下单，支持**模拟盘 + 实盘**双模式。
-> 与系统现有模拟盘 (PaperTradingBroker) 并行，互不影响。
+QuantMind 代码入口为 `backend/services/live_trading/services/broker_client.py` 的 `TdxBroker` 和 `tdx_push_service.py`；Windows 桥源码在 `tools/bridge-windows/`。它与大 QMT 执行端是不同通道，后者见 [大 QMT 指南](../大QMT真单镜像_部署与上线手册.md)。
 
----
+## 能力与边界
 
-## 一、架构总览
-
-```
-┌───────────────────────── Linux (QuantMind) ─────────────────────────┐
-│                                                                      │
-│  策略推理 → engine_signal_scores → TradingEngine.submit_order()       │
-│                                       │                             │
-│                              trading_mode 路由:                       │
-│   SIMULATION/BACKTEST ──→ PaperTradingBroker (本地模拟撮合, 不改动)   │
-│   REAL/SHADOW ──────────→ TdxBroker (通达信实盘) ─┐                  │
-└───────────────────────────────────────────────────┼──────────────────┘
-                                                     │ HTTP POST /api/v1/*
-┌───────────────────────── 局域网 (192.168.31.22) ─────────────────────┐
-│                                                    ▼                 │
-│   Windows 桥 (bridge-windows, :8550, token 鉴权)                     │
-│       │                                                            │
-│       ▼ JSON-RPC                                                   │
-│   通达信客户端 (TdxW.exe, 127.0.0.1:17709)                           │
-│       └─ 下单返回 Value: 2=直接提交(TQ收费账号) / 1=待确认 / 0=失败   │
-└───────────────────────────────────────────────────────────────────────┘
+```text
+QuantMind 运行实例 → HTTP/Bearer → Windows 桥 :8550
+                                      ↓
+                          Windows 本机通达信 :17709
 ```
 
-**关键点**：
-- **通达信 17709 只监听本机回环**，Linux/Docker 无法直连 → 必须经 Windows 桥转发。
-- **Docker 容器可访问桥**：`TDX_BRIDGE_URL` 指向 Windows 局域网 IP，容器 bridge 网络 NAT 可达。
-- **模拟盘完全不受影响**：只有 `REAL`/`SHADOW` 模式 + `ENABLE_REAL_TRADING=true` 才走 TdxBroker。
+- HTTP 提供账户/委托查询、信号推送、执行计划和撤单等接口；通达信端能力依客户端版本、插件、券商权限及账号而变。
+- Windows `:17709` 是本机接口，不应暴露给远端直连。跨机器访问经过桥；不要通过公开映射解决连接问题。
+- 返回委托号、待确认、已提交和已成交是不同状态。不同账号可能要求人工确认或允许直接提交，不能依据旧测试断言一定弹窗。
+- 选股板块推送不等于下单，但桥内止损守护或已接收计划仍可能产生订单。仅关闭 QuantMind 推送不能证明 Windows 端没有在途动作。
+- 源码有文件同步通道，但当前 QuantMind `TdxBroker` 是 HTTP 客户端，不承诺自动切换 SMB 容灾。仅 HTTP 接入无需为了照抄旧文档挂载共享盘。
 
----
+## Windows 部署
 
-## 二、双通道容灾
+1. 准备支持所需 TQ 能力的通达信并登录正确账号；先确认账户/客户端版本，不使用真实下单作探测。
+2. 将 `tools/bridge-windows/` 的配套源码与配置复制到受控目录，使用 Python 3.10+ 安装其 `requirements.txt`；当前类型注解使用 `str | None`，旧指南的 Python 3.9 要求已不足。桥 Python 与通达信插件 Python 可能不同，缺 `numpy/pandas` 时确认装在哪个解释器。
+3. 生成独立强 token，保存在私有配置或安全环境中，与 QuantMind 侧一致。不要复用文档、发布包、Git 历史或别人实例中的 token。
+4. 审阅 `config.yaml` 中监听地址、TDX 本机 URL、通道、订单跟踪和日志目录；保留已有状态，避免覆盖生产配置。
+5. 在桥源码目录启动 HTTP 模式：
 
-| 通道 | 路径 | 用途 | 状态 |
-|------|------|------|------|
-| **HTTP 桥** | Linux→Windows `:8550` | 实时下单/查账号/撤单 | 主通道 |
-| **文件同步** | SMB 共享 `/mnt/tdx-shared` | HTTP 断连时的兜底 | 备用 |
+   ```powershell
+   $env:BRIDGE_AUTH_TOKEN = "<独立强随机token>"
+   python -m main --mode http --config config.yaml
+   ```
 
-- Linux 侧 `ChannelManager`：HTTP 优先，失败自动切文件通道，HTTP 恢复自动切回。
-- TdxBroker 走 HTTP 主通道；文件通道由独立守护进程接管兜底。
+   占位字符串必须替换，不能作为真实 token。停止已有进程或重启桥属于维护操作，先核对在途订单与止损守护。
 
----
+`setup.ps1 http` 是可选辅助脚本，会安装/升级依赖、探测通达信 Python 并添加防火墙规则，不是无副作用启动器。它的默认防火墙规则未限定远端主机；使用时必须另行收紧到可信调用方。脚本/启动日志可能打印 token 或片段，分享前脱敏。
 
-## 三、代码改动清单
+## QuantMind 侧配置
 
-在 QuantMind 中新增的实盘 broker 接入，共 3 个文件：
+在实际实例的私有配置中设置，不在本地 Mac 沙盒里绕过禁用实盘的 overlay：
 
-### 1. `backend/services/trade/services/broker_client.py`
-新增 `TdxBroker(BaseBroker)` 类，实现 4 个抽象方法：
-
-| 方法 | 行为 |
-|------|------|
-| `place_order()` | 组装 TradePlan → POST `{bridge}/api/v1/plans/execute` |
-| `query_account()` | POST `{bridge}/api/v1/account/query`，返回 `{available_cash, total_asset, market_value, positions}` |
-| `cancel_order()` | POST `{bridge}/api/v1/orders/cancel` |
-| `query_quote()` | 行情走 stream，返回空（由上层行情源提供） |
-
-同时 `create_broker()` 工厂在 `enable_real=True` 分支新增 `broker_type == "tdx"` 分支。
-
-### 2. `backend/services/trade/services/trading_engine.py`
-`_get_broker()` 改为按 `trading_mode` 路由：
-- `REAL`/`SHADOW` + `ENABLE_REAL_TRADING=true` → `create_broker(enable_real=True, broker_type="tdx")`
-- 其他 → 原 `PaperTradingBroker`（模拟盘，逻辑不变）
-
-### 3. `backend/services/trade/trade_config.py`
-新增配置项：`ENABLE_REAL_TRADING`、`REAL_BROKER_TYPE`、`TDX_BRIDGE_URL`、`TDX_BRIDGE_TOKEN`、`TDX_ACCOUNT`、`TDX_ACCOUNT_TYPE`。
-
-### 4. `.env.example`
-已追加 TDX 配置段（见下方"配置"）。
-
----
-
-## 四、配置
-
-在 `.env` 或 docker-compose 环境变量中设置：
-
-```bash
-# ===== 通达信实盘桥 =====
-# 启用实盘交易 (false=仅模拟盘)
-ENABLE_REAL_TRADING=true
-# 实盘 broker 类型
-REAL_BROKER_TYPE=tdx
-# Windows 桥地址
-TDX_BRIDGE_URL=http://192.168.31.22:8550
-# 桥鉴权 token (与 Windows 侧 BRIDGE_AUTH_TOKEN 一致)
-TDX_BRIDGE_TOKEN=你的64位hextoken
-# 通达信资金账号 (留空用默认账号)
-TDX_ACCOUNT=
+```dotenv
+TDX_BRIDGE_URL=http://<Windows桥主机>:8550
+TDX_BRIDGE_TOKEN=<与Windows一致的强随机token>
+TDX_ACCOUNT=<目标资金账号>
 TDX_ACCOUNT_TYPE=stock
+ENABLE_TDX_PUSH=false
+ENABLE_REAL_TRADING=false
+REAL_BROKER_TYPE=tdx
 ```
 
-**安全注意**：`TDX_BRIDGE_TOKEN` 必须与 Windows 侧 `setup.bat` / `config.yaml` 里的 `BRIDGE_AUTH_TOKEN` 完全一致，否则桥返回 401。
+`false` 是初始安全示例，不代表 Windows 端自身没有持仓或订单。按目标实例已有入口应用配置，见 [运行与部署](../部署指南.md)；不要裸 Compose 重建或覆盖其他券商配置。
 
----
+需要推送时单独配置 `ENABLE_TDX_PUSH`；需要真实执行时另行完成券商选择、实盘授权和限额/对账核实。设置 `REAL_BROKER_TYPE=tdx` 本身不证明所有策略已经路由到它，页面持久化选择也需核对。
 
-## 五、Windows 部署步骤
+## 只读检查
 
-### 1. 文件准备
-`bridge-windows/` 已放在共享目录 `\\192.168.31.22\PYPlugins\bridge-windows\`，里面包含：
-- `setup.bat` — **一键启动脚本**（检测 Python → 装依赖 → 设环境变量 → **自动放行防火墙 8550** → 启动桥）
-- `start_bridge.ps1` / `bootstrap.bat` — 备用启动脚本
-- `main.py` + `src/` — 桥程序本体
-- `config.yaml` — 桥配置
+先在 Windows 检查：
 
-### 2. 启动步骤 (Windows 交易机)
-1. 启动通达信客户端 `TdxW.exe`，**登录交易账号**（模拟盘账号或实盘账号均可）
-2. 打开共享目录，双击 `bridge-windows\setup.bat`
-3. 按提示输入 `BRIDGE_AUTH_TOKEN`（64位 hex，与 Linux 侧一致）
-4. 首次运行 Windows 防火墙若弹窗，选择"允许访问"（脚本也会自动添加规则）
-5. 看到 `[bridge-windows] HTTP 桥已监听 http://0.0.0.0:8550` 即成功
-
-### 3. 验证
-在 Windows 命令行执行：
-```bat
-curl -s http://127.0.0.1:8550/api/v1/health
-:: 返回 {"status":"ok","tdx_connected":true}
+```powershell
+curl.exe http://127.0.0.1:8550/api/v1/health
 ```
 
----
+再从真正的 QuantMind 网络环境访问 `http://<Windows桥主机>:8550/api/v1/health`，避免只验证宿主能访问而容器不能访问。健康状态和 `tdx_connected` 不证明账号正确、具有下单权限或交易链路已验收。
 
-## 六、Linux/QuantMind 部署步骤
+| 接口 | 用途 |
+| --- | --- |
+| `GET /api/v1/health` | 桥与通达信连通状态 |
+| `POST /api/v1/account/query` | 账户与持仓查询（需 Bearer） |
+| `POST /api/v1/orders/query` | 当日委托查询（需 Bearer） |
+| `POST /api/v1/plans/execute` | 执行计划，可能真实下单，不是检查接口 |
+| `POST /api/v1/orders/cancel` | 撤单，有交易副作用 |
+| `/api/v1/sltp/*` | 止损守护配置/状态，配置可能产生后续订单 |
 
-### 1. 前提
-- SMB 共享已挂载：`mount -t cifs //192.168.31.22/PYPlugins /mnt/tdx-shared -o username=esxi,password=951951,vers=3.0,uid=1000,gid=1000`
-- QuantMind 的 trade 服务已能启动（docker 或本地）
+依据实际账户、持仓与当日委托对账后才讨论交易验证。超时后先查券商委托，不盲目重发订单。
 
-### 2. 配置
-在 QuantMind `.env` 设置（见第四节）。
+## 排错与安全
 
-### 3. 桥客户端 (可选)
-`~/trading-bridge/bridge-linux/` 提供独立的 `TradingClient`，供 QuandMind 策略脚本直接调用：
-```python
-from src.api.client import build_client
-from src.utils.config import Config
+| 现象 | 先检查 |
+| --- | --- |
+| 401 | token 两端是否一致，是否发送 Bearer，避免打印值 |
+| `tdx_connected=false` / TDX unavailable | 通达信是否运行并登录，本机 17709 与插件解释器依赖 |
+| 运行主机连接不上 8550 | 桥监听地址、网络路线、防火墙来源范围与容器网络 |
+| 委托待确认/无成交 | 通达信与券商的实际确认/拒单/成交状态，不依赖客户端推测 |
+| 选股没有推送 | 目标实例配置、推理完成日志和实际推送开关；不要因此开启实盘 |
 
-client = build_client(Config("config.yaml"))
-client.query_account()                       # 查账号
-client.buy("600519.SH", 100, price=1650.0)   # 下单
-client.configure_sltp([...])                 # 止损配置
-```
+桥的部分只读状态、缓存和 UI 路径豁免 token 鉴权，因此 token 不能替代网络隔离。限制 8550 到可信主机，不公开 UI、账户日志或缓存；共享目录若另行启用，凭据应独立保管，不放在命令历史或文档中。
 
----
-
-## 七、交易流程
-
-### 下单
-1. QuantMind 生成信号 → `TradingEngine.submit_order()`
-2. `trading_mode=REAL` + 桥启用 → `TdxBroker.place_order()`
-3. 桥转发到通达信 → 返回 `Wtbh` 委托编号
-4. **实盘**：通达信客户端弹出确认框，用户点"确认"后成交（`Value=1` 待确认）
-5. 成交回报通过桥的 `trade_log.jsonl` 记录，QuantMind 侧可查
-
-### 止损/止盈/移动止损
-- Windows 桥内 `stop_loss_daemon.py` 每 5 秒轮询行情
-- 触发条件（固定止损/止盈/移动止损）自动市价卖出
-- 状态持久化在 `bridge-windows/data/stop_loss_state.json`
-
----
-
-## 八、故障排查
-
-| 现象 | 原因 | 解决 |
-|------|------|------|
-| 桥返回 401 | token 不一致 | 核对 Linux `.env` 与 Windows `setup.bat` 的 token |
-| `TDX_UNAVAILABLE` | Windows 桥没启动/通达信没登录 | Windows 检查 `curl /health` |
-| 下单返回"待确认" | 普通账号需客户端确认 | 通达信客户端点确认；开通 TQ 收费账号后返回 Value=2 直接提交 |
-| Linux 连不上 8550 | 防火墙/桥没监听 0.0.0.0 | Windows `setup.bat` 已自动放行; 检查 `netsh advfirewall` |
-| 模拟盘还是用 PaperTradingBroker | `ENABLE_REAL_TRADING` 未开 | 设 `ENABLE_REAL_TRADING=true` |
-
----
-
-## 九、安全注意事项
-
-1. **Token 鉴权**：HTTP 桥用 Bearer token，`TDX_BRIDGE_TOKEN`/`BRIDGE_AUTH_TOKEN` 必须一致且保密
-2. **防火墙**：只放行 8550 到可信内网 IP
-3. **实盘人工确认**：普通账号实盘下单返回 Value=1 需客户端确认；**TQ 收费账号（量化会员）返回 Value=2 直接提交，免确认**（实测 2026-08-25: 卖单直接提交成功，无弹窗）
-4. **模拟盘与实盘隔离**：`ENABLE_REAL_TRADING=false` 时完全走模拟盘，零风险
-5. **交易日志**：桥把每次操作追加到 `execution_reports/trade_log.jsonl`，全程可审计
+桥运行日志在 `data/logs/bridge.log`，执行回报在配置的共享/回报目录。保留订单跟踪与止损状态，不通过删除状态文件消除错误。程序化交易的券商权限、报备与合规要求须独立确认。

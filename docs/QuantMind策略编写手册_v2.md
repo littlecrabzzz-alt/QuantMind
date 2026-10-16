@@ -1,66 +1,23 @@
-# QuantMind 策略编写手册 v2.0 (基本面过滤与对齐版)
+# 策略模板使用与编写
 
-## 1. 核心理念：统一对齐 (Single Source of Truth)
+用途：选择现有 Qlib 模板、编写可加载模板并避免无效参数与前视偏差。交互式 `setup/on_bar` 脚本请读 [Strategy Lab 用户手册](Strategy_Lab用户手册.md)，它与本文的模板接口不同。
 
-为了彻底解决“回测完美，实盘踩坑”的指标不一致问题，QuantMind 引入了**基本面统一对齐器 (Fundamental Aligner)**。
-- **回测时**：强制读取离线快照，模拟当日真实的决策环境。
-- **实盘时**：读取同样的对齐快照，确保拦截逻辑与回测完全一致。
+## 选择与运行现有模板
 
-## 2. 简洁模式：参数化过滤 (Mixin 2.0)
+在 AI-IDE 的策略模板面板选择模板，检查代码、市场、股票池、模型、日期和成本后再回测。模板列表由 `strategy_templates/` 中实际存在的 `.json` 与同名 `.py` 加载；名称或描述不证明策略已有独立实现、数据可用或盈利能力。
 
-你不再需要编写复杂的 Python 逻辑，只需在 `STRATEGY_CONFIG` 的 `kwargs` 中通过 `f_` 前缀直接配置过滤条件。
+- Top-K 类按预测排名选择持仓；`topk` 是持仓目标数，`n_drop` 控制调仓替换。
+- 权重类从分数生成目标权重；检查负分处理、归一化、单票上限及实际可交易约束，不能把分数直接当资金比例。
+- 动量、价值、风险、止损和时序类模板应逐项核对源码依赖与参数；显示为不同模板不代表使用不同模型。
+- 多空模板不等于 A 股账户具备融券能力。T+1、停牌、涨跌停、整手、交易成本与成交时点均需在目标回测/交易引擎中核实。
 
-### 2.1 参数语法规则
+A 股 `as01_*` 至 `as50_*` 模板由 `scripts/gen_ashare_strategy_templates.py` 维护。改生成模板时应改生成器再生成，避免下次覆盖。历史回测记录不是当前收益承诺，不应为了使用模板自动重跑全量研究。
 
-| 语法示例 | 逻辑意义 | 内部操作符 |
-| :--- | :--- | :--- |
-| `f_{field}_max` | 指标**小于等于**该值 | `<= (le)` |
-| `f_{field}_min` | 指标**大于等于**该值 | `>= (ge)` |
-| `f_{field}_not` | 指标**不等于**该值 | `!= (ne)` |
-| `f_{field}_in` | 指标**属于**该集合 | `in (isin)` |
-| `{field}` (无后缀) | 指标**等于**该值 | `== (eq)` |
+## 文件合同
 
-### 2.2 基础字段映射 (常用项)
+`backend/services/engine/qlib_app/services/strategy_templates.py` 只扫描模板目录顶层 `.json`。JSON 包含 `id/name/description/category/difficulty`，可带 `params`、`markets`、`dir`、执行默认值等；`dir` 是界面的虚拟分类，不是递归加载目录。
 
-你可以直接调用《实盘交易因子筛选手册》中的 88 个字段。常用字段如下：
-
-- **估值类**: `pe_ttm`, `pb`, `total_mv` (总市值), `float_mv` (流通市值), `roe`
-- **状态类**: `is_st` (1为ST), `listed_days` (上市天数)
-- **分类类**: `industry`, `listing_market`, `idx_hs300` (1为沪深300成分)
-
----
-
-## 3. 全量因子速查表 (88 维)
-
-| 分类 | 字段代码 | 含义 | 单位/格式 |
-| :--- | :--- | :--- | :--- |
-| **基础信息** | `listed_days` | 上市天数 | 天 |
-| | `is_st` | ST 状态 | 0/1 |
-| | `industry` | 所属行业 | 字符串 (申万一级) |
-| **估值指标** | `pe_ttm` | 动态市盈率 | 倍 |
-| | `pb` | 市净率 | 倍 |
-| | `total_mv` | 总市值 | 元 (CNY) |
-| | `roe` | 净资产收益率 | 百分比 (12 = 12%) |
-| **收益动量** | `return_5d` | 5日收益率 | 比率 (0.05 = 5%) |
-| | `return_20d` | 20日收益率 | 比率 (0.1 = 10%) |
-| **技术指标** | `rsi_6` | RSI 6 | 0 - 100 |
-| | `ma_gap_20` | 20日均线偏离 | 比率 |
-| | `vol_std_20` | 20日波动率 | 比率 |
-| **量能资金** | `turnover_rate` | 换手率 | 百分比 (5 = 5%) |
-| | `volume_ratio_5`| 5日量比 | 倍 |
-| | `inst_ownership`| 机构持仓 | 比率 (0.3 = 30%) |
-| **指数状态** | `idx_hs300` | 沪深300成分 | 0/1 |
-| | `limit_up_today`| 今日涨停 | 0/1 |
-
-> [!TIP]
-> 完整字段清单请参考 [实盘交易因子筛选手册](file:///Users/qusong/git/quantmind/docs/%E5%AE%9E%E7%9B%98%E4%BA%A4%E6%98%93%E5%9B%A0%E5%AD%90%E7%AD%9B%E9%80%89%E6%89%8B%E5%86%8C.md)。在编写 `f_` 参数时，请务必注意**比率**与**百分比**的单位区别。
-
----
-
-## 4. 策略模板示例
-
-### 3.1 价值成长策略 (Value Growth)
-剔除 ST，市值 10 亿-500 亿，PE 低于 25，ROE 高于 12%。
+Python 文件声明：
 
 ```python
 STRATEGY_CONFIG = {
@@ -69,63 +26,50 @@ STRATEGY_CONFIG = {
         "signal": "<PRED>",
         "topk": 30,
         "n_drop": 5,
-        
-        # --- 基本面过滤参数 (自动识别 f_ 前缀) ---
-        "f_is_st_not": 1,           # 剔除 ST
-        "f_total_mv_min": 1e9,      # 市值下限 10亿
-        "f_total_mv_max": 5e10,     # 市值上限 500亿
-        "f_pe_ttm_max": 25,         # PE 低于 25
-        "f_roe_min": 0.12,          # ROE 高于 12%
-        "f_listed_days_min": 365    # 上市满一年
-    }
+        "rebalance_days": 5,
+        "f_total_mv_min": 3e9,
+        "f_pe_ttm_max": 30,
+    },
 }
 ```
 
-### 3.2 行业专注策略 (Industry Specific)
-只在“医药”或“电子”行业中选股。
+`<PRED>` 由运行时替换为所选模型的预测结果。模板并不自带可用模型；模型解析见 [推理合同](模型推理服务设计与链路文档.md)。JSON 参数面板默认值应与代码一致。当前 Builder 对用户代码显式声明的参数保持原值，对缺失且类支持的参数回填；不要沿用旧指南“UI 总会覆盖 kwargs”的说法。最终以请求和落盘配置核对生效值。
 
-```python
-STRATEGY_CONFIG = {
-    "class": "RedisRecordingStrategy",
-    "kwargs": {
-        "signal": "<PRED>",
-        "topk": 10,
-        
-        # --- 行业动态过滤 ---
-        "f_industry_in": ["医药", "电子"],
-        "f_idx_zz1000": 1,          # 只看中证 1000 成分股
-        "f_is_st_not": 1
-    }
-}
-```
+自定义类可直接定义在模板 `.py` 中；不要为其填写不存在的 `module_path`。内置类映射与动态加载规则见 `strategy_builder.py`。
 
----
+## 基本面过滤
 
-## 4. 底层保障机制
+只有接入 `FundamentalFilterMixin` 的类才解释 `f_*`。约束读取 QuantDB `features_daily` 的日期快照，不读取旧的 `fundamental_aligned.parquet`。
 
-### 4.1 原子性更新
-数据同步脚本 `sync_factors_to_parquet.py` 采用 **Atomic Write** 机制。在实盘运行期间更新因子文件，不会造成策略读取中断或文件损坏。
+| 参数 | 比较 |
+| --- | --- |
+| `f_<field>_max` | 小于等于 |
+| `f_<field>_min` | 大于等于 |
+| `f_<field>_not` | 不等于 |
+| `f_<field>_in` | 属于集合 |
+| `f_<field>` | 等于 |
 
-### 4.2 新鲜度校验 (Freshness Guard)
-基本面对齐数据来自 QuantDB `features_daily`，跟随每日同步更新即为最新。
-- 确保已执行 `quantdb_daily_sync.py`，使 `features_daily` 覆盖到最近交易日。
-- 基于最新基本面快照做决策。
+必须核对实际列名、单位和历史可得性，不能照搬“88 个字段”或“169 个特征”的固定清单。尤其不要假设 `roe/is_st/listed_days/industry` 在当前数据源中存在。
 
-### 4.3 性能优化
-对齐器在初次加载后会将数据驻留内存。对于全市场 5000+ 股票的 100 个指标过滤，耗时通常控制在 **10ms** 以内。
+**当前缺失行为不是 fail-closed：** 整体快照为空会返回原股票池；单个约束列不存在会记录警告并跳过；数值比较会排除无法转为数字的值。因此 `f_*` 不能独立承担实盘强制风控。先查看数据覆盖与日志，不能把没有报错视为筛选生效。
 
----
+快照可向前查找最多 250 天的候选日期；这不是“最新且及时”的保证。财务数据仍需独立核对公告可得时点。
 
-## 5. 常见问题 (FAQ)
+## 自定义选股钩子
 
-**Q: 我填了参数但是没生效？**
-A: 请检查 QuantDB `features_daily` 中是否存在该列（如 `revenue_ttm`、`total_mv`、`pe_ttm` 等）。缺失的列会被对齐器 **静默跳过**（不报错也不生效），见对齐器 `fundamental_aligner.filter_instruments`。常用字段若干：revenue_ttm、net_profit_ttm、annual_net_profit、equity、total_mv、float_mv、pe_ttm、pe_static、pb、ps_ttm、dividend_rate、vol_std_20/60、vol_atr_14、beta_20、ma_gap_5/20、rsi_14、kdj_j、macd_hist、pct_change、vol_to_ma5。注意：features_daily 不含 roe、is_st。
+`TopkDropoutStrategy` 在 `generate_trade_decision` 中读信号，不调用权重策略的 `generate_target_weight_position`。基于当前 `RedisRecordingStrategy` 扩展时：
 
-**Q: 盘中实时涨幅能用这个过滤吗？**
-A: 建议仅对静态或低频因子（PE、市值、ST、行业）使用 `f_` 参数。对于盘中实时涨幅，建议在策略的 `generate_target_weight_position` 中动态调用行情接口。
+- `_adjust_signal(score, ref_date)` 调整排序/过滤，`ref_date` 为上一交易日。
+- `_dynamic_risk_degree(base, ref_date)` 调整风险仓位。
+- 行情使用基类 `_close_matrix()` / `_price_frame()` 的缓存路径，避免每个调仓步反复拉全量行情。
 
-**Q: 如果没有对齐文件会怎样？**
-A: 系统会记录一条 Warning 日志并“放行”所有股票，不会导致回测或实盘进程崩溃。
+权重类走另一条调用链，不能将上述钩子机械套用。`_adjust_signal` 异常时当前实现记录日志并沿用原信号，必须检查日志，不能认为异常会自动阻断交易。
 
----
-*QuantMind 研发团队 - 2026.05.09 更新*
+## 使用前检查
+
+- 训练特征、标签和策略筛选分开：`return_Nd` 等未来收益标签不能用作当时选股输入。
+- 明确信号可得时刻与成交时刻；收盘后得到的信号不能按同日已知收盘价成交。
+- 核对每项约束实际改变了候选池，并保存模型、日期、股票池、参数、成本和数据版本。
+- 样本外比较和交易能力验证独立进行。模板、回测、扫描通过均不自动授权实盘。
+
+费用口径见 [回测费用](回测费用配置说明.md)。本项目仅供研究，不构成投资建议。
