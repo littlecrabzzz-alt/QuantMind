@@ -208,6 +208,25 @@ def fetch(source, directory):
                     fetched=0, items=[])
 
 
+def research_case_progress(output):
+    """Attach recorded case progress without changing source/version fingerprints."""
+    path = output / "research_case_state.json"
+    if not path.exists():
+        return {"status": "not_registered", "cases": []}
+    try:
+        index = json.loads(path.read_text())
+        if index.get("schema_version") != 1 or not isinstance(index.get("cases"), dict):
+            raise ValueError("Invalid research case index")
+        entries = list(index["cases"].values())
+        if any(not isinstance(entry, dict) or not entry.get("title") or not entry.get("case_path")
+               or not isinstance(entry.get("state"), dict) or not entry["state"].get("workflow_stage")
+               for entry in entries):
+            raise ValueError("Invalid research case progress entry")
+        return {"status": "recorded_not_reverified", "cases": entries}
+    except (OSError, ValueError) as exc:
+        return {"status": "unavailable", "error": str(exc), "cases": []}
+
+
 def markdown(report):
     lines = ["# 量化研究采集试运行", "", f"执行时间：{report['run_at']}；方式：{report['mode']}",
              f"筛选区间：{report['start_date']} 至 {report['end_date']}（含首尾日期）。", "",
@@ -231,6 +250,15 @@ def markdown(report):
                   f"- 版本/公告类型：{x.get('version') or '不适用'} / {x.get('announce_type') or '不适用'}",
                   f"- 来源内容摘录：{x['summary'][:500]}",
                   "- 方法证据、项目适用性与最小实验：待人工或后续 LLM 评审，不由关键词得分代替。", ""]
+    progress = report.get("research_cases", {})
+    if progress.get("cases"):
+        lines += ["## 已登记研究案例", "", "以下为最近保存的检查状态，本次采集未重新验证数据或执行实验。", ""]
+        for entry in progress["cases"]:
+            state = entry["state"]
+            lines += [f"- {entry['title']}：{state['workflow_stage']}；最近检查 {state.get('checked_at', '尚未检查')}。",
+                      f"  案例：`{entry['case_path']}`；下一步：{state.get('next_action', '运行数据准入检查').rstrip('。')}。", ""]
+    elif progress.get("status") == "unavailable":
+        lines += ["## 研究案例状态", "", "进度索引读取失败，不能据此推断没有进行中的研究案例。", ""]
     lines += ["## 数据文件", "", "`report.json` 保存全部窗口内候选、条目筛选原因与来源状态；`raw/` 保存本次公开响应；共享 SQLite 保存条目及版本。", ""]
     return "\n".join(lines)
 
@@ -318,7 +346,7 @@ def main():
         start, end = screening_window(now, args.lookback_days, previous)
         report = dict(run_at=now.isoformat(), mode="replay" if args.replay else "live",
                       start_date=str(start), end_date=str(end), sources=[], counts={},
-                      candidates=[], screened=[])
+                      candidates=[], screened=[], research_cases=research_case_progress(args.output))
         with connect(args.output / "catalog.sqlite3") as db:
             for result in results:
                 entries = result.pop("items")

@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "case_id": "rrg-sector-rotation",
+  "title": "RRG 行业轮动复现",
+  "source": {
+    "key": "github:playbook:558536af13715aa13fd2131eaf90c70d32108a38",
+    "fingerprint": "9c99c57fd4a67b1fcdb29e0f3dca2a2484c768ffafe256dd4d459f11aa2439e6",
+    "revision": "558536af13715aa13fd2131eaf90c70d32108a38",
+    "url": "https://github.com/hugo2046/QuantsPlaybook/commit/558536af13715aa13fd2131eaf90c70d32108a38",
+    "note": "docs/2026-09-05-RRG行业轮动研究笔记.md"
+  },
+  "hypothesis": "固定行业分类、历史可得数据及成本后，RRG 相比简单行业动量能否改善风险调整收益或回撤；扩散度是否提供额外增量。",
+  "protocol": {
+    "purpose": "development_replication",
+    "comparison_window": ["2022-09-01", "2026-08-31"],
+    "window_note": "原项目已经报告过的时期，只作开发复现；最终独立测试窗口尚未确定。",
+    "classification": "中信一级",
+    "benchmark": "同分类行业日收益等权累乘",
+    "exclude_industries": ["综合", "综合金融"],
+    "parameters": {"ratio_lookback": 220, "momentum_lookback": 60, "smooth_window": 20},
+    "warmup_sessions": 318,
+    "min_price_observations": 319,
+    "controls": ["行业等权", "220日相对动量Top6", "纯RRG", "纯扩散度", "扩散度Top6再筛领先或改善"],
+    "selection": {"top_n": 6, "keep_quadrants": ["领先", "改善"], "refill_after_filter": false},
+    "rebalance": "月末收盘生成信号，下一交易日开盘执行",
+    "costs_one_way_bps": [10, 20, 30],
+    "metrics": ["成本后收益", "相对动量超额", "Sharpe", "最大回撤", "换手", "现金比例", "分年表现", "集中度"],
+    "rejection_rules": ["数据无法满足历史时点要求", "现实成本后相对简单动量无稳定增量", "优势集中于少数年份或单一参数"],
+    "next_design_gate": "信号层数据通过后，先冻结行业名单、排序同分规则及持仓/现金权重；ETF阶段另冻结成交约束与集中度，不从最佳回测倒推方案。"
+  },
+  "datasets": [
+    {
+      "id": "industry_prices", "phase": "signal_layer", "label": "目标分类行业历史指数",
+      "glob": "data/quantdb/1_kline_data/index_daily/*.parquet",
+      "required_columns": ["time", "IndexCode", "Category", "open", "close"],
+      "inspect_fields": ["Category", "time"],
+      "required_values": {"Category": ["中信一级"]},
+      "next_action": "取得固定版本的完整中信一级行业名单及历史开收盘价；现有中证行业不得替代中信。"
+    },
+    {
+      "id": "calendar", "phase": "signal_layer", "label": "交易日历",
+      "glob": "data/quantdb/2_base_sector/trading_calendar/trading_days.parquet",
+      "required_columns": ["TradingDate", "IsTradingDay"],
+      "inspect_fields": ["TradingDate"],
+      "required_values": {},
+      "next_action": "将行业价格逐日对齐此日历，核验比较期及318日预热，不用文件日期范围代替逐日覆盖。"
+    },
+    {
+      "id": "industry_members", "phase": "breadth_layer", "label": "历史行业成分与可得时点",
+      "glob": "data/quantdb/2_base_sector/sector_concept/sector_members.parquet",
+      "required_columns": ["SectorCode", "Symbol", "effective_from", "effective_to", "known_at"],
+      "inspect_fields": ["SectorType"],
+      "required_values": {},
+      "next_action": "补历史成员有效期和当时可知日期；需适配来源字段，当前无日期的成员表不用于历史扩散度。"
+    },
+    {
+      "id": "etf_prices", "phase": "etf_execution", "label": "ETF开收盘行情",
+      "glob": "data/quantdb/4_bond_etf/etf_kline/*.parquet",
+      "required_columns": ["time", "open", "close", "volume", "amount"],
+      "inspect_fields": ["time"],
+      "required_values": {},
+      "next_action": "确认一致的复权口径、分红处理及当日可成交状态；价格文件存在不等于可回测。"
+    },
+    {
+      "id": "etf_holdings", "phase": "etf_execution", "label": "ETF历史持仓暴露",
+      "glob": "data/quantdb/4_bond_etf/etf_pcf/etf_components.parquet",
+      "required_columns": ["EtfCode", "ComponentCode", "report_date", "announcement_date"],
+      "inspect_fields": [],
+      "required_values": {},
+      "next_action": "补历史PCF或带公告日期的持仓，保留未披露暴露；当前成分不能回填过去。"
+    },
+    {
+      "id": "etf_pcf", "phase": "etf_execution", "label": "ETF清单交易日期",
+      "glob": "data/quantdb/4_bond_etf/etf_pcf/etf_pcf.parquet",
+      "required_columns": ["EtfCode", "tradingDay"],
+      "inspect_fields": ["tradingDay"],
+      "nonempty_fields": ["tradingDay"],
+      "required_values": {},
+      "next_action": "需要有实际日期的历史清单及上市/退市记录，空日期清单不能用于历史池。"
+    }
+  ],
+  "review_gates": [
+    {"id": "industry_integrity", "phase": "signal_layer", "label": "完整行业名单、分类版本与逐日价格核验", "next_action": "核验代码/日期唯一、价格正且有限、全日历覆盖及至少319个观测；检查行业基准和排除名单。"},
+    {"id": "point_in_time_breadth", "phase": "breadth_layer", "label": "扩散度历史时点核验", "next_action": "核验历史成员、可比复权个股价和当期市值；明确流通市值替代自由流通市值的偏差。"},
+    {"id": "tradable_etf_universe", "phase": "etf_execution", "label": "历史ETF池与成交口径核验", "next_action": "核验上市退市、交易状态、公告时点、复权口径、单位、约束和成本；行业指数模拟与可交易ETF回测分开。"}
+  ]
+}
