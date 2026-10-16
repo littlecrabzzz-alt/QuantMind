@@ -1,9 +1,11 @@
 #!/bin/zsh
-# Archive maintenance (maintain.py: worker stop-if-running -> hold -> ingest ->
-# retire by original rules -> restore original worker state) runs automatically at
-# most once per MAINTAIN_CADENCE seconds via the .last-maintain marker; a failed
-# pass defers to the next cycle instead of crashing the loop. Authorized manual
-# windows can also run maintain.py directly.
+# Archive maintenance (maintain.py) follows the ENABLED-gated native order:
+# move ENABLED away -> drain pipeline/documents/.archive/.migration locks ->
+# pause the worker only at that idle point (pause journal kept) -> hold/ingest/
+# retire -> restore ENABLED first -> resume the worker, with resume failures
+# propagating non-zero (the journal then drives recovery on the next pass).
+# It runs automatically at most once per MAINTAIN_CADENCE seconds via the
+# .last-maintain marker; failures defer to the next cycle instead of crashing.
 # The QM_OCR_* overrides exist so scripts/test_pdf_text_driver.py can exercise
 # the cycle logic against fixtures (QM_OCR_PY substitutes the python executable,
 # including a fixture script that prints stage markers); production uses the

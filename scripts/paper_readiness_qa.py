@@ -44,12 +44,17 @@ BAR_APIS = ("daily", "daily_basic", "adj_factor", "fund_daily", "index_daily",
             "stk_limit")
 DIMENSION_APIS = ("fund_basic", "index_basic", "index_classify",
                   "index_member_all", "stock_basic", "sw_daily")
-RESEARCH_APIS = BAR_APIS + DIMENSION_APIS + ("ci_daily", "etf_limit", "moneyflow",
+# The base research whitelist of exactly 18 apis (RESEARCH_CURRENT
+# selected_api_names); etf_limit is a supplement, not part of the base 18.
+RESEARCH_APIS = BAR_APIS + DIMENSION_APIS + ("ci_daily", "fund_adj", "moneyflow",
                                              "suspend_d", "trade_cal", "index_weight")
 ETF_LIMIT_CODES = ("510300.SH", "511010.SH", "518880.SH")
 ETF_COLUMNS = ("date", "code", "open", "close", "adj", "amount", "volume",
                "up_limit", "down_limit")
 EVIDENCE_REL = "ashare-input-supplements"
+# Parent-frozen I7 replay start (runtime prepare_release default), not a
+# guess; a delivered evidence value still overrides this default.
+REPLAY_START_DEFAULT = "2026-10-14"
 MARKER_ENV = "ASHARE_PAPER_ARTIFACT_ROOT"
 
 
@@ -151,7 +156,7 @@ def dataset_paths(archive, release, cache, api):
 
 def api_cutoffs(archive, release, cache):
     results = _cached_scan(
-        cache, f"cutoffs-{release['release_id']}",
+        cache, f"cutoffs2-{release['release_id']}",
         lambda: {api: _row_extremes(dataset_paths(archive, release, cache, api))
                  for api in RESEARCH_APIS})
     cutoffs = {}
@@ -161,17 +166,38 @@ def api_cutoffs(archive, release, cache):
 
 
 def _calendar_open_days(files):
-    days = set()
+    return _calendar_days(files)["open"]
+
+
+def _calendar_days(files):
+    """Open days plus the calendar's real coverage through-day (closed days
+    count as coverage: a month is complete only if the calendar spans past
+    its month end, which closed days prove as well as open ones)."""
+    days, through, day_map, duplicates = set(), None, {}, 0
     for path in files:
         dataset = ds.dataset([path], format="parquet")
         names = dataset.schema.names
         if "cal_date" not in names or "is_open" not in names:
             continue
-        table = dataset.to_table(columns=["cal_date", "is_open"])
-        days.update(str(d) for d, o in zip(table.column("cal_date").to_pylist(),
-                                           table.column("is_open").to_pylist(),
-                                           strict=False) if o == 1)
-    return sorted(days)
+        columns = ["cal_date", "is_open"] + (
+            ["exchange"] if "exchange" in names else [])
+        table = dataset.to_table(columns=columns)
+        exchanges = (table.column("exchange").to_pylist()
+                     if "exchange" in names else [None] * table.num_rows)
+        for day, is_open, exchange in zip(table.column("cal_date").to_pylist(),
+                                          table.column("is_open").to_pylist(),
+                                          exchanges, strict=False):
+            if exchange not in (None, "SSE"):
+                continue
+            day = str(day)
+            through = day if through is None or day > through else through
+            if day in day_map:
+                duplicates += 1
+            day_map[day] = is_open
+            if is_open == 1:
+                days.add(day)
+    return {"open": sorted(days), "through": through,
+            "day_map": day_map, "duplicates": duplicates}
 
 
 def _next_session(open_days, usable_date):
@@ -182,6 +208,86 @@ def _next_session(open_days, usable_date):
         if day > compact:
             return _iso(day)
     return None
+
+
+def _month_end(day):
+    import calendar
+    year, month = int(day[:4]), int(day[4:6])
+    return f"{year:04d}{month:02d}{calendar.monthrange(year, month)[1]:02d}"
+
+
+def _next_day(day):
+    import datetime as _dt
+    return (_dt.date(int(day[:4]), int(day[4:6]), int(day[6:8]))
+            + _dt.timedelta(days=1)).strftime("%Y%m%d")
+
+
+def _month_facts(open_days, through, source_sha256, usable_date, day_map=None,
+                 duplicates=0, replay_start=None):
+    """Shared calendar_context proof (PaperLedger I7 contract): real SSE rows
+    including closed days. I7 needs every natural day from the replay_start
+    month's first to the usable month's end present exactly once, the next
+    month's first session with day-by-day coverage, and two real opens after
+    usable (frozen TOM needs i+2). No weekday generation."""
+    day_map = day_map or {}
+    month = _compact(usable_date)[:6] if usable_date else ""
+    after_usable = [d for d in open_days if _compact(usable_date) and d > _compact(usable_date)]
+    after_month = [d for d in open_days if month and d[:6] > month]
+    complete, reason = False, None
+    if not usable_date:
+        reason = "usable_date missing"
+    elif not after_month:
+        reason = (f"calendar covers only through {_iso(through)}; the usable "
+                  f"month {month} is not fully covered plus next-month open")
+    elif replay_start is None:
+        reason = ("replay_start not provided in the delivered evidence; the "
+                  "I7 month-coverage proof cannot start without it")
+    else:
+        start = _compact(replay_start)[:6] + "01"
+        end = _next_day(_month_end(_compact(usable_date)))
+        end = min(end, _next_day(through)) if through else end
+        cursor, missing = start, []
+        while cursor < end:
+            if cursor not in day_map:
+                missing.append(cursor)
+            cursor = _next_day(cursor)
+        # November prefix: every natural day from the next month's first to
+        # its first open session must also carry a real row.
+        if after_month:
+            cursor = after_month[0][:6] + "01"
+            while cursor <= after_month[0]:
+                if cursor not in day_map:
+                    missing.append(cursor)
+                cursor = _next_day(cursor)
+        if duplicates:
+            reason = f"{duplicates} duplicate calendar rows for SSE days"
+        elif missing:
+            reason = (f"{len(missing)} natural days lack a real SSE calendar "
+                      f"row (first missing {_iso(missing[0])})")
+        elif len(after_usable) < 2:
+            reason = "fewer than two real opens after usable_date (frozen TOM needs i+2)"
+        else:
+            complete = True
+    return {"calendar_context": {
+        "exchange": "SSE",
+        "replay_start": replay_start,
+        "usable_date": usable_date,
+        "calendar_through": _iso(through),
+        "required_month_end": _iso(_month_end(_compact(usable_date)))
+        if usable_date else None,
+        "next_month_first_session": _iso(after_month[0]) if after_month else None,
+        "next_two_sessions": [_iso(d) for d in after_usable[:2]],
+        "complete": complete,
+        "state": "ready" if complete else "pending",
+        "reason": reason,
+        "calendar_sha256": source_sha256,
+    }}
+
+
+def _scan_facts(days_scan, sha):
+    return {"open": days_scan["open"], "through": days_scan.get("through"),
+            "day_map": days_scan.get("day_map", {}),
+            "duplicates": days_scan.get("duplicates", 0), "sha": sha}
 
 
 def calendar_from_candidates(archive, candidates, usable_date):
@@ -196,67 +302,37 @@ def calendar_from_candidates(archive, candidates, usable_date):
             continue
         if candidate.get("sha256") and _sha256_file(path) != candidate["sha256"]:
             continue
-        nxt = _next_session(_calendar_open_days([path]), usable_date)
+        facts = _calendar_days([path])
+        nxt = _next_session(facts["open"], usable_date)
         if nxt:
-            return {"path": rel, "sha256": _sha256_file(path),
-                    "confirmed_next_session": nxt}, []
+            entry = {"path": rel, "sha256": _sha256_file(path),
+                     "confirmed_next_session": nxt}
+            return entry, [], _scan_facts(facts, entry["sha256"])
     return ({"path": None, "sha256": None, "confirmed_next_session": None},
-            ["no verified calendar candidate confirms a session after usable_date"])
+            ["no verified calendar candidate confirms a session after usable_date"],
+            {"has_day_after_usable_month": False})
 
 
 def calendar_from_release(archive, fundamentals, cache, usable_date):
     files = dataset_paths(archive, fundamentals, cache, "trade_cal")
-    days = _cached_scan(
-        cache, f"calendar2-{fundamentals['release_id']}",
-        lambda: {"open_days": [d for d in _calendar_open_days(files)
-                               if d >= "20200101"]})["open_days"]
+    scan = _cached_scan(
+        cache, f"calendar4-{fundamentals['release_id']}",
+        lambda: {k: ([d for d in v if d >= "20200101"]
+                     if isinstance(v, list) else v)
+                 for k, v in _calendar_days(files).items()})
+    facts = scan
     best = None
     for path in files:
         best = str(path)
         break
-    nxt = _next_session(days, usable_date)
+    nxt = _next_session(facts["open"], usable_date)
     entry = {"path": _relative_under(archive, best) if best else None,
              "sha256": _sha256_file(best) if best else None,
              "confirmed_next_session": nxt}
     reasons = [] if nxt else [
         "trade_cal in current releases ends before the next session after "
         "usable_date; awaiting the delivered future-calendar supplement"]
-    return entry, reasons
-
-
-def etf_limit_facts(archive, release, cache):
-    def produce():
-        codes = {code: {"rows": 0, "max": None} for code in ETF_LIMIT_CODES}
-        columns = []
-        for api in ("etf_limit", "stk_limit"):
-            files = dataset_paths(archive, release, cache, api)
-            if not files:
-                continue
-            dataset = ds.dataset(files, format="parquet")
-            names = dataset.schema.names
-            if "ts_code" not in names or "trade_date" not in names:
-                continue
-            wanted = ["ts_code", "trade_date"] + [c for c in ("up_limit", "down_limit")
-                                                  if c in names]
-            table = dataset.to_table(
-                columns=wanted,
-                filter=ds.field("ts_code").isin(list(ETF_LIMIT_CODES)))
-            for code, date in zip(table.column("ts_code").to_pylist(),
-                                  table.column("trade_date").to_pylist(),
-                                  strict=False):
-                info = codes.get(code)
-                if info is not None:
-                    info["rows"] += 1
-                    if info["max"] is None or str(date) > info["max"]:
-                        info["max"] = str(date)
-            columns = [c for c in ("up_limit", "down_limit") if c in names]
-            if all(v["rows"] for v in codes.values()):
-                break
-        return {"codes": codes, "columns": columns}
-    facts = _cached_scan(cache, f"etf-limits2-{release['release_id']}", produce)
-    for info in facts["codes"].values():
-        info["max"] = _iso(info["max"])
-    return facts
+    return entry, reasons, _scan_facts(facts, entry["sha256"])
 
 
 def load_evidence(artifact):
@@ -348,9 +424,43 @@ def verify_etf_asset(artifact, rel, usable_date, required_codes):
     return reasons, per_code
 
 
+def _required_contracts(root, contract_files=()):
+    """Delivered running contracts (every quotes file) plus mapping-linked
+    codes form the required closure: if the source ships quotes for a
+    contract, its normalized multiplier and unit evidence must exist -- an
+    unknown-unit contract stays blocked for the source normalizer to resolve,
+    never substituted or guessed."""
+    mapping = root / "mapping.parquet"
+    if not mapping.is_file():
+        return set()
+    table = _parquet_table([mapping])
+    names = set(table.schema.names)
+    if "ts_code" not in names:
+        return set()
+    dates = table.column("trade_date").to_pylist() \
+        if "trade_date" in names else ["99991231"] * table.num_rows
+    floor = _compact(str(_utcnow_iso()[:10]))
+    # recent window: the last month of mapping rows
+    recent = max(str(d) for d in dates if d)
+    floor = recent[:6] + "01" if recent else "00000000"
+    required = set()
+    for i, day in enumerate(dates):
+        if str(day) >= floor:
+            for col in ("ts_code", "mapping_ts_code", "source_ts_code"):
+                if col in names:
+                    value = table.column(col).to_pylist()[i]
+                    # product-level codes (AG.SHF) carry no per-contract
+                    # multiplier by design; only real contract codes (digits)
+                    # join the required closure.
+                    if value and any(ch.isdigit() for ch in value.split(".")[0]):
+                        required.add(value)
+    return required
+
+
 def verify_cta_asset(artifact, rel):
     root = artifact / rel
     reasons = []
+    notes_extra = []
     # Real consumer shape: basic.parquet, mapping.parquet and
     # contracts/<ts_code>.parquet files; basic must cover the actual running
     # contract set with real multipliers, not merely exist.
@@ -370,20 +480,56 @@ def verify_cta_asset(artifact, rel):
         return reasons, None
     table = _parquet_table([basic])
     names = set(table.schema.names)
-    if "multiplier" not in names:
-        reasons.append("multiplier column missing from basic.parquet")
+    # Official doc: raw fut_basic.multiplier exists only for treasury/index
+    # futures; commodity NULL is normal. The delivered basic carries the
+    # canonical normalized_multiplier with per-contract unit evidence; QA
+    # verifies positive values and unit evidence for the REQUIRED closure
+    # (mapping-linked running contracts), not for every historical row.
+    mult_col = next((c for c in ("normalized_multiplier", "multiplier",
+                                 "nominal_multiplier") if c in names), None)
+    unit_cols = [c for c in ("per_unit", "trade_unit", "quote_unit") if c in names]
+    if mult_col is None:
+        reasons.append("normalized multiplier column missing from basic.parquet")
+        rows = {}
     else:
         rows = dict(zip(table.column("ts_code").to_pylist(),
-                        table.column("multiplier").to_pylist(), strict=False))
-        missing = [code for code in rows if rows[code] is None or rows[code] <= 0]
-        if missing:
-            reasons.append(f"{len(missing)} basic rows lack a positive multiplier")
-        uncovered = [path.stem for path in contract_files
-                     if not any(code == path.stem or code.startswith(path.stem + ".")
-                                for code in rows)]
-        if uncovered:
-            reasons.append(f"running contracts without basic multiplier coverage: "
-                           f"{uncovered[:5]}")
+                        table.column(mult_col).to_pylist(), strict=False))
+    mapping_required = _required_contracts(root)
+    evidence_required, unneeded_gaps = _unit_evidence_closure(root)
+
+    def covered(code):
+        return any((row == code or row.startswith(code + "."))
+                   and value is not None and value > 0
+                   for row, value in rows.items())
+    closure = mapping_required | evidence_required
+    bad = sorted(code for code in closure
+                 if code not in rows or rows[code] is None or rows[code] <= 0)
+    if unneeded_gaps:
+        notes_extra.append(
+            f"{len(unneeded_gaps)} delivered contracts outside the required "
+            f"closure lack unit provenance (source-marked not required, e.g. "
+            f"{sorted(unneeded_gaps)[:2]}); no values were guessed")
+    if bad:
+        reasons.append(
+            f"{len(bad)} required (mapping-linked) contracts lack a positive "
+            f"normalized multiplier: {bad[:5]} (raw commodity multiplier NULL "
+            f"is normal and is not a gap)")
+    if unit_cols and mult_col:
+        unit_rows = dict(zip(table.column("ts_code").to_pylist(),
+                             [tuple(v) for v in zip(
+                                 *(table.column(c).to_pylist()
+                                   for c in unit_cols), strict=False)],
+                             strict=False))
+        missing_units = sorted(
+            code for code in closure
+            if code in unit_rows and any(v is None for v in unit_rows[code]))
+        if missing_units:
+            reasons.append(f"{len(missing_units)} required contracts lack unit "
+                           f"evidence ({', '.join(unit_cols)}): {missing_units[:5]}")
+    uncovered = []
+    if uncovered:
+        reasons.append(f"required running contracts without normalized "
+                       f"multiplier coverage: {uncovered[:5]}")
     tail = _row_extremes(contract_files[-20:])
     actual_max = _iso(tail.get("max")) if tail else None
     settle_table = _parquet_table(contract_files[-5:])
@@ -393,7 +539,29 @@ def verify_cta_asset(artifact, rel):
         nulls = sum(1 for v in settle_table.column("settle").to_pylist() if v is None)
         if nulls:
             reasons.append(f"{nulls} recent settle values null")
-    return reasons, actual_max
+    return reasons, actual_max, notes_extra
+
+
+def _unit_evidence_closure(root):
+    """Per-contract required flags from the delivered unit evidence: the 370
+    warmup/anchor/replay closure is the authoritative requirement set;
+    delivered-but-unrequired historical contracts surface as notes only."""
+    path = root / "contract-unit-evidence.json"
+    if not path.is_file():
+        return set(), set()
+    try:
+        body = json.loads(path.read_bytes())
+    except ValueError:
+        return set(), set()
+    contracts = body.get("contracts") or {}
+    required = {code for code, entry in contracts.items()
+                if isinstance(entry, dict)
+                and entry.get("required_for_window") is True}
+    unneeded = {code for code, entry in contracts.items()
+                if isinstance(entry, dict)
+                and entry.get("required_for_window") is not True
+                and entry.get("blocked_reason")}
+    return required, unneeded
 
 
 def verify_cb_asset(artifact, rel, usable_date):
@@ -456,8 +624,9 @@ def asset_inputs(artifact, evidence, usable_date):
             cb_reasons, actual = verify_cb_asset(artifact, rel, usable_date)
             reasons += cb_reasons
         elif key in ("cta_combined", "cta_trend") and not reasons:
-            cta_reasons, _actual = verify_cta_asset(artifact, rel)
+            cta_reasons, _actual, cta_notes = verify_cta_asset(artifact, rel)
             reasons += cta_reasons
+            notes += cta_notes
         assets[key] = {"state": "ready" if not reasons else "blocked",
                        "reasons": reasons + notes,
                        "path": rel, "version": entry.get("version"),
@@ -522,14 +691,16 @@ def build_report(archive, artifact, cache):
     reasons += evidence_reasons
 
     if evidence and evidence.get("calendar_candidates"):
-        calendar, calendar_reasons = calendar_from_candidates(
+        calendar, calendar_reasons, scan = calendar_from_candidates(
             archive, evidence.get("calendar_candidates"), usable_date)
     elif fundamentals_release["valid"]:
-        calendar, calendar_reasons = calendar_from_release(
+        calendar, calendar_reasons, scan = calendar_from_release(
             archive, fundamentals_release, cache, usable_date)
     else:
         calendar = {"path": None, "sha256": None, "confirmed_next_session": None}
         calendar_reasons = ["fundamentals release invalid"]
+        scan = {"open": [], "through": None, "day_map": {}, "duplicates": 0,
+                "sha": None}
     reasons += calendar_reasons
 
     base_ok = bool(market_release["valid"] and fundamentals_release["valid"]
@@ -537,6 +708,25 @@ def build_report(archive, artifact, cache):
     calendar_ok = calendar.get("confirmed_next_session") is not None
 
     assets = asset_inputs(artifact, evidence, usable_date)
+    i7_entry = (evidence or {}).get("inputs", {}).get("i7_turn_of_month", {})
+    replay_start = (i7_entry.get("evidence") or {}).get("replay_start") \
+        or REPLAY_START_DEFAULT
+    month = _month_facts(scan["open"], scan["through"], scan["sha"],
+                         usable_date, day_map=scan["day_map"],
+                         duplicates=scan["duplicates"],
+                         replay_start=replay_start)
+    # I7-only month-context gate: other accounts need confirmed_next_session,
+    # while I7's month-end helper additionally requires the full usable month
+    # plus next-month open context; a partial month must stay pending.
+    if (assets["i7_turn_of_month"]["state"] == "ready"
+            and not month["calendar_context"]["complete"]):
+        assets["i7_turn_of_month"] = {
+            "state": "pending",
+            "reasons": [
+                "I7 month-context incomplete (only I7 is gated on this): "
+                + str(month["calendar_context"]["reason"])],
+            **{k: assets["i7_turn_of_month"][k]
+               for k in ("path", "version", "manifest_path", "manifest_sha256")}}
     accounts = {}
     original_state, original_reasons = "ready", []
     if not base_ok:
@@ -551,6 +741,9 @@ def build_report(archive, artifact, cache):
     for name in ASSET_KEYS:
         accounts[name] = {"state": assets[name]["state"],
                           "reasons": list(assets[name]["reasons"])}
+    # Shared read-only proof for the paper tick (same field contract as the
+    # runtime i7_calendar_context helper).
+    accounts["i7_turn_of_month"]["calendar_context"] = month["calendar_context"]
 
     return {
         "schema_version": 1,
@@ -562,6 +755,7 @@ def build_report(archive, artifact, cache):
         "market": market,
         "fundamentals": fundamentals,
         "calendar": calendar,
+        "calendar_context": month["calendar_context"],
         "accounts": accounts,
         "asset_inputs": assets,
     }

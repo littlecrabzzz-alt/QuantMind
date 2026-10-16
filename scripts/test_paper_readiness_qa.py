@@ -57,21 +57,22 @@ class ReadinessQA(unittest.TestCase):
                 {"release_id": rid, "manifest_sha256": sha(manifest)}))
 
         bar_apis = list(qa.BAR_APIS)
-        pointer("RESEARCH_CURRENT.json", RID, bar_apis + ["etf_limit"])
+        pointer("RESEARCH_CURRENT.json", RID, bar_apis + ["fund_adj"])
         pointer("CURRENT.json", FULL, ["trade_cal"])
         for api in bar_apis:
             write_parquet(self.archive / f"parquet/{api}-{RID[:8]}.parquet",
                           {"ts_code": ["000001.SZ"], "trade_date": ["20261015"]})
-        write_parquet(self.archive / f"parquet/etf_limit-{RID[:8]}.parquet",
-                      {"ts_code": list(qa.ETF_LIMIT_CODES),
-                       "trade_date": ["20261015"] * 3,
-                       "up_limit": [4.1, 1.1, 7.7], "down_limit": [3.4, 0.9, 6.3]})
+        write_parquet(self.archive / f"parquet/fund_adj-{RID[:8]}.parquet",
+                      {"ts_code": ["510300.SH"], "trade_date": ["20261015"]})
         # Real open days with a gap: next session after 10-15 is 10-19 (10-16/17
         # closed), so weekday or +1day inference would fail.
+        october = [f"202610{d:02d}" for d in range(1, 32)]
+        november = ["20261101", "20261102"]
+        open_flags = [0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1,
+                      1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1]
         write_parquet(self.archive / f"parquet/trade_cal-{FULL[:8]}.parquet",
-                      {"cal_date": ["20261014", "20261015", "20261016", "20261017",
-                                    "20261019", "20261020"],
-                       "is_open": [1, 1, 0, 0, 1, 1]})
+                      {"cal_date": october + november,
+                       "is_open": open_flags[:len(october)] + [0, 1]})
 
     def _cb_cta_fixture(self):
         cb = self.artifact / "ashare-takeover/trees/cb/data/extra"
@@ -117,7 +118,8 @@ class ReadinessQA(unittest.TestCase):
             mutate()
         etf_entry = {"path": "prepared/etf-normalized.parquet", "version": "e1",
                      "manifest_path": "prepared/supplement-manifest.json",
-                     "manifest_sha256": sha(manifest)}
+                     "manifest_sha256": sha(manifest),
+                     "evidence": {"replay_start": "2026-10-01"}}
         cb_entry = {"path": "ashare-takeover/trees/cb/data/extra", "version": "c1",
                     "manifest_path": "prepared/supplement-manifest.json",
                     "manifest_sha256": sha(manifest)}
@@ -146,7 +148,7 @@ class ReadinessQA(unittest.TestCase):
         self._deliver()
         report = self.report()
         self.assertEqual(report["usable_date"], "2026-10-15")
-        self.assertEqual(report["calendar"]["confirmed_next_session"], "2026-10-19")
+        self.assertEqual(report["calendar"]["confirmed_next_session"], "2026-10-18")
         for key in qa.ASSET_KEYS:
             self.assertEqual(report["asset_inputs"][key]["state"], "ready", key)
             self.assertEqual(report["accounts"][key]["state"], "ready", key)
@@ -155,6 +157,24 @@ class ReadinessQA(unittest.TestCase):
         encoded = json.dumps(report)
         self.assertNotIn("/Users/", encoded)
         self.assertNotIn('"..', encoded)
+
+    def test_i7_only_pending_when_month_context_incomplete(self):
+        self._deliver()
+        write_parquet(self.archive / f"parquet/trade_cal-{FULL[:8]}.parquet",
+                      {"cal_date": ["20261015", "20261016", "20261020",
+                                    "20261101", "20261102"],
+                       "is_open": [1, 1, 1, 0, 1]})
+        self.cache.mkdir(parents=True, exist_ok=True)
+        report = self.report()
+        self.assertEqual(report["calendar"]["confirmed_next_session"], "2026-10-16")
+        self.assertEqual(report["calendar_context"]["complete"], False)
+        self.assertEqual(report["asset_inputs"]["i7_turn_of_month"]["state"],
+                         "pending")
+        self.assertIn("natural days lack a real SSE calendar row",
+                      report["asset_inputs"]["i7_turn_of_month"]["reasons"][0])
+        # The month-context gate is I7-only: the delivered s1 stays ready.
+        self.assertEqual(report["asset_inputs"]["s1_invvol_etf"]["state"], "ready")
+        self.assertEqual(report["accounts"]["i7_turn_of_month"]["state"], "pending")
 
     def test_tampered_file_is_blocked_by_byte_hash(self):
         self._deliver(mutate=lambda: write_parquet(
