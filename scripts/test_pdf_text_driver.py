@@ -1,10 +1,12 @@
-"""Driver cycle logic against fixtures: quota backoff branch, unknown-status
-pause branch, the clean no_candidates exit, and word-splitting safety for the
-default stage command on paths containing spaces. A zsh read-only variable
-regression (e.g. assigning to `status`) aborts the script with a non-zero code
-and stderr output, so these tests catch it too."""
+"""Driver cycle logic against fixtures. QM_OCR_PY substitutes the python
+executable with a fixture script that prints stage markers, so the quota
+backoff, unknown-status pause and no_candidates branches run without eval and
+without touching production paths. Paths deliberately contain spaces. A zsh
+read-only variable regression (e.g. assigning to `status`) aborts the script
+with a non-zero code and stderr output, so these tests catch it too."""
 
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -14,6 +16,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 DRIVER = Path(__file__).resolve().parents[1] / "scripts" / "pdf_text_driver.sh"
 CLIENT = Path.home() / "Library/Application Support/QuantMind/tushare-client"
+
+FIXTURE_STAGE = """#!/bin/sh
+# Fixture "python": prints a chosen stage marker per invocation cycle.
+if [ ! -f "$QM_FIX_DIR/.cycle" ]; then
+  touch "$QM_FIX_DIR/.cycle"
+  printf '%s\\n' "$QM_FIX_FIRST"
+else
+  echo "stage=no_candidates attempted=2 completed=2 total_pages=53"
+fi
+"""
 
 
 class DriverCycle(unittest.TestCase):
@@ -28,28 +40,28 @@ class DriverCycle(unittest.TestCase):
         env.update({
             "QM_OCR_M": home,
             "QM_OCR_RT": tempfile.gettempdir(),
-            "QM_OCR_ROOT": home,
-            "QM_OCR_ST": home,
+            "QM_OCR_ROOT": home + "/root with space",
+            "QM_OCR_ST": home + "/staging with space",
             "QM_OCR_BACKOFF": "1",
             "QM_OCR_PAUSE": "1",
             "QM_OCR_PARSE_PATTERN": "qm_driver_test_no_such_parse_job",
         })
         return env
 
-    def run_driver(self, stage_script):
+    def run_fixture_driver(self, first_marker):
         home = self.fixture_home()
+        fixture_py = Path(home, "fake python bin")
+        fixture_py.write_text(FIXTURE_STAGE, encoding="utf-8")
+        fixture_py.chmod(fixture_py.stat().st_mode | stat.S_IXUSR)
         env = self.base_env(home)
-        env["QM_OCR_STAGE"] = stage_script
-        return subprocess.run(["zsh", str(DRIVER)], env=env,
-                              capture_output=True, text=True, timeout=60), home
+        env.update({"QM_OCR_PY": str(fixture_py), "QM_FIX_DIR": home,
+                    "QM_FIX_FIRST": first_marker})
+        proc = subprocess.run(["zsh", str(DRIVER)], env=env,
+                              capture_output=True, text=True, timeout=60)
+        return proc, home
 
     def test_quota_backoff_then_no_candidates_exits_cleanly(self):
-        stage = (
-            'if [ ! -f "$QM_OCR_M/.cycle" ]; then touch "$QM_OCR_M/.cycle"; '
-            'echo "stage=quota_exceeded bounded_wait_exceeded=1"; '
-            'else echo "stage=no_candidates attempted=2 completed=2 total_pages=53"; fi'
-        )
-        proc, home = self.run_driver(stage)
+        proc, home = self.run_fixture_driver("stage=quota_exceeded bounded_wait_exceeded=1")
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertEqual(proc.stderr, "")
         maintain = Path(home, "maintain.log").read_text(encoding="utf-8")
@@ -57,31 +69,24 @@ class DriverCycle(unittest.TestCase):
         self.assertIn("no more candidates", maintain)
 
     def test_unknown_status_pauses_then_exits_on_no_candidates(self):
-        stage = (
-            'if [ ! -f "$QM_OCR_M/.cycle" ]; then touch "$QM_OCR_M/.cycle"; '
-            'echo "WARNING:root:OCR quota wait sha=abc page=3 sleep=120s"; '
-            'else echo "stage=no_candidates attempted=0 completed=0 total_pages=0"; fi'
-        )
-        proc, home = self.run_driver(stage)
+        proc, home = self.run_fixture_driver(
+            "WARNING:root:OCR quota wait sha=abc page=3 sleep=120s")
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertEqual(proc.stderr, "")
         maintain = Path(home, "maintain.log").read_text(encoding="utf-8")
         self.assertIn("no more candidates", maintain)
         self.assertNotIn("quota backoff", maintain)
+    def test_real_stage_command_handles_paths_with_spaces(self):
 
-    def test_default_stage_command_handles_paths_with_spaces(self):
-        # The default STAGE string is eval'd; unquoted $ROOT/$ST would split on
-        # "Application Support"-style spaces and argparse would reject fragments.
+        # Exercises the production command line (only the python executable is
+        # substituted) so word-splitting regressions on "Application Support"
+        # style paths fail here instead of in the error loop.
         if not (CLIENT / ".venv/bin/python").exists():
             self.skipTest("local tushare-client runtime not installed")
         home = self.fixture_home()
         env = self.base_env(home)
-        env.update({
-            "QM_OCR_RT": str(CLIENT),
-            "QM_OCR_ROOT": home + "/root with space",
-            "QM_OCR_ST": home + "/staging with space",
-        })
-        env.pop("QM_OCR_STAGE", None)
+        env["QM_OCR_RT"] = str(CLIENT)
+        env["QM_OCR_PY"] = str(CLIENT / ".venv/bin/python")
         proc = subprocess.run(["zsh", str(DRIVER)], env=env,
                               capture_output=True, text=True, timeout=120)
         self.assertEqual(proc.returncode, 0, proc.stderr)
