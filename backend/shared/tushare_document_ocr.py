@@ -20,6 +20,7 @@ import logging
 import os
 from pathlib import Path
 import re
+import random
 import shutil
 import sqlite3
 import subprocess
@@ -153,6 +154,20 @@ def _pdf(root, sha):
     return path
 
 
+def _native_page_count(pdf):
+    """Page count for PDFs pypdf cannot parse. Fails loudly, never fabricates."""
+    executable = shutil.which("pdfinfo")
+    if executable is None and Path("/opt/homebrew/bin/pdfinfo").is_file():
+        executable = "/opt/homebrew/bin/pdfinfo"
+    if executable is None:
+        raise RuntimeError("pdfinfo is required when pypdf cannot read a PDF")
+    probed = subprocess.run([executable, str(pdf)], capture_output=True, timeout=180)
+    match = re.search(r"^Pages:\s+(\d+)", probed.stdout.decode("utf-8", "replace"), re.MULTILINE)
+    if probed.returncode or match is None:
+        raise RuntimeError(f"page count unavailable via {executable}")
+    return int(match.group(1))
+
+
 def _has_table(db, table):
     return db.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
@@ -267,9 +282,15 @@ def stage_document(
         return {"status": "staged" if body["parse_status"] == "parsed" else "empty",
                 "pages": body["page_count"]}
 
-    reader = pypdf.PdfReader(pdf)
-    decrypted = bool(reader.decrypt("")) if reader.is_encrypted else False
-    page_count = len(reader.pages)
+    try:
+        reader = pypdf.PdfReader(pdf)
+        decrypted = bool(reader.decrypt("")) if reader.is_encrypted else False
+        page_count = len(reader.pages)
+    except Exception as exc:
+        logging.warning("pypdf page read failed sha=%s error=%s; trying pdfinfo fallback",
+                        sha, type(exc).__name__)
+        reader = decrypted = None
+        page_count = _native_page_count(pdf)
     if page_count == 0:
         return {"status": "empty", "pages": 0}
     local_pages = None
@@ -324,12 +345,26 @@ def stage_document(
                     if rendered.returncode:
                         raise RuntimeError("PDF page rendering failed")
                     png = prefix.with_suffix(".png").read_bytes()
+                    quota_waited = 0.0
                     while True:
                         try:
                             text = client.transcribe(png)
                             break
                         except QuotaExceeded as exc:
-                            sleep(exc.retry_after)
+                            requested = max(float(exc.retry_after), 1.0)
+                            if requested > 120.0:
+                                # Cap long server-side waits; jitter keeps workers
+                                # from waking into the same rate-limit burst.
+                                delay = 120.0 + random.uniform(1.0, 15.0)
+                            else:
+                                delay = requested
+                            quota_waited += delay
+                            if quota_waited > 1800.0:
+                                raise
+                            logging.warning(
+                                "OCR quota wait sha=%s page=%s sleep=%.0fs waited=%.0fs of 1800s",
+                                sha, number, delay, quota_waited)
+                            sleep(delay)
                     if not isinstance(text, str):
                         raise ValueError("invalid_transcription")
                 page = {"page_number": number, "text": text}
@@ -471,25 +506,43 @@ def main():
             return stage_document(args.root, args.staging, item, client,
                                   max_pages=args.max_pages,
                                   page_workers=args.page_workers)
+        except QuotaExceeded:
+            raise
         except Exception as exc:
             logging.error("OCR failed sha=%s error=%s", item["sha256"], type(exc).__name__)
             return None
 
+    quota_exceeded = exhausted = False
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
         while args.limit is None or attempted < args.limit:
             budget = args.workers if args.limit is None else min(args.workers, args.limit - attempted)
             items = ocr_candidates(args.root, limit=budget, after=cursor)
             if not items:
+                exhausted = True
                 break
             futures = [pool.submit(run, item) for item in items]
-            for future in futures:
-                report = future.result()
-                attempted += 1
-                if report is not None:
-                    completed += 1
-                    total += report["pages"]
-                    print(f"document={completed} pages={report['pages']} total_pages={total}", flush=True)
+            try:
+                for future in futures:
+                    report = future.result()
+                    attempted += 1
+                    if report is not None:
+                        completed += 1
+                        total += report["pages"]
+                        print(f"document={completed} pages={report['pages']} total_pages={total}", flush=True)
+            except QuotaExceeded:
+                for future in futures:
+                    future.cancel()
+                quota_exceeded = True
+                break
             cursor = items[-1]["sha256"]
+    if quota_exceeded:
+        print("stage=quota_exceeded bounded_wait_exceeded=1", flush=True)
+    elif exhausted:
+        print(f"stage=no_candidates attempted={attempted} completed={completed}"
+              f" total_pages={total}", flush=True)
+    else:
+        print(f"stage=summary attempted={attempted} completed={completed}"
+              f" total_pages={total}", flush=True)
 
 
 if __name__ == "__main__":

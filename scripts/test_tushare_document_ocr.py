@@ -6,8 +6,11 @@ Contract (backend/shared/tushare_document_ocr.py):
 - stage_document(root, staging, item, client, *, sleep=time.sleep, max_pages=None) -> dict
   renders pages, calls client.transcribe(png_bytes)->str per page, keeps per-page progress in
   `staging` so a rerun never re-sends finished pages; writes staging/<sha>.json when complete.
-  Returns {"status": "staged"|"empty", "pages": n}. QuotaExceeded(retry_after) -> sleep(retry_after)
-  then retry the same page. Never writes documents.sqlite.
+  Returns {"status": "staged"|"empty", "pages": n}. QuotaExceeded(retry_after) retries the same
+  page with capped, logged waits and re-raises once the cumulative wait exceeds one hour, so a
+  quota outage aborts the pass visibly instead of sleeping forever. PDFs pypdf cannot read fall
+  back to pdfinfo for the page count; if that also fails the document stays blocked. Never
+  writes documents.sqlite.
 - ingest_staged(root, staging) -> {"ingested": n, ...}: saves extracted JSON
   (parse_status parsed, document_sha256, page_count, pages, parser "glm-ocr", parser_version model)
   and marks every linked document parsed / pdf_structure_valid so retirement can pick it up.
@@ -127,14 +130,88 @@ class DocumentOCR(unittest.TestCase):
         self.assertEqual(report["status"], "staged")
         self.assertEqual(client.calls, 1)
 
+    def test_quota_wait_is_bounded_logged_and_propagates(self):
+        from backend.shared.tushare_document_ocr import QuotaExceeded
+
+        class AlwaysQuota:
+            model = "fake-ocr"
+
+            def transcribe(self, png):
+                raise QuotaExceeded(retry_after=99999)
+
+        self.add("no_text", pages=2)
+        item, = self.ocr.ocr_candidates(self.root, limit=10)
+        slept = []
+        with self.assertLogs(level="WARNING") as logs:
+            with self.assertRaises(QuotaExceeded):
+                self.ocr.stage_document(self.root, self.staging, item, AlwaysQuota(),
+                                        sleep=slept.append, page_workers=1)
+        self.assertTrue(all(s <= 135 for s in slept), slept)
+        self.assertGreater(sum(slept), 1500)
+        self.assertTrue(any("OCR quota wait" in line for line in logs.output))
+        # Partial page checkpoints survive the abort; nothing is faked as staged.
+        self.assertFalse((self.staging / f"{item['sha256']}.json").exists())
+        self.assertTrue(self.staging.joinpath(item["sha256"], "metadata.json").exists())
+
+    def test_page_count_falls_back_to_pdfinfo_when_pypdf_fails(self):
+        import pypdf
+
+        self.add("no_text", pages=3)
+        item, = self.ocr.ocr_candidates(self.root, limit=10)
+        with patch.object(pypdf, "PdfReader", side_effect=ValueError("unreadable")):
+            with patch.object(self.ocr, "_native_page_count", return_value=3) as fallback:
+                report = self.ocr.stage_document(self.root, self.staging, item,
+                                                 FakeClient(), sleep=lambda s: None)
+        fallback.assert_called_once()
+        self.assertEqual(report, {"status": "staged", "pages": 3})
+        meta = json.loads((self.staging / item["sha256"] / "metadata.json").read_text())
+        self.assertEqual((meta["parser"], meta["page_count"]), ("glm-ocr", 3))
+
+    def test_page_count_failure_stays_blocked_instead_of_fabricating(self):
+        import pypdf
+
+        self.add("no_text", pages=2)
+        item, = self.ocr.ocr_candidates(self.root, limit=10)
+        with patch.object(pypdf, "PdfReader", side_effect=ValueError("unreadable")):
+            with patch.object(self.ocr, "_native_page_count",
+                              side_effect=RuntimeError("page count unavailable via pdfinfo")):
+                with self.assertRaises(RuntimeError):
+                    self.ocr.stage_document(self.root, self.staging, item,
+                                            FakeClient(), sleep=lambda s: None)
+        self.assertFalse(list(self.staging.glob("*.json")))
+        self.assertFalse((self.staging / item["sha256"]).exists())
+
+    def test_native_page_count_uses_pdfinfo_and_never_guesses(self):
+        pdf_path = self.root / "probe.pdf"
+        pdf_path.write_bytes(b"%PDF-1.4 whatever")
+
+        class Probed:
+            def __init__(self, rc, out):
+                self.returncode, self.stdout = rc, out
+
+        with patch.object(self.ocr.shutil, "which", return_value="/fake/bin/pdfinfo"):
+            with patch.object(self.ocr.subprocess, "run",
+                              return_value=Probed(0, b"Producer: x\nPages:      7\n")) as run:
+                self.assertEqual(self.ocr._native_page_count(pdf_path), 7)
+            run.assert_called_once()
+            self.assertEqual(run.call_args[0][0][:2], ["/fake/bin/pdfinfo", str(pdf_path)])
+            for bad in (Probed(1, b"Pages: 7\n"), Probed(0, b"Producer: x\n")):
+                with patch.object(self.ocr.subprocess, "run", return_value=bad):
+                    with self.assertRaises(RuntimeError):
+                        self.ocr._native_page_count(pdf_path)
+        with patch.object(self.ocr.shutil, "which", return_value=None), \
+                patch.object(self.ocr.Path, "is_file", return_value=False):
+            with self.assertRaises(RuntimeError):
+                self.ocr._native_page_count(pdf_path)
     def test_quota_waits_and_retries_same_page(self):
         self.add("no_text", pages=2)
         item, = self.ocr.ocr_candidates(self.root, limit=10)
         slept = []
         client = FakeClient(quota_once_on=2)
         report = self.ocr.stage_document(self.root, self.staging, item, client, sleep=slept.append)
-        self.assertEqual(slept, [123])
+        self.assertTrue(121 <= slept[0] <= 135, slept)
         self.assertEqual(report, {"status": "staged", "pages": 2})
+
         staged = json.loads((self.staging / f"{item['sha256']}.json").read_text())
         self.assertEqual(len(staged["pages"]), 2)
         self.assertTrue(all(p["text"].strip() for p in staged["pages"]))
