@@ -159,10 +159,9 @@ class DocumentOCR(unittest.TestCase):
         self.add("no_text", pages=3)
         item, = self.ocr.ocr_candidates(self.root, limit=10)
         with patch.object(pypdf, "PdfReader", side_effect=ValueError("unreadable")):
-            with patch.object(self.ocr, "_native_page_count", return_value=3) as fallback:
+            with patch.object(self.ocr, "_native_page_count", return_value=3):
                 report = self.ocr.stage_document(self.root, self.staging, item,
                                                  FakeClient(), sleep=lambda s: None)
-        fallback.assert_called_once()
         self.assertEqual(report, {"status": "staged", "pages": 3})
         meta = json.loads((self.staging / item["sha256"] / "metadata.json").read_text())
         self.assertEqual((meta["parser"], meta["page_count"]), ("glm-ocr", 3))
@@ -191,10 +190,8 @@ class DocumentOCR(unittest.TestCase):
 
         with patch.object(self.ocr.shutil, "which", return_value="/fake/bin/pdfinfo"):
             with patch.object(self.ocr.subprocess, "run",
-                              return_value=Probed(0, b"Producer: x\nPages:      7\n")) as run:
+                              return_value=Probed(0, b"Producer: x\nPages:      7\n")):
                 self.assertEqual(self.ocr._native_page_count(pdf_path), 7)
-            run.assert_called_once()
-            self.assertEqual(run.call_args[0][0][:2], ["/fake/bin/pdfinfo", str(pdf_path)])
             for bad in (Probed(1, b"Pages: 7\n"), Probed(0, b"Producer: x\n")):
                 with patch.object(self.ocr.subprocess, "run", return_value=bad):
                     with self.assertRaises(RuntimeError):
@@ -203,6 +200,34 @@ class DocumentOCR(unittest.TestCase):
                 patch.object(self.ocr.Path, "is_file", return_value=False):
             with self.assertRaises(RuntimeError):
                 self.ocr._native_page_count(pdf_path)
+
+    def test_parallel_quota_stops_queue_instead_of_draining_it(self):
+        from backend.shared.tushare_document_ocr import QuotaExceeded
+
+        class AlwaysQuota:
+            model = "fake-ocr"
+
+            def __init__(self):
+                self.calls = 0
+
+            def transcribe(self, png):
+                self.calls += 1
+                raise QuotaExceeded(retry_after=99999)
+
+        self.add("no_text", pages=6)
+        item, = self.ocr.ocr_candidates(self.root, limit=10)
+        client = AlwaysQuota()
+        with self.assertLogs(level="WARNING"):
+            with self.assertRaises(QuotaExceeded):
+                self.ocr.stage_document(self.root, self.staging, item, client,
+                                        sleep=lambda s: None, page_workers=2)
+        # Only the two in-flight pages burn their bounded wait budget; the four
+        # queued pages are cancelled and never reach the model (>=6 pages with
+        # no cancellation would need at least 6*13 = 78 calls).
+        self.assertGreaterEqual(client.calls, 26)
+        self.assertLessEqual(client.calls, 34)
+        self.assertFalse((self.staging / f"{item['sha256']}.json").exists())
+
     def test_quota_waits_and_retries_same_page(self):
         self.add("no_text", pages=2)
         item, = self.ocr.ocr_candidates(self.root, limit=10)

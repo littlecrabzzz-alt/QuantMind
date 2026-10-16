@@ -317,6 +317,7 @@ def stage_document(
     else:
         _write_json(meta_path, metadata)
     budget = page_count if max_pages is None else min(page_count, max_pages)
+    stop = threading.Event()
     with tempfile.TemporaryDirectory(prefix="tushare-ocr-") as temporary:
         def transcribe_page(number):
             checkpoint = progress / f"{number}.json"
@@ -347,6 +348,8 @@ def stage_document(
                     png = prefix.with_suffix(".png").read_bytes()
                     quota_waited = 0.0
                     while True:
+                        if stop.is_set():
+                            raise QuotaExceeded(0)
                         try:
                             text = client.transcribe(png)
                             break
@@ -376,9 +379,17 @@ def stage_document(
             pages = [transcribe_page(number) for number in numbers]
         else:
             # Workers persist their own checkpoints even if another page fails.
-            # Shutdown waits for running pages before removing rendered files.
+            # The first failure stops in-flight quota waits and cancels queued
+            # pages so an outage surfaces now instead of draining the queue.
             with ThreadPoolExecutor(max_workers=page_workers) as pool:
-                pages = list(pool.map(transcribe_page, numbers))
+                futures = [pool.submit(transcribe_page, number) for number in numbers]
+                try:
+                    pages = [future.result() for future in futures]
+                except BaseException:
+                    stop.set()
+                    for future in futures:
+                        future.cancel()
+                    raise
     nonempty = any(p["text"].strip() for p in pages)
     if budget == page_count:
         _write_json(completed, {**metadata, "pages": pages,
