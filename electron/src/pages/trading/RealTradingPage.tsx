@@ -10,6 +10,7 @@ import PositionMonitor from './tabs/PositionMonitor';
 import TradingHistory from './tabs/TradingHistory';
 import SettingsCenter from './tabs/SettingsCenter';
 import ReplayPage from './tabs/ReplayPage';
+import FrozenPaperPage from './tabs/FrozenPaperPage';
 import type { RealTradingStatus, AccountInfo, PreflightCheckResponse, PreflightCheckItem } from '../../services/realTradingService';
 import { authService } from '../../features/auth/services/authService';
 import type { StrategyFile } from '../../types/backtest/strategy';
@@ -22,7 +23,7 @@ import LiveTradeConfigWizard from './components/LiveTradeConfigWizard';
 import type { DeployMode, ExecutionConfig, LiveTradeConfig } from '../../types/liveTrading';
 
 type TradingMode = 'real' | 'simulation';  // 支持实盘(通达信桥)与模拟盘
-type ActiveTab = 'manage' | 'manual-task' | 'personal' | 'position' | 'history' | 'settings' | 'replay';
+type ActiveTab = 'manage' | 'manual-task' | 'personal' | 'position' | 'history' | 'settings' | 'replay' | 'frozen-paper';
 type PreflightStage = 'trading-readiness' | 'preflight';
 const TRADING_MODE_PREF_KEY = 'qm:trading_mode_pref';
 type PendingDeploy = {
@@ -506,6 +507,7 @@ const RealTradingPage: React.FC = () => {
 
     const tabs: Array<{ id: ActiveTab; label: string; icon: LucideIcon }> = [
         { id: 'manage', label: '策略管理', icon: LayoutDashboard },
+        { id: 'frozen-paper', label: '冻结纸面观察', icon: Clock },
         // 时光回放功能尚存多处问题，暂时隐藏入口，完善后取消注释即可恢复（ReplayPage 渲染分支保留）
         // { id: 'replay', label: '时光回放', icon: Clock },
         { id: 'manual-task', label: '手动任务', icon: ClipboardList },
@@ -599,6 +601,7 @@ const RealTradingPage: React.FC = () => {
                     )}
                     {activeTab === 'settings' && <SettingsCenter userId={userId} isActive={activeTab === 'settings'} />}
                     {activeTab === 'replay' && <ReplayPage />}
+                    {activeTab === 'frozen-paper' && <FrozenPaperPage tenantId={tenantId} />}
                 </div>
             </div>
         </div>

@@ -468,6 +468,8 @@ def serialize_manifest_file(directory, content, timing=None):
 
 
 def authority():
+    if os.getenv("QM_NODE_ROLE") == "local":
+        raise ValueError("Local business node cannot acquire; use the native archive worker")
     if os.getenv("QM_NODE_ROLE") == "authority" and (ROOT / "ARCHIVE_RELOCATED.json").exists():
         raise ValueError("Cloud archive acquisition has been relocated to Mac/NAS")
     if os.getenv("QM_NODE_ROLE") == "archive":
@@ -6876,6 +6878,7 @@ def tick(max_requests=None, max_seconds=None, *, before_nonpublication_work=None
             raise ValueError(
                 "Planning cadence requires a positive publication interval"
             )
+        # authority() above rejects local business nodes before acquisition.
         if shutil.disk_usage(ROOT).free < (300 if os.getenv("QM_NODE_ROLE") == "archive" else 100) * 2**30:
             return {"status": "blocked_disk_reserve"}
         token = None

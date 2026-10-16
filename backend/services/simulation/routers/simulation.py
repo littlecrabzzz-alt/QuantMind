@@ -26,6 +26,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/frozen-paper/accounts")
+async def frozen_paper_accounts(auth: AuthContext = Depends(get_auth_context)):
+    """Read-only frozen observations; no order/deploy/account-reset side effects."""
+    from backend.services.simulation.services.frozen_paper_service import get_accounts
+
+    try:
+        return await get_accounts(auth.user_id, auth.tenant_id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 def _require_user_id(raw_user_id: str, tenant_id: str = "default") -> int:
     """兼容别名，统一走 require_sim_user_id（OSS admin 归 10000001）。"""
     return require_sim_user_id(raw_user_id, tenant_id=tenant_id)

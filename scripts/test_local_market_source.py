@@ -5,15 +5,54 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
+
+# macOS /var is a symlink; fixtures must obey the release no-symlink contract.
+tempfile.tempdir = str(Path(tempfile.gettempdir()).resolve())
 import unittest
 from unittest.mock import patch, Mock
 from zoneinfo import ZoneInfo
+
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts import local_market_source as source
 from backend.shared import data_source_config as policy
 
 
 class LocalMarketSourceTest(unittest.TestCase):
+    def test_primary_skips_cloud_and_does_not_reuse_sandbox_delivery_cursor(self):
+        import quantdb_refresh as refresh
+        with tempfile.TemporaryDirectory() as d:
+            project = Path(d)
+            root = project / "source"
+            (project / ".local-primary").mkdir()
+            (project / ".local-primary/READY").touch()
+            release_id = "market-" + "a" * 64
+            clock = datetime(2026, 10, 14, 9, tzinfo=ZoneInfo("Asia/Shanghai"))
+            source.write_json(root / "status.json", {
+                name: {"collected_day": "2026-10-14", "release_id": release_id,
+                       "local_release": release_id} for name in ("A", "BC")})
+            with patch.object(source.sys, "platform", "darwin"), \
+                 patch.object(source, "now", return_value=clock), \
+                 patch.object(source.shutil, "disk_usage", return_value=Mock(free=999*2**30)), \
+                 patch.object(source, "collect_on_mac") as collect, \
+                 patch.object(source, "send_cloud", side_effect=AssertionError("no cloud")) as cloud, \
+                 patch.object(source, "ssh", side_effect=AssertionError("no ssh")), \
+                 patch.object(source, "transfer", side_effect=AssertionError("no upload")), \
+                 patch.object(refresh, "apply", side_effect=[RuntimeError("busy"), None]) as apply, \
+                 patch.object(refresh, "apply_bc") as bc:
+                self.assertEqual(source.tick(root, project, project, "host"), 2)
+                self.assertEqual(source.tick(root, project, project, "host"), 0)
+                self.assertEqual(source.tick(root, project, project, "host"), 0)
+                self.assertEqual(apply.call_count, 2)
+                apply.assert_called_with(project, root / "releases/A" / release_id)
+                bc.assert_called_once_with(project, root / "releases/BC" / release_id)
+                cloud.assert_not_called()
+                collect.assert_not_called()
+            status = source.read_json(root / "status.json")
+            self.assertTrue(all(status[name]["primary_release"] == release_id for name in ("A", "BC")))
+            self.assertTrue(all("cloud_release" not in status[name] for name in ("A", "BC")))
+
     def test_ready_local_docker_is_reused(self):
         with patch.object(source.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as run:
             source.ensure_local_docker()

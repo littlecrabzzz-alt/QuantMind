@@ -22,13 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 def upstream_collection_allowed() -> bool:
-    """Cloud business authority consumes releases; it never acquires vendor data."""
-    return os.getenv("QM_NODE_ROLE", "").strip().lower() != "authority"
+    """Business authorities consume releases; native Mac workers acquire vendor data."""
+    return os.getenv("QM_NODE_ROLE", "").strip().lower() not in {"authority", "local"}
 
 
 def require_upstream_collection() -> None:
     if not upstream_collection_allowed():
-        raise RuntimeError("行情由本地采集；云端只接收已校验版本，请等待本地同步。")
+        raise RuntimeError("行情由本地采集；业务节点只接收已校验版本，请等待本地同步。")
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 

@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "archive_identity_sha256": "c76d30551f39214afc5a31e7e251bb5d5ba968ea5a7373d8ed3fe7cdfe0990cf",
+  "source_assembly_id": "c666b6f9f95630e37b788ac83604f06920d46d04bf554aacb9dbdb434a01087e",
+  "data_sets": [
+    {
+      "tree": "ashare-lab",
+      "data_id": "86c73c58f6097183bfdba38250d1f3d5f5a807ba55370bd82a28b2e1f5e9bb56",
+      "files": 97,
+      "bytes": 3888654408,
+      "path_manifest": "output/ashare-takeover/manifests/ashare-lab.jsonl"
+    },
+    {
+      "tree": "ashare-lab-aline",
+      "data_id": "fd7167c523477fafebd2bb09a6e60016b4b3f61e590a4b8d7b1d28af721dbdfc",
+      "files": 13,
+      "bytes": 304336007,
+      "path_manifest": "output/ashare-takeover/manifests/ashare-lab-aline.jsonl"
+    },
+    {
+      "tree": "ashare-lab-bline",
+      "data_id": "e42b18766f6a965ed4df5dfaa21b212f3cfecc96b3c7df011c24c2dee8e576c1",
+      "files": 13,
+      "bytes": 736628592,
+      "path_manifest": "output/ashare-takeover/manifests/ashare-lab-bline.jsonl"
+    },
+    {
+      "tree": "ashare-lab-paper",
+      "data_id": "926e2572a03e63df456dcafe9cf5a467777b52b7d7f6b3f13c0708b638716ea3",
+      "files": 57,
+      "bytes": 2138314679,
+      "path_manifest": "output/ashare-takeover/manifests/ashare-lab-paper.jsonl"
+    },
+    {
+      "tree": "ashare-lab-paper-s1",
+      "data_id": "2153aa17221b5486098e93b66e07e9d54ebb7426fb67a70afda4d273aa24a98d",
+      "files": 7,
+      "bytes": 3090728,
+      "path_manifest": "output/ashare-takeover/manifests/ashare-lab-paper-s1.jsonl"
+    },
+    {
+      "tree": "ashare-lab-expansion",
+      "data_id": "ad69471655dedb1a4643fa1cee47f842042ca68d5e4a4eadff2a2748c09a4131",
+      "files": 13,
+      "bytes": 7286947,
+      "path_manifest": "output/ashare-takeover/manifests/ashare-lab-expansion.jsonl"
+    },
+    {
+      "tree": "ashare-lab-ideas",
+      "data_id": "aa577e34464924dca1eff8fcb875a218ef8a3caa635697bdff3a8239b47c6d49",
+      "files": 10,
+      "bytes": 68405789,
+      "path_manifest": "output/ashare-takeover/manifests/ashare-lab-ideas.jsonl"
+    },
+    {
+      "tree": "ashare-lab-ideas-cb",
+      "data_id": "3067d60e5253306d8047222362e0da7b2ea43c5f50b54aa42c7332ee0077cfb2",
+      "files": 3588,
+      "bytes": 59328419,
+      "path_manifest": "output/ashare-takeover/manifests/ashare-lab-ideas-cb.jsonl"
+    },
+    {
+      "tree": "ashare-lab-ideas-cta",
+      "data_id": "88a6c949dd5915a292d7eac3302e1c4b4d4f4c69fcca601ce54713623a9d9514",
+      "files": 7270,
+      "bytes": 146167758,
+      "path_manifest": "output/ashare-takeover/manifests/ashare-lab-ideas-cta.jsonl"
+    }
+  ],
+  "paper_panel_release_id": "data-86bd4ceed5a622e5c92fc96649bbbd285858d306f3f0a991c3e72c156b062241",
+  "data_id_rule": "SHA256 UTF-8 compact JSON of SQLite rows (path,kind,size,sha256,link_target), ordered by path, path LIKE data/%; normal file bytes counted once per original tree, symlink targets retained in their original owning tree"
+}

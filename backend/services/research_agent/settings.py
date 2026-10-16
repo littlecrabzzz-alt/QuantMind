@@ -14,8 +14,10 @@ class Settings:
         self.root = self.data / "research" / "agent"
         self.cfg = json.loads((self.data / "research/settings.json").read_text())
         self.host_data = Path(os.environ["HOST_RUNTIME_PATH"]) / "data"
+        role = os.environ["QM_NODE_ROLE"]
         if (
-            self.cfg["role"] != os.environ["QM_NODE_ROLE"]
+            role not in ("authority", "sandbox", "local")
+            or self.cfg["role"] != role
             or Path(self.cfg["host_data"]) != self.host_data
         ):
             raise ValueError("研究节点与数据挂载不匹配")

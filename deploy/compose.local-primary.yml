@@ -1,0 +1,236 @@
+# Mac business primary. Always invoke through scripts/local-primary.sh.
+name: quantmind-local
+
+x-primary-environment: &primary-environment
+  QM_NODE_ROLE: local
+  HOST_PROJECT_PATH: ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}
+  HOST_RUNTIME_PATH: ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}
+  ENABLE_REAL_TRADING: "false"
+  ENABLE_TDX_PUSH: "false"
+  STRATEGY_LAB_SCAN_ENABLED: "false"
+  MARKET_SYNC_SCHEDULE_ENABLED: "false"
+
+x-primary-handover-labels: &primary-handover-labels
+  com.quantmind.primary-handover: ${QM_PRIMARY_HANDOVER_TOKEN:-manual}
+
+services:
+  research-agent:
+    container_name: quantmind-local-research-agent
+    environment:
+      <<: *primary-environment
+    volumes:
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/data:/data
+      - ${QM_PRIMARY_TUSHARE_ROOT:-${HOME}/Library/Application Support/QuantMind/tushare}:/data/tushare:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/backend/services/research_agent:/app/backend/services/research_agent:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/scripts/research_workbench_v2.sql:/app/scripts/research_workbench_v2.sql:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.config/quantmind/glm-research-api.json:/run/secrets/research-llm.json:ro
+    restart: "no"
+  db:
+    environment:
+      <<: *primary-environment
+    container_name: quantmind-local-db
+    labels: *primary-handover-labels
+    ports: !reset []
+    restart: unless-stopped
+  redis:
+    environment:
+      <<: *primary-environment
+    container_name: quantmind-local-redis
+    labels: *primary-handover-labels
+    ports: !reset []
+    restart: unless-stopped
+  quantmind:
+    container_name: quantmind-local-quantmind
+    labels: *primary-handover-labels
+    ports: !override
+      - "127.0.0.1:8000:8000"
+    environment:
+      <<: *primary-environment
+      HUNTLY_BASE_URL: http://huntly
+      ASHARE_LAB_SRC: /app/vendor/ashare-lab/src
+      ASHARE_LAB_PANEL: /app/vendor/ashare-lab/data/panel
+      APP_ENV: production
+      QM_TUSHARE_READ_STORE: archive
+      EMBEDDED_CELERY_WORKER: "false"
+      TRAINING_DOCKER_NETWORK: quantmind-local_quantmind-net
+      AI_IDE_DOCKER_NETWORK: quantmind-local_quantmind-net
+      RD_AGENT_DOCKER_NETWORK: quantmind-local_quantmind-net
+      TRAINING_PAUSE_OTHERS: "false"
+      OSS_EMBEDDED_CELERY: "false"
+      DAILY_SYNC_ENABLED: "false"
+      QUANTMIND_ENABLE_WEB_UPDATE: "false"
+    volumes: !override
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/vendor/ashare-lab:/app/vendor/ashare-lab:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/output/ashare-takeover:/app/output/ashare-takeover:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/output/ashare-paper:/app/output/ashare-paper
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/output/ashare-input-supplements:/app/output/ashare-input-supplements:ro
+      - ${HOME}/Library/Application Support/QuantMind/market-source:/run/quantmind-market-source:ro
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/data:/data
+      - ${QM_PRIMARY_TUSHARE_ROOT:-${HOME}/Library/Application Support/QuantMind/tushare}:/data/tushare:ro
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/models:/app/models
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/db:/app/db
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/logs:/app/logs
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/backend:/app/backend
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/docs:/app/docs:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/config:/app/config
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/scripts:/app/scripts
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/alphaagent:/app/alphaagent
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/TradingAgents-astock:/app/TradingAgents-astock
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/docker/training:/app/docker/training
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/strategy_templates:/app/strategy_templates
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/user_pools_local:/app/user_pools_local
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/docker/conda-shim:/usr/local/bin/conda:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/docker/litellm_sitecustomize.py:/usr/local/lib/python3.10/site-packages/sitecustomize.py:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.config/quantmind/glm-research-api.json:/run/secrets/research-llm.json:ro
+      - qwenpaw-shared:/qwenpaw-shared
+    restart: unless-stopped
+  celery-worker:
+    container_name: quantmind-local-celery
+    labels: *primary-handover-labels
+    environment:
+      <<: *primary-environment
+      HUNTLY_BASE_URL: http://huntly
+      ASHARE_LAB_SRC: /app/vendor/ashare-lab/src
+      ASHARE_LAB_PANEL: /app/vendor/ashare-lab/data/panel
+      TRAINING_DOCKER_NETWORK: quantmind-local_quantmind-net
+      AI_IDE_DOCKER_NETWORK: quantmind-local_quantmind-net
+      RD_AGENT_DOCKER_NETWORK: quantmind-local_quantmind-net
+      TRAINING_PAUSE_OTHERS: "false"
+      DAILY_SYNC_ENABLED: "false"
+    volumes: !override
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/vendor/ashare-lab:/app/vendor/ashare-lab:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/output/ashare-takeover:/app/output/ashare-takeover:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/output/ashare-paper:/app/output/ashare-paper
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/output/ashare-input-supplements:/app/output/ashare-input-supplements:ro
+      - ${HOME}/Library/Application Support/QuantMind/market-source:/run/quantmind-market-source:ro
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/data:/data
+      - ${QM_PRIMARY_TUSHARE_ROOT:-${HOME}/Library/Application Support/QuantMind/tushare}:/data/tushare:ro
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/models:/app/models
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/db:/app/db
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/logs:/app/logs
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/backend:/app/backend
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/config:/app/config
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/scripts:/app/scripts
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/strategy_templates:/app/strategy_templates
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/user_pools_local:/app/user_pools_local
+    command: celery -A backend.services.engine.qlib_app.celery_config:celery_app worker -Q market_sync,qlib_backtest_srv --loglevel=info --concurrency=4
+    restart: unless-stopped
+  celery-beat:
+    container_name: quantmind-local-celery-beat
+    labels: *primary-handover-labels
+    environment:
+      <<: *primary-environment
+      DAILY_SYNC_ENABLED: "false"
+      NEWS_ENRICH_ENABLED: "true"
+      HUNTLY_BASE_URL: http://huntly
+    volumes: !override
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/backend:/app/backend
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/config:/app/config
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/scripts:/app/scripts
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/logs:/app/logs
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/data:/data
+      - ${QM_PRIMARY_TUSHARE_ROOT:-${HOME}/Library/Application Support/QuantMind/tushare}:/data/tushare:ro
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/db:/app/db
+    restart: unless-stopped
+  research-worker:
+    profiles: [research]
+    extends:
+      file: docker-compose.yml
+      service: celery-worker
+    container_name: quantmind-local-research-worker
+    environment:
+      <<: *primary-environment
+      PYTHONPATH: /app:/app/scripts
+    volumes: !override
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/data:/data
+      - ${QM_PRIMARY_TUSHARE_ROOT:-${HOME}/Library/Application Support/QuantMind/tushare}:/data/tushare:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/backend:/app/backend:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/scripts:/app/scripts:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.config/quantmind/glm-research-api.json:/run/secrets/research-llm.json:ro
+    command: celery -A backend.services.engine.research.tasks:app worker --beat -Q research --concurrency=1 --loglevel=info --schedule=/tmp/research-beat
+    mem_limit: 1536m
+    cpus: 1.0
+    restart: "no"
+  data-gateway:
+    environment:
+      <<: *primary-environment
+    container_name: quantmind-local-data-gateway
+    labels: *primary-handover-labels
+    ports: !reset []
+    restart: unless-stopped
+  huntly:
+    environment:
+      <<: *primary-environment
+    container_name: quantmind-local-huntly
+    labels: *primary-handover-labels
+    ports: !reset []
+    volumes: !override
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/data/huntly:/data
+    restart: unless-stopped
+  rsshub:
+    environment:
+      <<: *primary-environment
+      REDIS_URL: redis://redis:6379/15
+    container_name: quantmind-local-rsshub
+    labels: *primary-handover-labels
+    ports: !reset []
+    restart: unless-stopped
+  qwenpaw:
+    image: quantmind-qwenpaw:local
+    container_name: quantmind-local-qwenpaw
+    labels: *primary-handover-labels
+    ports: !reset []
+    environment:
+      <<: *primary-environment
+      TRAINING_DOCKER_NETWORK: quantmind-local_quantmind-net
+      AI_IDE_DOCKER_NETWORK: quantmind-local_quantmind-net
+      RD_AGENT_DOCKER_NETWORK: quantmind-local_quantmind-net
+      TRAINING_PAUSE_OTHERS: "false"
+    volumes: !override
+      - qwenpaw-data:/app/working
+      - qwenpaw-secrets:/app/working.secret
+      - qwenpaw-backups:/app/working.backups
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/backend:/app/backend:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/config:/app/config:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/scripts:/app/scripts:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/strategy_templates:/app/strategy_templates:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/:/quantmind:ro
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/data:/quantmind/data
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/db:/quantmind/db
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/models:/quantmind/models
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/results:/quantmind/results
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/logs:/quantmind/logs
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/user_pools_local:/quantmind/user_pools_local
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/docker/training/fonts:/app/docker/training/fonts:ro
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/data:/data
+      - ${QM_PRIMARY_TUSHARE_ROOT:-${HOME}/Library/Application Support/QuantMind/tushare}:/data/tushare:ro
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/db:/app/db
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/models:/app/models
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/logs:/app/logs
+      - ${QM_PRIMARY_STATE:?run through scripts/local-primary.sh}/user_pools_local:/app/user_pools_local
+      - qwenpaw-shared:/qwenpaw-shared
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+  ib-gateway:
+    container_name: quantmind-local-ib-gateway
+    ports: !reset []
+    environment:
+      <<: *primary-environment
+    profiles: [disabled-trading]
+    restart: unless-stopped
+  web:
+    image: nginx:alpine
+    container_name: quantmind-local-web
+    labels: *primary-handover-labels
+    environment:
+      <<: *primary-environment
+    ports: !override
+      - "127.0.0.1:3080:80"
+    volumes:
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/electron/dist-react:/usr/share/nginx/html:ro
+      - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/docker/web/nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+    networks: [quantmind-net]

@@ -177,19 +177,20 @@ def _calendar_days(files):
     for path in files:
         dataset = ds.dataset([path], format="parquet")
         names = dataset.schema.names
-        if "cal_date" not in names or "is_open" not in names:
+        date_col = next((c for c in ("cal_date", "date") if c in names), None)
+        if date_col is None or "is_open" not in names:
             continue
-        columns = ["cal_date", "is_open"] + (
+        columns = [date_col, "is_open"] + (
             ["exchange"] if "exchange" in names else [])
         table = dataset.to_table(columns=columns)
         exchanges = (table.column("exchange").to_pylist()
                      if "exchange" in names else [None] * table.num_rows)
-        for day, is_open, exchange in zip(table.column("cal_date").to_pylist(),
+        for day, is_open, exchange in zip(table.column(date_col).to_pylist(),
                                           table.column("is_open").to_pylist(),
                                           exchanges, strict=False):
             if exchange not in (None, "SSE"):
                 continue
-            day = str(day)
+            day = str(day).replace("-", "")  # DATE objects render dashed
             through = day if through is None or day > through else through
             if day in day_map:
                 duplicates += 1
@@ -290,9 +291,36 @@ def _scan_facts(days_scan, sha):
             "duplicates": days_scan.get("duplicates", 0), "sha": sha}
 
 
+def _verify_closure(archive, candidate):
+    """Verify the merged calendar's source closure sidecar bytes+sha."""
+    rel = candidate.get("source_closure_path") or ""
+    if not rel:
+        return None
+    if ".." in rel.split("/"):
+        return ["closure path escapes the archive root"]
+    path = archive / rel
+    if not path.is_file():
+        return [f"closure sidecar missing: {rel}"]
+    reasons = []
+    if candidate.get("source_closure_sha256") and \
+            _sha256_file(path) != candidate["source_closure_sha256"]:
+        reasons.append("closure sidecar sha256 mismatch")
+    if (candidate.get("source_closure_bytes") is not None
+            and path.stat().st_size != candidate["source_closure_bytes"]):
+        reasons.append("closure sidecar byte size mismatch")
+    return reasons
+
+
 def calendar_from_candidates(archive, candidates, usable_date):
-    """Verify each delivered calendar candidate from its real rows; accept the
-    first whose sha256 matches and whose rows confirm a session after usable."""
+    """Verify calendar candidates from real rows (sha256 + row-level days).
+
+    A candidate carrying source_closure fields is the canonical merged
+    calendar: it is verified exclusively (bytes, closure sidecar, and an
+    independent duplicate-day check that must agree with the declared merge
+    having zero conflicts). Otherwise -- legacy lists -- the longest actual
+    coverage wins, never a max_date single shard.
+    """
+    best = None
     for candidate in candidates or []:
         rel = candidate.get("path") or ""
         if ".." in rel.split("/"):
@@ -302,15 +330,36 @@ def calendar_from_candidates(archive, candidates, usable_date):
             continue
         if candidate.get("sha256") and _sha256_file(path) != candidate["sha256"]:
             continue
+        closure_reasons = _verify_closure(archive, candidate)
         facts = _calendar_days([path])
         nxt = _next_session(facts["open"], usable_date)
-        if nxt:
+        if candidate.get("source_closure_path"):
+            # canonical merged calendar: verify exclusively and independently
+            reasons = list(closure_reasons or [])
+            if facts.get("duplicates"):
+                reasons.append(
+                    f"{facts['duplicates']} duplicate (exchange, cal_date) rows "
+                    f"in the merged calendar contradict the zero-conflict merge")
+            if not nxt:
+                reasons.append("merged calendar does not confirm the next "
+                               "session after usable_date")
             entry = {"path": rel, "sha256": _sha256_file(path),
                      "confirmed_next_session": nxt}
+            if reasons:
+                return entry, reasons, _scan_facts(facts, entry["sha256"])
             return entry, [], _scan_facts(facts, entry["sha256"])
+        if not nxt:
+            continue
+        entry = {"path": rel, "sha256": _sha256_file(path),
+                 "confirmed_next_session": nxt}
+        if best is None or (facts.get("through") or "") > (best[2]["through"] or ""):
+            best = (entry, [], _scan_facts(facts, entry["sha256"]))
+    if best:
+        return best
     return ({"path": None, "sha256": None, "confirmed_next_session": None},
             ["no verified calendar candidate confirms a session after usable_date"],
-            {"has_day_after_usable_month": False})
+            {"open": [], "through": None, "day_map": {}, "duplicates": 0,
+             "sha": None})
 
 
 def calendar_from_release(archive, fundamentals, cache, usable_date):
@@ -336,18 +385,41 @@ def calendar_from_release(archive, fundamentals, cache, usable_date):
 
 
 def load_evidence(artifact):
-    base = artifact / EVIDENCE_REL
-    if not base.is_dir():
-        return None, [f"no {EVIDENCE_REL}/ delivery under artifact root"]
-    latest = sorted(p for p in base.iterdir() if p.is_dir())
-    if not latest:
-        return None, [f"no epoch directory under {EVIDENCE_REL}/"]
-    epoch = latest[-1]
-    evidence = epoch / "asset-evidence.json"
-    if not evidence.is_file():
-        return None, [f"delivery epoch {epoch.name} has no asset-evidence.json yet "
-                      "(supplement in progress)"]
-    return json.loads(evidence.read_bytes()), []
+    """Read ONLY the canonical supplement pointer (clean cutover contract):
+    ashare-input-supplements/CURRENT.json = {schema_version, data_identity,
+    bundle_path, bundle_sha256}; the bundle bytes must match the recorded
+    sha256. A missing pointer means pending -- no directory scanning, no
+    newest-glob, no legacy epoch fallback. Returns (evidence, reasons,
+    binding) where binding is the verified pointer identity for transparent
+    passthrough, or None when unverified."""
+    binding = None
+    if artifact is None:
+        return None, ["artifact root unresolved"], None
+    pointer = artifact / EVIDENCE_REL / "CURRENT.json"
+    if not pointer.is_file():
+        return None, ["canonical supplement pointer CURRENT.json missing "
+                      "(pending; source publishes it only after verification)"], None
+    try:
+        spec = json.loads(pointer.read_bytes())
+    except ValueError:
+        return None, ["canonical supplement pointer unreadable"], None
+    if spec.get("schema_version") != 1:
+        return None, [f"unsupported pointer schema_version "
+                      f"{spec.get('schema_version')!r}"], None
+    rel = spec.get("bundle_path") or ""
+    if ".." in rel.split("/"):
+        return None, ["pointer bundle_path escapes the artifact root"], None
+    bundle = artifact / rel
+    if not bundle.is_file():
+        return None, [f"pointer bundle missing: {rel}"], None
+    if spec.get("bundle_sha256") and _sha256_file(bundle) != spec["bundle_sha256"]:
+        return None, ["bundle sha256 mismatch against the canonical pointer"], None
+    binding = {"pointer_path": f"{EVIDENCE_REL}/CURRENT.json",
+               "schema_version": spec.get("schema_version"),
+               "data_identity": spec.get("data_identity"),
+               "bundle_path": rel,
+               "bundle_sha256": spec.get("bundle_sha256")}
+    return json.loads(bundle.read_bytes()).get("evidence"), [], binding
 
 
 def _verify_entry(artifact, entry):
@@ -686,16 +758,24 @@ def build_report(archive, artifact, cache):
         else:
             usable_date = min(cutoffs[api] for api in BAR_APIS)
 
-    evidence, evidence_reasons = load_evidence(artifact) if artifact else (None, [
-        "artifact root unresolved; cannot read delivered input supplements"])
+    evidence, evidence_reasons, asset_bundle = load_evidence(artifact)
     reasons += evidence_reasons
 
+    # Verified calendar candidates and the release trade_cal both carry real
+    # rows; take the one with the longest actual coverage (through-day) so a
+    # short candidate never hides a longer verified calendar.
+    options = []
     if evidence and evidence.get("calendar_candidates"):
-        calendar, calendar_reasons, scan = calendar_from_candidates(
-            archive, evidence.get("calendar_candidates"), usable_date)
-    elif fundamentals_release["valid"]:
-        calendar, calendar_reasons, scan = calendar_from_release(
-            archive, fundamentals_release, cache, usable_date)
+        options.append(calendar_from_candidates(
+            archive, evidence.get("calendar_candidates"), usable_date))
+    if fundamentals_release["valid"]:
+        options.append(calendar_from_release(
+            archive, fundamentals_release, cache, usable_date))
+    if options:
+        confirmed = [o for o in options if o[0]["confirmed_next_session"]]
+        best = max(confirmed or options,
+                   key=lambda o: o[2]["through"] or "")
+        calendar, calendar_reasons, scan = best
     else:
         calendar = {"path": None, "sha256": None, "confirmed_next_session": None}
         calendar_reasons = ["fundamentals release invalid"]
@@ -755,6 +835,7 @@ def build_report(archive, artifact, cache):
         "market": market,
         "fundamentals": fundamentals,
         "calendar": calendar,
+        "asset_bundle": asset_bundle,
         "calendar_context": month["calendar_context"],
         "accounts": accounts,
         "asset_inputs": assets,

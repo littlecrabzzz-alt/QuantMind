@@ -5,7 +5,9 @@ from pathlib import Path
 
 def host_path(container_path: str, *, runtime_only: bool = False) -> str:
     code = Path(os.path.abspath(os.getenv("HOST_PROJECT_PATH") or os.getcwd()))
-    sandbox = os.getenv("QM_NODE_ROLE") == "sandbox"
+    role = os.getenv("QM_NODE_ROLE")
+    # local uses the explicit primary runtime root, without sandbox-only restrictions.
+    sandbox = False if role == "local" else role == "sandbox"
     configured = os.getenv("HOST_RUNTIME_PATH", "").strip()
     if configured and not Path(configured).is_absolute():
         raise ValueError("HOST_RUNTIME_PATH must be absolute")

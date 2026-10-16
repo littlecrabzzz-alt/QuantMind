@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.quantmind.ashare-paper</string>
+  <key>ProgramArguments</key><array>
+    <string>__PYTHON__</string><string>__REPO__/scripts/ashare_paper_daily.py</string><string>tick</string>
+    <string>--readiness</string><string>__READINESS__</string>
+    <string>--archive-root</string><string>__ARCHIVE_ROOT__</string>
+    <string>--artifact-root</string><string>__ARTIFACT_ROOT__</string>
+    <string>--market-pointer</string><string>RESEARCH_CURRENT.json</string>
+    <string>--fundamental-pointer</string><string>CURRENT.json</string>
+    <string>--prepared-root</string><string>__PREPARED_ROOT__</string>
+    <string>--user-id</string><string>__USER_ID__</string>
+    <string>--tenant-id</string><string>__TENANT_ID__</string>
+    <string>--registry-bindings</string><string>__REGISTRY_BINDINGS__</string>
+    <string>--ledger-root</string><string>__LEDGER_BASE__</string>
+  </array>
+  <key>WorkingDirectory</key><string>__REPO__</string>
+  <key>StartInterval</key><integer>900</integer>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>__REPO__/logs/ashare-paper.log</string>
+  <key>StandardErrorPath</key><string>__REPO__/logs/ashare-paper-error.log</string>
+</dict></plist>

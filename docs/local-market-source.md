@@ -27,8 +27,26 @@ python3 scripts/local_market_source.py tick --market BC --force
 - 独立源根：`~/Library/Application Support/QuantMind/market-source`；原始目录为 `working/project/data/{quantdb,quantbc}`，与研究沙盒隔离。
 - LaunchAgent：`com.quantmind.market-source`；持久客户端：相邻 `market-source-client`；日志：相邻 `logs/market-source.*.log`。采集代码从主树只读挂入隔离容器，不挂业务库/Redis。
 - `status.json` 分市场记录采集版本、`cloud_release`、`local_release` 与 `retry_pending`；`A-collection.json`、`BC-collection.json` 是原始采集结果。
-- 接收端 `/data/local-market-source/{A,BC}-receipt.json`；本地 A 使用 `.local-dev/QUANTDB_SYNC.json`，本地 BC 有自己的接收回执。必须区分节点，同名文件不是同一状态。
+
+纸盘就绪 QA（paper-readiness v1，见[后端唯一日更契约](../backend/README.md#唯一日更契约paper-readiness-v1)）：`python3 scripts/paper_readiness_qa.py` 只读核验受管归档行级日期与冻结资产输入，产出 `~/Library/Application Support/QuantMind/market-source/paper-readiness.json`，按固定输入身份缓存在相邻 `paper-readiness-cache/`。逐户 ready/pending/blocked 与原因见该 JSON；canonical CURRENT 或日历/资产身份变化须重新核验，不由 tick 重判。冷准备与复用成本依实际数据量记录，不以 QA green 代替八户 runtime/API/页面验收。
+- 接收端 `/data/local-market-source/{A,BC}-receipt.json`；开发态 A 的同步回执在 `.local-dev/QUANTDB_SYNC.json`，业务主节点使用独立 `.local-primary` 状态。必须区分节点和实际消费版本，同名文件不是同一状态。
 - Tushare 归档、缓存、版本读取及权限恢复见 [Tushare 运维](tushare-mac-source.md)；Binance 产品与手工批次见 [Binance 运维](binance-data-operations.md)。
+
+### 业务主节点沿用已有 READY 适配
+
+`scripts/local_market_source.py` 已有 `.local-primary/READY` 门禁：READY 后采集选择
+`quantmind-local-quantmind`，状态写 `primary_release`，A 复用 quantdb_refresh.apply，
+BC 复用 apply_bc；primary 分支不执行 send_cloud。未 READY 的旧开发态仍可能选择
+quantmind-dev；这不授权为恢复采集重启开发后端、另造目标配置或新增并行采集器。
+交接先完成最终冷备校验、全新恢复、云端冻结复查和业务服务健康，再调用现有 install
+把最终 Main 的客户端及既有依赖复制到相邻 Library 客户端并重载原 LaunchAgent，
+随后由同一十五分钟任务续跑。安装模板、代码已合并或 READY 之外的目录存在均非运行证明；
+应同时记录已安装脚本 SHA、ProgramArguments、首跑 phase 与 primary_release/真实消费查询。
+
+目标修复不代表供应商数据齐全。QuantDB 原有 HTTP410、下载失败和接口/历史缺口
+作为独立上游事实保留；分区名最后日期须再验非空行数、代表证券价格及 PG/Qlib/
+市场分析实际截止日。Binance 日线按 UTC 收盘时间核验，release 的 end_exclusive
+不是最后 bar 日期；既有正确收盘过滤不因时区或目录名猜测而改变。
 
 ## 故障按阶段恢复
 

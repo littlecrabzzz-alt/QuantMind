@@ -6,7 +6,6 @@ import numpy as np
 from ...ai_strategy_config import get_config as _get_config
 from .dashscope_client import DashScopeClient
 
-ai_strategy_config = _get_config()
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +68,7 @@ class StrategyVectorParser:
 
     def __init__(self):
         self.client = DashScopeClient()
-        self.model = ai_strategy_config.DASHSCOPE_EMBEDDING_MODEL
+        self.model = _get_config().DASHSCOPE_EMBEDDING_MODEL
 
         self._prototype_vectors: dict[str, list[np.ndarray]] = {}
         self._initialized = False

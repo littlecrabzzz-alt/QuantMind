@@ -67,15 +67,10 @@ def desired(role, settings):
     }
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("role", choices=("mac", "cloud"))
-    parser.add_argument("--apply", action="store_true")
-    parser.add_argument("--content-hash", action="store_true", help="Hash all indexed source/config files, including ignored Git secrets")
-    args = parser.parse_args()
-    settings = topology()
+def syncthing_api(role):
+    """Use the existing node-local credential without exposing it to callers."""
     cfg_path = (pathlib.Path.home() / "Library/Application Support/Syncthing/config.xml"
-                if args.role == "mac" else
+                if role == "mac" else
                 pathlib.Path("/root/.local/state/syncthing/config.xml"))
     cfg = ET.parse(cfg_path).getroot()
     base = "http://" + cfg.findtext("gui/address")
@@ -89,9 +84,31 @@ def main():
         with opener.open(request, timeout=30) as response:
             payload = response.read()
             return json.loads(payload) if payload else None
+    return api
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("role", choices=("mac", "cloud"))
+    parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--content-hash", action="store_true", help="Hash all indexed source/config files, including ignored Git secrets")
+    parser.add_argument("--pause-code", action="store_true",
+                        help="Pause only the existing QuantMind code folder")
+    args = parser.parse_args()
+    settings = topology()
+    api = syncthing_api(args.role)
 
     endpoint = "config/folders/" + settings["QM_CODE_FOLDER"]
     current = api(endpoint)
+    if args.pause_code:
+        expected_path = PROJECT if args.role == "mac" else pathlib.Path(settings["QM_REMOTE_PROJECT"])
+        if pathlib.Path(current["path"]).resolve() != expected_path.resolve():
+            raise SystemExit("Unexpected QuantMind sync path; refusing to alter another folder")
+        api(endpoint, {**current, "paused": True}, "PUT")
+        paused = api(endpoint).get("paused") is True
+        print(json.dumps({"role": args.role, "folder": settings["QM_CODE_FOLDER"],
+                          "path": str(expected_path), "paused": paused}))
+        return 0 if paused else 1
     expected = desired(args.role, settings)
     # Keep versioning extensions introduced by newer Syncthing versions.
     expected["versioning"] = {**current.get("versioning", {}), **expected["versioning"]}

@@ -5,6 +5,9 @@ import contextlib
 import shutil
 from pathlib import Path
 import tempfile
+
+# macOS /var is a symlink; fixtures must obey the release no-symlink contract.
+tempfile.tempdir = str(Path(tempfile.gettempdir()).resolve())
 import unittest
 from unittest.mock import patch
 
@@ -13,6 +16,104 @@ import dual_node_snapshot as snapshot
 
 
 class QuantDBRefresh(unittest.TestCase):
+
+    def test_primary_apply_uses_adopted_baseline_and_recovers_only_primary_services(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            state = project / ".local-primary"
+            local = state / "project"
+            data = local / "data/quantdb/day.parquet"
+            data.parent.mkdir(parents=True)
+            data.write_text("old")
+            row = {"path": "data/quantdb/day.parquet", "sha256": snapshot.digest(data), "bytes": 3}
+            (state / "runtime-manifest.jsonl").write_text(json.dumps(row))
+            (state / "READY").touch()
+            (project / "logs").mkdir()
+            sandbox = project / ".local-dev/project/data/keep"
+            sandbox.parent.mkdir(parents=True)
+            sandbox.write_text("sandbox result")
+            download = project / "download"
+            new = download / "project/data/quantdb/day.parquet"
+            new.parent.mkdir(parents=True)
+            new.write_text("new")
+            (download / "runtime-manifest.jsonl").write_text(json.dumps({**row, "sha256": snapshot.digest(new)}))
+            for name in ("COMPLETE", "VERIFIED"):
+                (download / name).touch()
+            services = ["quantmind-local-celery-beat", "quantmind-local-celery", "quantmind-local-quantmind"]
+            commands = []
+            def run(*args, **kwargs):
+                commands.append(args)
+                if args[0] != "docker":
+                    return subprocess.run(args, check=True, **kwargs)
+            with patch.object(refresh, "require_local_idle", return_value=services), \
+                 patch.object(snapshot, "run", side_effect=run), \
+                 patch.object(snapshot, "output", side_effect=RuntimeError("derive failed")):
+                with self.assertRaisesRegex(RuntimeError, "derive failed"):
+                    refresh.apply(project, download)
+            self.assertEqual(data.read_text(), "new")
+            self.assertFalse(any(c[:2] == ("docker", "start") for c in commands))
+            receipt = json.loads((state / "QUANTDB_SYNC.json").read_text())
+            self.assertEqual(receipt["resume_services"], services)
+            cache = local / "db/qlib_data"
+            staged = local / "db/.quantdb-qlib-fixture"
+            cache.mkdir(parents=True); staged.mkdir()
+            (cache / "day").write_text("old"); (staged / "day").write_text("new")
+            validation = {"qlib_staged": "/app/db/.quantdb-qlib-fixture", "qlib_live": "/app/db/qlib_data"}
+            with patch.object(refresh, "require_local_idle", return_value=[]), \
+                 patch.object(snapshot, "run", side_effect=run), \
+                 patch.object(snapshot, "output", return_value=json.dumps(validation)) as output:
+                refresh.apply(project, download)
+            command = output.call_args.args
+            self.assertIn("quantmind-local", command)
+            self.assertIn("QM_PRIMARY_STATE=" + str(local), command)
+            self.assertIn(str(project / "deploy/compose.local-primary.yml"), command)
+            self.assertEqual(commands[-1], ("docker", "start", *services))
+            self.assertEqual(sandbox.read_text(), "sandbox result")
+            self.assertEqual(json.loads((state / "QUANTDB_SYNC.json").read_text())["status"], "applied")
+            self.assertFalse((project / "logs/local-primary.lock").exists())
+            with patch.object(snapshot, "run") as remote:
+                with self.assertRaisesRegex(RuntimeError, "never cloud refresh"):
+                    refresh.refresh(project, download)
+                remote.assert_not_called()
+
+    def test_primary_bc_failed_receiver_preserves_pause_and_retries(self):
+        import local_market_source as source
+        import hashlib
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            state = project / ".local-primary"
+            state.mkdir(); (state / "READY").touch(); (project / "logs").mkdir()
+            payload = b"fixture"
+            row = {"path": "data/quantbc/CURRENT.json", "bytes": len(payload),
+                   "sha256": hashlib.sha256(payload).hexdigest()}
+            raw = json.dumps(row) + "\n"
+            bundle = project / ("market-" + hashlib.sha256(raw.encode()).hexdigest())
+            data = bundle / "project" / row["path"]
+            data.parent.mkdir(parents=True); data.write_bytes(payload)
+            (bundle / "runtime-manifest.jsonl").write_text(raw)
+            for name in ("COMPLETE", "VERIFIED"): (bundle / name).touch()
+            commands = []
+            fail = True
+            def run(*args, **kwargs):
+                commands.append(args)
+                if args[0] == "cp": return subprocess.run(args, check=True, **kwargs)
+                if args[0] == "env" and fail: raise RuntimeError("BC derive failed")
+            services = ["quantmind-local-quantmind"]
+            with patch.object(refresh, "require_local_idle", return_value=services), \
+                 patch.object(snapshot, "run", side_effect=run):
+                with self.assertRaisesRegex(RuntimeError, "BC derive failed"):
+                    refresh.apply_bc(project, bundle)
+            self.assertEqual(json.loads((state / "BC_SYNC.json").read_text())["status"], "files_applied")
+            self.assertFalse(any(c[:2] == ("docker", "start") for c in commands))
+            fail = False
+            with patch.object(refresh, "require_local_idle", return_value=[]), \
+                 patch.object(snapshot, "run", side_effect=run):
+                refresh.apply_bc(project, bundle)
+            self.assertEqual(commands[-1], ("docker", "start", *services))
+            self.assertEqual(json.loads((state / "BC_SYNC.json").read_text())["status"], "applied")
+            self.assertEqual(source.verify_bundle(bundle, "BC"), [row])
 
     def test_publish_failure_still_applies_verified_release_and_remains_visible(self):
         import subprocess

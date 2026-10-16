@@ -12,20 +12,23 @@ import pandas as pd
 from backend.shared.stock_utils import StockCodeUtil
 
 
+_VENDOR_ROOT = Path(__file__).resolve().parents[3] / "vendor" / "ashare-lab"
+
+
 class AshareLabUnavailable(RuntimeError):
     """本节点无法导入 ashare-lab。"""
 
 
 def _source_dir() -> Path:
-    return Path(os.environ.get("ASHARE_LAB_SRC", "~/code/ashare-lab/src")).expanduser()
+    return Path(os.environ.get("ASHARE_LAB_SRC", _VENDOR_ROOT / "src")).expanduser()
 
 
 def _panel_dir() -> Path:
-    return Path(os.environ.get("ASHARE_LAB_PANEL", "~/code/ashare-lab/data/panel")).expanduser()
+    return Path(os.environ.get("ASHARE_LAB_PANEL", _VENDOR_ROOT / "data" / "panel")).expanduser()
 
 
 def import_ashare_lab() -> SimpleNamespace:
-    """延迟导入外部源码，并暴露桥接所需的原生接口。"""
+    """延迟导入仓库内源码，并暴露桥接所需的原生接口。"""
     try:
         source = _source_dir()
         if not (source / "ashare_lab").is_dir():

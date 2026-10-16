@@ -27,8 +27,8 @@ CODE_FILES = ("frozen_research_worker.py", "research_expression.py")
 
 def settings():
     role = os.getenv("QM_NODE_ROLE")
-    if role not in ("authority", "sandbox"):
-        raise ValueError("研究需要已确认的数据角色：云端或本地沙盒")
+    if role not in ("authority", "sandbox", "local"):
+        raise ValueError("研究需要已确认的数据角色：云端、本地主节点或本地沙盒")
     data = frozen.read(ROOT / "settings.json")
     if data["role"] != role or data["host_data"] != host_path("/data", runtime_only=True):
         raise ValueError("研究配置与实际运行节点不匹配")

@@ -33,6 +33,12 @@ async def init_admin_data(db: AsyncSession):
     logger.info("Starting admin data initialization...")
     default_tenant_id = "default"
 
+    # Apply the existing nullable profile-column migration before either the
+    # admin lookup or the first public registration can load the full ORM row.
+    from .profile_service import ProfileService
+    await ProfileService()._ensure_profile_table(db)
+    await db.commit()
+
     # 1. 确保RBAC角色存在
     await init_default_roles_and_permissions(db)
 

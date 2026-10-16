@@ -1,18 +1,17 @@
 """桥接与 ashare-lab 原生回测的真实数据对数：同一策略结果一致到小数点后 4 位。
 
-需要 ashare-lab 面板（ASHARE_LAB_PANEL，默认 ~/code/ashare-lab/data/panel）。
+需要 ashare-lab 面板（ASHARE_LAB_PANEL，默认仓库 vendor/ashare-lab/data/panel）。
 """
 
-import os
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from backend.shared.ashare_lab_bridge import BridgeConfig, import_ashare_lab, run_signal_backtest
+from backend.shared.ashare_lab_bridge.bridge import _panel_dir
 
-PANEL = Path(os.environ.get("ASHARE_LAB_PANEL", Path.home() / "code/ashare-lab/data/panel"))
+PANEL = _panel_dir()
 pytestmark = pytest.mark.skipif(not (PANEL / "daily.parquet").exists(), reason="ashare-lab panel missing")
 
 

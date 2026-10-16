@@ -40,3 +40,4 @@ __pycache__
 /data/*
 !/db/sql
 /db/*
+.local-primary/

@@ -169,9 +169,11 @@ def retain_transport_copies(directory, *, protected=(), backup=False, managed_on
 
 
 def retain_local_backups(root, project):
-    ledger = root / "local-backups.json"
+    primary = (project / ".local-primary/READY").is_file()
+    state_dir = project / (".local-primary" if primary else ".local-dev")
+    ledger = root / ("primary-backups.json" if primary else "local-backups.json")
     entries = read_json(ledger, [])
-    receipt = read_json(project / ".local-dev/QUANTDB_SYNC.json", {})
+    receipt = read_json(state_dir / "QUANTDB_SYNC.json", {})
     current = {k: receipt[k] for k in ("backup", "qlib_backup") if receipt.get(k)}
     if current and current not in entries:
         entries.append(current)
@@ -179,7 +181,7 @@ def retain_local_backups(root, project):
     for entry in entries[:-2]:
         for value in entry.values():
             path = Path(value)
-            if (path.parent == project / ".local-dev" and not path.is_symlink()
+            if (path.parent == state_dir and not path.is_symlink()
                     and re.fullmatch(r"(?:quantdb-before-[0-9TZ]+-[a-f0-9]+|qlib-before-[a-f0-9]+)", path.name)):
                 if path.exists():
                     shutil.rmtree(path)
@@ -301,7 +303,8 @@ def collect_on_mac(root, market, project, secrets):
     endpoint = subprocess.check_output(["docker", "context", "inspect", "--format", "{{.Endpoints.docker.Host}}"], text=True).strip()
     if not endpoint.startswith("unix://"):
         raise RuntimeError("Refusing a remote Docker collector")
-    image = subprocess.check_output(["docker", "inspect", "quantmind-dev", "--format", "{{.Config.Image}}"], text=True).strip()
+    backend = "quantmind-local-quantmind" if (project / ".local-primary/READY").is_file() else "quantmind-dev"
+    image = subprocess.check_output(["docker", "inspect", backend, "--format", "{{.Config.Image}}"], text=True).strip()
     root.mkdir(parents=True, exist_ok=True)
     command = ["docker", "run", "--rm", "--name", "quantmind-local-source-" + market.lower(),
                "--platform", "linux/amd64", "--memory", "2g", "--cpus", "2", "-w", "/app", "--entrypoint", "python",
@@ -460,6 +463,8 @@ def receive(root, market, release_id, *, data_root=Path("/data")):
 def tick(root, project, secrets, host, market=None, force=False):
     if sys.platform != "darwin":
         raise RuntimeError("Only the Mac schedules vendor collection")
+    primary = (project / ".local-primary/READY").is_file()
+    local_key = "primary_release" if primary else "local_release"
     root.mkdir(parents=True, exist_ok=True)
     with lock(root / ".source.lock"):
         if shutil.disk_usage(root).free < 300 * 2**30:
@@ -484,16 +489,20 @@ def tick(root, project, secrets, host, market=None, force=False):
                 if not release_id:
                     continue
                 bundle = root / "releases" / name / release_id
-                if item.get("cloud_release") != release_id:
+                if not primary and item.get("cloud_release") != release_id:
                     send_cloud(bundle, name, host)
                     item.update(cloud_release=release_id, status="cloud_applied")
                     write_json(status_path, state)
-                if name == "A" and item.get("local_release") != release_id:
+                if name == "A" and item.get(local_key) != release_id:
                     from quantdb_refresh import apply
                     apply(project, bundle)
-                    item["local_release"] = release_id
+                    item[local_key] = release_id
                     retain_local_backups(root, project)
-                elif name == "BC" and item.get("local_release") != release_id:
+                elif name == "BC" and primary and item.get(local_key) != release_id:
+                    from quantdb_refresh import apply_bc
+                    apply_bc(project, bundle)
+                    item[local_key] = release_id
+                elif name == "BC" and item.get(local_key) != release_id:
                     incoming = project / ".local-dev/project/data/local-market-source/incoming/BC" / release_id
                     if not incoming.exists():
                         incoming.parent.mkdir(parents=True, exist_ok=True)
@@ -501,7 +510,7 @@ def tick(root, project, secrets, host, market=None, force=False):
                     subprocess.run(["docker", "exec", "quantmind-dev", "python", "scripts/local_market_source.py",
                                     "receive", "--root", "/data/local-market-source", "--market", "BC",
                                     "--release", release_id], check=True)
-                    item["local_release"] = release_id
+                    item[local_key] = release_id
                 item.update(status="applied", checked_at=now().isoformat())
                 item.pop("error", None)
             except Exception as exc:
@@ -512,7 +521,7 @@ def tick(root, project, secrets, host, market=None, force=False):
                     retain_transport_copies(
                         root / "releases" / name,
                         protected=[item[key] for key in
-                                   ("release_id", "local_release", "cloud_release")
+                                   ("release_id", "local_release", "primary_release", "cloud_release")
                                    if item.get(key)],
                     )
                     item.pop("rotation_error", None)

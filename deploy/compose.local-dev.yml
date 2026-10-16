@@ -27,8 +27,8 @@ services:
     ports: !override
       - "127.0.0.1:8000:8000"
     environment:
-      ASHARE_LAB_SRC: /opt/ashare-lab/src
-      ASHARE_LAB_PANEL: /opt/ashare-lab/data/panel
+      ASHARE_LAB_SRC: /app/vendor/ashare-lab/src
+      ASHARE_LAB_PANEL: /app/vendor/ashare-lab/data/panel
       APP_ENV: development
       QM_NODE_ROLE: sandbox
       HOST_PROJECT_PATH: ${QM_LOCAL_PROJECT:?run through scripts/local-dev.sh}
@@ -43,8 +43,9 @@ services:
       ENABLE_REAL_TRADING: "false"
       ENABLE_TDX_PUSH: "false"
     volumes: !override
-      - ${ASHARE_LAB_ROOT:-${HOME}/code/ashare-lab}/src:/opt/ashare-lab/src:ro
-      - ${ASHARE_LAB_ROOT:-${HOME}/code/ashare-lab}/data/panel:/opt/ashare-lab/data/panel:ro
+      - ${QM_LOCAL_PROJECT:?run through scripts/local-dev.sh}/vendor/ashare-lab:/app/vendor/ashare-lab:ro
+      - ${QM_LOCAL_PROJECT:?run through scripts/local-dev.sh}/output/ashare-takeover:/app/output/ashare-takeover:ro
+      - ${QM_LOCAL_PROJECT:?run through scripts/local-dev.sh}/output/ashare-paper:/app/output/ashare-paper
       - ${QM_LOCAL_STATE:?run through scripts/local-dev.sh}/data:/data
       - ${QM_LOCAL_TUSHARE_ROOT:-${QM_LOCAL_STATE}/data/tushare}:/data/tushare:ro
       - ${QM_LOCAL_STATE}/models:/app/models
@@ -68,8 +69,8 @@ services:
   celery-worker:
     container_name: quantmind-dev-celery
     environment:
-      ASHARE_LAB_SRC: /opt/ashare-lab/src
-      ASHARE_LAB_PANEL: /opt/ashare-lab/data/panel
+      ASHARE_LAB_SRC: /app/vendor/ashare-lab/src
+      ASHARE_LAB_PANEL: /app/vendor/ashare-lab/data/panel
       QM_NODE_ROLE: sandbox
       HOST_PROJECT_PATH: ${QM_LOCAL_PROJECT}
       HOST_RUNTIME_PATH: ${QM_LOCAL_STATE}
@@ -81,8 +82,9 @@ services:
       ENABLE_REAL_TRADING: "false"
       ENABLE_TDX_PUSH: "false"
     volumes: !override
-      - ${ASHARE_LAB_ROOT:-${HOME}/code/ashare-lab}/src:/opt/ashare-lab/src:ro
-      - ${ASHARE_LAB_ROOT:-${HOME}/code/ashare-lab}/data/panel:/opt/ashare-lab/data/panel:ro
+      - ${QM_LOCAL_PROJECT:?run through scripts/local-dev.sh}/vendor/ashare-lab:/app/vendor/ashare-lab:ro
+      - ${QM_LOCAL_PROJECT:?run through scripts/local-dev.sh}/output/ashare-takeover:/app/output/ashare-takeover:ro
+      - ${QM_LOCAL_PROJECT:?run through scripts/local-dev.sh}/output/ashare-paper:/app/output/ashare-paper
       - ${QM_LOCAL_STATE}/data:/data
       - ${QM_LOCAL_STATE}/models:/app/models
       - ${QM_LOCAL_STATE}/db:/app/db

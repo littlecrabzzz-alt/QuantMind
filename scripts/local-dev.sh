@@ -111,6 +111,7 @@ healthy() { curl --noproxy '*' --connect-timeout 2 --max-time 3 -fsS "http://127
 
 start_local() {
   local mode=${1:-core} running service current_env
+  [ -z "$(docker ps -q --filter label=com.docker.compose.project=quantmind-local)" ] || fail 'quantmind-local is running; refusing to start the sandbox.'
   case "$mode" in core|full|research) ;; *) fail 'Mode must be core, full or research.' ;; esac
   [ -f "$STATE/READY" ] && [ -s "$STATE/SNAPSHOT_ID" ] || fail 'Run scripts/local-dev.sh init first.'
   SERVICES=(db redis quantmind)

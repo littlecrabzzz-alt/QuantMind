@@ -8,7 +8,6 @@ try:
 except ImportError:
     from backend.services.engine.ai_strategy.ai_strategy_config import get_config as _get_config
 
-ai_strategy_config = _get_config()
 
 
 class DashScopeClient:
@@ -19,6 +18,7 @@ class DashScopeClient:
         api_key: str | None = None,
         base_url: str | None = None,
     ):
+        self.config = _get_config()
         self.api_key = api_key or os.getenv("DASHSCOPE_API_KEY")
         if not self.api_key:
             raise RuntimeError("DASHSCOPE_API_KEY is not configured")
@@ -31,11 +31,11 @@ class DashScopeClient:
         model: str | None = None,
         timeout: int | None = None,
     ) -> dict[str, Any]:
-        model = model or ai_strategy_config.DASHSCOPE_EMBEDDING_MODEL
+        model = model or self.config.DASHSCOPE_EMBEDDING_MODEL
         resp = self.client.embeddings.create(
             model=model,
             input=text,
-            timeout=timeout or ai_strategy_config.DASHSCOPE_EMBEDDING_TIMEOUT,
+            timeout=timeout or self.config.DASHSCOPE_EMBEDDING_TIMEOUT,
         )
         return {
             "model": resp.model,
@@ -47,9 +47,9 @@ class DashScopeClient:
         """Lightweight check that the configured endpoint responds."""
         try:
             resp = self.client.embeddings.create(
-                model=ai_strategy_config.DASHSCOPE_EMBEDDING_MODEL,
+                model=self.config.DASHSCOPE_EMBEDDING_MODEL,
                 input="health check",
-                timeout=ai_strategy_config.DASHSCOPE_EMBEDDING_TIMEOUT,
+                timeout=self.config.DASHSCOPE_EMBEDDING_TIMEOUT,
             )
             return resp.model
         except Exception as exc:

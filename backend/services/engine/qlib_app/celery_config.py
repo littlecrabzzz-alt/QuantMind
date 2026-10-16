@@ -161,6 +161,7 @@ if os.getenv("MARKET_SNAPSHOT_ENABLED", "true").lower() == "true":
     }
 
 # The retired cloud archive must not keep adding jobs after Mac takes ownership.
+# local never schedules archive acquisition; the native archive worker owns it.
 # ENABLED remains the temporary operator switch; other market schedules continue.
 if (os.getenv("QM_NODE_ROLE") == "authority"
         and not Path("/data/tushare/ARCHIVE_RELOCATED.json").exists()):

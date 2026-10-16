@@ -103,7 +103,7 @@ class ReadinessQA(unittest.TestCase):
 
     def _deliver(self, etf_path=None, mutate=None):
         etf_path = etf_path or self._etf_parquet()
-        epoch = self.artifact / qa.EVIDENCE_REL / EPOCH
+        epoch = self.artifact / qa.EVIDENCE_REL / "assets-testcanonical"
         epoch.mkdir(parents=True, exist_ok=True)
         manifest = self.artifact / "prepared/supplement-manifest.json"
         files = {}
@@ -132,7 +132,14 @@ class ReadinessQA(unittest.TestCase):
                                "cb_double_low": cb_entry,
                                "cta_combined": cta_entry, "cta_trend": cta_entry},
                     "errors": {}, "calendar_candidates": []}
-        (epoch / "asset-evidence.json").write_text(json.dumps(evidence))
+        bundle = epoch / "bundle.json"
+        bundle.write_text(json.dumps({"schema_version": 1,
+                                      "data_identity": "test-identity",
+                                      "evidence": evidence}))
+        (self.artifact / qa.EVIDENCE_REL / "CURRENT.json").write_text(json.dumps({
+            "schema_version": 1, "data_identity": "test-identity",
+            "bundle_path": "ashare-input-supplements/assets-testcanonical/bundle.json",
+            "bundle_sha256": sha(bundle)}))
 
     def report(self):
         return qa.build_report(self.archive, self.artifact, self.cache)
@@ -154,6 +161,11 @@ class ReadinessQA(unittest.TestCase):
             self.assertEqual(report["accounts"][key]["state"], "ready", key)
         self.assertTrue(report["asset_inputs"]["i7_turn_of_month"]["path"]
                         .startswith("prepared/"))
+        self.assertEqual(report["asset_bundle"]["data_identity"], "test-identity")
+        self.assertEqual(report["asset_bundle"]["pointer_path"],
+                         "ashare-input-supplements/CURRENT.json")
+        i7_input = report["asset_inputs"]["i7_turn_of_month"]
+        self.assertEqual(i7_input["path"], "prepared/etf-normalized.parquet")
         encoded = json.dumps(report)
         self.assertNotIn("/Users/", encoded)
         self.assertNotIn('"..', encoded)

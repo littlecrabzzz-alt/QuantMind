@@ -18,6 +18,32 @@ from dual_node_inventory import stat_key
 from dual_node_check import sandbox_mount_path
 
 
+def local_target(project):
+    """READY selects the adopted primary; otherwise preserve legacy sandbox behavior."""
+    primary = (project / '.local-primary/READY').is_file()
+    mode = 'local-primary' if primary else 'local-dev'
+    prefix = 'quantmind-local' if primary else 'quantmind-dev'
+    backend = prefix + '-quantmind' if primary else prefix
+    services = [prefix + '-celery', prefix + '-research-worker', backend]
+    if primary:
+        services = [prefix + '-celery-beat', prefix + '-qwenpaw',
+                    prefix + '-research-agent', *services]
+    return {'primary': primary, 'state': project / ('.' + mode),
+            'mode': mode, 'prefix': prefix, 'backend': backend, 'services': services,
+            'lock': project / 'logs' / (mode + '.lock')}
+
+
+def local_compose(project):
+    target = local_target(project)
+    env_prefix = 'QM_PRIMARY' if target['primary'] else 'QM_LOCAL'
+    return ['env', env_prefix + '_PROJECT=' + str(project),
+            env_prefix + '_STATE=' + str(target['state'] / 'project'),
+            'docker', 'compose', '--project-name', target['prefix'],
+            '--env-file', str(project / '.env.local'), '-f', str(project / 'docker-compose.yml'),
+            '-f', str(project / ('deploy/compose.' + target['mode'] + '.yml')),
+            '--project-directory', str(project)]
+
+
 def records(project):
     root = project / 'data/quantdb'
     return {p.relative_to(project).as_posix(): stat_key(p.stat())
@@ -127,20 +153,32 @@ def require_local_idle(project, *, recovering=False):
     running = snapshot.output('docker', 'ps', '--format', '{{.Names}}').splitlines()
     snapshot.require(not any(n.startswith(('qm-train-', 'qm-agent-', 'qm-frozen-', 'qm-ide-run-', 'rdagent-'))
                              for n in running), 'Running experiment: download retained; retry when idle')
-    for worker, app in [('quantmind-dev-research-worker', 'backend.services.engine.research.tasks:app'),
-                        ('quantmind-dev-celery', 'backend.services.engine.qlib_app.celery_config:celery_app')]:
+    target = local_target(project)
+    prefix = target['prefix']
+    for worker, app in [(prefix + '-research-worker', 'backend.services.engine.research.tasks:app'),
+                        (prefix + '-celery', 'backend.services.engine.qlib_app.celery_config:celery_app')]:
         if worker not in running:
             continue
         for kind in ('active', 'reserved', 'scheduled'):
             tasks = json.loads(snapshot.output('docker', 'exec', worker, 'celery', '-A', app,
                                               'inspect', kind, '--json', '--timeout=5'))
             snapshot.require(bool(tasks) and not any(tasks.values()), 'Local work pending; retry when idle')
-    snapshot.require(recovering or 'quantmind-dev' in running, 'Local backend stopped; downloaded version retained for next start')
-    mounts = json.loads(snapshot.output('docker', 'inspect', 'quantmind-dev', '--format', '{{json .Mounts}}'))
-    expected = (project / '.local-dev/project/data').resolve()
-    snapshot.require(any(m['Destination'] == '/data' and sandbox_mount_path(m['Source'], project) == expected for m in mounts),
+    snapshot.require(recovering or target['backend'] in running, 'Local backend stopped; downloaded version retained for next start')
+    if target['primary']:
+        environment = json.loads(snapshot.output('docker', 'inspect', target['backend'],
+                                                 '--format', '{{json .Config.Env}}'))
+        snapshot.require('QM_NODE_ROLE=local' in environment and
+                         'HOST_RUNTIME_PATH=' + str(target['state'] / 'project') in environment,
+                         'Unexpected primary role or runtime root')
+    mounts = json.loads(snapshot.output('docker', 'inspect', target['backend'], '--format', '{{json .Mounts}}'))
+    expected = (target['state'] / 'project/data').resolve()
+    def mount_path(source):
+        if target['primary']:
+            return Path(source.removeprefix('/host_mnt')).resolve()
+        return sandbox_mount_path(source, project)
+    snapshot.require(any(m['Destination'] == '/data' and mount_path(m['Source']) == expected for m in mounts),
                      'Unexpected local data mount')
-    return [name for name in ('quantmind-dev-celery', 'quantmind-dev-research-worker', 'quantmind-dev') if name in running]
+    return [name for name in target['services'] if name in running]
 
 
 DERIVED = '''
@@ -195,12 +233,13 @@ def local_cache_path(local, container_path):
 
 def refresh_market_view(project):
     # This derivative can catch up independently after an older successful apply.
-    lockdir = project / 'logs/local-dev.lock'
+    target = local_target(project)
+    lockdir = target['lock']
     lockdir.mkdir()
     (lockdir / 'pid').write_text(str(os.getpid()))
     try:
         require_local_idle(project)
-        result = snapshot.output('docker', 'exec', 'quantmind-dev', 'python', '-c',
+        result = snapshot.output('docker', 'exec', target['backend'], 'python', '-c',
             'import json; from backend.scripts.market_snapshot.compute import refresh_snapshot; '
             'print(json.dumps(refresh_snapshot()))')
         print('Market analysis updated:', result, flush=True)
@@ -213,7 +252,8 @@ def apply(project, downloaded):
     downloaded = downloaded.resolve()
     snapshot.require((downloaded / 'COMPLETE').is_file() and (downloaded / 'VERIFIED').is_file(),
                      'Only verified completed downloads can be applied')
-    state = project / '.local-dev'
+    target = local_target(project)
+    state = target['state']
     snapshot.require((state / 'READY').is_file(), 'Local sandbox is not initialized')
     incoming = manifest_rows(downloaded / 'runtime-manifest.jsonl')
     receipt = state / 'QUANTDB_SYNC.json'
@@ -222,7 +262,8 @@ def apply(project, downloaded):
         refresh_market_view(project)
         print('Local QuantDB already applied:', downloaded.name, flush=True)
         return
-    lockdir = project / 'logs/local-dev.lock'
+    target = local_target(project)
+    lockdir = target['lock']
     lockdir.mkdir()  # Share the existing local start/stop mutex.
     (lockdir / 'pid').write_text(str(os.getpid()))
     stopped = []
@@ -231,16 +272,18 @@ def apply(project, downloaded):
     try:
         stopped = require_local_idle(project, recovering=recovering)
         if recovering:
-            resume = prior.get('resume_services', ['quantmind-dev'])
-            snapshot.require(set(resume) <= {'quantmind-dev', 'quantmind-dev-celery', 'quantmind-dev-research-worker'},
+            resume = prior.get('resume_services', [target['backend']])
+            snapshot.require(set(resume) <= set(target['services']),
                              'Unexpected recovery service list')
             stopped = list(dict.fromkeys([*stopped, *resume]))
         previous = Path(prior['snapshot']) if prior.get('snapshot') else (
+            state if target['primary'] else
             project / 'logs/cloud-snapshots' / (state / 'SNAPSHOT_ID').read_text().strip())
         baseline = [json.loads(line) for line in (previous / 'runtime-manifest.jsonl').read_text().splitlines()
                     if json.loads(line)['path'].startswith('data/quantdb/') and json.loads(line)['path'].endswith('.parquet')]
         local = state / 'project'
-        snapshot.run('docker', 'stop', '--time', '60', *stopped)
+        if stopped or not target['primary']:
+            snapshot.run('docker', 'stop', '--time', '60', *stopped)
         check_local_changes(local, baseline, incoming)
         if prior.get('snapshot') == str(downloaded) and prior.get('status') == 'files_applied':
             backup = Path(prior['backup'])
@@ -268,10 +311,7 @@ def apply(project, downloaded):
         # Keep the API stopped until files, PG and Qlib agree: no new training
         # request can enter between the data exchange and cache completion.
         result = snapshot.output(
-            'env', 'QM_LOCAL_PROJECT=' + str(project), 'QM_LOCAL_STATE=' + str(local),
-            'docker', 'compose', '--project-name', 'quantmind-dev',
-            '--env-file', str(project / '.env.local'), '-f', str(project / 'docker-compose.yml'),
-            '-f', str(project / 'deploy/compose.local-dev.yml'), '--project-directory', str(project),
+            *local_compose(project),
             'run', '--rm', '--no-deps', '-T', '--entrypoint', 'python', 'quantmind', '-c', DERIVED)
         validation = json.loads(result.splitlines()[-1])
         qlib_staged = local_cache_path(local, validation['qlib_staged'])
@@ -297,7 +337,66 @@ def apply(project, downloaded):
             lockdir.rmdir()
 
 
+def apply_bc(project, bundle):
+    """Use the existing BC receiver and the primary's start/stop recovery mutex."""
+    from local_market_source import verify_bundle
+    target = local_target(project)
+    snapshot.require(target['primary'], 'BC primary application requires READY')
+    snapshot.require((bundle / 'COMPLETE').is_file() and (bundle / 'VERIFIED').is_file(),
+                     'Only verified completed releases can be applied')
+    verify_bundle(bundle, 'BC')
+    state = target['state']
+    receipt_path = state / 'BC_SYNC.json'
+    prior = json.loads(receipt_path.read_text()) if receipt_path.exists() else {}
+    if prior.get('release_id') == bundle.name and prior.get('status') == 'applied':
+        return
+    lockdir = target['lock']
+    lockdir.mkdir()
+    (lockdir / 'pid').write_text(str(os.getpid()))
+    stopped = []
+    recovering = prior.get('status') == 'files_applied'
+    can_restart = not recovering
+    try:
+        stopped = require_local_idle(project, recovering=recovering)
+        if recovering:
+            resume = prior.get('resume_services', [])
+            snapshot.require(set(resume) <= set(target['services']), 'Unexpected recovery service list')
+            stopped = list(dict.fromkeys([*stopped, *resume]))
+        incoming = state / 'project/data/local-market-source/incoming/BC' / bundle.name
+        if not incoming.exists():
+            incoming.parent.mkdir(parents=True, exist_ok=True)
+            staged = incoming.with_name('.copy-' + uuid.uuid4().hex)
+            try:
+                snapshot.run('cp', '-cR', str(bundle), str(staged))
+                staged.rename(incoming)
+            finally:
+                if staged.exists():
+                    shutil.rmtree(staged)
+        verify_bundle(incoming, 'BC')
+        if stopped:
+            snapshot.run('docker', 'stop', '--time', '60', *stopped)
+        write_json(receipt_path, {'status': 'files_applied', 'release_id': bundle.name,
+                                 'resume_services': stopped})
+        can_restart = False
+        # Receiver validates the immutable release and prepares PG/Qlib/H5 before CURRENT.
+        snapshot.run(*local_compose(project), 'run', '--rm', '--no-deps', '-T',
+                     '--entrypoint', 'python', 'quantmind', 'scripts/local_market_source.py',
+                     'receive', '--root', '/data/local-market-source', '--market', 'BC',
+                     '--release', bundle.name)
+        write_json(receipt_path, {'status': 'applied', 'release_id': bundle.name})
+        can_restart = True
+    finally:
+        try:
+            if stopped and can_restart:
+                snapshot.run('docker', 'start', *stopped)
+        finally:
+            (lockdir / 'pid').unlink(missing_ok=True)
+            lockdir.rmdir()
+
+
 def refresh(project, base):
+    snapshot.require(not local_target(project)['primary'],
+                     'Local primary consumes Mac releases; use local_market_source, never cloud refresh')
     snapshot.PROJECT = project
     publish_error = None
     try:

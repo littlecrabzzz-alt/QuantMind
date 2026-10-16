@@ -1,0 +1,601 @@
+{
+  "schema": 1,
+  "policy": "frozen research and paper observation only; no strategy-pass or live permission",
+  "archive": "output/ashare-takeover",
+  "archive_identity_sha256": "c76d30551f39214afc5a31e7e251bb5d5ba968ea5a7373d8ed3fe7cdfe0990cf",
+  "base_commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+  "paper_forward_commit": "ea48bfb1b4591855ed9fa01741a58face880e805",
+  "paper_s1_commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+  "ideas_commit": "33d8973013c55fbfe523a441469805b722acf5da",
+  "files": {
+    "src/ashare_lab/__init__.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "552ad26c6e259c3904eb68ee026aa680b5e47002db1fb23cc28422a2badb564c"
+    },
+    "src/ashare_lab/attribution.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "a1eb7320c1fa40340d78df7df0ff23a221fd0c8673b91dcaa469d749ec8858da"
+    },
+    "src/ashare_lab/benchmark.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "e2ee91d4972c8a94d2ffdb51f46f0afc774050d275f9254be97931edb460c307"
+    },
+    "src/ashare_lab/data/__init__.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "1872254e41c5eab6ab98290b9307f109411754c3a817c4c1ac70dc0812da04ea"
+    },
+    "src/ashare_lab/data/build.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "35011ae5ae23ff7047e69f6cba9eb93fa4199f7de9f27f493f8ce924b4501ef7"
+    },
+    "src/ashare_lab/data/events.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "2779ec78883884f5d34aa9dc3c29f156872154ff85695d967769723c856967dc"
+    },
+    "src/ashare_lab/data/fundamentals.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "89a297cd9486f654f921e0b4e787395d53476bde1b9adaa145ac8d5ce1033d4c"
+    },
+    "src/ashare_lab/data/market.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "dadfbdc9d5bfc20b7371499922b58dc416a22727f1291c0fbe81b017622ee0e3"
+    },
+    "src/ashare_lab/engine.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "6336ee157457abe9ab3904e017ff19100da84813693edb79873e450a94efe1fa"
+    },
+    "src/ashare_lab/factors.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "8a3c5c90611c6f5d85cd5f9d7d42fb332914edbe51a2318b5490ac1d9e7ff855"
+    },
+    "src/ashare_lab/index_timing.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "036b15a82a0944608998a2c5ec6ff5e725004f5e5d2182d3e8e29154fbffb1e5"
+    },
+    "src/ashare_lab/industry.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "ce94f546fcf2a4a0ef0ae3855de69ba1863dcc8f2b16b14e6c1ac48d0adcbc9c"
+    },
+    "src/ashare_lab/metrics.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "f27ce0e35b109f054fcf67d92be762f360e0b1cfd6033ed9d4c8b0c4e4565aa1"
+    },
+    "src/ashare_lab/ml/__init__.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "ea878c82f95a238c850837d04b160ef4662e218e448ecab4d231bc84050d5363"
+    },
+    "src/ashare_lab/ml/dataset.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "e3513a31d6bcd26ba9159a9e4c2a4cb9985945ce5cb5958bf5f4fedc8c66e5dd"
+    },
+    "src/ashare_lab/ml/evaluate.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "d92750534e00e84e14c1e9e9243754185a196f0035e0f3e026d9774d1e98b23c"
+    },
+    "src/ashare_lab/ml/models.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "61f7a93e149241a0c16cc68d59274602a4fc95468cb5351f541f7ce7caf53529"
+    },
+    "src/ashare_lab/ml/walkforward.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "282c7e5023ba34b65ffd893ab3d454e7738d03f0c7a08261486c7a91778806d2"
+    },
+    "src/ashare_lab/multifactor.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "16cb3f6e4e6ba18673d7ede3d50d472afa695adf8a071e5027f2a9cc59cd100a"
+    },
+    "src/ashare_lab/pbo.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "d73a40ca40953d5606e849a05e933d2f78c0cfc6746ac7f3682cee75a9c4565f"
+    },
+    "src/ashare_lab/strategies/__init__.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "a6661a3503a4e0ff38da7fc298b2744e59f4cc875efc0172c29e12ea85746bb4"
+    },
+    "src/ashare_lab/strategies/industry_lowvol.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "d56376ba130080d72157069d5e8d17da0f347b268c211aef9854ca8131a59e91"
+    },
+    "src/ashare_lab/strategies/lowvol_trend.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "a27a22d27ae8c5bb097b94fdfe8a0ae1f089e34c6dffa9183a2eaa5f6001c62f"
+    },
+    "src/ashare_lab/strategies/score.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "3a3a8abad47449602a6ac8dd6a5816655b674dce3506704d54e1fcbb7a16a1de"
+    },
+    "src/ashare_lab/strategies/vol_target.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "4c7975bbf2f43969332d232afae26a3ea16195b92f5927e87e12afe17c310197"
+    },
+    "src/ashare_lab/strategy.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "57e86dc924be351f9c7dde0a3b55f927ab98565a8fa23c7b2fcc401918908529"
+    },
+    "src/ashare_lab/universe.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "4ca2e720d30d773ebbee345869ff23e2923aad8fa7e2094457e9a06430d0f870"
+    },
+    "src/ashare_lab/valuation.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "ccde3dc0310d57a0ecc2f0004ea1668f2d8a2d873ab15ad207f204cff8843bfe"
+    },
+    "experiments/a1_pit_ic.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "627be0f44365aee122241adfe5008a5bf669be3cbd647f38f3e7340246de579a"
+    },
+    "experiments/b_line/b1_report.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "7e1418c62b5771dedec43b573d8a3fc7005cae2d239d0e3d63f1ccb3fa3232c1"
+    },
+    "experiments/b_line/b2_report.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "3dc781a2fe680c099b238eff116cfb4e6a5b2568c8c6560c12cd7addda7cf45e"
+    },
+    "experiments/b_line/b3_factors.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "eba5d1534309cd69a9dc6740498deef66da63830a0233073a2c745e2086d29f8"
+    },
+    "experiments/b_line/b3_report.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "5900b95aa30131ed4690c0c4597739e440e48a2ab488da763912da6f0c703ab4"
+    },
+    "experiments/b_line/b5_report.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "a279d1d38790253b02587f85a8c8f0dd3102bd21d765dfc9c7eb7a0f574d8636"
+    },
+    "experiments/b_line/c1_pvdiv.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "d6f1955e3895bd1e75d2c11fff151cf1dd627130ccafb7826ae43cc794623351"
+    },
+    "experiments/b_line/c27_timing.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "6fb18eada22d218ddbcf937e7c47beac41e5ca4bdd4ac2ada15b273e5ef98ac5"
+    },
+    "experiments/b_line/c6_report.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "9592bef5f0a29a0a7d6e6859d871c9ddf3f2502b6dd3fd21248dcc5fd89ba314"
+    },
+    "experiments/b_line/c6_scores.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "47783b3bb1216d1202f51f157dbacc7be4aadf6856c1770ddaabcd72caa00857"
+    },
+    "experiments/b_line/check_b1.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "43df09464d008d1be782d206a1fd268fd1adbfa9ab8014e5fb291ad0da9dbcf7"
+    },
+    "experiments/b_line/check_b2.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "0d95324d7f9d0b18159c48aa088ade20f7cbb1e43f602ccb3ab9ce24e2ad4adb"
+    },
+    "experiments/b_line/check_b3.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "f5a415c6eba74dc6c01a26fa685fd4cbd4c256e754851b36db61db7c20e90b4d"
+    },
+    "experiments/b_line/check_b5.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "26810ead72dca1039736cce6f554ad299c818f3488ec35e85f1b1b966b4e8e14"
+    },
+    "experiments/b_line/check_c27.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "e7da8149d8ac626f5bbf1169bade2c4ed9389af16dabeb519eed413a5c9daadb"
+    },
+    "experiments/b_line/check_c6.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "7d368f2ecd3806191426130bfeff79bd790bd9c19b599b15cbbacdc82b8898bb"
+    },
+    "experiments/b_line/check_pbo.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "acc2aa3758ac7851785aec28a95cc2ee763a06ea5c36358637c07f8dbc9a3f5c"
+    },
+    "experiments/b_line/check_vtcut.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "50ce568ef6f41d52c688fcd715ced311e5c942f66d8790e0f66f09236392c131"
+    },
+    "experiments/b_line/pbo_report.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "074a584b278bfc7ef753442008be402f7e064206b71860caf7a6f04105e00f2f"
+    },
+    "experiments/b_line/vtcut_report.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "99585535014136171438c77418769140393682fa4a2edd88a6db534631926ab1"
+    },
+    "experiments/configs.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "ba28bf0495518f1048ba0c469851ef9b7565c568ee5210305fe8d9a1c256356d"
+    },
+    "experiments/ml_run.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "1dca4a3d6451a8412c4066598ea0da76ca5d956ccdde896594336b9cae6f5d3e"
+    },
+    "experiments/run.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "d36f8573d626c0617e2394553b7cd00fcbbfe2237a8815aac5faebb3e56776ac"
+    },
+    "tests/conftest.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "f0658b19c900a84116ee9867e062eebf30b7b7a0e32f9e7c02e8848f9fe26ac5"
+    },
+    "tests/synth.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "636c667571873643ec7056a003c973e0abd02dd01a810a187d4da1dfe1067e31"
+    },
+    "tests/test_attribution.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "de7996f7d876031c838430f35a616db53410c24378a6b6dcbf4929bdfb3d1470"
+    },
+    "tests/test_benchmark.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "6cf2b31c07aeddb0f86f04080f07e0325bdb44e442a2fbfe17873ba86d31bb7a"
+    },
+    "tests/test_benchmark_real.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "31ae78a970844f232ad637dda01f23f8c9bcd455ffda4d7bb495c8e4a3d7ef4a"
+    },
+    "tests/test_data_panel.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "f2aeb10ff43c02b5a89306d82dcdf5f4815cd1c12f76b01e18d3f24ac2a2c49a"
+    },
+    "tests/test_engine.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "9d933b3528d251311236c6022e7b13992be0cfe32048861ef0fe7b717cee5c5e"
+    },
+    "tests/test_events.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "2c07b6fb5416b45b0d910a43db2bb328fa36dc2edb8af9843196a1dc41752d94"
+    },
+    "tests/test_events_real.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "114005f8df909359fc906cd53c660ea5ff466e15a3337040f7c095d06c235601"
+    },
+    "tests/test_fundamentals.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "705730d73cdba7488e3e498dd073d582619c14b8503fbff590ee73a26ef0ac8e"
+    },
+    "tests/test_fundamentals_build.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "254edcee7ed263c2a9474b334b13f346ecffe876d70947c0a736ce2cf24254f9"
+    },
+    "tests/test_fundamentals_real.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "cf6044890b4223ff1ef41e648727d5cefe728c9da3993835b325e55272613ae5"
+    },
+    "tests/test_impact.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "8adbef8427c506cd5c212e4d254a5f05b7ffa04ade1c3eec8635ed6fc685928a"
+    },
+    "tests/test_index_timing.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "fbd8cec8b86410c147508ea750d285e16901bce40cab9b8448237d9407bfa808"
+    },
+    "tests/test_industry_lowvol.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "80bb52bf1e5776db48ad265370c02647c31dbd8c84cd353aab364669eb9cf170"
+    },
+    "tests/test_metrics.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "d5bae3f005fddf12b571a3be125bad5e6135ea686f6b58ee117ab97b40078740"
+    },
+    "tests/test_ml.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "6f410b0556a436203d2e8aa58df2324c1d5883994847a115fd7880c740662260"
+    },
+    "tests/test_multifactor.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "46eab5fb1425dc857d6c64bc1c14b1cdf278fb6d09462be8a46e376f9590c2d2"
+    },
+    "tests/test_pbo.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "e44365d3e676d71bcb19613f3123c4c8cefe1cc1a901b7c1091d02967746f5a8"
+    },
+    "tests/test_strategy.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "b6f86411fa227a3fd0d525e5892276426759e0ac8e5b311ddc64f8469e53937c"
+    },
+    "tests/test_valuation.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "8c7c20cbff28d6773d8739eb11a97ddaa85e769c65944dbc8aa150216e7b584d"
+    },
+    "tests/test_vol_target.py": {
+      "tree": "ashare-lab",
+      "commit": "084917ba5418f9932bb9356737dba1bcc8f88ed0",
+      "sha256": "26b114a04b7e419934a0c26f50725803a6cbf15a5c35d8fc891e3c79b03d3405"
+    },
+    "src/ashare_lab/expansion/__init__.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "6d399e8c51031343e82bc042d07e5721a456cb3634c16a9e6fb40fa2cfe8df64"
+    },
+    "src/ashare_lab/expansion/assets.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "bcb8c70a32f5855b5939c854eb6ab39bbd49e5143ac7e698601e02c9df06b113"
+    },
+    "src/ashare_lab/expansion/etf_market.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "506f708871d4dcc7d826462dc147c1a5cee927d80cb90db818af745bbbf9ebc6"
+    },
+    "src/ashare_lab/expansion/event_study.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "3a206badb52de479c17ffd84b250d21c60b3214a969d137df1b0cb8eca60596c"
+    },
+    "src/ashare_lab/expansion/hedge.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "1e7c9a0603a15c17892b04a975fee61e4397e02131345d2879d378bd07df5f36"
+    },
+    "src/ashare_lab/expansion/overlay.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "0f3bf411b223cfd57ec044769095ba5b6d85e3fccf0a0a84daadfe741d16e452"
+    },
+    "src/ashare_lab/paper.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "cf05e9e47586a12dd82410ee319b041d920ccd75a24ba13b5a404bd967e1b30a"
+    },
+    "src/ashare_lab/strategies/allocation.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "855590c7bfdc133e2014661c67f4cac9d0d5b0c43ab929f878bb6c902b58b37e"
+    },
+    "src/ashare_lab/strategies/ensemble.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "c8283dbc0add89a1ac382b32cd2e3792738d2bf7fffc0df6ecf432a6c129be86"
+    },
+    "src/ashare_lab/strategies/event_portfolio.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "15ef155510c428f069805de7438330ecf4820c388099e9c18aef817222ade8d5"
+    },
+    "experiments/expansion/README.md": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "0dadc510559436d70a75606dad075f26dcb4d68af19fd1e8b4b1aaa8abbf099b"
+    },
+    "experiments/expansion/common.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "0a46b23d11c50bc266f44c3920cc111f5ef06806c24caab76da644cd4c992e21"
+    },
+    "experiments/expansion/s1_engine.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "d671f1e96bd20ede2a0e1ff596cc9fd9134d04e92ce82e539dcddce9bf2ec669"
+    },
+    "experiments/expansion/s1_report.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "23e5ebc467f09697aaa94b387f9cd1766452f21e42d28a2b630299f6b7d45e54"
+    },
+    "experiments/expansion/s2_report.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "60be9e6ec2f8ede1fec338115e3c3cd39ffd331d04b6eeed9ecc4a25db18bc78"
+    },
+    "experiments/expansion/s3_report.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "3169cc0ca20e56d92eb699afe6cee97c4768a41596e5dd6c90a140e7ba44d8fe"
+    },
+    "experiments/expansion/s4_report.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "55006fd5706a89fe9cd8174924ab43bad55b403fc8fa8aa0a63b7f0666bec6c2"
+    },
+    "experiments/paper/__init__.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "5b528d03e9043dce4804269d82c6cf3f9dd5852a517b30f2e3a0c6a15692b806"
+    },
+    "experiments/paper/accounts.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "48f78bf59b1a6a9cea83a0adf2dc136beaa2b8ed0ec12740e0b72350b1375332"
+    },
+    "experiments/paper/accounts_s1.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "0c9792cfce91112169a10dd28eb2c8a018118a824399ddd032e561118da84294"
+    },
+    "experiments/paper/update.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "daa90ee28184370cf66e6b747f0add80568367846f78d0346c7413acaf80c7ca"
+    },
+    "experiments/paper/update_s1.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "0febe86fc50c619d98d6069a922a17077dd0b928fbfb28df360c5756eadc640f"
+    },
+    "tests/test_allocation.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "06129d49f511385c7b291a0e1f9b79d07b04b7126ca45301cdc9a671cbc246ce"
+    },
+    "tests/test_ensemble.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "8eaa1f058cdb761f0e9fd1e0b058d4ff4ac3655d1954d059b51155596ecb95ac"
+    },
+    "tests/test_event_study.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "2ce880138940be016e18e42b2792c7f9e390d86a486a5b30616722d0a3e5617e"
+    },
+    "tests/test_expansion_common.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "9412df81b4af8ab1a8af66f9575bc5306e11742f82f0867720299571a34bfcc6"
+    },
+    "tests/test_hedge.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "1c166b52e569edb9d551815e8afe8125ba4e2a24be9d459e7781d9bffd3cfd2c"
+    },
+    "tests/test_overlay.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "53d8b85fad9dad41cf665421f5057ed659833a5fddc0414c5f2bde9bc889dff8"
+    },
+    "tests/test_paper.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "f3f29bddbb4f295ea5b86758b8fddac2d0717b1e990971411601f10912448f59"
+    },
+    "tests/test_paper_s1.py": {
+      "tree": "ashare-lab-paper-s1",
+      "commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "sha256": "1268f91e9c468a91e6c5de6956fd80f8ea2e440d760f76844df984ebcb589ff8"
+    },
+    "src/ashare_lab/ideas_calendar.py": {
+      "tree": "ashare-lab-ideas",
+      "commit": "33d8973013c55fbfe523a441469805b722acf5da",
+      "sha256": "eb2121391573290bd263f4064624f88807d6d97aa5848637a8328df3db5b0425"
+    },
+    "src/ashare_lab/ideas_cb.py": {
+      "tree": "ashare-lab-ideas",
+      "commit": "33d8973013c55fbfe523a441469805b722acf5da",
+      "sha256": "c70669ff87e1d8f02aa2c661349d8e8329b1dfe2d44495ee73dcea46853d3cbe"
+    },
+    "src/ashare_lab/ideas_cta.py": {
+      "tree": "ashare-lab-ideas",
+      "commit": "33d8973013c55fbfe523a441469805b722acf5da",
+      "sha256": "1f89125beddae87309715413a4953ef9de0f38a016fc6c4afb32411ddfa02911"
+    },
+    "src/ashare_lab/strategies/factor_topn.py": {
+      "tree": "ashare-lab-ideas",
+      "commit": "33d8973013c55fbfe523a441469805b722acf5da",
+      "sha256": "30f06121ad93fb7a8f4e65d85e68c288a7b66b24484420c5141016424be979c0"
+    },
+    "experiments/ideas/README.md": {
+      "tree": "ashare-lab-ideas",
+      "commit": "33d8973013c55fbfe523a441469805b722acf5da",
+      "sha256": "d687fcc0da87bdec3a23b7cf3b5ef3bd416c2aed66675f711e7759e03bccf05f"
+    },
+    "experiments/ideas/i8_cb.py": {
+      "tree": "ashare-lab-ideas",
+      "commit": "33d8973013c55fbfe523a441469805b722acf5da",
+      "sha256": "52198d41db43fbf36900685442564fd1051fda01975e97f0905ff0e2795feb58"
+    },
+    "experiments/ideas/i9_cta.py": {
+      "tree": "ashare-lab-ideas",
+      "commit": "33d8973013c55fbfe523a441469805b722acf5da",
+      "sha256": "6a91b6e3a5620378e79830c5b56a526cefda6896523354b19f62f08d427e170e"
+    },
+    "experiments/ideas/run.py": {
+      "tree": "ashare-lab-ideas",
+      "commit": "33d8973013c55fbfe523a441469805b722acf5da",
+      "sha256": "7fd86cf0112b0ff5b0a01ac799bd9e2547e9f706746d485d093ca80d00027be6"
+    },
+    "tests/test_ideas_cb.py": {
+      "tree": "ashare-lab-ideas",
+      "commit": "33d8973013c55fbfe523a441469805b722acf5da",
+      "sha256": "8d6b9e7a4f290ccef1d5e532cfc4b093e5818f8cf2a0536daf66c4e9b1be6746"
+    },
+    "tests/test_ideas_cta.py": {
+      "tree": "ashare-lab-ideas",
+      "commit": "33d8973013c55fbfe523a441469805b722acf5da",
+      "sha256": "afcec015a2b5324e865835e6fd5e2d80cba74a0473c9e375fafd8b8ba4d0d64e"
+    },
+    "tests/test_ideas_factors.py": {
+      "tree": "ashare-lab-ideas",
+      "commit": "33d8973013c55fbfe523a441469805b722acf5da",
+      "sha256": "1bf4259ed25a0559090966dff8096f9b7cdf4ed79204b71f3862a8a4695074ea"
+    }
+  },
+  "integration": {
+    "src/ashare_lab/universe.py": {
+      "from_commit": "33d8973013c55fbfe523a441469805b722acf5da",
+      "change": "universe=all unchanged frozen ideas support",
+      "sha256": "dc4b7fa1b201e1251cafebe324338023233ca98a408e41a93f3bc834985c7a19"
+    },
+    "experiments/configs.py": {
+      "from_commit": "f59ac74fe513b98f0b9ae95f595eccb56e42c284",
+      "change": "unchanged additive frozen S4 registry; parity never runs grids",
+      "sha256": "3a00d338cedd1236520b78cc22889fd26a4e268555407127d668945444e0ebe9"
+    }
+  },
+  "runtime_extensions": "paper_runtime.py/paper_accounts.py and optional engine paper execution flags are separate engineering integration; original frozen per-path hashes below remain archival source identities, not claims that active source bytes are identical",
+  "data": {
+    "default_panel": "output/ashare-takeover/trees/ashare-lab/data/panel",
+    "reference_reports": "output/ashare-takeover/trees/ashare-lab/reports",
+    "paper_snapshot": "output/ashare-takeover/trees/ashare-lab-paper/paper"
+  },
+  "assembly_id": "c666b6f9f95630e37b788ac83604f06920d46d04bf554aacb9dbdb434a01087e"
+}

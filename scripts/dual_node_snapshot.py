@@ -18,6 +18,7 @@ from pathlib import Path
 import shutil
 import signal
 import subprocess
+import shlex
 
 from dual_node_inventory import inventory, runtime_roots, runtime_files, stat_key, SNAPSHOT_EXCLUDED
 from dual_node_sync import PROJECT, topology
@@ -195,25 +196,88 @@ def require_agent_idle(active):
             raise BusyError("Research agent work active or unreadable; snapshot deferred")
 
 
-def cloud_snapshot():
+def _freeze_cloud_writers_locked():
+    """Final window; caller holds storage lock then snapshot lock throughout."""
+    require(os.geteuid() == 0 and (Path(REMOTE) / "AUTHORITY").is_file(),
+            "Run only on the existing cloud authority")
+    require(output("findmnt", "-n", "-o", "UUID", "-T", REMOTE) ==
+            SETTINGS["QM_DISK_UUID"], "Wrong or unmounted SSD")
+    require((Path(REMOTE) / "snapshots/latest/COMPLETE").is_file(),
+            "Retain a complete recovery point before stopping writers")
+    require(subprocess.run(["systemctl", "is-active", "--quiet",
+                            "quantmind-snapshot.service"]).returncode != 0,
+            "An old snapshot may restore writers; wait for it to finish")
+    existing = output("docker", "ps", "-a", "--format", "{{.Names}}").splitlines()
+    writers = [name for name in WRITERS
+               if name in existing and name != "quantmind-redis"]
+    # Do not stop the stack unit: its ExecStop also stops backing stores.
+    run("systemctl", "disable", "quantmind-stack.service")
+    if writers:
+        run("docker", "update", "--restart=no", *writers)
+    active = output("docker", "ps", "--format", "{{.Names}}").splitlines()
+    if "quantmind-celery-beat" in active:
+        run("docker", "stop", "--time", "60", "quantmind-celery-beat")
+    require_agent_idle(active)
+    for worker, app in (("quantmind-celery",
+                        "backend.services.engine.qlib_app.celery_config:celery_app"),
+                        ("quantmind-research-worker",
+                         "backend.services.engine.research.tasks:app")):
+        if worker not in active:
+            continue
+        for kind in ("active", "reserved", "scheduled"):
+            jobs = json.loads(output("docker", "exec", worker, "celery", "-A",
+                                     app, "inspect", kind, "--json", "--timeout=10"))
+            require(bool(jobs) and not any(jobs.values()),
+                    worker + " has " + kind + " work; dispatch remains stopped")
+    require(not any(name.startswith(RESEARCH_PREFIXES) for name in active),
+            "Research child still running; dispatch remains stopped")
+    if writers:
+        run("docker", "stop", "--time", "240", *writers)
+    states = [output("docker", "inspect", "--format",
+                     "{{.Name}} running={{.State.Running}} restart={{.HostConfig.RestartPolicy.Name}}",
+                     name) for name in writers]
+    require(all("running=false restart=no" in state for state in states),
+            "Cloud writer did not freeze")
+    receipt = {
+        "frozen_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
+        "previous_snapshot": (Path(REMOTE) / "snapshots/latest").resolve().name,
+        "writers": states,
+        "units": {unit: subprocess.run(["systemctl", "is-enabled", unit],
+                   capture_output=True, text=True).stdout.strip()
+                  for unit in ("quantmind-stack.service", "quantmind-snapshot.timer")},
+    }
+    directory = Path(REMOTE) / "maintenance/local-primary"
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / ("freeze-" + datetime.datetime.now(
+        datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + ".json")
+    path.write_text(json.dumps(receipt, indent=2) + "\n")
+    print(json.dumps({"freeze_receipt": str(path), **receipt}), flush=True)
+
+
+def cloud_snapshot(*, keep_writers_stopped=False):
     global _guard_root
     require(os.geteuid() == 0 and (Path(REMOTE) / "AUTHORITY").is_file(), "Run on the cloud authority after cutover")
+    if keep_writers_stopped:
+        # Close timer admission before taking the exact old-create lock order.
+        run("systemctl", "disable", "--now", "quantmind-snapshot.timer")
     with storage_lock(PROJECT / "data/local-market-source"):
         _guard_root = Path(REMOTE)
         try:
-            return _cloud_snapshot()
+            return _cloud_snapshot(keep_writers_stopped=keep_writers_stopped)
         finally:
             _guard_root = None
 
 
-def _cloud_snapshot():
+def _cloud_snapshot(*, keep_writers_stopped=False):
     require(os.geteuid() == 0 and (Path(REMOTE) / "AUTHORITY").is_file(), "Run on the cloud authority after cutover")
     require(output("findmnt", "-n", "-o", "UUID", "-T", REMOTE) == SETTINGS["QM_DISK_UUID"], "Wrong or unmounted SSD")
     base = Path(REMOTE) / "snapshots"
     base.mkdir(exist_ok=True, mode=0o700)
     with (base / ".lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        if (base / "latest").is_symlink() or list(base.glob("snapshot-*")):
+        if keep_writers_stopped:
+            _freeze_cloud_writers_locked()
+        if not keep_writers_stopped and ((base / "latest").is_symlink() or list(base.glob("snapshot-*"))):
             prune_snapshots(base, apply=True)
         # Fail before creating a snapshot if there is insufficient recovery headroom.
         require(shutil.disk_usage(REMOTE).free > 100 * 1024**3, "Keep 100 GiB free for recovery")
@@ -294,23 +358,96 @@ def _cloud_snapshot():
             require(runtime_stats(PROJECT, scope=SCOPE) == expected_stats,
                     "Runtime changed during quiesced copy; unpublished staging retained")
         finally:
-            if stopped:
-                ordered = (["quantmind-redis"] if "quantmind-redis" in stopped else [])
-                ordered += [name for name in stopped if name != "quantmind-redis"]
+            # Redis is a backing store, not a business writer; restore it even
+            # when the final handover intentionally keeps applications stopped.
+            restore = ([name for name in stopped if name == "quantmind-redis"]
+                       if keep_writers_stopped else stopped)
+            if restore:
+                ordered = (["quantmind-redis"] if "quantmind-redis" in restore else [])
+                ordered += [name for name in restore if name != "quantmind-redis"]
                 run("docker", "start", *ordered)
-            print(json.dumps({"phase": "writers_restored", "pause_seconds": round(time.monotonic() - started_at, 2)}), flush=True)
-        # Content hashing and manifest generation happen after writers are restored.
+            print(json.dumps({"phase": ("writers_frozen" if keep_writers_stopped
+                                        else "writers_restored"),
+                              "pause_seconds": round(time.monotonic() - started_at, 2)}),
+                  flush=True)
+        # Validate only the frozen copy; final handover never restarts writers.
         expected = list(inventory(target / "project", cache=target_cache, scope=SCOPE))
         (target / "runtime-manifest.jsonl").write_text(
             "".join(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n" for r in expected))
+        if keep_writers_stopped:
+            (target / "COLD_BACKUP.json").write_text(json.dumps({
+                "captured_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
+                "source_node": SETTINGS["QM_CLOUD_HOSTNAME"],
+                "stopped_writers": [name for name in WRITERS if name != "quantmind-redis"],
+                "automatic_writers_disabled": True,
+            }, indent=2) + "\n")
         # Independent full validation and compression touch only the frozen copy.
         # Never publish COMPLETE/latest until both have succeeded.
         finish_snapshot(target)
         published = base / name
         target.rename(published)
         publish_link(base, published)
-        prune_snapshots(base, apply=True)
+        if not keep_writers_stopped:
+            prune_snapshots(base, apply=True)
         print(published)
+
+
+def dump_data_identity(path):
+    """Fingerprint COPY rows and sequence state without logging business data."""
+    command = ["docker", "run", "--rm", "-v", str(path.parent) + ":/snapshot:ro",
+               "postgres:15-alpine", "pg_restore", "--data-only", "--no-owner",
+               "--no-privileges", "--file=-", "/snapshot/" + path.name]
+    tables, statements = {}, []
+    current = None
+    modulus = 1 << 256
+    with subprocess.Popen(command, stdout=subprocess.PIPE) as process:
+        for line in process.stdout:
+            if current is not None:
+                if line == b"\\.\n":
+                    current = None
+                else:
+                    record = tables[current]
+                    record["rows"] += 1
+                    record["row_hash_sum"] = (
+                        record["row_hash_sum"] + int.from_bytes(
+                            hashlib.sha256(line).digest(), "big")) % modulus
+            elif line.startswith(b"COPY "):
+                current = line.decode().rstrip()
+                require(current not in tables, "Duplicate COPY relation")
+                tables[current] = {"rows": 0, "row_hash_sum": 0}
+            elif (line.strip() and not line.startswith(
+                    (b"--", b"SET ", b"SELECT pg_catalog.set_config(",
+                     b"\\restrict ", b"\\unrestrict "))):
+                statements.append(hashlib.sha256(line).hexdigest())
+        require(process.wait() == 0, "Cannot inspect PostgreSQL dump")
+    require(current is None, "Truncated PostgreSQL COPY data")
+    return {"tables": tables, "other_data_statements": sorted(statements)}
+
+
+def verify_restored_database(target, container, receipt):
+    """Compare restored table contents/sequence state with the verified dump."""
+    target, receipt = Path(target), Path(receipt)
+    restored = receipt.parent / ".restore-check.dump"
+    require(not restored.exists(), "Previous restore inspection retained; inspect first")
+    try:
+        with restored.open("xb") as stream:
+            run("docker", "exec", container, "sh", "-c",
+                'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -Z0 --no-owner',
+                stdout=stream)
+        expected = dump_data_identity(target / "postgres.dump")
+        actual = dump_data_identity(restored)
+        require(expected == actual, "Restored PostgreSQL data differs from snapshot")
+        receipt.write_text(json.dumps({
+            "snapshot_id": target.name,
+            "postgres_dump_sha256": digest(target / "postgres.dump"),
+            "restored_data_identity_sha256": hashlib.sha256(
+                json.dumps(actual, sort_keys=True).encode()).hexdigest(),
+            "table_count": len(actual["tables"]),
+            "rows": sum(table["rows"] for table in actual["tables"].values()),
+            "verified_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
+        }, indent=2) + "\n")
+    finally:
+        restored.unlink(missing_ok=True)
 
 
 def cloud_prune(apply=False):
@@ -322,11 +459,80 @@ def cloud_prune(apply=False):
         print(json.dumps({"candidate_count": prune_snapshots(base, apply=apply), "applied": apply}), flush=True)
 
 
-def pull_snapshot(base=None, only_new=False, remote_base="snapshots"):
+def verify_snapshot(target, *, require_complete=True):
+    """Rehash an offline recovery point; marker files alone prove nothing."""
+    target = Path(target).resolve(strict=True)
+    require(not require_complete or (target / "COMPLETE").is_file(),
+            "Snapshot is incomplete")
+    hashes = json.loads((target / "SHA256.json").read_text())
+    require(bool(hashes) and all(Path(name).name == name for name in hashes),
+            "Invalid checksum paths")
+    require("runtime-manifest.jsonl" in hashes, "Missing hashed runtime manifest")
+    for name, expected in hashes.items():
+        require(digest(target / name) == expected, "Archive checksum mismatch: " + name)
+    require(manifest(target / "project", scope=snapshot_scope(target)) ==
+            (target / "runtime-manifest.jsonl").read_text(),
+            "Runtime file checksum mismatch")
+    return {"snapshot_id": target.name, "checksums": hashes,
+            "verified_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")}
+
+
+def verify_cloud_frozen(target):
+    """Attest the exact final recovery point and persistent writer shutdown."""
+    target = Path(target)
+    code = """
+import json, pathlib, subprocess, sys
+root = pathlib.Path(sys.argv[1])
+latest = (root / 'snapshots/latest').resolve(strict=True)
+assert latest.name == sys.argv[2] and (latest / 'COMPLETE').is_file()
+assert (latest / 'COLD_BACKUP.json').is_file()
+existing = set(subprocess.check_output(
+    ['docker', 'ps', '-a', '--format', '{{.Names}}'], text=True).splitlines())
+assert {'quantmind', 'quantmind-celery', 'quantmind-celery-beat'}.issubset(existing)
+present = [name for name in sys.argv[3:] if name in existing]
+containers = json.loads(subprocess.check_output(
+    ['docker', 'inspect', *present], text=True))
+writers = [c for c in containers if c['Name'] != '/quantmind-redis']
+assert all(not c['State']['Running'] and
+           c['HostConfig']['RestartPolicy']['Name'] == 'no' for c in writers)
+units = {}
+for unit in ('quantmind-stack.service', 'quantmind-snapshot.timer'):
+    units[unit] = subprocess.run(['systemctl', 'is-enabled', unit],
+        capture_output=True, text=True).stdout.strip()
+assert all(state in ('disabled', 'masked') for state in units.values())
+assert subprocess.run(['systemctl', 'is-active', '--quiet',
+    'quantmind-snapshot.service']).returncode != 0
+print(json.dumps({'snapshot_id': latest.name, 'units': units,
+    'checksums': json.loads((latest / 'SHA256.json').read_text()),
+    'writers': [{'name': c['Name'], 'running': c['State']['Running'],
+        'restart': c['HostConfig']['RestartPolicy']['Name']} for c in writers]}))
+"""
+    # Include only containers present in this deployment; missing historical
+    # optional collectors are not an excuse to skip the active writers.
+    names = [name for name in WRITERS if name != "quantmind-redis"]
+    remote = "sudo -n python3 -c " + shlex.quote(code) + " " + " ".join(
+        shlex.quote(value) for value in [REMOTE, target.name, *names])
+    receipt = json.loads(output(
+        "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
+        SETTINGS["QM_SSH_TARGET"], remote))
+    require(receipt["checksums"] == json.loads((target / "SHA256.json").read_text()),
+            "Local recovery point differs from final cloud snapshot")
+    receipt.pop("checksums")
+    receipt["verified_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+    return receipt
+
+
+def pull_snapshot(base=None, only_new=False, remote_base="snapshots", snapshot_id=None):
     require(remote_base in {"snapshots", "quantdb-snapshots"}, "Invalid snapshot collection")
+    print(json.dumps({"phase": "resolve_snapshot", "snapshot_id": snapshot_id or "latest",
+                      "collection": remote_base}), flush=True)
     ssh = SETTINGS["QM_SSH_TARGET"]
+    if snapshot_id is not None:
+        require(Path(snapshot_id).name == snapshot_id and snapshot_id.startswith("snapshot-"),
+                "Invalid immutable snapshot ID")
+    remote_target = REMOTE + "/" + remote_base + "/" + (snapshot_id or "latest")
     remote_path = output("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", ssh,
-                         "sudo -n realpath -e " + REMOTE + "/" + remote_base + "/latest")
+                         "sudo -n realpath -e " + remote_target)
     path = Path(remote_path)
     require(str(path.parent) == REMOTE + "/" + remote_base and path.name.startswith("snapshot-"), "Invalid snapshot path")
     run("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", ssh, "sudo -n test -f " + remote_path + "/COMPLETE")
@@ -336,6 +542,10 @@ def pull_snapshot(base=None, only_new=False, remote_base="snapshots"):
     with (base / ".lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         target = base / path.name
+        unverified_resume = (snapshot_id is not None
+            and not (target / "VERIFIED").exists()
+            and not (target / "COMPLETE").exists()
+            and (base / "latest").resolve() != target.resolve())
         if only_new and (base / "latest").resolve() == target.resolve() and (target / "VERIFIED").is_file() and (target / "COMPLETE").is_file():
             print("Already verified:", target, flush=True)
             return
@@ -346,9 +556,18 @@ def pull_snapshot(base=None, only_new=False, remote_base="snapshots"):
         (target / "VERIFIED").unlink(missing_ok=True)
         rsync = "/opt/homebrew/bin/rsync" if Path("/opt/homebrew/bin/rsync").exists() else "rsync"
         args = [rsync, "-a", "--checksum", "--no-owner", "--no-group", "--compress", "--partial", "--stats", "--timeout=120", "-e", "ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=30", "--rsync-path=sudo -n rsync"]
+        if rsync != "rsync":
+            args.append("--info=progress2")
         previous = (base / "latest").resolve()
         metadata_args = list(args)
         data_args = list(args)
+        retained_runtime = None
+        if unverified_resume:
+            attempt = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+            retained_runtime = base / "retained-unverified" / path.name / attempt / "project"
+            # Only an explicit, unpublished, unverified destination is ours to
+            # reconcile. Preserve removed/overwritten bytes outside its inventory.
+            data_args += ["--delete", "--backup", "--backup-dir=" + str(retained_runtime)]
         if previous.is_dir() and previous != target:
             metadata_args += ["--link-dest=" + str(previous)]
             data_args += ["--link-dest=" + str(previous / "project")]
@@ -364,13 +583,16 @@ def pull_snapshot(base=None, only_new=False, remote_base="snapshots"):
             if backups:
                 # PostgreSQL dump headers can change; rsync still reuses matching blocks.
                 metadata_args += ["--copy-dest=" + str(backups[-1].parent.resolve())]
+        print(json.dumps({"phase": "pull_metadata", "snapshot_id": path.name,
+                          "target": str(target)}), flush=True)
         transfer(*metadata_args, "--exclude=/project/", "--exclude=/COMPLETE", ssh + ":" + remote_path + "/", str(target) + "/")
         (target / "project").mkdir(exist_ok=True)
+        print(json.dumps({"phase": "pull_runtime", "snapshot_id": path.name,
+                          "retained_runtime": str(retained_runtime) if retained_runtime else None}), flush=True)
         transfer(*data_args, ssh + ":" + remote_path + "/project/", str(target / "project") + "/")
-        hashes = json.loads((target / "SHA256.json").read_text())
-        require(all(Path(name).name == name for name in hashes), "Invalid checksum path")
-        require(all(digest(target / name) == expected for name, expected in hashes.items()), "Archive checksum mismatch")
-        require(manifest(target / "project", scope=snapshot_scope(target)) == (target / "runtime-manifest.jsonl").read_text(), "Runtime file checksum mismatch")
+        print(json.dumps({"phase": "verify_archive_and_runtime",
+                          "snapshot_id": path.name}), flush=True)
+        verify_snapshot(target, require_complete=False)
         (target / "VERIFIED").touch()
         (target / "COMPLETE").touch()
         if previous != target:
@@ -451,27 +673,34 @@ if __name__ == "__main__":
     install_signal_handlers()
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("create", "pull", "install-mac-pull", "prune"))
+    parser.add_argument("action", choices=("create", "pull", "verify", "install-mac-pull", "prune"))
     parser.add_argument("--apply", action="store_true", help="Delete old complete cloud snapshots after a dry run")
+    parser.add_argument("--keep-writers-stopped", action="store_true",
+                        help="Final handover only: requires disabled cloud auto-start")
     parser.add_argument("--root", type=Path)
     parser.add_argument("--only-new", action="store_true")
+    parser.add_argument("--snapshot-id",
+                        help="Resume this immutable recovery point instead of following latest")
     parser.add_argument("--quantdb-project", type=Path)
     parser.add_argument("--quantdb-only", action="store_true",
                         help="Keep automatic daily data refresh independent of full backups")
     args = parser.parse_args()
     try:
         if args.action == "create":
-            cloud_snapshot()
+            cloud_snapshot(keep_writers_stopped=args.keep_writers_stopped)
         elif args.action == "prune":
             cloud_prune(args.apply)
         elif args.action == "install-mac-pull":
             install_mac_pull()
+        elif args.action == "verify":
+            require(args.root is not None, "verify requires --root <snapshot_dir>")
+            print(json.dumps(verify_snapshot(args.root), sort_keys=True))
         else:
             if args.quantdb_project:
                 from quantdb_refresh import refresh
                 refresh(args.quantdb_project, args.root / "quantdb")
             if not args.quantdb_only:
-                pull_snapshot(args.root, args.only_new)
+                pull_snapshot(args.root, args.only_new, snapshot_id=args.snapshot_id)
     except BusyError as exc:
         print(str(exc), flush=True)
         raise SystemExit(75) from exc

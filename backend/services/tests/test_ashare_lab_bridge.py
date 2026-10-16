@@ -11,8 +11,23 @@ from backend.shared.ashare_lab_bridge import (
     signals_to_scores,
     to_ts_code,
 )
+from backend.shared.ashare_lab_bridge.bridge import _panel_dir, _source_dir, _VENDOR_ROOT
 
 lab = import_ashare_lab()
+
+
+def test_default_paths_are_repository_owned(monkeypatch):
+    monkeypatch.delenv("ASHARE_LAB_SRC", raising=False)
+    monkeypatch.delenv("ASHARE_LAB_PANEL", raising=False)
+    assert _source_dir() == _VENDOR_ROOT / "src"
+    assert _panel_dir() == _VENDOR_ROOT / "data" / "panel"
+
+
+def test_explicit_paths_remain_supported(monkeypatch, tmp_path):
+    monkeypatch.setenv("ASHARE_LAB_SRC", str(tmp_path / "src"))
+    monkeypatch.setenv("ASHARE_LAB_PANEL", str(tmp_path / "panel"))
+    assert _source_dir() == tmp_path / "src"
+    assert _panel_dir() == tmp_path / "panel"
 
 
 @pytest.mark.parametrize("raw,expected", [

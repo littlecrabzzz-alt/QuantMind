@@ -127,7 +127,7 @@ export const QlibQuickBacktest: React.FC = () => {
   const tailTradeTimerRef = useRef<number | null>(null);
 
   const [ashareLabEnabled, setAshareLabEnabled] = useState<boolean>(() =>
-    typeof window !== 'undefined' && window.localStorage.getItem('qm.quickBacktest.ashareLab') === '1'
+    typeof window === 'undefined' || window.localStorage.getItem('qm.quickBacktest.ashareLab') !== '0'
   );
   useEffect(() => {
     window.localStorage.setItem('qm.quickBacktest.ashareLab', ashareLabEnabled ? '1' : '0');
