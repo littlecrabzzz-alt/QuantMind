@@ -1,0 +1,7 @@
+# 10:57Z hourly start
+
+Own isolated branch codex/glm-continuous-research @9b88293e, initially clean. Initial handoff cloud content-hash error; direct cloud check idle/drift={} and handoff retry PASS. No overlapping code owners found. Scope: glm_capacity_now owns quantdb_factor_reader.py and donor tests; hourly_quality_0448 read-only packer/provider preparation under /tmp; root runtime/quota checks, GLM packet dispatch, docs and final review. Stock hold remains, no real market/holdout reads, new real package, training, A account or cloud operation. Six slots idle, quota99%; improve concrete boundary blockers rather than add capacity. Artifacts 20260927T1057-evidence.
+
+Root additional scope: scripts/run_frozen_research.py snapshot QuantDB date selection and tests/continuous_research/test_snapshot_dependencies.py. Require explicit development_end, eliminate test_end+30 Parquet inventory, reject invalid partition dates. No actual freeze/run; Qlib remains blocked pending bounded provider design; do not claim complete package acceptance. Independent reviewer owns no files.
+
+Root follow-on after synthetic load_data finding and GLM review: within docker/training/data/loading.py and its test, frozen development mode rejects a date whose entire volume column is unknown before holiday filtering. Partial missing/ordinary mode remain documented; no calendar invention. Candidate pre-guard source saved in evidence for report identity.

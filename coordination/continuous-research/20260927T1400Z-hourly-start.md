@@ -1,0 +1,5 @@
+# 14:00Z hourly start
+
+Mac isolated worktree codex/glm-continuous-research at da5aadb2, clean. Handoff passed main215f89c8,7393 files,digest34a436a90fa73661082c5c871b9437cac943d2b4635f5cf6eb0411d33e21857c; no snapshot switch. Root owns source-only financial identity bridge synthetic evidence, platform observe/dispatch/review and docs if needed. hourly_quality_0448 owns /tmp-only frozen worker import closure; data_research_capabilities owns /tmp-only installed crypto source/template metadata. No overlapping repo writers. Stock scope held, no real provider/data/training/holdout/A/cloud changes. Next evidence follows 1300 root corrections.
+
+Scoped update: root also owns continuous_research.py feedback event and its existing Engine API test. A completed task used2 model calls with no durable parser-feedback evidence; preserve future feedback in existing bounded event list, no raw response. No other writer. Candidate tests first; only idle local group API may reload, controller/worker/A untouched.

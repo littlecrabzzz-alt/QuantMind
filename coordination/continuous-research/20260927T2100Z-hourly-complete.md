@@ -1,0 +1,7 @@
+# 2026-09-28 05时巡检完成
+
+候选80fe0dc157fd24ac6cc58e8aa9d74adae5742441，codex/glm-continuous-research已push/clean。生成受限provider显式manifest+SHA连接公共snapshot_files/freeze/verify，不回退原始Qlib；三阶段source hash保留完整输出校验/声明size；恢复交叉核对绑定并拒绝删除字段降级。87测试+5子测试、8文件×3实际哈希/19冻结原件核对及独立CLI通过。没有真实包、训练、服务重启或输入切换。
+
+GLM46e38e503d2ab75bf9fe8341完成1真实调用22112输入/7526输出，无重试。直接真实CN分区的下一步建议未采纳，原文与纠偏并存；股票hold、旧间接暴露事实和A账户不变。官方余99%，6模型槽/2实际计算进程，最终空闲。
+
+下项仅准备完整worker字段/benchmark/endpoint及有效合成Parquet合同和最小离线合成执行方案，真实性/PIT/生命周期与独立边界验收未完成。主树AGENTS最新数据采集归Mac规则已读，未使用handoff遗留data_authority字段做采集授权。详细记录在学习目录巡检20260927T2100-hourly-review及同名evidence。

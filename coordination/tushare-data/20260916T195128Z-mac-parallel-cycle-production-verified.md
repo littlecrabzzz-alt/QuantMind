@@ -1,0 +1,11 @@
+# 原生采集和文档阶段并行：生产验收
+- 提交 bf125f03 已合入 master/push；双端 handoff passed，源摘要 44c2be6bf8b96e0f2a872e35f532ed154915733f5598211b6c3c0c43fc8a034c。
+- 负责 scripts/tushare_archive_worker.py、对应测试、docs/tushare-mac-source.md；不提高接口频次、文档 100 阶段/90 秒/两个下载者边界不变。
+- 证据：原 12 轮中多个接口阶段结束后还串行等待 30–53 秒文档处理；现同轮并行，复用独立写锁/SQLite 连接，等待双方结束后再开始下一轮。状态 started_at 与 updated_at 分开，记录整轮耗时，文档异常明确失败。
+- 离线验证：worker/文档并行/注册预算 28 项通过，随后新增文档失败测试且 worker 3 项全部通过（共 29 个不同测试）。
+- 升级先将 ENABLED 改名暂停新轮次，等待 pipeline/documents/archive 三把写锁排空，bootout 旧 PID 98801，安装并验证代码 SHA256 bed87d450f159018f6d6b482f87428fdc164373dd8cd418e64165ac031ee6eeb，再恢复 ENABLED 并启动 PID 12142。运行中请求未强杀。
+- 新进程实际同时持有 pipeline.lock 和 documents.lock；首轮 UTC 19:47:56.575906–19:49:27.414406，总 90.837 秒，接口 322 请求；文档处理 100 个阶段（50 下载、50 解析），自身耗时 54.989 秒。
+- 按首轮完成时间窗读取持久化记录，322 对原始响应/observation 逐个 SHA256 校验及对象关联检查通过。最初使用 newest-322 会混入正在继续写入的下一轮，已改为固定时间窗核验，不暂停正常采集。
+- 私有报告：~/Library/Application Support/QuantMind/tushare-native-parallel-cycle-20260917.json。此证据仅证明这一轮重叠执行，不代表长期 500rpm 或历史已齐。
+- 云端 QuantDB worker 启动时间仍为 2026-09-16T15:31:26.406325253Z，healthy。
+- 云端只读清理预检 unit quantmind-tushare-prune-check-20260917.service / PID 632645 仍 active/running，最新 380000 文件 / 120413579375 逻辑字节，未执行删除。结束成功后再 --apply。

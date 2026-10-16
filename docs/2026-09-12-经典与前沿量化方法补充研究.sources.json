@@ -1,0 +1,421 @@
+{
+  "schema_version": 1,
+  "review_id": "quantmind-classics-frontier-deep-review-20260912",
+  "created_at": "2026-09-12T06:49:59.634542+00:00",
+  "report_path": "docs/2026-09-12-经典与前沿量化方法补充研究.md",
+  "report_sha256": "f63af3039159d6599e36b625bb4ee3fae7cc44c43de85a9697e0ce0faa859701",
+  "project_head_at_inventory": "3f42fc1c09315eab7996f0188b5ab0b113f2b6af",
+  "main_research_cards": 6,
+  "watch_items": 2,
+  "metadata_leads": 2,
+  "sources_count": 16,
+  "sources": [
+    {
+      "id": "hansen2005-spa",
+      "title": "A Test for Superior Predictive Ability",
+      "authors": [
+        "Peter R. Hansen"
+      ],
+      "publication_date": "2005",
+      "url": "https://bashtage.github.io/kevinsheppard.com/files/teaching/mfe/advanced-econometrics/Hansen.pdf",
+      "reading_depth": "Introduction, assumptions, studentized statistic and bootstrap discussion; not an independent proof audit",
+      "decision": "priority_evaluation_method",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "doi": "10.1198/073500105000000063",
+      "kind": "peer_reviewed",
+      "raw_source_id": "spa",
+      "card": "C1",
+      "local_evidence": {
+        "id": "spa",
+        "url": "https://bashtage.github.io/kevinsheppard.com/files/teaching/mfe/advanced-econometrics/Hansen.pdf",
+        "curl_exit": 0,
+        "raw_path": "data/research_watch/deep-reviews/20260912-classics-frontier/spa.pdf",
+        "bytes": 382192,
+        "sha256": "fb5ada1987f86b1f07d721d6fb1707cf9029c1fa0271d5532dfb791ff8790761",
+        "fetched_at": "2026-09-12T06:43:16.081761+00:00"
+      }
+    },
+    {
+      "id": "hansen2011-mcs",
+      "title": "The Model Confidence Set",
+      "authors": [
+        "Peter R. Hansen",
+        "Asger Lunde",
+        "James M. Nason"
+      ],
+      "publication_date": "2011-02-14",
+      "url": "https://onlinelibrary.wiley.com/doi/abs/10.3982/ECTA5771",
+      "reading_depth": "Publisher abstract and date; institutional 2010 working paper introduction, definition, assumptions; no exhaustive version comparison",
+      "decision": "priority_evaluation_method",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "doi": "10.3982/ECTA5771",
+      "kind": "peer_reviewed_with_working_paper_reading",
+      "working_paper_url": "https://pure.au.dk/ws/files/34269366/rp10_76.pdf",
+      "raw_source_id": "mcs",
+      "card": "C1",
+      "local_evidence": {
+        "id": "mcs",
+        "url": "https://pure.au.dk/ws/files/34269366/rp10_76.pdf",
+        "raw_path": "data/research_watch/deep-reviews/20260912-classics-frontier/mcs.pdf",
+        "curl_exit": 0,
+        "bytes": 362573,
+        "sha256": "c4abc4759af8a10ab68dbca077bafb51db3ad2b7142b280f5151eadddabfed00",
+        "fetched_at": "2026-09-12T06:44:24.629577+00:00"
+      }
+    },
+    {
+      "id": "arch-multiple-comparisons",
+      "title": "arch Multiple Comparisons",
+      "authors": [
+        "arch contributors"
+      ],
+      "publication_date": null,
+      "url": "https://arch.readthedocs.io/en/stable/multiple-comparison/multiple-comparison_examples.html",
+      "reading_depth": "Official documentation for loss inputs and SPA/StepM/MCS differences",
+      "decision": "implementation_reference_only",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "kind": "official_documentation",
+      "installed_version_checked": false,
+      "executed": false,
+      "card": "C1"
+    },
+    {
+      "id": "garleanu2013-dynamic",
+      "title": "Dynamic Trading with Predictable Returns and Transaction Costs",
+      "authors": [
+        "Nicolae Garleanu",
+        "Lasse Heje Pedersen"
+      ],
+      "publication_date": "2013-12",
+      "url": "https://w4.stern.nyu.edu/facdir/lpederse/papers/DynamicTrading.pdf",
+      "reading_depth": "Introduction, assumptions, propositions 1-3 and empirical overview; not return-table reproduction",
+      "decision": "priority_cost_aware_research",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "doi": "10.1111/jofi.12080",
+      "kind": "peer_reviewed",
+      "raw_source_id": "dynamic-trading-http",
+      "card": "C2",
+      "local_evidence": {
+        "id": "dynamic-trading-http",
+        "url": "http://docs.lhpedersen.com/DynamicTrading.pdf",
+        "raw_path": "data/research_watch/deep-reviews/20260912-classics-frontier/dynamic-trading-http.pdf",
+        "curl_exit": 0,
+        "bytes": 586123,
+        "sha256": "b9b01f48bd7ff0ce0431615d88b76f8a076b6593cc1d7765bd6ec2eb617473ab",
+        "fetched_at": "2026-09-12T06:44:23.768876+00:00"
+      }
+    },
+    {
+      "id": "garleanu-dynamic-corrigendum",
+      "title": "Dynamic Trading with Predictable Returns and Transaction Costs: Corrigendum",
+      "authors": [
+        "Nicolae Garleanu",
+        "Lasse Heje Pedersen"
+      ],
+      "publication_date": null,
+      "url": "https://nbgarleanu.github.io/DynTrad_corrigendum.pdf",
+      "reading_depth": "Entire one-page correction; replacement of appendix A15 and commuting-matrix exception",
+      "decision": "required_before_general_matrix_implementation",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "kind": "author_correction",
+      "date_note": "No explicit publication date in document",
+      "raw_source_id": "dynamic-corrigendum-http",
+      "card": "C2",
+      "local_evidence": {
+        "id": "dynamic-corrigendum-http",
+        "url": "http://docs.lhpedersen.com/DynamicTrading_corrigendum.pdf",
+        "raw_path": "data/research_watch/deep-reviews/20260912-classics-frontier/dynamic-corrigendum-http.pdf",
+        "curl_exit": 0,
+        "bytes": 30737,
+        "sha256": "99469db904292d2a909bd40151009891103bd11b95b94c95a8d0b25f3717baa2",
+        "fetched_at": "2026-09-12T06:44:23.206145+00:00"
+      }
+    },
+    {
+      "id": "jensen2026-frontier",
+      "title": "Machine Learning and the Implementable Efficient Frontier",
+      "authors": [
+        "Theis Ingerslev Jensen",
+        "Bryan Kelly",
+        "Semyon Malamud",
+        "Lasse Heje Pedersen"
+      ],
+      "publication_date": "2026-03-15",
+      "url": "https://academic.oup.com/rfs/advance-article/doi/10.1093/rfs/hhag022/8524346",
+      "reading_depth": "Publisher fulltext: abstract, introduction, sections 3.3, 4, 5.1-5.3; appendices not exhaustively reviewed",
+      "decision": "follow_cost_baseline_with_economic_evaluation",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "doi": "10.1093/rfs/hhag022",
+      "kind": "peer_reviewed",
+      "corrected_and_typeset_at": "2026-04-06",
+      "data_note": "US NYSE historical sample, out-of-sample 1981-2020; project applicability unverified",
+      "card": "C3"
+    },
+    {
+      "id": "jensen-frontier-code",
+      "title": "Machine Learning and the Implementable Efficient Frontier replication repository",
+      "authors": [
+        "Theis Ingerslev Jensen and coauthors"
+      ],
+      "publication_date": null,
+      "url": "https://github.com/theisij/ml-and-the-implementable-efficient-frontier",
+      "reading_depth": "README dataset list and computational-resource requirements",
+      "decision": "archive_code_index_without_execution",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "kind": "author_code",
+      "executed": false,
+      "commit_pinned": false,
+      "auth_note": "Original workflow uses WRDS-linked proprietary datasets; some shorting analysis needs Markit; repository access alone does not supply those data",
+      "card": "C3"
+    },
+    {
+      "id": "novymarx2013-gp",
+      "title": "The other side of value: The gross profitability premium",
+      "authors": [
+        "Robert Novy-Marx"
+      ],
+      "publication_date": "2013-04",
+      "url": "https://mysimon.rochester.edu/novy-marx/research/OSoV.pdf",
+      "reading_depth": "June 2012 author manuscript: abstract, introduction, sample and variable definitions; 2013 publication verified from institutional author directory",
+      "decision": "blocked_data_pit_audit_first",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "doi": "10.1016/j.jfineco.2013.01.003",
+      "kind": "peer_reviewed_with_author_manuscript_reading",
+      "manuscript_date": "2012-06",
+      "metadata_url": "https://simon.rochester.edu/faculty/robert-novy-marx",
+      "raw_source_id": "gp",
+      "card": "C4",
+      "local_evidence": {
+        "id": "gp",
+        "url": "https://mysimon.rochester.edu/novy-marx/research/OSoV.pdf",
+        "curl_exit": 0,
+        "raw_path": "data/research_watch/deep-reviews/20260912-classics-frontier/gp.pdf",
+        "bytes": 326274,
+        "sha256": "edcc990fefd4c4270bfc603cd9b0c61f36aaa97e14c2fd1c3d047494418856b1",
+        "fetched_at": "2026-09-12T06:43:16.093987+00:00"
+      }
+    },
+    {
+      "id": "sloan1996-accrual",
+      "title": "Do Stock Prices Fully Reflect Information in Accruals and Cash Flows about Future Earnings?",
+      "authors": [
+        "Richard G. Sloan"
+      ],
+      "publication_date": "1996-07",
+      "url": "https://www.cuhk.edu.hk/acy2/workshop/June2009Wasley/1996TAR%29.pdf",
+      "reading_depth": "Abstract, empirical design, accrual/cash-flow definitions and return-window timing; no table reproduction",
+      "decision": "blocked_data_pit_audit_first",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "kind": "peer_reviewed",
+      "raw_source_id": "sloan",
+      "card": "C5",
+      "local_evidence": {
+        "id": "sloan",
+        "url": "https://www.cuhk.edu.hk/acy2/workshop/June2009Wasley/1996TAR%29.pdf",
+        "curl_exit": 0,
+        "raw_path": "data/research_watch/deep-reviews/20260912-classics-frontier/sloan.pdf",
+        "bytes": 733503,
+        "sha256": "229b144840ad6ab30eebf299399e39e59ce2cab7c8f1aae018d9ca2a3946d2f6",
+        "fetched_at": "2026-09-12T06:43:16.861903+00:00"
+      }
+    },
+    {
+      "id": "green2011-accrual-decay",
+      "title": "Going, Going, Gone? The Apparent Demise of the Accruals Anomaly",
+      "authors": [
+        "Jeremiah Green",
+        "John R. M. Hand",
+        "Mark T. Soliman"
+      ],
+      "publication_date": "2011-05",
+      "url": "https://pure.psu.edu/en/publications/going-going-gone-the-apparent-demise-of-the-accruals-anomaly/",
+      "reading_depth": "Institutional abstract and publication metadata only",
+      "decision": "retain_counterevidence",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "doi": "10.1287/mnsc.1110.1320",
+      "kind": "peer_reviewed_abstract_only",
+      "card": "C5"
+    },
+    {
+      "id": "arxiv:2602.03903",
+      "title": "Taming Tail Risk in Financial Markets: Conformal Calibration for Nonstationary Portfolio VaR",
+      "authors": [
+        "Marc Schmitt"
+      ],
+      "publication_date": null,
+      "url": "https://arxiv.org/abs/2602.03903",
+      "reading_depth": "v3 fulltext sections 1, 4-7, algorithm 1, tables 1-3; no independent proof or data replication",
+      "decision": "shadow_risk_calibration_candidate",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "kind": "preprint",
+      "version": "v3",
+      "first_submitted_at": "2026-02-03T12:34:19Z",
+      "version_updated_at": "2026-08-03T07:09:44Z",
+      "fulltext_url": "https://arxiv.org/html/2602.03903v3",
+      "raw_source_id": "conformal-v3",
+      "card": "C6",
+      "local_evidence": {
+        "id": "conformal-v3",
+        "url": "https://arxiv.org/html/2602.03903v3",
+        "curl_exit": 0,
+        "raw_path": "data/research_watch/deep-reviews/20260912-classics-frontier/conformal-v3.html",
+        "bytes": 305355,
+        "sha256": "09b1de8a2c92ac7c9f11b7b365a9f505e0aac56ab1baa8d61c99102bf663436a",
+        "fetched_at": "2026-09-12T06:43:14.685035+00:00"
+      }
+    },
+    {
+      "id": "gibbs2021-aci",
+      "title": "Adaptive Conformal Inference Under Distribution Shift",
+      "authors": [
+        "Isaac Gibbs",
+        "Emmanuel Candes"
+      ],
+      "publication_date": "2021",
+      "url": "https://papers.neurips.cc/paper_files/paper/2021/hash/0d441de75945e5acbc865406fc9a2559-Abstract.html",
+      "reading_depth": "Conference abstract and paper introduction; no independent theorem audit",
+      "decision": "classic_baseline_for_shadow_comparison",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "kind": "peer_reviewed_conference",
+      "card": "C6"
+    },
+    {
+      "id": "arxiv:2601.04062",
+      "title": "Smart Predict--then--Optimize Paradigm for Portfolio Optimization in Real Markets",
+      "authors": [
+        "Yi Wang",
+        "Takashi Hasuike"
+      ],
+      "publication_date": null,
+      "url": "https://arxiv.org/abs/2601.04062",
+      "reading_depth": "v3 method overview, sections 4-7, tables 4-6; mixed empirical results recorded",
+      "decision": "archive_qualified_not_priority",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "kind": "preprint",
+      "version": "v3",
+      "first_submitted_at": "2026-01-07",
+      "version_updated_at": "2026-01-12",
+      "fulltext_url": "https://arxiv.org/html/2601.04062v3",
+      "raw_source_id": "spo-v3",
+      "card": "W1",
+      "local_evidence": {
+        "id": "spo-v3",
+        "url": "https://arxiv.org/html/2601.04062v3",
+        "curl_exit": 0,
+        "raw_path": "data/research_watch/deep-reviews/20260912-classics-frontier/spo-v3.html",
+        "bytes": 189796,
+        "sha256": "ecee129858111f06ce64e7b198870dd55cacb8cf1c887610293eb34250ed85f0",
+        "fetched_at": "2026-09-12T06:43:14.929265+00:00"
+      }
+    },
+    {
+      "id": "arxiv:2607.12208",
+      "title": "The Benjamini--Hochberg Procedure Can Fail to Control the FDR for Correlated Two-Sided Gaussian Tests",
+      "authors": [
+        "Edgar Dobriban"
+      ],
+      "publication_date": null,
+      "url": "https://arxiv.org/abs/2607.12208",
+      "reading_depth": "Abstract, construction, discussion and certificate description; proof/certificate not independently verified",
+      "decision": "method_assumption_watch",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "kind": "preprint",
+      "version": "v1",
+      "first_submitted_at": "2026-07-13T23:18:13Z",
+      "version_updated_at": "2026-07-13T23:18:13Z",
+      "document_title_date": "2026-08-24",
+      "date_note": "arXiv submission metadata and internal title date disagree; both retained; no invented v2",
+      "fulltext_url": "https://arxiv.org/html/2607.12208v1",
+      "raw_source_id": "bh-v1",
+      "card": "W2",
+      "local_evidence": {
+        "id": "bh-v1",
+        "url": "https://arxiv.org/html/2607.12208v1",
+        "curl_exit": 0,
+        "raw_path": "data/research_watch/deep-reviews/20260912-classics-frontier/bh-v1.html",
+        "bytes": 480482,
+        "sha256": "ca5c05815c180176e5b7153f7116328da95f1178c97eefba4cdeb37adb6a9d02",
+        "fetched_at": "2026-09-12T06:43:14.876190+00:00"
+      }
+    },
+    {
+      "id": "bernard1989-pead",
+      "title": "Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium?",
+      "authors": [
+        "Victor L. Bernard",
+        "Jacob K. Thomas"
+      ],
+      "publication_date": "1989",
+      "url": "https://www.jstor.org/stable/2491062",
+      "reading_depth": "Journal index metadata only; not paper fulltext",
+      "decision": "future_reading_lead",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "doi": "10.2307/2491062",
+      "kind": "metadata_only",
+      "card": null
+    },
+    {
+      "id": "frl2026-china-earnings-months",
+      "title": "Return extrapolation in China: momentum amplification during earnings announcement months",
+      "authors": null,
+      "publication_date": "2026-09",
+      "url": "https://www.sciencedirect.com/science/article/pii/S1544612326008196",
+      "reading_depth": "Public abstract and introduction; full methodology/data not independently reviewed",
+      "decision": "future_reading_lead_not_firm_pead",
+      "verified_at": "2026-09-12T06:49:59.634542+00:00",
+      "local_reproduction": false,
+      "doi": "10.1016/j.frl.2026.110291",
+      "kind": "publisher_abstract_and_introduction",
+      "date_note": "Issue month only; online publication date and author list not verified",
+      "card": null
+    }
+  ],
+  "local_evidence_dir": "data/research_watch/deep-reviews/20260912-classics-frontier",
+  "inventory_path": "data/research_watch/deep-reviews/20260912-classics-frontier/inventory.json",
+  "mathematical_check_path": "data/research_watch/deep-reviews/20260912-classics-frontier/shuffle-invariance.json",
+  "scope": {
+    "market_news_analysis": false,
+    "new_strategy_runs": 0,
+    "third_party_code_executed": false,
+    "production_code_modified": false,
+    "runtime_database_queried": false
+  },
+  "access_notes": [
+    "No new API key or credentials were supplied or requested.",
+    "Initial Python urllib downloads failed certificate verification. System curl succeeded for most public pages; failed attempts are preserved.",
+    "Author DynamicTrading HTTPS endpoint certificate failed; HTTP author link supplied public files, and content was cross-checked against separate author HTTPS sources via web.",
+    "CBS PDF and direct ScienceDirect curl returned 403; publisher web pages/author manuscripts were used, with reading depth recorded per item."
+  ],
+  "fetch_attempts_path": [
+    "data/research_watch/deep-reviews/20260912-classics-frontier/fetches.json",
+    "data/research_watch/deep-reviews/20260912-classics-frontier/fetches-curl.json",
+    "data/research_watch/deep-reviews/20260912-classics-frontier/fetches-extra.json"
+  ],
+  "final_checked_at": "2026-09-12T06:51:04.688714+00:00",
+  "current_head_at_document_check": "fe460087bb7a0413b2bd8c55fe8334af47761a19",
+  "additional_inspected_files": [
+    {
+      "path": "backend/services/engine/strategy_lab/routers.py",
+      "sha256": "3bce9df77762fa45d8363272c215aa427abc8bc398ba986e4ed2e3f144e8d3ae"
+    },
+    {
+      "path": "backend/services/engine/strategy_lab/engine/broker.py",
+      "sha256": "3dbbc7568ea81e47357324330ac520b0c1b9254189e874570466dc903f7abe4c"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+# Cloud checkpoint complete; Mac historical checkpoint catch-up
+- Time/node: 2026-09-16 17:46 UTC, Mac; migration remains in progress.
+- Code: master/codex/mac-data-source 509f6dba; no source edits this turn.
+- Cloud checkpoint unit quantmind-tushare-checkpoint-20260917.service is terminal success. COMPLETE.json: 1,210,967 files, 237,413,089,667 logical bytes; inventory SHA-256 ece6a8a2cf1e5f3dc34a2d6dff60e1471a694a85fee7c31f59241a21d25b412e. Source admission still paused, no ownership seal yet.
+- Local COMPLETE, staged CURRENT and inventory transfer finished successfully; local inventory checksum passed. Five root database backups and staged CURRENT hashes passed against inventory. These are still staging files, not installed active databases.
+- First database prestage PID 76276 terminated with exit 0 (13,635,276,800 logical bytes). Completed inventory revealed six more historical databases under validation/ generated after that prestage began. Resumed the now-idle same LaunchAgent; new PID 83793 copies these missing immutable checkpoints. Do not treat five root databases as all archived SQLite files.
+- Original full precopy PID 61325 / receiver 61393 is still live. Attachments phase finished; document indexes are advancing. No source data deleted or local acquisition enabled.
+- Local size census: ~/Library/Application Support/QuantMind/tushare-migration-census-20260917.json. This is a concurrent size-only census, not full hash verification; it includes staged DB/CURRENT paths. Existing hardlinks mean logical bytes are not physical disk requirements.
+- Next: wait original precopy and second database prestage for actual successful termination, then sync-frozen with completed checkpoint checkpoint-2026-09-16T16-34-47.667824+00-00, install checkpoints, verify every file/finalize handoff, activate native intake, verify throughput. Research cache remains verified for 12 APIs; production API reader switch and cloud cleanup remain pending.
