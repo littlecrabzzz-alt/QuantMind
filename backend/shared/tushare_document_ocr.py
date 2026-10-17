@@ -484,11 +484,149 @@ def ingest_staged(root, staging):
     return {"ingested": count}
 
 
+def _read_page_checkpoint(progress, number):
+    """Read one canonical page checkpoint using stage's existing contract."""
+    path = progress / f"{number}.json"
+    if not path.exists():
+        return None, None
+    if path.is_symlink():
+        return None, "symlink"
+    try:
+        page = json.loads(path.read_bytes())
+    except ValueError:
+        return None, "unreadable"
+    if (not isinstance(page, dict) or page.get("page_number") != number
+            or not isinstance(page.get("text"), str)):
+        return None, "invalid_page_checkpoint"
+    return page, None
+
+
+def _read_staged_document(path, sha):
+    """Read an ingestable complete document, or classify its invalid/empty state."""
+    if path.is_symlink():
+        return None, "symlink"
+    try:
+        body = json.loads(path.read_bytes())
+        if not isinstance(body, dict):
+            return None, "invalid_staged_document"
+        _validate(body, sha)
+    except (OSError, ValueError):
+        return None, "invalid_staged_document"
+    if (body.get("parse_status") != "parsed"
+            or not any(p["text"].strip() for p in body["pages"])):
+        return None, "empty"
+    return body, None
+
+
+def status_staging(staging, *, now=None):
+    """Read-only staging classification; no DB access, writes, or model calls.
+
+    Complete documents pass _validate and ingest_staged's non-empty text
+    condition. Valid SHA sets are disjoint with ingested taking precedence.
+    Empty/invalid artifacts are diagnostics, not finished documents. Completed
+    documents' checkpoint directories are residue, not in-flight work.
+    Checkpoint ages are observations, never process-liveness claims.
+    """
+    staging = _root(staging)
+    now = time.time() if now is None else now
+    sha_pattern = re.compile(r"[a-f0-9]{64}")
+    ingested_dir = staging / "ingested"
+
+    def classify(directory):
+        complete = set()
+        empty = invalid = 0
+        shas = set()
+        if directory.is_dir() and not directory.is_symlink():
+            for path in directory.glob("*.json"):
+                if not sha_pattern.fullmatch(path.stem):
+                    continue
+                body, reason = _read_staged_document(path, path.stem)
+                if reason is None:
+                    complete.add(path.stem)
+                elif reason == "empty":
+                    empty += 1
+                else:
+                    invalid += 1
+                shas.add(path.stem)
+        return complete, empty, invalid, shas
+
+    ing_complete, ing_empty, ing_invalid, ingested_shas = classify(ingested_dir)
+    st_complete, st_empty, st_invalid, staged_shas = classify(staging)
+    report = {
+        "staging": str(staging),
+        "as_of_epoch": round(now, 1),
+        "ingested": len(ing_complete),
+        "ingested_empty": ing_empty,
+        "ingested_invalid": ing_invalid,
+        "staged_awaiting_ingest": len(st_complete - ing_complete),
+        "staged_empty": st_empty,
+        "staged_invalid": st_invalid,
+        "staged_overlap_ingested": sorted(ing_complete & st_complete),
+        "incomplete_checkpoints": [],
+    }
+    if not staging.is_dir():
+        return report
+    resolved = ingested_shas | staged_shas
+    for progress in staging.iterdir():
+        if (progress.is_symlink() or not progress.is_dir()
+                or not sha_pattern.fullmatch(progress.name)):
+            continue
+        sha = progress.name
+        if sha in resolved:
+            continue
+        meta_path = progress / "metadata.json"
+        pages_total = None
+        if meta_path.is_file() and not meta_path.is_symlink():
+            try:
+                meta = json.loads(meta_path.read_bytes())
+            except ValueError:
+                meta = None
+            if (isinstance(meta, dict)
+                    and meta.get("document_sha256") == sha
+                    and type(meta.get("page_count")) is int):
+                pages_total = meta["page_count"]
+        numbers = (range(1, pages_total + 1) if pages_total is not None
+                   else sorted({int(p.stem) for p in progress.glob("*.json")
+                                if p.name != "metadata.json"
+                                and p.stem.isdigit() and int(p.stem) >= 1}))
+        pages_done = 0
+        invalid_pages = []
+        last_checkpoint = None
+        for number in numbers:
+            page, reason = _read_page_checkpoint(progress, number)
+            if reason is None and page is not None:
+                pages_done += 1
+                mtime = (progress / f"{number}.json").stat().st_mtime
+                if last_checkpoint is None or mtime > last_checkpoint:
+                    last_checkpoint = mtime
+            elif reason is not None:
+                invalid_pages.append(f"{number}.json:{reason}")
+        report["incomplete_checkpoints"].append({
+            "sha256": sha,
+            "pages_done": pages_done,
+            "pages_total": pages_total,
+            "invalid_page_files": invalid_pages,
+            "last_checkpoint_age_seconds":
+                None if last_checkpoint is None else round(now - last_checkpoint, 1),
+        })
+    report["incomplete_checkpoints"].sort(
+        key=lambda e: (e["last_checkpoint_age_seconds"] is None,
+                       e["last_checkpoint_age_seconds"] or 0.0))
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     stage = commands.add_parser("stage")
     ingest = commands.add_parser("ingest")
+    status = commands.add_parser(
+        "status", help="read-only staging progress; no DB access, writes, or model calls")
+    status.add_argument("--staging", required=True)
+    status.add_argument(
+        "--watch", type=float, metavar="SECONDS",
+        help="re-print every SECONDS until Ctrl-C; stops only this viewer",
+    )
     for command in (stage, ingest):
         command.add_argument("--root", required=True)
         command.add_argument("--staging", required=True)
@@ -501,6 +639,18 @@ def main():
     stage.add_argument("--max-pages", type=int)
     stage.add_argument("--limit", type=int)
     args = parser.parse_args()
+    if args.command == "status":
+        if args.watch is not None and args.watch < 1:
+            parser.error("--watch must be >= 1 second")
+        try:
+            while True:
+                print(json.dumps(status_staging(args.staging), ensure_ascii=False), flush=True)
+                if args.watch is None:
+                    break
+                time.sleep(args.watch)
+        except KeyboardInterrupt:
+            print("status=viewer_stopped", flush=True)
+        return
     if args.command == "ingest":
         print(json.dumps(ingest_staged(args.root, args.staging)))
         return
