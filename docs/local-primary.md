@@ -40,7 +40,7 @@ Main checkout 仍是源码权威，保留在原 Documents 位置；不搬仓库�
 在 Main 中一次性执行文件安装入口：
 
 ```bash
-scripts/local-primary.sh install-runtime \
+bash scripts/local-primary.sh install-runtime \
   "$HOME/Library/Application Support/QuantMind/primary-runtime-<approved-version>" \
   "$HOME/Library/Application Support/QuantMind/primary-artifacts-20261016"
 ```
@@ -76,6 +76,12 @@ nested commits、每个复制路径的 SHA-256/size/mode 以及符号链接目�
 ## 脚本 `scripts/local-primary.sh`
 
 以下入口用于已准备并通过数据验证的本地实例；必须从当前已核准运行快照执行。不要手工补造 `READY`、`AUTHORITY.json` 或恢复收据绕过门控。
+
+脚本按仓库记录的文件模式部署，不要求可执行位；人工命令、Python coordinator 的
+`adopt` / `start` / `install-autostart` 调用均须显式使用 `/bin/bash`，
+与受管 autostart plist 一致，不用 `chmod` 掩盖调用入口错误。若在 exec 前失败，
+应先保留原 failed state、contract 和代码版本，并确认未创建主库状态、容器或卷，
+才能在原精确基线及全部验证、防双写、队列门禁下受控接续；已有 partial 资源不覆盖。
 
 - `start`：要求数据基线和恢复验证齐全，并拒绝同时运行 local-dev。先启动 db/redis，再由 `local_primary_broker_guard.py` 检查业务队列及 unacked 路由；有未处理业务消息时拒启消费者，不清队列。通过后启动明示业务服务并检查本机 8000 health。
 - `stop`：停止该 Compose 项目的服务，保留数据卷。
