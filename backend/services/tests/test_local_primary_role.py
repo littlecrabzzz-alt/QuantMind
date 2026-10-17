@@ -101,6 +101,24 @@ def managed_runtime_fixture(tmp_path, monkeypatch):
         "alphaagent/__init__.py": "ALPHA = True\n",
         "alphaagent/log/logger.py": "LOGGER_CODE = True\n",
         "TradingAgents-astock/tradingagents/__init__.py": "AGENTS_CODE = True\n",
+        "TradingAgents-astock/tradingagents/default_config.py": "DEFAULT_CONFIG = {}\n",
+        "TradingAgents-astock/cli/__init__.py": "",
+        "TradingAgents-astock/cli/stats_handler.py": "class StatsCallbackHandler: pass\n",
+        "TradingAgents-astock/cli/static/welcome.txt": "CLI resource\n",
+        "TradingAgents-astock/README.md": "Package readme\n",
+        "TradingAgents-astock/LICENSE": "Package license\n",
+        "TradingAgents-astock/NOTICE": "Package attribution\n",
+        "TradingAgents-astock/pyproject.toml": "[project]\nname = 'fixture'\n",
+        "TradingAgents-astock/requirements.txt": ".\n",
+        "TradingAgents-astock/web/app.py": "RETIRED_UI = True\n",
+        "TradingAgents-astock/.streamlit/config.toml": "[server]\n",
+        "TradingAgents-astock/.dockerignore": "Fixture deployment shell\n",
+        "TradingAgents-astock/Dockerfile": "FROM fixture\n",
+        "TradingAgents-astock/docker-compose.yml": "services: {}\n",
+        "TradingAgents-astock/assets/screenshot.png": "MARKETING\n",
+        "TradingAgents-astock/tests/test_upstream.py": "UPSTREAM_TEST = True\n",
+        "TradingAgents-astock/examples/demo.py": "UPSTREAM_EXAMPLE = True\n",
+        "TradingAgents-astock/scripts/smoke.py": "UPSTREAM_SCRIPT = True\n",
         "rd-agent/dependency.py": "DEPENDENCY\n",
         "data/user.json": "USER DATA\n",
         "models/weights.pt": "MODEL DATA\n",
@@ -143,6 +161,22 @@ def managed_runtime_fixture(tmp_path, monkeypatch):
                               capture_output=True, text=True)
 
     return source, library, artifacts, git, install
+
+
+def test_install_runtime_keeps_integrated_vendor_resources_only(managed_runtime_fixture):
+    source, library, artifacts, git, install = managed_runtime_fixture
+    target = library / "primary-runtime-vendor-fixture"
+    result = install(target)
+    assert result.returncode == 0, result.stderr
+    vendor = Path("TradingAgents-astock")
+    for relative in ("tradingagents/__init__.py", "tradingagents/default_config.py",
+                     "cli/__init__.py", "cli/stats_handler.py", "cli/static/welcome.txt",
+                     "README.md", "LICENSE", "NOTICE", "pyproject.toml", "requirements.txt"):
+        assert (target / vendor / relative).read_bytes() == (source / vendor / relative).read_bytes()
+    for relative in ("web", ".streamlit", ".dockerignore", "Dockerfile", "docker-compose.yml",
+                     "assets", "tests", "examples", "scripts"):
+        assert not os.path.lexists(target / vendor / relative)
+    assert (source / vendor / "tests/test_upstream.py").is_file()
 
 
 def test_install_runtime_copies_only_current_source_and_links_artifacts(managed_runtime_fixture):

@@ -59,7 +59,6 @@ services:
       TRAINING_PAUSE_OTHERS: "false"
       OSS_EMBEDDED_CELERY: "false"
       DAILY_SYNC_ENABLED: "false"
-      QUANTMIND_ENABLE_WEB_UPDATE: "false"
     volumes: !override
       - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/vendor/ashare-lab:/app/vendor/ashare-lab:ro
       - ${QM_PRIMARY_PROJECT:?run through scripts/local-primary.sh}/output/ashare-takeover:/app/output/ashare-takeover:ro

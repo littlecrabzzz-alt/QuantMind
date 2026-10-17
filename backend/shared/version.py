@@ -1,11 +1,11 @@
 """运行时代码版本读取与上游更新检查。
 
 版本来源（优先级）：
-1. backend/shared/version.json —— 由 deploy/update.sh 每次构建前写入
+1. backend/shared/version.json —— 运行快照中的版本元数据
    （含 version/commit/branch 三个稳定字段，commit 为完整 HEAD SHA，
    describe 恰为 tag 而无短 SHA 时也可对比）
 2. backend/shared/version.txt —— 旧的 describe 单行（遗留回退，可解析出短 SHA）
-3. 缺省回退 "dev"（本地未走 update.sh 的开发环境）
+3. 缺省回退 "dev"（没有版本元数据的开发环境）
 
 更新检查：容器内没有 .git，也无法 git fetch，故改走上游平台（默认 gitee）的
 compare HTTP API，比较「本地部署 commit」与「上游分支」算出落后提交数。
@@ -109,7 +109,7 @@ async def check_updates(force: bool = False) -> dict | None:
     """
     info = get_version_info()
     commit, branch = info.get("commit"), info.get("branch")
-    # 无版本文件（本地 dev 环境）或不走 update.sh 时无法对比，跳过。
+    # 缺少可对比的提交元数据（如本地 dev 环境）时跳过。
     if not commit:
         return None
 

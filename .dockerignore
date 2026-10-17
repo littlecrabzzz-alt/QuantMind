@@ -19,13 +19,16 @@ electron/dist-electron
 rd-agent/.git
 rd-agent/.github/
 rd-agent/.vscode/
+rd-agent/.devcontainer/
+rd-agent/.streamlit/
 rd-agent/.bumpversion.cfg
 rd-agent/.commitlintrc.js
 rd-agent/.env
 rd-agent/.env.example
 rd-agent/.readthedocs.yaml
 rd-agent/docs/
-rd-agent/tests/
+rd-agent/test/
+rd-agent/web/
 rd-agent/CHANGELOG.md
 rd-agent/CODE_OF_CONDUCT.md
 rd-agent/CONTRIBUTING.md
@@ -83,6 +86,9 @@ research/
 README.md
 FRONTEND_CONFIG.md
 AGENTS.md
+# rd-agent's build metadata reads README.md; preserve package metadata and license.
+!rd-agent/README.md
+!rd-agent/LICENSE
 
 # Large non-essential directories
 models/

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, Spin, message, Result, Button, Space, Typography, Tag, Progress, List, Badge, Divider, Modal } from 'antd';
+import { Card, Row, Col, Statistic, Spin, message, Result, Button, Space, Typography, Tag, List, Badge, Divider } from 'antd';
 import {
     UserOutlined, 
     LineChartOutlined, 
@@ -13,17 +13,13 @@ import {
     GlobalOutlined,
     ApiOutlined,
     SwapOutlined,
-    CheckCircleFilled,
     ClockCircleOutlined,
-    AreaChartOutlined,
-    CloudSyncOutlined,
-    SyncOutlined
+    AreaChartOutlined
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { EChartsChart } from '../../../components/common/EChartsChart';
 import { adminService } from '../services/adminService';
-import { authService } from '../../auth/services/authService';
 import { useAppDispatch } from '../../../store';
 import { logout } from '../../auth/store/authSlice';
 import { DashboardMetrics, DashboardServiceInfo } from '../types';
@@ -37,7 +33,6 @@ export const AdminDashboard: React.FC = () => {
     const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
     const [loading, setLoading] = useState(true);
     const [authError, setAuthError] = useState<{ status: number; message: string } | null>(null);
-    const [updating, setUpdating] = useState(false);
     const [perfHistory, setPerfHistory] = useState<Array<{ ts: number; cpu: number; mem: number; disk: number }>>([]);
     const [perfLoading, setPerfLoading] = useState(true);
 
@@ -68,43 +63,6 @@ export const AdminDashboard: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
-
-    /**
-     * 「更新系统」：确认弹窗 → 触发宿主机 deploy/update.sh。
-     * 更新会重建并重启所有核心服务，当前会话可能短暂中断；故二次确认。
-     */
-    const handleUpdateSystem = () => {
-        Modal.confirm({
-            title: '确认更新系统？',
-            icon: <CloudSyncOutlined className="text-blue-500" />,
-            content: (
-                <div className="text-sm space-y-2">
-                    <p className="m-0">将执行宿主机 <b>deploy/update.sh</b>：拉取最新代码、重建镜像并重启服务。</p>
-                    <p className="m-0 text-amber-600">⚠️ 重启过程中当前连接可能中断，请勿在交易时段执行，并确保已保存数据。</p>
-                    <p className="m-0 text-slate-400 text-xs">更新完成后，页面会在一段时间后自动恢复。</p>
-                </div>
-            ),
-            okText: '开始更新',
-            cancelText: '取消',
-            okButtonProps: { type: 'primary', danger: true, disabled: updating, loading: updating },
-            onOk: async () => {
-                setUpdating(true);
-                try {
-                    const res = await adminService.updateSystem();
-                    message.success(res?.started ? '已提交系统更新，后台执行中…' : '更新任务已提交');
-                } catch (err: any) {
-                    const status = err?.response?.status;
-                    if (status === 403) {
-                        message.warning('更新功能未开启：需在宿主机挂载 docker socket 并设置 QUANTMIND_ENABLE_WEB_UPDATE=true');
-                    } else {
-                        message.error(err?.response?.data?.detail || '系统更新失败');
-                    }
-                } finally {
-                    setUpdating(false);
-                }
-            },
-        });
     };
 
     // 节点性能历史：挂载时拉取一次，此后每 30s 轮询（采样器 1min 一个点）
@@ -278,15 +236,6 @@ export const AdminDashboard: React.FC = () => {
                     <Text className="text-slate-400 text-xs font-medium">基础设施节点监控与管理</Text>
                 </div>
                 <Space size={10}>
-                    <Button
-                        icon={<SyncOutlined spin={updating} />}
-                        loading={updating}
-                        onClick={handleUpdateSystem}
-                        danger
-                        className="rounded-xl font-bold shadow-sm h-10 px-6"
-                    >
-                        更新系统
-                    </Button>
                     <Button
                         icon={<ThunderboltOutlined />}
                         onClick={loadMetrics}

@@ -37,13 +37,7 @@ Main checkout 仍是源码权威，保留在原 Documents 位置；不搬仓库�
 全新的代码/部署快照。launchd、controller、Compose 和 restore 都使用这同一份已核准
 字节，不再为日常运行必读 Documents。Main 后续编辑不自动改变已部署版本。
 
-在 Main 中一次性执行文件安装入口：
-
-```bash
-bash scripts/local-primary.sh install-runtime \
-  "$HOME/Library/Application Support/QuantMind/primary-runtime-<approved-version>" \
-  "$HOME/Library/Application Support/QuantMind/primary-artifacts-20261016"
-```
+安装命令与日常启停统一见[部署指南](部署指南.md)；以下仅定义安装及运行合同。
 
 `install-runtime` 在 Docker/launchd/adopt 的门控之前独立分派，不探测或启动 Docker，
 不安装 launchd，不恢复数据，也不创建 `.local-primary`、`READY` 或假的账户。
@@ -56,6 +50,8 @@ Compose、requirements、`.dockerignore`、`pyproject.toml`。alphaagent 与
 TradingAgents-astock 若是 nested Git，改用各自索引名单；不复制 `.git`。
 不带 node_modules、venv、rd-agent、运行 data/models/logs、用户目录或模型/依赖二进制，
 但保留已跟踪的 ORM `models/*.py`、alphaagent 日志模块等真正源码。
+TradingAgents-astock 仅带 `tradingagents/`、`cli/`、README/LICENSE/NOTICE 和包元数据；
+不带独立 Web 界面、营销附件、示例、测试或另一套部署包装。
 客户端政策文件及政策目录均不读取、不复制。
 vendor 仅复制 ashare-lab 的 `src`、`frozen-source.json`、`frozen-data.json`、
 `requirements.txt`；前端只带已有 `electron/dist-react` 构建资源，不重新构建。
@@ -83,13 +79,11 @@ nested commits、每个复制路径的 SHA-256/size/mode 以及符号链接目�
 应先保留原 failed state、contract 和代码版本，并确认未创建主库状态、容器或卷，
 才能在原精确基线及全部验证、防双写、队列门禁下受控接续；已有 partial 资源不覆盖。
 
-- `start`：要求数据基线和恢复验证齐全，并拒绝同时运行 local-dev。先启动 db/redis，再由 `local_primary_broker_guard.py` 检查业务队列及 unacked 路由；有未处理业务消息时拒启消费者，不清队列。通过后启动明示业务服务并检查本机 8000 health。
-- `stop`：停止该 Compose 项目的服务，保留数据卷。
-- `status`：只读查看服务状态、数据基线信息和本机 8000 端口归属。
-- `install-autostart` / `uninstall-autostart`：安装 / 卸载 `~/Library/LaunchAgents/com.quantmind.local-primary.plist`（登录时执行 `start`）。模板放 `deploy/com.quantmind.local-primary.plist`。
-- `install-runtime <new_Library_runtime_dir> <Library_artifact_root>`：以上述白名单安装代码/部署快照并输出 manifest SHA；纯文件操作，不触及正式运行资源。
-
-local-dev.sh 的 `start` 在 `quantmind-local` 栈运行时必须拒绝（避免两个后端抢 8000 和同一份数据）。
+启动顺序是 db/redis、`local_primary_broker_guard.py`、明示业务服务、8000 health；
+业务队列或 unacked 路由未通过检查就拒启消费者，不清队列。登录启动模板为
+`deploy/com.quantmind.local-primary.plist`，安装到
+`~/Library/LaunchAgents/com.quantmind.local-primary.plist`。所有运维命令及其前提
+统一在[部署指南](部署指南.md)维护，不在此另列。
 
 
 ## 行情数据

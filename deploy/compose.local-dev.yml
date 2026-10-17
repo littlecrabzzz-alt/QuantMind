@@ -39,7 +39,6 @@ services:
       TRAINING_PAUSE_OTHERS: "false"
       OSS_EMBEDDED_CELERY: "false"
       DAILY_SYNC_ENABLED: "false"
-      QUANTMIND_ENABLE_WEB_UPDATE: "false"
       ENABLE_REAL_TRADING: "false"
       ENABLE_TDX_PUSH: "false"
     volumes: !override

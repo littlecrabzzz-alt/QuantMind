@@ -27,10 +27,10 @@ export interface SystemUpdateInfo {
 export interface SystemVersion {
   version: string;
   edition: 'oss' | 'enterprise';
-  /** deploy/update.sh 写入的完整 HEAD SHA */
+  /** 运行快照中版本元数据记录的完整 HEAD SHA */
   commit?: string;
   branch?: string;
-  /** 上游更新检查结果；未走 update.sh 或无外网时为空 */
+  /** 上游更新检查结果；缺少提交元数据或无外网时为空 */
   update?: SystemUpdateInfo | null;
 }
 
@@ -43,7 +43,7 @@ export const systemService = {
   },
 
   /**
-   * 获取当前运行代码版本，并附带上游更新检查（deploy/update.sh 更新后写入 version.json）
+   * 获取当前运行代码版本，并附带上游更新检查；此接口不安装或发布更新。
    * @param force true 时绕过磁盘缓存，强制实时请求上游平台
    */
   getVersion: async (force = false): Promise<SystemVersion> => {

@@ -10,8 +10,7 @@
 # 用法：
 #   构建/打包侧（把指纹烙进镜像 Label，供部署侧比对）：
 #     QM_REQ_SHA=$(bash deploy/req-fingerprint.sh) docker compose build quantmind
-#   部署侧（deploy/full-deploy.sh 内部使用）：
-#     比对「当前代码指纹」与「镜像 LABEL qm.req.sha」，一致→复用，不一致→重建。
+#   版本验收侧比对「当前代码指纹」与「镜像 LABEL qm.req.sha」。
 #   从未写明 TORCH_DEVICE 时，按镜像 Label 反推形态（避免默认 skip 误重建）：
 #     bash deploy/req-fingerprint.sh --infer-torch [ROOT] [IMAGE]
 set -euo pipefail

@@ -14,7 +14,7 @@
 - `tradingagents/agents/`：模型提示和角色实现；A 股 fork 在基础角色外增加政策、游资与解禁分析。
 - `tradingagents/dataflows/a_stock.py`：A 股数据工具；代码中存在某个上游 HTTP/TCP 接口不等于该接口当前可用，也不替代 QuantMind 的数据事实源。
 - `tradingagents/llm_clients/` 与 `default_config.py`：模型客户端及运行配置。供应商可用模型和密钥由实例配置决定，不能从历史样例报告推定。
-- QuantMind 网关集成在 `backend/services/engine/routers/trading_agents.py`，从项目[主入口](../README.md)配置和使用；不要为修复集成而先启动 vendored Web UI。
+- QuantMind 网关集成在 `backend/services/engine/routers/trading_agents.py`，从项目[主入口](../README.md)配置和使用。独立 Streamlit UI 及其启动入口、部署壳和营销截图已退役；保留核心框架与 CLI 的统计、导出能力。
 
 `pyproject.toml` 将本 README 作为包元数据读取，打包时必须保留。Python 依赖、可选 provider 和版本约束以该文件为准，不照抄旧 issue 中已经过期的 akshare/httpx 安装建议。
 

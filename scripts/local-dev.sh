@@ -11,11 +11,8 @@ STATE="$PROJECT/.local-dev"
 export QM_LOCAL_PROJECT="$PROJECT"
 export QM_LOCAL_STATE="$STATE/project"
 COMPOSE=(docker compose --project-name quantmind-dev --env-file "$PROJECT/.env.local" -f "$PROJECT/docker-compose.yml" -f "$PROJECT/deploy/compose.local-dev.yml" --project-directory "$PROJECT")
-TUNNEL_LABEL=com.quantmind.cloud-tunnel
-TUNNEL_PLIST="$HOME/Library/LaunchAgents/$TUNNEL_LABEL.plist"
 LOCK="$PROJECT/logs/local-dev.lock"
 ROLLBACK=none
-RESTORE_TUNNEL=false
 SERVICES=()
 
 fail() { echo "$*" >&2; exit 1; }
@@ -33,11 +30,6 @@ require_mac() {
   [ "$(docker info --format '{{.OperatingSystem}}')" = 'Docker Desktop' ] || fail 'Expected local Docker Desktop daemon.'
 }
 
-start_tunnel() {
-  [ -f "$TUNNEL_PLIST" ] || { echo 'Cloud tunnel plist is missing.' >&2; return 1; }
-  launchctl print "gui/$(id -u)/$TUNNEL_LABEL" >/dev/null 2>&1 || \
-    launchctl bootstrap "gui/$(id -u)" "$TUNNEL_PLIST"
-}
 
 cleanup() {
   local rc=$?
@@ -45,10 +37,8 @@ cleanup() {
   set +e
   if [ "$ROLLBACK" = start ]; then
     # No services were running before this attempt. Preserve all volumes.
-    if "${COMPOSE[@]}" stop "${SERVICES[@]}"; then
-      [ "$RESTORE_TUNNEL" = false ] || start_tunnel
-    else
-      echo 'Rollback could not stop local services; inspect ports before restoring the tunnel.' >&2
+    if ! "${COMPOSE[@]}" stop "${SERVICES[@]}"; then
+      echo 'Rollback could not stop sandbox services; inspect the sandbox state.' >&2
     fi
   elif [ "$ROLLBACK" = init ]; then
     "${COMPOSE[@]}" stop db
@@ -129,16 +119,11 @@ start_local() {
     echo "$current_env" | grep -Fxq 'QM_NODE_ROLE=sandbox' || fail 'Existing backend is not a sandbox.'
     echo "$current_env" | grep -Fxq "HOST_RUNTIME_PATH=$QM_LOCAL_STATE" || fail 'Existing sandbox predates runtime isolation; stop and start it to apply the fix.'
     healthy 8000 || fail 'Existing sandbox is unhealthy; inspect it before restarting.'
-    echo 'Local sandbox is already running; no services or tunnels changed.'
+    echo 'Local sandbox is already running; no services changed.'
     return
   fi
-  if launchctl print "gui/$(id -u)/$TUNNEL_LABEL" >/dev/null 2>&1; then
-    RESTORE_TUNNEL=true
-    [ -f "$TUNNEL_PLIST" ] || fail 'Missing tunnel plist; cannot guarantee recovery.'
-  fi
-  # Install recovery before the first state change, including tunnel shutdown.
+  # Install rollback before the first sandbox service change.
   ROLLBACK=start
-  [ "$RESTORE_TUNNEL" = false ] || launchctl bootout "gui/$(id -u)/$TUNNEL_LABEL"
   for _ in {1..10}; do
     ! lsof -nP -iTCP:8000 -sTCP:LISTEN >/dev/null 2>&1 && break
     sleep 1
@@ -170,10 +155,6 @@ stop_local() {
   done <<< "$children"
   "${COMPOSE[@]}" --profile research-agent down
   echo 'Local sandbox stopped; all data volumes retained.'
-  start_tunnel || fail 'Local stop succeeded; cloud tunnel could not be loaded.'
-  for _ in {1..10}; do healthy 8000 && healthy 18080 && break; sleep 1; done
-  healthy 8000 && healthy 18080 || fail 'Local stop succeeded; tunnel loaded but cloud is unreachable (possibly offline).'
-  echo 'Ports 8000/18080 point to the cloud tunnel again.'
 }
 
 require_mac

@@ -31,6 +31,7 @@ npm run dev
 - `src/App.tsx`、`src/features/`、`src/pages/`：路由和业务页面；通用组件在 `src/components/`。
 - `src/config/services.ts`：后端地址、服务端口与桌面用户保存的连接配置。本地 HTTP 业务经 API 网关 `http://127.0.0.1:8000`，不要在页面硬编码后端主机；独立沙盒不能与主业务同时占用该端口。
 - `src/services/api-client.ts`：通用 HTTP 客户端；认证逻辑在 `src/features/auth/`。凭据不能写进前端源码或 Vite 公共环境变量。
+- 管理后台 `/admin/overview` 保留服务健康指标、节点性能历史和「刷新数据」；不提供后端代码更新或服务重启。源码修改不发布到 Library 运行快照，版本查询也不执行更新。
 - `src/services/backtestService.ts` 与后端 [Qlib 合同](../backend/services/engine/qlib_app/README.md)：回测请求、状态与结果排障入口。
 - QuantBot 的 `src/features/quantbot/services/agentApi.ts` 使用 `/api/v1/openclaw` 网关适配层；聊天以 SSE 接收，不能按旧 WebSocket 演示接入，也不能由组件存在推定上游技能可用。
 - `public/` 是复制到构建产物的静态资源；`scripts/` 是本模块构建辅助。目录职责可从源码读取，不另设逐目录 README。

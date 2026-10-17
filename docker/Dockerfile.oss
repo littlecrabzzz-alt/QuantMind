@@ -89,7 +89,7 @@ RUN --mount=type=cache,target=/root/.cache/pip,id=quantmind-pip \
   && python -m pip install --root-user-action=ignore -r /tmp/requirements-ai.txt \
   && rm -rf /tmp/requirements*.txt
 
-# 安装 QuantDB SDK（付费高质量数据源：K线/Tick/财报/估值/315维AI因子）
+# 安装 QuantDB SDK
 RUN --mount=type=cache,target=/root/.cache/pip,id=quantmind-pip \
     python -m pip install --root-user-action=ignore "quantdb-sdk==0.3.3"
 
@@ -97,12 +97,12 @@ RUN --mount=type=cache,target=/root/.cache/pip,id=quantmind-pip \
 COPY docker/patch_qlib.py /tmp/patch_qlib.py
 RUN python /tmp/patch_qlib.py && rm /tmp/patch_qlib.py
 
-# 安装 rd-agent 因子演化模块（可选，目录不存在则跳过）
-# rd-agent 在 .gitignore 中，OSS 克隆后可能不存在
-COPY docker/install_rdagent.sh /tmp/install_rdagent.sh
-# rd-agent 源码（OSS 克隆可能不存在；install 脚本会自行跳过）
-COPY rd-agent/ /app/rd-agent/
-RUN chmod +x /tmp/install_rdagent.sh && /tmp/install_rdagent.sh && rm /tmp/install_rdagent.sh
+# rd-agent 仅作临时构建输入；安装包保留，源码与构建 scratch 不进入镜像层。
+RUN --mount=type=bind,source=rd-agent,target=/tmp/rd-agent,rw \
+    --mount=type=cache,target=/root/.cache/pip,id=quantmind-pip \
+    SETUPTOOLS_SCM_PRETEND_VERSION_FOR_RDAGENT=0.1.dev1 \
+    python -m pip install --root-user-action=ignore /tmp/rd-agent
+
 
 # 预下载 FinBERT 中文金融情绪模型权重（~100MB，news.sentiment 惰性加载用；
 # 构建时下载到 /root/.cache/huggingface，运行时离线可用，不依赖 HF 网络）
@@ -137,8 +137,7 @@ RUN mkdir -p /data/models /data/qlib_data /data/uploads /data/strategies /tmp \
 # Qlib features 符号链接在运行时由 entrypoint 或首次访问时创建（数据卷挂载后才存在）
 
 # 依赖指纹戳（构建/打包侧经 deploy/req-fingerprint.sh 计算后以 --build-arg 注入）。
-# 供 full-deploy / update 比对「最新代码 requirements 指纹 vs 本镜像指纹」，
-# 一致→复用，不一致→重建。不传则为 unknown，视为无指纹。
+# 供构建与运行版本验收核对依赖合同；不传则为 unknown，视为无指纹。
 # 放在文件末尾：ARG 值变化只影响此元数据层，不会打断上方依赖层的构建缓存链
 #（真正由依赖引起的变化，本就会从对应 COPY/ARG 层开始正常失效重建）。
 ARG QM_REQ_SHA=unknown

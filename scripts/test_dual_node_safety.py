@@ -106,12 +106,9 @@ class Lifecycle(unittest.TestCase):
             root = Path(directory)
             (root / 'scripts').mkdir()
             (root / 'bin').mkdir()
-            script = (ROOT / 'scripts/local-dev.sh').read_text().replace(
-                'TUNNEL_PLIST="$HOME/Library/LaunchAgents/$TUNNEL_LABEL.plist"',
-                'TUNNEL_PLIST="$PROJECT/tunnel.plist"')
+            script = (ROOT / 'scripts/local-dev.sh').read_text()
             (root / 'scripts/local-dev.sh').write_text(script)
             (root / '.env.local').touch()
-            (root / 'tunnel.plist').touch()
             if initialized:
                 (root / '.local-dev').mkdir()
                 (root / '.local-dev/READY').touch()
@@ -128,7 +125,7 @@ class Lifecycle(unittest.TestCase):
                 binary.chmod(0o700)
             environment={k:v for k,v in os.environ.items() if k not in {'DOCKER_HOST','DOCKER_CONTEXT','QM_SCRIPT_TEXT'}}
             result=subprocess.run(['bash', str(root / 'scripts/local-dev.sh'), *args], capture_output=True, text=True,
-                env={**environment,'PATH':str(root / 'bin')+':'+os.environ['PATH'],'FAKE_STATE':str(state_file)}, timeout=30)
+                env={**environment,'HOME':str(root / 'home'),'PATH':str(root / 'bin')+':'+os.environ['PATH'],'FAKE_STATE':str(state_file)}, timeout=30)
             final=json.loads(state_file.read_text())
             self.assertFalse((root / 'logs/local-dev.lock').exists())
             return result, final
@@ -149,22 +146,14 @@ class Lifecycle(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertFalse(any(c[0]=='launchctl' or 'up' in c or 'stop' in c for c in state['calls']))
 
-    def test_start_failure_restores_original_tunnel(self):
-        result,state=self.invoke(['start'], {'tunnel':True,'up_rc':1})
-        self.assertNotEqual(result.returncode,0)
-        self.assertTrue(state['tunnel'])
-        self.assertTrue(state['stopped'])
-
-    def test_health_failure_restores_original_tunnel(self):
-        result,state=self.invoke(['start'], {'tunnel':True,'healthy':False})
-        self.assertNotEqual(result.returncode,0)
-        self.assertTrue(state['tunnel'])
-        self.assertTrue(state['stopped'])
-
-    def test_failure_does_not_invent_a_tunnel(self):
-        result,state=self.invoke(['start'], {'tunnel':False,'up_rc':1})
-        self.assertNotEqual(result.returncode,0)
-        self.assertFalse(state['tunnel'])
+    def test_failed_start_rolls_back_only_the_sandbox(self):
+        for failure in ({'up_rc': 1}, {'healthy': False}):
+            with self.subTest(failure=failure):
+                result, state = self.invoke(['start'], {'tunnel': True, **failure})
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(state['stopped'])
+                self.assertTrue(state['tunnel'])
+                self.assertFalse(any(call[0] == 'launchctl' for call in state['calls']))
 
     def test_partial_stack_and_invalid_mode_are_not_changed(self):
         for args,state in ((['start'],{'running':'db'}), (['start','typo'],{})):
@@ -176,7 +165,8 @@ class Lifecycle(unittest.TestCase):
         result,state=self.invoke(['stop'], {'tunnel':False}, snapshot=False)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertTrue(state['down'])
-        self.assertTrue(state['tunnel'])
+        self.assertFalse(state['tunnel'])
+        self.assertFalse(any(call[0] == 'launchctl' for call in state['calls']))
         self.assertFalse(any('--volumes' in c or '-v' in c for c in state['calls']))
 
     def test_stop_refuses_an_active_sandbox_child(self):

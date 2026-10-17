@@ -264,6 +264,9 @@ data_suffixes = {".pyc", ".pyo", ".log", ".jsonl", ".parquet", ".arrow", ".feath
                  ".sqlite", ".sqlite3", ".db", ".pt", ".pth", ".onnx", ".safetensors", ".pkl", ".pickle",
                  ".ckpt", ".bin", ".whl", ".egg", ".so", ".dylib"}
 policy = re.compile(r"^(?:agents|claude|gemini)(?:[._-]|$)", re.IGNORECASE)
+# Keep the integrated framework, CLI statistics/export resources, and install metadata only.
+tradingagents_sources = {"tradingagents", "cli", "README.md", "LICENSE", "NOTICE",
+                         "pyproject.toml", "requirements.txt"}
 
 def allowed(path):
     parts = path.parts
@@ -272,6 +275,8 @@ def allowed(path):
             or path.suffix.lower() in data_suffixes):
         return False
     if parts[0] in ("alphaagent", "TradingAgents-astock") and len(parts) > 1 and parts[1] in runtime_roots:
+        return False
+    if parts[0] == "TradingAgents-astock" and len(parts) > 1 and parts[1] not in tradingagents_sources:
         return False
     if len(parts) > 1 and parts[:2] == ("backend", "scratch"):
         return False
