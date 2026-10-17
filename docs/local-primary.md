@@ -31,6 +31,49 @@
   - `restart: unless-stopped`（主节点需要在 Docker Desktop 重启后恢复）。
 - `docker-compose.yml` 与 `deploy/compose.cloud.yml` 不改。
 
+### Main 源码与 Library 部署快照
+
+Main checkout 仍是源码权威，保留在原 Documents 位置；不搬仓库、依赖或用户文件。
+主节点实际运行的 `PROJECT` 则使用 `~/Library/Application Support/QuantMind/` 下独立、
+全新的代码/部署快照。launchd、controller、Compose 和 restore 都使用这同一份已核准
+字节，不再为日常运行必读 Documents。Main 后续编辑不自动改变已部署版本。
+
+在 Main 中一次性执行文件安装入口：
+
+```bash
+scripts/local-primary.sh install-runtime \
+  "$HOME/Library/Application Support/QuantMind/primary-runtime-<approved-version>" \
+  "$HOME/Library/Application Support/QuantMind/primary-artifacts-20261016"
+```
+
+`install-runtime` 在 Docker/launchd/adopt 的门控之前独立分派，不探测或启动 Docker，
+不安装 launchd，不恢复数据，也不创建 `.local-primary`、`READY` 或假的账户。
+目标必须不存在且是真实 Library 管理根内的新目录；artifact-root 必须是已存在的
+Library 真实目录，与代码快照不重叠，不能通过链接逃逸到 Documents 或其它位置。
+
+复制范围是 Main Git tracked/staged 名单对应的**当前工作树字节**：
+`backend/scripts/deploy/docker/config/strategy_templates/docs/requirements` 及必要根
+Compose、requirements、`.dockerignore`、`pyproject.toml`。alphaagent 与
+TradingAgents-astock 若是 nested Git，改用各自索引名单；不复制 `.git`。
+不带 node_modules、venv、rd-agent、运行 data/models/logs、用户目录或模型/依赖二进制，
+但保留已跟踪的 ORM `models/*.py`、alphaagent 日志模块等真正源码。
+任何 AGENTS/CLAUDE/GEMINI 政策文件或目录均不读取、不复制。
+vendor 仅复制 ashare-lab 的 `src`、`frozen-source.json`、`frozen-data.json`、
+`requirements.txt`；前端只带已有 `electron/dist-react` 构建资源，不重新构建。
+
+Main 现有 `.env.local` 与 `config/runtime.env` 原字节复制为私有 0600 文件，
+不生成凭据、不输出配置值、不更改 Main 原配置。快照的 `output` 链接到显式
+Library artifact-root，vendor `data/reports` 重建为该归档的相对链接，不复制归档内容。
+此 artifact-root 由唯一部署负责人迁移/维护，installer 不移动它，也不改变 Main 的别名。
+
+最后写私有 `MAIN_CODE_MANIFEST.json`：`source_project/source_commit`、
+nested commits、每个复制路径的 SHA-256/size/mode 以及符号链接目标。
+标准输出仅给安装路径、总文件数/字节数与 manifest 字节 SHA，供接管 contract 固定；
+它证明本次安装的 Main 字节，而不是声明 HEAD 干净或完成恢复。
+未来 controller 只核已安装快照和此 manifest，不回读 Main。失败的未完成目录保留，
+无完整 manifest 就不能作为已核准部署版本；重试须选新的目录。
+
+
 ## 脚本 `scripts/local-primary.sh`
 
 沿用 local-dev.sh 的写法（启动时读入自身内容、加锁、失败回滚）。子命令：
@@ -40,6 +83,7 @@
 - `stop`：`down`（保留卷），不恢复云端隧道。
 - `status`：服务状态、AUTHORITY.json、8000 归属。
 - `install-autostart` / `uninstall-autostart`：安装 / 卸载 `~/Library/LaunchAgents/com.quantmind.local-primary.plist`（登录时执行 `start`）。模板放 `deploy/com.quantmind.local-primary.plist`。
+- `install-runtime <new_Library_runtime_dir> <Library_artifact_root>`：以上述白名单安装代码/部署快照并输出 manifest SHA；纯文件操作，不触及正式运行资源。
 
 local-dev.sh 的 `start` 在 `quantmind-local` 栈运行时必须拒绝（避免两个后端抢 8000 和同一份数据）。
 
