@@ -36,18 +36,16 @@ class LocalMarketSourceTest(unittest.TestCase):
                  patch.object(source, "now", return_value=clock), \
                  patch.object(source.shutil, "disk_usage", return_value=Mock(free=999*2**30)), \
                  patch.object(source, "collect_on_mac") as collect, \
-                 patch.object(source, "send_cloud", side_effect=AssertionError("no cloud")) as cloud, \
-                 patch.object(source, "ssh", side_effect=AssertionError("no ssh")), \
-                 patch.object(source, "transfer", side_effect=AssertionError("no upload")), \
+                 patch.object(source.subprocess, "run", side_effect=AssertionError("no subprocess")), \
+                 patch.object(refresh, "primary_wait_reason", return_value=None), \
                  patch.object(refresh, "apply", side_effect=[RuntimeError("busy"), None]) as apply, \
                  patch.object(refresh, "apply_bc") as bc:
-                self.assertEqual(source.tick(root, project, project, "host"), 2)
-                self.assertEqual(source.tick(root, project, project, "host"), 0)
-                self.assertEqual(source.tick(root, project, project, "host"), 0)
+                self.assertEqual(source.tick(root, project, project, "approved-image"), 2)
+                self.assertEqual(source.tick(root, project, project, "approved-image"), 0)
+                self.assertEqual(source.tick(root, project, project, "approved-image"), 0)
                 self.assertEqual(apply.call_count, 2)
                 apply.assert_called_with(project, root / "releases/A" / release_id)
                 bc.assert_called_once_with(project, root / "releases/BC" / release_id)
-                cloud.assert_not_called()
                 collect.assert_not_called()
             status = source.read_json(root / "status.json")
             self.assertTrue(all(status[name]["primary_release"] == release_id for name in ("A", "BC")))
@@ -79,8 +77,197 @@ class LocalMarketSourceTest(unittest.TestCase):
              patch.dict(source.os.environ, {"DOCKER_HOST": "tcp://remote:2375"}), \
              patch.object(source, "ensure_local_docker") as ensure:
             with self.assertRaisesRegex(RuntimeError, "local Docker"):
-                source.collect_on_mac(Path("/tmp/source"), "A", Path("/tmp/project"), Path("/tmp/secrets"))
+                source.collect_on_mac(Path("/tmp/source"), "A", Path("/tmp/project"), Path("/tmp/secrets"), "approved-image")
         ensure.assert_not_called()
+
+    def test_explicit_local_image_runs_without_business_container_or_ready(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            project, root, secrets = (base / p for p in ("approved-code", "source", "secrets"))
+            project.mkdir(); secrets.mkdir()
+            (secrets / "runtime.env").write_text("fixture-only")
+            image_id = "sha256:" + "f" * 64
+            def output(command, **kwargs):
+                if command[:3] == ["docker", "context", "inspect"]:
+                    return "unix:///var/run/docker.sock\n"
+                if command == ["docker", "image", "inspect", "approved-image", "--format", "{{.Id}}"]:
+                    return image_id + "\n"
+                raise AssertionError("Business-container inspection is forbidden")
+            with patch.object(source.sys, "platform", "darwin"), \
+                 patch.dict(source.os.environ, {"DOCKER_HOST": ""}), \
+                 patch.object(source, "ensure_local_docker"), \
+                 patch.object(source.subprocess, "check_output", side_effect=output), \
+                 patch.object(source.subprocess, "run") as run:
+                source.collect_on_mac(root, "BC", project, secrets, "approved-image")
+            command = run.call_args.args[0]
+            self.assertEqual(command[:5], ["docker", "run", "--rm", "--pull", "never"])
+            self.assertIn(image_id, command)
+            self.assertIn(str(project) + ":/app:ro", command)
+            self.assertIn(str(root) + ":/source", command)
+            self.assertEqual(command[-6:], ["scripts/local_market_source.py", "collect",
+                                           "--root", "/source", "--market", "BC"])
+            self.assertFalse((project / ".local-primary").exists())
+            self.assertFalse((project / ".local-dev").exists())
+            with patch.object(source.sys, "platform", "darwin"), \
+                 patch.dict(source.os.environ, {"DOCKER_HOST": ""}), \
+                 patch.object(source, "ensure_local_docker"), \
+                 patch.object(source.subprocess, "check_output", side_effect=[
+                     "unix:///var/run/docker.sock", subprocess.CalledProcessError(1, ["docker", "image", "inspect"])]), \
+                 patch.object(source.subprocess, "run") as run:
+                with self.assertRaises(subprocess.CalledProcessError):
+                    source.collect_on_mac(root, "BC", project, secrets, "missing-image")
+                run.assert_not_called()
+
+    def test_collection_publishes_before_primary_then_applies_without_recollection(self):
+        import quantdb_refresh as refresh
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            project, code, root = (base / p for p in ("primary", "approved-code", "source"))
+            code.mkdir()
+            sandbox = project / ".local-dev"
+            sandbox.mkdir(parents=True)
+            (sandbox / "READY").touch()
+            sentinel = sandbox / "preserved"
+            sentinel.write_bytes(b"never apply to sandbox")
+            clock = datetime(2026, 10, 16, 9, tzinfo=ZoneInfo("Asia/Shanghai"))
+            def collect(root, market, project, secrets, image):
+                self.assertEqual(project, code)
+                data = root / "working/project/data" / source.MARKETS[market][0]
+                if market == "A":
+                    path = data / "day.parquet"
+                    path.parent.mkdir(parents=True)
+                    path.write_bytes(b"published-price")
+                else:
+                    raw = data / "releases/raw-fixture"
+                    raw.mkdir(parents=True, exist_ok=True)
+                    (raw / "manifest.json").write_text('{"fixture": true}')
+                    (raw / "bars.csv").write_text("2026-10-15,100\n")
+                    source.write_json(data / "CURRENT.json", {
+                        "release_id": raw.name, "manifest_sha256": source.digest(raw / "manifest.json")})
+            service_states = None
+            def docker_state(command, **kwargs):
+                if command[0] == "curl":
+                    self.assertEqual(command[-1], "http://127.0.0.1:8000/health")
+                    return '{"status": "ok"}'
+                if command[:3] == ["docker", "context", "inspect"]:
+                    return "unix:///var/run/docker.sock"
+                self.assertEqual(command[:2], ["docker", "inspect"])
+                self.assertEqual(command[2:5], ["quantmind-local-db", "quantmind-local-redis", "quantmind-local-quantmind"])
+                if service_states is None:
+                    import subprocess
+                    raise subprocess.CalledProcessError(1, command)
+                return "\n".join(json.dumps(state) for state in service_states)
+            with patch.object(source.sys, "platform", "darwin"), \
+                 patch.object(source, "now", return_value=clock), \
+                 patch.dict(source.os.environ, {"DOCKER_HOST": ""}), \
+                 patch.object(source.shutil, "disk_usage", return_value=Mock(free=999*2**30)), \
+                 patch.object(source, "collect_on_mac", side_effect=collect) as collector, \
+                 patch.object(source.subprocess, "check_output", side_effect=docker_state), \
+                 patch.object(refresh, "apply") as apply, patch.object(refresh, "apply_bc") as bc:
+                self.assertEqual(source.tick(root, project, base, "approved-image", collector_project=code), 0)
+                state = source.read_json(root / "status.json")
+                for market, item in state.items():
+                    self.assertEqual(item["collection_status"], "collected")
+                    self.assertEqual(item["publication_status"], "published")
+                    self.assertEqual(item["status"], "awaiting-primary")
+                    self.assertEqual(item["apply_status"], "awaiting-primary")
+                    self.assertNotIn("primary_release", item)
+                    self.assertTrue(source.verify_bundle(root / "releases" / market / item["release_id"], market))
+                    item.update(local_release=item["release_id"], cloud_release=item["release_id"], status="applied")
+                source.write_json(root / "status.json", state)
+                self.assertEqual(source.tick(root, project, base, "approved-image", collector_project=code), 0)
+                apply.assert_not_called(); bc.assert_not_called()
+                self.assertTrue(all(item["status"] == "awaiting-primary"
+                                    for item in source.read_json(root / "status.json").values()))
+                (project / ".local-primary").mkdir()
+                (project / ".local-primary/READY").touch()
+                # Adoption wrote READY, but the formal services do not yet exist.
+                self.assertEqual(source.tick(root, project, base, "approved-image", market="BC",
+                                             force=True, collector_project=code), 0)
+                healthy = {"Running": True, "Health": {"Status": "healthy"}}
+                for service_states in (
+                    [{"Running": False}, healthy, healthy],
+                    [healthy, healthy, {"Running": True, "Health": {"Status": "starting"}}],
+                ):
+                    self.assertEqual(source.tick(root, project, base, "approved-image", collector_project=code), 0)
+                    apply.assert_not_called(); bc.assert_not_called()
+                    self.assertTrue(all(item["status"] == "awaiting-primary" and item.get("apply_wait_reason")
+                                        for item in source.read_json(root / "status.json").values()))
+                service_states = [healthy, healthy, healthy]
+                self.assertEqual(source.tick(root, project, base, "approved-image", collector_project=code), 0)
+                self.assertEqual(source.tick(root, project, base, "approved-image", collector_project=code), 0)
+                self.assertEqual(collector.call_count, 3)
+                apply.assert_called_once_with(project, root / "releases/A" / state["A"]["release_id"])
+                bc.assert_called_once_with(project, root / "releases/BC" / state["BC"]["release_id"])
+            state = source.read_json(root / "status.json")
+            self.assertTrue(all(item["primary_release"] == item["release_id"] and item["apply_status"] == "applied"
+                                for item in state.values()))
+            self.assertEqual(sentinel.read_bytes(), b"never apply to sandbox")
+
+    def test_install_copies_approved_code_and_persists_explicit_collector_contract(self):
+        import plistlib
+        for start in (False, True):
+            with self.subTest(start=start), tempfile.TemporaryDirectory() as d:
+                base = Path(d)
+                home, code, project, root = (base / p for p in ("home", "code", "primary", "market-source"))
+                (home / "Library/LaunchAgents").mkdir(parents=True)
+                for name in ("local_market_source.py", "dual_node_snapshot.py", "dual_node_inventory.py",
+                             "dual_node_sync.py", "dual_node_check.py", "storage_guard.py", "quantdb_refresh.py"):
+                    target = code / "scripts" / name
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes((Path(source.__file__).parent / name).read_bytes())
+                (code / "deploy").mkdir()
+                (code / "deploy/dual-node.env").write_text("fixture=approved\n")
+                def launchctl(command, **kwargs):
+                    if command[1] == "bootstrap":
+                        with source.lock(root / ".source.lock"):
+                            pass  # RunAtLoad must be able to acquire the source lock.
+                    return SimpleNamespace(returncode=0, stdout="state = waiting\n")
+                with patch.object(source.sys, "platform", "darwin"), patch.object(source.Path, "home", return_value=home), \
+                     patch.object(source.subprocess, "run", side_effect=launchctl) as run:
+                    if start:
+                        source.install(project, root, base / "secrets", "approved-image", collector_project=code)
+                    else:
+                        source.install(project, root, base / "secrets", "approved-image", collector_project=code, start=False)
+                definition = plistlib.loads((home / "Library/LaunchAgents/com.quantmind.market-source.plist").read_bytes())
+                args = definition["ProgramArguments"]
+                self.assertEqual(args[args.index("--project") + 1], str(project))
+                self.assertEqual(args[args.index("--collector-project") + 1], str(code))
+                self.assertEqual(args[args.index("--collector-image") + 1], "approved-image")
+                self.assertNotIn("--host", args)
+                installed = base / "market-source-client/scripts/local_market_source.py"
+                self.assertEqual(installed.read_bytes(), Path(source.__file__).read_bytes())
+                self.assertFalse(project.exists())
+                self.assertEqual([call.args[0][1] for call in run.call_args_list],
+                                 ["print", "bootout", "bootstrap"] if start else ["print", "bootout"])
+
+
+    def test_install_never_replaces_or_boots_out_an_active_writer(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "source"
+            with patch.object(source.sys, "platform", "darwin"), source.lock(root / ".source.lock"), \
+                 patch.object(source.subprocess, "run") as run:
+                with self.assertRaises(BlockingIOError):
+                    source.install(Path("/missing"), root, Path("/missing"), "approved-image", start=False)
+                run.assert_not_called()
+            with patch.object(source.sys, "platform", "darwin"), \
+                 patch.object(source.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout="state = running\n\tpid = 123\n")) as run:
+                with self.assertRaisesRegex(RuntimeError, "retain the writer"):
+                    source.install(Path("/missing"), root, Path("/missing"), "approved-image", start=False)
+                self.assertEqual(run.call_count, 1)
+            self.assertFalse((root.parent / "market-source-client").exists())
+
+    def test_tick_and_install_reject_implicit_images_and_removed_cloud_cli(self):
+        for action in ("tick", "install"):
+            for options in ([], ["--collector-image", "approved-image", "--host", "legacy"]):
+                with self.subTest(action=action, options=options), \
+                     patch.object(source.sys, "argv", ["source", action, *options]), \
+                     patch.object(source, "tick") as tick, patch.object(source, "install") as install:
+                    with self.assertRaises(SystemExit) as error:
+                        source.main()
+                    self.assertEqual(error.exception.code, 2)
+                    tick.assert_not_called(); install.assert_not_called()
 
     def bundle(self, base, name="data/quantdb/1_kline_data/daily_forward/dt=20260924/data.parquet"):
         payload = b"bounded-fixture"
@@ -197,24 +384,37 @@ class LocalMarketSourceTest(unittest.TestCase):
             for name in [pinned, pending.name, "unrelated-research-input", "market-" + "4" * 64]:
                 self.assertTrue((root / name).exists())
 
-    def test_delivery_retry_does_not_repeat_successful_vendor_collection(self):
+    def test_apply_retry_does_not_repeat_successful_vendor_collection(self):
+        import quantdb_refresh as refresh
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            bundle, _ = self.bundle(root)
+            (root / ".local-primary").mkdir()
+            (root / ".local-primary/READY").touch()
             clock = datetime(2026, 9, 27, 9, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
+            def collect(root, market, project, secrets, image):
+                data = root / "working/project/data/quantdb/day.parquet"
+                data.parent.mkdir(parents=True)
+                data.write_bytes(b"collected-price")
             with patch.object(source.sys, "platform", "darwin"), patch.object(source, "now", return_value=clock), \
                  patch.object(source.shutil, "disk_usage", return_value=Mock(free=999*2**30)), \
-                 patch.object(source, "collect_on_mac") as collect, patch.object(source, "publish", return_value=bundle), \
-                 patch.object(source, "send_cloud", side_effect=RuntimeError("offline")) as send:
-                self.assertEqual(source.tick(root, root, root, "host", "A"), 2)
-                self.assertEqual(source.tick(root, root, root, "host", "A"), 2)
-                collect.assert_called_once()
-                self.assertEqual(send.call_count, 2)
+                 patch.object(refresh, "primary_wait_reason", return_value=None), \
+                 patch.object(source, "collect_on_mac", side_effect=collect) as collector, \
+                 patch.object(refresh, "apply", side_effect=RuntimeError("busy")) as apply:
+                self.assertEqual(source.tick(root, root, root, "approved-image", "A"), 2)
+                self.assertEqual(source.tick(root, root, root, "approved-image", "A"), 2)
+                collector.assert_called_once()
+                self.assertEqual(apply.call_count, 2)
+            status = source.read_json(root / "status.json")["A"]
+            self.assertEqual(status["publication_status"], "published")
+            self.assertEqual(status["apply_status"], "retry_pending")
+            bundle = root / "releases/A" / status["release_id"]
+            self.assertEqual(source.verify_bundle(bundle, "A")[0]["sha256"], hashlib.sha256(b"collected-price").hexdigest())
+
 
     def test_local_backup_rotation_never_registers_legacy_or_research_directories(self):
         with tempfile.TemporaryDirectory() as d:
             project = Path(d); root = project / "source"
-            state = project / ".local-dev"; state.mkdir()
+            state = project / ".local-primary"; state.mkdir()
             legacy = state / "quantdb-before-legacy"; legacy.mkdir()
             research = state / "research-input"; research.mkdir()
             for i in range(3):
@@ -224,16 +424,8 @@ class LocalMarketSourceTest(unittest.TestCase):
                 source.retain_local_backups(root, project)
             self.assertTrue(legacy.exists()); self.assertTrue(research.exists())
             self.assertFalse((state / "quantdb-before-20260927T000000-000000").exists())
-            self.assertEqual(len(source.read_json(root / "local-backups.json")), 2)
+            self.assertEqual(len(source.read_json(root / "primary-backups.json")), 2)
 
-    def test_resume_delivery_does_not_overwrite_interrupted_rollback_files(self):
-        release = "market-" + "a" * 64
-        for status in ("installing", "files_applied", "applied"):
-            with patch.object(source.subprocess, "check_output", return_value=json.dumps({"release_id": release, "status": status})), \
-                 patch.object(source, "transfer") as transfer, patch.object(source, "ssh") as ssh:
-                source.send_cloud(Path(release), "A", "host")
-                transfer.assert_not_called()
-                ssh.assert_called_once()
 
     def test_receiver_cli_does_not_require_host_deploy_topology(self):
         import subprocess, shutil, sys

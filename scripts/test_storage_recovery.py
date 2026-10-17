@@ -147,16 +147,29 @@ class StorageRecoveryTests(unittest.TestCase):
             receive.assert_called_once()
             guard.assert_not_called()
 
-    def test_upload_dry_run_before_payload_and_no_payload_on_failure(self):
+    def test_source_lock_refuses_second_writer_before_collection(self):
         with tempfile.TemporaryDirectory() as tmp:
-            bundle = Path(tmp) / ('market-' + 'a' * 64)
-            bundle.mkdir()
-            (bundle / 'runtime-manifest.jsonl').write_text('{}\n')
-            with patch.object(source, 'ssh'), patch.object(source, 'transfer') as transfer, patch.object(source.subprocess, 'check_output', side_effect=['{}', 'invalid stats']):
-                with self.assertRaises(RuntimeError):
-                    source.send_cloud(bundle, 'A', 'test')
-            self.assertEqual(transfer.call_count, 1)
-            self.assertIn('runtime-manifest.jsonl', ' '.join(transfer.call_args.args))
+            root = Path(tmp)
+            with source.lock(root / '.source.lock'), \
+                 patch.object(source.sys, 'platform', 'darwin'), \
+                 patch.object(source, 'collect_on_mac') as collect, \
+                 patch.object(source.shutil, 'disk_usage') as usage:
+                with self.assertRaises(BlockingIOError):
+                    source.tick(root, root, root, 'approved-image', 'A', True)
+                collect.assert_not_called()
+                usage.assert_not_called()
+
+    def test_source_reserve_refuses_collection_without_primary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.object(source.sys, 'platform', 'darwin'), \
+                 patch.object(source, 'collect_on_mac') as collect, \
+                 patch.object(source.shutil, 'disk_usage') as usage:
+                usage.return_value.free = 300 * 2**30 - 1
+                with self.assertRaisesRegex(RuntimeError, '300 GiB'):
+                    source.tick(root, root, root, 'approved-image', 'A', True)
+                collect.assert_not_called()
+
 
 
 if __name__ == '__main__':

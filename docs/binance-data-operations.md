@@ -77,7 +77,7 @@ python3 -m backend.scripts.equity_perpetual_archive \
 
 ## 定时更新口径
 
-BC 由 Mac 本地每天北京时间 08:15 采集，即 UTC 日线闭合后 15 分钟；每 15 分钟和唤醒后补查，失败阶段下轮重试。固定版本校验后应用到本机 `quantmind-local` 主业务栈并生成 Qlib/H5；长停机按已存最后一日回补。运行入口须显式指向已准备主业务状态的 Library 代码快照，不能从未具 READY 的项目调用 tick 代替。命令、客户端安装与回执见[本地数据源](local-market-source.md)。
+BC 由 Mac 本地每天北京时间 08:15 采集，即 UTC 日线闭合后 15 分钟；每 15 分钟和唤醒后补查，失败阶段下轮重试。采集使用显式核准本地镜像和只读代码快照，不依赖业务 DB；formal primary 未具 READY，或 adopt 后 READY 已存在但 formal 容器/DB/API 尚未就绪时，固定版本仍校验发布，应用记录 `awaiting-primary`，不回退 `.local-dev` 或云端。只读就绪检查通过后复用 safe apply 到本机 `quantmind-local` 主业务栈并生成 Qlib/H5，派生中断沿用原恢复流程；长停机按已存最后一日回补。`--collector-image`、代码/应用目标、客户端安装与回执见[本地数据源](local-market-source.md)。
 
 管理员 QuantBC 数据页独立于全局 crypto 研究开关；可保持 `ENABLE_CRYPTO=false`、`VITE_ENABLE_CRYPTO=false`。日更使用显式已验证 release 准备 Qlib/H5，不因数据构建把全局研究市场打开。
 

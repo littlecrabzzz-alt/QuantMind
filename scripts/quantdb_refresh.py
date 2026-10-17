@@ -33,6 +33,49 @@ def local_target(project):
             'lock': project / 'logs' / (mode + '.lock')}
 
 
+def primary_wait_reason(project, market):
+    """Read-only admission gate; READY alone does not mean services have started."""
+    target = local_target(project)
+    if not target['primary']:
+        return 'Primary READY is missing'
+    snapshot.require(not os.getenv('DOCKER_HOST'), 'Unset DOCKER_HOST')
+    receipt_name = 'QUANTDB_SYNC.json' if market == 'A' else 'BC_SYNC.json'
+    receipt = target['state'] / receipt_name
+    recovering = receipt.exists() and json.loads(receipt.read_text()).get('status') == 'files_applied'
+    try:
+        endpoint = subprocess.check_output(
+            ['docker', 'context', 'inspect', '--format', '{{.Endpoints.docker.Host}}'],
+            text=True, timeout=10).strip()
+        snapshot.require(endpoint.startswith('unix://'), 'Local Docker required')
+        names = [target['prefix'] + '-db', target['prefix'] + '-redis', target['backend']]
+        raw = subprocess.check_output(
+            ['docker', 'inspect', *names, '--format', '{{json .State}}'], text=True, timeout=10)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return 'Primary containers are unavailable'
+    states = [json.loads(line) for line in raw.splitlines()]
+    snapshot.require(len(states) == len(names), 'Incomplete primary container state')
+    for name, state in zip(names[:2], states[:2]):
+        if (not state.get('Running') or state.get('Paused')
+                or state.get('Health', {}).get('Status') != 'healthy'):
+            return name + ' is not healthy'
+    backend = states[2]
+    # A failed derivation deliberately keeps the backend paused/stopped; the
+    # existing safe-apply recovery must remain admissible once DB/Redis are ready.
+    if not recovering and (not backend.get('Running') or backend.get('Paused')
+                           or backend.get('Health', {}).get('Status') not in (None, 'healthy')):
+        return target['backend'] + ' is not ready'
+    if not recovering:
+        try:
+            # Same read-only readiness endpoint used by local-primary.sh start.
+            subprocess.check_output(
+                ['curl', '--noproxy', '*', '--connect-timeout', '2', '--max-time', '3',
+                 '-fsS', 'http://127.0.0.1:8000/health'],
+                text=True, stderr=subprocess.DEVNULL, timeout=6)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            return 'Primary API health is not ready'
+    return None
+
+
 def local_compose(project):
     target = local_target(project)
     env_prefix = 'QM_PRIMARY' if target['primary'] else 'QM_LOCAL'

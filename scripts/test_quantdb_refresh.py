@@ -17,6 +17,51 @@ import dual_node_snapshot as snapshot
 
 class QuantDBRefresh(unittest.TestCase):
 
+    def test_primary_readiness_only_inspects_local_states_and_preserves_recovery(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            state = project / ".local-primary"
+            state.mkdir()
+            with patch.object(refresh.subprocess, "check_output") as output:
+                self.assertIn("READY", refresh.primary_wait_reason(project, "A"))
+                output.assert_not_called()
+            (state / "READY").touch()
+            healthy = {"Running": True, "Health": {"Status": "healthy"}}
+            with patch.dict(refresh.os.environ, {"DOCKER_HOST": ""}):
+                cases = [
+                    ([{"Running": False}, healthy, healthy], "db"),
+                    ([healthy, {"Running": True, "Health": {"Status": "unhealthy"}}, healthy], "redis"),
+                    ([healthy, healthy, {"Running": False}], "quantmind"),
+                    ([healthy, healthy, {"Running": True, "Health": {"Status": "starting"}}], "quantmind"),
+                ]
+                for states, reason in cases:
+                    with self.subTest(reason=reason, states=states), \
+                         patch.object(refresh.subprocess, "check_output", side_effect=[
+                             "unix:///var/run/docker.sock", "\n".join(json.dumps(s) for s in states)]) as output:
+                        self.assertIn(reason, refresh.primary_wait_reason(project, "A"))
+                        self.assertTrue(all(call.args[0][:3] == ["docker", "context", "inspect"] or
+                                            call.args[0][:2] == ["docker", "inspect"]
+                                            for call in output.call_args_list))
+                with patch.object(refresh.subprocess, "check_output", side_effect=[
+                    "unix:///var/run/docker.sock", subprocess.CalledProcessError(1, ["docker", "inspect"])]):
+                    self.assertIn("unavailable", refresh.primary_wait_reason(project, "BC"))
+                states = "\n".join(json.dumps(healthy) for _ in range(3))
+                with patch.object(refresh.subprocess, "check_output", side_effect=[
+                    "unix:///var/run/docker.sock", states, subprocess.CalledProcessError(22, ["curl"])]):
+                    self.assertIn("API health", refresh.primary_wait_reason(project, "A"))
+                with patch.object(refresh.subprocess, "check_output", side_effect=[
+                    "unix:///var/run/docker.sock", states, '{"status": "ok"}']) as output:
+                    self.assertIsNone(refresh.primary_wait_reason(project, "A"))
+                    self.assertEqual(output.call_args.args[0][-1], "http://127.0.0.1:8000/health")
+                for market, receipt in (("A", "QUANTDB_SYNC.json"), ("BC", "BC_SYNC.json")):
+                    with self.subTest(market=market):
+                        (state / receipt).write_text(json.dumps({"status": "files_applied"}))
+                        states = [healthy, healthy, {"Running": False}]
+                        with patch.object(refresh.subprocess, "check_output", side_effect=[
+                            "unix:///var/run/docker.sock", "\n".join(json.dumps(s) for s in states)]):
+                            self.assertIsNone(refresh.primary_wait_reason(project, market))
+
     def test_primary_apply_uses_adopted_baseline_and_recovers_only_primary_services(self):
         import subprocess
         with tempfile.TemporaryDirectory() as tmp:

@@ -88,7 +88,7 @@ local-dev.sh 的 `start` 在 `quantmind-local` 栈运行时必须拒绝（避免
 
 ## 行情数据
 
-执行 `scripts/local_market_source.py` 前确认运行快照的 `.local-primary/READY` 及配置已核验。该模式将已校验的 QuantDB / BC 版本应用到 `quantmind-local` 栈，复用 `scripts/quantdb_refresh.py` 的本地应用与派生逻辑。实际生效版本、PG/Qlib/H5 截止日和真实消费查询分别验收；不得只用 READY 文件存在代替数据验证。
+`scripts/local_market_source.py` 的采集/发布使用显式已核准本地镜像（`--collector-image`，不拉取）与代码（`--collector-project`）；`--project` 是 formal primary 应用目标。目标尚无 `.local-primary/READY`，或 adopt 已写 READY 但 formal DB/Redis/backend 尚未就绪时，仍可采集，待应用版本仅记录 `awaiting-primary`，绝不回退沙盒或云端。只读本地容器健康与现有 API `/health` 检查通过后才复用 `scripts/quantdb_refresh.py` 安全应用；故意暂停 backend 的 `files_applied` 恢复仍由原 safe apply 继续，不执行 DB 写探测。安装可用 `--no-start` 暂存原客户端/plist 后做受限单 writer 验收；活动 writer 不得 bootout。完整命令见[本地市场数据源](local-market-source.md)。实际生效版本、PG/Qlib/H5 截止日和真实消费查询分别验收；不得只用 READY 文件存在代替数据验证。
 
 ## 回测
 

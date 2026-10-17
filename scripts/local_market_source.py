@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Mac-only vendor collection; checked file releases feed cloud and local research.
+"""Mac-only vendor collection; checked file releases feed the local primary.
 
-This transports market files, never databases, Redis or research results. The
-existing QuantDB and Binance collectors and PG/Qlib builders remain authoritative.
+Collection does not require a ready business database.
+The existing QuantDB and Binance collectors and PG/Qlib builders remain authoritative.
 """
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ import os
 from pathlib import Path
 import plistlib
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -27,12 +26,11 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from dual_node_inventory import stat_key
-from storage_guard import storage_lock, transfer_bytes, require_capacity, WRITE_MARGIN, guarded_run, install_signal_handlers
+from storage_guard import storage_lock, require_capacity, WRITE_MARGIN, guarded_run, install_signal_handlers
 
 MARKETS = {"A": ("quantdb", "03:00"), "BC": ("quantbc", "08:15")}
 RELEASE = re.compile(r"market-[a-f0-9]{64}")
 DEFAULT_ROOT = Path.home() / "Library/Application Support/QuantMind/market-source"
-REMOTE_PROJECT = "/root/data/disk/quantmind/project"
 
 
 def digest(path):
@@ -41,12 +39,6 @@ def digest(path):
         for block in iter(lambda: stream.read(4 * 1024 * 1024), b""):
             sha.update(block)
     return sha.hexdigest()
-
-
-def transfer(*args):
-    # Host topology belongs to the Mac transport, not the container receiver.
-    from dual_node_snapshot import transfer as send
-    return send(*args)
 
 
 def now():
@@ -169,9 +161,8 @@ def retain_transport_copies(directory, *, protected=(), backup=False, managed_on
 
 
 def retain_local_backups(root, project):
-    primary = (project / ".local-primary/READY").is_file()
-    state_dir = project / (".local-primary" if primary else ".local-dev")
-    ledger = root / ("primary-backups.json" if primary else "local-backups.json")
+    state_dir = project / ".local-primary"
+    ledger = root / "primary-backups.json"
     entries = read_json(ledger, [])
     receipt = read_json(state_dir / "QUANTDB_SYNC.json", {})
     current = {k: receipt[k] for k in ("backup", "qlib_backup") if receipt.get(k)}
@@ -296,17 +287,19 @@ def ensure_local_docker(timeout=180):
     raise RuntimeError("Local Docker startup timed out; existing market data retained")
 
 
-def collect_on_mac(root, market, project, secrets):
+def collect_on_mac(root, market, project, secrets, image):
     if sys.platform != "darwin" or os.getenv("DOCKER_HOST"):
         raise RuntimeError("Collector must run on the Mac with local Docker")
     ensure_local_docker()
     endpoint = subprocess.check_output(["docker", "context", "inspect", "--format", "{{.Endpoints.docker.Host}}"], text=True).strip()
     if not endpoint.startswith("unix://"):
         raise RuntimeError("Refusing a remote Docker collector")
-    backend = "quantmind-local-quantmind" if (project / ".local-primary/READY").is_file() else "quantmind-dev"
-    image = subprocess.check_output(["docker", "inspect", backend, "--format", "{{.Config.Image}}"], text=True).strip()
+    # Resolve only the explicitly approved local image; never inspect a business
+    # container or let docker run pull an unavailable image.
+    image = subprocess.check_output(
+        ["docker", "image", "inspect", image, "--format", "{{.Id}}"], text=True).strip()
     root.mkdir(parents=True, exist_ok=True)
-    command = ["docker", "run", "--rm", "--name", "quantmind-local-source-" + market.lower(),
+    command = ["docker", "run", "--rm", "--pull", "never", "--name", "quantmind-local-source-" + market.lower(),
                "--platform", "linux/amd64", "--memory", "2g", "--cpus", "2", "-w", "/app", "--entrypoint", "python",
                "-e", "QM_NODE_ROLE=archive", "-e", "PYTHONDONTWRITEBYTECODE=1",
                "-e", "QM_RUNTIME_ENV_FILE=/run/secrets/runtime.env",
@@ -315,42 +308,6 @@ def collect_on_mac(root, market, project, secrets):
                "scripts/local_market_source.py", "collect", "--root", "/source", "--market", market]
     with (root / f"{market}-collection.log").open("a") as log:
         subprocess.run(command, check=True, stdout=log, stderr=subprocess.STDOUT)
-
-
-def ssh(host, *args):
-    return subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host,
-                           shlex.join([str(a) for a in args])], check=True)
-
-
-def send_cloud(bundle, market, host):
-    remote_root = Path(REMOTE_PROJECT) / "data/local-market-source"
-    receipt_path = remote_root / (market + "-receipt.json")
-    command = "import json,pathlib; p=pathlib.Path(" + repr(str(receipt_path)) + "); print(p.read_text() if p.exists() else '{}')"
-    result = subprocess.check_output(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host,
-        shlex.join(["sudo", "-n", "python3", "-c", command])], text=True)
-    receipt = json.loads(result)
-    # After directory exchange, incoming may contain the OLD rollback files.
-    # Redelivery must not overwrite them before recovery finishes.
-    resumable = (receipt.get("release_id") == bundle.name and
-                 receipt.get("status") in ("installing", "files_applied", "applied"))
-    if not resumable:
-        remote = remote_root / "incoming" / market / bundle.name
-        ssh(host, "sudo", "-n", "mkdir", "-p", str(remote / "project"))
-        # Metadata first. No payload is written until rsync has estimated the
-        # actual delta (including existing incoming files and live link-dest).
-        transfer("rsync", "-a", "--rsync-path=sudo -n rsync", str(bundle / "runtime-manifest.jsonl"),
-                 host + ":" + str(remote) + "/")
-        copy = ["rsync", "-aH", "--checksum", "--safe-links",
-                "--link-dest=" + REMOTE_PROJECT]
-        paths = [str(bundle / "project") + "/", host + ":" + str(remote / "project") + "/"]
-        stats = subprocess.check_output([*copy, "--dry-run", "--stats", "--rsync-path=sudo -n rsync", *paths],
-                                        text=True, env={**os.environ, "LC_ALL": "C"})
-        required = transfer_bytes(stats)
-        guard = shlex.join(["sudo", "-n", "python3", REMOTE_PROJECT + "/scripts/storage_guard.py",
-                            "--root", str(remote_root), "--required-bytes", str(required), "--"])
-        transfer(*copy, "--rsync-path=" + guard, *paths)
-    ssh(host, "sudo", "-n", "docker", "exec", "quantmind", "python", "scripts/local_market_source.py",
-        "receive", "--root", "/data/local-market-source", "--market", market, "--release", bundle.name)
 
 
 def exchange(left, right):
@@ -460,11 +417,10 @@ def receive(root, market, release_id, *, data_root=Path("/data")):
             release_lock(key, token)
 
 
-def tick(root, project, secrets, host, market=None, force=False):
+def tick(root, project, secrets, collector_image, market=None, force=False, *, collector_project=None):
     if sys.platform != "darwin":
         raise RuntimeError("Only the Mac schedules vendor collection")
-    primary = (project / ".local-primary/READY").is_file()
-    local_key = "primary_release" if primary else "local_release"
+    collector_project = collector_project or project
     root.mkdir(parents=True, exist_ok=True)
     with lock(root / ".source.lock"):
         if shutil.disk_usage(root).free < 300 * 2**30:
@@ -477,44 +433,52 @@ def tick(root, project, secrets, host, market=None, force=False):
             clock = now()
             day = collection_day(clock, name)
             due = force or (clock.strftime("%H:%M") >= MARKETS[name][1] and item.get("collected_day") != day)
+            stage = "collection"
             try:
                 if due:
                     item.update(status="collecting", started_at=clock.isoformat())
                     write_json(status_path, state)
-                    collect_on_mac(root, name, project, secrets)
+                    collect_on_mac(root, name, collector_project, secrets, collector_image)
+                    item.update(collection_status="collected")
+                    stage = "publication"
                     bundle = publish(root, name)
-                    item.update(collected_day=day, release_id=bundle.name, status="collected")
+                    item.update(collected_day=day, release_id=bundle.name, status="published",
+                                publication_status="published")
                     write_json(status_path, state)
                 release_id = item.get("release_id")
                 if not release_id:
                     continue
                 bundle = root / "releases" / name / release_id
-                if not primary and item.get("cloud_release") != release_id:
-                    send_cloud(bundle, name, host)
-                    item.update(cloud_release=release_id, status="cloud_applied")
-                    write_json(status_path, state)
-                if name == "A" and item.get(local_key) != release_id:
-                    from quantdb_refresh import apply
-                    apply(project, bundle)
-                    item[local_key] = release_id
-                    retain_local_backups(root, project)
-                elif name == "BC" and primary and item.get(local_key) != release_id:
-                    from quantdb_refresh import apply_bc
-                    apply_bc(project, bundle)
-                    item[local_key] = release_id
-                elif name == "BC" and item.get(local_key) != release_id:
-                    incoming = project / ".local-dev/project/data/local-market-source/incoming/BC" / release_id
-                    if not incoming.exists():
-                        incoming.parent.mkdir(parents=True, exist_ok=True)
-                        subprocess.run(["cp", "-cR", str(bundle), str(incoming)], check=True)
-                    subprocess.run(["docker", "exec", "quantmind-dev", "python", "scripts/local_market_source.py",
-                                    "receive", "--root", "/data/local-market-source", "--market", "BC",
-                                    "--release", release_id], check=True)
-                    item[local_key] = release_id
-                item.update(status="applied", checked_at=now().isoformat())
+                stage = "application"
+                from quantdb_refresh import primary_wait_reason
+                waiting = (primary_wait_reason(project, name)
+                           if item.get("primary_release") != release_id else None)
+                if waiting:
+                    item.update(status="awaiting-primary", apply_status="awaiting-primary",
+                                checked_at=now().isoformat())
+                    item["apply_wait_reason"] = waiting
+                    item.pop("error", None)
+                    item.pop("failed_stage", None)
+                    continue
+                item.pop("apply_wait_reason", None)
+                if item.get("primary_release") != release_id:
+                    from quantdb_refresh import apply, apply_bc
+                    if name == "A":
+                        apply(project, bundle)
+                        item["primary_release"] = release_id
+                        retain_local_backups(root, project)
+                    else:
+                        apply_bc(project, bundle)
+                        item["primary_release"] = release_id
+                item.update(status="applied", apply_status="applied", checked_at=now().isoformat())
                 item.pop("error", None)
+                item.pop("failed_stage", None)
             except Exception as exc:
-                item.update(status="retry_pending", error=str(exc), checked_at=now().isoformat())
+                # Vendor failures remain failures; a missing primary is not one.
+                item.update(status="retry_pending", error=str(exc), failed_stage=stage,
+                            checked_at=now().isoformat())
+                if stage == "application":
+                    item["apply_status"] = "retry_pending"
                 failures.append(name)
             finally:
                 try:
@@ -532,30 +496,46 @@ def tick(root, project, secrets, host, market=None, force=False):
         return 2 if failures else 0
 
 
-def install(project, root, secrets, host):
+def install(project, root, secrets, collector_image, *, collector_project=None, start=True):
     if sys.platform != "darwin":
         raise RuntimeError("LaunchAgent installation is Mac-only")
+    # Never replace a live writer's client or boot it out during collection.
+    with lock(root / ".source.lock"):
+        plist = _install_client(project, root, secrets, collector_image,
+                                collector_project=collector_project)
+    # RunAtLoad must enter only after the installer has released the source lock.
+    if start:
+        subprocess.run(["launchctl", "bootstrap", f"gui/{os.getuid()}", str(plist)], check=True)
+
+
+def _install_client(project, root, secrets, collector_image, *, collector_project):
+    label = "com.quantmind.market-source"
+    job_target = f"gui/{os.getuid()}/{label}"
+    existing = subprocess.run(["launchctl", "print", job_target], capture_output=True, text=True)
+    if existing.returncode == 0 and re.search(r"(?m)^\s*pid = \d+\s*$", existing.stdout):
+        raise RuntimeError("Market source is running; retain the writer and install when idle")
     runtime = root.parent / "market-source-client"
+    collector_project = collector_project or project
     for relative in ("scripts/local_market_source.py", "scripts/dual_node_snapshot.py", "scripts/dual_node_inventory.py",
                      "scripts/dual_node_sync.py", "scripts/dual_node_check.py", "scripts/storage_guard.py", "scripts/quantdb_refresh.py", "deploy/dual-node.env"):
         target = runtime / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(project / relative, target)
-    label = "com.quantmind.market-source"
+        shutil.copy2(collector_project / relative, target)
     log = root.parent / "logs"
     log.mkdir(parents=True, exist_ok=True)
     definition = {"Label": label, "RunAtLoad": True, "WorkingDirectory": str(runtime),
                   "StartCalendarInterval": [{"Minute": m} for m in (0, 15, 30, 45)],
                   "ProgramArguments": [sys.executable, str(runtime / "scripts/local_market_source.py"), "tick",
-                                       "--root", str(root), "--project", str(project), "--secrets", str(secrets), "--host", host],
+                                       "--root", str(root), "--project", str(project), "--secrets", str(secrets),
+                                       "--collector-project", str(collector_project),
+                                       "--collector-image", collector_image],
                   "EnvironmentVariables": {"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"},
                   "StandardOutPath": str(log / "market-source.out.log"), "StandardErrorPath": str(log / "market-source.err.log")}
     plist = Path.home() / "Library/LaunchAgents" / (label + ".plist")
-    target = f"gui/{os.getuid()}/{label}"
-    if subprocess.run(["launchctl", "print", target], capture_output=True).returncode == 0:
-        subprocess.run(["launchctl", "bootout", target], check=True)
+    if existing.returncode == 0:
+        subprocess.run(["launchctl", "bootout", job_target], check=True)
     plist.write_bytes(plistlib.dumps(definition))
-    subprocess.run(["launchctl", "bootstrap", f"gui/{os.getuid()}", str(plist)], check=True)
+    return plist
 
 
 def main():
@@ -565,12 +545,18 @@ def main():
     parser.add_argument("--root", type=Path, default=DEFAULT_ROOT)
     parser.add_argument("--project", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--secrets", type=Path)
-    parser.add_argument("--host", default="lzy-vm")
+    parser.add_argument("--collector-project", type=Path, help="Approved collection code; defaults to --project")
+    parser.add_argument("--collector-image", help="Explicit approved local Docker image; never pulled")
     parser.add_argument("--market", choices=tuple(MARKETS))
     parser.add_argument("--release")
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--no-start", action="store_true", help="Install client/plist without bootstrapping the LaunchAgent")
     parser.add_argument("--_storage-worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.no_start and args.action != "install":
+        parser.error("--no-start is only valid for install")
+    if args.action in ("tick", "install") and not args.collector_image:
+        parser.error("--collector-image is required for tick/install")
     if args.action in ("collect", "publish", "receive") and not args.market:
         parser.error("market is required")
     if args.action == "collect":
@@ -587,9 +573,11 @@ def main():
             guarded_run([sys.executable, str(Path(__file__).resolve()), *sys.argv[1:],
                          "--_storage-worker"], args.root)
     elif args.action == "install":
-        install(args.project, args.root, args.secrets or args.project / "config", args.host)
+        install(args.project, args.root, args.secrets or args.project / "config", args.collector_image,
+                collector_project=args.collector_project, start=not args.no_start)
     else:
-        return tick(args.root, args.project, args.secrets or args.project / "config", args.host, args.market, args.force)
+        return tick(args.root, args.project, args.secrets or args.project / "config", args.collector_image,
+                    args.market, args.force, collector_project=args.collector_project)
     return 0
 
 
