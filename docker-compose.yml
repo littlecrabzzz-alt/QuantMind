@@ -739,7 +739,6 @@ services:
       - ./config:/app/config:ro
       - ./scripts:/app/scripts:ro
       - ./strategy_templates:/app/strategy_templates:ro
-      - ./CLAUDE.md:/app/CLAUDE.md:ro
       - ./AGENTS.md:/app/AGENTS.md:ro
       # 项目根目录（只读，供 Agent 查找本地文件/技能 zip 等）
       - ./:/quantmind:ro

@@ -168,7 +168,6 @@ services:
       - ./config:/app/config:ro
       - ./scripts:/app/scripts:ro
       - ./strategy_templates:/app/strategy_templates:ro
-      - ./CLAUDE.md:/app/CLAUDE.md:ro
       - ./AGENTS.md:/app/AGENTS.md:ro
       - ./:/quantmind:ro
       - ${QM_LOCAL_STATE}/data:/quantmind/data
