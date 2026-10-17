@@ -5,18 +5,18 @@ description: "个股深度投研分析（智能体自主版）— 拉取 QuantMi
 
 > ## ⚙️ 运行环境契约（最高优先级，先于本文其余内容执行）
 >
-> 本技能可能运行在 **QuantBot（QwenPaw 容器）** 或**宿主机/本地 Claude Code**。执行前先探测环境（`which docker`、API 连通性），并遵守以下映射规则：
+> QuantMind 只在本地 Mac 运行：主业务由 Library 中已核准运行快照的 `scripts/local-primary.sh` 管理，Main 是开发源码；`local-dev.sh` 沙盒数据独立，不能与主业务同时占用 8000。执行前确认本地 Docker Desktop context、项目和挂载：
 >
-> 1. **后端 API 地址**：QwenPaw / 容器网络内一律用 `http://quantmind:8000`（`quantmind` 是 docker 网络别名）；仅宿主机调试用 `http://127.0.0.1:8000`。正文中出现的 `127.0.0.1:8000`、`localhost:800x`，在 QwenPaw 环境下自动替换为 `http://quantmind:8000`。
-> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**必须在 quantmind 容器内执行**（QwenPaw 本地 venv 无这些依赖）：
+> 1. **后端 API 地址**：主栈 QwenPaw 与后端同在 `quantmind-local_quantmind-net`，使用 Compose 服务名 `http://quantmind:8000`；Mac 宿主机用 `http://127.0.0.1:8000`。正文 API 示例的回环 8000 地址仅在该容器场景替换为服务名；不要改写其他服务端口或 API 路径。
+> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**在主栈后端容器 `quantmind-local-quantmind` 内执行**（QwenPaw venv 无这些依赖）：
 >    ```bash
->    docker cp <脚本路径> quantmind:/tmp/<脚本名> && docker exec -w /app quantmind python3 /tmp/<脚本名> <参数>
+>    docker cp <脚本路径> quantmind-local-quantmind:/tmp/<脚本名> && docker exec -w /app quantmind-local-quantmind python3 /tmp/<脚本名> <参数>
 >    ```
->    脚本源三选一：宿主机 repo `skills/<name>/scripts/`、QwenPaw 工作区 `/app/working/workspaces/default/skills/<name>/scripts/`、挂载目录 `/quantmind/skills/<name>/scripts/`。纯标准库脚本（无重依赖）可在 QwenPaw 本地直接跑。
+>    脚本优先从当前 QwenPaw 已安装工作区 `/app/working/workspaces/default/skills/<name>/scripts/` 读取；宿主机源码在 Main 的 `skills/<name>/scripts/`。Library 运行快照不默认包含 `skills/`，仅在实际存在且版本匹配时使用 `/quantmind/skills/`。Main 的 `data/db` 不是主业务数据；读写以容器实际挂载为准。纯标准库脚本可在 QwenPaw 内直接跑。
 > 3. **报告落盘**：股票报告页可见的 MD/PDF 报告，直接写 `/data/reports/trading_agents/{市场或类别}/{股票名}/`（`/data` 是 QwenPaw 与 quantmind 容器共享的可读写挂载，**QwenPaw 直接 mkdir/cp 即可，不要 docker cp**）；过程数据 facts 写 `/data/reports/<类别>/`。
 > 4. **MD → PDF 转换（按优先级降级）**：
 >    ① QwenPaw 本地直接跑 `python3 /app/backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（扩展镜像已内置 reportlab + 中文字体，研报级排版，首选）；
->    ② QwenPaw 环境缺依赖时，`docker exec -w /app quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（扩展镜像已含 docker CLI）；
+>    ② QwenPaw 环境缺依赖时，`docker exec -w /app quantmind-local-quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版）；
 >    ③ 以上都不可用时，**改用 QwenPaw 内置 `pdf` 技能**把 MD 转成 PDF；
 >    ④ 全部失败则只交付 MD，并明确告知用户 PDF 未能生成及原因。
 > 5. 本文中的 `~/.claude`、`cp -r ... ~/.claude/skills` 等说明仅适用于本地 Claude Code 维护者，**QuantBot 不要执行**。
@@ -234,7 +234,7 @@ mkdir -p "/data/reports/trading_agents/A股市场/贵州茅台"
 # 例: 贵州茅台600519_2026-08-15_投研分析报告.md
 ```
 
-> QwenPaw 对 `/data` 有直接读写权限（与 quantmind 容器共享挂载），md 直接写入即可，**无需 docker cp**；仅宿主机本地 Claude Code 场景目录 owner 是容器内 root 时，才用 `docker exec quantmind python` 落盘（见 FAQ）。
+> QwenPaw 对 `/data` 有直接读写权限（与主栈后端容器共享挂载），md 直接写入即可，**无需 docker cp**；仅宿主机本地 Claude Code 场景目录 owner 是容器内 root 时，才用 `docker exec quantmind-local-quantmind python` 落盘（见 FAQ）。
 
 ### 7.2 转 PDF（首选 QwenPaw 本地，reportlab + 中文字体已内置）
 
@@ -243,7 +243,7 @@ python3 /app/backend/scripts/md_to_pdf_report.py \
   "/data/reports/trading_agents/A股市场/贵州茅台/贵州茅台600519_2026-08-15_投研分析报告.md" \
   "/data/reports/trading_agents/A股市场/贵州茅台/贵州茅台600519_2026-08-15_投研分析报告.pdf"
 # 备选（本地缺依赖时）：
-# docker exec quantmind python /app/backend/scripts/md_to_pdf_report.py <同上路径>
+# docker exec quantmind-local-quantmind python /app/backend/scripts/md_to_pdf_report.py <同上路径>
 ```
 
 **PDF 特性**：A4、TTF 内嵌中文字体（任何 PDF 阅读器含浏览器 pdfjs 都正常渲染）、**粗体真实加粗**（正文文泉驿 MicroHei + 粗体 ZenHei 独立字重）、h1 居中大标题、h2 蓝色小节、表格深蓝表头 + 隔行底色。
@@ -253,7 +253,7 @@ python3 /app/backend/scripts/md_to_pdf_report.py \
 **验证字体真正内嵌**（⚠️ reportlab 给子集字体加 `AAAAAA+` 前缀，直接 `grep 'WQY'` 字节串会误报 False，必须用 BaseFont 正则解析）：
 
 ```bash
-docker exec quantmind python -c "
+docker exec quantmind-local-quantmind python -c "
 import re
 data = open('/data/reports/trading_agents/A股市场/贵州茅台/贵州茅台600519_2026-08-15_投研分析报告.pdf','rb').read()
 bf = sorted(set(m.group(1).decode() for m in re.finditer(rb'/BaseFont\s*/([A-Za-z0-9+_.-]+)', data)))
@@ -272,13 +272,13 @@ print('正文 OK:', any('MicroHei' in f or 'CJK' in f for f in bf))
 
 ```bash
 # A股: QuantDB instrument_detail parquet（Symbol 格式 600519.SH）
-docker exec quantmind python -c "
+docker exec quantmind-local-quantmind python -c "
 import pandas as pd
 df = pd.read_parquet('/data/quantdb/2_base_sector/instrument_detail/instrument_detail.parquet', columns=['Symbol','Name'])
 print(df[df['Symbol']=='600519.SH']['Name'].iloc[0])
 "
 # 港股/美股: 板块 parquet
-docker exec quantmind python -c "
+docker exec quantmind-local-quantmind python -c "
 import pandas as pd
 df = pd.read_parquet('/data/quanthk/2_base_sector/sector/00700.HK.parquet')
 print(df.columns.tolist())   # 找 name 列
@@ -357,7 +357,7 @@ curl -s -H "$AUTH" "$BASE/api/v1/trading-agents/report/{analysis_id}"     # 拿 
 | features 接口返回空 | 检查 symbol 格式（A股必须带 .SH/.SZ/.BJ）；用 batch-features 批量试 |
 | 新闻为空 | 报告标注数据缺失 + 提醒用户加 RSS 新闻源（后台 RSS 管理/Huntly） |
 | 股票名查不到 | 标题回退纯代码；US/HK 查 sector parquet 的 name 列 |
-| PDF 转不出来 | 确认容器 `docker exec quantmind python -c "import reportlab"`；字体回退链见 7.2（WQY 在宿主机 `docker/training/fonts/`，bind mount 进容器 `/app/docker/training/fonts/`） |
+| PDF 转不出来 | 确认容器 `docker exec quantmind-local-quantmind python -c "import reportlab"`；字体回退链见 7.2（WQY 在运行快照 `docker/training/fonts/`，bind mount 进容器 `/app/docker/training/fonts/`） |
 | 股票报告页找不到报告 | 目录名必须用 **`A股市场`（无空格）**，与后端 `report_exporter.py::_MARKET_NAMES` 一致；新结构为「市场文件夹/股票名文件夹/{股票名}{代码}_{日期}_投研分析报告.{md,pdf}」 |
-| 报告目录写不进 | 宿主机目录 owner 是容器内 root：md 先写 `/tmp` 再 `docker cp` 进容器，或用 `docker exec quantmind python` 直接落盘 |
+| 报告目录写不进 | 宿主机目录 owner 是容器内 root：md 先写 `/tmp` 再 `docker cp` 进容器，或用 `docker exec quantmind-local-quantmind python` 直接落盘 |
 | 推理分数接口 404 | 该股近期无推理记录，报告中注明"无最近推理数据" |

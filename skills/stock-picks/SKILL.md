@@ -5,17 +5,17 @@ description: "每日复盘后的股票推荐（多维度选股）— 综合 A股
 
 > ## ⚙️ 运行环境契约（最高优先级，先于本文其余内容执行）
 >
-> 本技能可能运行在 **QuantBot（QwenPaw 容器）** 或**宿主机/本地 Claude Code**。执行前先探测环境（`which docker`、API 连通性），并遵守以下映射规则：
+> QuantMind 只在本地 Mac 运行：主业务由 Library 中已核准运行快照的 `scripts/local-primary.sh` 管理，Main 是开发源码；`local-dev.sh` 沙盒数据独立，不能与主业务同时占用 8000。执行前确认本地 Docker Desktop context、项目和挂载：
 >
-> 1. **后端 API 地址**：QwenPaw / 容器网络内一律用 `http://quantmind:8000`（`quantmind` 是 docker 网络别名）；仅宿主机调试用 `http://127.0.0.1:8000`。正文中出现的 `127.0.0.1:8000`、`localhost:800x`，在 QwenPaw 环境下自动替换为 `http://quantmind:8000`。
-> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**必须在 quantmind 容器内执行**（QwenPaw 本地 venv 无这些依赖）：
+> 1. **后端 API 地址**：主栈 QwenPaw 与后端同在 `quantmind-local_quantmind-net`，使用 Compose 服务名 `http://quantmind:8000`；Mac 宿主机用 `http://127.0.0.1:8000`。正文 API 示例的回环 8000 地址仅在该容器场景替换为服务名；不要改写其他服务端口或 API 路径。
+> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**在主栈后端容器 `quantmind-local-quantmind` 内执行**（QwenPaw venv 无这些依赖）：
 >    ```bash
->    docker cp <脚本路径> quantmind:/tmp/<脚本名> && docker exec -w /app quantmind python3 /tmp/<脚本名> <参数>
+>    docker cp <脚本路径> quantmind-local-quantmind:/tmp/<脚本名> && docker exec -w /app quantmind-local-quantmind python3 /tmp/<脚本名> <参数>
 >    ```
->    脚本源三选一：宿主机 repo `skills/<name>/scripts/`、QwenPaw 工作区 `/app/working/workspaces/default/skills/<name>/scripts/`、挂载目录 `/quantmind/skills/<name>/scripts/`。纯标准库脚本（无重依赖）可在 QwenPaw 本地直接跑。
+>    脚本优先从当前 QwenPaw 已安装工作区 `/app/working/workspaces/default/skills/<name>/scripts/` 读取；宿主机源码在 Main 的 `skills/<name>/scripts/`。Library 运行快照不默认包含 `skills/`，仅在实际存在且版本匹配时使用 `/quantmind/skills/`。Main 的 `data/db` 不是主业务数据；读写以容器实际挂载为准。纯标准库脚本可在 QwenPaw 内直接跑。
 > 3. **报告落盘**：股票报告页可见的 MD/PDF 报告，直接写 `/data/reports/trading_agents/{市场或类别}/{股票名}/`（QwenPaw 对 `/app/db` 有写权限，**直接写文件，不要 docker cp**）；过程数据 facts 写 `/data/reports/<类别>/`（`/data` 可写）。
 > 4. **MD → PDF 转换（按优先级降级）**：
->    ① `docker exec -w /app quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版，首选）；
+>    ① `docker exec -w /app quantmind-local-quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版）；
 >    ② docker 不可用时，**改用 QwenPaw 内置 `pdf` 技能**把 MD 转成 PDF；
 >    ③ 两者都不可用则只交付 MD，并明确告知用户 PDF 未能生成及原因。
 > 5. 本文中的 `~/.claude`、`cp -r ... ~/.claude/skills` 等说明仅适用于本地 Claude Code 维护者，**QuantBot 不要执行**。
@@ -48,8 +48,8 @@ cd <repo>/skills/daily-review/scripts
 python3 daily_review.py --date 20260821              # 不带 --date 取最新交易日
 
 # ② 容器内：news_review.py 聚合当日新闻情绪（先跑这个，新闻维度才能加权）
-docker cp <repo>/skills/daily-review/scripts/news_review.py quantmind:/tmp/
-docker exec quantmind python3 /tmp/news_review.py --date 20260821
+docker cp <repo>/skills/daily-review/scripts/news_review.py quantmind-local-quantmind:/tmp/
+docker exec quantmind-local-quantmind python3 /tmp/news_review.py --date 20260821
 ```
 
 产出：`data/reports/daily_review/{YYYY-MM-DD}_stats.json` + `{YYYY-MM-DD}_facts.md` + `{YYYY-MM-DD}_news.json`。
@@ -93,13 +93,13 @@ python3 <repo>/scripts/stock_9layer_fetch.py 001237.SZ --json   # 宿主机
 
 ```bash
 # Markdown → PDF（研报风，复用 md_to_pdf_report.py）
-docker cp 选股推荐.md quantmind:/tmp/picks.md
-docker exec quantmind bash -lc "cd /app && python3 backend/scripts/md_to_pdf_report.py /tmp/picks.md /tmp/picks.pdf"
-docker cp quantmind:/tmp/picks.pdf 选股推荐.pdf
+docker cp 选股推荐.md quantmind-local-quantmind:/tmp/picks.md
+docker exec quantmind-local-quantmind bash -lc "cd /app && python3 backend/scripts/md_to_pdf_report.py /tmp/picks.md /tmp/picks.pdf"
+docker cp quantmind-local-quantmind:/tmp/picks.pdf 选股推荐.pdf
 
 # 落盘股票报告目录（宿主机必须 docker cp，目录 owner 是容器 root）
-docker cp 选股推荐.md quantmind:/data/reports/trading_agents/每日选股/每日选股推荐_2026-08-21.md
-docker cp 选股推荐.pdf quantmind:/data/reports/trading_agents/每日选股/每日选股推荐_2026-08-21.pdf
+docker cp 选股推荐.md quantmind-local-quantmind:/data/reports/trading_agents/每日选股/每日选股推荐_2026-08-21.md
+docker cp 选股推荐.pdf quantmind-local-quantmind:/data/reports/trading_agents/每日选股/每日选股推荐_2026-08-21.pdf
 ```
 
 落盘后 `ls` 确认 md + pdf 都在（前端「股票报告」页 → 每日选股 文件夹）。

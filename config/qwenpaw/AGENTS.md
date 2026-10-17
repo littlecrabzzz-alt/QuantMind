@@ -16,8 +16,8 @@ read_when:
 
 ## 环境与数据所有权
 
-- Mac 是唯一开发源；远端开发退役不代表运行服务或数据库已迁移。执行前核对实例、Compose 项目、实际端口和挂载。
-- 同 Compose 网络中 API 通常为 `http://quantmind:8000`；宿主机地址以实际端口映射为准。鉴权使用目标配置提供的凭据，不把内部密钥写进提示词或报告。内部调用同时遵守服务要求的用户身份头。
+- QuantMind 只在本地 Mac 运行。Main 是开发源码；主业务用 `~/Library/Application Support/QuantMind/primary-runtime-*` 中已核准的快照和 `scripts/local-primary.sh`，Compose 项目为 `quantmind-local`。执行前核对本地 Docker Desktop context、实际端口和挂载。
+- 同一主栈网络内 API 为 `http://quantmind:8000`（Compose 服务名）；Mac 宿主机 API 为 `http://127.0.0.1:8000`，web 为 `http://127.0.0.1:3080`。隔离沙盒由 `local-dev.sh` 管理，不能与主业务同时占用 8000 或复用业务卷。鉴权使用目标配置提供的凭据，不把内部密钥写进提示词或报告；内部调用同时遵守服务要求的用户身份头。
 - 容器常见路径：`/app/backend` 源码、`/app/config` 配置、`/app/models` 模型、`/app/db` 特征、`/data` 数据与报告、`/app/logs` 日志、`/quantmind` 仓库、`/qwenpaw-shared` 交付文件。它们是定位线索，权限及真实宿主机目录必须查当前挂载，不能假定全部可写。
 - 查询和报告不启动额外采集、同步或研究。需要数据更新、长训练、回测、服务重启或恢复数据时，先确认用户授权的范围和目标。
 

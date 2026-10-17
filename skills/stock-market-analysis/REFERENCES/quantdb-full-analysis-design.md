@@ -196,8 +196,8 @@ curl -s -H "$AUTH" "$BASE/api/v1/models/default"               # 默认模型
 curl -s -H "$AUTH" "$BASE/api/v1/models/inference/stock/600519.SH/history?days=180"
 curl -s -H "$AUTH" "$BASE/api/v1/models/inference/stock/600519.SH/history?days=180&model_id=xxx"
 # L4b: 订单微结构截面分位（容器内 python + duckdb，需 pandas；先 ls 分区确认最新日期）
-#   docker exec quantmind ls /data/quantdb/6_ml_datasets/l2_factors/ | tail -1
-#   docker exec quantmind python3 - <<'PY'
+#   docker exec quantmind-local-quantmind ls /data/quantdb/6_ml_datasets/l2_factors/ | tail -1
+#   docker exec quantmind-local-quantmind python3 - <<'PY'
 #   import duckdb, pandas as pd
 #   mkt = duckdb.connect().execute("SELECT * FROM read_parquet('/data/quantdb/6_ml_datasets/l2_factors/dt=最新/data.parquet')").df()
 #   pct = (mkt[f].astype(float) < float(mkt[mkt.symbol=='xxx.SH'].iloc[0][f])).mean()  # 逐因子算截面分位

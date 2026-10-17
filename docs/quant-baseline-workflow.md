@@ -4,7 +4,7 @@
 
 ## 运行与恢复
 
-前置条件：目标 API、管理员账户及标准 CN 数据布局 `data/quantdb`、`db/qlib_data`、`data/training_jobs` 均已配置。确认服务实际使用的数据根，不因源码在 Mac 就假定数据库和数据已迁移。首次留档按实际输入预留空间；原始数据、数据库记录及快照无自动清理。
+前置条件：本地 API、管理员账户及标准 CN 数据布局 `data/quantdb`、`db/qlib_data`、`data/training_jobs` 均已配置。以当前运行快照的实际数据挂载为准，不把 Main 开发目录当作业务数据目录。首次留档按实际输入预留空间；原始数据、数据库记录及快照无自动清理。
 
 ```bash
 python3 scripts/run_quant_baseline.py run \

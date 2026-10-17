@@ -1,21 +1,21 @@
 ---
 name: quantdb-sdk
-description: "QuantDB 数据 SDK — API Key 配置、数据集目录、字段查询。在 QuantBot / Claude Code 中查询 QuantDB 数据、配置 API Key、预览/同步数据集、远程查询 K 线/财务/因子时使用。触发词：quantdb、QuantDB、数据key、API key、数据集、数据字段、远程数据、同步数据集、查询K线、查看字段"
+description: "QuantDB 数据 SDK — API Key 配置、数据集目录、字段查询。在 QuantBot / Claude Code 中查询 QuantDB 数据、配置 API Key、预览/同步数据集、向供应商查询 K 线/财务/因子时使用。触发词：quantdb、QuantDB、数据key、API key、数据集、数据字段、供应商数据、同步数据集、查询K线、查看字段"
 ---
 
 > ## ⚙️ 运行环境契约（最高优先级，先于本文其余内容执行）
 >
-> 本技能可能运行在 **QuantBot（QwenPaw 容器）** 或**宿主机/本地 Claude Code**。执行前先探测环境（`which docker`、API 连通性），并遵守以下映射规则：
+> QuantMind 只在本地 Mac 运行：主业务由 Library 中已核准运行快照的 `scripts/local-primary.sh` 管理，Main 是开发源码；`local-dev.sh` 沙盒数据独立，不能与主业务同时占用 8000。执行前确认本地 Docker Desktop context、项目和挂载：
 >
-> 1. **后端 API 地址**：QwenPaw / 容器网络内一律用 `http://quantmind:8000`（`quantmind` 是 docker 网络别名）；仅宿主机调试用 `http://127.0.0.1:8000`。正文中出现的 `127.0.0.1:8000`、`localhost:800x`，在 QwenPaw 环境下自动替换为 `http://quantmind:8000`。
-> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**必须在 quantmind 容器内执行**（QwenPaw 本地 venv 无这些依赖）：
+> 1. **后端 API 地址**：主栈 QwenPaw 与后端同在 `quantmind-local_quantmind-net`，使用 Compose 服务名 `http://quantmind:8000`；Mac 宿主机用 `http://127.0.0.1:8000`。正文 API 示例的回环 8000 地址仅在该容器场景替换为服务名；不要改写其他服务端口或 API 路径。
+> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**在主栈后端容器 `quantmind-local-quantmind` 内执行**（QwenPaw venv 无这些依赖）：
 >    ```bash
->    docker cp <脚本路径> quantmind:/tmp/<脚本名> && docker exec -w /app quantmind python3 /tmp/<脚本名> <参数>
+>    docker cp <脚本路径> quantmind-local-quantmind:/tmp/<脚本名> && docker exec -w /app quantmind-local-quantmind python3 /tmp/<脚本名> <参数>
 >    ```
->    脚本源三选一：宿主机 repo `skills/<name>/scripts/`、QwenPaw 工作区 `/app/working/workspaces/default/skills/<name>/scripts/`、挂载目录 `/quantmind/skills/<name>/scripts/`。纯标准库脚本（无重依赖）可在 QwenPaw 本地直接跑。
+>    脚本优先从当前 QwenPaw 已安装工作区 `/app/working/workspaces/default/skills/<name>/scripts/` 读取；宿主机源码在 Main 的 `skills/<name>/scripts/`。Library 运行快照不默认包含 `skills/`，仅在实际存在且版本匹配时使用 `/quantmind/skills/`。Main 的 `data/db` 不是主业务数据；读写以容器实际挂载为准。纯标准库脚本可在 QwenPaw 内直接跑。
 > 3. **报告落盘**：股票报告页可见的 MD/PDF 报告，直接写 `/data/reports/trading_agents/{市场或类别}/{股票名}/`（QwenPaw 对 `/app/db` 有写权限，**直接写文件，不要 docker cp**）；过程数据 facts 写 `/data/reports/<类别>/`（`/data` 可写）。
 > 4. **MD → PDF 转换（按优先级降级）**：
->    ① `docker exec -w /app quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版，首选）；
+>    ① `docker exec -w /app quantmind-local-quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版）；
 >    ② docker 不可用时，**改用 QwenPaw 内置 `pdf` 技能**把 MD 转成 PDF；
 >    ③ 两者都不可用则只交付 MD，并明确告知用户 PDF 未能生成及原因。
 > 5. 本文中的 `~/.claude`、`cp -r ... ~/.claude/skills` 等说明仅适用于本地 Claude Code 维护者，**QuantBot 不要执行**。
@@ -23,6 +23,8 @@ description: "QuantDB 数据 SDK — API Key 配置、数据集目录、字段�
 # QuantDB 数据 SDK 技能
 
 QuantDB 是付费 CDN 数据源，通过 API Key 认证。提供 A 股完整数据：K 线、财务、估值、技术指标、L1/L2 因子（共 315 维 AI 因子）。
+
+SDK 请求访问 QuantDB 数据供应商并消耗配额；已有数据优先读取本机已校验的 Parquet 版本。
 
 ## 1. API Key 配置
 
@@ -106,7 +108,7 @@ curl -s -H "$AUTH" "$BASE/api/v1/admin/data-platform/quantdb/catalog"
 # 返回: {groups: [{dataset_count, synced_count, files, size_mb}], datasets: [...], data_dir}
 ```
 
-### 远程 meta（各数据集日期范围）
+### 供应商 meta（各数据集日期范围）
 ```bash
 curl -s -H "$AUTH" "$BASE/api/v1/admin/data-platform/quantdb/remote-meta"
 # 返回 28 行: {source, dataset, dimension, min_date, max_date, row_count, file_count, file_size}
@@ -122,16 +124,16 @@ curl -s -H "$AUTH" "$BASE/api/v1/admin/data-platform/quantdb/preview?dataset=val
 curl -s -H "$AUTH" "$BASE/api/v1/admin/data-platform/quantdb/preview?dataset=l1_factors&limit=20"
 # 标的层数据集可指定 symbol
 curl -s -H "$AUTH" "$BASE/api/v1/admin/data-platform/quantdb/preview?dataset=income&symbol=600519.SH&limit=20"
-# 强制远端 SDK 预览
+# 直接向供应商请求 SDK 预览
 curl -s -H "$AUTH" "$BASE/api/v1/admin/data-platform/quantdb/preview?dataset=valuation&remote=true&limit=20"
 # 返回: {columns: [{name, dtype}], data: [...]}
 ```
 **用 preview 看字段**：返回的 `columns` 就是该数据集全部字段名——这是"能获取到哪些字段"的直接答案。
 
-## 4. 远程 SDK 查询（消耗流量配额）
+## 4. 供应商 SDK 查询（消耗流量配额）
 
 ```bash
-# 远程 K 线
+# 查询供应商 K 线
 curl -s -X POST -H "$AUTH" -H "Content-Type: application/json" \
   "$BASE/api/v1/admin/data-platform/quantdb/query-kline" \
   -d '{"symbol":"600519.SH","adj_type":"qfq","start_date":"2026-01-01","end_date":"2026-08-07"}'
@@ -231,7 +233,7 @@ VPIN/价差/深度/订单/资金流/已实现波动/竞价/跳跃/冲击等，�
 ## 7. 实战应用
 
 - **数据落盘校验**：`catalog` + `remote-meta` 看覆盖，`preview` 看字段
-- **当日数据补全**：本地缺当日时用 `query-kline` 远程拉
+- **当日数据补全**：本地缺当日时用 `query-kline` 向供应商请求
 - **因子挖掘原料**：`sync-datasets` 同步 l1/l2_factors，喂给 [[rd-agent-factor-mining]]
 - **选股字段**：valuation/l1_factors 的字段是 [[smart-strategy-stock-picking]] 的数据源
 - **训练特征**：features_daily/l1_factors 是 [[quantmind-operations]] 模型训练的特征来源
@@ -243,5 +245,5 @@ VPIN/价差/深度/订单/资金流/已实现波动/竞价/跳跃/冲击等，�
 | API Key 未配置 | 缺 QUANTDB_API_KEY | `/config` POST 保存 |
 | verified=false | Key 无效/过期 | 重新获取 Key |
 | preview 空 | 本地未同步该数据集 | 用 `remote=true` 或先 sync |
-| 流量消耗高 | 频繁远程查询 | 优先本地 parquet，`preview` 默认零流量 |
+| 流量消耗高 | 频繁向供应商查询 | 优先本地 parquet，`preview` 默认零流量 |
 | min1/tick 无数据 | 未同步 | 按需 `sync-datasets` |

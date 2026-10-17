@@ -5,24 +5,24 @@ description: "QuantMind 平台运营操作技能 — 覆盖模型训练、模型
 
 > ## ⚙️ 运行环境契约（最高优先级，先于本文其余内容执行）
 >
-> 本技能可能运行在 **QuantBot（QwenPaw 容器）** 或**宿主机/本地 Claude Code**。执行前先探测环境（`which docker`、API 连通性），并遵守以下映射规则：
+> QuantMind 只在本地 Mac 运行：主业务由 Library 中已核准运行快照的 `scripts/local-primary.sh` 管理，Main 是开发源码；`local-dev.sh` 沙盒数据独立，不能与主业务同时占用 8000。执行前确认本地 Docker Desktop context、项目和挂载：
 >
-> 1. **后端 API 地址**：QwenPaw / 容器网络内一律用 `http://quantmind:8000`（`quantmind` 是 docker 网络别名）；仅宿主机调试用 `http://127.0.0.1:8000`。正文中出现的 `127.0.0.1:8000`、`localhost:800x`，在 QwenPaw 环境下自动替换为 `http://quantmind:8000`。
-> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**必须在 quantmind 容器内执行**（QwenPaw 本地 venv 无这些依赖）：
+> 1. **后端 API 地址**：主栈 QwenPaw 与后端同在 `quantmind-local_quantmind-net`，使用 Compose 服务名 `http://quantmind:8000`；Mac 宿主机用 `http://127.0.0.1:8000`。正文 API 示例的回环 8000 地址仅在该容器场景替换为服务名；不要改写其他服务端口或 API 路径。
+> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**在主栈后端容器 `quantmind-local-quantmind` 内执行**（QwenPaw venv 无这些依赖）：
 >    ```bash
->    docker cp <脚本路径> quantmind:/tmp/<脚本名> && docker exec -w /app quantmind python3 /tmp/<脚本名> <参数>
+>    docker cp <脚本路径> quantmind-local-quantmind:/tmp/<脚本名> && docker exec -w /app quantmind-local-quantmind python3 /tmp/<脚本名> <参数>
 >    ```
->    脚本源三选一：宿主机 repo `skills/<name>/scripts/`、QwenPaw 工作区 `/app/working/workspaces/default/skills/<name>/scripts/`、挂载目录 `/quantmind/skills/<name>/scripts/`。纯标准库脚本（无重依赖）可在 QwenPaw 本地直接跑。
+>    脚本优先从当前 QwenPaw 已安装工作区 `/app/working/workspaces/default/skills/<name>/scripts/` 读取；宿主机源码在 Main 的 `skills/<name>/scripts/`。Library 运行快照不默认包含 `skills/`，仅在实际存在且版本匹配时使用 `/quantmind/skills/`。Main 的 `data/db` 不是主业务数据；读写以容器实际挂载为准。纯标准库脚本可在 QwenPaw 内直接跑。
 > 3. **报告落盘**：股票报告页可见的 MD/PDF 报告，直接写 `/data/reports/trading_agents/{市场或类别}/{股票名}/`（QwenPaw 对 `/app/db` 有写权限，**直接写文件，不要 docker cp**）；过程数据 facts 写 `/data/reports/<类别>/`（`/data` 可写）。
 > 4. **MD → PDF 转换（按优先级降级）**：
->    ① `docker exec -w /app quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版，首选）；
+>    ① `docker exec -w /app quantmind-local-quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版）；
 >    ② docker 不可用时，**改用 QwenPaw 内置 `pdf` 技能**把 MD 转成 PDF；
 >    ③ 两者都不可用则只交付 MD，并明确告知用户 PDF 未能生成及原因。
 > 5. 本文中的 `~/.claude`、`cp -r ... ~/.claude/skills` 等说明仅适用于本地 Claude Code 维护者，**QuantBot 不要执行**。
 
 # QuantMind 运营操作技能
 
-QuantMind 平台运营 API 操作指南。请求统一加 `/api/v1` 前缀；地址取目标实例实际配置。同网络 QuantBot 示例为 `http://quantmind:8000`，宿主机端口不能照抄旧服务器。Mac 是唯一开发源，运行服务及数据库是否迁移须另行核实；数据同步、训练和服务变更只在已授权目标执行。
+QuantMind 本地 Mac 平台运营 API 操作指南。请求统一加 `/api/v1` 前缀，地址遵守顶部主栈网络映射。主业务代码来自 Library 中已核准运行快照，服务启停使用该目录的 `scripts/local-primary.sh`；Main 与 `local-dev.sh` 沙盒不等同于主业务运行目录。数据更新、训练和服务变更只在明确授权范围内执行；采集由 Mac 本机的行情服务与原生 Tushare worker 负责，不为查询或报告重复启动采集、同步或研究。
 
 ## 认证
 
@@ -168,7 +168,9 @@ curl -s -X POST "$BASE/api/v1/admin/models/inference-backtest" -H "$AUTH" -H "$C
 
 ## 3. 后台数据更新（五市场）
 
-### 3.1 统一日同步（推荐）
+以下是接口参考，不是主业务默认调度配置。local-primary 关闭应用内定时采集派发；本机行情更新先按 `docs/local-primary.md` 与 `docs/local-market-source.md` 读取实际服务状态。缺数据先查覆盖和本机任务状态，不直接运行同步示例或启用第二套调度；确需更新时先明确授权与输入范围。
+
+### 3.1 统一日同步接口
 ```bash
 # 提交同步任务，返回 task_id（market: A/CN=QuantDB, US=QuantUS, HK=QuantHK, BC=区块链, FUTURES=期货）
 curl -s -X POST "$BASE/api/v1/admin/data-platform/daily-sync" -H "$AUTH" -H "$CT" -d '{
@@ -199,7 +201,7 @@ curl -s -H "$AUTH" "$BASE/api/v1/admin/data-platform/sync-schedule/{market}"
 # 保存单市场配置（enabled/time/days/datasets/with_qlib）
 curl -s -X POST -H "$AUTH" -H "$CT" "$BASE/api/v1/admin/data-platform/sync-schedule/{market}" \
   -d '{"enabled": true, "time": "22:30", "days": [1,2,3,4,5], "datasets": ["all"], "with_qlib": true}'
-# 立即触发一次同步（测试）
+# 已明确授权的手动同步触发（不作为健康检查）
 curl -s -X POST -H "$AUTH" "$BASE/api/v1/admin/data-platform/sync-schedule/{market}/run"
 ```
 
@@ -462,7 +464,7 @@ curl -s -X POST -H "$AUTH" "$BASE/api/v1/news/sources/{source_id}/refresh"
 
 - **[[rd-agent-factor-mining]]** — 自动调用 RD-Agent 挖掘因子（evolve/tasks/factors/backtest/export）
 - **[[smart-strategy-stock-picking]]** — 基于 QuantDB 数据的条件选股（自然语言/条件/DSL 三种方式）
-- **[[quantdb-sdk]]** — QuantDB 数据 SDK（API Key 配置、28 数据集目录、字段查询、远程查询、同步）
+- **[[quantdb-sdk]]** — QuantDB 数据 SDK（API Key 配置、28 数据集目录、字段查询、供应商查询、同步）
 - **[[stock-market-analysis]]** — 市场深度分析 + 数据导出（全市场扫描/行业轮动/个股371字段/风险评分/CSV导出）
 - **[[backtest-center]]** — 回测中心（快速回测/专家模式/策略对比/参数优化/高级分析/向量化极速回测）
 - **[[ai-ide-strategy-writing]]** — AI-IDE 写策略并执行（Docker runner 运行/回测）

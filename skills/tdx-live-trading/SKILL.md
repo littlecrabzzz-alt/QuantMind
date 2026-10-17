@@ -5,26 +5,28 @@ description: "TDX 通达信实盘交易 + 模拟/实盘全链路实时监控。�
 
 > ## ⚙️ 运行环境契约（最高优先级，先于本文其余内容执行）
 >
-> 本技能可能运行在 **QuantBot（QwenPaw 容器）** 或**宿主机/本地 Claude Code**。执行前先探测环境（`which docker`、API 连通性），并遵守以下映射规则：
+> QuantMind 只在本地 Mac 运行：主业务由 Library 中已核准运行快照的 `scripts/local-primary.sh` 管理，Main 是开发源码；`local-dev.sh` 沙盒数据独立，不能与主业务同时占用 8000。执行前确认本地 Docker Desktop context、项目和挂载：
 >
-> 1. **后端 API 地址**：QwenPaw / 容器网络内一律用 `http://quantmind:8000`（`quantmind` 是 docker 网络别名）；仅宿主机调试用 `http://127.0.0.1:8000`。正文中出现的 `127.0.0.1:8000`、`localhost:800x`，在 QwenPaw 环境下自动替换为 `http://quantmind:8000`。
-> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**必须在 quantmind 容器内执行**（QwenPaw 本地 venv 无这些依赖）：
+> 1. **后端 API 地址**：主栈 QwenPaw 与后端同在 `quantmind-local_quantmind-net`，使用 Compose 服务名 `http://quantmind:8000`；Mac 宿主机用 `http://127.0.0.1:8000`。正文 API 示例的回环 8000 地址仅在该容器场景替换为服务名；不要改写其他服务端口或 API 路径。
+> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**在主栈后端容器 `quantmind-local-quantmind` 内执行**（QwenPaw venv 无这些依赖）：
 >    ```bash
->    docker cp <脚本路径> quantmind:/tmp/<脚本名> && docker exec -w /app quantmind python3 /tmp/<脚本名> <参数>
+>    docker cp <脚本路径> quantmind-local-quantmind:/tmp/<脚本名> && docker exec -w /app quantmind-local-quantmind python3 /tmp/<脚本名> <参数>
 >    ```
->    脚本源三选一：宿主机 repo `skills/<name>/scripts/`、QwenPaw 工作区 `/app/working/workspaces/default/skills/<name>/scripts/`、挂载目录 `/quantmind/skills/<name>/scripts/`。纯标准库脚本（无重依赖）可在 QwenPaw 本地直接跑。
+>    脚本优先从当前 QwenPaw 已安装工作区 `/app/working/workspaces/default/skills/<name>/scripts/` 读取；宿主机源码在 Main 的 `skills/<name>/scripts/`。Library 运行快照不默认包含 `skills/`，仅在实际存在且版本匹配时使用 `/quantmind/skills/`。Main 的 `data/db` 不是主业务数据；读写以容器实际挂载为准。纯标准库脚本可在 QwenPaw 内直接跑。
 > 3. **报告落盘**：股票报告页可见的 MD/PDF 报告，直接写 `/data/reports/trading_agents/{市场或类别}/{股票名}/`（QwenPaw 对 `/app/db` 有写权限，**直接写文件，不要 docker cp**）；过程数据 facts 写 `/data/reports/<类别>/`（`/data` 可写）。
 > 4. **MD → PDF 转换（按优先级降级）**：
->    ① `docker exec -w /app quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版，首选）；
+>    ① `docker exec -w /app quantmind-local-quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版）；
 >    ② docker 不可用时，**改用 QwenPaw 内置 `pdf` 技能**把 MD 转成 PDF；
 >    ③ 两者都不可用则只交付 MD，并明确告知用户 PDF 未能生成及原因。
 > 5. 本文中的 `~/.claude`、`cp -r ... ~/.claude/skills` 等说明仅适用于本地 Claude Code 维护者，**QuantBot 不要执行**。
 
 # tdx-live-trading — TDX 实盘链路 + 模拟/实盘全链路实时监控
 
+QuantMind 业务服务与数据库只在本地 Mac；本文 Windows 桥和通达信客户端是可选券商交易适配器，不承载另一套业务栈。local-primary 配置默认关闭实盘和 TDX 推送；安装适配器或执行只读巡检不构成启用授权，下文交易及进程变更操作须另行确认。
+
 QuantMind 交易执行链路的**操作 + 监控手册**：从模型推理信号到通达信真实下单、再到交易记录与持仓的完整闭环，以及供 AI 周期性巡检的一键状态快照。
 
-**当前环境边界**：旧内网 TDX 桥已下线。本技能保留可选重新接入后的操作说明，不证明任何桥、账号或自动交易循环在线。先读仓库 `/quantmind/docs/integrations/tdx-bridge.md`（本地为 `docs/integrations/tdx-bridge.md`），核实真实配置与授权。Mac 是唯一开发源，Windows 仅作可选交易运行节点；不要默认恢复旧桥或启动自动交易。
+**可选交易适配边界**：先读仓库 `/quantmind/docs/integrations/tdx-bridge.md`（本地为 `docs/integrations/tdx-bridge.md`），核实桥的实际配置、账户、在线状态与授权。本文接口说明不证明桥或自动交易循环已启用，不因安装适配器而启动自动交易。
 
 **定位**：`[[simulation-trading]]` 是模拟盘操作（下单/持仓/账户），本技能是**实盘（通达信桥）操作 + 模拟/实盘全链路监控**——链路任何一环出问题，先跑状态快照定位，再按手册处置。部署/重启见 `[[quantmind-operations]]`。
 
@@ -70,14 +72,14 @@ Windows 桥 bridge-windows (端口以实际配置为准, token 认证)
 
 ```bash
 # 宿主机执行（容器内跑，输出 ①桥健康 ②L2循环 ③滚动策略 ④今日委托 ⑤实盘持仓 ⑥模拟盘）
-docker exec -i -w /app quantmind python - < skills/tdx-live-trading/scripts/tdx_live_status.py
+docker exec -i -w /app quantmind-local-quantmind python - < skills/tdx-live-trading/scripts/tdx_live_status.py
 ```
 
 ### 异常判定表（AI 巡检时对照）
 
 | 快照异常 | 判定 | 处置 |
 |---|---|---|
-| ① `tdx_connected: false` | 客户端掉线 | 下单/持仓同步/L2 行情全停；日线/推理/回测不受影响；需 Windows 机器人工重启通达信并登录（平台无法远程拉起） |
+| ① `tdx_connected: false` | 客户端掉线 | 下单/持仓同步/L2 行情全停；日线/推理/回测不受影响；需在 Windows 端由操作人重新启动通达信并登录 |
 | ② enabled=True 但全中性 | 今天无生产推理 | 正常，不触发买卖；有推理后自然恢复 |
 | ② enabled=False | 自动买卖关闭 | 用户侧关闭；需要时设置页开启 |
 | ④ 在途委托收盘后滞留 | 盘后废单未回报 | 盯次日桥回报；连续滞留才告警 |
@@ -103,7 +105,7 @@ docker exec -i -w /app quantmind python - < skills/tdx-live-trading/scripts/tdx_
 - 循环状态 Redis `tdx:l2:realtime:status`，每只分数 `tdx:l2:score:{symbol}`
 - **开关**：前端设置页，或
   ```bash
-  docker exec quantmind python -c "
+  docker exec quantmind-local-quantmind python -c "
   import asyncio
   from backend.services.trade.redis_client import RedisClient
   async def m():
@@ -128,7 +130,7 @@ docker exec -i -w /app quantmind python - < skills/tdx-live-trading/scripts/tdx_
 
 ## 4. 下单 / 挂单 / 卖出 / 撤单
 
-桥 API（`http://192.168.31.31:8550`，需 Bearer token，token 在 Redis `trade:tdx_config:runtime`）：
+桥 API 地址与 Bearer token 从 Redis `trade:tdx_config:runtime` 的实际生效配置读取，不使用历史固定 IP：
 
 | 操作 | 路径 | 要点 |
 |---|---|---|
@@ -152,7 +154,7 @@ docker exec -i -w /app quantmind python - < skills/tdx-live-trading/scripts/tdx_
   实现：`backend/services/trade/services/tdx_push_service.py::estimate_order_fee`
 - **旧单回填**（桥列表滚出后 sync 刷不到时）：
   ```bash
-  docker exec quantmind python -c "
+  docker exec quantmind-local-quantmind python -c "
   import asyncio
   from sqlalchemy import text
   from backend.shared.database_manager_v2 import get_session
@@ -182,14 +184,14 @@ docker exec -i -w /app quantmind python - < skills/tdx-live-trading/scripts/tdx_
 
 ```bash
 # 找到 trade worker (8002=0x1F42) 并杀掉，看门狗自动 respawn 新代码
-docker exec quantmind sh -c "ps aux | grep spawn_main | grep -v grep"  # 看 PID
-docker exec quantmind kill <trade-PID>   # 通过 0x1F42 端口归属确认
+docker exec quantmind-local-quantmind sh -c "ps aux | grep spawn_main | grep -v grep"  # 看 PID
+docker exec quantmind-local-quantmind kill <trade-PID>   # 通过 0x1F42 端口归属确认
 ```
 
 ### 桥健康 / 运行时配置
 
 ```bash
-docker exec quantmind python -c "
+docker exec quantmind-local-quantmind python -c "
 from backend.services.trade.redis_client import RedisClient
 r = RedisClient(); r.connect()
 print(r.get('trade:tdx_config:runtime'))   # 真实生效的 bridge_url/token

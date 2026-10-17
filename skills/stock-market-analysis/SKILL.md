@@ -5,17 +5,17 @@ description: "股票市场深度数据分析与导出 — 全市场信号扫描�
 
 > ## ⚙️ 运行环境契约（最高优先级，先于本文其余内容执行）
 >
-> 本技能可能运行在 **QuantBot（QwenPaw 容器）** 或**宿主机/本地 Claude Code**。执行前先探测环境（`which docker`、API 连通性），并遵守以下映射规则：
+> QuantMind 只在本地 Mac 运行：主业务由 Library 中已核准运行快照的 `scripts/local-primary.sh` 管理，Main 是开发源码；`local-dev.sh` 沙盒数据独立，不能与主业务同时占用 8000。执行前确认本地 Docker Desktop context、项目和挂载：
 >
-> 1. **后端 API 地址**：QwenPaw / 容器网络内一律用 `http://quantmind:8000`（`quantmind` 是 docker 网络别名）；仅宿主机调试用 `http://127.0.0.1:8000`。正文中出现的 `127.0.0.1:8000`、`localhost:800x`，在 QwenPaw 环境下自动替换为 `http://quantmind:8000`。
-> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**必须在 quantmind 容器内执行**（QwenPaw 本地 venv 无这些依赖）：
+> 1. **后端 API 地址**：主栈 QwenPaw 与后端同在 `quantmind-local_quantmind-net`，使用 Compose 服务名 `http://quantmind:8000`；Mac 宿主机用 `http://127.0.0.1:8000`。正文 API 示例的回环 8000 地址仅在该容器场景替换为服务名；不要改写其他服务端口或 API 路径。
+> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**在主栈后端容器 `quantmind-local-quantmind` 内执行**（QwenPaw venv 无这些依赖）：
 >    ```bash
->    docker cp <脚本路径> quantmind:/tmp/<脚本名> && docker exec -w /app quantmind python3 /tmp/<脚本名> <参数>
+>    docker cp <脚本路径> quantmind-local-quantmind:/tmp/<脚本名> && docker exec -w /app quantmind-local-quantmind python3 /tmp/<脚本名> <参数>
 >    ```
->    脚本源三选一：宿主机 repo `skills/<name>/scripts/`、QwenPaw 工作区 `/app/working/workspaces/default/skills/<name>/scripts/`、挂载目录 `/quantmind/skills/<name>/scripts/`。纯标准库脚本（无重依赖）可在 QwenPaw 本地直接跑。
+>    脚本优先从当前 QwenPaw 已安装工作区 `/app/working/workspaces/default/skills/<name>/scripts/` 读取；宿主机源码在 Main 的 `skills/<name>/scripts/`。Library 运行快照不默认包含 `skills/`，仅在实际存在且版本匹配时使用 `/quantmind/skills/`。Main 的 `data/db` 不是主业务数据；读写以容器实际挂载为准。纯标准库脚本可在 QwenPaw 内直接跑。
 > 3. **报告落盘**：股票报告页可见的 MD/PDF 报告，直接写 `/data/reports/trading_agents/{市场或类别}/{股票名}/`（QwenPaw 对 `/app/db` 有写权限，**直接写文件，不要 docker cp**）；过程数据 facts 写 `/data/reports/<类别>/`（`/data` 可写）。
 > 4. **MD → PDF 转换（按优先级降级）**：
->    ① `docker exec -w /app quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版，首选）；
+>    ① `docker exec -w /app quantmind-local-quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版）；
 >    ② docker 不可用时，**改用 QwenPaw 内置 `pdf` 技能**把 MD 转成 PDF；
 >    ③ 两者都不可用则只交付 MD，并明确告知用户 PDF 未能生成及原因。
 > 5. 本文中的 `~/.claude`、`cp -r ... ~/.claude/skills` 等说明仅适用于本地 Claude Code 维护者，**QuantBot 不要执行**。
@@ -126,8 +126,8 @@ curl -s -H "$AUTH" "$BASE/api/v1/market/index-kline?symbol=000001.SH&days=60"
 curl -s -H "$AUTH" "$BASE/api/v1/market/overview"           # 多市场指数概览
 
 # ⑥ 订单微结构截面分位（L4b，2026-08 新增；先确认最新分区）
-docker exec quantmind ls /data/quantdb/6_ml_datasets/l2_factors/ | tail -1   # → dt=YYYYMMDD
-docker exec quantmind python3 - <<'EOF'
+docker exec quantmind-local-quantmind ls /data/quantdb/6_ml_datasets/l2_factors/ | tail -1   # → dt=YYYYMMDD
+docker exec quantmind-local-quantmind python3 - <<'EOF'
 import duckdb, pandas as pd
 dt = "YYYYMMDD"   # 上一步最新分区
 mkt = duckdb.connect().execute(f"SELECT * FROM read_parquet('/data/quantdb/6_ml_datasets/l2_factors/dt={dt}/data.parquet')").df()
@@ -153,7 +153,7 @@ curl -s -H "$AUTH" "$BASE/api/v1/news/articles?tickers=600519&sort=sentiment_bul
 **必须 docker exec 直读**：
 
 ```bash
-docker exec quantmind python3 - <<'EOF'
+docker exec quantmind-local-quantmind python3 - <<'EOF'
 import pandas as pd
 base = "/data/quantdb/3_financial_data"
 code = "600519.SH"
@@ -186,7 +186,7 @@ EOF
 ### 3.3 估值（三维对照 + 历史分位，parquet 直读）
 
 ```bash
-docker exec quantmind python3 - <<'EOF'
+docker exec quantmind-local-quantmind python3 - <<'EOF'
 import pandas as pd, glob
 # 拉近 5 年 valuation 序列算历史分位（Hive 分区 dt=YYYYMMDD/data.parquet）
 files = sorted(glob.glob("/data/quantdb/5_technical_derived/valuation/dt=*/data.parquet"))[-1260:]
@@ -224,7 +224,7 @@ EOF
 - **融资融券**（parquet，单位：finance_*=**万元**、slo_volume=**股**）：
 
 ```bash
-docker exec quantmind python3 - <<'EOF'
+docker exec quantmind-local-quantmind python3 - <<'EOF'
 import pandas as pd, glob
 files = sorted(glob.glob("/data/quantdb/2_base_sector/margin_trading/dt=*/data.parquet"))[-30:]
 rows = []
@@ -459,14 +459,14 @@ db/trading_agents_results/{市场名}/{股票名}/{股票名}{代码}_{日期}_�
 - 文件名三段下划线格式：`{股票名}{代码}_{YYYY-MM-DD}_投研分析报告`，前端按此解析股票名/代码/日期
 - **md → pdf 转换**（reportlab 只有容器里有）：
   ```bash
-  docker cp /tmp/report.md quantmind:/tmp/report.md
-  docker exec quantmind bash -lc "cd /app && python3 backend/scripts/md_to_pdf_report.py /tmp/report.md /tmp/report.pdf"
-  docker cp quantmind:/tmp/report.pdf /tmp/report.pdf
+  docker cp /tmp/report.md quantmind-local-quantmind:/tmp/report.md
+  docker exec quantmind-local-quantmind bash -lc "cd /app && python3 backend/scripts/md_to_pdf_report.py /tmp/report.md /tmp/report.pdf"
+  docker cp quantmind-local-quantmind:/tmp/report.pdf /tmp/report.pdf
   ```
 - **落盘权限陷阱**：宿主机上 `db/trading_agents_results/` 的目录 owner 是容器内 root，宿主机直接 cp md 会 EACCES——**必须走 docker cp**（容器内路径 `/data/reports/trading_agents/...`，宿主机的 `./db` 挂载到容器 `/app/db`）：
   ```bash
-  docker cp /tmp/report.md quantmind:/data/reports/trading_agents/A股市场/{股票名}/{股票名}{代码}_{日期}_投研分析报告.md
-  docker cp /tmp/report.pdf quantmind:/data/reports/trading_agents/A股市场/{股票名}/{股票名}{代码}_{日期}_投研分析报告.pdf
+  docker cp /tmp/report.md quantmind-local-quantmind:/data/reports/trading_agents/A股市场/{股票名}/{股票名}{代码}_{日期}_投研分析报告.md
+  docker cp /tmp/report.pdf quantmind-local-quantmind:/data/reports/trading_agents/A股市场/{股票名}/{股票名}{代码}_{日期}_投研分析报告.pdf
   ```
 - 交付确认：ls 目标目录确认 md+pdf 都存在；只发 /tmp 路径 = 未交付
 

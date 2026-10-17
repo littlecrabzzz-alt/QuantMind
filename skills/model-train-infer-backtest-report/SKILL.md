@@ -5,17 +5,17 @@ description: "模型训练-推理-组合回测-专业报告全流程：提交T+N
 
 > ## ⚙️ 运行环境契约（最高优先级，先于本文其余内容执行）
 >
-> 本技能可能运行在 **QuantBot（QwenPaw 容器）** 或**宿主机/本地 Claude Code**。执行前先探测环境（`which docker`、API 连通性），并遵守以下映射规则：
+> QuantMind 只在本地 Mac 运行：主业务由 Library 中已核准运行快照的 `scripts/local-primary.sh` 管理，Main 是开发源码；`local-dev.sh` 沙盒数据独立，不能与主业务同时占用 8000。执行前确认本地 Docker Desktop context、项目和挂载：
 >
-> 1. **后端 API 地址**：QwenPaw / 容器网络内一律用 `http://quantmind:8000`（`quantmind` 是 docker 网络别名）；仅宿主机调试用 `http://127.0.0.1:8000`。正文中出现的 `127.0.0.1:8000`、`localhost:800x`，在 QwenPaw 环境下自动替换为 `http://quantmind:8000`。
-> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**必须在 quantmind 容器内执行**（QwenPaw 本地 venv 无这些依赖）：
+> 1. **后端 API 地址**：主栈 QwenPaw 与后端同在 `quantmind-local_quantmind-net`，使用 Compose 服务名 `http://quantmind:8000`；Mac 宿主机用 `http://127.0.0.1:8000`。正文 API 示例的回环 8000 地址仅在该容器场景替换为服务名；不要改写其他服务端口或 API 路径。
+> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**在主栈后端容器 `quantmind-local-quantmind` 内执行**（QwenPaw venv 无这些依赖）：
 >    ```bash
->    docker cp <脚本路径> quantmind:/tmp/<脚本名> && docker exec -w /app quantmind python3 /tmp/<脚本名> <参数>
+>    docker cp <脚本路径> quantmind-local-quantmind:/tmp/<脚本名> && docker exec -w /app quantmind-local-quantmind python3 /tmp/<脚本名> <参数>
 >    ```
->    脚本源三选一：宿主机 repo `skills/<name>/scripts/`、QwenPaw 工作区 `/app/working/workspaces/default/skills/<name>/scripts/`、挂载目录 `/quantmind/skills/<name>/scripts/`。纯标准库脚本（无重依赖）可在 QwenPaw 本地直接跑。
+>    脚本优先从当前 QwenPaw 已安装工作区 `/app/working/workspaces/default/skills/<name>/scripts/` 读取；宿主机源码在 Main 的 `skills/<name>/scripts/`。Library 运行快照不默认包含 `skills/`，仅在实际存在且版本匹配时使用 `/quantmind/skills/`。Main 的 `data/db` 不是主业务数据；读写以容器实际挂载为准。纯标准库脚本可在 QwenPaw 内直接跑。
 > 3. **报告落盘**：股票报告页可见的 MD/PDF 报告，直接写 `/data/reports/trading_agents/{市场或类别}/{股票名}/`（QwenPaw 对 `/app/db` 有写权限，**直接写文件，不要 docker cp**）；过程数据 facts 写 `/data/reports/<类别>/`（`/data` 可写）。
 > 4. **MD → PDF 转换（按优先级降级）**：
->    ① `docker exec -w /app quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版，首选）；
+>    ① `docker exec -w /app quantmind-local-quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版）；
 >    ② docker 不可用时，**改用 QwenPaw 内置 `pdf` 技能**把 MD 转成 PDF；
 >    ③ 两者都不可用则只交付 MD，并明确告知用户 PDF 未能生成及原因。
 > 5. 本文中的 `~/.claude`、`cp -r ... ~/.claude/skills` 等说明仅适用于本地 Claude Code 维护者，**QuantBot 不要执行**。
@@ -81,8 +81,8 @@ CT="Content-Type: application/json"
 已有可复用脚本：`scripts/submit_t3_training.py`（从 T+5 复制改 T+3）
 
 ```bash
-docker cp scripts/submit_t3_training.py quantmind:/tmp/
-docker exec quantmind python3 /tmp/submit_t3_training.py
+docker cp scripts/submit_t3_training.py quantmind-local-quantmind:/tmp/
+docker exec quantmind-local-quantmind python3 /tmp/submit_t3_training.py
 # 关键：从 admin_training_jobs 读 T+5 payload → target_horizon_days=3 → POST /models/run-training
 ```
 
@@ -110,7 +110,7 @@ curl -s -H "$AUTH" "$BASE/api/v1/models/training-runs/<runId>" \
 # 训练容器名: qm-train-<runId>
 docker ps | grep qm-train
 # 训练日志
-docker exec quantmind python3 -c "
+docker exec quantmind-local-quantmind python3 -c "
 import asyncio
 from backend.shared.database_manager_v2 import get_session
 from sqlalchemy import text
@@ -175,7 +175,7 @@ curl -s -H "$AUTH" "$BASE/api/v1/models/inference/batch/<batch_id>" \
 ### 2.3 验证推理结果（分数已写入 engine_signal_scores）
 
 ```bash
-docker exec quantmind python3 -c "
+docker exec quantmind-local-quantmind python3 -c "
 import asyncio
 from backend.shared.database_manager_v2 import get_session
 from sqlalchemy import text
@@ -219,11 +219,11 @@ SLIPPAGE = 0.002        # 滑点0.2%
 ### 3.3 运行回测（拷贝进容器，数据在 /data）
 
 ```bash
-docker cp scripts/backtest_l2_optimized.py quantmind:/tmp/
+docker cp scripts/backtest_l2_optimized.py quantmind-local-quantmind:/tmp/
 # 临时改模型/时间：
 #   MODEL_ID 改为目标模型的 id；START_DATE/END_DATE 设回测区间
 # 或用 python -c 注入：
-docker exec quantmind python3 -c "
+docker exec quantmind-local-quantmind python3 -c "
 import sys; sys.path.insert(0,'/tmp')
 import backtest_l2_optimized as b
 b.MODEL_ID = '<target_model_id>'
@@ -252,9 +252,9 @@ b.signals = b.load_signals()       # 自动读该模型全部信号
 
 ```bash
 # report_l2_optimized.py 复用回测数据生成研报级 MD
-docker cp scripts/report_l2_optimized.py quantmind:/tmp/
-docker cp scripts/backtest_l2_optimized.py quantmind:/tmp/
-docker exec quantmind python3 -c "
+docker cp scripts/report_l2_optimized.py quantmind-local-quantmind:/tmp/
+docker cp scripts/backtest_l2_optimized.py quantmind-local-quantmind:/tmp/
+docker exec quantmind-local-quantmind python3 -c "
 import sys; sys.path.insert(0,'/tmp')
 from report_l2_optimized import main; main()
 "   # 生成 docs/L2_CatBoost_T5_优化回测报告.md
@@ -264,9 +264,9 @@ from report_l2_optimized import main; main()
 
 ```bash
 # md_to_pdf_report.py：深蓝封面+金色双线+斑马纹表格+红涨绿跌
-docker cp "docs/xxx_report.md" quantmind:/tmp/rep.md
-docker exec quantmind python3 /app/backend/scripts/md_to_pdf_report.py /tmp/rep.md "/tmp/xxx_report.pdf"
-docker cp quantmind:/tmp/xxx_report.pdf "docs/xxx_report.pdf"
+docker cp "docs/xxx_report.md" quantmind-local-quantmind:/tmp/rep.md
+docker exec quantmind-local-quantmind python3 /app/backend/scripts/md_to_pdf_report.py /tmp/rep.md "/tmp/xxx_report.pdf"
+docker cp quantmind-local-quantmind:/tmp/xxx_report.pdf "docs/xxx_report.pdf"
 ```
 
 ### 4.3 报告结构（9 部分）

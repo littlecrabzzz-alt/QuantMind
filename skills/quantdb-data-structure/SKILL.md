@@ -1,6 +1,6 @@
 ---
 name: quantdb-data-structure
-description: "QuantDB 服务器数据结构与读取口径 — 数据目录组织（1_kline_data~6_ml_datasets）、Hive 分区规律（dt=YYYYMMDD 整数）、单文件 {symbol}.parquet、parquet 后缀式代码 600519.SH 与 PG 前缀式 SH600519 的转换口径、quantdb_hub.py 单一读取入口与 DuckDB 视图清单、服务器路径映射（/opt/quantmind/data/quantdb → 容器 /data/quantdb）。凡需要读写/探查/补数/验证 QuantDB 本地 parquet 数据、查目录结构、写 DuckDB 查询、排查查不到数据问题时使用。触发词：quantdb 结构、数据目录、dt 分区、hive 分区、parquet 路径、数据在哪里、600519.SH、代码格式、qdb_ 视图、quantdb_hub、增量同步、数据缺失排查"
+description: "QuantDB 本地数据结构与读取口径 — 数据目录组织（1_kline_data~6_ml_datasets）、Hive 分区规律（dt=YYYYMMDD 整数）、单文件 {symbol}.parquet、parquet 后缀式代码 600519.SH 与 PG 前缀式 SH600519 的转换口径、quantdb_hub.py 单一读取入口与 DuckDB 视图清单、本地主业务数据挂载（运行快照 .local-primary/project/data → 容器 /data）。凡需要读写/探查/补数/验证 QuantDB 本地 parquet 数据、查目录结构、写 DuckDB 查询、排查查不到数据问题时使用。触发词：quantdb 结构、数据目录、dt 分区、hive 分区、parquet 路径、数据在哪里、600519.SH、代码格式、qdb_ 视图、quantdb_hub、增量同步、数据缺失排查"
 ---
 
 # quantdb-data-structure — QuantDB 数据结构与读取口径
@@ -10,14 +10,14 @@ description: "QuantDB 服务器数据结构与读取口径 — 数据目录组�
 
 ## 一、路径映射（先定位数据）
 
-Mac 是唯一开发源，但数据目录不等于代码目录；旧 `/opt/quantmind` 仅是服务器部署示例。先查目标实例挂载及 `QM_QUANTDB_DATA_DIR`，不能假定运行数据已经迁移，或在本地相同相对路径发现空目录后启动补数。
+QuantMind 只在本地 Mac 运行。Main 是开发源码；主业务使用 Library 中已核准的 `primary-runtime-*` 快照，运行数据位于该快照的 `.local-primary/project/`，不能把 Main 的相同相对路径当作业务数据。先查 `quantmind-local-quantmind` 的实际挂载及 `QM_QUANTDB_DATA_DIR`；发现空目录或缺少日期时先检查本机数据更新状态，不自行启动补数。
 
 | 位置 | 路径 |
 |---|---|
-| 生产服务器宿主机 | `/opt/quantmind/data/quantdb` |
-| 容器内（`./data:/data` bind mount） | `/data/quantdb` |
-| 本地仓库 | `<项目根>/data/quantdb` |
-| **用户自定义数据集（产出区）** | `/data/quantcustom`（宿主机 `/opt/quantmind/data/quantcustom`） |
+| Mac 主业务宿主机 | `<运行快照>/.local-primary/project/data/quantdb`，以实际挂载为准 |
+| 主业务容器内 | `/data/quantdb`（主业务 `data` 目录挂载到 `/data`） |
+| 隔离开发沙盒 | `<Main>/.local-dev/project/data/quantdb`，不能与主业务混用 |
+| **用户自定义数据集（产出区）** | `/data/quantcustom`（宿主机 `<运行快照>/.local-primary/project/data/quantcustom`） |
 
 > ⚠️ `quantdb/` 是**官方只读数据**；`quantcustom/` 是**用户/挖掘产出**（因子挖掘、因子工厂的落盘区，`QM_QUANTCUSTOM_DATA_DIR`）。两者结构同为 6 大类，但写入一律进 `quantcustom`，**不要污染 quantdb**。
 
@@ -93,20 +93,20 @@ SELECT * FROM read_parquet('/data/quantdb/1_kline_data/daily_forward/dt=20260828
 WHERE symbol = '600519.SH';
 ```
 
-## 六、服务器核查命令速查
+## 六、本地主业务只读核查命令
 
 ```bash
-# 目录与体量
-ls /opt/quantmind/data/quantdb && du -sh /opt/quantmind/data/quantdb/*
+# 数据目录与体量（在主业务容器内读取实际挂载）
+docker exec quantmind-local-quantmind sh -c 'ls /data/quantdb && du -sh /data/quantdb/*'
 
 # 容器内可见性
-docker exec quantmind ls /data/quantdb
+docker exec quantmind-local-quantmind ls /data/quantdb
 
 # 某交易日数据是否到位（以日K为例）
-ls /opt/quantmind/data/quantdb/1_kline_data/daily_forward/dt=20260828/
+docker exec quantmind-local-quantmind ls /data/quantdb/1_kline_data/daily_forward/dt=20260828/
 ```
 
-数据更新后服务未感知时：`docker compose restart quantmind celery-worker`（数据走 bind mount，无需重建镜像）。增量同步需先在【个人中心】→【数据平台】绑定 `QUANTDB_API_KEY` 后 `docker exec` 触发。
+数据更新后服务未感知时，先读本机数据更新状态与日志，并从已核准运行快照执行 `scripts/local-primary.sh status`。不要用裸 Compose 重启或把缺数据当作补数授权；确需服务变更或同步，先明确目标、备份和授权。外部 QuantDB SDK 的 API Key 在【个人中心】→【数据平台】绑定，凭据不写进报告。
 
 ## 七、写代码前的自查清单
 

@@ -1,6 +1,6 @@
 # Electron 桌面端
 
-本目录是 React + Vite 渲染层与 Electron 主进程的开发入口。后端部署与数据准备见[项目入口](../README.md)，不由桌面进程隐式迁移或接管数据库。
+本目录是 React + Vite 渲染层与 Electron 主进程的开发入口。后端部署与数据准备见[本地 Mac 运行与部署](../docs/部署指南.md)：Main 是开发源码，主业务运行在 Library 受管快照中，不由桌面进程隐式启动另一套后端或接管数据库。
 
 ## 开发与打包
 
@@ -29,10 +29,10 @@ npm run dev
 
 - `electron/main.ts`：窗口生命周期、主进程 IPC 与更新；IPC 处理器在 `electron/ipc/handlers/`。
 - `src/App.tsx`、`src/features/`、`src/pages/`：路由和业务页面；通用组件在 `src/components/`。
-- `src/config/services.ts`：后端地址、服务端口与桌面用户保存的服务器配置。普通 HTTP 业务经 API 网关（默认 `http://127.0.0.1:8000`），不要在页面硬编码后端主机。
+- `src/config/services.ts`：后端地址、服务端口与桌面用户保存的连接配置。本地 HTTP 业务经 API 网关 `http://127.0.0.1:8000`，不要在页面硬编码后端主机；独立沙盒不能与主业务同时占用该端口。
 - `src/services/api-client.ts`：通用 HTTP 客户端；认证逻辑在 `src/features/auth/`。凭据不能写进前端源码或 Vite 公共环境变量。
 - `src/services/backtestService.ts` 与后端 [Qlib 合同](../backend/services/engine/qlib_app/README.md)：回测请求、状态与结果排障入口。
 - QuantBot 的 `src/features/quantbot/services/agentApi.ts` 使用 `/api/v1/openclaw` 网关适配层；聊天以 SSE 接收，不能按旧 WebSocket 演示接入，也不能由组件存在推定上游技能可用。
 - `public/` 是复制到构建产物的静态资源；`scripts/` 是本模块构建辅助。目录职责可从源码读取，不另设逐目录 README。
 
-服务器已保存但暂时不可达时，不应为恢复界面而切换数据权威来源。排查顺序：桌面设置中的地址、`/health`、认证/租户头、网关响应、对应后端服务日志。
+本机后端暂时不可达时，不应为恢复界面而启动另一套数据栈。排查顺序：桌面设置是否仍指向本机 8000、主业务脚本 `status`、`/health`、认证/租户头、网关响应、对应后端服务日志。

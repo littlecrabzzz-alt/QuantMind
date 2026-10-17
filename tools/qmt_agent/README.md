@@ -22,4 +22,4 @@ python tools/qmt_agent/qmt_agent.py --config <配置文件路径>
 - `runtime_supervisor.py` 负责监督，`schedule_policy.py` 定义时段和上报策略，`runtime_workers.py` 执行后台任务；时段和默认参数以当前代码及配置为准。
 - 鉴权使用 Access/Secret Key 换取短期 bridge session，再连接 `ws/bridge`；账户快照和心跳共同影响平台就绪判断。仅“测试连接成功”不能代替持续在线状态。
 
-开发源仍是 Mac；Windows 是独立交易运行节点，不作为第二套代码开发源。不要因旧安装包存在而假定当前实例、账户或远端数据库已迁移。
+QuantMind 平台和业务数据库只在本地 Mac 运行；Windows 上的 QMT Agent 是可选券商交易适配器，不承载另一套 QuantMind 业务栈或开发源码。启用前核对实际平台连接地址、账户和交易授权；本地单机运行不自动开启实盘权限。

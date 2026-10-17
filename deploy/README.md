@@ -1,25 +1,30 @@
-# 可选部署与更新任务
+# Mac 本地部署与运维
 
-Mac 是本仓库唯一开发源；这里的 Ubuntu 部署脚本是**明确指定目标后才执行的运维工具**，不是日常开发流程，也不表示远端运行服务、数据库或数据已经迁回本地。当前环境与数据边界见 [部署指南](../docs/部署指南.md)。
+QuantMind 只在本地 Mac 单机运行。主业务入口是 `scripts/local-primary.sh`，Compose 项目为 `quantmind-local`。Main 工作树是开发源码；日常业务使用 `~/Library/Application Support/QuantMind/primary-runtime-*` 中已核准的独立运行快照，编辑 Main 不会自动更新已部署版本。详细边界见 [本地主节点](../docs/local-primary.md)。
 
-## 选择脚本
+## 当前实例的操作入口
 
-| 任务 | 入口 | 执行前确认 |
-|---|---|---|
-| 新 Ubuntu 节点在线部署 | `sudo bash deploy/deploy.sh --ref <分支或tag>` | 目标目录、网络、凭据和独立数据来源 |
-| 从完整包部署 | `sudo bash deploy/full-deploy.sh` | `QUANTMIND_OFFLINE_BASE_URL` 包内容、校验和与数据覆盖范围 |
-| 更新已有 Ubuntu 部署 | `sudo bash deploy/update.sh --ref <分支或tag>` | 目标实例、备份、停机影响；`--no-build` 仅用于不需新依赖的更新 |
-| 可选 AutoDL GPU Worker | [autodl/README.md](autodl/README.md) | 仅卸载训练，不迁移开发源或生产数据库 |
+在已核准的 Library 运行快照目录执行：
 
-脚本默认项目目录和支持系统以对应脚本开头配置为准。不要在本地工作树调用服务器更新脚本；`--force` 会覆盖目标未提交代码，不能用来解决开发目录冲突。
+```bash
+scripts/local-primary.sh status
+```
 
-## 数据与镜像
+需要启停时，在获得相应授权后使用同一目录的 `scripts/local-primary.sh start` 或 `scripts/local-primary.sh stop`。`start` 只用于已具有 `READY`、`AUTHORITY.json` 和恢复验证记录的实例；`stop` 保留数据卷。不要用裸 Compose 启停、初始化 SQL 或删除卷来绕过入口门控。
 
-- 完整包中的镜像、业务目录、PostgreSQL 和 QwenPaw 持久卷是不同资产。`QUANTMIND_REPLACE_QLIB`、`QUANTMIND_REPLACE_BUSINESS_DATA`、`QUANTMIND_REPLACE_DATABASE`、`QUANTMIND_REPLACE_QWENPAW_DATA` 都是有意覆盖开关，不作为常规部署参数。
-- 部署前核对实际挂载和当前数据所有者，保留备份；不要用旧服务器路径或 Git 目录存在性判断数据已迁移。
-- `deploy/req-fingerprint.sh` 计算镜像依赖指纹，构建时传入 `QM_REQ_SHA`；完整部署会比对镜像 Label `qm.req.sha`。指纹不同可能触发联网重建，纯离线环境需准备匹配代码的镜像。
-- Compose 项目名、env 文件、override、服务数量和端口必须取自目标实际配置。不要直接在未知目录运行裸 `docker compose up`、`restart` 或 `down -v`。
+| 项目 | 本地边界 |
+|---|---|
+| 主业务数据 | `<运行快照>/.local-primary/project/{data,db,models,logs,user_pools_local}`，以实际挂载为准 |
+| API / web | `http://127.0.0.1:8000` / `http://127.0.0.1:3080`，仅绑定本机回环 |
+| 容器内 API | 同一 `quantmind-local_quantmind-net` 网络使用服务名 `http://quantmind:8000` |
+| 隔离开发沙盒 | Main 中的 `scripts/local-dev.sh` 管理独立 `quantmind-dev` 项目与 `.local-dev` 数据；不得与主业务同时占用 8000，不复用主业务卷 |
+
+## 安装代码快照
+
+在 Main 中使用 `scripts/local-primary.sh install-runtime <新的Library运行目录> <已存在的Library产物目录>`。目标必须是 `~/Library/Application Support/QuantMind/` 管理根内尚不存在的真实目录；产物目录与代码快照分离。安装范围、凭据文件和 manifest 合同见 [本地主节点](../docs/local-primary.md)。
+
+此入口仅安装文件，不启动 Docker、不恢复数据库、不创建就绪状态，也不安装登录自启。新实例恢复或重建须另行明确工具、输入、备份及授权，不能当作一次普通 `start`。
 
 ## 只读排障起点
 
-先确认本机 Docker context 和目标 Compose 参数，再使用同一组参数读取 `config --services`、`ps`、`logs --tail=200 <服务>`。API `/health` 只证明该端点可达，不能代替数据库、队列和 Worker 状态。修改配置、恢复备份、重建或重启属于另一个有副作用的运维步骤，须单独确认影响。
+先从运行快照执行 `status`，核对本地 Docker Desktop context、`quantmind-local` 标签、端口与挂载。后端日志可用 `docker logs --tail=200 quantmind-local-quantmind` 读取；其他容器名先从状态确认。API `/health` 只证明端点可达，不能代替数据库、队列和 Worker 状态。修改配置、恢复备份、重建或重启都是有副作用的运维步骤，须单独确认影响。

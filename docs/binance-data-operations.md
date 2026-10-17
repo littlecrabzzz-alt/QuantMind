@@ -1,12 +1,12 @@
 # 币安数据采集、发布与研究输入
 
-用途：手工采集、固定发布、增量恢复和数据消费验收。产品审核与限制见 [产品边界](binance-data-products.md)。现有研究适配只接受 `crypto_spot`，代币化证券和股票永续分别保存，不混入加密现货或底层证券样本。
+用途：在 Mac 单机维护手工采集、固定发布、增量恢复和数据消费验收。主业务使用 `~/Library/Application Support/QuantMind/primary-runtime-*` 的核准代码快照，Main 工作树用于开发；原始采集保存在独立 Library 数据源目录，主业务和沙盒不共享可写数据库。产品审核与限制见 [产品边界](binance-data-products.md)。现有研究适配只接受 `crypto_spot`，代币化证券和股票永续分别保存，不混入加密现货或底层证券样本。
 
 代码已登记十个加密现货、四个股票代币；默认 BTC/ETH 池和本地日更不会因登记表扩充自动改变。实际已发布范围读取目标数据根的 manifest，不把历史扩充批次当作当前持续更新状态。
 
 ## 采集与增量
 
-在项目根目录执行，明确指定本节点的数据目录。公开现货行情不需要账户或 API key。首次使用早于上市的开始日期；后续运行自动保留全部已发布历史，从最新已存日向前回看一周，重拉重叠区间。
+在 Mac 项目根目录执行手工批次，明确指定独立数据目录。自动日更由唯一市场源编排维护，手工批次不得并行写其受管数据根或运行中的固定研究输入；需要更新主业务日更时使用下文市场源入口，不直接覆盖其 CURRENT。公开现货行情不需要账户或 API key。首次使用早于上市的开始日期；后续运行自动保留全部已发布历史，从最新已存日向前回看一周，重拉重叠区间。
 
 ```sh
 python3 -m backend.scripts.quantbc_daily_sync \
@@ -77,12 +77,12 @@ python3 -m backend.scripts.equity_perpetual_archive \
 
 ## 定时更新口径
 
-BC 由 Mac 本地每天北京时间08:15采集，即UTC日线闭合后15分钟；每15分钟和唤醒后补查，失败阶段下轮重试。采集成功后传固定版本到云端与本地沙盒，分别生成Qlib/H5。长停机按已存最后一日回补，云端不向币安直接取数。运行说明见 [本地数据源](local-market-source.md)。
+BC 由 Mac 本地每天北京时间 08:15 采集，即 UTC 日线闭合后 15 分钟；每 15 分钟和唤醒后补查，失败阶段下轮重试。固定版本校验后应用到本机 `quantmind-local` 主业务栈并生成 Qlib/H5；长停机按已存最后一日回补。运行入口须显式指向已准备主业务状态的 Library 代码快照，不能从未具 READY 的项目调用 tick 代替。命令、客户端安装与回执见[本地数据源](local-market-source.md)。
 
 管理员 QuantBC 数据页独立于全局 crypto 研究开关；可保持 `ENABLE_CRYPTO=false`、`VITE_ENABLE_CRYPTO=false`。日更使用显式已验证 release 准备 Qlib/H5，不因数据构建把全局研究市场打开。
 
 ## 当前部署边界
 
-既有链路由 Mac 独立源采集 BTC/ETH，向本地沙盒与现有云端接收者交付文件版本，两端各自派生。云端不应重新派发供应商采集，业务数据库不随行情同步；远端开发退役不等于接收服务已迁移。实际 LaunchAgent、接收回执与派生截止日须分别核对。
+日更由 Mac 独立源采集 BTC/ETH，数据位于 `~/Library/Application Support/QuantMind/market-source`；主业务通过核准快照中的 `scripts/local-primary.sh` 管理。采集版本、`status.json` 的 `primary_release`、`.local-primary/BC_SYNC.json` 和实际 Qlib/H5 截止日分别核对；上游采集成功不等于研究已经读取该版本。独立沙盒由 Main 的 `local-dev.sh` 管理，与主业务不能同时占用 8000，不由日更自动启动。
 
 股票代币和扩充币池使用独立固定目录，不自动纳入日更。管理员数据页独立于全局 crypto 研究开关：保持 `ENABLE_CRYPTO=false`、`VITE_ENABLE_CRYPTO=false` 仍可检查/准备数据，但不因此启动策略或交易。不能把本文的边界要求当当前部署开关值的证明；实盘准入单独验收。

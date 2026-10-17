@@ -9,7 +9,7 @@
 
 ```bash
 # ① 股票名 → 代码（用户只说"振华科技"时）
-docker exec quantmind-db psql -U quantmind -d quantmind -t -c \
+docker exec quantmind-local-db psql -U quantmind -d quantmind -t -c \
   "SELECT symbol,name FROM stocks WHERE name LIKE '%振华科技%';"
 
 # ② 确认最新数据分区（日更节奏：当日 L2 晚间落盘；个别标的日K可能缺最新一天）
@@ -24,14 +24,14 @@ ls data/quantdb/1_kline_data/daily_forward/ | tail -1        # 日K 最新
 ```bash
 # parquet 层：行情/财务/估值/两融/订单微结构截面（自动探测 host/容器路径）
 python3 scripts/stock_9layer_fetch.py 000733.SZ --json       # 宿主机
-docker exec quantmind python3 /app/scripts/stock_9layer_fetch.py 000733.SZ --json  # 容器
+docker exec quantmind-local-quantmind python3 /app/scripts/stock_9layer_fetch.py 000733.SZ --json  # 容器
 
 # PG 层（脚本不管，需补）：
 # L6 模型信号
-docker exec quantmind-db psql -U quantmind -d quantmind -c \
+docker exec quantmind-local-db psql -U quantmind -d quantmind -c \
  "SELECT trade_date, model_version, light_score, tft_score, fusion_score, signal_side FROM engine_signal_scores WHERE symbol='000733' ORDER BY trade_date DESC LIMIT 15;"
 # L7 新闻富集（个股 ticker 命中）
-docker exec quantmind-db psql -U quantmind -d quantmind -c \
+docker exec quantmind-local-db psql -U quantmind -d quantmind -c \
  "SELECT huntly_page_id, sentiment_label, sentiment_score, substr(title,1,60) FROM news_article_enrichment WHERE tickers::text LIKE '%000733%' ORDER BY huntly_page_id DESC LIMIT 20;"
 # L0 大盘（上证 vs MA20，脚本暂无 → 手动 python 或 /selection/daily）
 ```
@@ -113,8 +113,8 @@ docker exec quantmind-db psql -U quantmind -d quantmind -c \
 ```bash
 # ① 按模板写 MD（结构见 §5）→ /tmp/{name}_{code}_report.md
 # ② 容器内转 PDF
-docker cp /tmp/{name}_{code}_report.md quantmind:/tmp/report.md
-docker exec quantmind bash -c 'mkdir -p "/data/reports/trading_agents/A股市场/{股票名}" && \
+docker cp /tmp/{name}_{code}_report.md quantmind-local-quantmind:/tmp/report.md
+docker exec quantmind-local-quantmind bash -c 'mkdir -p "/data/reports/trading_agents/A股市场/{股票名}" && \
   python3 /app/backend/scripts/md_to_pdf_report.py /tmp/report.md \
     "/data/reports/trading_agents/A股市场/{股票名}/{股票名}{code}_{YYYYMMDD}_深度学习分析报告.pdf" && \
   cp /tmp/report.md "/data/reports/trading_agents/A股市场/{股票名}/{股票名}{code}_{YYYYMMDD}_深度学习分析报告.md"'

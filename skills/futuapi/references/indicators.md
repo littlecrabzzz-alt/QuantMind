@@ -40,7 +40,7 @@ python skills/futuapi/scripts/quote/get_indicator_calc_result.py --short-name MA
 - --short-name: 指标短名（对应 IndicatorInfo.shortName，如 MA、MACD、RSI）[必填]
 - --lang: 语言类型：1=MyLang, 2=Python [必填]
 - --kl-file: K 线 JSON 路径（含 code/ktype/data，由 get_kline --json 写出）[必填]
-- --param: 入参覆盖，格式 idx=value（index 从 0 起），可多次使用；不传则使用云端默认配置
+- --param: 入参覆盖，格式 idx=value（index 从 0 起），可多次使用；不传则使用富途指标服务默认配置
 - --num: 截取前 N 条 K 线参与计算（正整数）；省略表示使用全部 K 线
 
 **工作流示例**：
@@ -59,4 +59,4 @@ python skills/futuapi/scripts/quote/get_indicator_calc_result.py --short-name MA
 
 ---
 
-**相关技能路由：** 相关：K线数据 → quote-commands.md；指标云端计算见正文。
+**相关技能路由：** 相关：K线数据 → quote-commands.md；富途指标服务计算见正文。

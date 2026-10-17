@@ -5,17 +5,17 @@ description: "RSS 新闻情绪识别（FinBERT 中文金融情感）安装与运
 
 > ## ⚙️ 运行环境契约（最高优先级，先于本文其余内容执行）
 >
-> 本技能可能运行在 **QuantBot（QwenPaw 容器）** 或**宿主机/本地 Claude Code**。执行前先探测环境（`which docker`、API 连通性），并遵守以下映射规则：
+> QuantMind 只在本地 Mac 运行：主业务由 Library 中已核准运行快照的 `scripts/local-primary.sh` 管理，Main 是开发源码；`local-dev.sh` 沙盒数据独立，不能与主业务同时占用 8000。执行前确认本地 Docker Desktop context、项目和挂载：
 >
-> 1. **后端 API 地址**：QwenPaw / 容器网络内一律用 `http://quantmind:8000`（`quantmind` 是 docker 网络别名）；仅宿主机调试用 `http://127.0.0.1:8000`。正文中出现的 `127.0.0.1:8000`、`localhost:800x`，在 QwenPaw 环境下自动替换为 `http://quantmind:8000`。
-> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**必须在 quantmind 容器内执行**（QwenPaw 本地 venv 无这些依赖）：
+> 1. **后端 API 地址**：主栈 QwenPaw 与后端同在 `quantmind-local_quantmind-net`，使用 Compose 服务名 `http://quantmind:8000`；Mac 宿主机用 `http://127.0.0.1:8000`。正文 API 示例的回环 8000 地址仅在该容器场景替换为服务名；不要改写其他服务端口或 API 路径。
+> 2. **取数脚本执行**：凡 import 了 `pandas / duckdb / psycopg2 / numpy / sqlalchemy` 等重依赖或 `backend` 包的脚本，**在主栈后端容器 `quantmind-local-quantmind` 内执行**（QwenPaw venv 无这些依赖）：
 >    ```bash
->    docker cp <脚本路径> quantmind:/tmp/<脚本名> && docker exec -w /app quantmind python3 /tmp/<脚本名> <参数>
+>    docker cp <脚本路径> quantmind-local-quantmind:/tmp/<脚本名> && docker exec -w /app quantmind-local-quantmind python3 /tmp/<脚本名> <参数>
 >    ```
->    脚本源三选一：宿主机 repo `skills/<name>/scripts/`、QwenPaw 工作区 `/app/working/workspaces/default/skills/<name>/scripts/`、挂载目录 `/quantmind/skills/<name>/scripts/`。纯标准库脚本（无重依赖）可在 QwenPaw 本地直接跑。
+>    脚本优先从当前 QwenPaw 已安装工作区 `/app/working/workspaces/default/skills/<name>/scripts/` 读取；宿主机源码在 Main 的 `skills/<name>/scripts/`。Library 运行快照不默认包含 `skills/`，仅在实际存在且版本匹配时使用 `/quantmind/skills/`。Main 的 `data/db` 不是主业务数据；读写以容器实际挂载为准。纯标准库脚本可在 QwenPaw 内直接跑。
 > 3. **报告落盘**：股票报告页可见的 MD/PDF 报告，直接写 `/data/reports/trading_agents/{市场或类别}/{股票名}/`（QwenPaw 对 `/app/db` 有写权限，**直接写文件，不要 docker cp**）；过程数据 facts 写 `/data/reports/<类别>/`（`/data` 可写）。
 > 4. **MD → PDF 转换（按优先级降级）**：
->    ① `docker exec -w /app quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版，首选）；
+>    ① `docker exec -w /app quantmind-local-quantmind python3 backend/scripts/md_to_pdf_report.py <输入.md> <输出.pdf>`（研报级排版）；
 >    ② docker 不可用时，**改用 QwenPaw 内置 `pdf` 技能**把 MD 转成 PDF；
 >    ③ 两者都不可用则只交付 MD，并明确告知用户 PDF 未能生成及原因。
 > 5. 本文中的 `~/.claude`、`cp -r ... ~/.claude/skills` 等说明仅适用于本地 Claude Code 维护者，**QuantBot 不要执行**。
@@ -67,7 +67,7 @@ Huntly (RSS 抓取, 381 源, 41.5 万文章)
 # 本地
 python3 backend/scripts/import_sentiment_lexicon.py
 # 容器
-docker exec quantmind python3 /app/backend/scripts/import_sentiment_lexicon.py
+docker exec quantmind-local-quantmind python3 /app/backend/scripts/import_sentiment_lexicon.py
 ```
 
 导入后重载 matcher：
@@ -89,7 +89,7 @@ curl -s -X POST -H "$AUTH" "$BASE/api/v1/news/enrichment/run"  # 触发重算
 
 **判断方法**：查 `model_version` 有没有 `+finbert` 后缀。
 ```bash
-docker exec quantmind python3 -c "
+docker exec quantmind-local-quantmind python3 -c "
 import asyncio
 from backend.shared.database_manager_v2 import get_session
 from sqlalchemy import text
@@ -109,34 +109,34 @@ asyncio.run(main())
 
 ### 3.1 检查 transformers 是否在容器里
 ```bash
-docker exec quantmind python3 -c "import transformers; print(transformers.__version__)"
+docker exec quantmind-local-quantmind python3 -c "import transformers; print(transformers.__version__)"
 # celery worker 也要有（enrich/rebuild 在 celery 里跑）
-docker exec quantmind-celery python3 -c "import transformers; print(transformers.__version__)"
+docker exec quantmind-local-celery python3 -c "import transformers; print(transformers.__version__)"
 ```
 
 ### 3.2 缺的话手动装（临时修复，镜像重建后固化）
 ```bash
-docker exec quantmind pip install --no-cache-dir transformers
-docker exec quantmind-celery pip install --no-cache-dir transformers
+docker exec quantmind-local-quantmind pip install --no-cache-dir transformers
+docker exec quantmind-local-celery pip install --no-cache-dir transformers
 ```
 
 ### 3.3 下载/同步 FinBERT 权重（~100MB，离线可用）
 ```bash
 # 触发下载（首次）
-docker exec quantmind python3 -c "
+docker exec quantmind-local-quantmind python3 -c "
 from backend.services.api.news import sentiment as s
 s._model_ready=False; s._model_failed=False
 s._try_load(); print('ready=', s._model_ready)
 "
 # 权重缓存位置: /root/.cache/huggingface/hub/models--bardsai--finance-sentiment-zh-base
 # celery worker 复用（主容器导出 → tar 管道 → celery 导入）
-docker exec quantmind tar -C /root/.cache/huggingface/hub -cf - models--bardsai--finance-sentiment-zh-base \
-  | docker exec -i quantmind-celery sh -c 'mkdir -p /root/.cache/huggingface/hub && tar -C /root/.cache/huggingface/hub -xf -'
+docker exec quantmind-local-quantmind tar -C /root/.cache/huggingface/hub -cf - models--bardsai--finance-sentiment-zh-base \
+  | docker exec -i quantmind-local-celery sh -c 'mkdir -p /root/.cache/huggingface/hub && tar -C /root/.cache/huggingface/hub -xf -'
 ```
 
 ### 3.4 验证 FinBERT 可用
 ```bash
-docker exec quantmind-celery python3 -c "
+docker exec quantmind-local-celery python3 -c "
 import os
 os.environ['HF_HUB_OFFLINE']='1'
 from transformers import pipeline
@@ -150,7 +150,7 @@ print(p('公司业绩暴雷，股价暴跌')[0])   # 期望 label=negative, scor
 docker restart quantmind-celery
 sleep 8
 # 确认后台加载成功
-docker exec quantmind-celery python3 -c "
+docker exec quantmind-local-celery python3 -c "
 from backend.services.api.news import sentiment as s
 s._ensure_loading()
 import time
@@ -191,11 +191,11 @@ curl -s -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/news/enrichment/rebuild-
 1. 改仓库 `backend/scripts/seed_a_share_stocks.py` 的 `_BUILTIN_SENTIMENT_POS/NEG` 常量（已含 2026-08 扩充的 ~80 个词）
 2. 重跑 seed：
 ```bash
-docker exec quantmind python3 /app/backend/scripts/seed_a_share_stocks.py
+docker exec quantmind-local-quantmind python3 /app/backend/scripts/seed_a_share_stocks.py
 ```
 3. 或直接 SQL 插入（幂等，先查后插）：
 ```bash
-docker exec quantmind python3 -c "
+docker exec quantmind-local-quantmind python3 -c "
 import asyncio
 from backend.shared.database_manager_v2 import get_session
 from sqlalchemy import text

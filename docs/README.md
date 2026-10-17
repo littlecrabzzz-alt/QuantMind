@@ -26,15 +26,16 @@ Markdown 链接只用于导航，不会把目标全文内联到编码助手上�
 
 | 指南 | 使用场景 |
 | --- | --- |
-| [数据写入合同](development-data-contract.md) | 区分 Mac 开发、沙盒、现有业务库与固定研究输入，确定写入目的地 |
+| [数据写入合同](development-data-contract.md) | 区分本地主业务、沙盒、采集目录与固定研究输入 |
+| [本地运行](local-primary.md) | 本机业务实例、Library 运行快照、端口与受管启停 |
 | [本地市场数据源](local-market-source.md) | QuantDB、BTC/ETH 日更，固定文件交付、派生计算和失败恢复 |
-| [Tushare 归档](tushare-mac-source.md) | 唯一写入者、研究白名单、供数缓存、权限频控与归档迁移 |
+| [Tushare 归档](tushare-mac-source.md) | 唯一写入者、研究白名单、固定发布、权限频控与归档校验 |
 | [Tushare 原文与 PDF](tushare-document-storage.md) | 下载解析、OCR staging/ingest、hold、收据式退役和中断恢复 |
 | [Binance 产品合同](binance-data-products.md) | 选择产品、资产与时间口径，判断研究准入 |
 | [Binance 操作](binance-data-operations.md) | 增量采集、固定发布、扩池和 Qlib/H5 消费验收 |
 | [存储与恢复](storage-recovery-20261009.md) | 容量、数据库/快照恢复点及派生计算内存故障 |
 | [QuantDB 数据包](QuantDB_数据包解压指南.md) | 在暂存区导入外部数据包，核对挂载和覆盖范围 |
-| [部署](部署指南.md) | 区分本地隔离实例、可选首次安装和已有实例维护 |
+| [运行维护](部署指南.md) | 本机业务运行、隔离开发环境与服务发布维护 |
 | [Electron 编译](Electron编译方案.md) | 运行 workspace 命令，定位构建产物和平台打包问题 |
 
 Tushare 离线回归原料放在 `backend/tests/fixtures/tushare/`，保留原始字节及 SHA 证据链，不作为当前权限或完整历史的证明。配置中 `git:<commit>:<path>` 表示历史证据，可用 `git show <commit>:<path>` 查阅；不是可直接打开的本地文件。
